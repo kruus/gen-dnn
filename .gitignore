@@ -1,4 +1,7 @@
 build
 external
+install
+install.bak
+build.bak
 .*.sw?
 *.log
