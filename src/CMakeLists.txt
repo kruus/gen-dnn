@@ -14,22 +14,36 @@
 # limitations under the License.
 #===============================================================================
 
+MESSAGE(STATUS "src/ TARGET_VANILLA: " ${TARGET_VANILLA})
+if(TARGET_VANILLA)
+    set(CPU_DIR vanilla)
+    #set(CPU_INCLUDE_DIRS)
+else()
+    set(CPU_DIR cpu)
+    set(CPU_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/src/cpu/xbyak")
+endif()
+
 set(TARGET_NAME ${LIB_NAME})
 file(GLOB_RECURSE HEADERS
     ${CMAKE_SOURCE_DIR}/include/*.h
     ${CMAKE_SOURCE_DIR}/include/*.hpp
     )
 file(GLOB_RECURSE SOURCES
-    ${CMAKE_SOURCE_DIR}/src/*.c
-    ${CMAKE_SOURCE_DIR}/src/*.cpp
-    ${CMAKE_SOURCE_DIR}/src/*.h
-    ${CMAKE_SOURCE_DIR}/src/*.hpp
+    ${CMAKE_SOURCE_DIR}/src/common/*.c
+    ${CMAKE_SOURCE_DIR}/src/common/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/common/*.h
+    ${CMAKE_SOURCE_DIR}/src/common/*.hpp
+    ${CMAKE_SOURCE_DIR}/src/${CPU_DIR}/*.c
+    ${CMAKE_SOURCE_DIR}/src/${CPU_DIR}/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/${CPU_DIR}/*.h
+    ${CMAKE_SOURCE_DIR}/src/${CPU_DIR}/*.hpp
     )
 include_directories(
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/common
-    ${CMAKE_SOURCE_DIR}/src/cpu/xbyak
+    ${CPU_INCLUDE_DIRS}
     )
+
 add_library(${TARGET_NAME} SHARED ${HEADERS} ${SOURCES})
 target_link_libraries(${TARGET_NAME} ${${TARGET_NAME}_LINKER_LIBS})
 set_property(TARGET ${TARGET_NAME} PROPERTY CXX_STANDARD 11)

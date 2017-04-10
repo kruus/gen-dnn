@@ -32,6 +32,11 @@ endif()
 include("cmake/MKL.cmake")
 include("cmake/Doxygen.cmake")
 
+option(TARGET_VANILLA "Use only pure C/C++ source_code, no JIT assembler" ON)
+if(TARGET_VANILLA)
+    set(TARGET_DEFS "-DTARGET_VANILLA")
+endif()
+
 # sdl options
 if(UNIX OR APPLE)
     set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -fPIC -Wformat -Wformat-security")
@@ -59,9 +64,9 @@ endif()
 
 set(OPENMP_FLAGS "-fopenmp")
 set(CCXX_WARN_FLAGS "-Wall -Werror -Wno-unknown-pragmas")
-set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} ${OPENMP_FLAGS} ${CCXX_WARN_FLAGS} -DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS -fvisibility=internal")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c99")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c++11 -fvisibility-inlines-hidden")
+set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} ${OPENMP_FLAGS} ${CCXX_WARN_FLAGS} ${TARGET_DEFS} -DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS -fvisibility=internal")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c99 ${TARGET_DEFS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c++11 -fvisibility-inlines-hidden ${TARGET_DEFS}")
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -xHOST")
@@ -72,7 +77,7 @@ enable_testing()
 include_directories(include)
 
 add_subdirectory(src)
-add_subdirectory(examples)
+#add_subdirectory(examples)
 add_subdirectory(tests)
 
 install(FILES LICENSE DESTINATION share/doc/${LIB_NAME})
