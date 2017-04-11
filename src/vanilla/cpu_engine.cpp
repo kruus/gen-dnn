@@ -36,7 +36,7 @@
 #include "ref_softmax.hpp"
 //#include "cpu/jit_uni_pooling.hpp"
 #include "ref_pooling.hpp"
-#include "cpu/nchw_pooling.hpp"
+#include "nchw_pooling.hpp"
 //#include "cpu/jit_avx512_mic_lrn.hpp"
 //#include "cpu/jit_avx2_lrn.hpp"
 #include "ref_lrn.hpp"
@@ -46,7 +46,7 @@
 #include "gemm_inner_product.hpp"
 //#include "cpu/jit_uni_inner_product.hpp"
 //
-#include "cpu/simple_reorder.hpp"
+#include "simple_reorder.hpp"
 
 namespace mkldnn {
 namespace impl {

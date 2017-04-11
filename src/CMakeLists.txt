@@ -14,15 +14,6 @@
 # limitations under the License.
 #===============================================================================
 
-MESSAGE(STATUS "src/ TARGET_VANILLA: " ${TARGET_VANILLA})
-if(TARGET_VANILLA)
-    set(CPU_DIR vanilla)
-    #set(CPU_INCLUDE_DIRS)
-else()
-    set(CPU_DIR cpu)
-    set(CPU_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/src/cpu/xbyak")
-endif()
-
 set(TARGET_NAME ${LIB_NAME})
 file(GLOB_RECURSE HEADERS
     ${CMAKE_SOURCE_DIR}/include/*.h

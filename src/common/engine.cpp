@@ -19,7 +19,11 @@
 #include "nstl.hpp"
 
 #include "c_types_map.hpp"
+#ifdef TARGET_VANILLA
+#include "../vanilla/cpu_engine.hpp"
+#else
 #include "../cpu/cpu_engine.hpp"
+#endif
 
 namespace mkldnn {
 namespace impl {

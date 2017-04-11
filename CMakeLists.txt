@@ -16,8 +16,8 @@
 
 cmake_minimum_required(VERSION 2.8)
 
-set(PROJECT_NAME "Intel(R) MKL-DNN")
-set(PROJECT_FULL_NAME "Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)")
+set(PROJECT_NAME "SX-DNN (Intel(R) MKL-DNN)")
+set(PROJECT_FULL_NAME "SX version of Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)")
 set(PROJECT_VERSION, "0.7")
 
 set(LIB_NAME mkldnn)
@@ -29,13 +29,22 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-include("cmake/MKL.cmake")
-include("cmake/Doxygen.cmake")
-
 option(TARGET_VANILLA "Use only pure C/C++ source_code, no JIT assembler" ON)
 if(TARGET_VANILLA)
     set(TARGET_DEFS "-DTARGET_VANILLA")
 endif()
+MESSAGE(STATUS "src/ TARGET_VANILLA: " ${TARGET_VANILLA})
+if(TARGET_VANILLA)
+    set(CPU_DIR vanilla)
+    #set(CPU_INCLUDE_DIRS)
+else()
+    set(CPU_DIR cpu)
+    set(CPU_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/src/cpu/xbyak")
+endif()
+
+
+include("cmake/MKL.cmake")
+include("cmake/Doxygen.cmake")
 
 # sdl options
 if(UNIX OR APPLE)
@@ -60,6 +69,13 @@ if(UNIX OR APPLE)
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -z noexecstack -z relro -z now")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -z noexecstack -z relro -z now")
     endif()
+endif()
+
+# ok for gcc, others ???
+if(HAVE_MKL)
+    get_filename_component(MKLLIBPATH "${MKLLIB}" PATH) # this one was just not exported by MKL.cmake
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-rpath=${MKLLIBPATH}")
+    message(STATUS "   MKL: shared linker flags: ${CMAKE_SHARED_LINKER_FLAGS}")
 endif()
 
 set(OPENMP_FLAGS "-fopenmp")
