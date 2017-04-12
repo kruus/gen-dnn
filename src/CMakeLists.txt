@@ -24,6 +24,10 @@ file(GLOB_RECURSE SOURCES
     ${CMAKE_SOURCE_DIR}/src/common/*.cpp
     ${CMAKE_SOURCE_DIR}/src/common/*.h
     ${CMAKE_SOURCE_DIR}/src/common/*.hpp
+    ${CMAKE_SOURCE_DIR}/src/io/*.c
+    ${CMAKE_SOURCE_DIR}/src/io/*.cpp
+    ${CMAKE_SOURCE_DIR}/src/io/*.h
+    ${CMAKE_SOURCE_DIR}/src/io/*.hpp
     ${CMAKE_SOURCE_DIR}/src/${CPU_DIR}/*.c
     ${CMAKE_SOURCE_DIR}/src/${CPU_DIR}/*.cpp
     ${CMAKE_SOURCE_DIR}/src/${CPU_DIR}/*.h

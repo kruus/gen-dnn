@@ -2,6 +2,7 @@ build
 external
 install
 install.bak
+install-dbg*
 build.bak
 .*.sw?
 *.log

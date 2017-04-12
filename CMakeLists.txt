@@ -80,7 +80,9 @@ endif()
 
 set(OPENMP_FLAGS "-fopenmp")
 set(CCXX_WARN_FLAGS "-Wall -Werror -Wno-unknown-pragmas")
-set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} ${OPENMP_FLAGS} ${CCXX_WARN_FLAGS} ${TARGET_DEFS} -DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS -fvisibility=internal")
+#set(CCXX_EXTRADEBUG_FLAGS "-g") # TODO separate Release-mode library debuginfo, someday.
+# SIMPLER alternative:           cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo
+set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} ${OPENMP_FLAGS} ${CCXX_EXTRADEBUG_FLAGS} ${CCXX_WARN_FLAGS} ${TARGET_DEFS} -DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS -fvisibility=internal")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c99 ${TARGET_DEFS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c++11 -fvisibility-inlines-hidden ${TARGET_DEFS}")
 
