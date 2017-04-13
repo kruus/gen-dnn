@@ -68,15 +68,21 @@ done
 	    { echo "Build OK... Doxygen (please be patient)"; make doc >& ../doxygen.log; }
     fi
 ) 2>&1 | tee build.log
-BUILDOK="n"; if [ -d 
-(
-    cd build
-    { echo "Installing ..."; make install; }
-) 2>&1 >> build.log
-if [ "$DOTEST" == "y" ]; then
-    (cd build && ARGS='-VV -N' make test \
-	      && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test0.log
-    (cd build && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log
+BUILDOK="n"; if [ -d build/reference/html ]; then BUILDOK="y"; fi # check last thing produced for OK build
+if [ "$BUILDOK" == "y" ]; then
+    (
+        cd build
+        { echo "Installing ..."; make install; }
+    ) 2>&1 >> build.log
+    if [ "$DOTEST" == "y" ]; then
+        echo "Testing ..."
+        (cd build && ARGS='-VV -N' make test \
+	          && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test0.log
+        (cd build && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log
+        echo "Tests done"
+    fi
+else
+    echo "Build NOT OK..."
 fi
 echo "FINISHED:     $ORIGINAL_CMD"
 # for a debug compile  --- FIXME
