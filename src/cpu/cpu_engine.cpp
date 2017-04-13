@@ -13,7 +13,15 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#ifndef JITFUNCS
+#ifdef DOXYGEN_SHOULD_SKIP_THIS
+/** 100: do everything. 0 makes testing VERY VERY slow */
 #define JITFUNCS 0
+#else
+/** document the full version, please */
+#define JITFUNCS 100
+#endif
+#endif
 
 #include <assert.h>
 

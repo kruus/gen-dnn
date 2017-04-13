@@ -8,3 +8,4 @@ build.bak
 *.log
 log-*
 old*
+*.diff

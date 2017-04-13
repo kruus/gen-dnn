@@ -88,9 +88,11 @@ timeoutPID() {
         echo "DOTEST    $DOTEST"
         echo "DODEBUG   $DODEBUG"
         echo "DODOC     $DODOC"
-        # Whatever you are currently debugging can go here
+        # Whatever you are currently debugging can go here ...
         { echo "api-io-c                ..."; time tests/api-io-c                   || BUILDOK="n"; }
-        { echo "simple-training-net-cpp ..."; time examples/simple-training-net-cpp || BUILDOK="n"; }
+        if [ "$DOTEST" == "n" -a "$DOJIT" == "y" ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
+            { echo "simple-training-net-cpp ..."; time examples/simple-training-net-cpp || BUILDOK="n"; }
+        fi
     fi
     if [ "$BUILDOK" == "y" ]; then
         touch ./stamp-BUILDOK
