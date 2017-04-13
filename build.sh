@@ -1,5 +1,6 @@
 #!/bin/bash
 # vim: et ts=4 sw=4
+ORIGINAL_CMD="$0 $*"
 DOVANILLA="y"
 DOJIT="n"
 DOTEST="n"
@@ -50,11 +51,24 @@ done
     CMAKEOPT="${CMAKEOPT} -DFAIL_WITHOUT_MKL=ON"
     # Without MKL, unit tests take **forever**
     #    TODO: cblas / mathkeisan alternatives?
+    BUILDOK="n"
     cmake ${CMAKEOPT} .. && \
 	    make VERBOSE=1 -j8 && \
-	    examples/simple-training-net-cpp && \
-	    { echo "Doxygen (please be patient)"; make doc >& ../doxygen.log; }
+        BUILDOK="y"
+    if [ "$BUILDOK" == "y" ]; then
+        echo "DOVANILLA $DOVANILLA"
+        echo "DOJIT     $DOJIT"
+        echo "DOTEST    $DOTEST"
+        echo "DODEBUG   $DODEBUG"
+        # Whatever you are currently debugging can go here
+        { echo "api-io-c                ..."; time tests/api-io-c                   || BUILDOK="n"; }
+        { echo "simple-training-net-cpp ..."; time examples/simple-training-net-cpp || BUILDOK="n"; }
+    fi
+    if [ "$BUILDOK" == "y" ]; then
+	    { echo "Build OK... Doxygen (please be patient)"; make doc >& ../doxygen.log; }
+    fi
 ) 2>&1 | tee build.log
+BUILDOK="n"; if [ -d 
 (
     cd build
     { echo "Installing ..."; make install; }
@@ -64,6 +78,7 @@ if [ "$DOTEST" == "y" ]; then
 	      && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test0.log
     (cd build && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log
 fi
+echo "FINISHED:     $ORIGINAL_CMD"
 # for a debug compile  --- FIXME
 #(cd build && ARGS='-VV -R .*simple_training-net-cpp' /usr/bin/time -v make test) 2>&1 | tee test1-dbg.log
 #(cd build && ARGS='-VV -R .*simple_training-net-cpp' valgrind make test) 2>&1 | tee test1-valgrind.log

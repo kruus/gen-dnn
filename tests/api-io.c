@@ -51,12 +51,14 @@ static size_t product(int *arr, size_t size) {
 typedef float real_t;
 
 void io0() {
+    // check that snprintf puts a terminating NUL always at buf[len-1] (or before)
     {
         int const len=100;
         char buf[len];
         mkldnn_dims_t d = {1};
         int sz0 = mkldnn_name_dims( d, buf, len );
         CHECK_TRUE(sz0 < len);
+        CHECK_TRUE(buf[sz0] == '\0');
         printf("mkldnn_dims_t d={1} full len %d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
     }
     {
@@ -65,6 +67,7 @@ void io0() {
         mkldnn_dims_t d = {1};
         int sz0 = mkldnn_name_dims( d, buf, len );
         CHECK_TRUE(sz0 < len);
+        CHECK_TRUE(buf[sz0] == '\0');
         printf("mkldnn_dims_t d={1} full len %d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
     }
     {
@@ -73,6 +76,7 @@ void io0() {
         mkldnn_dims_t d = {1};
         int sz0 = mkldnn_name_dims( d, buf, len );
         CHECK_TRUE(sz0 == len);
+        CHECK_TRUE(buf[len-1] == '\0');
         printf("mkldnn_dims_t d={1} full len %d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
     }
     {
@@ -81,6 +85,7 @@ void io0() {
         mkldnn_dims_t d = {1};
         int sz0 = mkldnn_name_dims( d, buf, len );
         CHECK_TRUE(sz0 > len);
+        CHECK_TRUE(buf[len-1] == '\0');
         printf("mkldnn_dims_t d={1} full len %d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
     }
 }
