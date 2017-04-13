@@ -126,6 +126,14 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     nullptr,
 };
 #define INSTANCE(inst) &primitive_desc_t::create<inst::pd_t>
+/** Implementations are tried in order to look for good implementations.
+ * These are object generator functions that all look like
+ * "INSTANCE"(primitive_desc_t*, op_desc_t*, engine_t*, primitive_desc_t* hint).
+ * \file primitive_iterator.cpp iterates over these creation functions in order,
+ * returning ones that return \c mkldnn::impl::success.
+ *
+ * Q: How is a "default" one selected?
+ */
 static const pd_create_f cpu_impl_list[] = {
     /* conv */
     //INSTANCE(jit_avx512_mic_1x1_convolution_fwd_t),

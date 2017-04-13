@@ -1,4 +1,19 @@
-# Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)
+# BRANCH for non-jit version of MKL-DNN, to ease porting API to SX-ACE
+This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
+
+* removes all Intel Jit stuff
+
+* adds some i/o funcs (because I know I will have to debug sooner or later)
+
+- Various build options added
+  - build.sh -h
+- defaults are:
+  - "vanilla" C/C++, and
+  - builds a RelWithDebug libmkldnn.so
+  - creates an ROOTDIR/install/ directory with extensive doxygen docs.
+    - browse at install/share/doc/mkldnn/reference/html/index.html
+
+## Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)
 [![Apache License Version 2.0](https://img.shields.io/badge/license-Apache_2.0-green.svg)](LICENSE)
 ![v0.7 beta](https://img.shields.io/badge/v0.7-beta-orange.svg)
 

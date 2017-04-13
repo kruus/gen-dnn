@@ -29,7 +29,7 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-option(TARGET_VANILLA "Use only pure C/C++ source_code, no JIT assembler" ON)
+option(TARGET_VANILLA "Use only pure C/C++ source_code, no JIT assembler" OFF)
 if(TARGET_VANILLA)
     set(TARGET_DEFS "-DTARGET_VANILLA")
 endif()
