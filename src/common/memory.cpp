@@ -69,17 +69,19 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     case io:
     case oihw:
     case ihwo:
+    case goihw:
+#if 1 // defined(TARGET_JIT)
     case OIhw8i8o:
     case OIhw16i16o:
     case OIhw8o8i:
     case OIhw16o16i:
     case Ohwi8o:
     case Ohwi16o:
-    case goihw:
     case gOIhw8i8o:
     case gOIhw16i16o:
     case gOIhw8o8i:
     case gOIhw16o16i:
+#endif
         status = memory_desc_wrapper::compute_blocking(md);
         break;
     /* not enough information */

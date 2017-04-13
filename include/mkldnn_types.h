@@ -126,6 +126,10 @@ typedef enum {
     /** 4D weights tensor in the format (input channels, width, height,
      * output channels). */
     mkldnn_ihwo,
+    /** 5D weights tensor in the @c oihw format with extra outer dimension for
+     * groups. */
+    mkldnn_goihw,
+#if 1 //defined(TARGET_JIT) ... but tests cover too many of the formats
     /** 4D weights tensor in the @c oihw format with both input and output
      * channels data laid out in memory in 8-element blocks. */
     mkldnn_OIhw8i8o,
@@ -146,9 +150,6 @@ typedef enum {
      * channels) with output channels data laid out in memory in 16-element
      * blocks. */
     mkldnn_Ohwi16o,
-    /** 5D weights tensor in the @c oihw format with extra outer dimension for
-     * groups. */
-    mkldnn_goihw,
     /** 5D weights tensor in the blocked version of @c goihw format with both
      * input and output channels data laid out in memory in 8-element blocks.
      */
@@ -165,6 +166,7 @@ typedef enum {
      * input and output channels data laid out in memory in 16-element blocks.
      */
     mkldnn_gOIhw16o16i,
+#endif
     /** 4D weights tensor in the oihw format with input channels data laid out
      * in memory in 8-element blocks. */
     mkldnn_oIhw8i = mkldnn_nChw8c,

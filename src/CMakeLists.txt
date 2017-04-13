@@ -15,28 +15,39 @@
 #===============================================================================
 
 set(TARGET_NAME ${LIB_NAME})
+
 file(GLOB_RECURSE HEADERS
-    ${CMAKE_SOURCE_DIR}/include/*.h
-    ${CMAKE_SOURCE_DIR}/include/*.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.hpp
     )
 file(GLOB_RECURSE SOURCES
-    ${CMAKE_SOURCE_DIR}/src/common/*.c
-    ${CMAKE_SOURCE_DIR}/src/common/*.cpp
-    ${CMAKE_SOURCE_DIR}/src/common/*.h
-    ${CMAKE_SOURCE_DIR}/src/common/*.hpp
-    ${CMAKE_SOURCE_DIR}/src/io/*.c
-    ${CMAKE_SOURCE_DIR}/src/io/*.cpp
-    ${CMAKE_SOURCE_DIR}/src/io/*.h
-    ${CMAKE_SOURCE_DIR}/src/io/*.hpp
-    ${CMAKE_SOURCE_DIR}/src/${CPU_DIR}/*.c
-    ${CMAKE_SOURCE_DIR}/src/${CPU_DIR}/*.cpp
-    ${CMAKE_SOURCE_DIR}/src/${CPU_DIR}/*.h
-    ${CMAKE_SOURCE_DIR}/src/${CPU_DIR}/*.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/*.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/common/*.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/io/*.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/io/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/io/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/io/*.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/${CPU_DIR}/*.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/${CPU_DIR}/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/${CPU_DIR}/*.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/${CPU_DIR}/*.hpp
     )
+# prefix any directories in CPU_INCLUDE_SUBDIRS with ${CMAKE_CURRENT_SOURCE_DIR}
+set(CPU_INCLUDE_DIRS)
+string(REGEX REPLACE "([^;]+)" "${CMAKE_CURRENT_SOURCE_DIR}/\\1" CPU_INCLUDE_DIRS "${CPU_INCLUDE_SRC_SUBDIRS}")
+message(STATUS " original CPU_INCLUDE_SRC_SUBDIRS : ${CPU_INCLUDE_SRC_SUBDIRS}")
+message(STATUS " extra CPU include directories    : ${CPU_INCLUDE_DIRS}")
+
 include_directories(
-    ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/src/common
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/common
     ${CPU_INCLUDE_DIRS}
+    #   upstream version ...
+    #${CMAKE_CURRENT_SOURCE_DIR}
+    #${CMAKE_CURRENT_SOURCE_DIR}/common
+    #${CMAKE_CURRENT_SOURCE_DIR}/cpu/xbyak
     )
 
 add_library(${TARGET_NAME} SHARED ${HEADERS} ${SOURCES})

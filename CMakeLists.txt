@@ -1,3 +1,4 @@
+# vim: et ts=4 sw=4
 #===============================================================================
 # Copyright 2016 Intel Corporation
 #
@@ -30,16 +31,20 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "")
 endif()
 
 option(TARGET_VANILLA "Use only pure C/C++ source_code, no JIT assembler" OFF)
+set(TARGET_JIT OFF)
 if(TARGET_VANILLA)
     set(TARGET_DEFS "-DTARGET_VANILLA")
+    set(TARGET_JIT OFF)
+else()
+    set(TARGET_DEFS "-DTARGET_XXJIT") # I removed this because too many tests involve the JIT formats
 endif()
 MESSAGE(STATUS "src/ TARGET_VANILLA: " ${TARGET_VANILLA})
 if(TARGET_VANILLA)
     set(CPU_DIR vanilla)
-    #set(CPU_INCLUDE_DIRS)
+    #set(CPU_INCLUDE_SRC_SUBDIRS)
 else()
     set(CPU_DIR cpu)
-    set(CPU_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/src/cpu/xbyak")
+    set(CPU_INCLUDE_SRC_SUBDIRS cpu/xbyak) # this can be a list of subdirectories of src/
 endif()
 
 
@@ -83,8 +88,8 @@ set(CCXX_WARN_FLAGS "-Wall -Werror -Wno-unknown-pragmas")
 #set(CCXX_EXTRADEBUG_FLAGS "-g") # TODO separate Release-mode library debuginfo, someday.
 # SIMPLER alternative:           cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo
 set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} ${OPENMP_FLAGS} ${CCXX_EXTRADEBUG_FLAGS} ${CCXX_WARN_FLAGS} ${TARGET_DEFS} -DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS -fvisibility=internal")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c99 ${TARGET_DEFS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c++11 -fvisibility-inlines-hidden ${TARGET_DEFS}")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c99")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c++11 -fvisibility-inlines-hidden")
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -xHOST")

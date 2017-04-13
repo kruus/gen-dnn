@@ -105,6 +105,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     simple_reorder_t<f32, nchw, f32, nhwc, fmt_order::keep>::pd_t::create,
     simple_reorder_t<f32, nchw, f32, nhwc, fmt_order::reverse>::pd_t::create,
     // Intel jit types ...
+#if 1 // defined(TARGET_JIT)
     simple_reorder_t<f32, oihw, f32, OIhw8i8o, fmt_order::keep>::pd_t::create,
     simple_reorder_t<f32, oihw, f32, OIhw8i8o, fmt_order::reverse>::pd_t::create,
     simple_reorder_t<f32, oihw, f32, OIhw16i16o, fmt_order::keep>::pd_t::create,
@@ -121,6 +122,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     simple_reorder_t<f32, gOIhw8i8o, f32, gOIhw8o8i, fmt_order::reverse>::pd_t::create,
     simple_reorder_t<f32, gOIhw16i16o, f32, gOIhw16o16i, fmt_order::keep>::pd_t::create,
     simple_reorder_t<f32, gOIhw16i16o, f32, gOIhw16o16i, fmt_order::reverse>::pd_t::create,
+#endif
     //
     simple_reorder_t<f32, any, f32, any, fmt_order::any, spec::reference>::pd_t::create,
     nullptr,
@@ -169,8 +171,8 @@ static const pd_create_f cpu_impl_list[] = {
     //INSTANCE(jit_uni_pooling_bwd_t<avx512_mic>),
     //INSTANCE(jit_uni_pooling_fwd_t<avx2>),
     //INSTANCE(jit_uni_pooling_bwd_t<avx2>),
-    INSTANCE(nchw_pooling_fwd_t<data_type::f32>),
-    INSTANCE(nchw_pooling_bwd_t<data_type::f32>),
+//    INSTANCE(nchw_pooling_fwd_t<data_type::f32>),
+//    INSTANCE(nchw_pooling_bwd_t<data_type::f32>),
     INSTANCE(ref_pooling_fwd_t<data_type::f32>),
     INSTANCE(ref_pooling_bwd_t<data_type::f32>),
     /* lrn */
@@ -190,9 +192,9 @@ static const pd_create_f cpu_impl_list[] = {
     /* inner product */
     //INSTANCE(jit_uni_inner_product_fwd_t<avx512_mic>),
     //INSTANCE(jit_uni_inner_product_fwd_t<avx2>),
-    INSTANCE(gemm_inner_product_fwd_t<data_type::f32>),
-    INSTANCE(gemm_inner_product_bwd_data_t<data_type::f32>),
-    INSTANCE(gemm_inner_product_bwd_weights_t<data_type::f32>),
+//    INSTANCE(gemm_inner_product_fwd_t<data_type::f32>),
+//    INSTANCE(gemm_inner_product_bwd_data_t<data_type::f32>),
+//    INSTANCE(gemm_inner_product_bwd_weights_t<data_type::f32>),
     //INSTANCE(jit_uni_inner_product_bwd_weights_t<avx512_mic>),
     //INSTANCE(jit_uni_inner_product_bwd_data_t<avx512_mic>),
     //INSTANCE(jit_uni_inner_product_bwd_weights_t<avx2>),

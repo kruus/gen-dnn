@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#define JITFUNCS 0
 
 #include <assert.h>
 
@@ -126,6 +127,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
 #define INSTANCE(inst) &primitive_desc_t::create<inst::pd_t>
 static const pd_create_f cpu_impl_list[] = {
     /* conv */
+#if JITFUNCS > 99
     INSTANCE(jit_avx512_mic_1x1_convolution_fwd_t),
     INSTANCE(jit_avx512_mic_1x1_convolution_bwd_data_t),
     INSTANCE(jit_avx512_mic_convolution_fwd_t),
@@ -142,60 +144,75 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_gemm_convolution_bwd_data_t),
     INSTANCE(jit_gemm_convolution_bwd_weights_t),
     INSTANCE(jit_sse42_convolution_fwd_t),
+#endif
     INSTANCE(ref_convolution_fwd_t<data_type::f32>),
     INSTANCE(ref_convolution_bwd_data_t<data_type::f32>),
     INSTANCE(ref_convolution_bwd_weights_t<data_type::f32>),
     /* relu */
+#if JITFUNCS > 99
     INSTANCE(jit_uni_relu_fwd_t<avx512_mic>),
     INSTANCE(jit_uni_relu_bwd_t<avx512_mic>),
     INSTANCE(jit_uni_relu_fwd_t<avx2>),
     INSTANCE(jit_uni_relu_bwd_t<avx2>),
+#endif
     INSTANCE(ref_relu_fwd_t<data_type::f32>),
     INSTANCE(ref_relu_bwd_t<data_type::f32>),
     /* softmax */
     INSTANCE(ref_softmax_fwd_t<data_type::f32>),
     /* pool */
+#if JITFUNCS > 99
     INSTANCE(jit_uni_pooling_fwd_t<avx512_mic>),
     INSTANCE(jit_uni_pooling_bwd_t<avx512_mic>),
     INSTANCE(jit_uni_pooling_fwd_t<avx2>),
     INSTANCE(jit_uni_pooling_bwd_t<avx2>),
+#endif
     INSTANCE(nchw_pooling_fwd_t<data_type::f32>),
     INSTANCE(nchw_pooling_bwd_t<data_type::f32>),
     INSTANCE(ref_pooling_fwd_t<data_type::f32>),
     INSTANCE(ref_pooling_bwd_t<data_type::f32>),
     /* lrn */
+#if JITFUNCS > 99
     INSTANCE(jit_avx512_mic_lrn_fwd_t),
     INSTANCE(jit_avx512_mic_lrn_bwd_t),
     INSTANCE(jit_avx2_lrn_fwd_t),
     INSTANCE(jit_avx2_lrn_bwd_t),
+#endif
     INSTANCE(ref_lrn_fwd_t<data_type::f32>),
     INSTANCE(ref_lrn_bwd_t<data_type::f32>),
     /* batch normalization */
+#if JITFUNCS > 99
     INSTANCE(jit_uni_batch_normalization_fwd_t<avx512_mic>),
     INSTANCE(jit_uni_batch_normalization_bwd_t<avx512_mic>),
     INSTANCE(jit_uni_batch_normalization_fwd_t<avx2>),
     INSTANCE(jit_uni_batch_normalization_bwd_t<avx2>),
+#endif
     INSTANCE(ref_batch_normalization_fwd_t<data_type::f32>),
     INSTANCE(ref_batch_normalization_bwd_t<data_type::f32>),
     /* inner product */
+#if JITFUNCS > 99
     INSTANCE(jit_uni_inner_product_fwd_t<avx512_mic>),
     INSTANCE(jit_uni_inner_product_fwd_t<avx2>),
+#endif
     INSTANCE(gemm_inner_product_fwd_t<data_type::f32>),
     INSTANCE(gemm_inner_product_bwd_data_t<data_type::f32>),
     INSTANCE(gemm_inner_product_bwd_weights_t<data_type::f32>),
+#if JITFUNCS > 99
     INSTANCE(jit_uni_inner_product_bwd_weights_t<avx512_mic>),
     INSTANCE(jit_uni_inner_product_bwd_data_t<avx512_mic>),
     INSTANCE(jit_uni_inner_product_bwd_weights_t<avx2>),
     INSTANCE(jit_uni_inner_product_bwd_data_t<avx2>),
+#endif
     INSTANCE(ref_inner_product_fwd_t<data_type::f32>),
     INSTANCE(ref_inner_product_bwd_data_t<data_type::f32>),
     INSTANCE(ref_inner_product_bwd_weights_t<data_type::f32>),
     /* conv_relu */
+#if JITFUNCS > 99
     INSTANCE(jit_avx2_1x1_convolution_relu_t),
     INSTANCE(jit_sse42_1x1_convolution_relu_t),
     INSTANCE(jit_avx2_convolution_relu_t),
     INSTANCE(jit_gemm_convolution_relu_t),
     INSTANCE(jit_sse42_convolution_relu_t),
+#endif
     INSTANCE(ref_convolution_relu_t<data_type::f32>),
     nullptr,
 };

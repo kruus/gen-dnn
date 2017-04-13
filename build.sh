@@ -5,6 +5,7 @@ DOVANILLA="y"
 DOJIT="n"
 DOTEST="n"
 DODEBUG="n"
+DODOC="y"
 usage() { echo "$0 usage:" && head -n 30 "$0" | grep " .)\ #"; exit 0; }
 while getopts ":htvijd" arg; do
     case $arg in
@@ -20,17 +21,42 @@ while getopts ":htvijd" arg; do
         d) # [no] debug release
             DODEBUG="y"
             ;;
+        q) # quick: skip doxygen docs [default: run doxygen if build OK]
+            DODOC="n"
+            ;;
         h | *) # help
             usage
             ;;
     esac
     shift
 done
+timeoutPID() {
+    PID="$1"
+    timeout="$2"
+    interval=1
+    delay=1
+    (
+        ((t = timeout))
+
+        while ((t > 0)); do
+            sleep $interval
+            kill -0 $$ || exit 0
+            ((t -= interval))
+        done
+
+        # Be nice, post SIGTERM first.
+        # The 'exit 0' below will be executed if any preceeding command fails.
+        kill -s SIGTERM $$ && kill -0 $$ || exit 0
+        sleep $delay
+        kill -s SIGKILL $$
+    ) 2> /dev/null &
+}
 (
     echo "DOVANILLA $DOVANILLA"
     echo "DOJIT     $DOJIT"
     echo "DOTEST    $DOTEST"
     echo "DODEBUG   $DODEBUG"
+    echo "DODOC     $DODOC"
     if [ -d build ]; then rm -rf build.bak && mv -v build build.bak; fi
     if [ -d install ]; then rm -rf install.bak && mv -v install install.bak; fi
     mkdir build
@@ -52,6 +78,7 @@ done
     # Without MKL, unit tests take **forever**
     #    TODO: cblas / mathkeisan alternatives?
     BUILDOK="n"
+    rm -f ./stamp-BUILDOK
     cmake ${CMAKEOPT} .. && \
 	    make VERBOSE=1 -j8 && \
         BUILDOK="y"
@@ -60,15 +87,20 @@ done
         echo "DOJIT     $DOJIT"
         echo "DOTEST    $DOTEST"
         echo "DODEBUG   $DODEBUG"
+        echo "DODOC     $DODOC"
         # Whatever you are currently debugging can go here
         { echo "api-io-c                ..."; time tests/api-io-c                   || BUILDOK="n"; }
         { echo "simple-training-net-cpp ..."; time examples/simple-training-net-cpp || BUILDOK="n"; }
     fi
     if [ "$BUILDOK" == "y" ]; then
-	    { echo "Build OK... Doxygen (please be patient)"; make doc >& ../doxygen.log; }
+        touch ./stamp-BUILDOK
+        if [ "$DODOC" == "y" ]; then
+            echo "Build OK... Doxygen (please be patient)"
+            make doc >& ../doxygen.log
+        fi
     fi
 ) 2>&1 | tee build.log
-BUILDOK="n"; if [ -d build/reference/html ]; then BUILDOK="y"; fi # check last thing produced for OK build
+BUILDOK="n"; if [ -f build/stamp-BUILDOK ]; then BUILDOK="y"; fi # check last thing produced for OK build
 if [ "$BUILDOK" == "y" ]; then
     (
         cd build

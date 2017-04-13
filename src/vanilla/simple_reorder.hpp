@@ -188,6 +188,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     }
 };
 
+#if 1 // defined(TARGET_JIT)
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<
@@ -270,7 +271,9 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         return success;
     }
 };
+#endif // JIT
 
+#if 1 // defined(TARGET_JIT)
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<
@@ -330,6 +333,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         return success;
     }
 };
+#endif // JIT
 
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
