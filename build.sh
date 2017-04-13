@@ -1,10 +1,11 @@
 #!/bin/bash
+# vim: et ts=4 sw=4
 DOVANILLA="y"
 DOJIT="n"
 DOTEST="n"
 DODEBUG="n"
 usage() { echo "$0 usage:" && head -n 30 "$0" | grep " .)\ #"; exit 0; }
-while getopts ":ht" arg; do
+while getopts ":htvijd" arg; do
     case $arg in
         t) # [no] Run tests (tens of minutes)
             DOTEST="y"
@@ -12,7 +13,7 @@ while getopts ":ht" arg; do
         v) # [yes] (src/vanilla C/C++ only: no src/cpu JIT assembler)
             DOVANILLA="y"; DOJIT="n"
             ;;
-        i) # [no] Intel (src/cpu JIT assembly version)
+        i | j) # [no] Intel JIT (src/cpu JIT assembly version)
             DOVANILLA="n"; DOJIT="y"
             ;;
         d) # [no] debug release
@@ -25,6 +26,10 @@ while getopts ":ht" arg; do
     shift
 done
 (
+    echo "DOVANILLA $DOVANILLA"
+    echo "DOJIT     $DOJIT"
+    echo "DOTEST    $DOTEST"
+    echo "DODEBUG   $DODEBUG"
     if [ -d build ]; then rm -rf build.bak && mv -v build build.bak; fi
     if [ -d install ]; then rm -rf install.bak && mv -v install install.bak; fi
     mkdir build
@@ -62,4 +67,3 @@ fi
 # for a debug compile  --- FIXME
 #(cd build && ARGS='-VV -R .*simple_training-net-cpp' /usr/bin/time -v make test) 2>&1 | tee test1-dbg.log
 #(cd build && ARGS='-VV -R .*simple_training-net-cpp' valgrind make test) 2>&1 | tee test1-valgrind.log
-#vim: et ts=4 sw=4
