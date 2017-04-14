@@ -1,7 +1,7 @@
-# BRANCH for non-jit version of MKL-DNN, to ease porting API to SX-ACE
+# BRANCH for non-jit version of MKL-DNN, to ease porting API to non-Intel platforms
 This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
 
-* removes all Intel Jit stuff
+* can remove all Intel Jit stuff
 
 * adds some i/o funcs (because I know I will have to debug sooner or later)
 
@@ -12,6 +12,12 @@ This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
   - builds a RelWithDebug libmkldnn.so
   - creates an ROOTDIR/install/ directory with extensive doxygen docs.
     - browse at install/share/doc/mkldnn/reference/html/index.html
+- So far, I've added some debug stuff, a build.sh to build original/vanilla
+  - I plan to add some slightly faster C++ impls (because the reference ones
+    seem to be "gold standard" readable impls, rather than trying hard to be
+    fast)
+- I might try some C++ versions of Winograd convolution, if I have time.
+- There are no plans to put low-level impls for other chips into this public repo
 
 ## Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)
 [![Apache License Version 2.0](https://img.shields.io/badge/license-Apache_2.0-green.svg)](LICENSE)
