@@ -105,7 +105,27 @@ void io0() {
       printf("%s\n",
              mkldnn_name_stream_kind(mkldnn_lazy));
     }
-        
+    { // print some more complicated structures
+#define BUFPRT( VAR, TYPENAME ) do \
+        { \
+            int const len=256; \
+            char buf[len]; \
+            mkldnn_name_##TYPENAME( VAR, buf, len ); \
+            printf(" " #TYPENAME " = <%s>\n", &buf[0] ); \
+        }while(0)
+        mkldnn_dims_t dims={1,2,3,4,0};
+        BUFPRT( dims, dims );
+
+        mkldnn_strides_t strides={1,2,0,3,4};
+        BUFPRT( strides, strides );
+
+#define BATCH 256
+        int conv_src_sizes[4] = {BATCH, 3, 227, 227}; // C-API: must be non-const?
+        mkldnn_memory_desc_t conv_src_md;
+        CHECK(mkldnn_memory_desc_init( &conv_src_md, 4, conv_src_sizes,
+                                       mkldnn_f32, mkldnn_any));
+        BUFPRT( &conv_src_md, memory_desc );
+    }
 }
 
 void test1() {

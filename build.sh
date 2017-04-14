@@ -10,14 +10,14 @@ usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
     awk '/getopts/{flag=1;next} /done/{flag=0} flag&&/^[^#]+) #/; flag&&/^ *# /' $0
-    echo "Example: full test run, debug compile---     $0 -dtt"
+    echo "Example: time a full test run for a debug compilation --- time $0 -dtt"
     exit 0
 }
 while getopts ":htvijdq" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
-            # 1: examples ~  1 min  (jit), 15 min (vanilla)
+            # 1: examples ~  1 min  (jit), 16 min (vanilla)
             # 2: test_*   ~ 10 mins (jit), 10 hrs (vanilla)
             DOTEST=$(( DOTEST + 1 ))
             ;;
@@ -135,7 +135,7 @@ fi
 echo "DOVANILLA=${DOVANILLA}, DOJIT=${DOJIT}, DOTEST=${DOTEST}, DODEBUG=${DODEBUG}, DODOC=${DODOC}"
 if [ "$DOTEST" == "y" ]; then
     LOGDIR="log-${DOVANILLA}${DOJIT}${DOTEST}${DODEBUG}${DODOC}"
-    echo "LOGDIR:       ${LOGDIR}" 2>&1 >> build.log
+    echo "LOGDIR:       ${LOGDIR}" 2>&1 | tee build.log
 fi
 if [ "$DOTEST" == "y" ]; then
     if [ -d "${LOGDIR}" ]; then mv "${LOGDIR}" "${LOGDIR}.bak"; fi
@@ -144,7 +144,7 @@ if [ "$DOTEST" == "y" ]; then
         cp -av "${f}" "${LOGDIR}/"
     done
 fi
-echo "FINISHED:     $ORIGINAL_CMD" 2>&1 >> build.log
+echo "FINISHED:     $ORIGINAL_CMD" 2>&1 | tee build.log
 # for a debug compile  --- FIXME
 #(cd build && ARGS='-VV -R .*simple_training-net-cpp' /usr/bin/time -v make test) 2>&1 | tee test1-dbg.log
 #(cd build && ARGS='-VV -R .*simple_training-net-cpp' valgrind make test) 2>&1 | tee test1-valgrind.log

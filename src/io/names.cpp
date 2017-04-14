@@ -4,6 +4,7 @@
 
 #include <cstdio> // snprintf
 #include <cstring>
+#include <assert.h>     // debug mode array bounds check (silently trimmed in Release mode)
 
 //#ifdef __cplusplus
 //extern "C"
@@ -197,7 +198,7 @@ NAMEENUM_T(stream_kind){
 // paranoia: set NUL into last char explicitly
 //#define CHKBUF do{ ret+=n; printf(" n,ret=%d,%d",n,ret); if( n>len ){b[len-1]='\0'; len=0;} else {b+=n; len-=n;}}while(0)
 // actually, it seems that snprintf always zero-terminates string overflow properly (GOOD)
-#define CHKBUF do{ ret+=n; printf(" n,ret=%d,%d",n,ret); if( n>len ){/*b[len-1]='\0';*/ len=0;} else {b+=n; len-=n;}}while(0)
+#define CHKBUF do{ ret+=n; /*printf(" n,ret=%d,%d",n,ret);*/ if( n>len ){/*b[len-1]='\0';*/ len=0;} else {b+=n; len-=n;}}while(0)
 #define SCAN_LASTNZ( ARR, SZ ) do{lastnz= -1; for(int i=0; i<(SZ); ++i){ if( ARR[i] > 0 ){ lastnz=i; }}}while(0)
 #define ARR_NZ( ARR, NSCAN, FMTSPEC ) do{ \
     int lastnz= -1; SCAN_LASTNZ( ARR, NSCAN ); \
@@ -238,6 +239,24 @@ int mkldnn_name_dims( mkldnn_dims_t const dims, char *const buf, int len){ /* no
     return ret;
 #undef DBG
 }
+int mkldnn_name_dims_sz( mkldnn_dims_t const dims, size_t sz, char *const buf, int len){ /* no macro - mkldnn_dims_t is already a ptr */
+    int ret = 0;
+    char * b = buf;
+    if( sz > TENSOR_MAX_DIMS ){
+        assert(sz <= TENSOR_MAX_DIMS);
+        sz = TENSOR_MAX_DIMS;
+    }
+    {int n = snprintf(b,len, "dims:"); CHKBUF;}
+    if(dims == nullptr){
+        {int n = snprintf(b,len,"NULL"); CHKBUF;}
+    }else{
+        for(size_t i=0; i<sz; ++i){
+            {int n = snprintf(b,len, "%c%d",(i==0?'{':','),dims[i]); CHKBUF;}
+        }
+        {int n = snprintf(b,len,"}"); CHKBUF;}
+    }
+    return ret;
+}
 int mkldnn_name_strides( mkldnn_strides_t const strides, char *const buf, int len){ /* no macro - mkldnn_strides_t is already a ptr */
     int ret = 0;
     char * b = buf;
@@ -246,6 +265,25 @@ int mkldnn_name_strides( mkldnn_strides_t const strides, char *const buf, int le
         {int n = snprintf(b,len,"NULL"); CHKBUF;}
     }else{
         ARR_NZ( strides, TENSOR_MAX_DIMS, "%td" );
+    }
+    return ret;
+}
+int mkldnn_name_strides_sz( mkldnn_strides_t const strides, size_t sz, char *const buf, int len){ /* no macro - mkldnn_strides_t is already a ptr */
+    assert(sz < TENSOR_MAX_DIMS);
+    int ret = 0;
+    char * b = buf;
+    if( sz > TENSOR_MAX_DIMS ){
+        assert(sz <= TENSOR_MAX_DIMS);
+        sz = TENSOR_MAX_DIMS;
+    }
+    {int n = snprintf(b,len, "strides:"); CHKBUF;}
+    if(strides == nullptr){
+        {int n = snprintf(b,len,"NULL"); CHKBUF;}
+    }else{
+        for(size_t i=0; i<sz; ++i){
+            {int n = snprintf(b,len, "%c%td",(i==0?'{':','),strides[i]); CHKBUF;}
+        }
+        {int n = snprintf(b,len,"}"); CHKBUF;}
     }
     return ret;
 }
@@ -278,18 +316,25 @@ int mkldnn_name_memory_desc( mkldnn_memory_desc_t const *md, char * const buf, i
     if(md == nullptr){
         {int n = snprintf(b,len,"NULL"); CHKBUF;}
     }else{
-        {int n = snprintf(b,len, "memory_desc:%s,dims=%d,%s,%s"
+        {int n = snprintf(b,len, "%s,%d,%s,%s"
                           , mkldnn_name_primitive_kind(md->primitive_kind)
                           , md->ndims
                           , mkldnn_name_data_type(md->data_type)
                           , mkldnn_name_memory_format(md->format)
                          ); CHKBUF;}
         /* md->dims */
-        {int n = snprintf(b,len, ",dims"); CHKBUF;}
+        {int n = snprintf(b,len, ",dims="); CHKBUF;}
+#if 0 // wrong: mkl-dnn can leave garbage in higher dims
+        {int n = mkldnn_name_dims( md->dims, b,len ); CHKBUF;}
+#elif 1
+        {int n = mkldnn_name_dims_sz( md->dims, md->ndims, b,len ); CHKBUF;} // added a new func
+#else
         for(int i=0; i<md->ndims; ++i){
             {int n = snprintf(b,len, "%c%d",(i==0?'{':','),md->dims[i]); CHKBUF;}
         }
-        /* */
+        {int n = snprintf(b,len, "}"); CHKBUF;}
+#endif
+        /* TODO: There is a REAL FUNCTION to do this correctly ! */
         if(md->format == mkldnn_blocked){ /* md->blocking  (optional: for memory formats that use them) */
             {int n = mkldnn_name_blocking_desc( &md->layout_desc.blocking, b, len ); CHKBUF; }
         }

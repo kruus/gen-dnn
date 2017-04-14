@@ -38,8 +38,12 @@ NAMEENUM_T(query);
 #define NAMEFUNC_T( TYPENAME ) int MKLDNN_API mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const *, char * const buf, int len )
 /** int[TENSOR_MAX_DIMS (already a ptr type) */
 int MKLDNN_API mkldnn_name_dims( mkldnn_dims_t const dims, char *const buf, int len);
+/** print \c dims with \c sz elements. */
+int mkldnn_name_dims_sz( mkldnn_dims_t const dims, size_t sz, char *const buf, int len);
 /** ptrdiff_t[TENSOR_MAX_DIMS (already a ptr type) */
-int MKLDNN_API mkldnn_name_strides( mkldnn_strides_t const dims, char *const buf, int len);
+int MKLDNN_API mkldnn_name_strides( mkldnn_strides_t const strides, char *const buf, int len);
+/** print \c strides with \c sz elements. */
+int MKLDNN_API mkldnn_name_strides_sz( mkldnn_strides_t const strides, size_t sz, char *const buf, int len);
 int MKLDNN_API mkldnn_name_blocking_desc( mkldnn_blocking_desc_t const *bd, char * const buf, int len);
 int MKLDNN_API mkldnn_name_memory_desc( mkldnn_memory_desc_t const *md, char * const buf, int len);
 // now ways to print "C" structures
