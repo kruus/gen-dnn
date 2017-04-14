@@ -2,21 +2,30 @@
 # vim: et ts=4 sw=4
 ORIGINAL_CMD="$0 $*"
 DOVANILLA="y"
-DOJIT="n"
-DOTEST="n"
+DOJIT=0
+DOTEST=0
 DODEBUG="n"
 DODOC="y"
-usage() { echo "$0 usage:" && head -n 30 "$0" | grep " .)\ #"; exit 0; }
-while getopts ":htvijd" arg; do
+usage() {
+    echo "$0 usage:"
+    #head -n 30 "$0" | grep "^[^#]*.)\ #"
+    awk '/getopts/{flag=1;next} /done/{flag=0} flag&&/^[^#]+) #/; flag&&/^ *# /' $0
+    echo "Example: full test run, debug compile---     $0 -dtt"
+    exit 0
+}
+while getopts ":htvijdq" arg; do
+    #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
-        t) # [no] Run tests (tens of minutes)
-            DOTEST="y"
+        t) # [0] increment test level: (1) examples, (2) tests (longer), ...
+            # 1: examples ~  1 min  (jit), 15 min (vanilla)
+            # 2: test_*   ~ 10 mins (jit), 10 hrs (vanilla)
+            DOTEST=$(( DOTEST + 1 ))
             ;;
         v) # [yes] (src/vanilla C/C++ only: no src/cpu JIT assembler)
-            DOVANILLA="y"; DOJIT="n"
+            DOVANILLA="y"; DOJIT=0
             ;;
-        i | j) # [no] Intel JIT (src/cpu JIT assembly version)
-            DOVANILLA="n"; DOJIT="y"
+    i | j) # [no] Intel JIT (src/cpu JIT assembly version)
+            DOVANILLA="n"; DOJIT=100 # 100 means all JIT funcs enabled
             ;;
         d) # [no] debug release
             DODEBUG="y"
@@ -24,7 +33,7 @@ while getopts ":htvijd" arg; do
         q) # quick: skip doxygen docs [default: run doxygen if build OK]
             DODOC="n"
             ;;
-        h | *) # help
+    h | *) # help
             usage
             ;;
     esac
@@ -63,6 +72,7 @@ timeoutPID() {
     cd build
     #
     CMAKEOPT=''
+    CMAKEOPT="${CMAKEOPT} -DCMAKE_CCXX_FLAGS=-DJITFUNCS=${DOJIT}"
     if [ "$DOVANILLA" == "y" ]; then
         CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
     fi
@@ -79,6 +89,7 @@ timeoutPID() {
     #    TODO: cblas / mathkeisan alternatives?
     BUILDOK="n"
     rm -f ./stamp-BUILDOK
+    echo "cmake ${CMAKEOPT} .."
     cmake ${CMAKEOPT} .. && \
 	    make VERBOSE=1 -j8 && \
         BUILDOK="y"
@@ -89,7 +100,7 @@ timeoutPID() {
         echo "DODEBUG   $DODEBUG"
         echo "DODOC     $DODOC"
         # Whatever you are currently debugging can go here ...
-        { echo "api-io-c                ..."; time tests/api-io-c                   || BUILDOK="n"; }
+        { echo "api-io-c                ..."; time tests/api-io-c || BUILDOK="n"; }
         if [ "$DOTEST" == "n" -a "$DOJIT" == "y" ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
             { echo "simple-training-net-cpp ..."; time examples/simple-training-net-cpp || BUILDOK="n"; }
         fi
@@ -108,15 +119,27 @@ if [ "$BUILDOK" == "y" ]; then
         cd build
         { echo "Installing ..."; make install; }
     ) 2>&1 >> build.log
-    if [ "$DOTEST" == "y" ]; then
+    if [ "$DOTEST" > 0 ]; then
         echo "Testing ..."
-        (cd build && ARGS='-VV -N' make test \
-	          && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test0.log
         (cd build && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log
+        if [ "$DOTEST" > 1 ]; then
+            (cd build && ARGS='-VV -N' make test \
+                && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test2.log
+        fi
         echo "Tests done"
     fi
 else
     echo "Build NOT OK..."
+fi
+echo "DOVANILLA=${DOVANILLA}, DOJIT=${DOJIT}, DOTEST=${DOTEST}, DODEBUG=${DODEBUG}, DODOC=${DODOC}"
+if [ "$DOTEST" == "y" ]; then
+    LOGDIR="log-${DOVANILLA}${DOJIT}${DOTEST}${DODEBUG}${DODOC}"
+    if [ -d "${LOGDIR}" ]; then mv "${LOGDIR}" "${LOGDIR}.bak"; fi
+    mkdir ${LOGDIR}
+    for f in build.log test1.log test2.log; do
+        cp -av "${f}" "${LOGDIR}/"
+    done
+    echo "LOGDIR:       ${LOGDIR}"
 fi
 echo "FINISHED:     $ORIGINAL_CMD"
 # for a debug compile  --- FIXME

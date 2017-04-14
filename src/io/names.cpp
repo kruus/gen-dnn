@@ -194,7 +194,10 @@ NAMEENUM_T(stream_kind){
 
 
 #define NAMEFUNC_T( TYPENAME, VAR ) int kldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const *VAR, char * const buf, int len )
-#define CHKBUF do{ ret+=n; printf(" n,ret=%d,%d",n,ret); if( n>len ){b[len-1]='\0'; len=0;} else {b+=n; len-=n;}}while(0)
+// paranoia: set NUL into last char explicitly
+//#define CHKBUF do{ ret+=n; printf(" n,ret=%d,%d",n,ret); if( n>len ){b[len-1]='\0'; len=0;} else {b+=n; len-=n;}}while(0)
+// actually, it seems that snprintf always zero-terminates string overflow properly (GOOD)
+#define CHKBUF do{ ret+=n; printf(" n,ret=%d,%d",n,ret); if( n>len ){/*b[len-1]='\0';*/ len=0;} else {b+=n; len-=n;}}while(0)
 #define SCAN_LASTNZ( ARR, SZ ) do{lastnz= -1; for(int i=0; i<(SZ); ++i){ if( ARR[i] > 0 ){ lastnz=i; }}}while(0)
 #define ARR_NZ( ARR, NSCAN, FMTSPEC ) do{ \
     int lastnz= -1; SCAN_LASTNZ( ARR, NSCAN ); \

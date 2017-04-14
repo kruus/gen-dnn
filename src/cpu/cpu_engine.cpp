@@ -16,6 +16,7 @@
 #ifndef JITFUNCS
 #ifdef DOXYGEN_SHOULD_SKIP_THIS
 /** 100: do everything. 0 makes testing VERY VERY slow */
+//#define JITFUNCS 100
 #define JITFUNCS 0
 #else
 /** document the full version, please */
