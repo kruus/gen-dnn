@@ -17,8 +17,9 @@ while getopts ":htvijdq" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
-            # 1: examples ~  1 min  (jit), 16 min (vanilla)
-            # 2: test_*   ~ 10 mins (jit), 10 hrs (vanilla)
+            # 0: build    ~ ?? min  (jit), 1 min (vanilla)
+            # 1: examples ~  1 min  (jit), 12-16  mins (vanilla)
+            # 2: test_*   ~ 10 mins (jit), 80 mins (vanilla)
             DOTEST=$(( DOTEST + 1 ))
             ;;
         v) # [yes] (src/vanilla C/C++ only: no src/cpu JIT assembler)
@@ -119,12 +120,13 @@ if [ "$BUILDOK" == "y" ]; then
         { echo "Installing ..."; make install; }
     ) 2>&1 >> build.log
     if [ "$DOTEST" -gt 0 ]; then
-        echo "Testing ..."
         rm -f test1.log test2.log
-        (cd build && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log
+        echo "Testing ... test1"
+        (cd build && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log || true
         if [ "$DOTEST" -gt 1 ]; then
+            echo "Testing ... test1"
             (cd build && ARGS='-VV -N' make test \
-                && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test2.log
+                && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test2.log || true
         fi
         echo "Tests done"
     fi
@@ -132,18 +134,18 @@ else
     echo "Build NOT OK..."
 fi
 echo "DOVANILLA=${DOVANILLA}, DOJIT=${DOJIT}, DOTEST=${DOTEST}, DODEBUG=${DODEBUG}, DODOC=${DODOC}"
-if [ "$DOTEST" == "y" ]; then
+if [ "$DOTEST" -gt 0 ]; then
     LOGDIR="log-${DOVANILLA}${DOJIT}${DOTEST}${DODEBUG}${DODOC}"
-    echo "LOGDIR:       ${LOGDIR}" 2>&1 | tee build.log
+    echo "LOGDIR:       ${LOGDIR}" 2>&1 >> build.log
 fi
-if [ "$DOTEST" == "y" ]; then
+if [ "$DOTEST" -gt 0 ]; then
     if [ -d "${LOGDIR}" ]; then mv "${LOGDIR}" "${LOGDIR}.bak"; fi
     mkdir ${LOGDIR}
     for f in build.log test1.log test2.log; do
         cp -av "${f}" "${LOGDIR}/"
     done
 fi
-echo "FINISHED:     $ORIGINAL_CMD" 2>&1 | tee build.log
+echo "FINISHED:     $ORIGINAL_CMD" 2>&1 >> build.log
 # for a debug compile  --- FIXME
 #(cd build && ARGS='-VV -R .*simple_training-net-cpp' /usr/bin/time -v make test) 2>&1 | tee test1-dbg.log
 #(cd build && ARGS='-VV -R .*simple_training-net-cpp' valgrind make test) 2>&1 | tee test1-valgrind.log
