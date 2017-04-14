@@ -17,9 +17,10 @@ while getopts ":htvijdq" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
-            # 0: build    ~ ?? min  (jit), 1 min (vanilla)
-            # 1: examples ~  1 min  (jit), 12-16  mins (vanilla)
-            # 2: test_*   ~ 10 mins (jit), 80 mins (vanilla)
+            # Apr-14-2017 build timings:
+            # 0: build    ~ ?? min  (jit), 1     min  (vanilla)
+            # 1: examples ~  1 min  (jit), 13-16 mins (vanilla)
+            # 2: test_*   ~ 10 mins (jit), 108   mins (vanilla)
             DOTEST=$(( DOTEST + 1 ))
             ;;
         v) # [yes] (src/vanilla C/C++ only: no src/cpu JIT assembler)
