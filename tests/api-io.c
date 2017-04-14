@@ -88,6 +88,24 @@ void io0() {
         CHECK_TRUE(buf[len-1] == '\0');
         printf("mkldnn_dims_t d={1} full len %d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
     }
+    { // print some random enums
+//#define CHKBUF do{ ret+=n; printf(" n,ret=%d,%d",n,ret); if( n>len ){b[len-1]='\0'; len=0;} else {b+=n; len-=n;}}while(0)
+      printf("%s %s %s %s %s\n",
+             mkldnn_name_status(mkldnn_invalid_arguments),
+             mkldnn_name_data_type(mkldnn_f32),
+             mkldnn_name_memory_format(mkldnn_nchw),
+             mkldnn_name_padding_kind(mkldnn_padding_zero),
+             mkldnn_name_prop_kind(mkldnn_forward));
+      printf("%s %s %s %s %s\n",
+             mkldnn_name_primitive_kind(mkldnn_convolution),
+             mkldnn_name_alg_kind(mkldnn_convolution_direct),
+             mkldnn_name_batch_normalization_flag(mkldnn_use_scaleshift),
+             mkldnn_name_engine_kind(mkldnn_any_engine),
+             mkldnn_name_query(mkldnn_query_src_pd));
+      printf("%s\n",
+             mkldnn_name_stream_kind(mkldnn_lazy));
+    }
+        
 }
 
 void test1() {

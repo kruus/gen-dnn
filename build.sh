@@ -101,7 +101,7 @@ timeoutPID() {
         echo "DODOC     $DODOC"
         # Whatever you are currently debugging can go here ...
         { echo "api-io-c                ..."; time tests/api-io-c || BUILDOK="n"; }
-        if [ "$DOTEST" == "n" -a "$DOJIT" == "y" ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
+        if [ "$DOTEST" == 0 -a "$DOJIT" -gt 0 ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
             { echo "simple-training-net-cpp ..."; time examples/simple-training-net-cpp || BUILDOK="n"; }
         fi
     fi
@@ -119,10 +119,11 @@ if [ "$BUILDOK" == "y" ]; then
         cd build
         { echo "Installing ..."; make install; }
     ) 2>&1 >> build.log
-    if [ "$DOTEST" > 0 ]; then
+    if [ "$DOTEST" -gt 0 ]; then
         echo "Testing ..."
+        rm -f test1.log test2.log
         (cd build && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log
-        if [ "$DOTEST" > 1 ]; then
+        if [ "$DOTEST" -gt 1 ]; then
             (cd build && ARGS='-VV -N' make test \
                 && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test2.log
         fi
@@ -134,14 +135,16 @@ fi
 echo "DOVANILLA=${DOVANILLA}, DOJIT=${DOJIT}, DOTEST=${DOTEST}, DODEBUG=${DODEBUG}, DODOC=${DODOC}"
 if [ "$DOTEST" == "y" ]; then
     LOGDIR="log-${DOVANILLA}${DOJIT}${DOTEST}${DODEBUG}${DODOC}"
+    echo "LOGDIR:       ${LOGDIR}" 2>&1 >> build.log
+fi
+if [ "$DOTEST" == "y" ]; then
     if [ -d "${LOGDIR}" ]; then mv "${LOGDIR}" "${LOGDIR}.bak"; fi
     mkdir ${LOGDIR}
     for f in build.log test1.log test2.log; do
         cp -av "${f}" "${LOGDIR}/"
     done
-    echo "LOGDIR:       ${LOGDIR}"
 fi
-echo "FINISHED:     $ORIGINAL_CMD"
+echo "FINISHED:     $ORIGINAL_CMD" 2>&1 >> build.log
 # for a debug compile  --- FIXME
 #(cd build && ARGS='-VV -R .*simple_training-net-cpp' /usr/bin/time -v make test) 2>&1 | tee test1-dbg.log
 #(cd build && ARGS='-VV -R .*simple_training-net-cpp' valgrind make test) 2>&1 | tee test1-valgrind.log
