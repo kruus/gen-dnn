@@ -37,7 +37,6 @@ while getopts ":htvijdq" arg; do
             usage
             ;;
     esac
-    shift
 done
 timeoutPID() {
     PID="$1"
