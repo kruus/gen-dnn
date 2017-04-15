@@ -30,6 +30,8 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
+####################################
+# [ejk] support a TARGET_VANILLA **alternative** to src/cpu/ 
 option(TARGET_VANILLA "Use only pure C/C++ source_code, no JIT assembler" OFF)
 set(TARGET_JIT OFF)
 if(TARGET_VANILLA)
@@ -46,6 +48,7 @@ else()
     set(CPU_DIR cpu)
     set(CPU_INCLUDE_SRC_SUBDIRS cpu/xbyak) # this can be a list of subdirectories of src/
 endif()
+####################################
 
 
 include("cmake/MKL.cmake")
@@ -76,12 +79,15 @@ if(UNIX OR APPLE)
     endif()
 endif()
 
+####################################
 # [ejk] (might be needed for -DUSE_CBLAS compiles, CHECKME) ok for gcc, others ???
 #if(HAVE_MKL)
 #    get_filename_component(MKLLIBPATH "${MKLLIB}" PATH) # this one was just not exported by MKL.cmake
 #    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-rpath=${MKLLIBPATH}")
 #    message(STATUS "   MKL: shared linker flags: ${CMAKE_SHARED_LINKER_FLAGS}")
 #endif()
+message(STATUS "initial CMAKE_CCXX_FLAGS: ${CMAKE_CCXX_FLAGS}")
+####################################
 
 set(OPENMP_FLAGS "-fopenmp")
 set(CCXX_WARN_FLAGS "-Wall -Werror -Wno-unknown-pragmas")

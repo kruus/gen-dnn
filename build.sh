@@ -1,8 +1,13 @@
 #!/bin/bash
 # vim: et ts=4 sw=4
 ORIGINAL_CMD="$0 $*"
-DOVANILLA="y"
-DOJIT=0
+if [ -d src/vanilla ]; then
+    DOVANILLA="y"
+    DOJIT=0
+else
+    DOVANILLA="n"
+    DOJIT=100
+fi
 DOTEST=0
 DODEBUG="n"
 DODOC="y"
@@ -23,10 +28,11 @@ while getopts ":htvijdq" arg; do
             # 2: test_*   ~ 10 mins (jit), 108   mins (vanilla)
             DOTEST=$(( DOTEST + 1 ))
             ;;
-        v) # [yes] (src/vanilla C/C++ only: no src/cpu JIT assembler)
-            DOVANILLA="y"; DOJIT=0
+        v) # [yes] (vanilla C/C++ only: no src/cpu/ JIT assembler)
+            if [ -d src/vanilla ]; then DOVANILLA="y"; fi
+            DOJIT=0
             ;;
-    i | j) # [no] Intel JIT (src/cpu JIT assembly version)
+    i | j) # force Intel JIT (src/cpu/ JIT assembly code)
             DOVANILLA="n"; DOJIT=100 # 100 means all JIT funcs enabled
             ;;
         d) # [no] debug release
@@ -100,8 +106,12 @@ timeoutPID() {
         echo "DOTEST    $DOTEST"
         echo "DODEBUG   $DODEBUG"
         echo "DODOC     $DODOC"
-        # Whatever you are currently debugging can go here ...
-        { echo "api-io-c                ..."; time tests/api-io-c || BUILDOK="n"; }
+        # Whatever you are currently debugging (and is a quick sanity check) can go here
+        if [ -x tests/api-io-c ]; then
+            { echo "api-io-c                ..."; time tests/api-io-c || BUILDOK="n"; }
+        else
+            { echo "api-c                ..."; time tests/api-c || BUILDOK="n"; }
+        fi
         if [ "$DOTEST" == 0 -a "$DOJIT" -gt 0 ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
             { echo "simple-training-net-cpp ..."; time examples/simple-training-net-cpp || BUILDOK="n"; }
         fi
@@ -143,7 +153,7 @@ if [ "$DOTEST" -gt 0 ]; then
     if [ -d "${LOGDIR}" ]; then mv "${LOGDIR}" "${LOGDIR}.bak"; fi
     mkdir ${LOGDIR}
     for f in build.log test1.log test2.log; do
-        cp -av "${f}" "${LOGDIR}/"
+        cp -av "${f}" "${LOGDIR}/" || true
     done
 fi
 echo "FINISHED:     $ORIGINAL_CMD" 2>&1 >> build.log
