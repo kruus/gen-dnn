@@ -11,6 +11,7 @@ fi
 DOTEST=0
 DODEBUG="n"
 DODOC="y"
+DONEEDMKL="y"
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -18,7 +19,7 @@ usage() {
     echo "Example: time a full test run for a debug compilation --- time $0 -dtt"
     exit 0
 }
-while getopts ":htvijdq" arg; do
+while getopts ":htvijdqs" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
@@ -40,6 +41,9 @@ while getopts ":htvijdq" arg; do
             ;;
         q) # quick: skip doxygen docs [default: run doxygen if build OK]
             DODOC="n"
+            ;;
+        s) # slow: disable the FAIL_WITHOUT_MKL switch
+            DONEEDMKL="n"
             ;;
     h | *) # help
             usage
@@ -91,7 +95,9 @@ timeoutPID() {
         CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=RelWithDebInfo"
         CMAKEOPT="${CMAKEOPT} -DCMAKE_INSTALL_PREFIX=../install"
     fi
-    CMAKEOPT="${CMAKEOPT} -DFAIL_WITHOUT_MKL=ON"
+    if [ "$DONEEDMKL" == "y" ]; then
+        CMAKEOPT="${CMAKEOPT} -DFAIL_WITHOUT_MKL=ON"
+    fi
     # Without MKL, unit tests take **forever**
     #    TODO: cblas / mathkeisan alternatives?
     BUILDOK="n"
@@ -144,9 +150,9 @@ if [ "$BUILDOK" == "y" ]; then
 else
     echo "Build NOT OK..."
 fi
-echo "DOVANILLA=${DOVANILLA}, DOJIT=${DOJIT}, DOTEST=${DOTEST}, DODEBUG=${DODEBUG}, DODOC=${DODOC}"
+echo "DOVANILLA=${DOVANILLA}, DOJIT=${DOJIT}, DOTEST=${DOTEST}, DODEBUG=${DODEBUG}, DODOC=${DODOC}, DONEEDMKL=${DONEEDMKL}"
 if [ "$DOTEST" -gt 0 ]; then
-    LOGDIR="log-${DOVANILLA}${DOJIT}${DOTEST}${DODEBUG}${DODOC}"
+    LOGDIR="log-${DOVANILLA}${DOJIT}${DOTEST}${DODEBUG}${DODOC}${DONEEDMKL}"
     echo "LOGDIR:       ${LOGDIR}" 2>&1 >> build.log
 fi
 if [ "$DOTEST" -gt 0 ]; then
