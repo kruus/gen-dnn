@@ -156,7 +156,7 @@ if [ "$DOTEST" -gt 0 ]; then
     echo "LOGDIR:       ${LOGDIR}" 2>&1 >> build.log
 fi
 if [ "$DOTEST" -gt 0 ]; then
-    if [ -d "${LOGDIR}" ]; then mv "${LOGDIR}" "${LOGDIR}.bak"; fi
+    if [ -d "${LOGDIR}" ]; then rm -f "${LOGIDR}.bak"; mv -v "${LOGDIR}" "${LOGDIR}.bak"; fi
     mkdir ${LOGDIR}
     for f in build.log test1.log test2.log; do
         cp -av "${f}" "${LOGDIR}/" || true

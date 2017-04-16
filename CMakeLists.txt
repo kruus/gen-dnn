@@ -52,7 +52,33 @@ endif()
 
 include("cmake/MKL.cmake")
 include("cmake/Doxygen.cmake")
-#find_package(Threads) # helps cygwin a bit, but headers are too different.
+
+#[ejk] fooling around ...
+if(CYGWIN)
+    find_package(Threads) # helps cygwin a bit, but headers are too different.
+endif()
+if(FALSE AND NOT HAVE_MKL) # test code -- not working
+    #set(BLA_VENDOR OpenBLAS)
+    #find_package(BLAS)
+    message(STATUS "BLAS_FOUND        ${BLAS_FOUND}")
+    if(BLAS_FOUND)
+        add_definitions(-DUSE_MKL -DUSE_CBLAS)
+        #include_directories(AFTER ${})
+        list(APPEND mkldnn_LINKER_LIBS ${BLAS_LIBRARIES})
+        message(STATUS "Intel(R) MKL found: include ${MKLINC}, lib ${MKLLIB}")
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${BLAS_LINKER_FLAGS}")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${BLAS_LINKER_FLAGS}")
+        message(STATUS "BLAS_LIBRARIES    ${BLAS_LIBRARIES}")
+        message(STATUS "BLAS_LINKER_FLAGS ${BLAS_LINKER_FLAGS}")
+        message(STATUS "BLA95_FOUND       ${BLA95_FOUND}")
+        message(STATUS "BLA95_LIBRARIES   ${BLA95_LIBRARIES}")
+    endif()
+    add_definitions(-DUSE_CBLAS)
+    include_directories(AFTER /usr/include/openblas)
+    #set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${BLAS_LINKER_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lblas")
+    add_definitions(-DUSE_CBLAS)
+endif()
 
 # sdl options
 if(UNIX OR APPLE)
