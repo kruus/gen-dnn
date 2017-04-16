@@ -158,7 +158,7 @@ fi
 if [ "$DOTEST" -gt 0 ]; then
     if [ -d "${LOGDIR}" ]; then rm -f "${LOGIDR}.bak"; mv -v "${LOGDIR}" "${LOGDIR}.bak"; fi
     mkdir ${LOGDIR}
-    for f in build.log test1.log test2.log; do
+    for f in build.log test1.log test2.log doxygen.log; do
         cp -av "${f}" "${LOGDIR}/" || true
     done
 fi
