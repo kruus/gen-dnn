@@ -18,6 +18,8 @@ if(POLICY CMP0065)
     cmake_policy(SET CMP0065 NEW)
 endif()
 
+#[ejk] library not found for cygwin -- it links with lib${LIB_NAME}.dll.a
+
 #add_executable(api-check-c api_check.c)
 #target_link_libraries(api-check-c ${LIB_NAME})
 #add_test(api-check-c api-check-c)
