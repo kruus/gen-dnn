@@ -11,7 +11,7 @@ extern "C"
 {
 #endif
 
-/** \group enum --> char const* */
+/** \defgroup enum --> char const* */
 /** @{ */
 // gcc want the function attribute MKLDNN_API **after** the function decl for funcs returning a pointer
 #define NAMEENUM_T( TYPENAME ) char const* mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const e ) MKLDNN_API;
@@ -30,7 +30,7 @@ NAMEENUM_T(query);
 #undef NAMEENUM_T
 /** @} */
 
-/** \group variably sized outputs
+/** \defgroup variably sized outputs
  * These work like \c sprintf.
  * \return eturn the number of chars required to fully print the string.
  */
@@ -56,7 +56,6 @@ NAMEFUNC_T(batch_normalization_desc);
 NAMEFUNC_T(inner_product_desc);
 NAMEFUNC_T(convolution_relu_desc);
 NAMEFUNC_T(primitive_at);
-/** @} */
 #undef NAMEFUNC_T
 /* */
 //#define NAMEFUNC( TYPENAME ) char const* mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME const *e ) MKLDNN_API
@@ -71,6 +70,7 @@ NAMEFUNC_T2(primitive_desc, const_mkldnn_primitive_desc_t);
 NAMEFUNC_T2(primitive, const_mkldnn_primitive_t);
 NAMEFUNC_T2(stream, const_mkldnn_stream_t);
 #undef NAMEFUNC_T2
+/** @} */
 
 #ifdef __cplusplus
 } // "C"

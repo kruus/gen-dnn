@@ -149,4 +149,4 @@ add_subdirectory(src)
 add_subdirectory(examples)
 add_subdirectory(tests)
 
-install(FILES LICENSE DESTINATION share/doc/${LIB_NAME})
+install(FILES LICENSE DESTINATION share/doc/${LIB_NAME} COMPONENT doc)

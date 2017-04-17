@@ -12,6 +12,7 @@ DOTEST=0
 DODEBUG="n"
 DODOC="y"
 DONEEDMKL="y"
+DOJUSTDOC="n"
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -19,7 +20,7 @@ usage() {
     echo "Example: time a full test run for a debug compilation --- time $0 -dtt"
     exit 0
 }
-while getopts ":htvijdqs" arg; do
+while getopts ":htvijdDqs" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
@@ -39,6 +40,9 @@ while getopts ":htvijdqs" arg; do
         d) # [no] debug release
             DODEBUG="y"
             ;;
+        D) # [no] Doxygen : force a full rebuild of only the doc component
+            DOJUSTDOC="y"
+            ;;
         q) # quick: skip doxygen docs [default: run doxygen if build OK]
             DODOC="n"
             ;;
@@ -50,6 +54,22 @@ while getopts ":htvijdqs" arg; do
             ;;
     esac
 done
+if [ "$DOJUSTDOC" == "y" ]; then
+    (
+        if [ ! -d build ]; then mkdir build; fi
+        if [ ! -f build/Doxyfile ]; then
+            # doxygen doesn't much care HOW to build, just WHERE
+            (cd build && cmake -DCMAKE_INSTALL_PREFIX=../install -DFAIL_WITHOUT_MKL=OFF ..)
+        fi
+        echo "Doxygen (please be patient)"
+        rm -rf build/doc*stamp build/reference install/share/doc
+        #cd build \
+        #&& make VERBOSE=1 doc \
+        #&& cmake -DCOMPONENT=doc -P cmake_install.cmake
+        cd build && make VERBOSE=1 install-doc # Doxygen.cmake custom target
+    ) 2>&1 | tee ../doxygen.log
+    exit 0
+fi
 timeoutPID() {
     PID="$1"
     timeout="$2"
@@ -126,7 +146,7 @@ timeoutPID() {
         touch ./stamp-BUILDOK
         if [ "$DODOC" == "y" ]; then
             echo "Build OK... Doxygen (please be patient)"
-            make doc >& ../doxygen.log
+            make VERBOSE=1 doc >& ../doxygen.log
         fi
     fi
 ) 2>&1 | tee build.log
