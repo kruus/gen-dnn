@@ -130,6 +130,7 @@ typedef enum {
      * groups. */
     mkldnn_goihw,
 #if 1 //defined(TARGET_JIT) ... but tests cover too many of the formats
+    // jit-related types have a capital O (at least for now)
     /** 4D weights tensor in the @c oihw format with both input and output
      * channels data laid out in memory in 8-element blocks. */
     mkldnn_OIhw8i8o,

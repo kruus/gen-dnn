@@ -132,18 +132,29 @@ TEST_P(conv_any_fmt_test_float, TestsConvolutionAnyFmt)
 #define ANY_X { fmt::any, { fmt::x, fmt::format_undef } }
 #define ANY_NCHW { fmt::any, { fmt::nchw, fmt::format_undef } }
 #define ANY_OIHW { fmt::any, { fmt::oihw, fmt::format_undef } }
-
-#define ANY_OHWIxO { fmt::any, { fmt::Ohwi8o, fmt::Ohwi16o } }
 #define ANY_NCHWxC { fmt::any, { fmt::nChw8c, fmt::nChw16c } }
+
+#if !defined(TARGET_VANILLA)
+#define ANY_OHWIxO { fmt::any, { fmt::Ohwi8o, fmt::Ohwi16o } }
 #define ANY_OHWIxO { fmt::any, { fmt::Ohwi8o, fmt::Ohwi16o } }
 #define ANY_OIHWxIxO { fmt::any, { fmt::OIhw8i8o, fmt::OIhw16i16o } }
 #define ANY_GOIHWxIxO { fmt::any, { fmt::gOIhw8i8o, fmt::gOIhw16i16o } }
+#endif // TARGET_VANILLA
 
 INSTANTIATE_TEST_CASE_P(TestConvolutionAnyFmtForward, conv_any_fmt_test_float,
     ::testing::Values(conv_any_fmt_test_params_float{ PROP_KIND, ENGINE, ALG,
     ANY_NCHW, ANY_OIHW, ANY_X, ANY_NCHW,
-    { 2, 1, 4, 4, 4, 6, 4, 4, 3, 3, 1, 1, 1, 1 } }));
+    /* src     weights  bias    dst    */
+    { 2, 1, 4, 4, 4, 6, 4, 4, 3, 3, 1, 1, 1, 1 }/* conv sizes */ }));
 
+// OK, NCHWxC is supported by *some* ref primitives, but apparently not by convolution [yet]
+//INSTANTIATE_TEST_CASE_P(TestConvolutionAnyFmtForward_NCHWxC, conv_any_fmt_test_float,
+//    ::testing::Values(conv_any_fmt_test_params_float{ PROP_KIND, ENGINE, ALG,
+//    ANY_NCHWxC, ANY_OIHW, ANY_X, ANY_NCHWxC,
+//    { 2, 1, 4, 4, 4, 6, 4, 4, 3, 3, 1, 1, 1, 1 } }));
+
+#if !defined(TARGET_VANILLA)
+/* For now, these formats all require JIT (cpu/) code */
 INSTANTIATE_TEST_CASE_P(
         TestConvolutionAlexnetAnyFmtForwardxlocked, conv_any_fmt_test_float,
         ::testing::Values(
@@ -162,4 +173,6 @@ INSTANTIATE_TEST_CASE_P(
                 conv_any_fmt_test_params_float{ PROP_KIND, ENGINE, ALG,
                     ANY_NCHWxC, ANY_GOIHWxIxO, ANY_X, ANY_NCHWxC,
                     { 2, 2, 384, 13, 13, 256, 13, 13, 3, 3, 1, 1, 1, 1 } }));
+#endif // TARGET_VANILLA
+
 }

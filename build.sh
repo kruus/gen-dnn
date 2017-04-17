@@ -171,11 +171,11 @@ else
     echo "Build NOT OK..."
 fi
 echo "DOVANILLA=${DOVANILLA}, DOJIT=${DOJIT}, DOTEST=${DOTEST}, DODEBUG=${DODEBUG}, DODOC=${DODOC}, DONEEDMKL=${DONEEDMKL}"
-if [ "$DOTEST" -gt 0 ]; then
+if [ "$DOTEST" -gt 0 -a "${BUILDOK}" == "y" ]; then
     LOGDIR="log-${DOVANILLA}${DOJIT}${DOTEST}${DODEBUG}${DODOC}${DONEEDMKL}"
     echo "LOGDIR:       ${LOGDIR}" 2>&1 >> build.log
 fi
-if [ "$DOTEST" -gt 0 ]; then
+if [ "$DOTEST" -gt 0  -a "${BUILDOK}" == "y"]; then
     if [ -d "${LOGDIR}" ]; then rm -f "${LOGIDR}.bak"; mv -v "${LOGDIR}" "${LOGDIR}.bak"; fi
     mkdir ${LOGDIR}
     for f in build.log test1.log test2.log doxygen.log; do
