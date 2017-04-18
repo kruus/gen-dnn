@@ -20,7 +20,7 @@ usage() {
     echo "Example: time a full test run for a debug compilation --- time $0 -dtt"
     exit 0
 }
-while getopts ":htvijdDqs" arg; do
+while getopts ":htvjdDqs" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
@@ -34,7 +34,7 @@ while getopts ":htvijdDqs" arg; do
             if [ -d src/vanilla ]; then DOVANILLA="y"; fi
             DOJIT=0
             ;;
-    i | j) # force Intel JIT (src/cpu/ JIT assembly code)
+        j) # force Intel JIT (src/cpu/ JIT assembly code)
             DOVANILLA="n"; DOJIT=100 # 100 means all JIT funcs enabled
             ;;
         d) # [no] debug release
