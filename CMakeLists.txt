@@ -125,6 +125,12 @@ message(STATUS "initial CMAKE_CCXX_FLAGS: ${CMAKE_CCXX_FLAGS}")
 ####################################
 
 set(OPENMP_FLAGS "-fopenmp")
+if(HAVE_MKL)
+    set(CMAKE_C_CREATE_SHARED_LIBRARY_FORBIDDEN_FLAGS ${OPENMP_FLAGS})
+    set(CMAKE_CXX_CREATE_SHARED_LIBRARY_FORBIDDEN_FLAGS ${OPENMP_FLAGS})
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -liomp5 -Wl,--as-needed")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -liomp5 -Wl,--as-needed")
+endif()
 set(CCXX_WARN_FLAGS "-Wall -Werror -Wno-unknown-pragmas")
 #set(CCXX_EXTRADEBUG_FLAGS "-g") # TODO separate Release-mode library debuginfo, someday.
 # SIMPLER alternative:           cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo

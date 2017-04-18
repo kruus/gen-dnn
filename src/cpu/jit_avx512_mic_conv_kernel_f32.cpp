@@ -43,7 +43,7 @@ void jit_avx512_mic_conv_fwd_kernel_f32::prepare_output(int ur_w)
 
 void jit_avx512_mic_conv_fwd_kernel_f32::store_output(int ur_w)
 {
-    Label no_update_label, store_label;
+    Label no_update_label, store_label, relu_label;
 
     mov(reg_current_ic, ptr[this->param1 + GET_OFF(current_ic)]);
     if (jcp.with_bias)
@@ -56,7 +56,7 @@ void jit_avx512_mic_conv_fwd_kernel_f32::store_output(int ur_w)
         int aux_output_offset = typesize * (i)*jcp.oc_block;
         vaddps(zmm, zmm, EVEX_compress_addr(reg_out, aux_output_offset));
     }
-    jmp(store_label, T_NEAR);
+    jmp(relu_label, T_NEAR);
 
     L(no_update_label);
     if (jcp.with_bias) {
@@ -67,6 +67,20 @@ void jit_avx512_mic_conv_fwd_kernel_f32::store_output(int ur_w)
     }
     if (jcp.with_bias)
         prefetcht1(EVEX_compress_addr(reg_bias, 64));
+
+    L(relu_label);
+    if (jcp.with_relu) {
+        cmp(reg_current_ic, jcp.nb_ic-1);
+        jl(store_label, T_NEAR);
+        const unsigned char _cmp_lt_os = 1;
+        for (int i = 0; i < ur_w; i++){
+            Opmask kmask = Opmask(7);
+            Zmm zmm(i);
+            vcmpps(kmask, zmm, zmm_zero, _cmp_lt_os);
+            vmulps(zmm | kmask, zmm, zmm_relu_ns);
+        }
+    }
+
     L(store_label);
     for (int i = 0; i < ur_w; i++) {
         Zmm zmm(i);
@@ -242,6 +256,10 @@ void jit_avx512_mic_conv_fwd_kernel_f32::generate()
     mov(reg_ker, ptr[this->param1 + GET_OFF(filt)]);
     mov(reg_kh, ptr[this->param1 + GET_OFF(kh_padding)]);
     mov(reg_ker_prf, ptr[this->param1 + GET_OFF(filt_prf)]);
+    mov(reg_relu_ns, reinterpret_cast<size_t>(&jcp.relu_negative_slope));
+
+    vbroadcastss(zmm_relu_ns, ptr[reg_relu_ns]);
+    vpxord(zmm_zero, zmm_zero, zmm_zero);
 
     int r_pad = nstl::max(0, (ow - 1) * stride_w + (kw - 1) - (iw + l_pad - 1));
     if (ow == ur_w) {
@@ -358,9 +376,24 @@ status_t jit_avx512_mic_conv_fwd_kernel_f32::init_conf(jit_conv_conf_t &jcp,
     if (jcp.l_pad > 0 && r_pad > 0)
         n_oi--;
 
+    jcp.ic_block = (jcp.ic % simd_w != 0) ? jcp.ic : simd_w;
+    jcp.nb_ic = jcp.ic / jcp.ic_block;
+
     bool large_code_size = jcp.ur_w != jcp.ow && jcp.l_pad > 0 && r_pad > 0
             && ((jcp.l_pad <= 0 && n_oi > 0) || (jcp.l_pad > 0 && n_oi > 1));
-    jcp.ur_w = (large_code_size) ? 16 : jcp.ur_w;
+    if (large_code_size) {
+        const int max_code_size = 24 * 1024;
+        const int num_ops_per_reg = 6 + jcp.ic_block * jcp.kw;
+        int mult = 1;
+        if (jcp.l_pad > 0) mult += 1;
+        if (r_pad > 0) mult += 1;
+        for (int ur_w = jcp.ur_w; ur_w > regs/2; --ur_w) {
+            if (ur_w * mult * num_ops_per_reg * 9.0 < max_code_size) {
+                jcp.ur_w = ur_w;
+                break;
+            }
+        }
+    }
     jcp.ur_w_tail = jcp.ow % jcp.ur_w;
 
     args_ok = true && jcp.oc % simd_w == 0 && jcp.l_pad <= jcp.ur_w
@@ -372,9 +405,6 @@ status_t jit_avx512_mic_conv_fwd_kernel_f32::init_conf(jit_conv_conf_t &jcp,
                     + jcp.kw - jcp.iw - jcp.l_pad);
     if (r_pad_no_tail > jcp.ur_w)
         return status::unimplemented;
-
-    jcp.ic_block = (jcp.ic % simd_w != 0) ? jcp.ic : simd_w;
-    jcp.nb_ic = jcp.ic / jcp.ic_block;
 
     jcp.oc_block = simd_w;
     jcp.nb_oc = jcp.oc / jcp.oc_block;
@@ -697,21 +727,30 @@ status_t jit_avx512_mic_conv_bwd_data_kernel_f32::init_conf(
 
     int regs = 28;
     jcp.ur_w = (jcp.iw <= regs) ? jcp.iw : regs;
-    jcp.ur_w_tail = jcp.iw % jcp.ur_w;
     int n_oi  = (jcp.iw / jcp.ur_w);
     int l_overflow  = nstl::max(0, ((jcp.kw-1) - jcp.l_pad));
     int r_overflow1 = nstl::max(0, ((jcp.kw-1) - (jcp.iw - jcp.ur_w*n_oi)
                                 - jcp.r_pad));
     if (r_overflow1 > 0) n_oi--;
 
+
     bool large_code_size = (jcp.ur_w != jcp.ow)
          && ((l_overflow <= 0 && n_oi > 0) ||(l_overflow >  0 && n_oi > 1))
          && (r_overflow1 > 0) && (l_overflow > 0);
     if (large_code_size) {
-        regs = 14;
-        jcp.ur_w = (jcp.iw <= regs) ? jcp.iw : regs;
-        jcp.ur_w_tail = jcp.iw % jcp.ur_w;
+        const int max_code_size = 24 * 1024;
+        const int num_ops_per_reg = 6 + jcp.oc_block * jcp.kw;
+        int mult = 1;
+        if (l_overflow > 0) mult += 1;
+        if (r_overflow1 > 0) mult += 1;
+        for (int ur_w = jcp.ur_w; ur_w > regs/2; --ur_w) {
+            if (ur_w * mult * num_ops_per_reg * 9.2 < max_code_size) {
+                jcp.ur_w = ur_w;
+                break;
+            }
+        }
     }
+    jcp.ur_w_tail = jcp.iw % jcp.ur_w;
 
     if (l_overflow > jcp.ur_w)
         return status::unimplemented;
