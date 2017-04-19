@@ -62,7 +62,7 @@ if(DOXYGEN_FOUND)
     #install( DIRECTORY DESTINATION share/doc/${LIB_NAME} COMPONENT doc)
     install(
         DIRECTORY ${DOXYGEN_OUTPUT_DIR}
-        DESTINATION share/doc/${LIB_NAME} OPTIONAL
+        DESTINATION share/doc/${LIB_NAME} # OPTIONAL is an error in [too old] cmake 2.6.4
         COMPONENT doc)
     # convenience target, so 'make install-doc' does just the doxygen and doc install
     add_custom_target(install-doc

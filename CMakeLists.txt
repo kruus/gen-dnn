@@ -15,7 +15,8 @@
 # limitations under the License.
 #===============================================================================
 
-cmake_minimum_required(VERSION 2.8)
+#cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.6.4)
 
 set(PROJECT_NAME "SX-DNN (Intel(R) MKL-DNN)")
 set(PROJECT_FULL_NAME "SX version of Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)")
@@ -23,11 +24,39 @@ set(PROJECT_VERSION, "0.7")
 
 set(LIB_NAME mkldnn)
 
-project(${PROJECT_NAME} C CXX)
-
 if("${CMAKE_BUILD_TYPE}" STREQUAL "")
-    message(STATUS "CMAKE_BUILD_TYPE is unset, defaulting to Release")
-    set(CMAKE_BUILD_TYPE "Release")
+    message(STATUS "CMAKE_BUILD_TYPE is unset, defaulting to RelWithDebInfo")
+    set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+endif()
+
+# SX compilers sxc and sxc++ are not found by CMAKE 2.6.4, so...
+include("cmake/sx.cmake")
+function(error_if_SX)
+    if(NECSX)
+        message(WARNING "Error: should not be here for NECSX")
+    endif()
+endfunction()
+if(NECSX)
+    show_cmake_stuff("After sx check, before project(... C CXX)")
+    message(STATUS "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp")
+    #message(STATUS "Enabling C...")
+    #enable_language(C)
+    #message(STATUS "Enabling CXX...")
+    #enable_language(CXX)
+    #message(STATUS "CMakeTestCompilerCommon...")
+    #include(${CMAKE_ROOT}/Modules/CMakeTestCCompiler.cmake)
+    #message(STATUS "CMakeTestCCompiler...")
+    #include(${CMAKE_ROOT}/Modules/CMakeTestCCompiler.cmake)
+    #message(STATUS "CMakeTestCXXCompiler...")
+    #include(${CMAKE_ROOT}/Modules/CMakeTestCXXCompiler.cmake)
+    message(STATUS "Other NEC SX options here ...")
+    set(CMAKE_RELEASE_POSTFIX "-rel") # release library name
+    set(CMAKE_DEBUG_POSTFIX "-dbg") # dbg library name
+    #project(${PROJECT_NAME} C CXX)
+else()
+    project(${PROJECT_NAME} C CXX)
+    show_cmake_stuff("NO sx, after normal project(... C CXX)")
+    include("cmake/MKL.cmake")
 endif()
 
 ####################################
@@ -50,38 +79,40 @@ else()
 endif()
 ####################################
 
-include("cmake/MKL.cmake")
 include("cmake/Doxygen.cmake")
 
 #[ejk] fooling around ...
-if(CYGWIN)
-    find_package(Threads) # helps cygwin a bit, but headers are too different.
-endif()
-if(FALSE AND NOT HAVE_MKL) # test code -- not working
-    #set(BLA_VENDOR OpenBLAS)
-    #find_package(BLAS)
-    message(STATUS "BLAS_FOUND        ${BLAS_FOUND}")
-    if(BLAS_FOUND)
-        add_definitions(-DUSE_MKL -DUSE_CBLAS)
-        #include_directories(AFTER ${})
-        list(APPEND mkldnn_LINKER_LIBS ${BLAS_LIBRARIES})
-        message(STATUS "Intel(R) MKL found: include ${MKLINC}, lib ${MKLLIB}")
-        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${BLAS_LINKER_FLAGS}")
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${BLAS_LINKER_FLAGS}")
-        message(STATUS "BLAS_LIBRARIES    ${BLAS_LIBRARIES}")
-        message(STATUS "BLAS_LINKER_FLAGS ${BLAS_LINKER_FLAGS}")
-        message(STATUS "BLA95_FOUND       ${BLA95_FOUND}")
-        message(STATUS "BLA95_LIBRARIES   ${BLA95_LIBRARIES}")
-    endif()
-    add_definitions(-DUSE_CBLAS)
-    include_directories(AFTER /usr/include/openblas)
-    #set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${BLAS_LINKER_FLAGS}")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lblas")
-    add_definitions(-DUSE_CBLAS)
-endif()
+#if(CYGWIN)
+#    find_package(Threads) # helps cygwin a bit, but headers are too different.
+#endif()
+#if(FALSE AND NOT HAVE_MKL) # test code -- not working
+#    #set(BLA_VENDOR OpenBLAS)
+#    #find_package(BLAS)
+#    message(STATUS "BLAS_FOUND        ${BLAS_FOUND}")
+#    if(BLAS_FOUND)
+#        add_definitions(-DUSE_MKL -DUSE_CBLAS)
+#        #include_directories(AFTER ${})
+#        list(APPEND mkldnn_LINKER_LIBS ${BLAS_LIBRARIES})
+#        message(STATUS "Intel(R) MKL found: include ${MKLINC}, lib ${MKLLIB}")
+#        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${BLAS_LINKER_FLAGS}")
+#        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${BLAS_LINKER_FLAGS}")
+#        message(STATUS "BLAS_LIBRARIES    ${BLAS_LIBRARIES}")
+#        message(STATUS "BLAS_LINKER_FLAGS ${BLAS_LINKER_FLAGS}")
+#        message(STATUS "BLA95_FOUND       ${BLA95_FOUND}")
+#        message(STATUS "BLA95_LIBRARIES   ${BLA95_LIBRARIES}")
+#    endif()
+#    add_definitions(-DUSE_CBLAS)
+#    include_directories(AFTER /usr/include/openblas)
+#    #set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${BLAS_LINKER_FLAGS}")
+#    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lblas")
+#    add_definitions(-DUSE_CBLAS)
+#endif()
 
 # sdl options
-if(UNIX OR APPLE)
+if(NECSX)
+    message(STATUS "more SX stuff can go here")
+elseif(UNIX OR APPLE)
+    error_if_SX()
     if(NOT CYGWIN)
         set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -fPIC")
     endif()
@@ -147,12 +178,12 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -xHOST")
 endif()
 
-enable_testing()
+#enable_testing()
 
 include_directories(include)
 
 add_subdirectory(src)
-add_subdirectory(examples)
-add_subdirectory(tests)
+#add_subdirectory(examples)
+#add_subdirectory(tests)
 
 install(FILES LICENSE DESTINATION share/doc/${LIB_NAME} COMPONENT doc)
