@@ -15,30 +15,32 @@
 # limitations under the License.
 #===============================================================================
 
-#cmake_minimum_required(VERSION 2.8)
-cmake_minimum_required(VERSION 2.6.4)
-
-set(PROJECT_NAME "SX-DNN (Intel(R) MKL-DNN)")
+cmake_minimum_required(VERSION 2.8)
+set(PROJECT_NAME "GEN-DNN (Intel(R) MKL-DNN)")
 set(PROJECT_FULL_NAME "SX version of Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)")
 set(PROJECT_VERSION, "0.7")
 
 set(LIB_NAME mkldnn)
+
+project(${PROJECT_NAME} C CXX) # This runs any CMAKE_TOOLCHAIN_FILE (twice)
+message(STATUS "CMAKE_TOOLCHAIN_PREFIX = ${CMAKE_TOOLCHAIN_PREFIX}")
 
 if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     message(STATUS "CMAKE_BUILD_TYPE is unset, defaulting to RelWithDebInfo")
     set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
 
-# SX compilers sxc and sxc++ are not found by CMAKE 2.6.4, so...
-include("cmake/sx.cmake")
 function(error_if_SX)
     if(NECSX)
         message(WARNING "Error: should not be here for NECSX")
     endif()
 endfunction()
 if(NECSX)
-    show_cmake_stuff("After sx check, before project(... C CXX)")
-    message(STATUS "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp")
+    #show_cmake_stuff("NECSX, after project(... C CXX)")
+    cmake_policy(SET CMP0066 NEW) # try_compile in cmake 3.6+ will honor CMAKE_EXE_LINKER_FLAGS in the test project
+    cmake_policy(SET CMP0056 NEW) # try_compile in cmake 3.6+ will honor CMAKE_EXE_LINKER_FLAGS in the test project
+    message(STATUS "Other NEC SX options here ...")
+    #message(STATUS "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp")
     #message(STATUS "Enabling C...")
     #enable_language(C)
     #message(STATUS "Enabling CXX...")
@@ -49,15 +51,22 @@ if(NECSX)
     #include(${CMAKE_ROOT}/Modules/CMakeTestCCompiler.cmake)
     #message(STATUS "CMakeTestCXXCompiler...")
     #include(${CMAKE_ROOT}/Modules/CMakeTestCXXCompiler.cmake)
-    message(STATUS "Other NEC SX options here ...")
-    set(CMAKE_RELEASE_POSTFIX "-rel") # release library name
-    set(CMAKE_DEBUG_POSTFIX "-dbg") # dbg library name
-    #project(${PROJECT_NAME} C CXX)
+    #set(CMAKE_RELEASE_POSTFIX "-rel") # release library name
+    #set(CMAKE_DEBUG_POSTFIX "-dbg") # dbg library name
 else()
     project(${PROJECT_NAME} C CXX)
-    show_cmake_stuff("NO sx, after normal project(... C CXX)")
     include("cmake/MKL.cmake")
 endif()
+if(NECSX)
+    cmake_minimum_required(VERSION 3.0)
+    #show_cmake_stuff("NO sx, after normal project(... C CXX)")
+else()
+    message(STATUS "CMAKE_SYSTEM_NAME is ${CMAKE_SYSTEM_NAME}")
+    message(STATUS "CMAKE_C_FLAGS    are ${CMAKE_C_FLAGS}")
+    message(FATAL_ERROR "SX toolchain file not loaded???")
+    cmake_minimum_required(VERSION 2.8)
+endif()
+
 
 ####################################
 # [ejk] support a TARGET_VANILLA **alternative** to src/cpu/ 
@@ -109,8 +118,14 @@ include("cmake/Doxygen.cmake")
 #endif()
 
 # sdl options
+function(set_cmake_ccxx SUFFIX OPT)
+    set(CMAKE_C_${SUFFIX} "${OPT}")
+    set(CMAKE_CXX_${SUFFIX} "${OPT}")
+endfunction()
+
 if(NECSX)
     message(STATUS "more SX stuff can go here")
+    #set_cmake_ccxx(FLAGS -fopenmp)
 elseif(UNIX OR APPLE)
     error_if_SX()
     if(NOT CYGWIN)
@@ -143,6 +158,30 @@ elseif(UNIX OR APPLE)
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -z noexecstack -z relro -z now")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -z noexecstack -z relro -z now")
     endif()
+
+    set(OPENMP_FLAGS "-fopenmp")
+    if(HAVE_MKL)
+        set(CMAKE_C_CREATE_SHARED_LIBRARY_FORBIDDEN_FLAGS ${OPENMP_FLAGS})
+        set(CMAKE_CXX_CREATE_SHARED_LIBRARY_FORBIDDEN_FLAGS ${OPENMP_FLAGS})
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -liomp5 -Wl,--as-needed")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -liomp5 -Wl,--as-needed")
+    endif()
+    set(CCXX_WARN_FLAGS "-Wall -Werror -Wno-unknown-pragmas")
+    #set(CCXX_EXTRADEBUG_FLAGS "-g") # TODO separate Release-mode library debuginfo, someday.
+    # SIMPLER alternative:           cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} ${OPENMP_FLAGS} ${CCXX_EXTRADEBUG_FLAGS} ${CCXX_WARN_FLAGS} ${TARGET_DEFS} -DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS -fvisibility=internal")
+    if(NOT CYGWIN)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c99")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c++11 -fvisibility-inlines-hidden")
+    else()
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c99")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} -std=gnu++11 -fvisibility-inlines-hidden")
+    endif()
+
+    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -xHOST")
+    endif()
+
 endif()
 
 ####################################
@@ -155,35 +194,15 @@ endif()
 message(STATUS "initial CMAKE_CCXX_FLAGS: ${CMAKE_CCXX_FLAGS}")
 ####################################
 
-set(OPENMP_FLAGS "-fopenmp")
-if(HAVE_MKL)
-    set(CMAKE_C_CREATE_SHARED_LIBRARY_FORBIDDEN_FLAGS ${OPENMP_FLAGS})
-    set(CMAKE_CXX_CREATE_SHARED_LIBRARY_FORBIDDEN_FLAGS ${OPENMP_FLAGS})
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -liomp5 -Wl,--as-needed")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -liomp5 -Wl,--as-needed")
-endif()
-set(CCXX_WARN_FLAGS "-Wall -Werror -Wno-unknown-pragmas")
-#set(CCXX_EXTRADEBUG_FLAGS "-g") # TODO separate Release-mode library debuginfo, someday.
-# SIMPLER alternative:           cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo
-set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} ${OPENMP_FLAGS} ${CCXX_EXTRADEBUG_FLAGS} ${CCXX_WARN_FLAGS} ${TARGET_DEFS} -DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS -fvisibility=internal")
-if(NOT CYGWIN)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c99")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c++11 -fvisibility-inlines-hidden")
-else()
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c99")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} -std=gnu++11 -fvisibility-inlines-hidden")
-endif()
-
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -xHOST")
-endif()
-
 #enable_testing()
 
 include_directories(include)
 
+message(STATUS "CMAKE_CXX_COMPILER = ${CMAKE_CXX_COMPILER}")
 add_subdirectory(src)
+#message(STATUS "CMAKE_CXX_COMPILER = ${CMAKE_CXX_COMPILER}")
 #add_subdirectory(examples)
 #add_subdirectory(tests)
 
 install(FILES LICENSE DESTINATION share/doc/${LIB_NAME} COMPONENT doc)
+message(STATUS "CMakeLists.txt DONE!")

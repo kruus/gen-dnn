@@ -1,12 +1,12 @@
 #!/bin/bash
 # vim: et ts=4 sw=4
 ORIGINAL_CMD="$0 $*"
-if [ -d src/vanilla ]; then
-    DOVANILLA="y"
-    DOJIT=0
+if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
+    DOTARGET="s" # s for SX (C/C++ code, cross-compile)
+elif [ -d src/vanilla ]; then
+    DOTARGET="v" # v for vanilla (C/C++ code)
 else
-    DOVANILLA="n"
-    DOJIT=100
+    DOTARGET="j" # j for JIT (Intel assembler)
 fi
 DOTEST=0
 DODEBUG="n"
@@ -20,7 +20,7 @@ usage() {
     echo "Example: time a full test run for a debug compilation --- time $0 -dtt"
     exit 0
 }
-while getopts ":htvjdDqs" arg; do
+while getopts ":htvjdDqps" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
@@ -31,11 +31,10 @@ while getopts ":htvjdDqs" arg; do
             DOTEST=$(( DOTEST + 1 ))
             ;;
         v) # [yes] (vanilla C/C++ only: no src/cpu/ JIT assembler)
-            if [ -d src/vanilla ]; then DOVANILLA="y"; fi
-            DOJIT=0
+            if [ -d src/vanilla ]; then DOTARGET="v"; fi
             ;;
         j) # force Intel JIT (src/cpu/ JIT assembly code)
-            DOVANILLA="n"; DOJIT=100 # 100 means all JIT funcs enabled
+            DOTARGET="j"; DOJIT=100 # 100 means all JIT funcs enabled
             ;;
         d) # [no] debug release
             DODEBUG="y"
@@ -46,23 +45,33 @@ while getopts ":htvjdDqs" arg; do
         q) # quick: skip doxygen docs [default: run doxygen if build OK]
             DODOC="n"
             ;;
-        s) # slow: disable the FAIL_WITHOUT_MKL switch
+        p) # permissive: disable the FAIL_WITHOUT_MKL switch
             DONEEDMKL="n"
+            ;;
+        s) # SX cross-compile
+            DOTARGET="s"; DOJIT=0
             ;;
     h | *) # help
             usage
             ;;
     esac
 done
+DOJIT=0
+INSTALLDIR=install
+BUILDDIR=build
+if [ "$DOTARGET" == "j" ]; then DOJIT=100; INSTALLDIR='install-jit'; BUILDDIR='build-jit'; fi
+if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST="n"; INSTALLDIR='install-sx'; BUILDDIR='build-sx'; fi
+#if [ "$DOTARGET" == "v" ]; then ; fi
+if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; fi
 if [ "$DOJUSTDOC" == "y" ]; then
     (
         if [ ! -d build ]; then mkdir build; fi
         if [ ! -f build/Doxyfile ]; then
             # doxygen doesn't much care HOW to build, just WHERE
-            (cd build && cmake -DCMAKE_INSTALL_PREFIX=../install -DFAIL_WITHOUT_MKL=OFF ..)
+            (cd build && cmake -DCMAKE_INSTALL_PREFIX=../${INSTALL_DIR} -DFAIL_WITHOUT_MKL=OFF ..)
         fi
         echo "Doxygen (please be patient)"
-        rm -rf build/doc*stamp build/reference install/share/doc
+        rm -rf build/doc*stamp build/reference "${INSTALL_DIR}/share/doc"
         #cd build \
         #&& make VERBOSE=1 doc \
         #&& cmake -DCOMPONENT=doc -P cmake_install.cmake
@@ -70,7 +79,7 @@ if [ "$DOJUSTDOC" == "y" ]; then
     ) 2>&1 | tee ../doxygen.log
     exit 0
 fi
-timeoutPID() {
+timeoutPID() { # unused
     PID="$1"
     timeout="$2"
     interval=1
@@ -92,42 +101,55 @@ timeoutPID() {
     ) 2> /dev/null &
 }
 (
-    echo "DOVANILLA $DOVANILLA"
-    echo "DOJIT     $DOJIT"
-    echo "DOTEST    $DOTEST"
-    echo "DODEBUG   $DODEBUG"
-    echo "DODOC     $DODOC"
-    if [ -d build ]; then rm -rf build.bak && mv -v build build.bak; fi
-    if [ -d install ]; then rm -rf install.bak && mv -v install install.bak; fi
-    mkdir build
-    cd build
+    echo "DOTARGET   $DOTARGET"
+    echo "DOJIT      $DOJIT"
+    echo "DOTEST     $DOTEST"
+    echo "DODEBUG    $DODEBUG"
+    echo "DODOC      $DODOC"
+    echo "BUILDDIR   ${BUILDDIR}"
+    echo "INSTALLDIR ${INSTALLDIR}"
+    if [ -d "${BUILDDIR}" ]; then rm -rf "${BUILDDIR}".bak && mv -v "${BUILDDIR}" "${BUILDDIR}".bak; fi
+    if [ -d "$INSTALLDIR}" ]; then rm -rf "$INSTALLDIR}".bak && mv -v "$INSTALLDIR}" "$INSTALLDIR}".bak; fi
+    mkdir "${BUILDDIR}"
+    cd "${BUILDDIR}"
     #
+    BUILDOK="y"
     CMAKEOPT=''
     CMAKEOPT="${CMAKEOPT} -DCMAKE_CCXX_FLAGS=-DJITFUNCS=${DOJIT}"
-    if [ "$DOVANILLA" == "y" ]; then
+    if [ ! "$DOTARGET" == "j" ]; then
         CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
+    fi
+    if [ "$DOTARGET" == "s" ]; then
+        SIZE_T=32
+        TOOLCHAIN=../cmake/sx.cmake
+        if [ ! $SIZE_T = 32 ]; then TOOLCHAIN=../cmake/sx32.cmake; fi
+        if [ ! -f "${TOOLCHAIN}" ]; then echo "Ohoh. ${TOOLCHAIN} not found?"; BUILDOK="n"; fi
+        CMAKEOPT="${CMAKEOPT} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}"
+        CMAKEOPT="${CMAKEOPT} --debug-trycompile --trace -LAH" # long debug of cmake
     fi
     if [ "$DODEBUG" == "y" ]; then
         CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=Debug"
-        CMAKEOPT="${CMAKEOPT} -DCMAKE_INSTALL_PREFIX=../install-dbg"
+        CMAKEOPT="${CMAKEOPT} -DCMAKE_INSTALL_PREFIX=../${INSTALLDIR}-dbg"
     else
         #CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=Release"
         CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=RelWithDebInfo"
-        CMAKEOPT="${CMAKEOPT} -DCMAKE_INSTALL_PREFIX=../install"
+        CMAKEOPT="${CMAKEOPT} -DCMAKE_INSTALL_PREFIX=../${INSTALLDIR}"
     fi
     if [ "$DONEEDMKL" == "y" ]; then
         CMAKEOPT="${CMAKEOPT} -DFAIL_WITHOUT_MKL=ON"
     fi
     # Without MKL, unit tests take **forever**
     #    TODO: cblas / mathkeisan alternatives?
-    BUILDOK="n"
-    rm -f ./stamp-BUILDOK
-    echo "cmake ${CMAKEOPT} .."
-    cmake ${CMAKEOPT} .. && \
-	    make VERBOSE=1 -j8 && \
-        BUILDOK="y"
     if [ "$BUILDOK" == "y" ]; then
-        echo "DOVANILLA $DOVANILLA"
+        BUILDOK="n"
+        rm -f ./stamp-BUILDOK
+        echo "cmake ${CMAKEOPT} .."
+        cmake ${CMAKEOPT} .. \
+        && make VERBOSE=1 -j8 \
+        && BUILDOK="y"
+    fi
+    if [ "$BUILDOK" == "y" -a ! "$DOTARGET" == "s" ]; then
+        echo "DOTARGET  $DOTARGET"
         echo "DOJIT     $DOJIT"
         echo "DOTEST    $DOTEST"
         echo "DODEBUG   $DODEBUG"
@@ -149,40 +171,45 @@ timeoutPID() {
             make VERBOSE=1 doc >& ../doxygen.log
         fi
     fi
-) 2>&1 | tee build.log
-BUILDOK="n"; if [ -f build/stamp-BUILDOK ]; then BUILDOK="y"; fi # check last thing produced for OK build
+) 2>&1 | tee "${BUILDDIR}".log
+BUILDOK="n"; if [ -f "${BUILDDIR}"/stamp-BUILDOK ]; then BUILDOK="y"; fi # check last thing produced for OK build
 if [ "$BUILDOK" == "y" ]; then
     (
-        cd build
-        { echo "Installing ..."; make install; }
-    ) 2>&1 >> build.log
-    if [ "$DOTEST" -gt 0 ]; then
+    cd "${BUILDDIR}"
+    { echo "Installing ..."; make install-bin install-dev; }
+    { echo "Installing docs ..."; make install-doc; }
+    ) 2>&1 >> "${BUILDDIR}".log
+    if [ $DOTEST -gt 0 -a ! "$DOTARGET" == "s" ]; then
         rm -f test1.log test2.log
         echo "Testing ... test1"
-        (cd build && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log || true
+        (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log || true
         if [ "$DOTEST" -gt 1 ]; then
             echo "Testing ... test1"
-            (cd build && ARGS='-VV -N' make test \
-                && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test2.log || true
+            (cd "${BUILDDIR}" && ARGS='-VV -N' make test \
+            && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test2.log || true
         fi
         echo "Tests done"
     fi
 else
     echo "Build NOT OK..."
 fi
-echo "DOVANILLA=${DOVANILLA}, DOJIT=${DOJIT}, DOTEST=${DOTEST}, DODEBUG=${DODEBUG}, DODOC=${DODOC}, DONEEDMKL=${DONEEDMKL}"
-LOGDIR="log-${DOVANILLA}${DOJIT}${DOTEST}${DODEBUG}${DODOC}${DONEEDMKL}"
-if [ "$DOTEST" -gt 0 -a "${BUILDOK}" == "y" ]; then
-    echo "LOGDIR:       ${LOGDIR}" 2>&1 >> build.log
+echo "BUILDDIR   ${BUILDDIR}"
+echo "INSTALLDIR ${INSTALLDIR}"
+echo "DOTARGET=${DOTARGET}, DOJIT=${DOJIT}, DODEBUG=${DODEBUG}, DOTEST=${DOTEST}, DODOC=${DODOC}, DONEEDMKL=${DONEEDMKL}"
+if [ "${BUILDOK}" == "y" ]; then
+    LOGDIR="log-${DOTARGET}${DOJIT}${DODEBUG}${DOTEST}${DODOC}${DONEEDMKL}"
+    if [ $DOTEST -gt 0 ]; then
+        echo "LOGDIR:       ${LOGDIR}" 2>&1 >> "${BUILDDIR}".log
+    fi
+    if [ $DOTEST -gt 0 ]; then
+        if [ -d "${LOGDIR}" ]; then rm -f "${LOGIDR}.bak"; mv -v "${LOGDIR}" "${LOGDIR}.bak"; fi
+        mkdir ${LOGDIR}
+        for f in "${BUILDDIR}.log" test1.log test2.log doxygen.log; do
+            cp -av "${f}" "${LOGDIR}/" || true
+        done
+    fi
 fi
-if [ "$DOTEST" -gt 0  -a "${BUILDOK}" == "y" ]; then
-    if [ -d "${LOGDIR}" ]; then rm -f "${LOGIDR}.bak"; mv -v "${LOGDIR}" "${LOGDIR}.bak"; fi
-    mkdir ${LOGDIR}
-    for f in build.log test1.log test2.log doxygen.log; do
-        cp -av "${f}" "${LOGDIR}/" || true
-    done
-fi
-echo "FINISHED:     $ORIGINAL_CMD" 2>&1 >> build.log
+echo "FINISHED:     $ORIGINAL_CMD" 2>&1 >> "${BUILDDIR}".log
 # for a debug compile  --- FIXME
-#(cd build && ARGS='-VV -R .*simple_training-net-cpp' /usr/bin/time -v make test) 2>&1 | tee test1-dbg.log
-#(cd build && ARGS='-VV -R .*simple_training-net-cpp' valgrind make test) 2>&1 | tee test1-valgrind.log
+#(cd "${BUILDDIR}" && ARGS='-VV -R .*simple_training-net-cpp' /usr/bin/time -v make test) 2>&1 | tee test1-dbg.log
+#(cd "${BUILDDIR}" && ARGS='-VV -R .*simple_training-net-cpp' valgrind make test) 2>&1 | tee test1-valgrind.log

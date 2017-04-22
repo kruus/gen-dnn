@@ -1,0 +1,83 @@
+# vim: set sw=4 ts=4 et ft=cmake
+if(SX_TRACE)
+    message(STATUS " *** Platform/SX-Initialize ***")
+endif()
+# set up CMAKE_SX_ROOT by looking at path of sxcc command [or "/SX"]
+execute_process(COMMAND /usr/bin/which sxcc
+	OUTPUT_VARIABLE _stdout
+	OUTPUT_STRIP_TRAILING_WHITESPACE
+	ERROR_VARIABLE _stderr
+	RESULT_VARIABLE _failed)
+#message(STATUS "_stdout ${_stdout}")
+#message(STATUS "_stderr ${_stderr}")
+#message(STATUS "_failed ${_failed}")
+if(NOT _failed AND EXISTS "${_stdout}")
+    string(REGEX REPLACE "\(.*\)[/]?usr.*bin.*" "\\1" SX_ROOT ${_stdout})
+elseif(IS_DIRECTORY "/SX")
+    set(SX_ROOT "/SX")
+else()
+    set(SX_ROOT "")
+endif()
+message(STATUS "from sxcc path, using SX_ROOT ${SX_ROOT}")
+
+#SET(CMAKE_SYSTEM_PREFIX_PATH "${SX_ROOT}")
+#
+SET(CMAKE_FIND_ROOT_PATH "${SX_ROOT}")
+SET(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY)
+SET(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+SET(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+SET(NECSX TRUE)
+
+# help CMakeFindBinUtils locate things  (this might be in DetermineCCompiler ?)
+set(_CMAKE_TOOLCHAIN_PREFIX "sx")
+set(CMAKE_C_COMPILER_EXTERNAL_TOOLCHAIN "${SX_ROOT}")
+#set(_CMAKE_TOOLCHAIN_LOCATION "${SX_ROOT}")
+
+set(CMAKE_RULE_MESSAGES ON)
+set(CMAKE_TARGET_MESSAGES ON)
+
+# did not work... use cmake -Wno-dev to get rid of warnings
+#cmake_policy(SET CMP0056 OLD)
+#cmake_policy(SET CMP0066 OLD)
+
+
+# These do NOT short-circuit the incorrect identification as a GNU compiler
+set(CMAKE_C_COMPILER_NAMES sxcc)
+set(CMAKE_CXX_COMPILER_NAMES sxc++)
+#set(CMAKE_C_COMPILER_INIT sxcc)
+#set(CMAKE_CXX_COMPILER_INIT sxc++)
+#set(CMAKE_C_COMPILER_ID SXCC)
+#set(CMAKE_CXX_COMPILER_ID SXCXX)
+##
+# So it looks like after project(FOO C CXX), we chould include a FIXUPS cmake file
+# to undo the bad GNU assumptions
+##
+
+# ------ Suggestions -------------
+set(SX_CFLAGS_INLINING   "-pi auto" CACHE STRING "")
+set(SX_CFLAGS_NOINLINING "-pi noauto" CACHE STRING "")
+set(SX_CCXXFLAGS_QUIET   "-pi nomsg -pvctl nomsg -O nomsg" CACHE STRING "")
+set(SX_CCXXFLAGS_VERBOSE "-ftrace -R,diaglist,fmtlist -pvctl,fullmsg,noneighbors" CACHE STRING "")
+set(SX_CCXXFLAGS_WARNALL "-w all" CACHE STRING "")
+set(SX_CFLAGS_C99     "${SX_CFLAGS} -f90lib -Kc99,gcc" CACHE STRING "")
+set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -f90lib -K exceptions rtti cpp11 gcc)" CACHE STRING "")
+set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -f90lib -K exceptions rtti cpp11 gcc)" CACHE STRING "")
+set(SX_LINK_LIBRARIES "${SX_LINK_LIBRARARIES} -llapack -lcblas -lblas" CACHE STRING "")
+# --------------------------------
+
+function(fix_bad_gnu_things)
+    # ------ Defaults ----------------
+    function(set_cmake_ccxx SUFFIX OPT)
+        set(CMAKE_C_${SUFFIX} "${OPT}")
+        set(CMAKE_CXX_${SUFFIX} "${OPT}")
+        message(STATUS "CMAKE_C_${SUFFIX} --> ${CMAKE_C_${SUFFIX}}")
+    endfunction()
+    set_cmake_ccxx("FLAGS_DEBUG" "-g -ftrace -Cnoopt")
+    set_cmake_ccxx("FLAGS_RELEASE" "-Caopt")
+    set_cmake_ccxx("FLAGS_MINSIZEREL" "-Cvopt -Os")
+    set_cmake_ccxx("FLAGS_RELWITHDEBINFO" "-g -Cvopt")
+    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-g -ftrace")
+    set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "-g")
+    # ------ Suggestions -------------
+endfunction()
+
