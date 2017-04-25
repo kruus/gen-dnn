@@ -194,15 +194,15 @@ endif()
 message(STATUS "initial CMAKE_CCXX_FLAGS: ${CMAKE_CCXX_FLAGS}")
 ####################################
 
-#enable_testing()
+enable_testing()
 
 include_directories(include)
 
 message(STATUS "CMAKE_CXX_COMPILER = ${CMAKE_CXX_COMPILER}")
 add_subdirectory(src)
 #message(STATUS "CMAKE_CXX_COMPILER = ${CMAKE_CXX_COMPILER}")
-#add_subdirectory(examples)
-#add_subdirectory(tests)
+add_subdirectory(examples)
+add_subdirectory(tests)
 
 install(FILES LICENSE DESTINATION share/doc/${LIB_NAME} COMPONENT doc)
 message(STATUS "CMakeLists.txt DONE!")

@@ -13,6 +13,9 @@ DODEBUG="n"
 DODOC="y"
 DONEEDMKL="y"
 DOJUSTDOC="n"
+SIZE_T=32 # or 64, for -s or -S SX compile
+JOBS="-j8"
+CMAKETRACE=""
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -20,7 +23,7 @@ usage() {
     echo "Example: time a full test run for a debug compilation --- time $0 -dtt"
     exit 0
 }
-while getopts ":htvjdDqps" arg; do
+while getopts ":htvjdDqpsST" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
@@ -48,8 +51,14 @@ while getopts ":htvjdDqps" arg; do
         p) # permissive: disable the FAIL_WITHOUT_MKL switch
             DONEEDMKL="n"
             ;;
-        s) # SX cross-compile
-            DOTARGET="s"; DOJIT=0
+        s) # SX cross-compile (size_t=32)
+            DOTARGET="s"; DOJIT=0; SIZE_T=32; JOBS="-j1"
+            ;;
+        S) # SX cross-compile (size_t=64)
+            DOTARGET="s"; DOJIT=0; SIZE_T=64; JOBS="-j1"
+            ;;
+        T) # cmake --trace
+            CMAKETRACE="--trace"
             ;;
     h | *) # help
             usage
@@ -120,12 +129,18 @@ timeoutPID() { # unused
         CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
     fi
     if [ "$DOTARGET" == "s" ]; then
-        SIZE_T=32
         TOOLCHAIN=../cmake/sx.cmake
-        if [ ! $SIZE_T = 32 ]; then TOOLCHAIN=../cmake/sx32.cmake; fi
         if [ ! -f "${TOOLCHAIN}" ]; then echo "Ohoh. ${TOOLCHAIN} not found?"; BUILDOK="n"; fi
         CMAKEOPT="${CMAKEOPT} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}"
         CMAKEOPT="${CMAKEOPT} --debug-trycompile --trace -LAH" # long debug of cmake
+        export CFLAGS="${CFLAGS} -size_t${SIZE_T} -Kc99,gcc"
+        # An object file that is generated with -Kexceptions and an object file
+        # that is generated with -Knoexceptions must not be linked together. In
+        # such a case, the exception may not be thrown correctly Therefore, do
+        # not specify -Kexceptions if the program does not use the try, catch
+        # and throw keywords.
+        export CXXFLAGS="${CXXFLAGS} -size_t${SIZE_T} -Kcpp11,gcc,rtti,exceptions"
+        #export CXXFLAGS="${CXXFLAGS} -size_t${SIZE_T} -Kcpp11,gcc,rtti"
     fi
     if [ "$DODEBUG" == "y" ]; then
         CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=Debug"
@@ -138,14 +153,16 @@ timeoutPID() { # unused
     if [ "$DONEEDMKL" == "y" ]; then
         CMAKEOPT="${CMAKEOPT} -DFAIL_WITHOUT_MKL=ON"
     fi
+    # Remove leading whitespace from CMAKEENV (bash magic)
+    shopt -s extglob; CMAKEENV=\""${CMAKEENV##*([[:space:]])}"\"; shopt -u extglob
     # Without MKL, unit tests take **forever**
     #    TODO: cblas / mathkeisan alternatives?
     if [ "$BUILDOK" == "y" ]; then
         BUILDOK="n"
         rm -f ./stamp-BUILDOK
-        echo "cmake ${CMAKEOPT} .."
-        cmake ${CMAKEOPT} .. \
-        && make VERBOSE=1 -j8 \
+        echo "${CMAKEENV}; cmake ${CMAKEOPT} ${CMAKETRACE} .."
+        ${CMAKEENV}; cmake ${CMAKEOPT} ${CMAKETRACE} .. \
+        && make VERBOSE=1 ${JOBS} \
         && BUILDOK="y"
     fi
     if [ "$BUILDOK" == "y" -a ! "$DOTARGET" == "s" ]; then
@@ -183,7 +200,7 @@ if [ "$BUILDOK" == "y" ]; then
         rm -f test1.log test2.log
         echo "Testing ... test1"
         (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log || true
-        if [ "$DOTEST" -gt 1 ]; then
+        if [ $DOTEST -gt 1 ]; then
             echo "Testing ... test1"
             (cd "${BUILDDIR}" && ARGS='-VV -N' make test \
             && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test2.log || true
