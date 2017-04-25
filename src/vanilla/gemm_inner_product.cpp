@@ -30,6 +30,11 @@ typedef MKL_INT cblas_int;
 #endif
 
 #ifdef USE_CBLAS
+extern "C" {
+#include "cblas.h"
+}
+#endif
+
 namespace {
 
 template <data_type_t data_type>

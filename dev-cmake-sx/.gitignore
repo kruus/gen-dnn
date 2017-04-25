@@ -1,0 +1,7 @@
+build
+build-dbg
+build-rel
+cmake.log
+dbg.log
+rel.log
+

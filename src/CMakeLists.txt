@@ -1,4 +1,5 @@
 #===============================================================================
+# vim: set ts=4 sw=4 et ftype=cmake
 # Copyright 2016-2017 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -50,7 +51,11 @@ include_directories(
     #${CMAKE_CURRENT_SOURCE_DIR}/cpu/xbyak
     )
 
-add_library(${TARGET_NAME} SHARED ${HEADERS} ${SOURCES})
+if(MECSX)
+	add_library(${TARGET_NAME}        ${HEADERS} ${SOURCES})
+else()
+    add_library(${TARGET_NAME} SHARED ${HEADERS} ${SOURCES})
+endif()
 target_link_libraries(${TARGET_NAME} ${${TARGET_NAME}_LINKER_LIBS})
 set_property(TARGET ${TARGET_NAME} PROPERTY CXX_STANDARD 11)
 set_property(TARGET ${TARGET_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)

@@ -110,3 +110,5 @@ set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO_INIT "-g")
 #    # ------ Suggestions -------------
 #endfunction()
 #
+
+include(Platform/SX-util.cmake)

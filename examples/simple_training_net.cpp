@@ -32,7 +32,7 @@ void simple_net()
 
     /* initializing non-zero values for src */
     for (size_t i = 0; i < net_src.size(); ++i)
-        net_src[i] = sin(i);
+        net_src[i] = static_cast<float>(sin(i));
 
     /* AlexNet: conv
      * {batch, 3, 227, 227} (x) {96, 3, 11, 11} -> {batch, 96, 55, 55}
@@ -54,9 +54,9 @@ void simple_net()
 
     /* initializing non-zero values for weights and bias */
     for (size_t i = 0; i < conv_weights.size(); ++i)
-        conv_weights[i] = sin(i);
+        conv_weights[i] = static_cast<float>(sin(i));
     for (size_t i = 0; i < conv_bias.size(); ++i)
-        conv_bias[i] = sin(i);
+        conv_bias[i] = static_cast<float>(sin(i));
 
     /* create memory for user data */
     auto conv_user_src_memory = memory(
@@ -236,7 +236,7 @@ void simple_net()
     /* ... user diff_data ...*/
     std::vector<float> net_diff_dst(batch * 96 * 27 * 27);
     for (size_t i = 0; i < net_diff_dst.size(); ++i)
-        net_diff_dst[i] = sin(i);
+        net_diff_dst[i] = static_cast<float>(sin(i));
 
     /* create memory for user diff dst data */
     auto pool_user_diff_dst_memory = memory(
@@ -444,6 +444,11 @@ void simple_net()
     }
 }
 
+#if defined(_SX)
+#include <iostream>
+#include <string>       // operator<< for string is here ?
+using namespace std;
+#endif
 int main(int argc, char **argv)
 {
     try

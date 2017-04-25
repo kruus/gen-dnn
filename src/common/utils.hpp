@@ -220,6 +220,18 @@ inline void* malloc(size_t size, int alignment) {
 }
 inline void free(void* p) { ::free(p); }
 #else
+#if 1
+/** SX -> std malloc and free, instead of aligning pointers.
+ * Until I am sure that we do not use these pointers in mkldnn.hpp
+ * shared pointers, we had better err on side of compatibility.
+ *
+ * (i.e. match with _malloc/_free lambdas in mkldnn.hpp)
+ *
+ * \p alignment arg ignored.
+ */
+inline void* malloc(size_t size, int /*alignment*/) { return ::malloc(size); }
+inline void free(void* p) { ::free(p); }
+#else
 // Adapted from FFTW aligned malloc/free.  Assumes that malloc is at least
 // sizeof(void*)-aligned. Allocated memory must be freed with free0.
 inline int posix_memalign0(void **memptr, size_t alignment, size_t size)
@@ -248,6 +260,7 @@ inline void* malloc(size_t size, int alignment) {
     return (rc == 0) ? ptr : 0;
 }
 inline void free(void* p) { free0(p); }
+#endif
 #endif
 
 struct c_compatible {

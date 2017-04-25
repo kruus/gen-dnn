@@ -15,14 +15,21 @@
 # limitations under the License.
 #===============================================================================
 
-cmake_minimum_required(VERSION 2.8)
-set(PROJECT_NAME "GEN-DNN (Intel(R) MKL-DNN)")
-set(PROJECT_FULL_NAME "SX version of Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)")
+# 3.8 makes it easier to construct Platform/SX-* files
+#cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.8)
+
+set(PROJECT_NAME "GEN-DNN generic MKL-DNN)")
+set(PROJECT_FULL_NAME "Generic (Intel(R) MKL-DNN)")
 set(PROJECT_VERSION, "0.7")
 
 set(LIB_NAME mkldnn)
 
 project(${PROJECT_NAME} C CXX) # This runs any CMAKE_TOOLCHAIN_FILE (twice)
+
+# Want -lcblas *after* -lmkldnn ... How?
+set(LINK_LIBRARIES "${LINK_LIBRARIES} ${SX_LINK_LIBRARIES}" CACHE STRING "will this go after -lmkldnn?")
+
 message(STATUS "CMAKE_TOOLCHAIN_PREFIX = ${CMAKE_TOOLCHAIN_PREFIX}")
 
 if("${CMAKE_BUILD_TYPE}" STREQUAL "")
@@ -36,23 +43,13 @@ function(error_if_SX)
     endif()
 endfunction()
 if(NECSX)
-    #show_cmake_stuff("NECSX, after project(... C CXX)")
-    cmake_policy(SET CMP0066 NEW) # try_compile in cmake 3.6+ will honor CMAKE_EXE_LINKER_FLAGS in the test project
-    cmake_policy(SET CMP0056 NEW) # try_compile in cmake 3.6+ will honor CMAKE_EXE_LINKER_FLAGS in the test project
+    show_cmake_stuff("NECSX, after project(... C CXX)")
+    #cmake_policy(SET CMP0066 NEW) # try_compile in cmake 3.6+ will honor CMAKE_EXE_LINKER_FLAGS in the test project
+    #cmake_policy(SET CMP0056 NEW) # try_compile in cmake 3.6+ will honor CMAKE_EXE_LINKER_FLAGS in the test project
     message(STATUS "Other NEC SX options here ...")
-    #message(STATUS "${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp")
-    #message(STATUS "Enabling C...")
-    #enable_language(C)
-    #message(STATUS "Enabling CXX...")
-    #enable_language(CXX)
-    #message(STATUS "CMakeTestCompilerCommon...")
-    #include(${CMAKE_ROOT}/Modules/CMakeTestCCompiler.cmake)
-    #message(STATUS "CMakeTestCCompiler...")
-    #include(${CMAKE_ROOT}/Modules/CMakeTestCCompiler.cmake)
-    #message(STATUS "CMakeTestCXXCompiler...")
-    #include(${CMAKE_ROOT}/Modules/CMakeTestCXXCompiler.cmake)
-    #set(CMAKE_RELEASE_POSTFIX "-rel") # release library name
-    #set(CMAKE_DEBUG_POSTFIX "-dbg") # dbg library name
+    # OHOH. this appear *before* -lmkldnn, and we want it to appear *after*
+    #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${SX_LINK_LIBRARIES}")
+    #set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} ${SX_LINK_LIBRARIES}")
 else()
     project(${PROJECT_NAME} C CXX)
     include("cmake/MKL.cmake")
@@ -60,6 +57,8 @@ endif()
 if(NECSX)
     cmake_minimum_required(VERSION 3.0)
     #show_cmake_stuff("NO sx, after normal project(... C CXX)")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -f90lib")
+    set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -f90lib")
 else()
     message(STATUS "CMAKE_SYSTEM_NAME is ${CMAKE_SYSTEM_NAME}")
     message(STATUS "CMAKE_C_FLAGS    are ${CMAKE_C_FLAGS}")
