@@ -1,3 +1,12 @@
+-------------------- QuickStart ---------------------------
+# Purpose testbed for developing/tweaking cmake SX platform definitions
+# set up ** cmake-3.8 ** in your PATH
+make help
+make
+# Now the .tar.gz file can be untarred in the parent directory (gen-dnn)
+# to incorporate changes developed here for SX cmake support.
+
+-------------------- Changelog ----------------------------
 ## cmake-sample
 
 Quickstart: In top-level dir

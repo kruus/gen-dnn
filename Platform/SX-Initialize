@@ -56,11 +56,14 @@ set(CMAKE_CXX_COMPILER_NAMES sxc++)
 ##
 
 # ------ Suggestions -------------
-set(SX_CFLAGS_INLINING   "-pi auto" CACHE STRING "")
-set(SX_CFLAGS_NOINLINING "-pi noauto" CACHE STRING "")
-set(SX_CCXXFLAGS_QUIET   "-pi nomsg -pvctl nomsg -O nomsg" CACHE STRING "")
-set(SX_CCXXFLAGS_VERBOSE "-ftrace -R,diaglist,fmtlist -pvctl,fullmsg,noneighbors" CACHE STRING "")
-set(SX_CCXXFLAGS_WARNALL "-w all" CACHE STRING "")
+set(SX_CFLAGS_INLINING    "-pi auto" CACHE STRING "")
+set(SX_CFLAGS_NOINLINING  "-pi noauto" CACHE STRING "")
+set(SX_CCXXFLAGS_PAR_AUTO   "-Pauto")
+set(SX_CCXXFLAGS_PAR_OPENMP "-Popenmp")
+set(SX_CCXXFLAGS_PTHREADS   "-Pmulti" CACHE STRING "")
+set(SX_CCXXFLAGS_QUIET    "-pi nomsg -pvctl nomsg -O nomsg" CACHE STRING "")
+set(SX_CCXXFLAGS_VERBOSE  "-ftrace -R,diaglist,fmtlist -pvctl,fullmsg,noneighbors" CACHE STRING "")
+set(SX_CCXXFLAGS_WARNALL  "-w all" CACHE STRING "")
 set(SX_CFLAGS_C99     "${SX_CFLAGS} -f90lib -Kc99,gcc" CACHE STRING "")
 set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -f90lib -K exceptions rtti cpp11 gcc)" CACHE STRING "")
 set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -f90lib -K exceptions rtti cpp11 gcc)" CACHE STRING "")
@@ -80,12 +83,11 @@ function(set_cmake_ccxx SUFFIX OPT)
         message(STATUS "CMAKE_C_${SUFFIX} --> ${CMAKE_C_${SUFFIX}}")
 	endif()
 endfunction()
-set_cmake_ccxx("FLAGS_DEBUG_INIT" "-g -ftrace -Cnoopt")
-# aopt should be "aggressive" optimization, but where is it documented?
-#set_cmake_ccxx("FLAGS_RELEASE_INIT" "-Caopt")
-set_cmake_ccxx("FLAGS_RELEASE_INIT" "-Chopt") # documented, but maybe unsafe?
-set_cmake_ccxx("FLAGS_MINSIZEREL_INIT" "-Cvopt -Os")
-set_cmake_ccxx("FLAGS_RELWITHDEBINFO_INIT" "-g -Cvopt")
+# vsafe < vopt < aopt < hopt
+set_cmake_ccxx("FLAGS_DEBUG_INIT"          "-g -ftrace -Cvopt")
+set_cmake_ccxx("FLAGS_RELEASE_INIT"        "-Caopt -math,vector,nostrict_prototype -DNDEBUG")
+set_cmake_ccxx("FLAGS_MINSIZEREL_INIT"     "-Caopt -math,vector,nostrict_prototype -DNDEBUG")
+set_cmake_ccxx("FLAGS_RELWITHDEBINFO_INIT" "-g -Caopt -math vector nostrict_prototype -DNDEBUG")
 set(CMAKE_EXE_LINKER_FLAGS_DEBUG_INIT "-g -ftrace")
 set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO_INIT "-g")
 
@@ -108,3 +110,5 @@ set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO_INIT "-g")
 #    # ------ Suggestions -------------
 #endfunction()
 #
+
+include(Platform/SX-util.cmake)

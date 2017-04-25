@@ -23,6 +23,9 @@
 #include <memory>
 #include <vector>
 #include <algorithm>
+#if defined(_SX)
+#include <iterator> // std::back_inserter
+#endif
 #endif
 
 namespace mkldnn {
@@ -316,7 +319,7 @@ struct memory: public primitive  {
                 format aformat) {
             validate_dims(adims);
             error::wrap_c_api(
-                    c_api::mkldnn_memory_desc_init(&data, adims.size(),
+                    c_api::mkldnn_memory_desc_init(&data, static_cast<int>(adims.size()),
                         adims.size() == 0 ? nullptr : &adims[0],
                          convert_to_c(adata_type), convert_to_c(aformat)),
                     "could not initialize a memory descriptor");
@@ -380,12 +383,27 @@ struct memory: public primitive  {
                 c_api::mkldnn_primitive_create(&result, adesc.get(), nullptr, nullptr),
                 "could not create a memory primitive");
         reset(result);
+#if defined(_SX) // changed my mind. let's just ignore all alignment for SX
+        // XXX check other posix_memalign and do this too!
+        //     (Alt: posix_memalign0 and free0 as in simd/sx/ code)
+        auto _malloc = [](size_t size, int /*alignment*/) -> char* {
+            void *ptr = ::malloc(size);
+            return static_cast<char*>(ptr);
+        };
+        auto _free = [](char* p) { ::free((void*)p); };
+#else
         auto _malloc = [](size_t size, int alignment) {
             void *ptr;
             int rc = ::posix_memalign(&ptr, alignment, size);
             return (rc == 0) ? (char*)ptr : nullptr;
         };
         auto _free = [](char* p) { ::free((void*)p); };
+#endif
+        // /SX/usr/include/c++/memory warns about void* --> char* conversion
+        // why? "argument of type "void *"
+        //          is incompatible with parameter of type "char *"
+        //_handle.reset(static_cast<char*>(_malloc(adesc.get_size(), 64)), _free);
+        //  ... modified _malloc lambda instead !!!
         _handle.reset(_malloc(adesc.get_size(), 64), _free);
         set_data_handle(_handle.get());
     }
@@ -615,7 +633,7 @@ struct concat : public primitive {
             auto c_api_inputs = cpp_to_c(inputs);
 
             error::wrap_c_api(c_api::mkldnn_concat_primitive_desc_create(
-                    &result, &output.data, c_api_inputs.size(),
+                    &result, &output.data, static_cast<int>(c_api_inputs.size()),
                     concat_dimension, &c_api_inputs[0]),
                 "could not create a concat primitive descriptor");
             reset(result);
@@ -628,8 +646,8 @@ struct concat : public primitive {
             auto c_api_inputs = cpp_to_c(inputs);
 
             error::wrap_c_api(c_api::mkldnn_concat_primitive_desc_create(
-                    &result, nullptr, c_api_inputs.size(), concat_dimension,
-                    &c_api_inputs[0]),
+                    &result, nullptr, static_cast<int>(c_api_inputs.size()),
+                    concat_dimension, &c_api_inputs[0]),
                 "could not create a concat primitive descriptor");
             reset(result);
         }
@@ -683,7 +701,7 @@ struct sum : public primitive {
             auto c_api_inputs = cpp_to_c(inputs);
 
             error::wrap_c_api(c_api::mkldnn_sum_primitive_desc_create(
-                    &result, &output.data, c_api_inputs.size(),
+                    &result, &output.data, static_cast<int>(c_api_inputs.size()),
                     &scale[0], &c_api_inputs[0]),
                 "could not create a sum primitive descriptor");
             reset(result);
@@ -696,8 +714,8 @@ struct sum : public primitive {
             auto c_api_inputs = cpp_to_c(inputs);
 
             error::wrap_c_api(c_api::mkldnn_sum_primitive_desc_create(
-                    &result, nullptr, c_api_inputs.size(), &scale[0],
-                    &c_api_inputs[0]),
+                    &result, nullptr, static_cast<int>(c_api_inputs.size()),
+                    &scale[0], &c_api_inputs[0]),
                 "could not create a sum primitive descriptor");
             reset(result);
         }

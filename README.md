@@ -12,12 +12,45 @@ This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
   - builds a RelWithDebug libmkldnn.so
   - creates an ROOTDIR/install/ directory with extensive doxygen docs.
     - browse at install/share/doc/mkldnn/reference/html/index.html
-- So far, I've added some debug stuff, a build.sh to build original/vanilla
+- So far, I have added some debug stuff, a build.sh to build original/vanilla
   - I plan to add some slightly faster C++ impls (because the reference ones
     seem to be "gold standard" readable impls, rather than trying hard to be
     fast)
 - I might try some C++ versions of Winograd convolution, if I have time.
 - There are no plans to put low-level impls for other chips into this public repo
+
+- SX cmake support is developed in subdirectory dev-cmake-sx
+  - changes to SX platform spec go into a tarfile that get untarred in gen-dnn root dir
+  - *** cmake-3.8 *** is OK, cmake-3.0 is not
+    - because cmake-3.8 has a handy call to Platform/SX-Initialize that I require
+  - ./build.sh -ST      SX, TRACE [cmake --trace]
+    - ---> build-sx/ and build-sx.log
+
+- SX has no posix_memalign :(
+- SX int is only 32-bit (even though you can use -size_t64)
+- SX has many conversion warnings.
+
+## Github repos
+
+NECLA master is on
+
+	snake10:/local/kruus/sx/sx-dnn,
+Japan master is on /mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn
+       or, for me  ~/wrk/simd/gen-dnn
+
+
+There is also a github master,
+
+    git+ssh://git@github.com/kruus/gen-dnn.git
+
+which is being left out-of-date until a decision is made on whether SX support
+should enter public domain.  For at least FY17 1st quarter we will target basic
+functionality, implementing no "new" algorithms.
+                                   
+Later on, for fancier vectorizable "tiled" algs, we may initially want to keep
+those impls private -- this can be done via and add-on library that "grafts"
+the additional convolutions onto the existing "engine" lists of primitives.
+
 
 ## Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)
 [![Apache License Version 2.0](https://img.shields.io/badge/license-Apache_2.0-green.svg)](LICENSE)

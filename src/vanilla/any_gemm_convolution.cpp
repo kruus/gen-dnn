@@ -23,9 +23,14 @@
 #include "mkldnn_thread.hpp"
 
 #if defined(_SX)
+// USE_CBLAS ???
+extern "C" {
 #include "cblas.h" // /SX/opt/mathkeisan/include 
-#else
+}
 //#define SGEMM cblas_sgemm // nope, layouts here are const char* like the fortran API
+
+#else
+#ifdef USE_MKL
 #include "mkl_blas.h"
 #endif
 

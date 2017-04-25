@@ -35,3 +35,14 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-size_t64")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${SX_CCXXFLAGS_WARNALL} ${SX_CCXXFLAGS_VERBOSE} ${SX_LINK_LIBRARIES}")
 
 add_executable(foo foo.cc)
+
+add_executable(speed64 speed.cpp)
+target_link_libraries(speed64 "-lcblas -lblas -lf2003")
+
+add_library(spd libspeed.cpp libspeed.hpp) # create libspd.a
+set_target_properties(spd PROPERTIES COMPILE_FLAGS "-Tauto,all")
+
+add_executable(speed2 speed2.cpp)
+add_dependencies(speed2 spd)
+target_link_libraries(speed2 "-Wl,-h,muldefs,-h,lib_cyclic -L. libspd.a -lcblas -lblas -lf2003")
+
