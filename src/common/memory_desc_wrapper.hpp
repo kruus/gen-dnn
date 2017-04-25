@@ -150,7 +150,7 @@ struct memory_desc_wrapper: public c_compatible {
         for (int rd = 0; rd < ndims(); ++rd) {
             const int d = ndims() - 1 - rd;
             const int cur_dim = is_pos_padded ? padding_dims[d] : dims()[d];
-            pos[d] = l_offset % cur_dim;
+            pos[d] = static_cast<int>(l_offset % cur_dim);
             l_offset /= cur_dim;
         }
         return off_v(pos, is_pos_padded);

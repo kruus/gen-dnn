@@ -1,0 +1,8 @@
+#! /bin/sh
+
+opt=$1; shift
+file=$1; shift
+
+echo $* > /tmp/log
+sxc++ -prelink $*
+sxar $opt $file $*

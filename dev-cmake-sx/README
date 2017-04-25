@@ -1,0 +1,20 @@
+Current way:
+  # setup cmake-3.0 or cmake-3.8 in your path
+  % cmake --version
+  % ./cmake.sh
+
+---------------------------------------------
+
+Original way: edit path for your env in cmake.sh and sx.cmake
+
+  % mkdir build
+  % cd build
+  % ../cmake.sh
+  % make
+
+Next way: edit and source bashrc-local so cmake 3.0 binary is found automatically
+
+  $ mkdir build
+  $ cd build
+  $ cmake -DCMAKE_TOOLCHAIN_FILE=../sx.cmake ..
+  $ make

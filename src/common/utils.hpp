@@ -21,6 +21,45 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#ifndef HAVE_POSIX_MEMALIGN
+# ifdef __GLIBC_PREREQ
+# if __GLIBC_PREREQ(2,3)
+# define HAVE_POSIX_MEMALIGN
+# endif
+# else
+# ifdef _POSIX_SOURCE
+# define HAVE_POSIX_MEMALIGN
+# endif
+# endif
+#endif
+
+#if defined(_SX) // posix_memalign compat...
+#include <malloc.h>
+#include <errno.h>
+/* OHOH -- _SX does not even give us memalign
+inline int posix_memalign(void **ptr, size_t align, size_t size) {
+    bool ok=false;
+    for(size_t i=sizeof(void*); i!=0; i*=2){
+        if(align==i){
+            ok=true;
+            break;
+        }
+    }
+    if(ok){
+        int saved_errno=errno;
+        void *p = memalign(align,size);
+        if(p == nullptr){
+            errno = saved_errno;
+            return ENOMEM;
+        }
+        *ptr = p;
+        return 0;
+    }
+    return EINVAL;
+}
+*/
+#endif
+
 namespace mkldnn {
 namespace impl {
 
@@ -157,8 +196,8 @@ inline T nd_iterator_init(T start) { return start; }
 template<typename T, typename U, typename W, typename... Args>
 inline T nd_iterator_init(T start, U &x, const W &X, Args &&... tuple) {
     start = nd_iterator_init(start, utils::forward<Args>(tuple)...);
-    x = start % X;
-    return start / X;
+    x = static_cast<U>(start % static_cast<T>(X));  // ? do in "larger-of" type ?
+    return start / static_cast<T>(X);
 }
 
 inline bool nd_iterator_step() { return true; }
@@ -173,12 +212,43 @@ inline bool nd_iterator_step(U &x, const W &X, Args &&... tuple) {
 
 }
 
+#if !defined(_SX)
 inline void* malloc(size_t size, int alignment) {
     void *ptr;
     int rc = ::posix_memalign(&ptr, alignment, size);
     return (rc == 0) ? ptr : 0;
 }
 inline void free(void* p) { ::free(p); }
+#else
+// Adapted from FFTW aligned malloc/free.  Assumes that malloc is at least
+// sizeof(void*)-aligned. Allocated memory must be freed with free0.
+inline int posix_memalign0(void **memptr, size_t alignment, size_t size)
+{
+    //#if defined(_SX)
+    //    std::cout<<" align.h: posix_memalign0( (void**)memptr="<<(void*)memptr<<", alignment="<<alignment<<", size="<<size<<")"<<std::endl;
+    //#endif
+    if(alignment % sizeof (void *) != 0 || (alignment & (alignment - 1)) != 0)
+        return EINVAL;
+    void *p0=malloc(size+alignment);
+    if(!p0) return ENOMEM;
+    void *p=(void *)(((uintptr_t) p0+alignment)&~(alignment-1));
+    *((void **) p-1)=p0;
+    *memptr=p;
+    return 0;
+}
+
+inline void free0(void *p)
+{
+    if(p) ::free(*((void **) p-1));
+}
+/** For SX, mkldnn::impl::malloc/free **MUST** be called in matching pairs */
+inline void* malloc(size_t size, int alignment) {
+    void *ptr;
+    int rc = posix_memalign0(&ptr, alignment, size);
+    return (rc == 0) ? ptr : 0;
+}
+inline void free(void* p) { free0(p); }
+#endif
 
 struct c_compatible {
     enum { default_alignment = 64 };

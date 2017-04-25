@@ -22,10 +22,12 @@
 #include "type_helpers.hpp"
 #include "mkldnn_thread.hpp"
 
-// NOT SURE:
-//#include "mkl_cblas.h"
+#if defined(_SX)
+#include "cblas.h" // /SX/opt/mathkeisan/include 
+#else
 //#define SGEMM cblas_sgemm // nope, layouts here are const char* like the fortran API
 #include "mkl_blas.h"
+#endif
 
 namespace mkldnn {
 namespace impl {
@@ -72,9 +74,20 @@ void _any_gemm_convolution_fwd_t<with_relu>::execute_forward() {
 
             if (jcp.need_im2col)
                 any_gemm_convolution_utils::im2col(jcp, _src, _col);
+#if defined(_SX) // mathkeisan comes with a cblas.h
+            // just guessing [for now] check with simd/sx convolution codes XXX
+            cblas_sgemm( CblasRowMajor, CblasNoTrans, CblasNoTrans, // Order, TransA, TransB
+                         M, N, K, one,                              // M, N, K, alpha
+                         jcp.need_im2col ? _col:_src, M,            // A, lda
+                         _weights, K,                               // B, ldb
+                         zero, _dst, M);                            // beta, C, ldc
+#else
             // XXX is mkl-dnn sgemm interface identical to std gemm?
             SGEMM("N", "N", &M, &N, &K, &one,
-                  jcp.need_im2col ? _col:_src, &M, _weights, &K, &zero, _dst, &M);
+                  jcp.need_im2col ? _col:_src, &M,
+                  _weights, &K,
+                  &zero, _dst, &M);
+#endif
             if (jcp.with_bias || jcp.with_relu) {
                 data_t *d = _dst, b = 0.0;
                 for (int oc = 0; oc < jcp.oc; ++oc) {
@@ -129,9 +142,18 @@ void any_gemm_convolution_bwd_data_t::execute_backward_data() {
             const data_t *_diff_dst = diff_dst + (n * jcp.ngroups + g)*dst_step;
             const data_t *_weights = weights + g * weights_g_size;
             data_t *_col = this->ws + ithr * jcp.ic * jcp.ks * jcp.os;
+#if defined(_SX)
+            // just guessing [for now] check with simd/sx convolution codes XXX
+            cblas_sgemm( CblasRowMajor, CblasNoTrans, CblasTrans,   // Order, TransA, TransB
+                         M, N, K, one,                              // M, N, K, alpha
+                         _diff_dst, M,                              // A, lda
+                         _weights, N,                               // B, ldb
+                         zero, jcp.need_im2col?_col:_diff_src, M);  // beta, C, ldc
+#else
             // XXX is mkl-dnn sgemm interface identical to std gemm?
             SGEMM("N", "T", &M, &N, &K, &one, _diff_dst, &M,
                 _weights, &N, &zero, jcp.need_im2col ? _col : _diff_src, &M);
+#endif
             if (jcp.need_im2col)
                 any_gemm_convolution_utils::col2im(jcp, _col, _diff_src);
             nd_iterator_step(g, jcp.ngroups, n, jcp.mb);
@@ -189,6 +211,16 @@ void any_gemm_convolution_bwd_weights_t::execute_backward_weights() {
                             + (mb*jcp.ngroups+g)*dst_step;
                     if (jcp.need_im2col)
                         any_gemm_convolution_utils::im2col(jcp, _src, _col);
+#if defined(_SX)
+                    if (mb == mb_start)
+                        cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, M, N, K, one,
+                                    jcp.need_im2col ? _col : _src, K,
+                                    _diff_dst, K, zero, _diff_weights, M);
+                    else
+                        cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, M, N, K, one,
+                            jcp.need_im2col ? _col : _src, K,
+                                _diff_dst, K, one, _diff_weights, M);
+#else
                     // XXX is mkl-dnn sgemm interface identical to std gemm?
                     if (mb == mb_start)
                         SGEMM("T", "N", &M, &N, &K, &one,
@@ -198,6 +230,7 @@ void any_gemm_convolution_bwd_weights_t::execute_backward_weights() {
                         SGEMM("T", "N", &M, &N, &K, &one,
                             jcp.need_im2col ? _col : _src, &K,
                                 _diff_dst, &K, &one, _diff_weights, &M);
+#endif
                 }
             }
             if (need_reduction) {
