@@ -12,6 +12,8 @@ install-jit
 install-dbg*
 .*.sw?
 build.log
+doxygen.log
+test*.log
 log-*
 old*
 *.diff

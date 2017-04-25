@@ -19,6 +19,29 @@ This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
 - I might try some C++ versions of Winograd convolution, if I have time.
 - There are no plans to put low-level impls for other chips into this public repo
 
+### git notes-to-self
+- clone this mkl-dnn fork
+  - git clone https://github.com/kruus/gen-dnn.git
+- upstream merge, from within cloned fork:
+  - git checkout master # in case you are on a branch
+  - git pull https://github.com/01org/mkl-dnn.git
+  - # ... resolve merge conflicts ...
+  - git commit # use default message
+  - git push # ... origin master ... update gen-dnn on Github.
+
+### remotes
+
+- snake10 is the main devel repo.
+  - Pull latest SX commits from Japan:
+    - git pull japan master
+  - Push to github (public repo):
+    - git push
+  - Pull from upstream:
+    - git pull upstream master
+  - Push snake10 (Intel) work to Japan:
+    - git push japan master
+
+
 ## Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)
 [![Apache License Version 2.0](https://img.shields.io/badge/license-Apache_2.0-green.svg)](LICENSE)
 ![v0.7 beta](https://img.shields.io/badge/v0.7-beta-orange.svg)
