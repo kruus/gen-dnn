@@ -445,9 +445,7 @@ void simple_net()
 }
 
 #if defined(_SX)
-#include <iostream>
-#include <string>       // operator<< for string is here ?
-using namespace std;
+#include <string>       // operator<<(ostream,string) is defined here!
 #endif
 int main(int argc, char **argv)
 {

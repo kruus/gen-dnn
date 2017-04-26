@@ -162,7 +162,7 @@ static const pd_create_f cpu_impl_list[] = {
     //INSTANCE(jit_uni_relu_bwd_t<avx512_mic>),
     //INSTANCE(jit_uni_relu_fwd_t<avx2>),
     //INSTANCE(jit_uni_relu_bwd_t<avx2>),
-    INSTANCE(ref_relu_fwd_t<data_type::f32>),
+    INSTANCE(ref_relu_fwd_t<data_type::f32>), // SX segfault? (primitive_iterator _idx==3)
     INSTANCE(ref_relu_bwd_t<data_type::f32>),
     /* softmax */
     INSTANCE(ref_softmax_fwd_t<data_type::f32>),

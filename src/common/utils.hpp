@@ -22,18 +22,22 @@
 #include <assert.h>
 
 #ifndef HAVE_POSIX_MEMALIGN
-# ifdef __GLIBC_PREREQ
-# if __GLIBC_PREREQ(2,3)
-# define HAVE_POSIX_MEMALIGN
-# endif
+# if defined(_SX)
+//  SX ** does not ** have memalign
 # else
-# ifdef _POSIX_SOURCE
-# define HAVE_POSIX_MEMALIGN
-# endif
+#  ifdef __GLIBC_PREREQ
+#  if __GLIBC_PREREQ(2,3)
+#  define HAVE_POSIX_MEMALIGN
+#  endif
+#  else
+#  ifdef _POSIX_SOURCE
+#  define HAVE_POSIX_MEMALIGN
+#  endif
+#  endif
 # endif
 #endif
 
-#if defined(_SX) // posix_memalign compat...
+#if 0 && defined(_SX) // posix_memalign compat...
 #include <malloc.h>
 #include <errno.h>
 /* OHOH -- _SX does not even give us memalign
@@ -220,18 +224,7 @@ inline void* malloc(size_t size, int alignment) {
 }
 inline void free(void* p) { ::free(p); }
 #else
-#if 1
-/** SX -> std malloc and free, instead of aligning pointers.
- * Until I am sure that we do not use these pointers in mkldnn.hpp
- * shared pointers, we had better err on side of compatibility.
- *
- * (i.e. match with _malloc/_free lambdas in mkldnn.hpp)
- *
- * \p alignment arg ignored.
- */
-inline void* malloc(size_t size, int /*alignment*/) { return ::malloc(size); }
-inline void free(void* p) { ::free(p); }
-#else
+#if 0
 // Adapted from FFTW aligned malloc/free.  Assumes that malloc is at least
 // sizeof(void*)-aligned. Allocated memory must be freed with free0.
 inline int posix_memalign0(void **memptr, size_t alignment, size_t size)
@@ -260,6 +253,17 @@ inline void* malloc(size_t size, int alignment) {
     return (rc == 0) ? ptr : 0;
 }
 inline void free(void* p) { free0(p); }
+#else
+/** SX -> std malloc and free, instead of aligning pointers.
+ * Until I am sure that we do not use these pointers in mkldnn.hpp
+ * shared pointers, we had better err on side of compatibility.
+ *
+ * (i.e. match with _malloc/_free lambdas in mkldnn.hpp)
+ *
+ * \p alignment arg ignored.
+ */
+inline void* malloc(size_t size, int /*alignment*/) { return ::malloc(size); }
+inline void free(void* p) { ::free(p); }
 #endif
 #endif
 

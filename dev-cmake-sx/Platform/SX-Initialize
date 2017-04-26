@@ -65,9 +65,13 @@ set(SX_CCXXFLAGS_QUIET    "-pi nomsg -pvctl nomsg -O nomsg" CACHE STRING "")
 set(SX_CCXXFLAGS_VERBOSE  "-ftrace -R,diaglist,fmtlist -pvctl,fullmsg,noneighbors" CACHE STRING "")
 set(SX_CCXXFLAGS_WARNALL  "-w all" CACHE STRING "")
 set(SX_CFLAGS_C99     "${SX_CFLAGS} -f90lib -Kc99,gcc" CACHE STRING "")
-set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -f90lib -K exceptions rtti cpp11 gcc)" CACHE STRING "")
-set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -f90lib -K exceptions rtti cpp11 gcc)" CACHE STRING "")
-set(SX_LINK_LIBRARIES "${SX_LINK_LIBRARARIES} -llapack -lcblas -lblas" CACHE STRING "")
+set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -f90lib -K,exceptions,rtti,cpp11,gcc" CACHE STRING "")
+#set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -f90lib -K exceptions rtti cpp11 gcc" CACHE STRING "")
+set(SX_LINK_LIBRARIES "${SX_LINK_LIBRARIES} -llapack -lcblas -lblas -lm" CACHE STRING "decent set of default math libs for SX")
+
+string(STRIP "${SX_LINK_LIBRARIES}" SX_LINK_LIBRARIES)
+string(STRIP "${SX_CFLAGS_C99}" SX_CFLAGS_C99)
+string(STRIP "${SX_CXXFLAGS_C11}" SX_CXXFLAGS_C11)
 # --------------------------------
 
 # SX-Initialize runs early -- before SX-C and SX-CXX and flags settings

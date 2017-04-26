@@ -150,7 +150,7 @@ status_t prepare_workspace(
     } else {
         jcp.im2col_size = 0;
     }
-    int weights_reduce_size = 0;
+    size_t weights_reduce_size = 0;
     if (is_bwd_weights && jcp.mb != 1 && nthr != 1) {
         const size_t sz_per_thread = jcp.ngroups * weights_size;
         weights_reduce_size = nthr * sz_per_thread;

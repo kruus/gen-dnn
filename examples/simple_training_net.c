@@ -42,9 +42,15 @@
         }                                                                      \
     } while (0)
 
+#if defined(_SX)
+void *aligned_malloc(size_t size, size_t alignment) {
+    return malloc(size);
+}
+#else
 void *aligned_malloc(size_t size, size_t alignment) {
     return memalign(alignment, size);
 }
+#endif
 
 static size_t product(int *arr, size_t size)
 {

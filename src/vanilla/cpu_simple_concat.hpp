@@ -56,7 +56,7 @@ struct cpu_simple_concat_t: public c_compatible {
     static void execute(const nstl::vector<cpu_memory_t::pd_t> &src_pds_,
             const nstl::vector<cpu_memory_t::pd_t> &dst_pds_,
             cpu_primitive_t *concat) {
-        const int num_arrs = src_pds_.size();
+        const size_t num_arrs = src_pds_.size();
         const data_t *input_ptrs[num_arrs];
         data_t *output_ptrs[num_arrs];
         size_t nelems_no_d0[num_arrs];
@@ -64,7 +64,7 @@ struct cpu_simple_concat_t: public c_compatible {
 
         auto o_base_ptr = reinterpret_cast<data_t *>(concat->memory());
 
-        for (int a = 0; a < num_arrs; ++a) {
+        for (size_t a = 0; a < num_arrs; ++a) {
             const memory_desc_wrapper i_d(&src_pds_[a]);
             const memory_desc_wrapper o_d(&dst_pds_[a]);
 
@@ -84,7 +84,7 @@ struct cpu_simple_concat_t: public c_compatible {
 
 #       pragma omp parallel for collapse(2) schedule(static)
         for (size_t n = 0; n < N; ++n) {
-            for (int a = 0; a < num_arrs; ++a) {
+            for (size_t a = 0; a < num_arrs; ++a) {
                 /* do coping */
                 const data_t *i = &input_ptrs[a][is[a]*n];
                 data_t *o = &output_ptrs[a][os*n];

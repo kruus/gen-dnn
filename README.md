@@ -1,4 +1,17 @@
 # BRANCH for non-jit version of MKL-DNN, to ease porting API to non-Intel platforms
+
+## Quickstart:
+
+```
+./build.sh -h         # help</BR>
+Intel: ./build.sh -tt # build and run all tests (no jit)</BR>
+           --> build/    and build.log
+SX:    ./build.sh -ST # build for *S*X and *T*race cmake setup</BR>
+           --> build-sx/ and build-sx.log
+```
+
+## Purpose
+
 This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
 
 * can remove all Intel Jit stuff
@@ -18,6 +31,22 @@ This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
     fast)
 - I might try some C++ versions of Winograd convolution, if I have time.
 - There are no plans to put low-level impls for other chips into this public repo
+
+### SX modifications
+
+- SX cmake support is developed in subdirectory dev-cmake-sx
+  - changes to SX platform spec go into a tarfile that get untarred in gen-dnn root dir
+  - *** cmake-3.8 *** is OK, cmake-3.0 is not
+    - because cmake-3.8 has a handy call to Platform/SX-Initialize that I require
+  - ./build.sh -ST      SX, TRACE [cmake --trace]
+    - ---> build-sx/ and build-sx.log
+
+- SX has no posix_memalign :(
+- SX int is only 32-bit (even though you can use -size_t64)
+- SX has many conversion warnings.
+- SX link with libmkldnn.a ~ OK
+- SX run FAILS -- segfault within ref_relu_fwd init during memory_desc_wrapper
+  - is this related to 32-bit int issues?
 
 ## Github repos
 
@@ -39,7 +68,24 @@ functionality, implementing no "new" algorithms.
 Later on, for fancier vectorizable "tiled" algs, we may initially want to keep
 those impls private -- this can be done via and add-on library that "grafts"
 the additional convolutions onto the existing "engine" lists of primitives.
-### git notes-to-self
+
+### (snake10) and remotes (git remote -v)
+
+- snake10 is the main devel repo.
+  - Pull latest SX commits from Japan:
+    - git pull japan master
+  - Push snake10 (Intel) work to Japan:
+    - snake10:$ git push japan master:necla  # push to a tmp branch
+    - sapphire2:$ git merge necla            # merge from branch
+    - sapphire2:$ git branch -d necla        # delete tmp branch
+  - For public-domain SX work:
+    - Pull from upstream:
+      - git pull upstream master
+    - Push to github (public repo):
+      - git push
+
+### upstream merges
+
 - clone this mkl-dnn fork
   - git clone https://github.com/kruus/gen-dnn.git
 - upstream merge, from within cloned fork:
@@ -48,31 +94,6 @@ the additional convolutions onto the existing "engine" lists of primitives.
   - # ... resolve merge conflicts ...
   - git commit # use default message
   - git push # ... origin master ... update gen-dnn on Github.
-
-### (snake10) and remotes (git remote -v)
-
-- snake10 is the main devel repo.
-  - Pull latest SX commits from Japan:
-    - git pull japan master
-  - Push to github (public repo):
-    - git push
-  - Pull from upstream:
-    - git pull upstream master
-  - Push snake10 (Intel) work to Japan:
-    - git push japan master
-
-### SX modifications
-- SX cmake support is developed in subdirectory dev-cmake-sx
-  - changes to SX platform spec go into a tarfile that get untarred in gen-dnn root dir
-  - *** cmake-3.8 *** is OK, cmake-3.0 is not
-    - because cmake-3.8 has a handy call to Platform/SX-Initialize that I require
-  - ./build.sh -ST      SX, TRACE [cmake --trace]
-    - ---> build-sx/ and build-sx.log
-
-- SX has no posix_memalign :(
-- SX int is only 32-bit (even though you can use -size_t64)
-- SX has many conversion warnings.
-- SX ... again trouble linking, now that libmkldnn.a is compiled, prelinked and sxar'ed
 
 
 ## Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)

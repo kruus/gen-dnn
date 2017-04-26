@@ -56,9 +56,6 @@ else()
 endif()
 if(NECSX)
     cmake_minimum_required(VERSION 3.0)
-    #show_cmake_stuff("NO sx, after normal project(... C CXX)")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -f90lib")
-    set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -f90lib")
 else()
     message(STATUS "CMAKE_SYSTEM_NAME is ${CMAKE_SYSTEM_NAME}")
     message(STATUS "CMAKE_C_FLAGS    are ${CMAKE_C_FLAGS}")
@@ -117,14 +114,23 @@ include("cmake/Doxygen.cmake")
 #endif()
 
 # sdl options
-function(set_cmake_ccxx SUFFIX OPT)
-    set(CMAKE_C_${SUFFIX} "${OPT}")
-    set(CMAKE_CXX_${SUFFIX} "${OPT}")
-endfunction()
-
 if(NECSX)
     message(STATUS "more SX stuff can go here")
-    #set_cmake_ccxx(FLAGS -fopenmp)
+    message(STATUS "testing : CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
+    #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -fopenmp")
+    #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -f90lib")
+    set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -DUSE_CBLAS")
+    set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Wl,-M")
+
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} ${SX_CFLAGS_C99}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} ${SX_CXXFLAGS_C11}")
+
+    # additional link libs set in src/CMakeLists.txt
+    list(APPEND mkldnn_LINKER_LIBS ${SX_LINK_LIBRARIES})    # -llapack -lcblas -lblas -lf2003 -lm
+    # cmake propagates the library dependencies to any targets
+    # that depend on the build mkldnn target
+
+    message(STATUS "testing : CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
 elseif(UNIX OR APPLE)
     error_if_SX()
     if(NOT CYGWIN)
@@ -191,6 +197,10 @@ endif()
 #    message(STATUS "   MKL: shared linker flags: ${CMAKE_SHARED_LINKER_FLAGS}")
 #endif()
 message(STATUS "initial CMAKE_CCXX_FLAGS: ${CMAKE_CCXX_FLAGS}")
+message(STATUS "initial CMAKE_CCXX_FLAGS: ${CMAKE_CXX_FLAGS}")
+if(NECSX)
+    show_cmake_stuff("NECSX, CMAKE settings before subdirectories...")
+endif()
 ####################################
 
 enable_testing()

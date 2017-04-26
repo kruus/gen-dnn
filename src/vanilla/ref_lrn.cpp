@@ -68,10 +68,10 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
                 }
             }
         }
-        sum = k + alpha * sum / summands;
+        sum = static_cast<data_t>(k + alpha * sum / summands);
         if (ws)
             ws[ws_d.off(mb, oc, oh, ow)] = sum; // for back prop
-        d[0] = src[data_d.off(mb, oc, oh, ow)] / pow(sum, beta);
+        d[0] = static_cast<data_t>(src[data_d.off(mb, oc, oh, ow)] / pow(sum, beta));
     };
 
     const int MB = conf_.MB();
@@ -107,7 +107,7 @@ void ref_lrn_bwd_t<data_type>::execute_backward() {
 
     const double alpha = conf_.desc()->lrn_alpha;
     const double beta = conf_.desc()->lrn_beta;
-    const double k = conf_.desc()->lrn_k;
+    const data_t k = static_cast<data_t>(conf_.desc()->lrn_k);
     const int kernel_size = conf_.desc()->local_size;
 
     auto get_omega = [=](data_t c_k, int kernel_size, double alpha, int C,
@@ -139,11 +139,11 @@ void ref_lrn_bwd_t<data_type>::execute_backward() {
 
             if (ks == kernel_size/2) omega_mid = omega;
 
-            data_t t = src[data_d.off(mb, _t, oh, ow)] / powf(omega, beta);
+            data_t t = src[data_d.off(mb, _t, oh, ow)] / std::pow(omega, static_cast<data_t>(beta));
             B +=  (1.0f / omega) * t * diff_dst[diff_data_d.off(mb, _t, oh, ow)];
         }
 
-        A = (1.0f / powf(omega_mid, beta)) * diff_dst[diff_data_d.off(mb, oc, oh, ow)];
+        A = (1.0f / std::pow(omega_mid, static_cast<data_t>(beta))) * diff_dst[diff_data_d.off(mb, oc, oh, ow)];
         B *= src[data_d.off(mb, oc, oh, ow)];
         B *= (2.0f * alpha * beta) / kernel_size;
         *d = A - B;

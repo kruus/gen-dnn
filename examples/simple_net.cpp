@@ -180,6 +180,9 @@ void simple_net(){
     stream(stream::kind::eager).submit(net).wait();
 }
 
+#if defined(_SX)
+#include <string>       // operator<<(ostream,string) is defined here!
+#endif
 int main(int argc, char **argv) {
     try {
         simple_net();

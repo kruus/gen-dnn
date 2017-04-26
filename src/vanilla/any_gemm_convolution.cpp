@@ -33,6 +33,7 @@ extern "C" {
 #ifdef USE_MKL
 #include "mkl_blas.h"
 #endif
+#endif
 
 namespace mkldnn {
 namespace impl {
@@ -81,7 +82,8 @@ void _any_gemm_convolution_fwd_t<with_relu>::execute_forward() {
                 any_gemm_convolution_utils::im2col(jcp, _src, _col);
 #if defined(_SX) // mathkeisan comes with a cblas.h
             // just guessing [for now] check with simd/sx convolution codes XXX
-            cblas_sgemm( CblasRowMajor, CblasNoTrans, CblasNoTrans, // Order, TransA, TransB
+            // ColMajor agrees w/ fortran, but isn't NCHW row-wise for HW?
+            cblas_sgemm( CblasColMajor, CblasNoTrans, CblasNoTrans, // Order, TransA, TransB
                          M, N, K, one,                              // M, N, K, alpha
                          jcp.need_im2col ? _col:_src, M,            // A, lda
                          _weights, K,                               // B, ldb
@@ -149,7 +151,7 @@ void any_gemm_convolution_bwd_data_t::execute_backward_data() {
             data_t *_col = this->ws + ithr * jcp.ic * jcp.ks * jcp.os;
 #if defined(_SX)
             // just guessing [for now] check with simd/sx convolution codes XXX
-            cblas_sgemm( CblasRowMajor, CblasNoTrans, CblasTrans,   // Order, TransA, TransB
+            cblas_sgemm( CblasColMajor, CblasNoTrans, CblasTrans,   // Order, TransA, TransB
                          M, N, K, one,                              // M, N, K, alpha
                          _diff_dst, M,                              // A, lda
                          _weights, N,                               // B, ldb
@@ -218,11 +220,11 @@ void any_gemm_convolution_bwd_weights_t::execute_backward_weights() {
                         any_gemm_convolution_utils::im2col(jcp, _src, _col);
 #if defined(_SX)
                     if (mb == mb_start)
-                        cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, M, N, K, one,
+                        cblas_sgemm(CblasColMajor, CblasTrans, CblasNoTrans, M, N, K, one,
                                     jcp.need_im2col ? _col : _src, K,
                                     _diff_dst, K, zero, _diff_weights, M);
                     else
-                        cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, M, N, K, one,
+                        cblas_sgemm(CblasColMajor, CblasTrans, CblasNoTrans, M, N, K, one,
                             jcp.need_im2col ? _col : _src, K,
                                 _diff_dst, K, one, _diff_weights, M);
 #else
