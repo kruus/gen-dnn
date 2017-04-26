@@ -19,19 +19,19 @@
 
 #include "gemm_inner_product.hpp"
 
-#if defined(_SX) || defined(USE_CBLAS)
-#include "cblas.h"
-#elif USE_MKL
+#if defined(USE_MKL) && defined(USE_CBLAS)
 #include "mkl_cblas.h"
+#elif defined(_SX) || defined(USE_CBLAS)
+#include "cblas.h"
 #endif
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-#ifdef USE_MKL
+#if defined(USE_MKL) && defined(USE_CBLAS)
 typedef MKL_INT cblas_int;
-#elif defined(USE_CBLAS) || defined(_SX)
+#elif defined(_SX) || defined(USE_CBLAS)
 typedef int cblas_int;  ///< also OK for SX cblas.h
 #if defined(_SX)
 typedef CBLAS_ORDER CBLAS_LAYOUT;

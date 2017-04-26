@@ -139,11 +139,19 @@ void ref_lrn_bwd_t<data_type>::execute_backward() {
 
             if (ks == kernel_size/2) omega_mid = omega;
 
+#if defined(_SX)
             data_t t = src[data_d.off(mb, _t, oh, ow)] / std::pow(omega, static_cast<data_t>(beta));
+#else
+            data_t t = src[data_d.off(mb, _t, oh, ow)] / powf(omega, beta);
+#endif
             B +=  (1.0f / omega) * t * diff_dst[diff_data_d.off(mb, _t, oh, ow)];
         }
 
+#if defined(_SX)
         A = (1.0f / std::pow(omega_mid, static_cast<data_t>(beta))) * diff_dst[diff_data_d.off(mb, oc, oh, ow)];
+#else
+        A = (1.0f / powf(omega_mid, beta)) * diff_dst[diff_data_d.off(mb, oc, oh, ow)];
+#endif
         B *= src[data_d.off(mb, oc, oh, ow)];
         B *= (2.0f * alpha * beta) / kernel_size;
         *d = A - B;
