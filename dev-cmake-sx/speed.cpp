@@ -80,7 +80,7 @@ template<> inline
 template< typename FLOAT >
 inline void init( FLOAT* const x, size_t cnt ){
     while(cnt--)
-        x[cnt] = 0.5 + drand48();
+        x[cnt] = static_cast<FLOAT>(0.5 + drand48());
 }
 template< typename FLOAT >
 inline void init( FLOAT* const x, size_t cnt, FLOAT const value ){
@@ -107,8 +107,8 @@ blasDmatDvecMult( size_t N, size_t reps, size_t steps, double maxtime )
     init<T>( res, N, T(0.0) );
 
     // prep caches (untimed)
-    gemv( CblasRowMajor, CblasNoTrans, N, N,
-            T(1.0), mat,N,   vec,1,   T(0.0), res,1 );
+    gemv( CblasRowMajor, CblasNoTrans, (int)N, (int)N,
+            T(1.0), mat,(int)N,   vec,1,   T(0.0), res,1 );
 
     Timer timer;
     for( size_t rep=0UL; rep<reps; ++rep )
@@ -121,7 +121,7 @@ blasDmatDvecMult( size_t N, size_t reps, size_t steps, double maxtime )
             //        T(1.0),mat,N,  vec,1,  T(0.0),res,1 );
             //
             //cblas_sgemv( order, TransA, M, N, alpha, A, lda, X, incX, beta, Y, incY );
-            cblas_sgemv( CblasRowMajor, CblasNoTrans, N, N, 1.0, mat, N, vec, 1, 0.0, res, 1 );
+            cblas_sgemv( CblasRowMajor, CblasNoTrans, (int)N, (int)N, 1.0, mat, (int)N, vec, 1, 0.0, res, 1 );
         }
         timer.end();
 
@@ -148,6 +148,9 @@ double round( double x, double unit ){
 
 int main(int,char**)
 {
+    cout<<" sizeof(int)     "<<sizeof(int)<<endl;
+    cout<<" sizeof(size_t)  "<<sizeof(size_t)<<endl;
+    cout<<" sizeof(ssize_t) "<<sizeof(ssize_t)<<endl;
     Timer t;
 #define DMATDVEC_FLOAT( N, REP, STEP, MAXTIME ) do { \
     t = blasDmatDvecMult< float >( (N), (REP), (STEP), (MAXTIME) ); \

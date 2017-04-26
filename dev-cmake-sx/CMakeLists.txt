@@ -23,7 +23,7 @@ project(cmake-sample C CXX)
 #   for any environment :
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Kgcc -size_t64 -v")
 # NOTE: -size_t64 must **also** be given to linker:
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-size_t64")
+#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-size_t64")
 #         ^^^ or SHARED or MODULE
 # or for just foo, set_target_properties(foo PROPERTIES LINK_FLAGS -Wl,-size_t64)
 
@@ -36,6 +36,9 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${SX_CCXXFLAGS_WARNALL} 
 
 add_executable(foo foo.cc)
 
+add_executable(speed32 speed.cpp)
+target_link_libraries(speed32 "-lcblas -lblas -lf2003")
+
 add_executable(speed64 speed.cpp)
 target_link_libraries(speed64 "-lcblas -lblas -lf2003")
 
@@ -44,5 +47,5 @@ set_target_properties(spd PROPERTIES COMPILE_FLAGS "-Tauto,all")
 
 add_executable(speed2 speed2.cpp)
 add_dependencies(speed2 spd)
-target_link_libraries(speed2 "-Wl,-h,muldefs,-h,lib_cyclic -L. libspd.a -lcblas -lblas -lf2003")
+target_link_libraries(speed2 "-size_t64 -Wl,-h,muldefs,-h,lib_cyclic -L. libspd.a -lcblas -lblas -lf2003")
 
