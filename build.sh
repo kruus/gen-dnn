@@ -189,6 +189,7 @@ timeoutPID() { # unused
         fi
     fi
 ) 2>&1 | tee "${BUILDDIR}".log
+ls -l "${BUILDDIR}"
 BUILDOK="n"; if [ -f "${BUILDDIR}"/stamp-BUILDOK ]; then BUILDOK="y"; fi # check last thing produced for OK build
 if [ "$BUILDOK" == "y" ]; then
     (
