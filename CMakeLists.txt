@@ -61,7 +61,6 @@ if(NECSX)
 else()
     message(STATUS "CMAKE_SYSTEM_NAME is ${CMAKE_SYSTEM_NAME}")
     message(STATUS "CMAKE_C_FLAGS    are ${CMAKE_C_FLAGS}")
-    message(FATAL_ERROR "SX toolchain file not loaded???")
     cmake_minimum_required(VERSION 2.8)
 endif()
 
