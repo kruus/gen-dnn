@@ -146,8 +146,8 @@ timeoutPID() { # unused
         CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=Debug"
         CMAKEOPT="${CMAKEOPT} -DCMAKE_INSTALL_PREFIX=../${INSTALLDIR}-dbg"
     else
-        #CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=Release"
-        CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=RelWithDebInfo"
+        CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=Release"
+        #CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=RelWithDebInfo"
         CMAKEOPT="${CMAKEOPT} -DCMAKE_INSTALL_PREFIX=../${INSTALLDIR}"
     fi
     if [ "$DONEEDMKL" == "y" ]; then
@@ -197,7 +197,7 @@ if [ "$BUILDOK" == "y" ]; then
     { echo "Installing ..."; make install-bin install-dev; }
     { echo "Installing docs ..."; make install-doc; }
     ) 2>&1 >> "${BUILDDIR}".log
-    if [ $DOTEST -gt 0 -a ! "$DOTARGET" == "s" ]; then
+    if [ ! "$DOTEST" == "0" -a ! "$DOTARGET" == "s" ]; then
         rm -f test1.log test2.log
         echo "Testing ... test1"
         (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log || true
@@ -216,10 +216,10 @@ echo "INSTALLDIR ${INSTALLDIR}"
 echo "DOTARGET=${DOTARGET}, DOJIT=${DOJIT}, DODEBUG=${DODEBUG}, DOTEST=${DOTEST}, DODOC=${DODOC}, DONEEDMKL=${DONEEDMKL}"
 if [ "${BUILDOK}" == "y" ]; then
     LOGDIR="log-${DOTARGET}${DOJIT}${DODEBUG}${DOTEST}${DODOC}${DONEEDMKL}"
-    if [ $DOTEST -gt 0 ]; then
+    if [ "$DOTEST" -gt "0" ]; then
         echo "LOGDIR:       ${LOGDIR}" 2>&1 >> "${BUILDDIR}".log
     fi
-    if [ $DOTEST -gt 0 ]; then
+    if [ "$DOTEST" -gt "0" ]; then
         if [ -d "${LOGDIR}" ]; then rm -f "${LOGIDR}.bak"; mv -v "${LOGDIR}" "${LOGDIR}.bak"; fi
         mkdir ${LOGDIR}
         for f in "${BUILDDIR}.log" test1.log test2.log doxygen.log; do

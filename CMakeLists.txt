@@ -121,13 +121,12 @@ if(NECSX)
     #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -fopenmp")
     #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -f90lib")
     set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -DUSE_CBLAS")
-    set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Wl,-M")
+    #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Wl,-M") # or maybe as linker flags?
 
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} ${SX_CFLAGS_C99}")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} ${SX_CXXFLAGS_C11}")
-
-    # additional link libs set in src/CMakeLists.txt
-    list(APPEND mkldnn_LINKER_LIBS ${SX_LINK_LIBRARIES})    # -llapack -lcblas -lblas -lf2003 -lm
+    # MathKeisan libs: additional link libs set in src/CMakeLists.txt
+    list(APPEND mkldnn_LINKER_LIBS ${SX_LINK_LIBRARIES})    # ex. -llapack -lcblas -lblas -lm
     # cmake propagates the library dependencies to any targets
     # that depend on the build mkldnn target
 

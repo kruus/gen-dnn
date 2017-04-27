@@ -73,12 +73,12 @@ struct cpu_simple_concat_t: public c_compatible {
             output_ptrs[a] = o_base_ptr + o_d.blk_off(0);
 
             nelems_no_d0[a] = nelems_no_dim_0(i_d);
-            is[a] = i_d.blocking_desc().strides[0][0];
+            is[a] = static_cast<size_t>(i_d.blocking_desc().strides[0][0]);
         }
 
         const memory_desc_wrapper o_d(&dst_pds_[0]);
         const size_t N = o_d.dims()[0];
-        const size_t os = o_d.blocking_desc().strides[0][0];
+        const size_t os = static_cast<size_t>(o_d.blocking_desc().strides[0][0]);
 
         catch_me();
 
@@ -106,7 +106,7 @@ private:
         for (int d = 1; d < data_d.ndims(); ++d) {
             auto block = blk.block_dims[d];
             max_size = nstl::max(max_size,
-                    size_t(blk.padding_dims[d]/block)*blk.strides[0][d]);
+                    static_cast<size_t>((blk.padding_dims[d]/block)*blk.strides[0][d]));
             if (block > 1)
                 max_size = nstl::max(max_size,
                         size_t(block*blk.strides[1][d]));

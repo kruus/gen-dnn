@@ -51,8 +51,8 @@ include_directories(
     #${CMAKE_CURRENT_SOURCE_DIR}/cpu/xbyak
     )
 
-if(MECSX)
-	add_library(${TARGET_NAME}        ${HEADERS} ${SOURCES})
+if(NECSX)
+    add_library(${TARGET_NAME}        ${HEADERS} ${SOURCES})
 else()
     add_library(${TARGET_NAME} SHARED ${HEADERS} ${SOURCES})
 endif()

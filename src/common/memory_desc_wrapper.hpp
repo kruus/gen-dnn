@@ -80,10 +80,10 @@ struct memory_desc_wrapper: public c_compatible {
         size_t max_size = 0;
         for (int d = 0; d < ndims(); ++d) {
             auto block = block_dims[d];
-            max_size = nstl::max(max_size,
-                    size_t(padding_dims[d]/block)*strides[0][d]);
+            max_size = nstl::max(max_size, // strides are ptrdiff_t
+                    static_cast<size_t>((padding_dims[d]/block)*strides[0][d]));
             if (block > 1)
-                max_size = nstl::max(max_size, size_t(block*strides[1][d]));
+                max_size = nstl::max(max_size, static_cast<size_t>(block*strides[1][d]));
         }
         return max_size * types::data_type_size(data_type());
     }
@@ -127,7 +127,8 @@ struct memory_desc_wrapper: public c_compatible {
         const blocking_desc_t &blk = blocking_desc();
         const dims_t &optd = blk.offset_padding_to_data;
 
-        size_t phys_offset = blk.offset_padding;
+        // offset_padding is ptrdiff_t (signed?)
+        size_t phys_offset = static_cast<size_t>(blk.offset_padding);
         for (int d = 0; d < ndims(); ++d) {
             const int block = blk.block_dims[d];
 
@@ -204,13 +205,13 @@ private:
                 &dims()[ndims() - n_args]) + logical_offset(args...);
     }
 
-    template<typename ...Void>
-    inline size_t _blk_off() const { return blocking_desc().offset_padding; }
+    template<typename ...Void> // from ptrdiff_t
+    inline size_t _blk_off() const { return static_cast<size_t>(blocking_desc().offset_padding); }
 
     template<typename T, typename ...Args>
     inline size_t _blk_off(Args ...args, T xn) const {
-        return size_t(xn)*blocking_desc().strides[0][sizeof...(args)] +
-            _blk_off<Args...>(args...);
+        return static_cast<size_t>(size_t(xn)*blocking_desc().strides[0][sizeof...(args)] +
+            _blk_off<Args...>(args...));
     }
 };
 

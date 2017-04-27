@@ -64,10 +64,20 @@ set(SX_CCXXFLAGS_PTHREADS   "-Pmulti" CACHE STRING "")
 set(SX_CCXXFLAGS_QUIET    "-pi nomsg -pvctl nomsg -O nomsg" CACHE STRING "")
 set(SX_CCXXFLAGS_VERBOSE  "-ftrace -R,diaglist,fmtlist -pvctl,fullmsg,noneighbors" CACHE STRING "")
 set(SX_CCXXFLAGS_WARNALL  "-w all" CACHE STRING "")
-set(SX_CFLAGS_C99     "${SX_CFLAGS} -f90lib -Kc99,gcc" CACHE STRING "")
-set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -f90lib -K,exceptions,rtti,cpp11,gcc" CACHE STRING "")
-#set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -f90lib -K exceptions rtti cpp11 gcc" CACHE STRING "")
+# ? -f90lib
+set(SX_CFLAGS_C99     "${SX_CFLAGS} -Kc99,gcc" CACHE STRING "")
+
+#set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -f90lib -Kexceptions,rtti,cpp11,gcc" CACHE STRING "")
+# perhaps leave out -Krtti
+set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -f90lib -Kexceptions,cpp11,gcc" CACHE STRING "")
 set(SX_LINK_LIBRARIES "${SX_LINK_LIBRARIES} -llapack -lcblas -lblas -lm" CACHE STRING "decent set of default math libs for SX")
+#     -f90lib,dw,eW   : allows 4-byte integer and 4-byte reals
+# OR, without -f90lib ... seeem to need -lf2003  (to define symbol f_rtdt)
+#   but what is diff between libf2003 and libf2003_m and libi90sx and libi90sxe and libi90sxt
+#set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -K exceptions rtti cpp11 gcc" CACHE STRING "")
+#set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -K,exceptions,cpp11,gcc" CACHE STRING "")
+#set(SX_LINK_LIBRARIES "${SX_LINK_LIBRARIES} -llapack -lcblas -lblas -lf2003 -lm" CACHE STRING "decent set of default math libs for SX")
+#set(SX_LINK_LIBRARIES "-f90lib ${SX_LINK_LIBRARIES} -llapack -lcblas -lblas -lm" CACHE STRING "decent set of default math libs for SX")
 
 string(STRIP "${SX_LINK_LIBRARIES}" SX_LINK_LIBRARIES)
 string(STRIP "${SX_CFLAGS_C99}" SX_CFLAGS_C99)

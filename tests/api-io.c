@@ -26,7 +26,7 @@
 #include "mkldnn_io.h"
 
 #define CHECK(f) do { \
-    mkldnn_status_t s = f; \
+    mkldnn_status_t const s = (f); \
     if (s != mkldnn_success) { \
         char const * name = mkldnn_name_status(s); \
         printf("[%s:%d] error: %s returns %d : %s \n", __FILE__, __LINE__, #f, s, name); \
@@ -35,7 +35,7 @@
 } while(0)
 
 #define CHECK_TRUE(expr) do { \
-    int e_ = expr; \
+    int e_ = (int)(expr); \
     if (!e_) { \
         printf("[%s:%d] %s failed\n", __FILE__, __LINE__, #expr); \
         exit(2); \
@@ -54,7 +54,8 @@ void io0() {
     // check that snprintf puts a terminating NUL always at buf[len-1] (or before)
     {
         int const len=100;
-        char buf[len];
+        char buf[len]; // On SX, this gives a warning:
+        // "use of a const variable in a constant expression is nonstandard in C"
         mkldnn_dims_t d = {1};
         int sz0 = mkldnn_name_dims( d, buf, len );
         CHECK_TRUE(sz0 < len);
@@ -172,6 +173,7 @@ void test2() {
      * pad: {1, 1}
      * strides: {1, 1}
      */
+    int const verbose = 1;
 
     const int mb = 2;
     const int groups = 2;
@@ -192,11 +194,12 @@ void test2() {
     real_t *out_mem = (real_t*)calloc(product(c3_dst_sizes, 4), sizeof(real_t));
     CHECK_TRUE(src && weights && bias && dst && out_mem);
 
-    for (int i = 0; i < c3_bias_sizes[0]; ++i) bias[i] = i;
+    for (int i = 0; i < c3_bias_sizes[0]; ++i) bias[i] = (real_t)(i);
 
     mkldnn_engine_t engine;
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0));
 
+    if(verbose)printf(" creating descriptors\n");
     /* first describe user data and create data descriptors for future
      * convolution w/ the specified format -- we do not want to do a reorder */
     mkldnn_memory_desc_t c3_src_md, c3_weights_md, c3_bias_md, c3_dst_md, out_md;
@@ -245,7 +248,8 @@ void test2() {
         CHECK(mkldnn_memory_set_data_handle(out, out_mem));
     }
 
-    mkldnn_primitive_at_t c3_srcs[] = {
+    if(verbose)printf(" creating srcs and dsts\n");
+    mkldnn_primitive_at_t c3_srcs[] = { /* are there zero-initialized? */
         mkldnn_primitive_at(c3_src, 0),
         mkldnn_primitive_at(c3_weights, 0),
         mkldnn_primitive_at(c3_bias, 0)
@@ -258,6 +262,7 @@ void test2() {
     mkldnn_primitive_desc_t c3_pd;
     mkldnn_primitive_t c3;
 
+    if(verbose)printf(" creating convolution\n");
     CHECK(mkldnn_convolution_forward_desc_init(&c3_desc,
                 mkldnn_forward_training, mkldnn_convolution_direct,
                 &c3_src_md, &c3_weights_md, &c3_bias_md, &c3_dst_md,
@@ -294,6 +299,7 @@ void test2() {
     CHECK(mkldnn_primitive_create(&r, r_pd, r_srcs, r_dsts));
     CHECK(mkldnn_primitive_desc_destroy(r_pd));
 
+    if(verbose)printf(" assembling network and submitting...\n");
     /* let us build a net */
     mkldnn_primitive_t net[] = {c3, r};
     mkldnn_stream_t stream;
@@ -301,6 +307,7 @@ void test2() {
     CHECK(mkldnn_stream_submit(stream, 2, net, NULL));
     CHECK(mkldnn_stream_wait(stream, 1, NULL));
 
+    if(verbose)printf(" clean-up primitives\n");
     /* clean-up */
     CHECK(mkldnn_stream_destroy(stream));
     CHECK(mkldnn_primitive_destroy(r));
@@ -311,6 +318,7 @@ void test2() {
     CHECK(mkldnn_primitive_destroy(c3_dst));
     CHECK(mkldnn_engine_destroy(engine));
 
+    if(verbose)printf(" checking out_mem\n");
     const int N = c3_dst_sizes[0], C = c3_dst_sizes[1],
           H = c3_dst_sizes[2], W = c3_dst_sizes[3];
     for (int n = 0; n < N; ++n)
@@ -322,6 +330,7 @@ void test2() {
         CHECK_TRUE(out_mem[off] == bias[c]);
     }
 
+    if(verbose)printf(" free data memory\n");
     free(src);
     free(weights);
     free(bias);
@@ -339,7 +348,7 @@ void test3() {
     CHECK_TRUE(src && dst && out_mem);
 
     for (size_t i = 0; i < product(l2_data_sizes, 4); ++i)
-        src[i] = (i % 13) + 1;
+        src[i] = (real_t)((i % 13) + 1);
 
     mkldnn_engine_t engine;
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0));
@@ -429,9 +438,9 @@ void test3() {
     for (int h = 0; h < H; ++h)
     for (int w = 0; w < W; ++w)
     {
-        size_t off = ((n*C + c)*H + h)*W + w;
-        real_t e = (off % 13) + 1;
-        real_t diff = fabs(out_mem[off] - e);
+        size_t off = (size_t)(((n*C + c)*H + h)*W + w);
+        real_t e = (real_t)((off % 13) + 1);
+        real_t diff = (real_t)(fabs(out_mem[off] - e));
         if (diff/fabs(e) > 0.0125)
             printf("exp: %g, got: %g\n", e, out_mem[off]);
         CHECK_TRUE(diff/fabs(e) < 0.0125);
@@ -443,9 +452,17 @@ void test3() {
 }
 
 int main() {
+    printf("\n io0 test ...\n");
     io0();
+    printf("\n io0 test DONE\n");
+    printf("\n test1 test ...\n");
     test1();
+    printf("\n test1 test DONE\n");
+    printf("\n test2 test ...\n");
     test2();
+    printf("\n test2 test DONE\n");
+    printf("\n test3 test ...\n");
     test3();
+    printf("\n test3 test DONE\n");
     return 0;
 }

@@ -404,8 +404,9 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         output += output_d.blk_off(0);
 
         const int N = input_d.dims()[0];
-        const size_t is = input_d.blocking_desc().strides[0][0];
-        const size_t os = output_d.blocking_desc().strides[0][0];
+        // strides are ptrdiff_t, so should is/os be a signed type?
+        const size_t is = static_cast<size_t>(input_d.blocking_desc().strides[0][0]);
+        const size_t os = static_cast<size_t>(output_d.blocking_desc().strides[0][0]);
         const size_t nelems_no_d0 = nelems_no_dim_0(input_d);
 
         if (alpha == 1.0 && beta == 0.0) {
@@ -442,7 +443,7 @@ private:
         for (int d = 1; d < data_d.ndims(); ++d) {
             auto block = blk.block_dims[d];
             max_size = nstl::max(max_size,
-                    size_t(blk.padding_dims[d]/block)*blk.strides[0][d]);
+                    static_cast<size_t>((blk.padding_dims[d]/block)*blk.strides[0][d]));
             if (block > 1)
                 max_size = nstl::max(max_size,
                         size_t(block*blk.strides[1][d]));
