@@ -1,4 +1,5 @@
-
+#ifndef LIBSPEED_CPP
+#define LIBSPEED_CPP
 #include "libspeed.hpp"
 //extern "C"
 //{
@@ -13,7 +14,7 @@ using namespace std;
 
 #if ! LIBSPD_INLINE_GEMV // I would like to explicitly instantiate into lib but do not know how, so ...
 template<> 
-    void gemv<float>( const enum CBLAS_ORDER order, const enum CBLAS_TRANSPOSE TransA,
+    void gemv<float>( const CBLAS_ORDER order, const CBLAS_TRANSPOSE TransA,
             const int M, const int N,
             const float alpha, const float *A, const int lda,
             const float *X, const int incX,
@@ -24,7 +25,7 @@ template<>
 }
 
 template<>
-    void gemv<double>( const enum CBLAS_ORDER order, const enum CBLAS_TRANSPOSE TransA,
+    void gemv<double>( const CBLAS_ORDER order, const CBLAS_TRANSPOSE TransA,
             const int M, const int N,
             const double alpha, const double *A, const int lda,
             const double *X, const int incX,
@@ -43,4 +44,4 @@ template<> Timer blasDmatDvecMult<float>( int N, size_t reps, size_t steps, doub
 double round( double x, double unit ){
     return uint64_t( (x + 0.5*unit)/unit ) * unit;
 }
-
+#endif // LIBSPEED_CPP

@@ -1,4 +1,5 @@
-
+#ifndef LIBSPEED_HPP
+#define LIBSPEED_HPP
 extern "C"
 {
 #include <cblas.h>
@@ -6,6 +7,7 @@ extern "C"
 #include <stdint.h>
 #include <sys/time.h>
 #include <stdlib.h>
+#include <iostream>
 
 class Timer {
     public:
@@ -27,11 +29,14 @@ class Timer {
             rt_sum += runTime;
             rt_sumsqr += runTime*runTime;
         }
+        ~Timer() { std::cout<<" ~T"<<static_cast<int>(this->bogus*1.e-12)<<' '; }
         double last() const { return runTime; }
         double min()  const { return rt_min; }
         double avg() const { return rt_sum/rt_n; }
         uint64_t samples() const { return rt_n; }
         //double stdev() const { return ...; }
+    public: // a convenient spot to update things (try to gaurd against compiler over-optimization)
+        double volatile bogus;
     private:
         struct timeval tvStart, tvEnd;
         double runTime;
@@ -44,16 +49,18 @@ class Timer {
 
 /** y = alpha * A * x + beta * y */
 template< typename T >
-void gemv( const enum CBLAS_ORDER order, const enum CBLAS_TRANSPOSE TransA,
+void gemv( const CBLAS_ORDER order, const CBLAS_TRANSPOSE TransA,
         const int M, const int N,
         const T alpha, const T *A, const int lda,
         const T *X, const int incX,
         const T beta, T *Y, const int incY);
 
+#ifndef LIBSPD_INLINE_GEMV
 #define LIBSPD_INLINE_GEMV 1
-#if LIBSPD_INLINE_GEMV // I would like to explicitly instantiate into lib but do not know how, so ...
-template<> inline
-    void gemv<float>( const enum CBLAS_ORDER order, const enum CBLAS_TRANSPOSE TransA,
+#endif
+#if LIBSPD_INLINE_GEMV
+template<> inline 
+    void gemv( const CBLAS_ORDER order, const CBLAS_TRANSPOSE TransA,
             const int M, const int N,
             const float alpha, const float *A, const int lda,
             const float *X, const int incX,
@@ -62,9 +69,8 @@ template<> inline
     //cout<<" lda = "<<lda<<endl;
     cblas_sgemv( order, TransA, M, N, alpha, A, lda, X, incX, beta, Y, incY );
 }
-
 template<> inline
-    void gemv<double>( const enum CBLAS_ORDER order, const enum CBLAS_TRANSPOSE TransA,
+    void gemv( const CBLAS_ORDER order, const CBLAS_TRANSPOSE TransA,
             const int M, const int N,
             const double alpha, const double *A, const int lda,
             const double *X, const int incX,
@@ -72,21 +78,25 @@ template<> inline
 {
     cblas_dgemv( order, TransA, M, N, alpha, A, lda, X, incX, beta, Y, incY );
 }
-#endif // LIBSPD_INLINE_GEMV
+#endif
+
 
 /** init with randoms */
 template< typename FLOAT >
 inline void init( FLOAT* const x, size_t cnt ){
     while(cnt--)
-        x[cnt] = static_cast<float>(0.5 + drand48());
+        x[cnt] = static_cast<FLOAT>(0.5 + drand48());
 }
+/** init with const value */
 template< typename FLOAT >
 inline void init( FLOAT* const x, size_t cnt, FLOAT const value ){
     while(cnt--)
         x[cnt] = value;
 }
 
+#ifndef LIBSPD_INLINE_TEST
 #define LIBSPD_INLINE_TEST 1
+#endif
 #if LIBSPD_INLINE_TEST
 /** \p N      size of matrix and vector
  * \p reps    size of outer loop
@@ -110,7 +120,7 @@ blasDmatDvecMult( int N, size_t reps, size_t steps, double maxtime )
             T(1.0), mat,N,   vec,1,   T(0.0), res,1 );
 
     Timer timer;
-    for( size_t rep=0UL; rep<reps; ++rep )
+    for(size_t rep=0UL, rr=0U; rep<reps; ++rep )
     {
         timer.start();
         for( size_t step=0UL; step<steps; ++step ) {
@@ -121,6 +131,11 @@ blasDmatDvecMult( int N, size_t reps, size_t steps, double maxtime )
             //
             //cblas_sgemv( order, TransA, M, N, alpha, A, lda, X, incX, beta, Y, incY );
             cblas_sgemv( CblasRowMajor, CblasNoTrans, N, N, 1.0, mat, N, vec, 1, 0.0, res, 1 );
+            // more heavy-handed data mods (not strictly nec here)
+            // Guard against compiler recognizing that calls/result are never used.
+            rr=(rr+1U)%N;
+            vec[rr] += 1.e-6;
+            timer.bogus += static_cast<double>(res[rr]);
         }
         timer.end();
 
@@ -142,4 +157,4 @@ blasDmatDvecMult( int N, size_t reps, size_t steps, double maxtime )
 /** this one always goes into the library. OK, so something works. */
 double round( double x, double unit );
 
-//
+#endif // LIBSPEED_HPP
