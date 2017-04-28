@@ -4,6 +4,11 @@
 #
 #==============================================
 message(STATUS " *** Toolchain file: sx.cmake ***")
+
+# The Platform files (esp. SX-Initialize "common" init) are known to work with 3.8.0
+# 3.0 does not pull in this file, which just makes life so much easier
+cmake_minimum_required(VERSION 3.8.0 FATAL_ERROR)
+
 #SET(CMAKE_SYSTEM_NAME Generic) # incorrectly assumes GNU, so CMAKE_BUILD_TYPE options are WRONG
 SET(CMAKE_SYSTEM_NAME SX)   # this would need our own Platforms/SX.cmake file
 # this seems to be somewhat flaky
