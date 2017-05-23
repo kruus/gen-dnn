@@ -17,8 +17,6 @@
 #include <assert.h>
 #include <math.h>
 
-#include <float.h>
-
 #include "c_types_map.hpp"
 #include "type_helpers.hpp"
 #include "nstl.hpp"
@@ -29,14 +27,17 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-template <impl::data_type_t data_type>
-void ref_pooling_fwd_t<data_type>::execute_forward() {
+template <data_type_t data_type, data_type_t acc_type>
+void ref_pooling_fwd_t<data_type, acc_type>::execute_forward() {
     using namespace alg_kind;
+    using namespace prop_kind;
+
+    auto alg = conf_.desc()->alg_kind;
 
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
-    auto dst = reinterpret_cast<data_t*>(this->memory(0));
-    auto ws = conf_.desc()->alg_kind == pooling_max ?
-        reinterpret_cast<int*>(this->memory(1)) : nullptr;
+    auto dst = reinterpret_cast<data_t *>(this->memory(0));
+    auto ws = alg == pooling_max && conf_.desc()->prop_kind == forward_training
+        ? reinterpret_cast<int *>(this->memory(1)) : nullptr;
 
     const memory_desc_wrapper src_d(conf_.src_pd());
     const memory_desc_wrapper dst_d(conf_.dst_pd());
@@ -50,8 +51,6 @@ void ref_pooling_fwd_t<data_type>::execute_forward() {
     const int SW = conf_.KSW();
     const int padT = conf_.padT();
     const int padL = conf_.padL();
-
-    auto alg = conf_.desc()->alg_kind;
 
     auto apply_offset = [=](int index, int offset) {
         return (index > offset) ? index - offset : 0;
@@ -84,13 +83,15 @@ void ref_pooling_fwd_t<data_type>::execute_forward() {
         auto num_summands = (alg == pooling_avg_include_padding) ? KW*KH
             : (ih_end - ih_start)*(iw_end - iw_start);
 
+        acc_data_t dst = 0;
         for (int ih = ih_start; ih < ih_end; ++ih) {
             for (int iw = iw_start; iw < iw_end; ++iw) {
-                d[0] += src[src_d.off(mb, oc, ih, iw)];
+                dst += src[src_d.off(mb, oc, ih, iw)];
             }
         }
 
-        d[0] /= num_summands;
+        dst /= num_summands;
+        d[0] = (data_t)dst;
     };
 
     const int MB = conf_.MB();
@@ -105,7 +106,7 @@ void ref_pooling_fwd_t<data_type>::execute_forward() {
                 for (int oh = 0; oh < OH; ++oh) {
                     for (int ow = 0; ow < OW; ++ow) {
                         data_t *d = &dst[dst_d.off(mb, oc, oh, ow)];
-                        d[0] = -FLT_MAX;
+                        d[0] = nstl::numeric_limits<data_t>::lowest();
                         ker_max(d, mb, oc, oh, ow);
                     }
                 }
@@ -226,6 +227,11 @@ void ref_pooling_bwd_t<data_type>::execute_backward() {
 }
 
 template struct ref_pooling_fwd_t<data_type::f32>;
+template struct ref_pooling_fwd_t<data_type::s32>;
+template struct ref_pooling_fwd_t<data_type::s16, data_type::s32>;
+template struct ref_pooling_fwd_t<data_type::s8, data_type::s32>;
+template struct ref_pooling_fwd_t<data_type::u8, data_type::s32>;
+
 template struct ref_pooling_bwd_t<data_type::f32>;
 
 }

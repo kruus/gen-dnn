@@ -17,7 +17,7 @@
 #include "mkldnn_types.h"
 
 #include "c_types_map.hpp"
-#include "jit_avx512_mic_convolution.hpp"
+#include "jit_avx512_common_convolution.hpp"
 #include "mkldnn_thread.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
@@ -31,7 +31,7 @@ using namespace mkldnn::impl::memory_format;
 using namespace mkldnn::impl::utils;
 
 template <bool with_relu>
-void _jit_avx512_mic_convolution_fwd_t<with_relu>::execute_forward()
+void _jit_avx512_common_convolution_fwd_t<with_relu>::execute_forward()
 {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto weights = reinterpret_cast<const data_t *>(this->input_memory(1));
@@ -77,22 +77,20 @@ void _jit_avx512_mic_convolution_fwd_t<with_relu>::execute_forward()
                     par_conv.current_ic = par_conv.current_ic_prf;
 
                     const int ih = nstl::max(ij - jcp.t_pad, 0);
-                    par_conv.src_prf = const_cast<data_t *>(&src[src_d.blk_off(
-                            n, jcp.ic == 3 ? 0 : g * jcp.nb_ic + ic, ih, 0)]);
-                    par_conv.dst_prf = const_cast<data_t *>(
-                            &dst[dst_d.blk_off(n, g * jcp.nb_oc + oc, oh, 0)]);
+                    par_conv.src_prf = &src[src_d.blk_off(
+                            n, jcp.ic == 3 ? 0 : g * jcp.nb_ic + ic, ih, 0)];
+                    par_conv.dst_prf = &dst[dst_d.blk_off(
+                            n, g * jcp.nb_oc + oc, oh, 0)];
                     if (bias)
-                        par_conv.bias_prf
-                            = const_cast<data_t *>(&bias[bias_d.blk_off(
-                                        (g * jcp.nb_oc + oc) * jcp.oc_block)]);
-                    par_conv.filt_prf = const_cast<data_t *>(
-                            &weights[conf_.with_groups() ?
+                        par_conv.bias_prf = &bias[bias_d.blk_off(
+                                        (g * jcp.nb_oc + oc) * jcp.oc_block)];
+                    par_conv.filt_prf = &weights[conf_.with_groups() ?
                                             weights_d.blk_off(g, oc,
                                                     jcp.ic == 3 ? 0 : ic,
                                                     i_t_overflow, 0) :
                                             weights_d.blk_off(oc,
                                                     jcp.ic == 3 ? 0 : ic,
-                                                    i_t_overflow, 0)]);
+                                                    i_t_overflow, 0)];
 
                     par_conv.kh_padding = par_conv.kh_padding_prf;
                     par_conv.kh_padding_prf
@@ -130,10 +128,10 @@ void _jit_avx512_mic_convolution_fwd_t<with_relu>::execute_forward()
         ker(omp_get_thread_num(), omp_get_num_threads());
     }
 }
-template void _jit_avx512_mic_convolution_fwd_t<true>::execute_forward();
-template void _jit_avx512_mic_convolution_fwd_t<false>::execute_forward();
+template void _jit_avx512_common_convolution_fwd_t<true>::execute_forward();
+template void _jit_avx512_common_convolution_fwd_t<false>::execute_forward();
 
-void jit_avx512_mic_convolution_bwd_data_t::execute_backward_data() {
+void jit_avx512_common_convolution_bwd_data_t::execute_backward_data() {
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto weights = reinterpret_cast<const data_t *>(this->input_memory(1));
     auto diff_src = reinterpret_cast<data_t*>(this->memory());
@@ -215,7 +213,7 @@ void jit_avx512_mic_convolution_bwd_data_t::execute_backward_data() {
     }
 }
 
-void jit_avx512_mic_convolution_bwd_weights_t::execute_backward_weights() {
+void jit_avx512_common_convolution_bwd_weights_t::execute_backward_weights() {
     auto src = reinterpret_cast<const data_t * > (this->input_memory(0));
     auto diff_dst = reinterpret_cast<const data_t * > (this->input_memory(1));
     auto diff_weights = reinterpret_cast<data_t *>(this->memory(0));

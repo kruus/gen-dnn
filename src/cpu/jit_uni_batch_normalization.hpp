@@ -46,9 +46,9 @@ struct jit_uni_batch_normalization_fwd_t: public cpu_primitive_t {
             using namespace prop_kind;
             using namespace data_type;
             assert(engine()->kind() == engine_kind::cpu);
-            auto desired_fmt = isa == avx2
-                ? memory_format::nChw8c
-                : memory_format::nChw16c;
+            auto desired_fmt = isa == avx512_common
+                ? memory_format::nChw16c
+                : memory_format::nChw8c;
             bool ok = true
                 && mayiuse(isa)
                 && is_fwd()
@@ -71,7 +71,7 @@ struct jit_uni_batch_normalization_fwd_t: public cpu_primitive_t {
         }
     };
 
-    typedef typename prec_trait<data_type::f32>::type data_t;
+    typedef typename prec_traits<data_type::f32>::type data_t;
 
     jit_uni_batch_normalization_fwd_t(const pd_t *pd,
             const input_vector &inputs, const output_vector &outputs);
@@ -118,7 +118,7 @@ struct jit_uni_batch_normalization_bwd_t: public cpu_primitive_t {
         }
     };
 
-    typedef typename prec_trait<data_type::f32>::type data_t;
+    typedef typename prec_traits<data_type::f32>::type data_t;
 
     jit_uni_batch_normalization_bwd_t(const pd_t *pd,
             const input_vector &inputs, const output_vector &outputs);

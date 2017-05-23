@@ -21,15 +21,16 @@
 #include "cpu_convolution_pd.hpp"
 #include "cpu_engine.hpp"
 #include "jit_avx2_gemm_f32.hpp"
+#include "jit_avx512_common_gemm_f32.hpp"
 #include "jit_primitive_conf.hpp"
-#include "jit_gemm_convolution_utils.hpp"
+#include "gemm_convolution_utils.hpp"
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-template <bool with_relu>
-struct _jit_gemm_convolution_fwd_t: public cpu_primitive_t {
+template <bool with_relu, bool run_jit, cpu_isa_t isa>
+struct _gemm_convolution_fwd_t: public cpu_primitive_t {
     struct pd_t: public _cpu_convolution_fwd_pd_t<with_relu> {
         pd_t(engine_t *engine,
                 const typename pd_t::base_desc_t *adesc,
@@ -37,7 +38,7 @@ struct _jit_gemm_convolution_fwd_t: public cpu_primitive_t {
             : _cpu_convolution_fwd_pd_t<with_relu>(engine, adesc, hint_fwd_pd)
             , jcp_({}) {}
 
-        DECLARE_COMMON_PD_T(_jit_gemm_convolution_fwd_t<with_relu>);
+        DECLARE_COMMON_PD_T(_gemm_convolution_fwd_t<with_relu, run_jit, isa>);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -45,7 +46,13 @@ struct _jit_gemm_convolution_fwd_t: public cpu_primitive_t {
 
             assert(this->engine()->kind() == engine_kind::cpu);
 
-            if (!mayiuse(avx2)) return status::unimplemented;
+            if (run_jit) {
+                if (!mayiuse(isa)) return status::unimplemented;
+            } else {
+#ifndef USE_CBLAS
+                return status::unimplemented;
+#endif
+            }
 
             bool ok = true
                 && this->set_default_params() == status::success
@@ -86,12 +93,14 @@ struct _jit_gemm_convolution_fwd_t: public cpu_primitive_t {
         }
     };
 
-    _jit_gemm_convolution_fwd_t(const pd_t *pd, const input_vector &inputs,
+    _gemm_convolution_fwd_t(const pd_t *pd, const input_vector &inputs,
            const output_vector &outputs)
         : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
     {
         using namespace prop_kind;
-        sgemm_ =  new jit_avx2_gemm_f32('N', 'N', 0.0, false);
+
+        if (run_jit)
+            sgemm_ = new jit_uni_gemm_f32('N', 'N', 0.0, false);
 
         jit_gemm_convolution_utils::init_conf(conf_.jcp_,
             *(conf_.cdesc()), conf_.src_pd(), conf_.weights_pd(0),
@@ -99,12 +108,12 @@ struct _jit_gemm_convolution_fwd_t: public cpu_primitive_t {
         jit_gemm_convolution_utils::prepare_workspace(this->conf_.jcp_,
             &this->ws, false, 0L);
     }
-    ~_jit_gemm_convolution_fwd_t() {
-        delete sgemm_;
+    ~_gemm_convolution_fwd_t() {
+        if (run_jit) delete sgemm_;
         if (this->ws) free(this->ws);
     };
 
-    typedef typename prec_trait<data_type::f32>::type data_t;
+    typedef typename prec_traits<data_type::f32>::type data_t;
 
     virtual void execute(event_t *e) {
         execute_forward();
@@ -114,14 +123,27 @@ struct _jit_gemm_convolution_fwd_t: public cpu_primitive_t {
 private:
     void execute_forward();
     pd_t conf_;
-    jit_avx2_gemm_f32 *sgemm_;
+    using jit_uni_gemm_f32 = typename utils::conditional
+          <isa == avx2, jit_avx2_gemm_f32, jit_avx512_common_gemm_f32>::type;
+    jit_uni_gemm_f32 *sgemm_;
     data_t *ws;
 };
 
-using jit_gemm_convolution_fwd_t = _jit_gemm_convolution_fwd_t<false>;
-using jit_gemm_convolution_relu_t = _jit_gemm_convolution_fwd_t<true>;
+using jit_avx512_common_gemm_convolution_fwd_t =
+                         _gemm_convolution_fwd_t<false, true, avx512_common>;
+using jit_avx512_common_gemm_convolution_relu_t =
+                         _gemm_convolution_fwd_t<true, true, avx512_common>;
+using jit_avx2_gemm_convolution_fwd_t =
+                         _gemm_convolution_fwd_t<false, true, avx2>;
+using jit_avx2_gemm_convolution_relu_t =
+                         _gemm_convolution_fwd_t<true, true, avx2>;
+using mkl_gemm_convolution_fwd_t =
+                         _gemm_convolution_fwd_t<false, false, isa_any>;
+using mkl_gemm_convolution_relu_t =
+                         _gemm_convolution_fwd_t<true, false, isa_any>;
 
-struct jit_gemm_convolution_bwd_data_t: public cpu_primitive_t {
+template <bool run_jit, cpu_isa_t isa>
+struct _gemm_convolution_bwd_data_t: public cpu_primitive_t {
     struct pd_t: public cpu_convolution_bwd_data_pd_t {
         pd_t(engine_t *engine,
                 const convolution_desc_t *adesc,
@@ -130,7 +152,7 @@ struct jit_gemm_convolution_bwd_data_t: public cpu_primitive_t {
             , jcp_({})
         {}
 
-        DECLARE_COMMON_PD_T(jit_gemm_convolution_bwd_data_t);
+        DECLARE_COMMON_PD_T(_gemm_convolution_bwd_data_t<run_jit, isa>);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -138,7 +160,13 @@ struct jit_gemm_convolution_bwd_data_t: public cpu_primitive_t {
 
             assert(this->engine()->kind() == engine_kind::cpu);
 
-            if (!mayiuse(avx2)) return status::unimplemented;
+            if (run_jit) {
+                if (!mayiuse(isa)) return status::unimplemented;
+            } else {
+#ifndef USE_CBLAS
+                return status::unimplemented;
+#endif
+            }
 
             bool ok = true
                 && this->set_default_params() == status::success
@@ -172,12 +200,14 @@ struct jit_gemm_convolution_bwd_data_t: public cpu_primitive_t {
         }
     };
 
-    jit_gemm_convolution_bwd_data_t(const pd_t *pd, const input_vector &inputs,
+    _gemm_convolution_bwd_data_t(const pd_t *pd, const input_vector &inputs,
               const output_vector &outputs)
         : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
     {
         using namespace prop_kind;
-        sgemm_ =  new jit_avx2_gemm_f32('N', 'T', 0.0, false);
+
+        if (run_jit)
+            sgemm_ = new jit_uni_gemm_f32('N', 'T', 0.0, false);
 
         jit_gemm_convolution_utils::init_conf(conf_.jcp_,
             *(conf_.desc()), conf_.diff_src_pd(), conf_.weights_pd(0),
@@ -185,12 +215,12 @@ struct jit_gemm_convolution_bwd_data_t: public cpu_primitive_t {
         jit_gemm_convolution_utils::prepare_workspace(this->conf_.jcp_,
             &this->ws, true, 0L);
     }
-    ~jit_gemm_convolution_bwd_data_t() {
-        delete sgemm_;
+    ~_gemm_convolution_bwd_data_t() {
+        if (run_jit) delete sgemm_;
         if (this->ws) free(this->ws);
     };
 
-    typedef typename prec_trait<data_type::f32>::type data_t;
+    typedef typename prec_traits<data_type::f32>::type data_t;
 
     virtual void execute(event_t *e) {
         switch (conf_.desc()->prop_kind) {
@@ -207,11 +237,21 @@ struct jit_gemm_convolution_bwd_data_t: public cpu_primitive_t {
 private:
     void execute_backward_data();
     pd_t conf_;
-    jit_avx2_gemm_f32 *sgemm_;
+    using jit_uni_gemm_f32 = typename utils::conditional
+          <isa == avx2, jit_avx2_gemm_f32, jit_avx512_common_gemm_f32>::type;
+    jit_uni_gemm_f32 *sgemm_;
     data_t *ws;
 };
 
-struct jit_gemm_convolution_bwd_weights_t: public cpu_primitive_t {
+using jit_avx512_common_gemm_convolution_bwd_data_t =
+                         _gemm_convolution_bwd_data_t<true, avx512_common>;
+using jit_avx2_gemm_convolution_bwd_data_t =
+                         _gemm_convolution_bwd_data_t<true, avx2>;
+using mkl_gemm_convolution_bwd_data_t =
+                         _gemm_convolution_bwd_data_t<false, isa_any>;
+
+template <bool run_jit, cpu_isa_t isa>
+struct _gemm_convolution_bwd_weights_t: public cpu_primitive_t {
     struct pd_t: public cpu_convolution_bwd_weights_pd_t {
         pd_t(engine_t *engine,
                 const convolution_desc_t *adesc,
@@ -220,7 +260,7 @@ struct jit_gemm_convolution_bwd_weights_t: public cpu_primitive_t {
             , jcp_({})
         {}
 
-        DECLARE_COMMON_PD_T(jit_gemm_convolution_bwd_weights_t);
+        DECLARE_COMMON_PD_T(_gemm_convolution_bwd_weights_t<run_jit, isa>);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -228,7 +268,13 @@ struct jit_gemm_convolution_bwd_weights_t: public cpu_primitive_t {
 
             assert(this->engine()->kind() == engine_kind::cpu);
 
-            if (!mayiuse(avx2)) return status::unimplemented;
+            if (run_jit) {
+                if (!mayiuse(isa)) return status::unimplemented;
+            } else {
+#ifndef USE_CBLAS
+                return status::unimplemented;
+#endif
+            }
 
             bool ok = true
             && this->set_default_params() == status::success
@@ -266,13 +312,15 @@ struct jit_gemm_convolution_bwd_weights_t: public cpu_primitive_t {
         }
     };
 
-    jit_gemm_convolution_bwd_weights_t(const pd_t *pd, const input_vector &inputs,
+    _gemm_convolution_bwd_weights_t(const pd_t *pd, const input_vector &inputs,
               const output_vector &outputs)
         : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
     {
         using namespace prop_kind;
-        sgemm_0 =  new jit_avx2_gemm_f32('T', 'N', 0.0, false);
-        sgemm_1 =  new jit_avx2_gemm_f32('T', 'N', 1.0, false);
+        if (run_jit) {
+            sgemm_0 = new jit_uni_gemm_f32('T', 'N', 0.0, false);
+            sgemm_1 = new jit_uni_gemm_f32('T', 'N', 1.0, false);
+        }
 
         jit_gemm_convolution_utils::init_conf(conf_.jcp_,
             *(conf_.desc()), conf_.src_pd(), conf_.diff_weights_pd(0),
@@ -281,13 +329,15 @@ struct jit_gemm_convolution_bwd_weights_t: public cpu_primitive_t {
         jit_gemm_convolution_utils::prepare_workspace(this->conf_.jcp_,
             &this->ws, true, weights_d.size());
     }
-    ~jit_gemm_convolution_bwd_weights_t() {
-        delete sgemm_0;
-        delete sgemm_1;
+    ~_gemm_convolution_bwd_weights_t() {
+        if (run_jit) {
+            delete sgemm_0;
+            delete sgemm_1;
+        }
         if (this->ws) free(this->ws);
      };
 
-    typedef typename prec_trait<data_type::f32>::type data_t;
+    typedef typename prec_traits<data_type::f32>::type data_t;
 
     virtual void execute(event_t *e) {
         switch (conf_.desc()->prop_kind) {
@@ -304,9 +354,18 @@ struct jit_gemm_convolution_bwd_weights_t: public cpu_primitive_t {
 private:
     void execute_backward_weights();
     pd_t conf_;
-    jit_avx2_gemm_f32 *sgemm_0, *sgemm_1;
+    using jit_uni_gemm_f32 = typename utils::conditional
+          <isa == avx2, jit_avx2_gemm_f32, jit_avx512_common_gemm_f32>::type;
+    jit_uni_gemm_f32 *sgemm_0, *sgemm_1;
     data_t *ws;
 };
+
+using jit_avx512_common_gemm_convolution_bwd_weights_t =
+                         _gemm_convolution_bwd_weights_t<true, avx512_common>;
+using jit_avx2_gemm_convolution_bwd_weights_t =
+                         _gemm_convolution_bwd_weights_t<true, avx2>;
+using mkl_gemm_convolution_bwd_weights_t =
+                         _gemm_convolution_bwd_weights_t<false, isa_any>;
 
 }
 }

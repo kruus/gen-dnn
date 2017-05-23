@@ -32,28 +32,40 @@ namespace impl {
 namespace cpu {
 
 typedef enum {
+    isa_any,
     sse42,
     avx2,
+    avx512_common,
+    avx512_core,
     avx512_mic,
+    avx512_mic_4ops,
 } cpu_isa_t;
 
-template <cpu_isa_t> struct cpu_isa_trait {}; /* ::vlen -> 32 (for avx2) */
+template <cpu_isa_t> struct cpu_isa_traits {}; /* ::vlen -> 32 (for avx2) */
 
-template <> struct cpu_isa_trait<sse42> {
+template <> struct cpu_isa_traits<sse42> {
     static constexpr int vlen_shift = 4;
     static constexpr int vlen = 16;
     static constexpr int n_vregs = 16;
 };
-template <> struct cpu_isa_trait<avx2> {
+template <> struct cpu_isa_traits<avx2> {
     static constexpr int vlen_shift = 5;
     static constexpr int vlen = 32;
     static constexpr int n_vregs = 16;
 };
-template <> struct cpu_isa_trait<avx512_mic> {
+template <> struct cpu_isa_traits<avx512_common> {
     static constexpr int vlen_shift = 6;
     static constexpr int vlen = 64;
     static constexpr int n_vregs = 32;
 };
+template <> struct cpu_isa_traits<avx512_core>:
+    public cpu_isa_traits<avx512_common> {};
+
+template <> struct cpu_isa_traits<avx512_mic>:
+    public cpu_isa_traits<avx512_common> {};
+
+template <> struct cpu_isa_traits<avx512_mic_4ops>:
+    public cpu_isa_traits<avx512_common> {};
 
 // TODO: move this to jit_generator class?
 namespace {
@@ -122,12 +134,27 @@ static inline bool mayiuse(const cpu_isa_t cpu_isa) {
         return cpu.has(Cpu::tSSE42);
     case avx2:
         return cpu.has(Cpu::tAVX2);
+    case avx512_common:
+        return cpu.has(Cpu::tAVX512F);
+    case avx512_core:
+        return true
+            && cpu.has(Cpu::tAVX512F)
+            && cpu.has(Cpu::tAVX512BW)
+            && cpu.has(Cpu::tAVX512VL)
+            && cpu.has(Cpu::tAVX512DQ);
     case avx512_mic:
         return true
             && cpu.has(Cpu::tAVX512F)
             && cpu.has(Cpu::tAVX512CD)
             && cpu.has(Cpu::tAVX512ER)
             && cpu.has(Cpu::tAVX512PF);
+    case avx512_mic_4ops:
+        return true
+            && mayiuse(avx512_mic)
+            && cpu.has(Cpu::tAVX512_4FMAPS)
+            && cpu.has(Cpu::tAVX512_4VNNIW);
+    case isa_any:
+        return true;
     }
     return false;
 }
@@ -186,9 +213,23 @@ protected:
     void preamble() {
         for (size_t i = 0; i < num_abi_save_regs; ++i)
             push(Xbyak::Reg64(abi_save_regs[i]));
-        if (mayiuse(avx512_mic)) {
+        if (mayiuse(avx512_common)) {
             mov(reg_EVEX_max_8b_offt, 2 * EVEX_max_8b_offt);
         }
+    }
+    void mic_prefetcht0(Xbyak::Address a) {
+        if (mayiuse(avx512_mic))
+            prefetcht0(a);
+    }
+
+    void mic_prefetcht1(Xbyak::Address a) {
+        if (mayiuse(avx512_mic))
+            prefetcht1(a);
+    }
+
+    void mic_prefetcht2(Xbyak::Address a) {
+        if (mayiuse(avx512_mic))
+            prefetcht2(a);
     }
 
     void postamble() {
@@ -236,6 +277,154 @@ protected:
 
     void L(const char *label) { Xbyak::CodeGenerator::L(label); }
     void L(const Xbyak::Label& label) { Xbyak::CodeGenerator::L(label); }
+
+    void uni_vpxor(const Xbyak::Xmm& x1, const Xbyak::Xmm& x2,
+                   const Xbyak::Operand& op) {
+        assert(x1.getIdx() == x2.getIdx());
+        pxor(x2, op);
+    }
+    void uni_vpxor(const Xbyak::Ymm& x1, const Xbyak::Ymm& x2,
+                   const Xbyak::Operand& op) {
+        vpxor(x1, x2, op);
+    }
+    void uni_vpxor(const Xbyak::Zmm& x1, const Xbyak::Zmm& x2,
+                   const Xbyak::Operand& op) {
+        vpxord(x1, x2, op);
+    }
+
+    void uni_vmovdqu(const Xbyak::Address& addr, const Xbyak::Xmm& x) {
+        movdqu(addr, x);
+    }
+    void uni_vmovdqu(const Xbyak::Address& addr, const Xbyak::Ymm& x) {
+        vmovdqu(addr, x);
+    }
+    void uni_vmovdqu(const Xbyak::Address& addr, const Xbyak::Zmm& x) {
+        vmovdqu32(addr, x);
+    }
+
+    void uni_vmovdqu(const Xbyak::Xmm& x, const Xbyak::Address& addr) {
+        movdqu(x, addr);
+    }
+    void uni_vmovdqu(const Xbyak::Ymm& x, const Xbyak::Address& addr) {
+        vmovdqu(x, addr);
+    }
+    void uni_vmovdqu(const Xbyak::Zmm& x, const Xbyak::Address& addr) {
+        vmovdqu32(x, addr);
+    }
+
+    void uni_vmovups(const Xbyak::Address& addr, const Xbyak::Xmm& x) {
+        movups(addr, x);
+    }
+    void uni_vmovups(const Xbyak::Address& addr, const Xbyak::Ymm& x) {
+        vmovups(addr, x);
+    }
+
+    void uni_vmovups(const Xbyak::Xmm& x, const Xbyak::Operand& op) {
+        movups(x, op);
+    }
+    void uni_vmovups(const Xbyak::Ymm& x, const Xbyak::Operand& op) {
+        vmovups(x, op);
+    }
+
+    void uni_vmovntps(const Xbyak::Address& addr, const Xbyak::Xmm& x) {
+        movntps(addr, x);
+    }
+    void uni_vmovntps(const Xbyak::Address& addr, const Xbyak::Ymm& x) {
+        vmovntps(addr, x);
+    }
+
+    void uni_vbroadcastss(const Xbyak::Xmm& x, const Xbyak::Operand& op) {
+        movss(x, op);
+        shufps(x, x, 0x0);
+    }
+    void uni_vbroadcastss(const Xbyak::Ymm& x, const Xbyak::Operand& op) {
+        vbroadcastss(x, op);
+    }
+
+    void uni_vpbroadcastd(const Xbyak::Xmm& x, const Xbyak::Operand& op) {
+        movsd(x, op);
+        pshufd(x, x, 0x0);
+    }
+    void uni_vpbroadcastd(const Xbyak::Ymm& x, const Xbyak::Operand& op) {
+        vpbroadcastd(x, op);
+    }
+
+    void uni_vdivps(const Xbyak::Xmm& x, const Xbyak::Operand& op1,
+                    const Xbyak::Operand& op2 = Xbyak::Operand()) {
+        assert(x.getIdx() == op1.getIdx());
+        divps(x, op2);
+    }
+    void uni_vdivps(const Xbyak::Ymm& x, const Xbyak::Operand& op1,
+                    const Xbyak::Operand& op2 = Xbyak::Operand()) {
+        vdivps(x, op1, op2);
+    }
+
+    void uni_vaddps(const Xbyak::Xmm& x, const Xbyak::Operand& op1,
+                    const Xbyak::Operand& op2 = Xbyak::Operand()) {
+        assert(x.getIdx() == op1.getIdx());
+        addps(x, op2);
+    }
+    void uni_vaddps(const Xbyak::Ymm& x, const Xbyak::Operand& op1,
+                    const Xbyak::Operand& op2 = Xbyak::Operand()) {
+        vaddps(x, op1, op2);
+    }
+
+    void uni_vsubps(const Xbyak::Xmm& x, const Xbyak::Operand& op1,
+                    const Xbyak::Operand& op2 = Xbyak::Operand()) {
+        assert(x.getIdx() == op1.getIdx());
+        subps(x, op2);
+    }
+    void uni_vsubps(const Xbyak::Ymm& x, const Xbyak::Operand& op1,
+                    const Xbyak::Operand& op2 = Xbyak::Operand()) {
+        vsubps(x, op1, op2);
+    }
+
+    void uni_vmulps(const Xbyak::Xmm& x, const Xbyak::Operand& op1,
+                    const Xbyak::Operand& op2 = Xbyak::Operand()) {
+        assert(x.getIdx() == op1.getIdx());
+        mulps(x, op2);
+    }
+    void uni_vmulps(const Xbyak::Ymm& x, const Xbyak::Operand& op1,
+                    const Xbyak::Operand& op2 = Xbyak::Operand()) {
+        vmulps(x, op1, op2);
+    }
+
+    void uni_vfmadd213ps(const Xbyak::Xmm& x1, const Xbyak::Xmm& x2,
+                         const Xbyak::Operand& op) {
+        mulps(x1, x2);
+        addps(x1, op);
+    }
+    void uni_vfmadd213ps(const Xbyak::Ymm& x1, const Xbyak::Ymm& x2,
+                         const Xbyak::Operand& op) {
+        vfmadd213ps(x1, x2, op);
+    }
+
+    void uni_vfmadd231ps(const Xbyak::Xmm& x1, const Xbyak::Xmm& x2,
+                         const Xbyak::Operand& op) {
+        mulps(x2, op);
+        addps(x1, x2);
+    }
+    void uni_vfmadd231ps(const Xbyak::Ymm& x1, const Xbyak::Ymm& x2,
+                         const Xbyak::Operand& op) {
+        vfmadd231ps(x1, x2, op);
+    }
+
+    void uni_vsqrtps(const Xbyak::Xmm& x, const Xbyak::Operand& op) {
+        sqrtps(x, op);
+    }
+    void uni_vsqrtps(const Xbyak::Ymm& x, const Xbyak::Operand& op) {
+        vsqrtps(x, op);
+    }
+
+    void uni_vpaddd(const Xbyak::Xmm& x1, const Xbyak::Xmm& x2,
+                    const Xbyak::Operand& op) {
+        assert(x1.getIdx() == x2.getIdx());
+        paddd(x2, op);
+    }
+    void uni_vpaddd(const Xbyak::Ymm& x1, const Xbyak::Xmm& x2,
+                    const Xbyak::Operand& op) {
+        vpaddd(x1, x2, op);
+    }
 
 public:
     jit_generator(

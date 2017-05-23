@@ -17,6 +17,8 @@
 #ifndef JIT_PRIMITIVE_CONF_HPP
 #define JIT_PRIMITIVE_CONF_HPP
 
+#include <stdint.h>
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -43,17 +45,27 @@ struct jit_conv_conf_t {
     int ur_h, ur_w;
     int ur_w_tail;
     bool is_1stconv;
+    /* 4vnni */
+    size_t typesize_in;
+    size_t typesize_out;
+    bool _4vnni;
+    /* avx512_u8s8u8 */
+    int ic_nb1, ic_nb2;
+    int oc_nb1;
+    int ur_ow_max, ur_ow, ur_ow_tail;
+    int ur_ow_nsteps;
+    data_type_t bia_dt;
 };
 
 struct __attribute__((__packed__)) jit_conv_call_s {
-    const float *src; /* hack, non-const for backward_data */
-    const float *dst; /* hack, non-const for forward */
-    const float *filt; /* hack, non-const for backward_weights */
-    const float *bias; /* hack, non-const for backward_bias */
-    const float *src_prf;
-    const float *dst_prf;
-    const float *filt_prf;
-    const float *bias_prf;
+    const void *src; /* hack, non-const for backward_data */
+    const void *dst; /* hack, non-const for forward */
+    const void *filt; /* hack, non-const for backward_weights */
+    const void *bias; /* hack, non-const for backward_bias */
+    const void *src_prf;
+    const void *dst_prf;
+    const void *filt_prf;
+    const void *bias_prf;
     size_t kh_padding;
     size_t kh_padding_prf;
     size_t kw_padding;
@@ -81,7 +93,8 @@ struct jit_1x1_conv_conf_t {
 
     int ur, ur_tail;
 
-    int reduce_dim, reduce_block, nb_reduce, nb_reduce_blocking;
+    int reduce_dim, reduce_block, nb_reduce,
+        nb_reduce_blocking, nb_reduce_blocking_max;
     int load_dim, load_block, nb_load,
         nb_load_blocking, nb_load_blocking_max;
     int bcast_dim, bcast_block, nb_bcast,

@@ -31,9 +31,12 @@ char const* mkldnn_name_status( mkldnn_status_t const e ){
 NAMEENUM_T(data_type){
     char const * ret = "Huh?";
     switch(e){
-      case(mkldnn_data_type_undef): ret = "data_type:data_type_undef"; break;
+      case(mkldnn_data_type_undef): ret = "data_type:undef"; break;
       case(mkldnn_f32): ret = "data_type:f32"; break;
       case(mkldnn_s32): ret = "data_type:s32"; break;
+      case(mkldnn_s16): ret = "data_type:s16"; break;
+      case(mkldnn_s8): ret = "data_type:s8"; break;
+      case(mkldnn_u8): ret = "data_type:u8"; break;
     }
     return ret;
 }
@@ -54,18 +57,24 @@ NAMEENUM_T(memory_format){
     case(mkldnn_io): ret = "memory_format:io"; break;
     case(mkldnn_oihw): ret = "memory_format:oihw"; break;
     case(mkldnn_ihwo): ret = "memory_format:ihwo"; break;
-    case(mkldnn_goihw): ret = "memory_format:goihw"; break;
 #if 1 // defined(TARGET_JIT)
     case(mkldnn_OIhw8i8o): ret = "memory_format:OIhw8i8o"; break;
     case(mkldnn_OIhw16i16o): ret = "memory_format:OIhw16i16o"; break;
+    case(mkldnn_OIhw8i16o2i): ret = "memory_format:OIhw8i16o2i"; break;
     case(mkldnn_OIhw8o8i): ret = "memory_format:OIhw8o8i"; break;
     case(mkldnn_OIhw16o16i): ret = "memory_format:OIhw16o16i"; break;
     case(mkldnn_Ohwi8o): ret = "memory_format:Ohwi8o"; break;
     case(mkldnn_Ohwi16o): ret = "memory_format:Ohwi16o"; break;
+    case(mkldnn_OhIw16o4i): ret = "memory_format:OhIw16o4i"; break;
+#endif
+    case(mkldnn_goihw): ret = "memory_format:goihw"; break;
+#if 1 // defined(TARGET_JIT)
     case(mkldnn_gOIhw8i8o): ret = "memory_format:gOIhw8i8o"; break;
     case(mkldnn_gOIhw16i16o): ret = "memory_format:gOIhw16i16o"; break;
+    case(mkldnn_gOIhw8i16o2i): ret = "memory_format:gOIhw8i16o2i"; break;
     case(mkldnn_gOIhw8o8i): ret = "memory_format:gOIhw8o8i"; break;
     case(mkldnn_gOIhw16o16i): ret = "memory_format:gOIhw16o16i"; break;
+    case(mkldnn_gOhIw16o4i): ret = "memory_format:gOhIw16o4i"; break;
 #endif
     // dup case(mkldnn_oIhw8i): ret = "memory_format:oIhw8i"; break; // alias for nChw8c
     // dup case(mkldnn_oIhw16i): ret = "memory_format:oIhw16i"; break; // alias for nChw16c
@@ -120,7 +129,9 @@ NAMEENUM_T(alg_kind){
     switch(e){
       case(mkldnn_convolution_direct): ret = "alg_kind:convolution_direct"; break;
       case(mkldnn_pooling_max): ret = "alg_kind:pooling_max"; break;
-      case(mkldnn_pooling_avg): ret = "alg_kind:pooling_avg"; break;
+      case(mkldnn_pooling_avg_include_padding): ret = "alg_kind:pooling_avg+padding"; break;
+      case(mkldnn_pooling_avg_exclude_padding): ret = "alg_kind:pooling_avg-padding"; break;
+      //case(mkldnn_pooling_avg): ret = "alg_kind:pooling_avg"; break; // short for avg-padding
       case(mkldnn_lrn_across_channels): ret = "alg_kind:lrn_across_channels"; break;
       case(mkldnn_lrn_within_channel): ret = "alg_kind:lrn_within_channel"; break;
     }

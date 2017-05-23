@@ -26,6 +26,10 @@
 #include "nstl.hpp"
 #include "utils.hpp"
 
+#ifndef NDEBUG
+#include <iostream>
+#endif
+
 namespace mkldnn {
 namespace impl {
 
@@ -41,8 +45,11 @@ namespace types {
 inline size_t data_type_size(data_type_t data_type) {
     using namespace data_type;
     switch (data_type) {
-    case f32: return sizeof(prec_trait<f32>::type);
-    case s32: return sizeof(prec_trait<s32>::type);
+    case f32: return sizeof(prec_traits<f32>::type);
+    case s32: return sizeof(prec_traits<s32>::type);
+    case s16: return sizeof(prec_traits<s16>::type);
+    case s8: return sizeof(prec_traits<s8>::type);
+    case u8: return sizeof(prec_traits<u8>::type);
     case data_type::undef:
     default: assert(!"unknown data_type");
     }
@@ -54,8 +61,10 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
     if (utils::one_of(fmt, x, nc, nchw, nhwc, chwn, nChw8c, oi, io, oihw, ihwo,
                 nChw16c,
 #if 1 // defined(TARGET_JIT)
-                OIhw8i8o, OIhw8o8i, Ohwi8o, gOIhw8i8o, gOIhw8o8i,
-                OIhw16i16o, OIhw16o16i, Ohwi16o, gOIhw16i16o, gOIhw16o16i,
+                OIhw8i8o, OIhw8o8i, Ohwi8o, OhIw16o4i, /*goihw,*/ gOIhw8i8o,
+                gOIhw8o8i, /*nChw16c,*/ OIhw16i16o, OIhw16o16i, Ohwi16o,
+                gOIhw16i16o, gOIhw16o16i, gOhIw16o4i,
+                OIhw8i16o2i, gOIhw8i16o2i,
 #endif
                 goihw))
         return blocked;
@@ -101,6 +110,29 @@ inline memory_desc_t zero_md() {
 
 inline status_t set_default_format(memory_desc_t &md, memory_format_t fmt) {
     return mkldnn_memory_desc_init(&md, md.ndims, md.dims, md.data_type, fmt);
+}
+
+inline data_type_t default_accum_data_type(data_type_t src_dt,
+        data_type_t wei_dt, data_type_t dst_dt) {
+    using namespace utils;
+    using namespace data_type;
+
+    //if (everyone_is(f32, src_dt, wei_dt, dst_dt)) return f32;
+    // [ejk] to pass examples in debug compile
+    //     Ex: pooling.cpp:70 was
+    //     pd.accum_data_type = types::default_accum_data_type(
+    //         src_desc->data_type, data_type::undef, dst_desc->data_type);
+    //     So our arguments could be   ( f32, undef, f32 )
+    if (everyone_is(f32, src_dt, dst_dt) && one_of(wei_dt, f32, data_type::undef)) return f32;
+    if (src_dt == s16 && wei_dt == s16 && dst_dt == s32) return s32;
+    if (one_of(src_dt, s8, u8) && one_of(wei_dt, s8, u8, data_type::undef) &&
+            one_of(dst_dt, s8, u8, data_type::undef)) return s32;
+
+#ifndef NDEBUG
+    std::cout<<"Oh? src_dt="<<src_dt<<" wei_dt="<<wei_dt<<" dst_dt="<<dst_dt<<std::endl;
+#endif
+    assert(!"unimplemented use-case: no default parameters available");
+    return dst_dt;
 }
 
 }

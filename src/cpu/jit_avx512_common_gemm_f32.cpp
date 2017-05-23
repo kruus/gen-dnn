@@ -19,7 +19,7 @@
 #include "mkldnn_thread.hpp"
 #include "utils.hpp"
 
-#include "jit_avx512_mic_gemm_f32.hpp"
+#include "jit_avx512_common_gemm_f32.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -38,7 +38,7 @@ using namespace Xbyak;
 #define UNROLL_M 48
 #define UNROLL_N 8
 
-struct jit_avx512_mic_gemm_f32::xbyak_gemm : public jit_generator {
+struct jit_avx512_common_gemm_f32::xbyak_gemm : public jit_generator {
     xbyak_gemm(char transa, char transb, float beta, bool hasBias = false,
             void *code_ptr = nullptr,
             size_t code_size = 80 * Xbyak::DEFAULT_MAX_CODE_SIZE)
@@ -552,25 +552,23 @@ struct jit_avx512_mic_gemm_f32::xbyak_gemm : public jit_generator {
 
             for (int i = 0; i < 8; i++) {
                 if (!isDirect) {
-                    prefetcht0(ptr[AO1
+                    mic_prefetcht0(ptr[AO1
                             + (PREFETCHSIZEA + i * unroll_m + 0 * 16 - OFFSET)
                                     * SIZE]);
                     if (unroll_m >= 32)
-                        prefetcht0(ptr[AO1
-                                + (PREFETCHSIZEA + i * unroll_m + 1 * 16
-                                          - OFFSET)
-                                        * SIZE]);
+                        mic_prefetcht0(ptr[AO1
+                            + (PREFETCHSIZEA + i * unroll_m + 1 * 16 - OFFSET)
+                                    * SIZE]);
                     if (unroll_m >= 48)
-                        prefetcht0(ptr[AO1
-                                + (PREFETCHSIZEA + i * unroll_m + 2 * 16
-                                          - OFFSET)
-                                        * SIZE]);
+                        mic_prefetcht0(ptr[AO1
+                            + (PREFETCHSIZEA + i * unroll_m + 2 * 16 - OFFSET)
+                                    * SIZE]);
                 } else {
-                    prefetcht0(ptr[AO1 + LDA4 + (16 * 0 * SIZE)]);
+                    mic_prefetcht0(ptr[AO1 + LDA4 + (16 * 0 * SIZE)]);
                     if (unroll_m >= 32)
-                        prefetcht0(ptr[AO1 + LDA4 + (16 * 1 * SIZE)]);
+                        mic_prefetcht0(ptr[AO1 + LDA4 + (16 * 1 * SIZE)]);
                     if (unroll_m >= 48)
-                        prefetcht0(ptr[AO1 + LDA4 + (16 * 2 * SIZE)]);
+                        mic_prefetcht0(ptr[AO1 + LDA4 + (16 * 2 * SIZE)]);
                 }
 
                 if (!isDirect) {
@@ -665,35 +663,35 @@ struct jit_avx512_mic_gemm_f32::xbyak_gemm : public jit_generator {
                     if (!isTransB) {
                         switch (i) {
                         case 0:
-                            prefetcht0(
+                            mic_prefetcht0(
                                     ptr[BO1 + (PREFETCHSIZEB - OFFSET) * SIZE]);
                             break;
                         case 1:
-                            prefetcht0(ptr[BO1 + LDB
+                            mic_prefetcht0(ptr[BO1 + LDB
                                     + (PREFETCHSIZEB - OFFSET) * SIZE]);
                             break;
                         case 2:
-                            prefetcht0(ptr[BO1 + LDB * 2
+                            mic_prefetcht0(ptr[BO1 + LDB * 2
                                     + (PREFETCHSIZEB - OFFSET) * SIZE]);
                             break;
                         case 3:
-                            prefetcht0(ptr[BO1 + LDB3
+                            mic_prefetcht0(ptr[BO1 + LDB3
                                     + (PREFETCHSIZEB - OFFSET) * SIZE]);
                             break;
                         case 4:
-                            prefetcht0(
+                            mic_prefetcht0(
                                     ptr[BO2 + (PREFETCHSIZEB - OFFSET) * SIZE]);
                             break;
                         case 5:
-                            prefetcht0(ptr[BO2 + LDB
+                            mic_prefetcht0(ptr[BO2 + LDB
                                     + (PREFETCHSIZEB - OFFSET) * SIZE]);
                             break;
                         case 6:
-                            prefetcht0(ptr[BO2 + LDB * 2
+                            mic_prefetcht0(ptr[BO2 + LDB * 2
                                     + (PREFETCHSIZEB - OFFSET) * SIZE]);
                             break;
                         case 7:
-                            prefetcht0(ptr[BO2 + LDB3
+                            mic_prefetcht0(ptr[BO2 + LDB3
                                     + (PREFETCHSIZEB - OFFSET) * SIZE]);
                             break;
                         }
@@ -769,32 +767,32 @@ struct jit_avx512_mic_gemm_f32::xbyak_gemm : public jit_generator {
 
                 if (i == 1) {
                     if (doCPrefetch) {
-                        prefetcht0(ptr[CO2 + 0 * 16 * SIZE]);
+                        mic_prefetcht0(ptr[CO2 + 0 * 16 * SIZE]);
                     }
                 }
                 if (i == 3) {
                     if (doCPrefetch && unroll_m >= 32) {
-                        prefetcht0(ptr[CO2 + 1 * 16 * SIZE]);
+                        mic_prefetcht0(ptr[CO2 + 1 * 16 * SIZE]);
                     }
                     if (!isTransA) {
-                        prefetcht2(ptr[AA + 16 * 0 * SIZE]);
+                        mic_prefetcht2(ptr[AA + 16 * 0 * SIZE]);
                     }
                 }
                 if (i == 5) {
                     if (doCPrefetch) {
                         if (unroll_m >= 48)
-                            prefetcht0(ptr[CO2 + 2 * 16 * SIZE]);
+                            mic_prefetcht0(ptr[CO2 + 2 * 16 * SIZE]);
                         add(CO2, LDC);
                     }
                     if (!isTransA) {
                         if (unroll_m >= 32) {
-                            prefetcht2(ptr[AA + 16 * 1 * SIZE]);
+                            mic_prefetcht2(ptr[AA + 16 * 1 * SIZE]);
                         }
                     }
                 }
 
                 if (isTransB) {
-                    prefetcht0(ptr[BO1 + BO2]);
+                    mic_prefetcht0(ptr[BO1 + BO2]);
                     add(BO1, LDB);
                 }
             } // end of for loop
@@ -806,7 +804,7 @@ struct jit_avx512_mic_gemm_f32::xbyak_gemm : public jit_generator {
             }
             if (!isTransA) {
                 if (unroll_m >= 48)
-                    prefetcht2(ptr[AA + 16 * 2 * SIZE]);
+                    mic_prefetcht2(ptr[AA + 16 * 2 * SIZE]);
                 lea(AA, ptr[AA + LDA]);
             }
 
@@ -1609,7 +1607,7 @@ private:
 typedef void (*ker)(long long int, long long int, long long int, float *,
         float *, long long int, float *, long long int, float *, float *,
         long long int, float *);
-void jit_avx512_mic_gemm_f32::sgemm_nocopy_driver(const char *transa,
+void jit_avx512_common_gemm_f32::sgemm_nocopy_driver(const char *transa,
         const char *transb, int m, int n, int k, const float *alpha,
         const float *a, int lda, const float *b, int ldb, const float *beta,
         float *c, int ldc, const float *bias)
@@ -1718,7 +1716,7 @@ void jit_avx512_mic_gemm_f32::sgemm_nocopy_driver(const char *transa,
 // Partition n values as equally as possible among nthr threads
 // and set the offset (t_offset) and number of values (t_block) for ithr
 // Assumption: 0 <= ithr < nthr
-inline void jit_avx512_mic_gemm_f32::partition_unit_diff(
+inline void jit_avx512_common_gemm_f32::partition_unit_diff(
         int ithr, int nthr, int n, int *t_offset, int *t_block)
 {
     int band = n / nthr;
@@ -1749,7 +1747,7 @@ inline void jit_avx512_mic_gemm_f32::partition_unit_diff(
 
 // Sum the m*n values from p_src into p_dst, assuming the two-dimensional
 // arrays have leading dimensions ld_src and ld_dst, respectively
-inline void jit_avx512_mic_gemm_f32::sum_two_matrices(
+inline void jit_avx512_common_gemm_f32::sum_two_matrices(
         int m, int n, float *p_src, int ld_src, float *p_dst, int ld_dst)
 {
     int i, j;
@@ -1760,22 +1758,22 @@ inline void jit_avx512_mic_gemm_f32::sum_two_matrices(
     }
 }
 
-#define BM_NOCOPY_AVX512_MIC 32
-#define BN_NOCOPY_AVX512_MIC 64
-#define BK_NOCOPY_AVX512_MIC 192
-#define BN_LARGE_NOCOPY_AVX512_MIC 192
-#define BM_SMALL_NOCOPY_AVX512_MIC 16
-#define BN_SMALL_NOCOPY_AVX512_MIC 1
-#define BK_SMALL_NOCOPY_AVX512_MIC 4
+#define BM_NOCOPY_AVX512_COMMON 32
+#define BN_NOCOPY_AVX512_COMMON 64
+#define BK_NOCOPY_AVX512_COMMON 192
+#define BN_LARGE_NOCOPY_AVX512_COMMON 192
+#define BM_SMALL_NOCOPY_AVX512_COMMON 16
+#define BN_SMALL_NOCOPY_AVX512_COMMON 1
+#define BK_SMALL_NOCOPY_AVX512_COMMON 4
 // Determine number of threads for each dimension of a 3-D partitioning
 // algorithm based on input parameters
 // m/n/k - First/second/third parameter for GEMM
 // nthrs - total available number of threads
 // nthrs_m/nthrs_n/nthrs_k - number of threads to use in each dimension
 // BM/BN/BK - blocking values
-inline void jit_avx512_mic_gemm_f32::calc_nthr_nocopy_avx512_mic(int m, int n,
-        int k, int nthrs, int *nthrs_m, int *nthrs_n, int *nthrs_k, int *BM,
-        int *BN, int *BK)
+inline void jit_avx512_common_gemm_f32::calc_nthr_nocopy_avx512_common(int m,
+        int n, int k, int nthrs, int *nthrs_m, int *nthrs_n, int *nthrs_k,
+        int *BM, int *BN, int *BK)
 {
     int nthr, nthr_m, nthr_n, nthr_k;
     int MB, NB, KB;
@@ -1789,8 +1787,9 @@ inline void jit_avx512_mic_gemm_f32::calc_nthr_nocopy_avx512_mic(int m, int n,
 
     /* Partition along K dimension if there is enough K and there is not enough
      * M/N */
-    if (n <= 2 * BN_NOCOPY_AVX512_MIC && m <= 2 * BM_NOCOPY_AVX512_MIC * nthr) {
-        nthr_k = k / BK_NOCOPY_AVX512_MIC;
+    if (n <= 2 * BN_NOCOPY_AVX512_COMMON &&
+            m <= 2 * BM_NOCOPY_AVX512_COMMON * nthr) {
+        nthr_k = k / BK_NOCOPY_AVX512_COMMON;
         if (nthr_k > nthr / 4)
             nthr_k = nthr / 4;
         if (nthr_k < 1)
@@ -1803,8 +1802,8 @@ inline void jit_avx512_mic_gemm_f32::calc_nthr_nocopy_avx512_mic(int m, int n,
     } else {
         nthr_k = 1;
     }
-    nthr_m = (m + BM_NOCOPY_AVX512_MIC - 1) / BM_NOCOPY_AVX512_MIC;
-    nthr_n = (n + BN_NOCOPY_AVX512_MIC - 1) / BN_NOCOPY_AVX512_MIC;
+    nthr_m = (m + BM_NOCOPY_AVX512_COMMON - 1) / BM_NOCOPY_AVX512_COMMON;
+    nthr_n = (n + BN_NOCOPY_AVX512_COMMON - 1) / BN_NOCOPY_AVX512_COMMON;
 
     if (nthr_m < 1)
         nthr_m = 1;
@@ -1877,10 +1876,10 @@ inline void jit_avx512_mic_gemm_f32::calc_nthr_nocopy_avx512_mic(int m, int n,
 
         if (nthr_m <= nthr_n) {
             nthr_m = (int)sqrt((double)nthr);
-            if (nthr_m > (m + BM_SMALL_NOCOPY_AVX512_MIC - 1)
-                            / BM_SMALL_NOCOPY_AVX512_MIC)
-                nthr_m = (m + BM_SMALL_NOCOPY_AVX512_MIC - 1)
-                        / BM_SMALL_NOCOPY_AVX512_MIC;
+            if (nthr_m > (m + BM_SMALL_NOCOPY_AVX512_COMMON - 1)
+                            / BM_SMALL_NOCOPY_AVX512_COMMON)
+                nthr_m = (m + BM_SMALL_NOCOPY_AVX512_COMMON - 1)
+                        / BM_SMALL_NOCOPY_AVX512_COMMON;
             nthr_n = nthr / nthr_m;
 
             while ((nthr_m > 1) && (nthr_m * nthr_n != nthr)) {
@@ -1889,10 +1888,10 @@ inline void jit_avx512_mic_gemm_f32::calc_nthr_nocopy_avx512_mic(int m, int n,
             }
         } else {
             nthr_n = (int)sqrt((double)nthr);
-            if (nthr_n > (n + BN_SMALL_NOCOPY_AVX512_MIC - 1)
-                            / BN_SMALL_NOCOPY_AVX512_MIC)
-                nthr_n = (n + BN_SMALL_NOCOPY_AVX512_MIC - 1)
-                        / BN_SMALL_NOCOPY_AVX512_MIC;
+            if (nthr_n > (n + BN_SMALL_NOCOPY_AVX512_COMMON - 1)
+                            / BN_SMALL_NOCOPY_AVX512_COMMON)
+                nthr_n = (n + BN_SMALL_NOCOPY_AVX512_COMMON - 1)
+                        / BN_SMALL_NOCOPY_AVX512_COMMON;
             nthr_m = nthr / nthr_n;
 
             while ((nthr_n > 1) && (nthr_m * nthr_n != nthr)) {
@@ -1902,12 +1901,12 @@ inline void jit_avx512_mic_gemm_f32::calc_nthr_nocopy_avx512_mic(int m, int n,
         }
     }
 
-    MB = (m + nthr_m - 1) / nthr_m + BM_SMALL_NOCOPY_AVX512_MIC - 1;
-    MB -= MB % BM_SMALL_NOCOPY_AVX512_MIC;
-    NB = (n + nthr_n - 1) / nthr_n + BN_SMALL_NOCOPY_AVX512_MIC - 1;
-    NB -= NB % BN_SMALL_NOCOPY_AVX512_MIC;
-    KB = (k + nthr_k - 1) / nthr_k + BK_SMALL_NOCOPY_AVX512_MIC - 1;
-    KB -= KB % BK_SMALL_NOCOPY_AVX512_MIC;
+    MB = (m + nthr_m - 1) / nthr_m + BM_SMALL_NOCOPY_AVX512_COMMON - 1;
+    MB -= MB % BM_SMALL_NOCOPY_AVX512_COMMON;
+    NB = (n + nthr_n - 1) / nthr_n + BN_SMALL_NOCOPY_AVX512_COMMON - 1;
+    NB -= NB % BN_SMALL_NOCOPY_AVX512_COMMON;
+    KB = (k + nthr_k - 1) / nthr_k + BK_SMALL_NOCOPY_AVX512_COMMON - 1;
+    KB -= KB % BK_SMALL_NOCOPY_AVX512_COMMON;
 
     if (MB * nthr_m > m)
         nthr_m = (m + MB - 1) / MB;
@@ -1924,15 +1923,15 @@ inline void jit_avx512_mic_gemm_f32::calc_nthr_nocopy_avx512_mic(int m, int n,
     *BN = NB;
     *BK = KB;
 }
-#undef BM_NOCOPY_AVX512_MIC
-#undef BN_NOCOPY_AVX512_MIC
-#undef BK_NOCOPY_AVX512_MIC
-#undef BN_LARGE_NOCOPY_AVX512_MIC
-#undef BM_SMALL_NOCOPY_AVX512_MIC
-#undef BN_SMALL_NOCOPY_AVX512_MIC
-#undef BK_SMALL_NOCOPY_AVX512_MIC
+#undef BM_NOCOPY_AVX512_COMMON
+#undef BN_NOCOPY_AVX512_COMMON
+#undef BK_NOCOPY_AVX512_COMMON
+#undef BN_LARGE_NOCOPY_AVX512_COMMON
+#undef BM_SMALL_NOCOPY_AVX512_COMMON
+#undef BN_SMALL_NOCOPY_AVX512_COMMON
+#undef BK_SMALL_NOCOPY_AVX512_COMMON
 
-void jit_avx512_mic_gemm_f32::sgemm(const char *transa, const char *transb,
+void jit_avx512_common_gemm_f32::sgemm(const char *transa, const char *transb,
         const int *p_m, const int *p_n, const int *p_k, const float *p_alpha,
         const float *A, const int *p_lda, const float *B, const int *p_ldb,
         const float *p_beta, float *C, const int *p_ldc, const float *bias)
@@ -1951,7 +1950,7 @@ void jit_avx512_mic_gemm_f32::sgemm(const char *transa, const char *transb,
     int nthr_m, nthr_n, nthr_k, nthr_mn;
 
     // Determine threading partitioning
-    calc_nthr_nocopy_avx512_mic(
+    calc_nthr_nocopy_avx512_common(
             m, n, k, nthr, &nthr_m, &nthr_n, &nthr_k, &MB, &NB, &KB);
 
     // May not happen, but just in case
@@ -2091,7 +2090,7 @@ void jit_avx512_mic_gemm_f32::sgemm(const char *transa, const char *transb,
         Xbyak::AlignedFree(c_buffers);
 }
 
-jit_avx512_mic_gemm_f32::jit_avx512_mic_gemm_f32(
+jit_avx512_common_gemm_f32::jit_avx512_common_gemm_f32(
         char transa, char transb, float beta, bool hasBias)
 {
     transa_ = transa;
@@ -2114,7 +2113,7 @@ jit_avx512_mic_gemm_f32::jit_avx512_mic_gemm_f32(
     }
 }
 
-jit_avx512_mic_gemm_f32::~jit_avx512_mic_gemm_f32()
+jit_avx512_common_gemm_f32::~jit_avx512_common_gemm_f32()
 {
     delete ker_bn_;
     if (beta_ != 1.0)

@@ -66,6 +66,12 @@ typedef enum {
     mkldnn_f32 = 1,
     /** 32-bit signed integer. */
     mkldnn_s32 = 2,
+    /** 16-bit signed integer. */
+    mkldnn_s16 = 4,
+    /** 8-bit signed integer. */
+    mkldnn_s8 = 5,
+    /** 8-bit unsigned integer. */
+    mkldnn_u8 = 6,
 } mkldnn_data_type_t;
 
 /** Memory format specification.
@@ -126,9 +132,6 @@ typedef enum {
     /** 4D weights tensor in the format (input channels, width, height,
      * output channels). */
     mkldnn_ihwo,
-    /** 5D weights tensor in the @c oihw format with extra outer dimension for
-     * groups. */
-    mkldnn_goihw,
 #if 1 //defined(TARGET_JIT) ... but tests cover too many of the formats
     // jit-related types have a capital O (at least for now)
     /** 4D weights tensor in the @c oihw format with both input and output
@@ -137,6 +140,10 @@ typedef enum {
     /** 4D weights tensor in the @c oihw format with both input and output
      * channels data laid out in memory in 16-element blocks. */
     mkldnn_OIhw16i16o,
+    /** 4D weights tensor in the @c oihw format with output channels data
+     * laid out in memory in 16-element blocks and input channels data
+     * laid out in memory in 8-element blocks blocked by pairs. */
+    mkldnn_OIhw8i16o2i,
     /** 4D weights tensor in the @c oihw format with both input and output
      * channels data laid out in memory in 8-element blocks. */
     mkldnn_OIhw8o8i,
@@ -151,6 +158,14 @@ typedef enum {
      * channels) with output channels data laid out in memory in 16-element
      * blocks. */
     mkldnn_Ohwi16o,
+    /** 4D weights tensor in the @c oihw format with both input and output
+     * channels data laid out in memory in 16-element and 4-element blocks. */
+    mkldnn_OhIw16o4i,
+#endif
+    /** 5D weights tensor in the @c oihw format with extra outer dimension for
+     * groups. */
+    mkldnn_goihw,
+#if 1 //defined(TARGET_JIT) ... but tests cover too many of the formats
     /** 5D weights tensor in the blocked version of @c goihw format with both
      * input and output channels data laid out in memory in 8-element blocks.
      */
@@ -159,6 +174,10 @@ typedef enum {
      * input and output channels data laid out in memory in 16-element blocks.
      */
     mkldnn_gOIhw16i16o,
+    /** 5D weights tensor in the @c oihw format with output channels data
+     * laid out in memory in 16-element blocks and input channels data
+     * laid out in memory in 8-element blocks blocked by pairs. */
+    mkldnn_gOIhw8i16o2i,
     /** 5D weights tensor in the blocked version of @c goihw format with both
      * input and output channels data laid out in memory in 8-element blocks.
      */
@@ -167,6 +186,9 @@ typedef enum {
      * input and output channels data laid out in memory in 16-element blocks.
      */
     mkldnn_gOIhw16o16i,
+    /** 5D weights tensor in the @c goihw format with both input and output
+     * channels data laid out in memory in 16-element and 4-element blocks. */
+    mkldnn_gOhIw16o4i,
 #endif
     /** 4D weights tensor in the oihw format with input channels data laid out
      * in memory in 8-element blocks. */
@@ -402,6 +424,8 @@ typedef struct {
     mkldnn_dims_t padding[2];
     /** The kind of padding to use. */
     mkldnn_padding_kind_t padding_kind;
+    /** The accumulator data type. Initialized automatically. */
+    mkldnn_data_type_t accum_data_type;
 } mkldnn_convolution_desc_t;
 
 /** A descriptor of a rectifier linear unit (ReLU) operation. */
@@ -467,6 +491,8 @@ typedef struct {
     mkldnn_dims_t padding[2];
     /** The kind of padding to use. */
     mkldnn_padding_kind_t padding_kind;
+    /** The accumulator data type. Initialized automatically. */
+    mkldnn_data_type_t accum_data_type;
 } mkldnn_pooling_desc_t;
 
 /** A descriptor of a Local Response Normalization (LRN) operation. */
@@ -552,6 +578,8 @@ typedef struct {
     mkldnn_memory_desc_t dst_desc;
     /** Destination gradient memory descriptor. */
     mkldnn_memory_desc_t diff_dst_desc;
+    /** The accumulator data type. Initialized automatically. */
+    mkldnn_data_type_t accum_data_type;
 } mkldnn_inner_product_desc_t;
 
 /** A descriptor of a convolution followed by relu operation. */

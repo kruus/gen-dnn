@@ -40,7 +40,8 @@ inline void rtus_prepare(conv_pd_t *self, const convolution_desc_t *&conv_d,
 
     bool rtus_applicable = true
         && (conv_d->strides[0] != 1 || conv_d->strides[1] != 1)
-        && src_d->format == memory_format::nChw8c;
+        && utils::one_of(src_d->format,
+            memory_format::nChw8c, memory_format::nChw16c);
     for (int d = 2; d < 4; ++d) {
         /* TODO: relax these conditions (by improving reducer) */
         rtus_applicable = rtus_applicable
@@ -90,7 +91,7 @@ struct rtus_driver_f32_t: public jit_generator {
     void uni_vpxor(const Xbyak::Xmm& x1, const Xbyak::Xmm& x2,
             const Xbyak::Operand& op)
     { if (isa == avx2) vpxor(x1, x2, op); else vpxord(x1, x2, op); }
-    const int vlen = cpu_isa_trait<isa>::vlen;
+    const int vlen = cpu_isa_traits<isa>::vlen;
     const int typesize = sizeof(float);
 
     Xbyak::Reg64 reg_ws = abi_param1;
@@ -175,7 +176,7 @@ struct rtus_driver_f32_t: public jit_generator {
 
     void generate() {
         using namespace Xbyak;
-        assert(isa == avx2 || isa == avx512_mic);
+        assert(isa == avx2 || isa == avx512_common || isa == avx512_mic);
 
 #if defined(_WIN32)
         push(rdi);
@@ -192,7 +193,7 @@ struct rtus_driver_f32_t: public jit_generator {
         READ_PARAM(ws); /* reg_ws should always be read the last */
 #undef  READ_PARAM
 
-        shl(reg_os, cpu_isa_trait<isa>::vlen_shift);
+        shl(reg_os, cpu_isa_traits<isa>::vlen_shift);
 
         if (!src_to_ws_)
             uni_vpxor(reg_zero, reg_zero, reg_zero);
@@ -246,7 +247,11 @@ inline void init_rtus_driver_f32(conv_t *self) {
     const int stride_h = cd.strides[0];
     const int stride_w = cd.strides[1];
 
-    const auto &src_d = is_bwd_data ? cd.diff_src_desc : cd.src_desc;
+    const auto &src_d = is_bwd_data ? *conf.diff_src_pd()->desc()
+                                    : *conf.src_pd()->desc();
+    assert((isa == avx2 && src_d.format == memory_format::nChw8c)
+           || (isa == avx512_common && src_d.format == memory_format::nChw16c));
+
     const int ih = src_d.dims[2];
     const int iw = src_d.dims[3];
 

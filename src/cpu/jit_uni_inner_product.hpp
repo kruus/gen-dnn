@@ -23,7 +23,7 @@
 #include "cpu_engine.hpp"
 #include "cpu_inner_product_pd.hpp"
 #include "jit_avx2_gemm_f32.hpp"
-#include "jit_avx512_mic_gemm_f32.hpp"
+#include "jit_avx512_common_gemm_f32.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
@@ -83,7 +83,7 @@ struct jit_uni_inner_product_fwd_t : public cpu_primitive_t {
             const output_vector &outputs);
     ~jit_uni_inner_product_fwd_t();
 
-    typedef typename prec_trait<data_type::f32>::type data_t;
+    typedef typename prec_traits<data_type::f32>::type data_t;
 
     virtual void execute(event_t *e)
     {
@@ -95,7 +95,7 @@ private:
     void execute_forward();
     pd_t conf_;
     using jit_uni_gemm_f32 = typename utils::conditional
-         <isa == avx2, jit_avx2_gemm_f32, jit_avx512_mic_gemm_f32>::type;
+         <isa == avx2, jit_avx2_gemm_f32, jit_avx512_common_gemm_f32>::type;
     jit_uni_gemm_f32 *sgemm_;
 };
 
@@ -149,7 +149,7 @@ struct jit_uni_inner_product_bwd_weights_t : public cpu_primitive_t {
             const output_vector &outputs);
     ~jit_uni_inner_product_bwd_weights_t();
 
-    typedef typename prec_trait<data_type::f32>::type data_t;
+    typedef typename prec_traits<data_type::f32>::type data_t;
 
     virtual void execute(event_t *e)
     {
@@ -161,7 +161,7 @@ private:
     void execute_backward_weights();
     pd_t conf_;
     using jit_uni_gemm_f32 = typename utils::conditional
-        <isa == avx2, jit_avx2_gemm_f32, jit_avx512_mic_gemm_f32>::type;
+        <isa == avx2, jit_avx2_gemm_f32, jit_avx512_common_gemm_f32>::type;
     jit_uni_gemm_f32 *sgemm_;
 };
 
@@ -216,7 +216,7 @@ struct jit_uni_inner_product_bwd_data_t : public cpu_primitive_t {
             const output_vector &outputs);
     ~jit_uni_inner_product_bwd_data_t();
 
-    typedef typename prec_trait<data_type::f32>::type data_t;
+    typedef typename prec_traits<data_type::f32>::type data_t;
 
     virtual void execute(event_t *e)
     {
@@ -228,7 +228,7 @@ private:
     void execute_backward_data();
     pd_t conf_;
     using jit_uni_gemm_f32 = typename utils::conditional
-        <isa == avx2, jit_avx2_gemm_f32, jit_avx512_mic_gemm_f32>::type;
+        <isa == avx2, jit_avx2_gemm_f32, jit_avx512_common_gemm_f32>::type;
     jit_uni_gemm_f32 *sgemm_;
 };
 }

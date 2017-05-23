@@ -14,8 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef JIT_AVX512_MIC_1x1_CONV_KERNEL_F32_HPP
-#define JIT_AVX512_MIC_1x1_CONV_KERNEL_F32_HPP
+#ifndef JIT_AVX512_COMMON_1x1_CONV_KERNEL_F32_HPP
+#define JIT_AVX512_COMMON_1x1_CONV_KERNEL_F32_HPP
 
 #include "c_types_map.hpp"
 #include "jit_generator.hpp"
@@ -25,24 +25,21 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-struct jit_avx512_mic_1x1_conv_kernel_f32 : public jit_generator {
-    enum {
-        REDUCE_FLAG_FIRST = 1,
-        REDUCE_FLAG_LAST = 2
-    };
+struct jit_avx512_common_1x1_conv_kernel_f32 : public jit_generator {
+    enum { REDUCE_FLAG_FIRST = 1, REDUCE_FLAG_LAST = 2 };
 
-    jit_avx512_mic_1x1_conv_kernel_f32(jit_1x1_conv_conf_t ajcp) : jcp(ajcp)
+    jit_avx512_common_1x1_conv_kernel_f32(jit_1x1_conv_conf_t ajcp) : jcp(ajcp)
     {
         this->generate();
         jit_ker = (void (*)(jit_1x1_conv_call_s *)) this->getCode();
     }
 
     static status_t init_conf(jit_1x1_conv_conf_t &jcp,
-                              const convolution_desc_t &cd,
-                              const memory_desc_wrapper &src_d,
-                              const memory_desc_wrapper &weights_d,
-                              const memory_desc_wrapper &dst_d, bool with_relu,
-                              double relu_negative_slope);
+                                const convolution_desc_t &cd,
+                                const memory_desc_wrapper &src_d,
+                                const memory_desc_wrapper &weights_d,
+                                const memory_desc_wrapper &dst_d,
+                                bool with_relu, double relu_negative_slope);
 
     static status_t init_conf(jit_1x1_conv_conf_t &jcp,
                               const convolution_desc_t &cd,
@@ -70,15 +67,18 @@ struct jit_avx512_mic_1x1_conv_kernel_f32 : public jit_generator {
     reg64_t aux_reg_output_data = rcx;
     reg64_t reg_load_loop_work = rsi;
     reg64_t reg_reduce_loop_work = r11;
-    reg64_t load_loop_iter = r13;
     reg64_t bcast_loop_iter = rdx;
     reg64_t reduce_loop_iter = rdi;
     reg64_t reg_reduce_pos_flag = rax;
     reg64_t reg_output_stride = r12;
     reg64_t reg_bias_data = r12;
+    reg64_t reg_relu_ns = r13;
     reg64_t reg_bcast_loop_work = aux1_reg_bcast_data;
     reg64_t reg_diff_bias_data = bcast_loop_iter;
     mask_t vmask = k7;
+
+    Xbyak::Zmm zmm_relu_ns = Xbyak::Zmm(30);
+    Xbyak::Zmm zmm_zero = Xbyak::Zmm(31);
 
     int reg_diff_bias_data_stack_offt = 0;
     int bcast_loop_work_offt = 16;

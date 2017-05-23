@@ -90,7 +90,7 @@ using namespace Xbyak;
 
 template <impl::data_type_t data_type>
 struct reducer_2d_driver_t: public c_compatible {
-    typedef typename prec_trait<data_type>::type data_t;
+    typedef typename prec_traits<data_type>::type data_t;
 
     reducer_2d_driver_t(int n_src, size_t src_ld,
             size_t src_step, size_t dst_step, bool nullify_dst)
@@ -115,7 +115,7 @@ struct reducer_2d_driver_f32_t: public reducer_2d_driver_t<data_type::f32>,
     const AddressFrame &vmmword = (isa == avx2) ? yword : zword;
     void uni_vpxor(const Xmm& x1, const Xmm& x2, const Operand& op)
     { if (isa == avx2) vpxor(x1, x2, op); else vpxord(x1, x2, op); }
-    const int vlen = cpu_isa_trait<isa>::vlen;
+    const int vlen = cpu_isa_traits<isa>::vlen;
     const int typesize = sizeof(float);
 
     Xbyak::Reg64 reg_dst = abi_param1;
@@ -175,7 +175,7 @@ struct reducer_2d_driver_f32_t: public reducer_2d_driver_t<data_type::f32>,
     }
 
     void loop_x() {
-        const int nloads[] = {cpu_isa_trait<isa>::n_vregs, 1, 1};
+        const int nloads[] = {cpu_isa_traits<isa>::n_vregs, 1, 1};
         const int nbranches = sizeof(nloads) / sizeof(nloads[0]);
 
         const int load_len[nbranches] = {vlen, vlen, typesize};
@@ -231,7 +231,7 @@ struct reducer_2d_driver_f32_t: public reducer_2d_driver_t<data_type::f32>,
     }
 
     void generate() {
-        assert(isa == avx2 || isa == avx512_mic);
+        assert(isa == avx2 || isa == avx512_common || isa == avx512_mic);
 
         preamble();
 
@@ -258,8 +258,8 @@ template <impl::data_type_t data_type>
 inline reducer_2d_driver_t<data_type> *create_reduce_2d_drv(int n_src,
         size_t src_ld, size_t src_step, size_t dst_step, bool nullify_dst) {
     if (data_type == data_type::f32) {
-        if (mayiuse(avx512_mic))
-            return new reducer_2d_driver_f32_t<avx512_mic>(n_src, src_ld,
+        if (mayiuse(avx512_common))
+            return new reducer_2d_driver_f32_t<avx512_common>(n_src, src_ld,
                     src_step, dst_step, nullify_dst);
         else if (mayiuse(avx2))
             return new reducer_2d_driver_f32_t<avx2>(n_src, src_ld, src_step,
@@ -365,10 +365,11 @@ template struct cpu_reducer_t<data_type::f32>;
 
 template <impl::data_type_t data_type>
 cpu_reducer_2d_t<data_type>::cpu_reducer_2d_t(
-        const reduce_balancer_t &balancer, int job_size_x, int job_size_y,
+        const reduce_balancer_t &balancer,
+        int job_size_x, int job_size_y, int x_block,
         int dst_x, int dst_y, bool master_uses_dst)
     : balancer_(balancer), master_uses_dst_(master_uses_dst)
-    , job_size_x_(job_size_x), job_size_y_(job_size_y)
+    , job_size_x_(job_size_x), job_size_y_(job_size_y), x_block_(x_block)
     , dst_x_(dst_x), dst_y_(dst_y), workspace_(nullptr), drv_(nullptr)
     , barriers_(nullptr)
 {
@@ -421,6 +422,50 @@ cpu_reducer_2d_t<data_type>::get_local_ptr(int ithr, data_t *dst) {
 }
 
 template <impl::data_type_t data_type>
+int cpu_reducer_2d_t<data_type>::choose_x_blocking(int nx, int ny,
+                                                    int nthr_per_grp) {
+    // find x_blocking for better balance reducing work between threads
+    assert(x_block_ > 0 && nx > x_block_ && nx % x_block_ == 0);
+    int x_blocking = nx / x_block_;
+    int min_x_blocking =
+            utils::div_up(x_blocking, nstl::max(1, nthr_per_grp / ny));
+    while (true) {
+        if (x_blocking % 2 == 0 && x_blocking >= min_x_blocking * 2)
+            x_blocking /= 2;
+        else if (x_blocking % 3 == 0 && x_blocking >= min_x_blocking * 3)
+            x_blocking /= 3;
+        else
+            break;
+    }
+    if (x_blocking >= min_x_blocking * 4) x_blocking = 1;
+    x_blocking *= x_block_;
+    return x_blocking;
+}
+
+template <impl::data_type_t data_type>
+void cpu_reducer_2d_t<data_type>::reduce_block(const data_t* wspace_base,
+            data_t *dst, int job, int start_y, int start_x,
+            int ny_start, int nx_start, int ny_step, int nx_step) {
+    data_t *d = dst + (start_y + ny_start) * dst_x_
+                    + start_x + nx_start;
+    const data_t *wspace = wspace_base + job * balancer_.job_size_
+                            + ny_start * job_size_x_ + nx_start;
+#ifdef SIMPLE_IMPL
+    const int idg_start = master_uses_dst_ ? 1 : 0;
+    for (int idg = idg_start; idg < balancer_.nthr_per_group_; ++idg) {
+        const data_t *w = &wspace[(idg - idg_start) * ws_per_thread()];
+        for (int y = 0; y < ny_step; ++y)
+            for (int x = 0; x < nx_step; ++x) {
+                d[y * dst_x_ + x] = (idg == 0 ? 0 : d[y * dst_x_ + x])
+                    + w[y * job_size_x_ + x];
+            }
+    }
+#else
+    (*drv_)(d, wspace, ny_step, nx_step);
+#endif
+}
+
+template <impl::data_type_t data_type>
 void cpu_reducer_2d_t<data_type>::reduce_nolock(int ithr, data_t *dst) {
     bool redundant_reduction = balancer_.nthr_per_group_ == 1
         || balancer_.idle(ithr);
@@ -453,28 +498,32 @@ void cpu_reducer_2d_t<data_type>::reduce_nolock(int ithr, data_t *dst) {
         const int start_x = j_x * job_size_x_;
         const int ny = nstl::min(dst_y_ - start_y, job_size_y_);
         const int nx = nstl::min(dst_x_ - start_x, job_size_x_);
+        int x_blocking = choose_x_blocking(nx, ny, pr_nthr_per_grp);
 
-        int ny_start{0}, ny_end{0};
-        balance211(ny, pr_nthr_per_grp, pr_my_id, ny_start, ny_end);
-        if (ny_start == ny_end) continue;
+        int nxy_start{0}, nxy_end{0};
+        balance211(ny * nx / x_blocking, pr_nthr_per_grp, pr_my_id,
+                    nxy_start, nxy_end);
+        if (nxy_start == nxy_end) continue;
+        nxy_start *= x_blocking;
+        nxy_end *= x_blocking;
 
-        data_t *d = dst + (start_y + ny_start) * dst_x_ + start_x;
-        const data_t *wspace = wspace_base + j * balancer_.job_size_
-            + ny_start * job_size_x_;
-
-#ifdef SIMPLE_IMPL
-        const int idg_start = master_uses_dst_ ? 1 : 0;
-        for (int idg = idg_start; idg < balancer_.nthr_per_group_; ++idg)
-        {
-            const data_t *w = &wspace[(idg - idg_start) * ws_per_thread()];
-            for (int y = 0; y < ny_end - ny_start; ++y)
-                for (int x = 0; x < nx; ++x)
-                    d[y * dst_x_ + x] = (idg == 0 ? 0 : d[y * dst_x_ + x])
-                        + w[y * job_size_x_ + x];
+        int nxy = nxy_start;
+        if (nxy % nx != 0) {
+            int nx_step = nstl::min(nx - nxy % nx, nxy_end - nxy);
+            reduce_block(wspace_base, dst, j, start_y, start_x,
+                        nxy / nx, nxy % nx, 1, nx_step);
+            nxy += nx_step;
         }
-#else
-        (*drv_)(d, wspace, ny_end - ny_start, nx);
-#endif
+        if ((nxy_end - nxy) > nx) {
+            int ny_step = (nxy_end - nxy) / nx;
+            reduce_block(wspace_base, dst, j, start_y, start_x,
+                        nxy / nx, nxy % nx, ny_step, nx);
+            nxy += nx * ny_step;
+        }
+        if ((nxy_end - nxy) > 0) {
+            reduce_block(wspace_base, dst, j, start_y, start_x,
+                        nxy / nx, nxy % nx, 1, nxy_end - nxy);
+        }
     }
 }
 

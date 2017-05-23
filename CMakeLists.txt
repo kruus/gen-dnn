@@ -21,9 +21,14 @@ if(CMAKE_TOOLCHAIN_FILE)
     cmake_minimum_required(VERSION 3.8)
 endif()
 
+# version handling is done with old style
+if(POLICY CMP0048)
+    cmake_policy(SET CMP0048 OLD)
+endif()
+
 set(PROJECT_NAME "GEN-DNN generic MKL-DNN)")
 set(PROJECT_FULL_NAME "Generic (Intel(R) MKL-DNN)")
-set(PROJECT_VERSION, "0.7")
+set(PROJECT_VERSION "0.9")
 
 set(LIB_NAME mkldnn)
 
