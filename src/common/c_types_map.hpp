@@ -93,6 +93,8 @@ namespace memory_format {
     const memory_format_t io = mkldnn_io;
     const memory_format_t oihw = mkldnn_oihw;
     const memory_format_t ihwo = mkldnn_ihwo;
+    const memory_format_t oIhw8i = mkldnn_oIhw8i;
+    const memory_format_t oIhw16i = mkldnn_oIhw16i;
 #if 1 // defined(TARGET_JIT)
     const memory_format_t OIhw8i8o = mkldnn_OIhw8i8o;
     const memory_format_t OIhw16i16o = mkldnn_OIhw16i16o;
@@ -110,8 +112,8 @@ namespace memory_format {
     const memory_format_t gOIhw8i16o2i = mkldnn_gOIhw8i16o2i;
     const memory_format_t gOIhw8o8i = mkldnn_gOIhw8o8i;
     const memory_format_t gOIhw16o16i = mkldnn_gOIhw16o16i;
-    const memory_format_t oIhw8i = mkldnn_oIhw8i;
-    const memory_format_t oIhw16i = mkldnn_oIhw16i;
+    const memory_format_t gOhwi8o = mkldnn_gOhwi8o;
+    const memory_format_t gOhwi16o = mkldnn_gOhwi16o;
     const memory_format_t gOhIw16o4i = mkldnn_gOhIw16o4i;
 #endif
 }

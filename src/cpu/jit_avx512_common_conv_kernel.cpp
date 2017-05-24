@@ -77,6 +77,16 @@ void jit_avx512_common_conv_fwd_kernel::store_output(int ur_w)
     L(relu_label);
     if (jcp.with_relu) {
         // TODO: Not supported for int16->int32 convolution
+        if (!jcp._4vnni) {
+            vpxord(zmm_zero, zmm_zero, zmm_zero);
+            if (jcp.relu_negative_slope == 0) {
+                zmm_relu_ns = zmm_zero;
+            } else {
+                mov(reg_relu_ns,
+                    reinterpret_cast<size_t>(&jcp.relu_negative_slope));
+                vbroadcastss(zmm_relu_ns, ptr[reg_relu_ns]);
+            }
+        }
         cmp(reg_current_ic, jcp.nb_ic-1);
         jl(store_label, T_NEAR);
         const unsigned char _cmp_lt_os = 1;
@@ -319,14 +329,8 @@ void jit_avx512_common_conv_fwd_kernel::generate()
     mov(reg_out, ptr[this->param1 + GET_OFF(dst)]);
     mov(reg_ker, ptr[this->param1 + GET_OFF(filt)]);
     mov(reg_ker_prf, ptr[this->param1 + GET_OFF(filt_prf)]);
-
     mov(reg_kh, ptr[this->param1 + GET_OFF(kh_padding)]);
 
-    if (!jcp._4vnni) {
-        mov(reg_relu_ns, reinterpret_cast<size_t>(&jcp.relu_negative_slope));
-        vbroadcastss(zmm_relu_ns, ptr[reg_relu_ns]);
-        vpxord(zmm_zero, zmm_zero, zmm_zero);
-    }
     int r_pad = nstl::max(0, (ow - 1) * stride_w + (kw - 1) - (iw + l_pad - 1));
     if (ow == ur_w) {
         mov(reg_inp_prf, ptr[this->param1 + GET_OFF(src_prf)]);
@@ -434,11 +438,10 @@ status_t jit_avx512_common_conv_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
         jcp.typesize_in = sizeof(float);
         jcp.typesize_out = sizeof(float);
         bool args_ok = true
-            && implication(flat, one_of(src_d.format(), nchw, nhwc))
-            && implication(mimo, src_d.format() == nChw16c)
-            && weights_d.format()
-                    == (with_groups ? gOIhw16i16o :
-                                      (flat ? Ohwi16o : OIhw16i16o))
+            && implication(flat, one_of(src_d.format(), nchw, nhwc)
+                    && one_of(weights_d.format(), Ohwi16o, gOhwi16o))
+            && implication(mimo, src_d.format() == nChw16c
+                    && one_of(weights_d.format(), OIhw16i16o, gOIhw16i16o))
             && one_of(cd.bias_desc.format, memory_format::undef, any, x)
             && dst_d.format() == nChw16c;
         if (!args_ok)
@@ -1249,10 +1252,10 @@ status_t jit_avx512_common_conv_bwd_weights_kernel_f32::init_conf(
     jcp.owp = jcp.ow;
 
     bool args_ok = true
-        && implication(flat, one_of(src_d.format(), nchw, nhwc))
-        && implication(mimo, src_d.format() == nChw16c)
-        && diff_weights_d.format() == (with_groups ? gOIhw16i16o : (flat ?
-              Ohwi16o : OIhw16i16o))
+        && implication(flat, one_of(src_d.format(), nchw, nhwc)
+                && one_of(diff_weights_d.format(), Ohwi16o, gOhwi16o))
+        && implication(mimo, src_d.format() == nChw16c
+                && one_of(diff_weights_d.format(), OIhw16i16o, gOIhw16i16o))
         && one_of(cd.bias_desc.format, memory_format::undef, any, x)
         && diff_dst_d.format() == nChw16c;
     if (!args_ok) return status::unimplemented;

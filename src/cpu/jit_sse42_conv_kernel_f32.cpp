@@ -213,9 +213,11 @@ void jit_sse42_conv_fwd_kernel_f32::width_blk_step(int ur_w,
                 const size_t o_off = (ii * oh * ow + jj) * oc_blk;
                 Xmm reg_out = Xmm(ur_w * ii + jj + 1);
 
+                const unsigned char _cmp_gt_os = 6;
+
                 pxor(xmask, xmask);
-                cmpps(xmask, reg_out, 5);
-                blendvps(reg_out, xmask);
+                cmpps(xmask, reg_out, _cmp_gt_os);
+                blendvps(reg_out, xzero);
                 movups(xword[reg_output + sizeof(float) * o_off], reg_out);
             }
         }
@@ -383,10 +385,10 @@ status_t jit_sse42_conv_fwd_kernel_f32::init_conf(jit_conv_conf_t &jcp,
     const bool mimo = !flat;
 
     bool args_ok = true
-        && implication(flat, one_of(src_d.format(), nchw, nhwc))
-        && implication(mimo, src_d.format() == nChw8c)
-        && weights_d.format() ==
-                (with_groups ? gOIhw8i8o : (flat ? Ohwi8o : OIhw8i8o))
+        && implication(flat, one_of(src_d.format(), nchw, nhwc)
+                && one_of(weights_d.format(), Ohwi8o, gOhwi8o))
+        && implication(mimo, src_d.format() == nChw8c
+                && one_of(weights_d.format(), OIhw8i8o, gOIhw8i8o))
         && one_of(cd.bias_desc.format, memory_format::undef, any, x)
         && dst_d.format() == nChw8c;
     if (!args_ok) return status::unimplemented;
