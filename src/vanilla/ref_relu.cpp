@@ -37,7 +37,7 @@ void ref_relu_fwd_t<data_type>::execute_forward_generic() {
     const int C = conf_.C();
     const int H = conf_.H();
     const int W = conf_.W();
-    const data_t negative_slope = static_cast<data_t>(conf_.desc()->negative_slope);
+    const double negative_slope = conf_.desc()->negative_slope;
 
 #   pragma omp parallel for collapse(4) schedule(static)
     for (int n = 0; n < MB; ++n) {
@@ -62,15 +62,14 @@ void ref_relu_fwd_t<data_type>::execute_forward_dense() {
     const memory_desc_wrapper data_d(conf_.src_pd());
 
     const size_t nelems = data_d.nelems();
-    //const double negative_slope = conf_.desc()->negative_slope;
-    const data_t negative_slope = static_cast<data_t>(conf_.desc()->negative_slope);
+    const double negative_slope = conf_.desc()->negative_slope;
 
     src += data_d.blocking_desc().offset_padding;
     dst += data_d.blocking_desc().offset_padding;
 
 #   pragma omp parallel for schedule(static)
     for (size_t e = 0; e < nelems; ++e) {
-        dst[e] = src[e] * ((src[e] > 0) ? data_t{1} : negative_slope);
+        dst[e] = src[e] * ((src[e] > 0) ? 1. : negative_slope);
     }
 }
 
@@ -81,23 +80,25 @@ void ref_relu_bwd_t<data_type>::execute_backward_generic() {
     auto diff_src = reinterpret_cast<data_t*>(this->memory(0));
 
     const memory_desc_wrapper data_d(conf_.src_pd());
+    const memory_desc_wrapper diff_data_d(conf_.diff_src_pd());
 
     const int MB = conf_.MB();
     const int C = conf_.C();
     const int H = conf_.H();
     const int W = conf_.W();
-    const data_t negative_slope = static_cast<data_t>(conf_.desc()->negative_slope);
+    const double negative_slope = conf_.desc()->negative_slope;
 
 #   pragma omp parallel for collapse(4) schedule(static)
     for (int n = 0; n < MB; ++n) {
         for (int c = 0; c < C; ++c) {
             for (int h = 0; h < H; ++h) {
                 for (int w = 0; w < W; ++w) {
-                    auto d_off = data_d.off(n, c, h, w);
-                    data_t s = src[d_off];
-                    data_t dd = diff_dst[d_off];
-                    data_t &ds = diff_src[d_off];
-                    ds = dd * ((s > 0) ? data_t{1} : negative_slope);
+                    auto data_off = data_d.off(n, c, h, w);
+                    auto diff_data_off = diff_data_d.off(n, c, h, w);
+                    data_t s = src[data_off];
+                    data_t dd = diff_dst[diff_data_off];
+                    data_t &ds = diff_src[diff_data_off];
+                    ds = dd * ((s > 0) ? 1. : negative_slope);
                 }
             }
         }
@@ -114,7 +115,7 @@ void ref_relu_bwd_t<data_type>::execute_backward_dense() {
     const memory_desc_wrapper diff_data_d(conf_.diff_src_pd());
 
     const size_t nelems = data_d.nelems();
-    const data_t negative_slope = static_cast<data_t>(conf_.desc()->negative_slope);
+    const double negative_slope = conf_.desc()->negative_slope;
 
     src += data_d.blocking_desc().offset_padding;
     diff_dst += diff_data_d.blocking_desc().offset_padding;
@@ -122,11 +123,16 @@ void ref_relu_bwd_t<data_type>::execute_backward_dense() {
 
 #   pragma omp parallel for schedule(static)
     for (size_t e = 0; e < nelems; ++e) {
-        diff_src[e] = diff_dst[e] * ((src[e] > 0) ? data_t{1} : negative_slope);
+        diff_src[e] = diff_dst[e] * ((src[e] > 0) ? 1. : negative_slope);
     }
 }
 
 template struct ref_relu_fwd_t<data_type::f32>;
+template struct ref_relu_fwd_t<data_type::s32>;
+template struct ref_relu_fwd_t<data_type::s16>;
+template struct ref_relu_fwd_t<data_type::s8>;
+template struct ref_relu_fwd_t<data_type::u8>;
+
 template struct ref_relu_bwd_t<data_type::f32>;
 
 }

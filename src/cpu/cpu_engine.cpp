@@ -34,44 +34,44 @@
 #include "cpu_sum.hpp"
 
 #if JITFUNCS > 99
-#include "cpu/jit_avx512_common_1x1_convolution.hpp"
-#include "cpu/jit_avx512_common_convolution.hpp"
-#include "cpu/jit_avx2_1x1_convolution.hpp"
-#include "cpu/jit_sse42_1x1_convolution.hpp"
-#include "cpu/jit_avx2_convolution.hpp"
-#include "cpu/jit_avx512_u8s8u8_convolution.hpp"
-#include "cpu/jit_sse42_convolution.hpp"
+#include "jit_avx512_common_1x1_convolution.hpp"
+#include "jit_avx512_common_convolution.hpp"
+#include "jit_avx2_1x1_convolution.hpp"
+#include "jit_sse42_1x1_convolution.hpp"
+#include "jit_avx2_convolution.hpp"
+#include "jit_avx512_u8s8u8_convolution.hpp"
+#include "jit_sse42_convolution.hpp"
 #endif
-#include "cpu/gemm_convolution.hpp"
-#include "cpu/ref_convolution.hpp"
+#include "gemm_convolution.hpp"
+#include "ref_convolution.hpp"
 #if JITFUNCS > 99
-#include "cpu/jit_uni_relu.hpp"
+#include "jit_uni_relu.hpp"
 #endif
-#include "cpu/ref_relu.hpp"
-#include "cpu/ref_softmax.hpp"
+#include "ref_relu.hpp"
+#include "ref_softmax.hpp"
 #if JITFUNCS > 99
-#include "cpu/jit_uni_pooling.hpp"
+#include "jit_uni_pooling.hpp"
 #endif
-#include "cpu/ref_pooling.hpp"
-#include "cpu/nchw_pooling.hpp"
+#include "ref_pooling.hpp"
+#include "nchw_pooling.hpp"
 #if JITFUNCS > 99
-#include "cpu/jit_avx512_common_lrn.hpp"
-#include "cpu/jit_uni_lrn.hpp"
+#include "jit_avx512_common_lrn.hpp"
+#include "jit_uni_lrn.hpp"
 #endif
-#include "cpu/ref_lrn.hpp"
+#include "ref_lrn.hpp"
 #if JITFUNCS > 99
-#include "cpu/jit_uni_batch_normalization.hpp"
+#include "jit_uni_batch_normalization.hpp"
 #endif
-#include "cpu/ref_batch_normalization.hpp"
-#include "cpu/ref_inner_product.hpp"
-#include "cpu/gemm_inner_product.hpp"
+#include "ref_batch_normalization.hpp"
+#include "ref_inner_product.hpp"
+#include "gemm_inner_product.hpp"
 #if JITFUNCS > 99
-#include "cpu/jit_uni_inner_product.hpp"
-#include "cpu/jit_avx512_mic_s16s16s32_convolution.hpp"
+#include "jit_uni_inner_product.hpp"
+#include "jit_avx512_mic_s16s16s32_convolution.hpp"
 
-#include "cpu/jit_reorder.hpp"
+#include "jit_reorder.hpp"
 #endif
-#include "cpu/simple_reorder.hpp"
+#include "simple_reorder.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -142,16 +142,20 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     simple_reorder_t<f32, goihw, f32, gOIhw8i8o, fmt_order::reverse>::pd_t::create,
     simple_reorder_t<f32, goihw, f32, gOIhw16i16o, fmt_order::keep>::pd_t::create,
     simple_reorder_t<f32, goihw, f32, gOIhw16i16o, fmt_order::reverse>::pd_t::create,
+#ifndef TARGET_VANILLA
     jit_reorder_t<f32, OIhw8i8o, f32, OIhw8o8i, fmt_order::keep>::pd_t::create,
     jit_reorder_t<f32, OIhw8i8o, f32, OIhw8o8i, fmt_order::reverse>::pd_t::create,
+#endif
     simple_reorder_t<s16, goihw, s16, gOIhw8i16o2i, fmt_order::keep>::pd_t::create,
     simple_reorder_t<s16, goihw, s16, gOIhw8i16o2i, fmt_order::reverse>::pd_t::create,
     simple_reorder_t<f32, OIhw8i8o, f32, OIhw8o8i, fmt_order::keep>::pd_t::create,
     simple_reorder_t<f32, OIhw8i8o, f32, OIhw8o8i, fmt_order::reverse>::pd_t::create,
     simple_reorder_t<f32, OIhw16i16o, f32, OIhw16o16i, fmt_order::keep>::pd_t::create,
     simple_reorder_t<f32, OIhw16i16o, f32, OIhw16o16i, fmt_order::reverse>::pd_t::create,
+#ifndef TARGET_VANILLA
     jit_reorder_t<f32, gOIhw8i8o, f32, gOIhw8o8i, fmt_order::keep>::pd_t::create,
     jit_reorder_t<f32, gOIhw8i8o, f32, gOIhw8o8i, fmt_order::reverse>::pd_t::create,
+#endif
     simple_reorder_t<f32, gOIhw8i8o, f32, gOIhw8o8i, fmt_order::keep>::pd_t::create,
     simple_reorder_t<f32, gOIhw8i8o, f32, gOIhw8o8i, fmt_order::reverse>::pd_t::create,
     simple_reorder_t<f32, gOIhw16i16o, f32, gOIhw16o16i, fmt_order::keep>::pd_t::create,

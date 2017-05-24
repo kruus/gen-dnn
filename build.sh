@@ -195,7 +195,9 @@ if [ "$BUILDOK" == "y" ]; then
     (
     cd "${BUILDDIR}"
     { echo "Installing ..."; make install-bin install-dev; }
-    { echo "Installing docs ..."; make install-doc; }
+    if [ "$DODOC" == "y" ]; then
+        { echo "Installing docs ..."; make install-doc; }
+    fi
     ) 2>&1 >> "${BUILDDIR}".log
     if [ ! "$DOTEST" == "0" -a ! "$DOTARGET" == "s" ]; then
         rm -f test1.log test2.log

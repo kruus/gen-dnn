@@ -74,6 +74,8 @@ NAMEENUM_T(memory_format){
     case(mkldnn_gOIhw8i16o2i): ret = "memory_format:gOIhw8i16o2i"; break;
     case(mkldnn_gOIhw8o8i): ret = "memory_format:gOIhw8o8i"; break;
     case(mkldnn_gOIhw16o16i): ret = "memory_format:gOIhw16o16i"; break;
+    case(mkldnn_gOhwi8o): ret = "memory_format:gOIhwi8o"; break;
+    case(mkldnn_gOhwi16o): ret = "memory_format:gOIhwi16o"; break;
     case(mkldnn_gOhIw16o4i): ret = "memory_format:gOhIw16o4i"; break;
 #endif
     // dup case(mkldnn_oIhw8i): ret = "memory_format:oIhw8i"; break; // alias for nChw8c

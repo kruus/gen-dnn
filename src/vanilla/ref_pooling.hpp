@@ -29,7 +29,7 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-template <impl::data_type_t data_type>
+template <impl::data_type_t data_type, impl::data_type_t acc_type = data_type>
 struct ref_pooling_fwd_t: public cpu_primitive_t {
     struct pd_t: public cpu_pooling_fwd_pd_t {
         pd_t(engine_t *engine, const pooling_desc_t *adesc,
@@ -46,9 +46,12 @@ struct ref_pooling_fwd_t: public cpu_primitive_t {
                 && set_default_params() == status::success
                 && utils::one_of(desc()->prop_kind, forward_training,
                         forward_inference)
-                && utils::one_of(desc()->alg_kind, pooling_max, pooling_avg)
+                && utils::one_of(desc()->alg_kind, pooling_max,
+                        pooling_avg_include_padding,
+                        pooling_avg_exclude_padding)
                 && utils::everyone_is(data_type, src_pd()->desc()->data_type,
-                        dst_pd()->desc()->data_type);
+                        dst_pd()->desc()->data_type)
+                && desc()->accum_data_type == acc_type;
             if (!ok) return status::unimplemented;
 
             bool is_training = desc_.prop_kind == forward_training;
@@ -65,7 +68,9 @@ struct ref_pooling_fwd_t: public cpu_primitive_t {
     ref_pooling_fwd_t(const pd_t *pd, const input_vector &inputs,
             const output_vector &outputs)
         : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {}
+
     typedef typename prec_traits<data_type>::type data_t;
+    typedef typename prec_traits<acc_type>::type acc_data_t;
 
     virtual void execute(event_t *e) {
         execute_forward();
@@ -93,16 +98,18 @@ struct ref_pooling_bwd_t: public cpu_primitive_t {
             bool ok = true
                 && set_default_params() == status::success
                 && utils::one_of(desc()->prop_kind, backward_data)
-                && utils::one_of(desc()->alg_kind, pooling_max, pooling_avg)
+                && utils::one_of(desc()->alg_kind, pooling_max,
+                        pooling_avg_include_padding,
+                        pooling_avg_exclude_padding)
                 && utils::everyone_is(data_type, diff_dst_pd()->desc()->data_type,
                         diff_src_pd()->desc()->data_type)
-                && utils::implication(desc()->alg_kind != pooling_avg,
+                && utils::implication(desc()->alg_kind == pooling_max,
                         hint_fwd_pd_ && hint_fwd_pd_->workspace_pd()
                         && hint_fwd_pd_->workspace_pd()->engine()->kind()
                                 == engine_kind::cpu);
             if (!ok) return status::unimplemented;
 
-            if (desc()->alg_kind != pooling_avg)
+            if (desc()->alg_kind == pooling_max)
                 ws_pd_ = *(cpu_memory_t::pd_t*)hint_fwd_pd_->workspace_pd();
 
             return status::success;

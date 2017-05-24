@@ -19,23 +19,14 @@
 
 #include "gemm_inner_product.hpp"
 
-#if defined(USE_MKL) && defined(USE_CBLAS)
-#include "mkl_cblas.h"
-#elif defined(_SX) || defined(USE_CBLAS)
-#include "cblas.h"
-#endif
-
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-#if defined(USE_MKL) && defined(USE_CBLAS)
+// TODO: move BLAS wrappers to a separate header?
+#ifdef USE_MKL
+#include "mkl_cblas.h"
 typedef MKL_INT cblas_int;
-#elif defined(_SX) || defined(USE_CBLAS)
-typedef int cblas_int;  ///< also OK for SX cblas.h
-#if defined(_SX)
-typedef CBLAS_ORDER CBLAS_LAYOUT;
-#endif
 #endif
 
 #ifdef USE_CBLAS
@@ -98,7 +89,7 @@ void gemm_inner_product_fwd_t<data_type>::execute_forward() {
     const cblas_int OC = conf_.OC();
     const cblas_int IC = conf_.IC_total();
 
-    cblas_gemm<data_type>(CblasRowMajor, CblasTrans, CblasNoTrans, OC, MB, IC,
+    cblas_gemm<data_type>(CblasColMajor, CblasTrans, CblasNoTrans, OC, MB, IC,
             1.0, weights, IC, src, IC, 0.0, dst, OC);
     if (bias)
 #       pragma omp parallel for schedule(static)
@@ -119,7 +110,7 @@ void gemm_inner_product_bwd_data_t<data_type>::execute_backward_data() {
     const cblas_int OC = conf_.OC();
     const cblas_int IC = conf_.IC_total();
 
-    cblas_gemm<data_type>(CblasRowMajor, CblasNoTrans, CblasNoTrans, IC, MB, OC,
+    cblas_gemm<data_type>(CblasColMajor, CblasNoTrans, CblasNoTrans, IC, MB, OC,
             1.0, weights, IC, diff_dst, OC, 0.0, diff_src, IC);
 #endif
 }
@@ -140,7 +131,7 @@ void gemm_inner_product_bwd_weights_t<data_type>::execute_backward_weights() {
     const cblas_int OC = conf_.OC();
     const cblas_int IC = conf_.IC_total();
 
-    cblas_gemm<data_type>(CblasRowMajor, CblasNoTrans, CblasTrans, IC, OC, MB,
+    cblas_gemm<data_type>(CblasColMajor, CblasNoTrans, CblasTrans, IC, OC, MB,
             1.0, src, IC, diff_dst, OC, 0.0, diff_weights, IC);
 
 
