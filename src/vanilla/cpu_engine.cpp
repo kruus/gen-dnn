@@ -39,7 +39,7 @@
 #include "jit_avx2_1x1_convolution.hpp"
 #include "jit_sse42_1x1_convolution.hpp"
 #include "jit_avx2_convolution.hpp"
-#include "jit_avx512_u8s8u8_convolution.hpp"
+#include "jit_avx512_core_u8s8u8_convolution.hpp"
 #include "jit_sse42_convolution.hpp"
 #endif
 #include "gemm_convolution.hpp"

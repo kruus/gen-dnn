@@ -33,41 +33,31 @@
 #include "cpu_concat.hpp"
 #include "cpu_sum.hpp"
 
-#if JITFUNCS > 99
-#include "jit_avx512_common_1x1_convolution.hpp"
-#include "jit_avx512_common_convolution.hpp"
-#include "jit_avx2_1x1_convolution.hpp"
-#include "jit_sse42_1x1_convolution.hpp"
-#include "jit_avx2_convolution.hpp"
-#include "jit_avx512_u8s8u8_convolution.hpp"
-#include "jit_sse42_convolution.hpp"
-#endif
-#include "gemm_convolution.hpp"
-#include "ref_convolution.hpp"
-#if JITFUNCS > 99
-#include "jit_uni_relu.hpp"
-#endif
-#include "ref_relu.hpp"
-#include "ref_softmax.hpp"
-#if JITFUNCS > 99
-#include "jit_uni_pooling.hpp"
-#endif
-#include "ref_pooling.hpp"
-#include "nchw_pooling.hpp"
-#if JITFUNCS > 99
-#include "jit_avx512_common_lrn.hpp"
-#include "jit_uni_lrn.hpp"
-#endif
-#include "ref_lrn.hpp"
-#if JITFUNCS > 99
-#include "jit_uni_batch_normalization.hpp"
-#endif
-#include "ref_batch_normalization.hpp"
-#include "ref_inner_product.hpp"
-#include "gemm_inner_product.hpp"
-#if JITFUNCS > 99
-#include "jit_uni_inner_product.hpp"
-#include "jit_avx512_mic_s16s16s32_convolution.hpp"
+// JITFUNCS removed -- frequent updates here make merges difficult
+#include "cpu/jit_avx512_common_1x1_convolution.hpp"
+#include "cpu/jit_avx512_common_convolution.hpp"
+#include "cpu/jit_avx2_1x1_convolution.hpp"
+#include "cpu/jit_sse42_1x1_convolution.hpp"
+#include "cpu/jit_avx2_convolution.hpp"
+#include "cpu/jit_avx512_core_u8s8u8_convolution.hpp"
+#include "cpu/jit_sse42_convolution.hpp"
+#include "cpu/gemm_convolution.hpp"
+#include "cpu/ref_convolution.hpp"
+#include "cpu/jit_uni_relu.hpp"
+#include "cpu/ref_relu.hpp"
+#include "cpu/ref_softmax.hpp"
+#include "cpu/jit_uni_pooling.hpp"
+#include "cpu/ref_pooling.hpp"
+#include "cpu/nchw_pooling.hpp"
+#include "cpu/jit_avx512_common_lrn.hpp"
+#include "cpu/jit_uni_lrn.hpp"
+#include "cpu/ref_lrn.hpp"
+#include "cpu/jit_uni_batch_normalization.hpp"
+#include "cpu/ref_batch_normalization.hpp"
+#include "cpu/ref_inner_product.hpp"
+#include "cpu/gemm_inner_product.hpp"
+#include "cpu/jit_uni_inner_product.hpp"
+#include "cpu/jit_avx512_mic_s16s16s32_convolution.hpp"
 
 #include "jit_reorder.hpp"
 #endif
@@ -209,7 +199,7 @@ static const pd_create_f cpu_impl_list[] = {
     /* conv (int) */
 #if JITFUNCS > 99
     INSTANCE(jit_avx512_mic_s16s16s32_convolution_fwd_t),
-    INSTANCE(jit_avx512_u8s8u8_convolution_fwd_t),
+    INSTANCE(jit_avx512_core_u8s8u8_convolution_fwd_t),
 #endif
     INSTANCE(ref_convolution_fwd_t<data_type::u8, data_type::s8,
             data_type::s32, data_type::u8>),
@@ -313,7 +303,7 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(ref_convolution_relu_t<data_type::f32>),
     /* conv_relu (int) */
 #if JITFUNCS > 99
-    INSTANCE(jit_avx512_u8s8u8_convolution_relu_t),
+    INSTANCE(jit_avx512_core_u8s8u8_convolution_relu_t),
 #endif
     INSTANCE(ref_convolution_relu_t<data_type::s16, data_type::s16,
             data_type::s32, data_type::s32>),
