@@ -14,8 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include <assert.h>
-#include <math.h>
+#include <cmath>
 
 #include "c_types_map.hpp"
 #include "type_helpers.hpp"
@@ -140,8 +139,8 @@ void ref_lrn_bwd_t<data_type>::execute_backward() {
             const accsqr_t value = src[data_d.off(n, i, h, w)];
             sum += value * value;
         }
-        const float_t fsum = sum * alpha / kernel_size;
-        return c_k + fsum;
+        const auto fsum = sum * alpha / kernel_size;
+        return static_cast<data_t>(c_k + fsum);
     };
 
     auto ker = [=](data_t *d, int mb, int oc, int oh, int ow) {

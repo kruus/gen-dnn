@@ -37,6 +37,10 @@
     } \
 } while(0)
 
+#define TRACE(string) do { \
+    printf(" T:%s",string); fflush(stdout); \
+}while(0)
+
 static size_t product(int *arr, size_t size) {
     size_t prod = 1;
     for (size_t i = 0; i < size; ++i) prod *= arr[i];
@@ -46,12 +50,13 @@ static size_t product(int *arr, size_t size) {
 typedef float real_t;
 
 void test1() {
+    TRACE("+test1");
     mkldnn_engine_t engine;
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0));
 
     const int len0 = 100;
     mkldnn_dims_t dims = {len0};
-    real_t data[len0];
+    real_t data[len0]; // SX: const variable in a constant expression is nonstandard in C
 
     mkldnn_memory_desc_t md;
     mkldnn_primitive_desc_t mpd;
@@ -80,9 +85,11 @@ void test1() {
     CHECK(mkldnn_primitive_desc_destroy(mpd));
 
     CHECK(mkldnn_engine_destroy(engine));
+    TRACE("-test1");
 }
 
 void test2() {
+    TRACE("+test2");
     /* AlexNet: c3
      * {2, 256, 13, 13} (x) {384, 256, 3, 3} -> {2, 384, 13, 13}
      * pad: {1, 1}
@@ -108,8 +115,9 @@ void test2() {
     real_t *out_mem = (real_t*)calloc(product(c3_dst_sizes, 4), sizeof(real_t));
     CHECK_TRUE(src && weights && bias && dst && out_mem);
 
-    for (int i = 0; i < c3_bias_sizes[0]; ++i) bias[i] = i;
+    for (int i = 0; i < c3_bias_sizes[0]; ++i) bias[i] = (real_t)(i);
 
+    TRACE("2:engine");
     mkldnn_engine_t engine;
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0));
 
@@ -170,6 +178,7 @@ void test2() {
     const_mkldnn_primitive_t c3_dsts[1] = {c3_dst};
 
     /* create a convolution */
+    TRACE("2:conv");
     mkldnn_convolution_desc_t c3_desc;
     mkldnn_primitive_desc_t c3_pd;
     mkldnn_primitive_t c3;
@@ -211,6 +220,7 @@ void test2() {
     CHECK(mkldnn_primitive_desc_destroy(r_pd));
 
     /* let us build a net */
+    TRACE("2:net");
     mkldnn_primitive_t net[] = {c3, r};
     mkldnn_stream_t stream;
     CHECK(mkldnn_stream_create(&stream, mkldnn_eager));
@@ -218,6 +228,7 @@ void test2() {
     CHECK(mkldnn_stream_wait(stream, 1, NULL));
 
     /* clean-up */
+    TRACE("2:clean");
     CHECK(mkldnn_stream_destroy(stream));
     CHECK(mkldnn_primitive_destroy(r));
     CHECK(mkldnn_primitive_destroy(c3));
@@ -238,14 +249,17 @@ void test2() {
         CHECK_TRUE(out_mem[off] == bias[c]);
     }
 
+    TRACE("-test2-a");
     free(src);
     free(weights);
     free(bias);
     free(dst);
     free(out_mem);
+    TRACE("-test2");
 }
 
 void test3() {
+    TRACE("+test3");
     const int mb = 2;
     int l2_data_sizes[4] = {mb, 256, 13, 13};
 
@@ -255,8 +269,9 @@ void test3() {
     CHECK_TRUE(src && dst && out_mem);
 
     for (size_t i = 0; i < product(l2_data_sizes, 4); ++i)
-        src[i] = (i % 13) + 1;
+        src[i] = (real_t)((i % 13) + 1);
 
+    TRACE("3:engine");
     mkldnn_engine_t engine;
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0));
 
@@ -289,6 +304,7 @@ void test3() {
     const_mkldnn_primitive_t l2_dsts[1] = {l2_dst};
 
     /* create an lrn */
+    TRACE("3:lrn");
     mkldnn_lrn_desc_t l2_desc;
     mkldnn_primitive_desc_t l2_pd;
     mkldnn_primitive_t l2;
@@ -324,12 +340,14 @@ void test3() {
     CHECK(mkldnn_primitive_desc_destroy(r_pd));
 
     /* let us build a net */
+    TRACE("3:net");
     mkldnn_primitive_t net[] = {l2, r};
     mkldnn_stream_t stream;
     CHECK(mkldnn_stream_create(&stream, mkldnn_eager));
     CHECK(mkldnn_stream_submit(stream, 2, net, NULL));
     CHECK(mkldnn_stream_wait(stream, 1, NULL));
 
+    TRACE("3:clean");
     /* clean-up */
     CHECK(mkldnn_stream_destroy(stream));
     CHECK(mkldnn_primitive_destroy(r));
@@ -346,16 +364,18 @@ void test3() {
     for (int w = 0; w < W; ++w)
     {
         size_t off = ((n*C + c)*H + h)*W + w;
-        real_t e = (off % 13) + 1;
-        real_t diff = fabs(out_mem[off] - e);
+        real_t e = (real_t)((off % 13) + 1);
+        real_t diff = fabs((real_t)(out_mem[off] - e));
         if (diff/fabs(e) > 0.0125)
             printf("exp: %g, got: %g\n", e, out_mem[off]);
         CHECK_TRUE(diff/fabs(e) < 0.0125);
     }
 
+    TRACE("-test3-a");
     free(src);
     free(dst);
     free(out_mem);
+    TRACE("-test3");
 }
 
 int main() {
