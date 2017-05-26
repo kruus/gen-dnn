@@ -1,25 +1,16 @@
-## BRANCH for non-jit version of MKL-DNN, to ease porting API to non-Intel platforms
+# BRANCH for non-jit version of MKL-DNN, to ease porting API to non-Intel platforms
 
-### Quickstart:
+## Quickstart:
 
 ```
 ./build.sh -h         # help</BR>
 Intel: ./build.sh -tt # build and run all tests (no jit)</BR>
            --> build/    and build.log
-Platform XX:
-       ./build.sh -sdttT    # s:other system, d:debug compile, T:trace cmake decisions
-
-This public branch is a not-up-to-date repo that reflects some work
-done on an internal git repository porting mkl-dnn to:
-- non-JIT cpu
-- HPC-style cpu with 32-bit int
-
-When clearance is obtained, I intend to upload the full mods here.
-I also have some decently fast "other" C/C++ impls of convolutions
-that might eventually be contributed.  [Erik Kruus, NEC Labs America]
+SX:    ./build.sh -ST # build for *S*X and *T*race cmake setup</BR>
+           --> build-sx/ and build-sx.log
 ```
 
-### Purpose
+## Purpose
 
 This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
 
@@ -41,23 +32,69 @@ This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
 - I might try some C++ versions of Winograd convolution, if I have time.
 - There are no plans to put low-level impls for other chips into this public repo
 
-### My notes: port to another CPU/platform (XX) modifications
+### SX modifications
 
-- cmake support is developed in subdirectory dev-cmake-XX
-  - changes to XX platform spec go into a tarfile that get untarred in gen-dnn root dir
+- SX cmake support is developed in subdirectory dev-cmake-sx
+  - changes to SX platform spec go into a tarfile that get untarred in gen-dnn root dir
   - *** cmake-3.8 *** is OK, cmake-3.0 is not
-    - because cmake-3.8 has a handy call to Platform/XX-Initialize that I require
-  - ./build.sh -dqst   [runs cmake on platform XX]
-    - ---> build-XX/ and build-XX.log
+    - because cmake-3.8 has a handy call to Platform/SX-Initialize that I require
+  - ./build.sh -ST      SX, TRACE [cmake --trace]
+    - ---> build-sx/ and build-sx.log
 
-- Platform issues
-  - has no posix_memalign :(
-  - int is only 32-bit (even though you can use -size_t64)
-  - has many conversion warnings.
+- SX Platform issues
+  - SX has no posix_memalign :(
+  - SX int is only 32-bit (even though you can use -size_t64)
+  - SX has many conversion warnings.
   - linking now OK
   - most tests OK (some memory formats don't need support for non-JIT)
 
-## Original README.md ...
+## Github repos
+
+NECLA master is on
+
+	snake10:/local/kruus/sx/sx-dnn,
+Japan master is on /mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn
+       or, for me  ~/wrk/simd/gen-dnn
+
+
+There is also a github master,
+
+    git+ssh://git@github.com/kruus/gen-dnn.git
+
+which is being left out-of-date until a decision is made on whether SX support
+should enter public domain.  For at least FY17 1st quarter we will target basic
+functionality, implementing no "new" algorithms.
+                                   
+Later on, for fancier vectorizable "tiled" algs, we may initially want to keep
+those impls private -- this can be done via and add-on library that "grafts"
+the additional convolutions onto the existing "engine" lists of primitives.
+
+### (snake10) and remotes (git remote -v)
+
+- snake10 is the main devel repo.
+  - Pull latest SX commits from Japan:
+    - git pull japan master
+  - Push snake10 (Intel) work to Japan:
+    - snake10:$ git push japan master:necla  # push to a tmp branch
+    - sapphire2:$ git merge necla            # merge from branch
+    - sapphire2:$ git branch -d necla        # delete tmp branch
+  - For public-domain SX work:
+    - Pull from upstream:
+      - git pull upstream master
+    - Push to github (public repo):
+      - git push
+
+### upstream merges
+
+- clone this mkl-dnn fork
+  - git clone https://github.com/kruus/gen-dnn.git
+- upstream merge, from within cloned fork:
+  - git checkout master # in case you are on a branch
+  - git pull https://github.com/01org/mkl-dnn.git
+  - # ... resolve merge conflicts ...
+  - git commit # use default message
+  - git push # ... origin master ... update gen-dnn on Github.
+
 
 ## Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)
 [![Apache License Version 2.0](https://img.shields.io/badge/license-Apache_2.0-green.svg)](LICENSE)
