@@ -45,7 +45,7 @@ This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
 
 - cmake support is developed in subdirectory dev-cmake-XX
   - changes to XX platform spec go into a tarfile that get untarred in gen-dnn root dir
-  - *** cmake-3.8 *** is OK, cmake-3.0 is not
+  - ** cmake-3.8 ** is OK, cmake-3.0 is not
     - because cmake-3.8 has a handy call to Platform/XX-Initialize that I require
   - ./build.sh -dqst   [runs cmake on platform XX]
     - ---> build-XX/ and build-XX.log
