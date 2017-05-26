@@ -47,7 +47,7 @@ void ref_relu_fwd_t<data_type>::execute_forward_generic() {
                     auto d_off = data_d.off(n, c, h, w);
                     data_t s = src[d_off];
                     data_t &d = dst[d_off];
-                    d = (s > 0) ? s : s * negative_slope;
+                    d = (s > 0) ? s : static_cast<data_t>(s * negative_slope);
                 }
             }
         }
@@ -69,7 +69,7 @@ void ref_relu_fwd_t<data_type>::execute_forward_dense() {
 
 #   pragma omp parallel for schedule(static)
     for (size_t e = 0; e < nelems; ++e) {
-        dst[e] = src[e] * ((src[e] > 0) ? 1. : negative_slope);
+        dst[e] = static_cast<data_t>(src[e] * ((src[e] > 0) ? 1. : negative_slope));
     }
 }
 
@@ -98,7 +98,7 @@ void ref_relu_bwd_t<data_type>::execute_backward_generic() {
                     data_t s = src[data_off];
                     data_t dd = diff_dst[diff_data_off];
                     data_t &ds = diff_src[diff_data_off];
-                    ds = dd * ((s > 0) ? 1. : negative_slope);
+                    ds = static_cast<data_t>(dd * ((s > 0) ? 1. : negative_slope));
                 }
             }
         }
@@ -123,7 +123,7 @@ void ref_relu_bwd_t<data_type>::execute_backward_dense() {
 
 #   pragma omp parallel for schedule(static)
     for (size_t e = 0; e < nelems; ++e) {
-        diff_src[e] = diff_dst[e] * ((src[e] > 0) ? 1. : negative_slope);
+        diff_src[e] = static_cast<data_t>(diff_dst[e] * ((src[e] > 0) ? 1. : negative_slope));
     }
 }
 
