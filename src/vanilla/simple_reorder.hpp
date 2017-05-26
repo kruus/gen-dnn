@@ -456,8 +456,10 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         } else {
 #           pragma omp parallel for schedule(static)
             for (size_t e = 0; e < nelems; ++e) {
-                output[e] = alpha * data_t<type_o>(input[e])
-                    + (beta ? beta * output[e] : 0);
+                // alpha, beta double means there MUST technically be a **final** cast down to type_o (??)
+                // Perhaps even do a subcase for alpha=1.0, where beta can be [pre-]cast to type_o XXX
+                output[e] = data_t<type_o>(alpha * input[e]
+                    + (beta ? beta * output[e] : 0));
             }
         }
 
@@ -527,8 +529,9 @@ private:
         auto &blk = data_d.blocking_desc();
         for (int d = 1; d < data_d.ndims(); ++d) {
             auto block = blk.block_dims[d];
+            assert(blk.strides[0][d] > 0);
             max_size = nstl::max(max_size,
-                    size_t(blk.padding_dims[d] / block) * blk.strides[0][d]);
+                    static_cast<size_t>(size_t(blk.padding_dims[d] / block) * blk.strides[0][d]));
             if (block > 1)
                 max_size = nstl::max(max_size,
                         size_t(block * blk.strides[1][d]));

@@ -19,14 +19,24 @@
 
 #include "gemm_inner_product.hpp"
 
+#if defined(USE_MKL) && defined(USE_CBLAS)
+#include "mkl_cblas.h"
+#elif defined(_SX) || defined(USE_CBLAS)
+#include "cblas.h"
+#endif
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
 // TODO: move BLAS wrappers to a separate header?
-#ifdef USE_MKL
-#include "mkl_cblas.h"
+#if defined(USE_MKL) && defined(USE_CBLAS)
 typedef MKL_INT cblas_int;
+#elif defined(_SX) || defined(USE_CBLAS)
+typedef int cblas_int; // also OK for SX cblas.h
+#if defined(_SX) // this cblas is peculiar...
+typedef CBLAS_ORDER CBLAS_LAYOUT;
+#endif //SX
 #endif
 
 #ifdef USE_CBLAS

@@ -69,7 +69,7 @@ DOJIT=0
 INSTALLDIR=install
 BUILDDIR=build
 if [ "$DOTARGET" == "j" ]; then DOJIT=100; INSTALLDIR='install-jit'; BUILDDIR='build-jit'; fi
-if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST="n"; INSTALLDIR='install-sx'; BUILDDIR='build-sx'; fi
+if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx'; fi
 #if [ "$DOTARGET" == "v" ]; then ; fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; fi
 if [ "$DOJUSTDOC" == "y" ]; then
@@ -133,14 +133,16 @@ timeoutPID() { # unused
         if [ ! -f "${TOOLCHAIN}" ]; then echo "Ohoh. ${TOOLCHAIN} not found?"; BUILDOK="n"; fi
         CMAKEOPT="${CMAKEOPT} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}"
         CMAKEOPT="${CMAKEOPT} --debug-trycompile --trace -LAH" # long debug of cmake
-        export CFLAGS="${CFLAGS} -size_t${SIZE_T} -Kc99,gcc"
+        export CFLAGS="${CFLAGS} -size_t${SIZE_T} -Kc99,gcc -D__STDC_LIMIT_MACROS -DTARGET_VANILLA"
         # An object file that is generated with -Kexceptions and an object file
         # that is generated with -Knoexceptions must not be linked together. In
         # such a case, the exception may not be thrown correctly Therefore, do
         # not specify -Kexceptions if the program does not use the try, catch
         # and throw keywords.
-        export CXXFLAGS="${CXXFLAGS} -size_t${SIZE_T} -Kcpp11,gcc,rtti,exceptions"
+        export CXXFLAGS="${CXXFLAGS} -size_t${SIZE_T} -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA"
         #export CXXFLAGS="${CXXFLAGS} -size_t${SIZE_T} -Kcpp11,gcc,rtti"
+        # __STDC_LIMIT_MACROS is a way to force definitions like INT8_MIN in stdint.h (cstdint)
+        #    (it **should** be autmatic in C++11, imho)
     fi
     if [ "$DODEBUG" == "y" ]; then
         CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=Debug"
@@ -177,7 +179,7 @@ timeoutPID() { # unused
         else
             { echo "api-c                ..."; time tests/api-c || BUILDOK="n"; }
         fi
-        if [ "$DOTEST" == 0 -a "$DOJIT" -gt 0 ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
+        if [ $DOTEST -eq 0 -a "$DOJIT" -gt 0 ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
             { echo "simple-training-net-cpp ..."; time examples/simple-training-net-cpp || BUILDOK="n"; }
         fi
     fi
@@ -199,7 +201,7 @@ if [ "$BUILDOK" == "y" ]; then
         { echo "Installing docs ..."; make install-doc; }
     fi
     ) 2>&1 >> "${BUILDDIR}".log
-    if [ ! "$DOTEST" == "0" -a ! "$DOTARGET" == "s" ]; then
+    if [ ! $DOTEST -eq 0 -a ! "$DOTARGET" == "s" ]; then
         rm -f test1.log test2.log
         echo "Testing ... test1"
         (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log || true
@@ -218,10 +220,10 @@ echo "INSTALLDIR ${INSTALLDIR}"
 echo "DOTARGET=${DOTARGET}, DOJIT=${DOJIT}, DODEBUG=${DODEBUG}, DOTEST=${DOTEST}, DODOC=${DODOC}, DONEEDMKL=${DONEEDMKL}"
 if [ "${BUILDOK}" == "y" ]; then
     LOGDIR="log-${DOTARGET}${DOJIT}${DODEBUG}${DOTEST}${DODOC}${DONEEDMKL}"
-    if [ "$DOTEST" -gt "0" ]; then
+    if [ $DOTEST -gt 0 ]; then
         echo "LOGDIR:       ${LOGDIR}" 2>&1 >> "${BUILDDIR}".log
     fi
-    if [ "$DOTEST" -gt "0" ]; then
+    if [ $DOTEST -gt 0 ]; then
         if [ -d "${LOGDIR}" ]; then rm -f "${LOGIDR}.bak"; mv -v "${LOGDIR}" "${LOGDIR}.bak"; fi
         mkdir ${LOGDIR}
         for f in "${BUILDDIR}.log" test1.log test2.log doxygen.log; do
