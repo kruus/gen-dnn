@@ -47,30 +47,48 @@ endif(NECSX)
 
 add_executable(foo foo.cc)
 
+# This prints out the sizes of various basic C++ types
+# It requires no link libraries,
+#    but -size_t64 compilation also needs -size_t64 for LINK_FLAGS !
+add_executable(types types.cpp)
+add_executable(types32 types.cpp)
+add_executable(types64 types.cpp)
+if(NECSX)
+    set_target_properties(types32 PROPERTIES COMPILE_FLAGS -size_t32)
+    set_target_properties(types64 PROPERTIES COMPILE_FLAGS -size_t64 LINK_FLAGS -size_t64)
+endif()
+# I find types is the same as types32, so -size_t32 seems to be the default setting
+
+# Using blas libs, we can compile and link with size_t32 as default
 add_executable(speed32 speed.cpp)
 target_link_libraries(speed32 "${CBLAS_LIBS}")
 if(NECSX)
     set_target_properties(speed32 PROPERTIES COMPILE_FLAGS -size_t32)
 endif()
 
+# size_t64 wants
 add_executable(speed64 speed.cpp)
-target_link_libraries(speed64 "${CBLAS_LIBS}")
+target_link_libraries(speed64 -size_t64 "${CBLAS_LIBS}")
 if(NECSX)
-    set_target_properties(speed32 PROPERTIES COMPILE_FLAGS -size_t64)
+    set_target_properties(speed64 PROPERTIES COMPILE_FLAGS -size_t64)
 endif()
 
-add_library(spd libspeed.cpp libspeed.hpp) # create libspd.a
+add_library(spd32 libspeed.cpp libspeed.hpp) # create libspd32.a
+add_library(spd64 libspeed.cpp libspeed.hpp) # create libspd64.a
 if(NECSX)
-    set_target_properties(spd PROPERTIES COMPILE_FLAGS "-Tauto,all")
+    set_target_properties(spd32 PROPERTIES COMPILE_FLAGS "-Tauto,all -size_t32")
+    set_target_properties(spd64 PROPERTIES COMPILE_FLAGS "-Tauto,all -size_t64")
 endif(NECSX)
 list(APPEND spd_LINKER_LIBS "${CBLAS_LIBS}")
 
-add_executable(speed2 speed2.cpp)
-add_dependencies(speed2 spd)
+add_executable(speed2 speed2.cpp) # WITHOUT -size_tNN, it make 32-bit?
+add_dependencies(speed2 spd32)
+#add_dependencies(speed2 spd64)
 if(NECSX)
-    target_link_libraries(speed2 "-size_t64 -Wl,-h,muldefs,-h,lib_cyclic -L. libspd.a -lcblas -lblas -lf2003")
+    #target_link_libraries(speed2 "-size_t64 -Wl,-h,muldefs,-h,lib_cyclic -L. libspd64.a -lcblas -lblas -lf2003")
+    target_link_libraries(speed2 "-size_t32 -Wl,-h,muldefs,-h,lib_cyclic -L. libspd32.a -lcblas -lblas -lf2003")
     # XXX also show minimal requirement
 else(NECSX)
-    target_link_libraries(speed2 "-L. libspd.a ${CBLAS_LIBS}") # cmake recognizes that other libs are also required ???
+    target_link_libraries(speed2 "-L. libspd64.a ${CBLAS_LIBS}") # cmake recognizes that other libs are also required ???
 endif(NECSX)
 # vim: set ts=4 sw=4 et:

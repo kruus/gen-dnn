@@ -1,12 +1,12 @@
 DOTARGET   s
 DOJIT      0
 DOTEST     0
-DODEBUG    n
+DODEBUG    y
 DODOC      n
 BUILDDIR   build-sx
-INSTALLDIR install-sx
+INSTALLDIR install-sx-dbg
 `build-sx' -> `build-sx.bak'
-""; cmake  -DCMAKE_CCXX_FLAGS=-DJITFUNCS=0 -DTARGET_VANILLA=ON -DCMAKE_TOOLCHAIN_FILE=../cmake/sx.cmake --debug-trycompile --trace -LAH -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../install-sx  ..
+""; cmake  -DCMAKE_CCXX_FLAGS=-DJITFUNCS=0 -DTARGET_VANILLA=ON -DCMAKE_TOOLCHAIN_FILE=../cmake/sx.cmake --debug-trycompile --trace -LAH -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=../install-sx-dbg-dbg  ..
 ./build.sh: line 166: "": command not found
 debug trycompile on
 Running with trace output on.
@@ -1690,7 +1690,7 @@ Platform/SX to use this system, please send your config file to cmake@www.cmake.
 CMAKE_AR:FILEPATH=/home/4gi/nlabhpg/wrk/simd/gen-dnn/Platform/SX-ar
 
 // Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel.
-CMAKE_BUILD_TYPE:STRING=Release
+CMAKE_BUILD_TYPE:STRING=Debug
 
 // Enable/Disable color output during build.
 CMAKE_COLOR_MAKEFILE:BOOL=ON
@@ -1907,27 +1907,39 @@ make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-s
 make -f src/CMakeFiles/mkldnn.dir/build.make src/CMakeFiles/mkldnn.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 [  1%] Building CXX object src/CMakeFiles/mkldnn.dir/common/batch_normalization.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/batch_normalization.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/batch_normalization.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/batch_normalization.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/batch_normalization.cpp
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Logical clause simplified.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
 [  2%] Building CXX object src/CMakeFiles/mkldnn.dir/common/convolution.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/convolution.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/convolution.cpp
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 148: Vectorized loop.
-sxc++: opt(1418): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/convolution.cpp, line 89: Constant-length loop is expanded.
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/convolution.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/convolution.cpp
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::basic_string<char, std::char_traits<char>, std::allocator<char>> &std::basic_string<char, std::char_traits<char>, std::allocator<char>>::assign(std::basic_string<char, std::char_traits<char>, std::allocator<char>> &&)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::basic_string<char, std::char_traits<char>, std::allocator<char>>::_Copy(std::_String_alloc<std::_String_base_types<char, std::allocator<char>>>::size_type, std::_String_alloc<std::_String_base_types<char, std::allocator<char>>>::size_type)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::numpunct<char>::_Init(const std::_Locinfo &, bool)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: const std::ctype<char> &std::use_facet(const std::locale &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: const std::num_put<char, std::ostreambuf_iterator<char, std::char_traits<char>>> &std::use_facet(const std::locale &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: const std::numpunct<char> &std::use_facet(const std::locale &)
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 148: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/convolution.cpp, line 89: Unvectorized loop.
 [  3%] Building CXX object src/CMakeFiles/mkldnn.dir/common/convolution_relu.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/convolution_relu.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/convolution_relu.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/convolution_relu.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/convolution_relu.cpp
 [  4%] Building CXX object src/CMakeFiles/mkldnn.dir/common/engine.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/engine.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/engine.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/engine.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/engine.cpp
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/engine.cpp, line 37: Unvectorized loop.
 [  5%] Building CXX object src/CMakeFiles/mkldnn.dir/common/inner_product.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/inner_product.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/inner_product.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/inner_product.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/inner_product.cpp
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::basic_string<char, std::char_traits<char>, std::allocator<char>> &std::basic_string<char, std::char_traits<char>, std::allocator<char>>::assign(std::basic_string<char, std::char_traits<char>, std::allocator<char>> &&)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::basic_string<char, std::char_traits<char>, std::allocator<char>>::_Copy(std::_String_alloc<std::_String_base_types<char, std::allocator<char>>>::size_type, std::_String_alloc<std::_String_base_types<char, std::allocator<char>>>::size_type)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::numpunct<char>::_Init(const std::_Locinfo &, bool)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: const std::ctype<char> &std::use_facet(const std::locale &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: const std::num_put<char, std::ostreambuf_iterator<char, std::char_traits<char>>> &std::use_facet(const std::locale &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: const std::numpunct<char> &std::use_facet(const std::locale &)
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
 [  6%] Building CXX object src/CMakeFiles/mkldnn.dir/common/lrn.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/lrn.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/lrn.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/lrn.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/lrn.cpp
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Logical clause simplified.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
 [  7%] Building CXX object src/CMakeFiles/mkldnn.dir/common/memory.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/memory.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/memory.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory.cpp
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory.cpp, line 125: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory.cpp, line 179: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory.cpp, line 195: Unvectorized loop.
@@ -1935,52 +1947,69 @@ sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory.cpp, line 2
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory.cpp, line 229: Unvectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory.cpp, line 244: Vectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory.cpp, line 254: Vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 148: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 148: Unvectorized loop.
 [  8%] Building CXX object src/CMakeFiles/mkldnn.dir/common/memory_desc_wrapper.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/memory_desc_wrapper.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/memory_desc_wrapper.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.cpp
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 157: Unvectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 157: Vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 157: Vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 148: Vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 148: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 148: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 148: Unvectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.cpp, line 54: Vectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.cpp, line 60: Unvectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.cpp, line 91: Vectorized loop.
 [  9%] Building CXX object src/CMakeFiles/mkldnn.dir/common/pooling.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/pooling.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/pooling.cpp
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 148: Vectorized loop.
-sxc++: opt(1418): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/pooling.cpp, line 81: Constant-length loop is expanded.
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/pooling.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/pooling.cpp
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::basic_string<char, std::char_traits<char>, std::allocator<char>> &std::basic_string<char, std::char_traits<char>, std::allocator<char>>::assign(std::basic_string<char, std::char_traits<char>, std::allocator<char>> &&)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::basic_string<char, std::char_traits<char>, std::allocator<char>>::_Copy(std::_String_alloc<std::_String_base_types<char, std::allocator<char>>>::size_type, std::_String_alloc<std::_String_base_types<char, std::allocator<char>>>::size_type)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::numpunct<char>::_Init(const std::_Locinfo &, bool)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: const std::ctype<char> &std::use_facet(const std::locale &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: const std::num_put<char, std::ostreambuf_iterator<char, std::char_traits<char>>> &std::use_facet(const std::locale &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: const std::numpunct<char> &std::use_facet(const std::locale &)
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 148: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/pooling.cpp, line 81: Unvectorized loop.
 [ 10%] Building CXX object src/CMakeFiles/mkldnn.dir/common/primitive.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/primitive.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/primitive.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive.cpp
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive.cpp, line 39: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive.cpp, line 41: Unvectorized loop.
 [ 11%] Building CXX object src/CMakeFiles/mkldnn.dir/common/primitive_desc.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/primitive_desc.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive_desc.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/primitive_desc.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive_desc.cpp
 [ 12%] Building CXX object src/CMakeFiles/mkldnn.dir/common/primitive_iterator.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/primitive_iterator.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive_iterator.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/primitive_iterator.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive_iterator.cpp
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive_iterator.cpp, line 38: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive_iterator.cpp, line 52: Unvectorized loop.
 [ 13%] Building CXX object src/CMakeFiles/mkldnn.dir/common/query.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/query.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/query.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/query.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/query.cpp
 [ 14%] Building CXX object src/CMakeFiles/mkldnn.dir/common/relu.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/relu.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/relu.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/relu.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/relu.cpp
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
 [ 15%] Building CXX object src/CMakeFiles/mkldnn.dir/common/reorder.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/reorder.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/reorder.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/reorder.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/reorder.cpp
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/reorder.cpp, line 54: Unvectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 272: Vectorized loop.
 [ 16%] Building CXX object src/CMakeFiles/mkldnn.dir/common/softmax.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/softmax.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/softmax.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/softmax.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/softmax.cpp
 [ 17%] Building CXX object src/CMakeFiles/mkldnn.dir/common/stream.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/common/stream.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/common/stream.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.cpp
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.cpp, line 101: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.cpp, line 39: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>> &std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>::operator =(const std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>::push_back(const std::_Vector_alloc<std::_Vec_base_types<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>>::value_type &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>::_Reallocate(std::_Vector_alloc<std::_Vec_base_types<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>>::size_type)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR387___Insert__tm__121_Q2_3std110_Vector_const_iterator__tm__80_Q2_3std70_Vector_val__tm__51_Q2_3std41_Simple_types__tm__20_P16mkldnn_primitive__Q2_3std80vector__tm__66_PJ119JQ2_3std37allocator__tm__J115JFQ2_3stdJ24JZ1_2ZT2Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::_Tree_base_types<std::_Tmap_traits<const mkldnn_primitive *, mkldnn::impl::event_t, std::less<const mkldnn_primitive *>, std::allocator<std::pair<const mkldnn_primitive *const, mkldnn::impl::event_t>>, false>::value_type, std::_Tmap_traits<const mkldnn_primitive *, mkldnn::impl::event_t, std::less<const mkldnn_primitive *>, std::allocator<std::pair<const mkldnn_primitive *const, mkldnn::impl::event_t>>, false>::allocator_type>::_Nodeptr std::_Tree_comp_alloc<std::_Tmap_traits<const mkldnn_primitive *, mkldnn::impl::event_t, std::less<const mkldnn_primitive *>, std::allocator<std::pair<const mkldnn_primitive *const, mkldnn::impl::event_t>>, false>>::_Buyheadnode()
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::_Tree_base_types<std::_Tmap_traits<const mkldnn_primitive *, mkldnn::impl::event_t, std::less<const mkldnn_primitive *>, std::allocator<std::pair<const mkldnn_primitive *const, mkldnn::impl::event_t>>, false>::value_type, std::_Tmap_traits<const mkldnn_primitive *, mkldnn::impl::event_t, std::less<const mkldnn_primitive *>, std::allocator<std::pair<const mkldnn_primitive *const, mkldnn::impl::event_t>>, false>::allocator_type>::_Nodeptr std::_Tree_comp_alloc<std::_Tmap_traits<const mkldnn_primitive *, mkldnn::impl::event_t, std::less<const mkldnn_primitive *>, std::allocator<std::pair<const mkldnn_primitive *const, mkldnn::impl::event_t>>, false>>::_Buynode0()
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR507___Buynode__tm__127___pk__117_RCQ2_3std21piecewise_construct_tQ2_3std45tuple__tm__32___pk__23_RCPC16mkldnn_primitiveQ2_3std21tuple__tm__9___pk__1___Q2_3std244_Tree_comp_alloc__tm__219_Q2_3std208_Tmap_traits__tm__187_PCJ96JQ3_6mkldnn4impl7event_tQ2_3std33less__tm__21_PCJ96JQ2_3std84allocator__tm__67_Q2_3std57pair__tm__45_CPCJ96JQ3_J237JJ244JJ249JXCbL_1_0FDpEZ1_2Z_PQ2_3std87_Tree_node__tm__69_Q2_3stdJ333JPv
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR780___Insert_hint__tm__165_RQ2_3std57pair__tm__45_CPC16mkldnn_primitiveQ3_6mkldnn4impl7event_tPQ2_3std87_Tree_node__tm__69_Q2_3stdJ30JPv__Q2_3std233_Tree__tm__219_Q2_3std208_Tmap_traits__tm__187_PCJ48JQ3_J69JJ76JJ81JQ2_3std33less__tm__21_PCJ48JQ2_3std84allocator__tm__67_Q2_3stdJ30JXCbL_1_0FQ2_3std161_Tree_const_iterator__tm__132_Q2_3std121_Tree_val__tm__103_Q2_3std93_Tree_simple_types__tm__J354JEZ1_2ZZ2_2Z_Q2_3std155_Tree_iterator__tm__J468J
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR637___Insert_nohint__tm__165_RQ2_3std57pair__tm__45_CPC16mkldnn_primitiveQ3_6mkldnn4impl7event_tPQ2_3std87_Tree_node__tm__69_Q2_3stdJ32JPv__Q2_3std233_Tree__tm__219_Q2_3std208_Tmap_traits__tm__187_PCJ50JQ3_J71JJ78JJ83JQ2_3std33less__tm__21_PCJ50JQ2_3std84allocator__tm__67_Q2_3stdJ32JXCbL_1_0FbEZ1_2ZZ2_2Z_Q2_3std180pair__tm__167_Q2_3std155_Tree_iterator__tm__132_Q2_3std121_Tree_val__tm__103_Q2_3std93_Tree_simple_types__tm__J356Jb
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn::impl::event_t *, std::allocator<mkldnn::impl::event_t *>>::push_back(const std::_Vector_alloc<std::_Vec_base_types<mkldnn::impl::event_t *, std::allocator<mkldnn::impl::event_t *>>>::value_type &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn::impl::event_t *, std::allocator<mkldnn::impl::event_t *>>::_Reallocate(std::_Vector_alloc<std::_Vec_base_types<mkldnn::impl::event_t *, std::allocator<mkldnn::impl::event_t *>>>::size_type)
 sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.hpp, line 182: Structure pointer inhibits loop optimization.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.hpp, line 183: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.hpp, line 183: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.hpp, line 206: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.hpp, line 213: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.hpp, line 225: Unvectorized loop.
 [ 17%] Building CXX object src/CMakeFiles/mkldnn.dir/io/names.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/io/names.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/io/names.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/io/names.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/io/names.cpp
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/io/names.cpp, line 243: Vectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/io/names.cpp, line 243: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/io/names.cpp, line 266: Unvectorized loop.
@@ -1996,17 +2025,32 @@ sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/io/names.cpp, line 318: U
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/io/names.cpp, line 321: Vectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/io/names.cpp, line 321: Unvectorized loop.
 [ 18%] Building CXX object src/CMakeFiles/mkldnn.dir/vanilla/cpu_engine.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/vanilla/cpu_engine.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_engine.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/vanilla/cpu_engine.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_engine.cpp
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>>::vector(const std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR182___Construct__tm__26_PC21mkldnn_primitive_at_t__Q2_3std88vector__tm__74_J21JQ2_3std41allocator__tm__24_J21JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::vector(const std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::_Construct_n(std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::size_type, const std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::value_type *)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR172___Construct__tm__22_PPC16mkldnn_primitive__Q2_3std82vector__tm__68_PCJ22JQ2_3std38allocator__tm__21_PCJ22JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn::impl::cpu::cpu_memory_t::pd_t, std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>>::vector(const std::vector<mkldnn::impl::cpu::cpu_memory_t::pd_t, std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn::impl::cpu::cpu_memory_t::pd_t, std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>>::push_back(const std::_Vector_alloc<std::_Vec_base_types<mkldnn::impl::cpu::cpu_memory_t::pd_t, std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>>>::value_type &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn::impl::cpu::cpu_memory_t::pd_t, std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>>::_Reallocate(std::_Vector_alloc<std::_Vec_base_types<mkldnn::impl::cpu::cpu_memory_t::pd_t, std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>>>::size_type)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn::impl::reorder_pd_t *, std::allocator<const mkldnn::impl::reorder_pd_t *>>::push_back(const std::_Vector_alloc<std::_Vec_base_types<const mkldnn::impl::reorder_pd_t *, std::allocator<const mkldnn::impl::reorder_pd_t *>>>::value_type &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn::impl::reorder_pd_t *, std::allocator<const mkldnn::impl::reorder_pd_t *>>::_Reallocate(std::_Vector_alloc<std::_Vec_base_types<const mkldnn::impl::reorder_pd_t *, std::allocator<const mkldnn::impl::reorder_pd_t *>>>::size_type)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>::vector(const std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>::resize(std::_Vector_alloc<std::_Vec_base_types<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>>::size_type)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>::_Reallocate(std::_Vector_alloc<std::_Vec_base_types<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>>::size_type)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<double, std::allocator<double>>::push_back(const std::_Vector_alloc<std::_Vec_base_types<double, std::allocator<double>>>::value_type &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<double, std::allocator<double>>::_Reallocate(std::_Vector_alloc<std::_Vec_base_types<double, std::allocator<double>>>::size_type)
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/memory_desc_wrapper.hpp, line 83: Unvectorized loop.
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/memory_desc_wrapper.hpp, line 142: Logical clause simplified.
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/memory_desc_wrapper.hpp, line 135: Partially vectorized loop.
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/memory_desc_wrapper.hpp, line 164: Logical clause simplified.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/memory_desc_wrapper.hpp, line 161: Partially vectorized loop.
-sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/nstl.hpp, line 105: Structure pointer inhibits loop optimization.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/nstl.hpp, line 105: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/memory_desc_wrapper.hpp, line 161: Unvectorized loop.
 sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/nstl.hpp, line 105: Structure pointer inhibits loop optimization.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/nstl.hpp, line 105: Unvectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_memory.hpp, line 91: Vectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/nstl.hpp, line 105: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/nstl.hpp, line 105: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_memory.hpp, line 91: Unvectorized loop.
 sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 153: Structure pointer inhibits loop optimization.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 152: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 161: Unvectorized loop.
@@ -2043,21 +2087,14 @@ sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_sum.hpp, line
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 44: Unvectorized loop.
 sxc++: opt(1135): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 84: Outer loop conditionally executes inner loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 66: Unvectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 87: Vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 91: Vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 100: Vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 104: Vectorized loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 461: Moved invariant if outside of an inner loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 453: Vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 458: Vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 458: Vectorized loop.
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 501: Outer loop unrolled inside inner loop.: n
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 508: Outer loop unrolled inside inner loop.: n
-sxc++: opt(1401): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 509: Moved invariant if outside of an outer loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 510: Moved invariant if outside of an inner loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 502: Vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 509: Vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 509: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 87: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 91: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 100: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 104: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 453: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 458: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 502: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 509: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 530: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 118: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 118: Unvectorized loop.
@@ -2101,174 +2138,150 @@ sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hp
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 568: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 562: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 568: Unvectorized loop.
-sxc++: opt(1589): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 85: Outer loop moved inside inner loop(s).: w
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 86: Outer loop unrolled inside inner loop.: c
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Moved invariant if outside of an inner loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 94: Array delinearized.: o
-sxc++: opt(1589): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 97: Outer loop moved inside inner loop(s).: w
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Outer loop unrolled inside inner loop.: c
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 101: Moved invariant if outside of an inner loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 101: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 110: Array delinearized.: o
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 85: Partially vectorized loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 97: Partially vectorized loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Moved invariant if outside of an inner loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 86: Partially vectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Partially vectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 94: Array delinearized.: i
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 101: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 110: Array delinearized.: i
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 86: Partially vectorized loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Partially vectorized loop.
-sxc++: opt(1589): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 85: Outer loop moved inside inner loop(s).: w
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 86: Outer loop unrolled inside inner loop.: c
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Moved invariant if outside of an inner loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 94: Array delinearized.: o
-sxc++: opt(1589): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 97: Outer loop moved inside inner loop(s).: w
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Outer loop unrolled inside inner loop.: c
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 101: Moved invariant if outside of an inner loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 101: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 110: Array delinearized.: o
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 85: Partially vectorized loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 97: Partially vectorized loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Moved invariant if outside of an inner loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 86: Partially vectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Partially vectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 94: Array delinearized.: i
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 101: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 110: Array delinearized.: i
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 86: Partially vectorized loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Partially vectorized loop.
-sxc++: opt(1589): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 85: Outer loop moved inside inner loop(s).: w
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 86: Outer loop unrolled inside inner loop.: c
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Moved invariant if outside of an inner loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 94: Array delinearized.: o
-sxc++: opt(1589): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 97: Outer loop moved inside inner loop(s).: w
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Outer loop unrolled inside inner loop.: c
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 101: Moved invariant if outside of an inner loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 101: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 110: Array delinearized.: o
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 85: Partially vectorized loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 97: Partially vectorized loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Moved invariant if outside of an inner loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 86: Partially vectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Partially vectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 94: Array delinearized.: i
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 101: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 110: Array delinearized.: i
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 86: Partially vectorized loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Partially vectorized loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 154: Moved invariant if outside of an inner loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 166: Moved invariant if outside of an inner loop.
-sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 151: Unvectorized loop.
-sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 163: Unvectorized loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 154: Moved invariant if outside of an inner loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 154: Logical clause simplified.
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 166: Logical clause simplified.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 151: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 163: Unvectorized loop.
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 219: Outer loop unrolled inside inner loop.: ic
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Moved invariant if outside of an inner loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 154: Logical clause simplified.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 166: Logical clause simplified.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 151: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 163: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: o
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 233: Outer loop unrolled inside inner loop.: ic
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Moved invariant if outside of an inner loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: o
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Partially vectorized loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Moved invariant if outside of an inner loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: i
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: i
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Vectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Unvectorized loop.
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 219: Outer loop unrolled inside inner loop.: ic
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Moved invariant if outside of an inner loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: o
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 233: Outer loop unrolled inside inner loop.: ic
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Moved invariant if outside of an inner loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: o
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Partially vectorized loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Moved invariant if outside of an inner loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: i
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
 sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: i
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Vectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Unvectorized loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 312: Moved invariant if outside of an inner loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 328: Moved invariant if outside of an inner loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 307: Partially vectorized loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 308: Partially vectorized loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 322: Partially vectorized loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 323: Partially vectorized loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 312: Moved invariant if outside of an inner loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 312: Logical clause simplified.
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 328: Logical clause simplified.
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 307: Partially vectorized loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 308: Partially vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 323: Vectorized loop.
-sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 323: Unvectorized loop.
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 219: Outer loop unrolled inside inner loop.: ic
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Moved invariant if outside of an inner loop.
-sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: o
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 233: Outer loop unrolled inside inner loop.: ic
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Moved invariant if outside of an inner loop.
-sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: o
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Partially vectorized loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Moved invariant if outside of an inner loop.
-sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: i
-sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
-sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: i
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Vectorized loop.
-sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Unvectorized loop.
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 219: Outer loop unrolled inside inner loop.: ic
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Moved invariant if outside of an inner loop.
-sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: o
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 233: Outer loop unrolled inside inner loop.: ic
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Moved invariant if outside of an inner loop.
-sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: o
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Partially vectorized loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Moved invariant if outside of an inner loop.
-sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: i
-sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
-sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: i
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Vectorized loop.
-sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Unvectorized loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 312: Moved invariant if outside of an inner loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 328: Moved invariant if outside of an inner loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 307: Partially vectorized loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 308: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 308: Unvectorized loop.
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 322: Partially vectorized loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 323: Partially vectorized loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 312: Moved invariant if outside of an inner loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 323: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 312: Logical clause simplified.
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 328: Logical clause simplified.
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 307: Partially vectorized loop.
-sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 308: Partially vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 323: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 308: Unvectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 322: Partially vectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 323: Unvectorized loop.
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 392: Outer loop unrolled inside inner loop.: ic
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Vectorized loop.
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 392: Outer loop unrolled inside inner loop.: ic
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Vectorized loop.
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 392: Outer loop unrolled inside inner loop.: ic
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Vectorized loop.
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 392: Outer loop unrolled inside inner loop.: ic
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Vectorized loop.
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 392: Outer loop unrolled inside inner loop.: ic
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Vectorized loop.
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 392: Outer loop unrolled inside inner loop.: ic
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Vectorized loop.
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 392: Outer loop unrolled inside inner loop.: ic
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Vectorized loop.
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 392: Outer loop unrolled inside inner loop.: ic
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Vectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: o
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: o
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Partially vectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: i
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: i
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: o
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: o
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Partially vectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: i
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: i
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 312: Logical clause simplified.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 328: Logical clause simplified.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 307: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 308: Unvectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 322: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 323: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 312: Logical clause simplified.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 328: Logical clause simplified.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 307: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 308: Unvectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 322: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 323: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn_primitive_at_t * std::_Uninit_copy(const mkldnn_primitive_at_t *, const mkldnn_primitive_at_t *, mkldnn_primitive_at_t *, std::_Wrap_alloc<std::allocator<mkldnn_primitive_at_t>> &, std::_Nonscalar_ptr_iterator_tag)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn::impl::cpu::cpu_memory_t::pd_t * std::_Uninit_move(mkldnn::impl::cpu::cpu_memory_t::pd_t *, mkldnn::impl::cpu::cpu_memory_t::pd_t *, mkldnn::impl::cpu::cpu_memory_t::pd_t *, std::_Wrap_alloc<std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>> &, mkldnn::impl::cpu::cpu_memory_t::pd_t *, std::_Nonscalar_ptr_iterator_tag)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn::impl::cpu::cpu_memory_t::pd_t * std::_Uninit_copy(const mkldnn::impl::cpu::cpu_memory_t::pd_t *, const mkldnn::impl::cpu::cpu_memory_t::pd_t *, mkldnn::impl::cpu::cpu_memory_t::pd_t *, std::_Wrap_alloc<std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>> &, std::_Nonscalar_ptr_iterator_tag)
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/utils.hpp, line 152: Vectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/utils.hpp, line 152: Vectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/utils.hpp, line 179: Vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/utils.hpp, line 148: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/utils.hpp, line 148: Unvectorized loop.
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/mkldnn_thread.hpp, line 41: Logical clause simplified.
 [ 19%] Building CXX object src/CMakeFiles/mkldnn.dir/vanilla/gemm_convolution.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/vanilla/gemm_convolution.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/vanilla/gemm_convolution.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution.cpp
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>>::vector(const std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR182___Construct__tm__26_PC21mkldnn_primitive_at_t__Q2_3std88vector__tm__74_J21JQ2_3std41allocator__tm__24_J21JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::vector(const std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::_Construct_n(std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::size_type, const std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::value_type *)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR172___Construct__tm__22_PPC16mkldnn_primitive__Q2_3std82vector__tm__68_PCJ22JQ2_3std38allocator__tm__21_PCJ22JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 83: Unvectorized loop.
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 142: Logical clause simplified.
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 135: Partially vectorized loop.
 sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Structure pointer inhibits loop optimization.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Unvectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution.cpp, line 105: Vectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution.cpp, line 105: Vectorized loop.
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution.cpp, line 166: Logical clause simplified.
@@ -2276,50 +2289,569 @@ sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution.
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution.cpp, line 244: Logical clause simplified.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution.cpp, line 238: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution.cpp, line 287: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn_primitive_at_t * std::_Uninit_copy(const mkldnn_primitive_at_t *, const mkldnn_primitive_at_t *, mkldnn_primitive_at_t *, std::_Wrap_alloc<std::allocator<mkldnn_primitive_at_t>> &, std::_Nonscalar_ptr_iterator_tag)
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/mkldnn_thread.hpp, line 41: Logical clause simplified.
 [ 20%] Building CXX object src/CMakeFiles/mkldnn.dir/vanilla/gemm_convolution_utils.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/vanilla/gemm_convolution_utils.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/vanilla/gemm_convolution_utils.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp
 sxc++: opt(1135): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp, line 43: Outer loop conditionally executes inner loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp, line 48: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp, line 48: Unvectorized loop.
 sxc++: opt(1135): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp, line 76: Outer loop conditionally executes inner loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp, line 73: Vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp, line 81: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp, line 81: Unvectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp, line 158: Vectorized loop.
-sxc++: opt(1135): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp, line 182: Outer loop conditionally executes inner loop.
-sxc++: opt(1394): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp, line 185: Moved invariant if outside of an inner loop.
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp, line 182: Partially vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp, line 184: Vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp, line 184: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_convolution_utils.cpp, line 184: Unvectorized loop.
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/mkldnn_thread.hpp, line 41: Logical clause simplified.
 [ 21%] Building CXX object src/CMakeFiles/mkldnn.dir/vanilla/gemm_inner_product.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/vanilla/gemm_inner_product.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_inner_product.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/vanilla/gemm_inner_product.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_inner_product.cpp
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>>::vector(const std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR182___Construct__tm__26_PC21mkldnn_primitive_at_t__Q2_3std88vector__tm__74_J21JQ2_3std41allocator__tm__24_J21JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::vector(const std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::_Construct_n(std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::size_type, const std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::value_type *)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR172___Construct__tm__22_PPC16mkldnn_primitive__Q2_3std82vector__tm__68_PCJ22JQ2_3std38allocator__tm__21_PCJ22JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 83: Unvectorized loop.
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 142: Logical clause simplified.
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 135: Partially vectorized loop.
 sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Structure pointer inhibits loop optimization.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_inner_product.cpp, line 106: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/gemm_inner_product.cpp, line 153: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn_primitive_at_t * std::_Uninit_copy(const mkldnn_primitive_at_t *, const mkldnn_primitive_at_t *, mkldnn_primitive_at_t *, std::_Wrap_alloc<std::allocator<mkldnn_primitive_at_t>> &, std::_Nonscalar_ptr_iterator_tag)
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 179: Vectorized loop.
 [ 22%] Building CXX object src/CMakeFiles/mkldnn.dir/vanilla/nchw_pooling.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/vanilla/nchw_pooling.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/nchw_pooling.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/vanilla/nchw_pooling.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/nchw_pooling.cpp
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/nchw_pooling.cpp, line 60: Unvectorized loop.
-sxc++: opt(1592): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/nchw_pooling.cpp, line 89: Outer loop unrolled inside inner loop.: ih
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/nchw_pooling.cpp, line 90: Vectorized loop.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/nchw_pooling.cpp, line 164: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/nchw_pooling.cpp, line 90: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/nchw_pooling.cpp, line 164: Unvectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/nchw_pooling.cpp, line 193: Vectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>>::vector(const std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR182___Construct__tm__26_PC21mkldnn_primitive_at_t__Q2_3std88vector__tm__74_J21JQ2_3std41allocator__tm__24_J21JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::vector(const std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::_Construct_n(std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::size_type, const std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::value_type *)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR172___Construct__tm__22_PPC16mkldnn_primitive__Q2_3std82vector__tm__68_PCJ22JQ2_3std38allocator__tm__21_PCJ22JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 83: Unvectorized loop.
 sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Structure pointer inhibits loop optimization.
-sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/nchw_pooling.cpp, line 105: Unvectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/nchw_pooling.cpp, line 119: Unvectorized loop.
 sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/nchw_pooling.cpp, line 207: Partially vectorized loop.
 sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/nchw_pooling.cpp, line 221: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn_primitive_at_t * std::_Uninit_copy(const mkldnn_primitive_at_t *, const mkldnn_primitive_at_t *, mkldnn_primitive_at_t *, std::_Wrap_alloc<std::allocator<mkldnn_primitive_at_t>> &, std::_Nonscalar_ptr_iterator_tag)
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
 sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
 [ 23%] Building CXX object src/CMakeFiles/mkldnn.dir/vanilla/ref_batch_normalization.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -Caopt -math,vector,nostrict_prototype -DNDEBUG   -o CMakeFiles/mkldnn.dir/vanilla/ref_batch_normalization.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_batch_normalization.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/vanilla/ref_batch_normalization.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_batch_normalization.cpp
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>>::vector(const std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR182___Construct__tm__26_PC21mkldnn_primitive_at_t__Q2_3std88vector__tm__74_J21JQ2_3std41allocator__tm__24_J21JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::vector(const std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::_Construct_n(std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::size_type, const std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::value_type *)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR172___Construct__tm__22_PPC16mkldnn_primitive__Q2_3std82vector__tm__68_PCJ22JQ2_3std38allocator__tm__21_PCJ22JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 83: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 142: Logical clause simplified.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 135: Partially vectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_batch_normalization.cpp, line 71: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_batch_normalization.cpp, line 77: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_batch_normalization.cpp, line 88: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_batch_normalization.cpp, line 98: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_batch_normalization.cpp, line 155: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_batch_normalization.cpp, line 169: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn_primitive_at_t * std::_Uninit_copy(const mkldnn_primitive_at_t *, const mkldnn_primitive_at_t *, mkldnn_primitive_at_t *, std::_Wrap_alloc<std::allocator<mkldnn_primitive_at_t>> &, std::_Nonscalar_ptr_iterator_tag)
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
+[ 24%] Building CXX object src/CMakeFiles/mkldnn.dir/vanilla/ref_convolution.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/vanilla/ref_convolution.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp
+"/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp", line 89:
+          warning(2463): conversion may change the value
+          case data_type::s32: return *((const int *)bias + off);
+                                      ^
+          detected during instantiation of "void
+                    mkldnn::impl::cpu::_ref_convolution_fwd_t<with_relu,
+                    src_type, wei_type, acc_type, dst_type>::execute_forward()
+                    [with with_relu=false,
+                    src_type=(mkldnn::impl::data_type_t)1,
+                    wei_type=(mkldnn::impl::data_type_t)1,
+                    acc_type=(mkldnn::impl::data_type_t)1,
+                    dst_type=(mkldnn::impl::data_type_t)1]" at line 85 of
+                    "/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolu
+                    tion.hpp"
+
+"/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp", line 89:
+          warning(2463): conversion may change the value
+          case data_type::s32: return *((const int *)bias + off);
+                                      ^
+          detected during instantiation of "void
+                    mkldnn::impl::cpu::_ref_convolution_fwd_t<with_relu,
+                    src_type, wei_type, acc_type, dst_type>::execute_forward()
+                    [with with_relu=true,
+                    src_type=(mkldnn::impl::data_type_t)1,
+                    wei_type=(mkldnn::impl::data_type_t)1,
+                    acc_type=(mkldnn::impl::data_type_t)1,
+                    dst_type=(mkldnn::impl::data_type_t)1]" at line 85 of
+                    "/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolu
+                    tion.hpp"
+
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 66: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 66: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 66: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 66: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 66: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 66: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 153: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 227: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 247: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>>::vector(const std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR182___Construct__tm__26_PC21mkldnn_primitive_at_t__Q2_3std88vector__tm__74_J21JQ2_3std41allocator__tm__24_J21JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::vector(const std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::_Construct_n(std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::size_type, const std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::value_type *)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR172___Construct__tm__22_PPC16mkldnn_primitive__Q2_3std82vector__tm__68_PCJ22JQ2_3std38allocator__tm__21_PCJ22JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 83: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 142: Logical clause simplified.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 135: Partially vectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 102: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 102: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 102: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 102: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 102: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 102: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 179: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_convolution.cpp, line 265: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn_primitive_at_t * std::_Uninit_copy(const mkldnn_primitive_at_t *, const mkldnn_primitive_at_t *, mkldnn_primitive_at_t *, std::_Wrap_alloc<std::allocator<mkldnn_primitive_at_t>> &, std::_Nonscalar_ptr_iterator_tag)
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
+[ 25%] Building CXX object src/CMakeFiles/mkldnn.dir/vanilla/ref_inner_product.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/vanilla/ref_inner_product.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_inner_product.cpp
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_inner_product.cpp, line 50: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_inner_product.cpp, line 59: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_inner_product.cpp, line 50: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_inner_product.cpp, line 59: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_inner_product.cpp, line 50: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_inner_product.cpp, line 59: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>>::vector(const std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR182___Construct__tm__26_PC21mkldnn_primitive_at_t__Q2_3std88vector__tm__74_J21JQ2_3std41allocator__tm__24_J21JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::vector(const std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::_Construct_n(std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::size_type, const std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::value_type *)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR172___Construct__tm__22_PPC16mkldnn_primitive__Q2_3std82vector__tm__68_PCJ22JQ2_3std38allocator__tm__21_PCJ22JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 83: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 142: Logical clause simplified.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 135: Partially vectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_inner_product.cpp, line 67: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_inner_product.cpp, line 67: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_inner_product.cpp, line 67: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_inner_product.cpp, line 111: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_inner_product.cpp, line 120: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_inner_product.cpp, line 160: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_inner_product.cpp, line 169: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_inner_product.cpp, line 182: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn_primitive_at_t * std::_Uninit_copy(const mkldnn_primitive_at_t *, const mkldnn_primitive_at_t *, mkldnn_primitive_at_t *, std::_Wrap_alloc<std::allocator<mkldnn_primitive_at_t>> &, std::_Nonscalar_ptr_iterator_tag)
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
+[ 26%] Building CXX object src/CMakeFiles/mkldnn.dir/vanilla/ref_lrn.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/vanilla/ref_lrn.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_lrn.cpp
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_lrn.cpp, line 75: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_lrn.cpp, line 138: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_lrn.cpp, line 152: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>>::vector(const std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR182___Construct__tm__26_PC21mkldnn_primitive_at_t__Q2_3std88vector__tm__74_J21JQ2_3std41allocator__tm__24_J21JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::vector(const std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::_Construct_n(std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::size_type, const std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::value_type *)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR172___Construct__tm__22_PPC16mkldnn_primitive__Q2_3std82vector__tm__68_PCJ22JQ2_3std38allocator__tm__21_PCJ22JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 83: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 142: Logical clause simplified.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 135: Partially vectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_lrn.cpp, line 96: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_lrn.cpp, line 174: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn_primitive_at_t * std::_Uninit_copy(const mkldnn_primitive_at_t *, const mkldnn_primitive_at_t *, mkldnn_primitive_at_t *, std::_Wrap_alloc<std::allocator<mkldnn_primitive_at_t>> &, std::_Nonscalar_ptr_iterator_tag)
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
+[ 27%] Building CXX object src/CMakeFiles/mkldnn.dir/vanilla/ref_pooling.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/vanilla/ref_pooling.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 61: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 88: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 61: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 88: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 61: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 88: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 61: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 88: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 61: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 88: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 161: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 187: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>>::vector(const std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR182___Construct__tm__26_PC21mkldnn_primitive_at_t__Q2_3std88vector__tm__74_J21JQ2_3std41allocator__tm__24_J21JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::vector(const std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::_Construct_n(std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::size_type, const std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::value_type *)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR172___Construct__tm__22_PPC16mkldnn_primitive__Q2_3std82vector__tm__68_PCJ22JQ2_3std38allocator__tm__21_PCJ22JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 83: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 142: Logical clause simplified.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 135: Partially vectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 107: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 120: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 107: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 120: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 107: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 120: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 107: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 120: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 107: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 120: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 204: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_pooling.cpp, line 218: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn_primitive_at_t * std::_Uninit_copy(const mkldnn_primitive_at_t *, const mkldnn_primitive_at_t *, mkldnn_primitive_at_t *, std::_Wrap_alloc<std::allocator<mkldnn_primitive_at_t>> &, std::_Nonscalar_ptr_iterator_tag)
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
+[ 28%] Building CXX object src/CMakeFiles/mkldnn.dir/vanilla/ref_relu.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/vanilla/ref_relu.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_relu.cpp
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>>::vector(const std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR182___Construct__tm__26_PC21mkldnn_primitive_at_t__Q2_3std88vector__tm__74_J21JQ2_3std41allocator__tm__24_J21JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::vector(const std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::_Construct_n(std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::size_type, const std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::value_type *)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR172___Construct__tm__22_PPC16mkldnn_primitive__Q2_3std82vector__tm__68_PCJ22JQ2_3std38allocator__tm__21_PCJ22JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 83: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 142: Logical clause simplified.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 135: Partially vectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_relu.cpp, line 71: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_relu.cpp, line 46: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_relu.cpp, line 71: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_relu.cpp, line 46: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_relu.cpp, line 71: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_relu.cpp, line 46: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_relu.cpp, line 71: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_relu.cpp, line 46: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_relu.cpp, line 71: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_relu.cpp, line 46: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_relu.cpp, line 125: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_relu.cpp, line 95: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn_primitive_at_t * std::_Uninit_copy(const mkldnn_primitive_at_t *, const mkldnn_primitive_at_t *, mkldnn_primitive_at_t *, std::_Wrap_alloc<std::allocator<mkldnn_primitive_at_t>> &, std::_Nonscalar_ptr_iterator_tag)
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 179: Vectorized loop.
+[ 29%] Building CXX object src/CMakeFiles/mkldnn.dir/vanilla/ref_softmax.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/mkldnn.dir/vanilla/ref_softmax.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_softmax.cpp
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>>::vector(const std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR182___Construct__tm__26_PC21mkldnn_primitive_at_t__Q2_3std88vector__tm__74_J21JQ2_3std41allocator__tm__24_J21JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::vector(const std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::_Construct_n(std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::size_type, const std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::value_type *)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR172___Construct__tm__22_PPC16mkldnn_primitive__Q2_3std82vector__tm__68_PCJ22JQ2_3std38allocator__tm__21_PCJ22JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 83: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 142: Logical clause simplified.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 135: Partially vectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 164: Logical clause simplified.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/memory_desc_wrapper.hpp, line 161: Unvectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/nstl.hpp, line 105: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_softmax.cpp, line 37: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_softmax.cpp, line 40: Unvectorized loop.
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_softmax.cpp, line 43: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_softmax.cpp, line 64: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_softmax.cpp, line 71: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/ref_softmax.cpp, line 78: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn_primitive_at_t * std::_Uninit_copy(const mkldnn_primitive_at_t *, const mkldnn_primitive_at_t *, mkldnn_primitive_at_t *, std::_Wrap_alloc<std::allocator<mkldnn_primitive_at_t>> &, std::_Nonscalar_ptr_iterator_tag)
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 152: Vectorized loop.
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 179: Vectorized loop.
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/utils.hpp, line 157: Vectorized loop.
+[ 30%] Linking CXX static library libmkldnn.a
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /gfs/nlabhpg/local/cmake3.8/bin/cmake -P CMakeFiles/mkldnn.dir/cmake_clean_target.cmake
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/mkldnn.dir/link.txt --verbose=1
+/home/4gi/nlabhpg/wrk/simd/gen-dnn/Platform/SX-ar qc libmkldnn.a  CMakeFiles/mkldnn.dir/common/batch_normalization.cpp.o CMakeFiles/mkldnn.dir/common/convolution.cpp.o CMakeFiles/mkldnn.dir/common/convolution_relu.cpp.o CMakeFiles/mkldnn.dir/common/engine.cpp.o CMakeFiles/mkldnn.dir/common/inner_product.cpp.o CMakeFiles/mkldnn.dir/common/lrn.cpp.o CMakeFiles/mkldnn.dir/common/memory.cpp.o CMakeFiles/mkldnn.dir/common/memory_desc_wrapper.cpp.o CMakeFiles/mkldnn.dir/common/pooling.cpp.o CMakeFiles/mkldnn.dir/common/primitive.cpp.o CMakeFiles/mkldnn.dir/common/primitive_desc.cpp.o CMakeFiles/mkldnn.dir/common/primitive_iterator.cpp.o CMakeFiles/mkldnn.dir/common/query.cpp.o CMakeFiles/mkldnn.dir/common/relu.cpp.o CMakeFiles/mkldnn.dir/common/reorder.cpp.o CMakeFiles/mkldnn.dir/common/softmax.cpp.o CMakeFiles/mkldnn.dir/common/stream.cpp.o CMakeFiles/mkldnn.dir/io/names.cpp.o CMakeFiles/mkldnn.dir/vanilla/cpu_engine.cpp.o CMakeFiles/mkldnn.dir/vanilla/gemm_convolution.cpp.o CMakeFiles/mkldnn.dir/vanilla/gemm_convolution_utils.cpp.o CMakeFiles/mkldnn.dir/vanilla/gemm_inner_product.cpp.o CMakeFiles/mkldnn.dir/vanilla/nchw_pooling.cpp.o CMakeFiles/mkldnn.dir/vanilla/ref_batch_normalization.cpp.o CMakeFiles/mkldnn.dir/vanilla/ref_convolution.cpp.o CMakeFiles/mkldnn.dir/vanilla/ref_inner_product.cpp.o CMakeFiles/mkldnn.dir/vanilla/ref_lrn.cpp.o CMakeFiles/mkldnn.dir/vanilla/ref_pooling.cpp.o CMakeFiles/mkldnn.dir/vanilla/ref_relu.cpp.o CMakeFiles/mkldnn.dir/vanilla/ref_softmax.cpp.o
+re-compiling: -K_sysver=2110 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -Kexceptions,cpp11,gcc -g -ftrace -Cvopt -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive.cpp
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive.cpp, line 39: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive.cpp, line 41: Unvectorized loop.
+re-compiling: -K_sysver=2110 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -Kexceptions,cpp11,gcc -g -ftrace -Cvopt -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive_iterator.cpp
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive_iterator.cpp, line 38: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/primitive_iterator.cpp, line 52: Unvectorized loop.
+re-compiling: -K_sysver=2110 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -Kexceptions,cpp11,gcc -g -ftrace -Cvopt -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.cpp
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.cpp, line 101: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.cpp, line 39: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>> &std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>::operator =(const std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>::push_back(const std::_Vector_alloc<std::_Vec_base_types<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>>::value_type &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>::_Reallocate(std::_Vector_alloc<std::_Vec_base_types<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>>::size_type)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR387___Insert__tm__121_Q2_3std110_Vector_const_iterator__tm__80_Q2_3std70_Vector_val__tm__51_Q2_3std41_Simple_types__tm__20_P16mkldnn_primitive__Q2_3std80vector__tm__66_PJ119JQ2_3std37allocator__tm__J115JFQ2_3stdJ24JZ1_2ZT2Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::_Tree_base_types<std::_Tmap_traits<const mkldnn_primitive *, mkldnn::impl::event_t, std::less<const mkldnn_primitive *>, std::allocator<std::pair<const mkldnn_primitive *const, mkldnn::impl::event_t>>, false>::value_type, std::_Tmap_traits<const mkldnn_primitive *, mkldnn::impl::event_t, std::less<const mkldnn_primitive *>, std::allocator<std::pair<const mkldnn_primitive *const, mkldnn::impl::event_t>>, false>::allocator_type>::_Nodeptr std::_Tree_comp_alloc<std::_Tmap_traits<const mkldnn_primitive *, mkldnn::impl::event_t, std::less<const mkldnn_primitive *>, std::allocator<std::pair<const mkldnn_primitive *const, mkldnn::impl::event_t>>, false>>::_Buyheadnode()
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::_Tree_base_types<std::_Tmap_traits<const mkldnn_primitive *, mkldnn::impl::event_t, std::less<const mkldnn_primitive *>, std::allocator<std::pair<const mkldnn_primitive *const, mkldnn::impl::event_t>>, false>::value_type, std::_Tmap_traits<const mkldnn_primitive *, mkldnn::impl::event_t, std::less<const mkldnn_primitive *>, std::allocator<std::pair<const mkldnn_primitive *const, mkldnn::impl::event_t>>, false>::allocator_type>::_Nodeptr std::_Tree_comp_alloc<std::_Tmap_traits<const mkldnn_primitive *, mkldnn::impl::event_t, std::less<const mkldnn_primitive *>, std::allocator<std::pair<const mkldnn_primitive *const, mkldnn::impl::event_t>>, false>>::_Buynode0()
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR507___Buynode__tm__127___pk__117_RCQ2_3std21piecewise_construct_tQ2_3std45tuple__tm__32___pk__23_RCPC16mkldnn_primitiveQ2_3std21tuple__tm__9___pk__1___Q2_3std244_Tree_comp_alloc__tm__219_Q2_3std208_Tmap_traits__tm__187_PCJ96JQ3_6mkldnn4impl7event_tQ2_3std33less__tm__21_PCJ96JQ2_3std84allocator__tm__67_Q2_3std57pair__tm__45_CPCJ96JQ3_J237JJ244JJ249JXCbL_1_0FDpEZ1_2Z_PQ2_3std87_Tree_node__tm__69_Q2_3stdJ333JPv
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR780___Insert_hint__tm__165_RQ2_3std57pair__tm__45_CPC16mkldnn_primitiveQ3_6mkldnn4impl7event_tPQ2_3std87_Tree_node__tm__69_Q2_3stdJ30JPv__Q2_3std233_Tree__tm__219_Q2_3std208_Tmap_traits__tm__187_PCJ48JQ3_J69JJ76JJ81JQ2_3std33less__tm__21_PCJ48JQ2_3std84allocator__tm__67_Q2_3stdJ30JXCbL_1_0FQ2_3std161_Tree_const_iterator__tm__132_Q2_3std121_Tree_val__tm__103_Q2_3std93_Tree_simple_types__tm__J354JEZ1_2ZZ2_2Z_Q2_3std155_Tree_iterator__tm__J468J
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR637___Insert_nohint__tm__165_RQ2_3std57pair__tm__45_CPC16mkldnn_primitiveQ3_6mkldnn4impl7event_tPQ2_3std87_Tree_node__tm__69_Q2_3stdJ32JPv__Q2_3std233_Tree__tm__219_Q2_3std208_Tmap_traits__tm__187_PCJ50JQ3_J71JJ78JJ83JQ2_3std33less__tm__21_PCJ50JQ2_3std84allocator__tm__67_Q2_3stdJ32JXCbL_1_0FbEZ1_2ZZ2_2Z_Q2_3std180pair__tm__167_Q2_3std155_Tree_iterator__tm__132_Q2_3std121_Tree_val__tm__103_Q2_3std93_Tree_simple_types__tm__J356Jb
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn::impl::event_t *, std::allocator<mkldnn::impl::event_t *>>::push_back(const std::_Vector_alloc<std::_Vec_base_types<mkldnn::impl::event_t *, std::allocator<mkldnn::impl::event_t *>>>::value_type &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn::impl::event_t *, std::allocator<mkldnn::impl::event_t *>>::_Reallocate(std::_Vector_alloc<std::_Vec_base_types<mkldnn::impl::event_t *, std::allocator<mkldnn::impl::event_t *>>>::size_type)
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.hpp, line 182: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.hpp, line 183: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.hpp, line 206: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.hpp, line 213: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.hpp, line 225: Unvectorized loop.
+re-compiling: -K_sysver=2110 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -Kexceptions,cpp11,gcc -g -ftrace -Cvopt -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_engine.cpp
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>>::vector(const std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR182___Construct__tm__26_PC21mkldnn_primitive_at_t__Q2_3std88vector__tm__74_J21JQ2_3std41allocator__tm__24_J21JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::vector(const std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>::_Construct_n(std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::size_type, const std::_Vector_alloc<std::_Vec_base_types<const mkldnn_primitive *, std::allocator<const mkldnn_primitive *>>>::value_type *)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: __CPR172___Construct__tm__22_PPC16mkldnn_primitive__Q2_3std82vector__tm__68_PCJ22JQ2_3std38allocator__tm__21_PCJ22JFZ1_2ZT1Q2_3std20forward_iterator_tag_v
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn::impl::cpu::cpu_memory_t::pd_t, std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>>::vector(const std::vector<mkldnn::impl::cpu::cpu_memory_t::pd_t, std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn::impl::cpu::cpu_memory_t::pd_t, std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>>::push_back(const std::_Vector_alloc<std::_Vec_base_types<mkldnn::impl::cpu::cpu_memory_t::pd_t, std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>>>::value_type &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn::impl::cpu::cpu_memory_t::pd_t, std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>>::_Reallocate(std::_Vector_alloc<std::_Vec_base_types<mkldnn::impl::cpu::cpu_memory_t::pd_t, std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>>>::size_type)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn::impl::reorder_pd_t *, std::allocator<const mkldnn::impl::reorder_pd_t *>>::push_back(const std::_Vector_alloc<std::_Vec_base_types<const mkldnn::impl::reorder_pd_t *, std::allocator<const mkldnn::impl::reorder_pd_t *>>>::value_type &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<const mkldnn::impl::reorder_pd_t *, std::allocator<const mkldnn::impl::reorder_pd_t *>>::_Reallocate(std::_Vector_alloc<std::_Vec_base_types<const mkldnn::impl::reorder_pd_t *, std::allocator<const mkldnn::impl::reorder_pd_t *>>>::size_type)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>::vector(const std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>> &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>::resize(std::_Vector_alloc<std::_Vec_base_types<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>>::size_type)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>::_Reallocate(std::_Vector_alloc<std::_Vec_base_types<mkldnn_primitive *, std::allocator<mkldnn_primitive *>>>::size_type)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<double, std::allocator<double>>::push_back(const std::_Vector_alloc<std::_Vec_base_types<double, std::allocator<double>>>::value_type &)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: void std::vector<double, std::allocator<double>>::_Reallocate(std::_Vector_alloc<std::_Vec_base_types<double, std::allocator<double>>>::size_type)
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/memory_desc_wrapper.hpp, line 83: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/memory_desc_wrapper.hpp, line 142: Logical clause simplified.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/memory_desc_wrapper.hpp, line 135: Partially vectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/memory_desc_wrapper.hpp, line 164: Logical clause simplified.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/memory_desc_wrapper.hpp, line 161: Unvectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/nstl.hpp, line 105: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/nstl.hpp, line 105: Unvectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/nstl.hpp, line 105: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/nstl.hpp, line 105: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_memory.hpp, line 91: Unvectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 153: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 152: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 161: Unvectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 60: Structure pointer inhibits loop optimization.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 69: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 53: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 59: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 68: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 88: Unvectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 104: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 103: Unvectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 111: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 110: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_concat.hpp, line 123: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_concat.hpp, line 46: Unvectorized loop.
+sxc++: opt(1135): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_concat.hpp, line 88: Outer loop conditionally executes inner loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_concat.hpp, line 67: Unvectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_concat.hpp, line 88: Partially vectorized loop.
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_concat.hpp, line 92: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_concat.hpp, line 107: Unvectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_sum.hpp, line 153: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_sum.hpp, line 152: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_sum.hpp, line 162: Unvectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_sum.hpp, line 64: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_sum.hpp, line 55: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_sum.hpp, line 63: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_sum.hpp, line 77: Unvectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_sum.hpp, line 97: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_sum.hpp, line 93: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_sum.hpp, line 96: Unvectorized loop.
+sxc++: opt(1821): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_sum.hpp, line 105: Structure pointer inhibits loop optimization.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_sum.hpp, line 104: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_sum.hpp, line 118: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 44: Unvectorized loop.
+sxc++: opt(1135): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 84: Outer loop conditionally executes inner loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 66: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 87: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 91: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 100: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/cpu_simple_sum.hpp, line 104: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 453: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 458: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 502: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 509: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 530: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 118: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 118: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 118: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 118: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 118: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 118: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 182: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 182: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 260: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 260: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 260: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 260: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 349: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 349: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 260: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 260: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 260: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 260: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 349: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 349: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 411: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 411: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 411: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 411: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 411: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 411: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 411: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 411: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 562: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 568: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 562: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 568: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 562: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 568: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 562: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 568: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 562: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 568: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 562: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 568: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 562: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 568: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 94: Array delinearized.: o
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 101: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 110: Array delinearized.: o
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 86: Partially vectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Partially vectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 94: Array delinearized.: i
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 101: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 110: Array delinearized.: i
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 86: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 94: Array delinearized.: o
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 101: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 110: Array delinearized.: o
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 86: Partially vectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Partially vectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 94: Array delinearized.: i
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 101: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 110: Array delinearized.: i
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 86: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 94: Array delinearized.: o
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 101: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 110: Array delinearized.: o
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 86: Partially vectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Partially vectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 89: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 94: Array delinearized.: i
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 101: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 110: Array delinearized.: i
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 86: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 98: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 154: Logical clause simplified.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 166: Logical clause simplified.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 151: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 163: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 154: Logical clause simplified.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 166: Logical clause simplified.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 151: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 163: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: o
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: o
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Partially vectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: i
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: i
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: o
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: o
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Partially vectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: i
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: i
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 312: Logical clause simplified.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 328: Logical clause simplified.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 307: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 308: Unvectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 322: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 323: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 312: Logical clause simplified.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 328: Logical clause simplified.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 307: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 308: Unvectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 322: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 323: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: o
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: o
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Partially vectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: i
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: i
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: o
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: o
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Partially vectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 225: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 230: Array delinearized.: i
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 239: Logical clause simplified.
+sxc++: opt(1600): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 248: Array delinearized.: i
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 220: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 234: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 312: Logical clause simplified.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 328: Logical clause simplified.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 307: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 308: Unvectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 322: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 323: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 312: Logical clause simplified.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 328: Logical clause simplified.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 307: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 308: Unvectorized loop.
+sxc++: vec( 2): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 322: Partially vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 323: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/simple_reorder.hpp, line 393: Unvectorized loop.
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn_primitive_at_t * std::_Uninit_copy(const mkldnn_primitive_at_t *, const mkldnn_primitive_at_t *, mkldnn_primitive_at_t *, std::_Wrap_alloc<std::allocator<mkldnn_primitive_at_t>> &, std::_Nonscalar_ptr_iterator_tag)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn::impl::cpu::cpu_memory_t::pd_t * std::_Uninit_move(mkldnn::impl::cpu::cpu_memory_t::pd_t *, mkldnn::impl::cpu::cpu_memory_t::pd_t *, mkldnn::impl::cpu::cpu_memory_t::pd_t *, std::_Wrap_alloc<std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>> &, mkldnn::impl::cpu::cpu_memory_t::pd_t *, std::_Nonscalar_ptr_iterator_tag)
+sxc++: Warning: longjmp(3C)/throw causes incorrect ftrace analysis information.: mkldnn::impl::cpu::cpu_memory_t::pd_t * std::_Uninit_copy(const mkldnn::impl::cpu::cpu_memory_t::pd_t *, const mkldnn::impl::cpu::cpu_memory_t::pd_t *, mkldnn::impl::cpu::cpu_memory_t::pd_t *, std::_Wrap_alloc<std::allocator<mkldnn::impl::cpu::cpu_memory_t::pd_t>> &, std::_Nonscalar_ptr_iterator_tag)
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/utils.hpp, line 152: Vectorized loop.
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/utils.hpp, line 152: Vectorized loop.
+sxc++: vec( 1): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/utils.hpp, line 179: Vectorized loop.
+sxc++: vec( 3): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/vanilla/../common/utils.hpp, line 148: Unvectorized loop.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/mkldnn_thread.hpp, line 41: Logical clause simplified.
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 30%] Built target mkldnn
+make -f examples/CMakeFiles/simple-training-net-cpp.dir/build.make examples/CMakeFiles/simple-training-net-cpp.dir/depend
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-training-net-cpp.dir/DependInfo.cmake --color=
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-training-net-cpp.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-training-net-cpp.dir/depend.internal".
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-training-net-cpp.dir/depend.internal".
+Scanning dependencies of target simple-training-net-cpp
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+make -f examples/CMakeFiles/simple-training-net-cpp.dir/build.make examples/CMakeFiles/simple-training-net-cpp.dir/build
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 31%] Building CXX object examples/CMakeFiles/simple-training-net-cpp.dir/simple_training_net.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples && /SX/usr/bin/sxc++   -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include  -size_t32 -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA -DJITFUNCS=0 -DUSE_CBLAS -f90lib -Kexceptions,cpp11,gcc -g -ftrace -Cvopt   -o CMakeFiles/simple-training-net-cpp.dir/simple_training_net.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples/simple_training_net.cpp
+FINISHED:     ./build.sh -sdq
