@@ -52,6 +52,7 @@ while getopts ":htvjdDqpsST" arg; do
             DONEEDMKL="n"
             ;;
         s) # SX cross-compile (size_t=32)
+            # this is NOT GOOD: sizeof(ptrdiff_t) is still 8 bytes!
             DOTARGET="s"; DOJIT=0; SIZE_T=32; JOBS="-j1"
             ;;
         S) # SX cross-compile (size_t=64)
