@@ -81,7 +81,7 @@ void _ref_convolution_fwd_t<with_relu, src_type, wei_type, acc_type, dst_type>
 
     auto get_bias = [=](size_t off) -> acc_data_t {
         switch (conf_.cdesc()->bias_desc.data_type) {
-#if 0
+#if 1
 #define SUPPORTED_CASE( DTYPE ) case DTYPE: return static_cast<acc_data_t> \
             (*((const impl::prec_traits<DTYPE>::type *)bias + off));
         SUPPORTED_CASE(data_type::s8)
