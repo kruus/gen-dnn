@@ -138,7 +138,7 @@ void init_conf(
 status_t prepare_workspace(
         jit_gemm_conv_conf_t &jcp, float **ws, bool is_bwd_weights,
         const size_t weights_size) {
-    const size_t nthr = omp_get_max_threads(); // upcast for convenience
+    const size_t nthr = omp_get_max_threads(); // unsigned for convenience
     if (jcp.need_im2col) {
         const size_t sz_per_thread = jcp.ic*jcp.ks*jcp.os;
         jcp.im2col_size = utils::rnd_up(nthr*sz_per_thread, 16);

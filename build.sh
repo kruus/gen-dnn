@@ -21,6 +21,7 @@ usage() {
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
     awk '/getopts/{flag=1;next} /done/{flag=0} flag&&/^[^#]+) #/; flag&&/^ *# /' $0
     echo "Example: time a full test run for a debug compilation --- time $0 -dtt"
+    echo "         SX debug compile, quick (no doxygen) --- time $0 -Sdq"
     exit 0
 }
 while getopts ":htvjdDqpsST" arg; do
@@ -51,12 +52,13 @@ while getopts ":htvjdDqpsST" arg; do
         p) # permissive: disable the FAIL_WITHOUT_MKL switch
             DONEEDMKL="n"
             ;;
-        s) # SX cross-compile (size_t=32)
-            # this is NOT GOOD: sizeof(ptrdiff_t) is still 8 bytes!
-            DOTARGET="s"; DOJIT=0; SIZE_T=32; JOBS="-j1"
-            ;;
         S) # SX cross-compile (size_t=64)
             DOTARGET="s"; DOJIT=0; SIZE_T=64; JOBS="-j1"
+            ;;
+        s) # SX cross-compile (size_t=32) DISCOURAGED
+            # this is NOT GOOD: sizeof(ptrdiff_t) is still 8 bytes!
+            # this may generate strange warnings
+            DOTARGET="s"; DOJIT=0; SIZE_T=32; JOBS="-j1"
             ;;
         T) # cmake --trace
             CMAKETRACE="--trace"
@@ -70,6 +72,7 @@ DOJIT=0
 INSTALLDIR=install
 BUILDDIR=build
 if [ "$DOTARGET" == "j" ]; then DOJIT=100; INSTALLDIR='install-jit'; BUILDDIR='build-jit'; fi
+if [ "$DOTARGET" == "S" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx'; fi
 if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx'; fi
 #if [ "$DOTARGET" == "v" ]; then ; fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; fi
