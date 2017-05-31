@@ -137,13 +137,16 @@ timeoutPID() { # unused
         if [ ! -f "${TOOLCHAIN}" ]; then echo "Ohoh. ${TOOLCHAIN} not found?"; BUILDOK="n"; fi
         CMAKEOPT="${CMAKEOPT} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}"
         CMAKEOPT="${CMAKEOPT} --debug-trycompile --trace -LAH" # long debug of cmake
-        export CFLAGS="${CFLAGS} -size_t${SIZE_T} -Kc99,gcc -D__STDC_LIMIT_MACROS -DTARGET_VANILLA"
+        SXOPT="-DTARGET_VANILLA -D__STDC_LIMIT_MACROS"
+        SXOPT="${SXOPT} -wall -woff=1097 -woff=4038" # turn off warnings about not using 'attributes'
+        SXOPT="${SXOPT} -wnolongjmp"           # turn off warnings about setjmp/longjmp (and tracing)
+        export CFLAGS="${CFLAGS} -size_t${SIZE_T} -Kc99,gcc ${SXOPT}"
         # An object file that is generated with -Kexceptions and an object file
         # that is generated with -Knoexceptions must not be linked together. In
         # such a case, the exception may not be thrown correctly Therefore, do
         # not specify -Kexceptions if the program does not use the try, catch
         # and throw keywords.
-        export CXXFLAGS="${CXXFLAGS} -size_t${SIZE_T} -Kcpp11,gcc,rtti,exceptions -D__STDC_LIMIT_MACROS -DTARGET_VANILLA"
+        export CXXFLAGS="${CXXFLAGS} -size_t${SIZE_T} -Kcpp11,gcc,rtti,exceptions ${SXOPT}"
         #export CXXFLAGS="${CXXFLAGS} -size_t${SIZE_T} -Kcpp11,gcc,rtti"
         # __STDC_LIMIT_MACROS is a way to force definitions like INT8_MIN in stdint.h (cstdint)
         #    (it **should** be autmatic in C++11, imho)
