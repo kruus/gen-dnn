@@ -72,7 +72,6 @@ DOJIT=0
 INSTALLDIR=install
 BUILDDIR=build
 if [ "$DOTARGET" == "j" ]; then DOJIT=100; INSTALLDIR='install-jit'; BUILDDIR='build-jit'; fi
-if [ "$DOTARGET" == "S" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx'; fi
 if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx'; fi
 #if [ "$DOTARGET" == "v" ]; then ; fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; fi
@@ -189,6 +188,10 @@ timeoutPID() { # unused
         if [ $DOTEST -eq 0 -a "$DOJIT" -gt 0 ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
             { echo "simple-training-net-cpp ..."; time examples/simple-training-net-cpp || BUILDOK="n"; }
         fi
+    fi
+    if [ "$BUILDOK" == "y" -a "$DOTARGET" == "s" ]; then
+        # make SX build dirs all-writable so SX runs can store logs etc.
+        find "${BUILDDIR}" -type d -exec chmod o+w {} \;
     fi
     if [ "$BUILDOK" == "y" ]; then
         touch ./stamp-BUILDOK
