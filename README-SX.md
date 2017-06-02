@@ -97,6 +97,26 @@ the additional convolutions onto the existing "engine" lists of primitives.
 
 ## SX Performance
 
+### SX segfault
+
+- examples/simple-net-cpp and simple-net-c both segfault
+- tests/api-io-c does not segfault (linker issue???)
+
+```
+dbx ./simple-net-c
+(dbx) run
+... (absentee space fault) in cpu_engine.is_dense__Q3_6mkldnn4impl19memory_desc_wrapperCFb at 0x4000cc03c
+(dbx) where
+*  0 cpu_engine.is_dense__Q3_6mkldnn4impl19memory_desc_wrapperCFb(this = 0x0000008000022fe0, with_padding = 0) at 0x4000cc03c
+   1 cpu_engine.init__Q5_6mkldnn4impl3cpu50ref_relu_fwd_t__tm__28_XC18mkldnn_data_type_tL_1_14pd_tFv_15mkldnn_status_t(this = 0x00000004049961f0) at 0x4001eb1b4
+   2 __CPR229__create__tm__77_Q5_6mkldnn4impl3cpu50ref_relu_fwd_t__tm__28_XC18mkldnn_data_type_tL_1_14pd_t__21mkldnn_primitive_descSFPPJ93JPCQ3_J18JJ25J9op_desc_tP13mkldnn_enginePCJ93J_15mkldnn_status_t(pd = 0x0000008000022470, adesc = 0x0000008000020cc0, engine = 0x0000000404291940, hint_fwd = (nil)) at 0x4000a22dc
+   3 mkldnn_primitive_desc_iterator::operator++(this = 0x0000008000022460), line 53 in "primitive_iterator.cpp"
+   4 mkldnn_primitive_desc_create(primitive_desc = 0x0000008000021cb8, c_op_desc = 0x0000008000020cc0, engine = 0x0000000404291940, hint_fwd_pd = (nil)), line 131 in "primitive_iterator.cpp"
+   5 simple_net.simple_net(), line 252 in "simple_net.c"
+   6 main(argc = 1, argv = 0x00000080000003f8), line 463 in "simple_net.c"
+   7 _start(0x1, 0x80000003f8, 0x8000000408) at 0x4000005c4
+```
+
 ### Convolution is abysmally slow
 
 - Even though im2col gemm is there, `[guest@ps6s0000 tests]$ ./api-io-c` take "forever".

@@ -38,8 +38,14 @@
     } \
 } while(0)
 
+#define TRACE(string) do { \
+    printf("\nT:%s ",string); fflush(stdout); \
+}while(0)
+
+
 #if defined(_SX)
 void *aligned_malloc(size_t size, size_t alignment) {
+    printf(" SX aligned_malloc --> malloc(%lu)\n",(unsigned long)size);
     return malloc(size);
 }
 #else
@@ -139,6 +145,7 @@ mkldnn_status_t simple_net(){
     float *conv_bias =
        (float*)aligned_malloc(product(conv_bias_sizes, 1)*sizeof(float), 64);
 
+    TRACE("create memory");
     /* create memory for user data */
     mkldnn_primitive_t conv_user_src_memory, conv_user_weights_memory,
         conv_user_bias_memory;
@@ -149,6 +156,7 @@ mkldnn_status_t simple_net(){
     init_data_memory(1, conv_bias_sizes, mkldnn_x, mkldnn_f32, engine,
         conv_bias, &conv_user_bias_memory);
 
+    TRACE("create data descriptors for convolutions, mkldnn_any");
     /* create data descriptors for convolution w/ no specified format */
 
     mkldnn_memory_desc_t conv_src_md, conv_weights_md, conv_bias_md,
@@ -162,6 +170,7 @@ mkldnn_status_t simple_net(){
     CHECK(mkldnn_memory_desc_init(&conv_dst_md, 4, conv_dst_sizes,
         mkldnn_f32, mkldnn_any));
 
+    TRACE("create convolution");
     /* create a convolution */
     mkldnn_convolution_desc_t conv_any_desc;
     CHECK(mkldnn_convolution_forward_desc_init(&conv_any_desc, mkldnn_forward,
@@ -186,6 +195,7 @@ mkldnn_status_t simple_net(){
     memset(conv_weights_buffer, 0, product(conv_weights_sizes, 4)*sizeof(float));
     memset(conv_dst_buffer, 0, product(conv_dst_sizes, 4)*sizeof(float));
 
+    TRACE("create mem for dst data (no need to reorder it same as user)");
     /* create memory for dst data, we don't need reorder it to user data */
     CHECK(mkldnn_primitive_create(&conv_internal_dst_memory,
             mkldnn_primitive_desc_query_pd(conv_pd, mkldnn_query_dst_pd, 0),
@@ -193,6 +203,7 @@ mkldnn_status_t simple_net(){
     CHECK(mkldnn_memory_set_data_handle(
             conv_internal_dst_memory, conv_dst_buffer));
 
+    TRACE("create reorder primitives user data --> conv src");
     /* create reorder primitives between user data and convolution srcs
      * if required */
     mkldnn_primitive_t conv_reorder_src, conv_reorder_weights;
@@ -222,10 +233,12 @@ mkldnn_status_t simple_net(){
 
     const_mkldnn_primitive_t conv_dsts[] = { conv_internal_dst_memory };
 
+    TRACE("create convolution primitive");
     /* finally create a convolution primitive */
     mkldnn_primitive_t conv;
     CHECK(mkldnn_primitive_create(&conv, conv_pd, conv_srcs, conv_dsts));
 
+    TRACE("AlexNet: relu {BATCH,96,55,55} -> {BATCH,96,55,55}");
     /* AlexNet: relu
      * {BATCH, 96, 55, 55} -> {BATCH, 96, 55, 55}
      */
@@ -243,20 +256,25 @@ mkldnn_status_t simple_net(){
     const mkldnn_memory_desc_t *relu_src_md =
         mkldnn_primitive_desc_query_memory_d(conv_dst_pd);
 
+    TRACE("create relu");
     /* create a relu */
     mkldnn_relu_desc_t relu_desc;
+    TRACE("mkldnn_relu_forward_desc_init,,,");
     CHECK(mkldnn_relu_forward_desc_init(&relu_desc, mkldnn_forward,
             relu_src_md, negative_slope));
 
     mkldnn_primitive_desc_t relu_pd;
+    TRACE("mkldnn_primitive_desc_create...");
     CHECK(mkldnn_primitive_desc_create(&relu_pd, &relu_desc, engine, NULL));
 
     mkldnn_primitive_t relu_dst_memory;
+    TRACE("mkldnn_primitive_desc_query_pd...");
     const_mkldnn_primitive_desc_t relu_dst_pd = mkldnn_primitive_desc_query_pd(
             relu_pd, mkldnn_query_dst_pd, 0);
     CHECK(mkldnn_primitive_create(&relu_dst_memory, relu_dst_pd, NULL, NULL));
     CHECK(mkldnn_memory_set_data_handle(relu_dst_memory, relu_dst_buffer));
 
+    TRACE("create relu primitive");
     /* finally create a relu primitive */
     mkldnn_primitive_t relu;
     mkldnn_primitive_at_t relu_srcs = { conv_internal_dst_memory };
@@ -264,6 +282,7 @@ mkldnn_status_t simple_net(){
 
     CHECK(mkldnn_primitive_create(&relu, relu_pd, &relu_srcs, relu_dsts));
 
+    TRACE("AlexNet: lrn (local response normalization");
     /* AlexNet: lrn
      * {BATCH, 96, 55, 55} -> {BATCH, 96, 55, 55}
      * local size: 5
@@ -318,6 +337,7 @@ mkldnn_status_t simple_net(){
     const_mkldnn_primitive_t lrn_dsts[] = { lrn_dst_memory,
             lrn_scratch_memory };
 
+    TRACE("lrn primitive");
     /* finally create a lrn primitive */
     mkldnn_primitive_t lrn;
     CHECK(mkldnn_primitive_create(&lrn, lrn_pd, &lrn_srcs, lrn_dsts));
@@ -351,6 +371,7 @@ mkldnn_status_t simple_net(){
     init_data_memory(4, pool_dst_sizes, mkldnn_nchw, mkldnn_f32, engine,
         net_dst, &pool_user_dst_memory);
 
+    TRACE("pooling descriptor");
     /* create a pooling */
     mkldnn_pooling_desc_t pool_desc;
     CHECK(mkldnn_pooling_forward_desc_init(&pool_desc, mkldnn_forward,
@@ -360,6 +381,7 @@ mkldnn_status_t simple_net(){
     mkldnn_primitive_desc_t pool_pd;
     CHECK(mkldnn_primitive_desc_create(&pool_pd, &pool_desc, engine, NULL));
 
+    TRACE("pooling workspace");
     /* create memory for workspace */
     mkldnn_primitive_t pool_indices_memory;
     const_mkldnn_primitive_desc_t pool_indices_pd =
@@ -375,6 +397,7 @@ mkldnn_status_t simple_net(){
 
     mkldnn_primitive_t pool_dst_memory;
 
+    TRACE("reorder primitives user data -> pooling dsts");
     /* create reorder primitives between user data and pooling dsts
      * if required */
     mkldnn_primitive_t pool_reorder_dst, pool_internal_dst_memory;
@@ -391,10 +414,12 @@ mkldnn_status_t simple_net(){
     const_mkldnn_primitive_t pool_dsts[] = { pool_dst_memory,
             pool_indices_memory };
 
+    TRACE("pooling primitive");
     /* finally create a pooling primitive */
     mkldnn_primitive_t pool;
     CHECK(mkldnn_primitive_create(&pool, pool_pd, &pool_srcs, pool_dsts));
 
+    TRACE("connect primitives");
     /* build a simple net */
     uint32_t n = 0;
     mkldnn_primitive_t net[10];
@@ -407,11 +432,15 @@ mkldnn_status_t simple_net(){
     net[n++] = pool;
     if (pool_reorder_dst) net[n++] = pool_reorder_dst;
 
+    TRACE("create");
     mkldnn_stream_t stream;
     CHECK(mkldnn_stream_create(&stream, mkldnn_eager));
+    TRACE("submit");
     CHECK(mkldnn_stream_submit(stream, n, net, NULL));
+    TRACE("wait");
     CHECK(mkldnn_stream_wait(stream, n, NULL));
 
+    TRACE("clean-up");
     /* clean-up */
     mkldnn_stream_destroy(stream);
 
@@ -456,6 +485,7 @@ mkldnn_status_t simple_net(){
     free(pool_dst_buffer);
     free(pool_indices_buffer);
 
+    TRACE("simple_net() DONE");
     return mkldnn_success;
 }
 

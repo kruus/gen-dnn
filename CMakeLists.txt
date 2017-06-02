@@ -50,13 +50,25 @@ function(error_if_SX)
     endif()
 endfunction()
 if(NECSX)
-    show_cmake_stuff("NECSX, after project(... C CXX)")
+    #show_cmake_stuff("NECSX, after project(... C CXX)")
     #cmake_policy(SET CMP0066 NEW) # try_compile in cmake 3.6+ will honor CMAKE_EXE_LINKER_FLAGS in the test project
     #cmake_policy(SET CMP0056 NEW) # try_compile in cmake 3.6+ will honor CMAKE_EXE_LINKER_FLAGS in the test project
     message(STATUS "Other NEC SX options here ...")
     # OHOH. this appear *before* -lmkldnn, and we want it to appear *after*
     #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${SX_LINK_LIBRARIES}")
     #set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} ${SX_LINK_LIBRARIES}")
+    #
+    # -----------------------------------------------------------------------
+    # These changes may eventually percolate into dev-cmake-sx and Platform/
+    #
+    #   override to better run SX dbx debugger ... (was with -Cvopt)
+    #   Original: -g -ftrace -Cvopt
+    #       (should be -gv -ftrace -CVopt ???)
+    set(CMAKE_C_FLAGS_DEBUG "-g -traceback -Cdebug")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -traceback -Cdebug")
+    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-g") # should NOT conflict (but did!)
+    # -----------------------------------------------------------------------
+    show_cmake_stuff("NECSX, after project(... C CXX)")
 else()
     project(${PROJECT_NAME} C CXX)
     include("cmake/MKL.cmake")

@@ -136,7 +136,11 @@ void test1() {
 
     const int len0 = 100;
     mkldnn_dims_t dims = {len0};
+#ifndef _SX // SX warns about non-standard C
     real_t data[len0];
+#else
+    real_t *data = (float*)malloc(product(dims,1)*sizeof(float));
+#endif
 
     mkldnn_memory_desc_t md;
     mkldnn_primitive_desc_t mpd;
@@ -165,6 +169,9 @@ void test1() {
     CHECK(mkldnn_primitive_desc_destroy(mpd));
 
     CHECK(mkldnn_engine_destroy(engine));
+#ifdef _SX
+    free(data);
+#endif
 }
 
 void test2() {

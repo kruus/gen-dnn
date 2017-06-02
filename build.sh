@@ -13,6 +13,7 @@ DODEBUG="n"
 DODOC="y"
 DONEEDMKL="y"
 DOJUSTDOC="n"
+BUILDOK="y"
 SIZE_T=32 # or 64, for -s or -S SX compile
 JOBS="-j8"
 CMAKETRACE=""
@@ -21,10 +22,12 @@ usage() {
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
     awk '/getopts/{flag=1;next} /done/{flag=0} flag&&/^[^#]+) #/; flag&&/^ *# /' $0
     echo "Example: time a full test run for a debug compilation --- time $0 -dtt"
-    echo "         SX debug compile, quick (no doxygen) --- time $0 -Sdq"
+    echo "         SX debug compile, quick (no doxygen)         --- time $0 -Sdq"
+    echo "         *just* run cmake, for SX debug compile       ---      $0 -SdQ"
+    echo "         *just* create doxygen docs                   ---      $0 -D"
     exit 0
 }
-while getopts ":htvjdDqpsST" arg; do
+while getopts ":htvjdDqQpsST" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
@@ -49,16 +52,21 @@ while getopts ":htvjdDqpsST" arg; do
         q) # quick: skip doxygen docs [default: run doxygen if build OK]
             DODOC="n"
             ;;
+        Q) # really quick: skip build and doxygen docs [JUST run cmake and stop]
+            BUILDOK="n"; DODOC="n"
+            ;;
         p) # permissive: disable the FAIL_WITHOUT_MKL switch
             DONEEDMKL="n"
             ;;
-        S) # SX cross-compile (size_t=64)
-            DOTARGET="s"; DOJIT=0; SIZE_T=64; JOBS="-j1"
+        S) # SX cross-compile (size_t=64, built in build-sx/)
+            DOTARGET="s"; DOJIT=0; SIZE_T=64; JOBS="-j4"
             ;;
-        s) # SX cross-compile (size_t=32) DISCOURAGED
-            # this is NOT GOOD: sizeof(ptrdiff_t) is still 8 bytes!
-            # this may generate strange warnings
-            DOTARGET="s"; DOJIT=0; SIZE_T=32; JOBS="-j1"
+        s) # SX cross-compile (size_t=32, built in build-sx/) DISCOURAGED
+            # -s is NOT GOOD: sizeof(ptrdiff_t) is still 8 bytes!
+            DOTARGET="s"; DOJIT=0; SIZE_T=32; JOBS="-j4"
+            echo "*** WARNING ***"
+            echo "-s --> -size_t32 compilation NOT SUPPORTED (-S is recommended)"
+            echo "***************"
             ;;
         T) # cmake --trace
             CMAKETRACE="--trace"
@@ -125,7 +133,6 @@ timeoutPID() { # unused
     mkdir "${BUILDDIR}"
     cd "${BUILDDIR}"
     #
-    BUILDOK="y"
     CMAKEOPT=''
     CMAKEOPT="${CMAKEOPT} -DCMAKE_CCXX_FLAGS=-DJITFUNCS=${DOJIT}"
     if [ ! "$DOTARGET" == "j" ]; then
@@ -136,6 +143,9 @@ timeoutPID() { # unused
         if [ ! -f "${TOOLCHAIN}" ]; then echo "Ohoh. ${TOOLCHAIN} not found?"; BUILDOK="n"; fi
         CMAKEOPT="${CMAKEOPT} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}"
         CMAKEOPT="${CMAKEOPT} --debug-trycompile --trace -LAH" # long debug of cmake
+        #  ... ohoh no easy way to include the spaces and expand variable properly ...
+        #      Solution: do these changes within CMakeLists.txt
+        #CMAKEOPT="${CMAKEOPT} -DCMAKE_C_FLAGS=-g\ -ftrace\ -Cdebug" # override Cvopt
         SXOPT="-DTARGET_VANILLA -D__STDC_LIMIT_MACROS"
         SXOPT="${SXOPT} -wall -woff=1097 -woff=4038" # turn off warnings about not using 'attributes'
         SXOPT="${SXOPT} -wnolongjmp"           # turn off warnings about setjmp/longjmp (and tracing)
@@ -150,13 +160,12 @@ timeoutPID() { # unused
         # __STDC_LIMIT_MACROS is a way to force definitions like INT8_MIN in stdint.h (cstdint)
         #    (it **should** be autmatic in C++11, imho)
     fi
+    CMAKEOPT="${CMAKEOPT} -DCMAKE_INSTALL_PREFIX=../${INSTALLDIR}"
     if [ "$DODEBUG" == "y" ]; then
         CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=Debug"
-        CMAKEOPT="${CMAKEOPT} -DCMAKE_INSTALL_PREFIX=../${INSTALLDIR}-dbg"
     else
         CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=Release"
         #CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=RelWithDebInfo"
-        CMAKEOPT="${CMAKEOPT} -DCMAKE_INSTALL_PREFIX=../${INSTALLDIR}"
     fi
     if [ "$DONEEDMKL" == "y" ]; then
         CMAKEOPT="${CMAKEOPT} -DFAIL_WITHOUT_MKL=ON"
@@ -167,11 +176,22 @@ timeoutPID() { # unused
     #    TODO: cblas / mathkeisan alternatives?
     if [ "$BUILDOK" == "y" ]; then
         BUILDOK="n"
-        rm -f ./stamp-BUILDOK
+        rm -f ./stamp-BUILDOK ./CMakeCache.txt
         echo "${CMAKEENV}; cmake ${CMAKEOPT} ${CMAKETRACE} .."
-        ${CMAKEENV}; cmake ${CMAKEOPT} ${CMAKETRACE} .. \
+        set -x
+        { if [ x"${CMAKEENV}" == x"" ]; then ${CMAKEENV}; fi; \
+        cmake ${CMAKEOPT} ${CMAKETRACE} .. \
         && make VERBOSE=1 ${JOBS} \
-        && BUILDOK="y"
+        && BUILDOK="y"; }
+        set +x
+    else # skip the build, just run cmake ...
+        echo "CMAKEENV   <${CMAKEENV}>"
+        echo "CMAKEOPT   <${CMAKEOPT}>"
+        echo "CMAKETRACE <${CMAKETRACE}>"
+        set +x
+        { if [ x"${CMAKEENV}" == x"" ]; then ${CMAKEENV}; fi; \
+        cmake ${CMAKEOPT} ${CMAKETRACE} .. ; }
+        set -x
     fi
     if [ "$BUILDOK" == "y" -a ! "$DOTARGET" == "s" ]; then
         echo "DOTARGET  $DOTARGET"
@@ -206,7 +226,12 @@ BUILDOK="n"; if [ -f "${BUILDDIR}"/stamp-BUILDOK ]; then BUILDOK="y"; fi # check
 if [ "$BUILDOK" == "y" ]; then
     (
     cd "${BUILDDIR}"
-    { echo "Installing ..."; make install-bin install-dev; }
+    # not sure about whether I need to go into subdirs for components...
+    if [ "${DOTARGET}" == "s" ]; then
+        { echo "Installing ..."; make install; }
+    else
+        { echo "Installing ..."; make install-bin install-dev; } # in src/, tried install COMPONENTS
+    fi
     if [ "$DODOC" == "y" ]; then
         { echo "Installing docs ..."; make install-doc; }
     fi
