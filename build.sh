@@ -25,6 +25,7 @@ usage() {
     echo "         SX debug compile, quick (no doxygen)         --- time $0 -Sdq"
     echo "         *just* run cmake, for SX debug compile       ---      $0 -SdQ"
     echo "         *just* create doxygen docs                   ---      $0 -D"
+    echo "Debug: Individual tests can be run like build-sx/tests/gtests/test_relu"
     exit 0
 }
 while getopts ":htvjdDqQpsST" arg; do
