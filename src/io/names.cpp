@@ -4,12 +4,16 @@
 
 #include <cstdio> // snprintf
 #include <cstring>
+#include <cerrno>
 #include <assert.h>     // debug mode array bounds check (silently trimmed in Release mode)
 
 //#ifdef __cplusplus
 //extern "C"
 //{
 //#endif
+
+// nonexistent on SX
+//using std::snprintf;    // C11 snprintf specifices C99 behavior (always return # chars that would have been written)
 
 #define NAMEENUM_T( TYPENAME ) char const* mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const e )
 /*NAMEENUM_T(status){*/
@@ -208,17 +212,28 @@ NAMEENUM_T(stream_kind){
 
 
 #define NAMEFUNC_T( TYPENAME, VAR ) int kldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const *VAR, char * const buf, int len )
-// paranoia: set NUL into last char explicitly
-//#define CHKBUF do{ ret+=n; printf(" n,ret=%d,%d",n,ret); if( n>len ){b[len-1]='\0'; len=0;} else {b+=n; len-=n;}}while(0)
+
+// paranoia: set NUL into last char explicitly (*all* snprintfs should do this already)
+//#define CHKBUF do{ assert(n>0); ret+=n; printf(" n,ret,len_in,errno=%d,%d,%d,%d ",n,ret,len); if( n>len ){b[len-1]='\0'; len=0;} else {b+=n; len-=n;}}while(0)
 // actually, it seems that snprintf always zero-terminates string overflow properly (GOOD)
-#define CHKBUF do{ ret+=n; /*printf(" n,ret=%d,%d",n,ret);*/ if( n>len ){/*b[len-1]='\0';*/ len=0;} else {b+=n; len-=n;}}while(0)
+#if defined(BAD_SNPRINTF)
+// TODO replace snprintf, if sxc++ is going to NOT implement c++11 standard correctly XXX
+#define CHKBUF do{ assert(n>=0); if(n<0){len=0; errno=0;/*ignore*/;} else { assert(n<len); ret+=n; b+=n; len-=n; }}while(0)
+#else
+// - C99 behavior always returns the # of chars that would have been written.
+// - Format conversion errors MIGHT still return -ve (error), so these lib
+//   functions will just *assert* that no conversion errors happen.
+// - and release-mode will just do-nothing (just in case)
+#define CHKBUF do{ assert(n>=0); if(n<0){len=0; errno=0;}else{ret+=n; if( n>len ){/*b[len-1]='\0';*/ len=0;} else {b+=n; len-=n;}}}while(0)
+#endif
+
 #define SCAN_LASTNZ( ARR, SZ ) do{lastnz= -1; for(int i=0; i<(SZ); ++i){ if( ARR[i] > 0 ){ lastnz=i; }}}while(0)
 #define ARR_NZ( ARR, NSCAN, FMTSPEC ) do{ \
     int lastnz= -1; SCAN_LASTNZ( ARR, NSCAN ); \
     for(int i=0; i<=lastnz; ++i){ \
-        {int n = snprintf(b,len, "%c" FMTSPEC,(i==0?'{':','),ARR[i]); CHKBUF;} \
+        {errno=0; int n = snprintf(b,len, "%c" FMTSPEC,(i==0?'{':','),ARR[i]); CHKBUF;} \
     } \
-    {int n = snprintf(b,len,"}"); CHKBUF;} \
+    {errno=0; int n = snprintf(b,len,"}"); CHKBUF;} \
 }while(0)
 
 int mkldnn_name_dims( mkldnn_dims_t const dims, char *const buf, int len){ /* no macro - mkldnn_dims_t is already a ptr */
@@ -228,9 +243,9 @@ int mkldnn_name_dims( mkldnn_dims_t const dims, char *const buf, int len){ /* no
 #endif
     int ret = 0;
     char * b = buf;
-    {int n = snprintf(b,len, "dims:"); CHKBUF;}
+    {errno=0; int n = snprintf(b,len, "dims:"); CHKBUF;}
     if(dims == nullptr){
-        {int n = snprintf(b,len,"NULL"); CHKBUF;}
+        {errno=0; int n = snprintf(b,len,"NULL"); CHKBUF;}
     }else{
 #if 0
         int lastnz=-1;

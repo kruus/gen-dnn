@@ -46,7 +46,8 @@ This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
   - SX int is only 32-bit (even though you can use -size_t64)
   - SX has many conversion warnings.
   - linking now OK
-  - most tests OK (some memory formats don't need support for non-JIT)
+  - most tests OK (some memory formats do not need support for non-JIT)
+  - snprintf does not follow C99 conventions: it does not return "the length that would have been written"
 
 ## Github repos
 

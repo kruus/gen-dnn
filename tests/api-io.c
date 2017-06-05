@@ -25,6 +25,13 @@
 #include "mkldnn.h"
 #include "mkldnn_io.h"
 
+// SX compile will define BAD_SNPRINTF because it does not follow c++11 std
+#if defined(BAD_SNPRINTF)
+#define SNPRINTF_OK 0
+#else
+#define SNPRINTF_OK 1
+#endif
+
 #define CHECK(f) do { \
     mkldnn_status_t const s = (f); \
     if (s != mkldnn_success) { \
@@ -58,36 +65,56 @@ void io0() {
         // "use of a const variable in a constant expression is nonstandard in C"
         mkldnn_dims_t d = {1};
         int sz0 = mkldnn_name_dims( d, buf, len );
+#if defined(_SX)
+        printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %lu\n", sz0, len, buf, (long unsigned)strlen(&buf[0]));
+#else
+        printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
+#endif
         CHECK_TRUE(sz0 < len);
         CHECK_TRUE(buf[sz0] == '\0');
-        printf("mkldnn_dims_t d={1} full len %d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
     }
     {
         int const len=9;
         char buf[len];
         mkldnn_dims_t d = {1};
         int sz0 = mkldnn_name_dims( d, buf, len );
+#if defined(_SX)
+        printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %lu\n", sz0, len, buf, (long unsigned)strlen(&buf[0]));
+#else
+        printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
+#endif
         CHECK_TRUE(sz0 < len);
         CHECK_TRUE(buf[sz0] == '\0');
-        printf("mkldnn_dims_t d={1} full len %d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
     }
     {
         int const len=8;
         char buf[len];
         mkldnn_dims_t d = {1};
         int sz0 = mkldnn_name_dims( d, buf, len );
+#if defined(_SX)
+        printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %lu\n", sz0, len, buf, (long unsigned)strlen(&buf[0]));
+#else
+        printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
+#endif
+#if SNPRINTF_OK
         CHECK_TRUE(sz0 == len);
+#endif
         CHECK_TRUE(buf[len-1] == '\0');
-        printf("mkldnn_dims_t d={1} full len %d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
     }
     {
         int const len=7;
         char buf[len];
         mkldnn_dims_t d = {1};
         int sz0 = mkldnn_name_dims( d, buf, len );
+#if defined(_SX)
+        printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %lu\n", sz0, len, buf, (long unsigned)strlen(&buf[0]));
+#else
+        printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
+#endif
+#if SNPRINTF_OK
         CHECK_TRUE(sz0 > len);
+#endif
         CHECK_TRUE(buf[len-1] == '\0');
-        printf("mkldnn_dims_t d={1} full len %d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
     }
     { // print some random enums
 //#define CHKBUF do{ ret+=n; printf(" n,ret=%d,%d",n,ret); if( n>len ){b[len-1]='\0'; len=0;} else {b+=n; len-=n;}}while(0)

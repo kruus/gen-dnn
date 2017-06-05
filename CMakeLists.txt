@@ -139,6 +139,9 @@ if(NECSX)
     #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -f90lib")
     set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -DUSE_CBLAS")
     #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Wl,-M") # or maybe as linker flags?
+    set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -wfatal=47")     # macro redefinition
+    set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -woff=1")        # last line of input file doesn't end with newline
+    set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -DBAD_SNPRINTF") # return value of snprintf does not follow c99/c++11 conventions
 
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} ${SX_CFLAGS_C99}")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} ${SX_CXXFLAGS_C11}")

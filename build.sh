@@ -212,7 +212,8 @@ timeoutPID() { # unused
     fi
     if [ "$BUILDOK" == "y" -a "$DOTARGET" == "s" ]; then
         # make SX build dirs all-writable so SX runs can store logs etc.
-        find "${BUILDDIR}" -type d -exec chmod o+w {} \;
+        #find "${BUILDDIR}" -type d -exec chmod o+w {} \;
+        { cd ..; find "${BUILDDIR}" -type d -exec chmod o+w {} \; ; }
     fi
     if [ "$BUILDOK" == "y" ]; then
         touch ./stamp-BUILDOK
