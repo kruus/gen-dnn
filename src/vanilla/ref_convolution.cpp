@@ -38,7 +38,7 @@ inline int constexpr cmem_fmt_tag() {
     mkldnn_memory_format_t const m=mkldnn_memory_format_max;
     return ((s)*m + wb)*m + d;
 }
-inline int const mem_fmt_tag(mkldnn_memory_format_t s, mkldnn_memory_format_t wb, mkldnn_memory_format_t d){
+inline int mem_fmt_tag(mkldnn_memory_format_t s, mkldnn_memory_format_t wb, mkldnn_memory_format_t d){
     mkldnn_memory_format_t const m=mkldnn_memory_format_max;
     return ((s)*m + wb)*m + d;
 }

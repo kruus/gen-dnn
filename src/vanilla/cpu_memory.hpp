@@ -26,6 +26,10 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
+#ifndef NDEBUG
+#include <iostream>
+#endif
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -69,7 +73,15 @@ struct cpu_memory_t: public cpu_primitive_t {
     virtual char *memory(size_t output_index = 0) const
     { assert(output_index == 0); return data_; }
     virtual const char* const_memory(size_t output_index = 0) const
-    { assert(output_index == 0); return data_; }
+    //{ assert(output_index == 0); return data_; }
+    {
+#ifndef NDEBUG
+        // sxc++ triggers this assertion !!!
+        /*assert(output_index == 0);*/
+        if(!output_index==0) printf(" cpu_memory_t::const_memory(%lu)!!!\n",(long unsigned)output_index);
+#endif
+        return data_;
+    }
 
 private:
     pd_t conf_;
