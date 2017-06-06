@@ -27,7 +27,7 @@
 
 // SX compile will define BAD_SNPRINTF because it does not follow c++11 std
 #if defined(BAD_SNPRINTF)
-#define SNPRINTF_OK 0
+#define SNPRINTF_OK 1
 #else
 #define SNPRINTF_OK 1
 #endif
@@ -60,11 +60,14 @@ typedef float real_t;
 void io0() {
     // check that snprintf puts a terminating NUL always at buf[len-1] (or before)
     {
-        int const len=100;
+#define len 100
+        //int const len=100;
         char buf[len]; // On SX, this gives a warning:
         // "use of a const variable in a constant expression is nonstandard in C"
         mkldnn_dims_t d = {1};
+        printf("\n\nmkldnn_name_dims, buf[%d]...\n",len); fflush(stdout);
         int sz0 = mkldnn_name_dims( d, buf, len );
+        fflush(stdout);
 #if defined(_SX)
         printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %lu\n", sz0, len, buf, (long unsigned)strlen(&buf[0]));
 #else
@@ -72,9 +75,11 @@ void io0() {
 #endif
         CHECK_TRUE(sz0 < len);
         CHECK_TRUE(buf[sz0] == '\0');
+#undef len
     }
     {
-        int const len=9;
+#define len 9
+        //int const len=9;
         char buf[len];
         mkldnn_dims_t d = {1};
         int sz0 = mkldnn_name_dims( d, buf, len );
@@ -85,9 +90,11 @@ void io0() {
 #endif
         CHECK_TRUE(sz0 < len);
         CHECK_TRUE(buf[sz0] == '\0');
+#undef len
     }
     {
-        int const len=8;
+#define len 8
+        //int const len=8;
         char buf[len];
         mkldnn_dims_t d = {1};
         int sz0 = mkldnn_name_dims( d, buf, len );
@@ -100,9 +107,11 @@ void io0() {
         CHECK_TRUE(sz0 == len);
 #endif
         CHECK_TRUE(buf[len-1] == '\0');
+#undef len
     }
     {
-        int const len=7;
+#define len 7
+        //int const len=7;
         char buf[len];
         mkldnn_dims_t d = {1};
         int sz0 = mkldnn_name_dims( d, buf, len );
@@ -115,6 +124,7 @@ void io0() {
         CHECK_TRUE(sz0 > len);
 #endif
         CHECK_TRUE(buf[len-1] == '\0');
+#undef len
     }
     { // print some random enums
 //#define CHKBUF do{ ret+=n; printf(" n,ret=%d,%d",n,ret); if( n>len ){b[len-1]='\0'; len=0;} else {b+=n; len-=n;}}while(0)
@@ -136,9 +146,9 @@ void io0() {
     { // print some more complicated structures
 #define BUFPRT( VAR, TYPENAME ) do \
         { \
-            int const len=256; \
-            char buf[len]; \
-            mkldnn_name_##TYPENAME( VAR, buf, len ); \
+            /*int const len=256;*/ \
+            char buf[256]; \
+            mkldnn_name_##TYPENAME( VAR, buf, 256 ); \
             printf(" " #TYPENAME " = <%s>\n", &buf[0] ); \
         }while(0)
         mkldnn_dims_t dims={1,2,3,4,0};
@@ -158,7 +168,7 @@ void io0() {
 
 void test1() {
     mkldnn_engine_t engine;
-    CHECK(mkldnn_engine_create(&engine, mkldnn_any, 0));
+    CHECK(mkldnn_engine_create(&engine, mkldnn_any_engine, 0)); // NOT mkldnn_any
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0));
 
     const int len0 = 100;

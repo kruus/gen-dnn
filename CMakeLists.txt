@@ -64,9 +64,11 @@ if(NECSX)
     #   override to better run SX dbx debugger ... (was with -Cvopt)
     #   Original: -g -ftrace -Cvopt
     #       (should be -gv -ftrace -CVopt ???)
-    set(CMAKE_C_FLAGS_DEBUG "-g -traceback -Cdebug")
-    set(CMAKE_CXX_FLAGS_DEBUG "-g -traceback -Cdebug")
-    set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-g") # should NOT conflict (but did!)
+    #
+    # Note: do not use -Cdbeug or -Cnoopt (semantics of language changes?)
+    set(CMAKE_C_FLAGS_DEBUG "-g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg")
+    #set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-g") # should NOT conflict (but did!)
     # -----------------------------------------------------------------------
     show_cmake_stuff("NECSX, after project(... C CXX)")
 else()
@@ -141,7 +143,11 @@ if(NECSX)
     #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Wl,-M") # or maybe as linker flags?
     set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -wfatal=47")     # macro redefinition
     set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -woff=1")        # last line of input file doesn't end with newline
-    set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -DBAD_SNPRINTF") # return value of snprintf does not follow c99/c++11 conventions
+    #
+    # sxc++ with -Cnoopt or -Cdebug CHANGES SEMANTICS OF snprintf
+    # Soln:
+    #  do not use -Cdebug or -Cnoopt
+    #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -DBAD_SNPRINTF") # return value of snprintf does not follow c99/c++11 conventions
 
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} ${SX_CFLAGS_C99}")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} ${SX_CXXFLAGS_C11}")

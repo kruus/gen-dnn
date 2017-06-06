@@ -214,48 +214,73 @@ NAMEENUM_T(stream_kind){
 #define NAMEFUNC_T( TYPENAME, VAR ) int kldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const *VAR, char * const buf, int len )
 
 // paranoia: set NUL into last char explicitly (*all* snprintfs should do this already)
-//#define CHKBUF do{ assert(n>0); ret+=n; printf(" n,ret,len_in,errno=%d,%d,%d,%d ",n,ret,len); if( n>len ){b[len-1]='\0'; len=0;} else {b+=n; len-=n;}}while(0)
+//#define CHKBUF do{ assert(n>0); printf(" n,ret,len_in,errno=%d,%d,%d,%d ",n,ret,len); ret+=n; if( n>len ){b[len-1]='\0'; len=0;} else {b+=n; len-=n;} printf("-->ret,len=%d,%d\n",ret,len);}while(0)
+#define CHKBUF do{ \
+    printf(" n,ret,len_in,errno=%d,%d,%d,%d ",n,ret,len,errno); \
+    if(n<=0) printf(" **n<=0** "); \
+    ret+=n; \
+    char *b0=b; \
+    if( n>len ){ printf(" n>len "); b[len-1]='\0'; len=0;} \
+    else {b+=n; len-=n; if(b[0]!='\0')printf(" **no-NUL** "); b[0]='\0';} \
+    long const off=b-b0; \
+    printf("-->ret,off,len=%d,%ld,%d, written=<%s>[%d]\n",ret,off,len,b0,strlen(b0)); \
+    fflush(stdout); \
+}while(0)
 // actually, it seems that snprintf always zero-terminates string overflow properly (GOOD)
-#if defined(BAD_SNPRINTF)
+//#if defined(BAD_SNPRINTF)
 // TODO replace snprintf, if sxc++ is going to NOT implement c++11 standard correctly XXX
-#define CHKBUF do{ assert(n>=0); if(n<0){len=0; errno=0;/*ignore*/;} else { assert(n<len); ret+=n; b+=n; len-=n; }}while(0)
-#else
+//#define CHKBUF do{ assert(n>=0); if(n<0){len=0; errno=0;/*ignore*/;} else { assert(n<len); ret+=n; b+=n; len-=n; }}while(0)
+//#else
 // - C99 behavior always returns the # of chars that would have been written.
 // - Format conversion errors MIGHT still return -ve (error), so these lib
 //   functions will just *assert* that no conversion errors happen.
 // - and release-mode will just do-nothing (just in case)
-#define CHKBUF do{ assert(n>=0); if(n<0){len=0; errno=0;}else{ret+=n; if( n>len ){/*b[len-1]='\0';*/ len=0;} else {b+=n; len-=n;}}}while(0)
-#endif
+//#define CHKBUF do{ assert(n>=0); if(n<0){len=0; errno=0;}else{ret+=n; if( n>=len ){/*b[len-1]='\0';*/ len=0;} else {b+=n; len-=n;}}}while(0)
+//#endif
 
 #define SCAN_LASTNZ( ARR, SZ ) do{lastnz= -1; for(int i=0; i<(SZ); ++i){ if( ARR[i] > 0 ){ lastnz=i; }}}while(0)
 #define ARR_NZ( ARR, NSCAN, FMTSPEC ) do{ \
     int lastnz= -1; SCAN_LASTNZ( ARR, NSCAN ); \
-    for(int i=0; i<=lastnz; ++i){ \
-        {errno=0; int n = snprintf(b,len, "%c" FMTSPEC,(i==0?'{':','),ARR[i]); CHKBUF;} \
+    printf(" lastnz=%d",lastnz); fflush(stdout); \
+    if(lastnz < 0){ \
+        errno=0; printf("zeros-case"); fflush(stdout); int const n = snprintf(b,len, "ZEROS" ); CHKBUF; \
+    }else{ \
+        for(int i=0; i<=lastnz; ++i){ \
+            printf("\nfmt=%s ARR[%d]=" FMTSPEC, "%c" FMTSPEC, i, ARR[i]); \
+            {errno=0; int const n = snprintf(b,len, "%c" FMTSPEC,(i==0?'{':','),ARR[i]); CHKBUF;} \
+        } \
+        printf(" fmt=%s", "}"); \
+        {errno=0; int const n = snprintf(b,len,"}"); CHKBUF;} \
     } \
-    {errno=0; int n = snprintf(b,len,"}"); CHKBUF;} \
 }while(0)
 
 int mkldnn_name_dims( mkldnn_dims_t const dims, char *const buf, int len){ /* no macro - mkldnn_dims_t is already a ptr */
-#define DBG 0
+#define DBG 1
 #if DBG
+    fflush(stdout);
     int const len0 = len;
+    printf("\nlen0=%d   ",len0); fflush(stdout);
 #endif
     int ret = 0;
-    char * b = buf;
-    {errno=0; int n = snprintf(b,len, "dims:"); CHKBUF;}
+    char * b = buf; b[0]='\0';
+    printf(" A %s %d %d",buf,ret,len); fflush(stdout);
+    {errno=0; int const n = snprintf(b,len, "dims:"); CHKBUF;}
+    printf(" B %s %d %d",buf,ret,len); fflush(stdout);
     if(dims == nullptr){
-        {errno=0; int n = snprintf(b,len,"NULL"); CHKBUF;}
+        {errno=0; printf(" null-branch"); fflush(stdout); int const n = snprintf(b,len,"NULL"); CHKBUF;}
     }else{
-#if 0
+        printf(" C %s %d %d",buf,ret,len); fflush(stdout);
+#if 1
         int lastnz=-1;
         SCAN_LASTNZ( dims, TENSOR_MAX_DIMS );
         for(int i=0; i<=lastnz; ++i){
-            {int n = snprintf(b,len, "%c%d",(i==0?'{':','),dims[i]); CHKBUF;}
+            {int const n = snprintf(b,len, "%c%d",(i==0?'{':','),dims[i]); CHKBUF;}
+            printf(" X %s %d %d",buf,ret,len); fflush(stdout);
         }
-        {int n = snprintf(b,len,"}"); CHKBUF;}
+        {printf(" buf[%d]...last-} n=snprintf(&buf[%ld],%d,\"}\")\n",len0,(long)(b-&buf[0]),len); fflush(stdout); int const n = snprintf(b,len,"}"); printf("--> returned %d\n",n); CHKBUF;}
 #else
         ARR_NZ( dims, TENSOR_MAX_DIMS, "%d" );
+        printf(" D %s %d %d",buf,ret,len); fflush(stdout);
 #endif
     }
 #if DBG
@@ -269,19 +294,19 @@ int mkldnn_name_dims( mkldnn_dims_t const dims, char *const buf, int len){ /* no
 }
 int mkldnn_name_dims_sz( mkldnn_dims_t const dims, size_t sz, char *const buf, int len){ /* no macro - mkldnn_dims_t is already a ptr */
     int ret = 0;
-    char * b = buf;
+    char * b = buf; b[0]='\0';
     if( sz > TENSOR_MAX_DIMS ){
         assert(sz <= TENSOR_MAX_DIMS);
         sz = TENSOR_MAX_DIMS;
     }
-    {int n = snprintf(b,len, "dims:"); CHKBUF;}
+    {int const n = snprintf(b,len, "dims:"); CHKBUF;}
     if(dims == nullptr){
-        {int n = snprintf(b,len,"NULL"); CHKBUF;}
+        {int const n = snprintf(b,len,"NULL"); CHKBUF;}
     }else{
         for(size_t i=0; i<sz; ++i){
-            {int n = snprintf(b,len, "%c%d",(i==0?'{':','),dims[i]); CHKBUF;}
+            {int const n = snprintf(b,len, "%c%d",(i==0?'{':','),dims[i]); CHKBUF;}
         }
-        {int n = snprintf(b,len,"}"); CHKBUF;}
+        {int const n = snprintf(b,len,"}"); CHKBUF;}
     }
     return ret;
 }
