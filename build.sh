@@ -228,12 +228,13 @@ BUILDOK="n"; if [ -f "${BUILDDIR}"/stamp-BUILDOK ]; then BUILDOK="y"; fi # check
 if [ "$BUILDOK" == "y" ]; then
     (
     cd "${BUILDDIR}"
+    # cmake "COMPONENTS" are not working properly? Is this a cmake version issue?
     # not sure about whether I need to go into subdirs for components...
-    if [ "${DOTARGET}" == "s" ]; then
+    #if [ "${DOTARGET}" == "s" ]; then
         { echo "Installing ..."; make install; }
-    else
-        { echo "Installing ..."; make install-bin install-dev; } # in src/, tried install COMPONENTS
-    fi
+    #else
+    #    { echo "Installing ..."; make install-bin install-dev; } # in src/, tried install COMPONENTS
+    #fi
     if [ "$DODOC" == "y" ]; then
         { echo "Installing docs ..."; make install-doc; }
     fi

@@ -223,7 +223,7 @@ NAMEENUM_T(stream_kind){
     if( n>len ){ printf(" n>len "); b[len-1]='\0'; len=0;} \
     else {b+=n; len-=n; if(b[0]!='\0')printf(" **no-NUL** "); b[0]='\0';} \
     long const off=b-b0; \
-    printf("-->ret,off,len=%d,%ld,%d, written=<%s>[%d]\n",ret,off,len,b0,strlen(b0)); \
+    printf("-->ret,off,len=%d,%ld,%d, written=<%s>[%lu]\n",ret,off,len,b0,(long unsigned)(strlen(b0))); \
     fflush(stdout); \
 }while(0)
 // actually, it seems that snprintf always zero-terminates string overflow properly (GOOD)

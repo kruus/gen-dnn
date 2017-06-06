@@ -76,5 +76,5 @@ NAMEFUNC_T2(stream, const_mkldnn_stream_t);
 } // "C"
 #endif
 
-/* vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s */
+/* vim: et ts=4 sw=4 cindent */
 #endif // MKLDNN_IO_H

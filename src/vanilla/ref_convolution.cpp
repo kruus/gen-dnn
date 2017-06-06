@@ -17,12 +17,74 @@
 #include "c_types_map.hpp"
 #include "type_helpers.hpp"
 #include "mkldnn_traits.hpp"
+#ifndef NDEBUG
+#include "mkldnn_io.h"
+#endif
 
 #include "ref_convolution.hpp"
+
+#include <unordered_set> // XXX REMOVE THIS XXX [ejk]
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
+
+#if 1
+// There are mkldnn_memory_format_max^3 possible combinations, of which only
+// a small percentage commonly occur.  We can restrict register optimized cases
+// into a lookup table XXX eventually.
+template<mkldnn_memory_format_t s, mkldnn_memory_format_t wb, mkldnn_memory_format_t d>
+inline int constexpr cmem_fmt_tag() {
+    mkldnn_memory_format_t const m=mkldnn_memory_format_max;
+    return ((s)*m + wb)*m + d;
+}
+inline int const mem_fmt_tag(mkldnn_memory_format_t s, mkldnn_memory_format_t wb, mkldnn_memory_format_t d){
+    mkldnn_memory_format_t const m=mkldnn_memory_format_max;
+    return ((s)*m + wb)*m + d;
+}
+// maintain a registry, and avoid outputting duplicates ?
+static std::unordered_set<int> seen;
+
+#endif
+
+template <bool with_relu, data_type_t src_type, data_type_t wei_type,
+         data_type_t acc_type, data_type_t dst_type>
+_ref_convolution_fwd_t<with_relu, src_type, wei_type, acc_type, dst_type>
+::_ref_convolution_fwd_t (const pd_t *pd, const input_vector &inputs,
+                          const output_vector &outputs)
+: cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {
+#ifndef NDEBUG
+    using namespace std;
+    // debug data_type info for deciding which cases to optimize...
+    // Eventually, common cases can be "switched" into memory-format-optimized
+    // implementations for the inner-loop off() offset calculations.
+    //
+    //const memory_desc_wrapper src_d(conf_.src_pd());
+    //const memory_desc_wrapper dst_d(conf_.dst_pd());
+    //const memory_desc_wrapper weights_d(conf_.weights_pd(0));
+    //const memory_desc_wrapper bias_d(conf_.weights_pd(1));
+    //
+    mkldnn_memory_format_t const sfmt = conf_.src_pd()->desc()->format;
+    mkldnn_memory_format_t const wbfmt = conf_.weights_pd()->desc()->format;
+    mkldnn_memory_format_t const dfmt = conf_.dst_pd()->desc()->format;
+    int tag = mem_fmt_tag(sfmt,wbfmt,dfmt);
+    auto ins = seen.insert( tag );
+    if(ins.second){
+        cout<<"\n ***** NEW CONVOLUTION TYPES *****\n";
+    }
+    if(1 || ins.second){
+#define LEN 500
+        char sbuf[LEN], wbuf[LEN], dbuf[LEN]; // biases *same* layout as weights
+        mkldnn_name_memory_desc( conf_.src_pd()->desc(), sbuf, LEN );
+        mkldnn_name_memory_desc( conf_.weights_pd()->desc(), wbuf, LEN );
+        mkldnn_name_memory_desc( conf_.dst_pd()->desc(), dbuf, LEN );
+#undef LEN
+        cout<<" _ref_conv( src        :fmt="<<sfmt<<" : "<<sbuf
+            <<"\n          , weight/bias:fmt="<<wbfmt<<" : "<<wbuf
+            <<"\n          , dst        :fmt="<<dfmt<<" : "<<dbuf<<" )"<<endl;
+    }
+#endif
+}
 
 template <bool with_relu, data_type_t src_type, data_type_t wei_type,
          data_type_t acc_type, data_type_t dst_type>
@@ -106,6 +168,10 @@ void _ref_convolution_fwd_t<with_relu, src_type, wei_type, acc_type, dst_type>
         return 0;
     };
 
+    // subcases: G=1<-?->with_groups
+    //           bias (true/false)
+    //           src_d.off(...), weights_d.off(...), dst_d.off(...)
+    //             according to src_d/weights_d/dst_d format()
 #   pragma omp parallel for collapse(5) schedule(static)
     for (int g = 0; g < G; ++g) {
         for (int mb = 0; mb < MB; ++mb) {

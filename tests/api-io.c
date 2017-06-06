@@ -168,7 +168,8 @@ void io0() {
 
 void test1() {
     mkldnn_engine_t engine;
-    CHECK(mkldnn_engine_create(&engine, mkldnn_any_engine, 0)); // NOT mkldnn_any
+    // oops - this should eventually make a "vanilla" engine.
+    // CHECK(mkldnn_engine_create(&engine, mkldnn_any_engine, 0)); // NOT mkldnn_any
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0));
 
     const int len0 = 100;

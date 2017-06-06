@@ -28,6 +28,20 @@
 namespace mkldnn {
 namespace impl {
 
+// What effect on vanilla runtimes ...
+//  fast_memory_desc_wrapper< memory_format_t >
+//  - with size and off_v and off_l specialized.
+// Use in kernels as switch over all possible memory formats
+//  - Ex. switch(src_pd._md.format())
+//          case(nchw): fast_memory_desc_wrapper<nchw> src_xx(src_pd._md);
+//                      KERNEL( ..src_data[ src_xx.off(a,b,...) ] );
+//                      // and now src_xx.off is known at COMPILE-time.
+//                      break
+//          // ... repeat KERNEL code for ALL possible _md.format()s
+//        }
+//  - with multiple src/wei/out formats could get template explosion, so
+//    include a default case invoking the un-templated memory_desc_wrapper
+//    
 /** thin wrapper class over \struct memory_desc_t which allows easy
  * manipulatings with underlying C structure, which is taken by refernce */
 struct memory_desc_wrapper: public c_compatible {
@@ -39,7 +53,7 @@ struct memory_desc_wrapper: public c_compatible {
     memory_desc_wrapper(const memory_desc_t *md) : _md(md) {}
     memory_desc_wrapper(const memory_pd_t *m_pd);
 
-    /* implementing attrubutes */
+    /* implementing attributes */
     inline int ndims() const { return _md->ndims; }
     const dims_t &dims() const { return _md->dims; }
     data_type_t data_type() const { return _md->data_type; }
@@ -130,7 +144,7 @@ struct memory_desc_wrapper: public c_compatible {
         const blocking_desc_t &blk = blocking_desc();
         const dims_t &optd = blk.offset_padding_to_data;
 
-        // offset_padding is ptrdiff_t (signed?)
+        assert( blk.offset_padding >= 0 ); // offset_padding is ptrdiff_t (signed?)
         size_t phys_offset = static_cast<size_t>(blk.offset_padding);
         for (int d = 0; d < ndims(); ++d) {
             const int block = blk.block_dims[d];
