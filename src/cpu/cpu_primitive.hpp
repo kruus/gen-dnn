@@ -50,8 +50,18 @@ struct cpu_primitive_t: public primitive_t {
     const char *input_memory(size_t index = 0) const {
         if (index >= this->inputs().size()) return nullptr;
         const size_t oi = this->inputs()[index].output_index;
+        // primitive_at_t (see common/primitive.hpp)
+        // ...{ const_mkldnn_primitive_t primitive; ... }
+        // with const_mkldnn_primitive_t typedef'ed as const mkldnn_primitive*
+        // --> cpu_primitive_t
+#ifndef NDEBUG
         auto p = static_cast<const cpu_primitive_t *>(
                 this->inputs()[index].primitive);
+#else
+        auto p = dynamic_cast<const cpu_primitive_t *>(
+                this->inputs()[index].primitive);
+#endif
+        assert( p != nullptr );
         return p->const_memory(oi);
     }
 };
