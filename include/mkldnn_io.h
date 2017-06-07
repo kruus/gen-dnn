@@ -3,7 +3,6 @@
 /** \file
  * i/o utilities extending basic mkldnn API.
  */
-
 #include "mkldnn.h"
 
 #ifdef __cplusplus
@@ -55,7 +54,7 @@ NAMEFUNC_T(lrn_desc);
 NAMEFUNC_T(batch_normalization_desc);
 NAMEFUNC_T(inner_product_desc);
 NAMEFUNC_T(convolution_relu_desc);
-NAMEFUNC_T(primitive_at);
+NAMEFUNC_T(primitive_at); // this is mostly opaque at C level (use C++ version for details)
 #undef NAMEFUNC_T
 /* */
 //#define NAMEFUNC( TYPENAME ) char const* mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME const *e ) MKLDNN_API

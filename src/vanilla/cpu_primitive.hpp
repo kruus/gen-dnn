@@ -23,6 +23,10 @@
 #include "event.hpp"
 #include "primitive.hpp"
 
+#ifndef NDEBUG
+#include "mkldnn_io.hpp"
+#endif
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -46,9 +50,19 @@ struct cpu_primitive_t: public primitive_t {
                 this->outputs()[output_index]);
         return p->const_memory();
     }
-
     const char *input_memory(size_t index = 0) const {
-        if (index >= this->inputs().size()) return nullptr;
+        if (index >= this->inputs().size()) {
+#ifndef NDEBUG
+            std::cout<<" cpu_primitive.hpp input_memory(index="<<index<<") does not exist (return nullptr)"<<std::endl;
+#endif
+            return nullptr;
+        }
+#ifndef NDEBUG
+        using ::mkldnn::operator<<;
+        std::cout<<" cpu_primitive.hpp input_memory(index="<<index<<")"
+            <<this->inputs()[index]
+            <<std::endl;
+#endif
         const size_t oi = this->inputs()[index].output_index;
         auto p = static_cast<const cpu_primitive_t *>(
                 this->inputs()[index].primitive);

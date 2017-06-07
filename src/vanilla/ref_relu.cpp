@@ -22,10 +22,37 @@
 
 #include "ref_relu.hpp"
 
+#ifndef NDEBUG
+#include <iostream>
+#include "mkldnn_io.h"
+#endif
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
+template <impl::data_type_t data_type>
+ref_relu_fwd_t<data_type>::ref_relu_fwd_t(const pd_t *pd,
+        const input_vector &inputs, const output_vector &outputs)
+: cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {
+#ifndef NDEBUG
+    using namespace std;
+    cout<<"\n+relu_fwd_t:"
+        <<"\n            kind()="<<this->kind() // mkldnn:impl::primitive_kind_t
+        <<"\n            inputs,outputs.size()="<<this->inputs().size()<<","<<this->outputs().size()
+        <<"\n            conf_.n_inputs(),n_outputs()"<<conf_.n_inputs()<<","<<conf_.n_outputs()
+        ;
+#if 0
+    if(conf_.n_inputs() > 0){
+        cout<<"\n            input_pd(0)="<<conf_.input_pd(0);
+    }
+    if(conf_.n_outputs() > 0){
+        cout<<"\n            output_pd(0)="<<conf_.output_pd(0);
+    }
+#endif
+    cout<<endl;
+#endif
+}
 template <impl::data_type_t data_type>
 void ref_relu_fwd_t<data_type>::execute_forward_generic() {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
@@ -60,6 +87,9 @@ void ref_relu_fwd_t<data_type>::execute_forward_dense() {
     auto dst = reinterpret_cast<data_t*>(this->memory(0));
 
     const memory_desc_wrapper data_d(conf_.src_pd());
+#ifndef NDEBUG
+    { char buf[1024]; mkldnn_name_memory_desc(data_d._md,buf,1024); std::cout<<"\nref_relu_fwd_t<>::execut_forward_dense() data_d = "<<buf<<std::endl; }
+#endif
 
     const size_t nelems = data_d.nelems();
     const double negative_slope = conf_.desc()->negative_slope;

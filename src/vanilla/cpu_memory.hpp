@@ -93,7 +93,7 @@ struct cpu_memory_t: public cpu_primitive_t {
         mkldnn_name_memory_desc(conf_.desc(), buf, 1024);
         printf("              conf_.desc() = %s", buf);
         if(output_index!=0) {
-            printf(" ERROR: cpu_memory_t::const_memory(output_index) called with non-zero output_index", (long unsigned)output_index);
+            printf(" ERROR: cpu_memory_t::const_memory(output_index=%lu) called with non-zero output_index", (long unsigned)output_index);
 #if defined(_SX)
             ::cpu_memory_brk(output_index);
 #endif

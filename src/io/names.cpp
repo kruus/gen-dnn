@@ -272,8 +272,8 @@ NAMEENUM_T(stream_kind){
 #endif
 
 
+#if 0
 int mkldnn_name_dims( mkldnn_dims_t const dims, char *const buf, int len){ /* no macro - mkldnn_dims_t is already a ptr */
-#define DBG 1
 #if DBG
     fflush(stdout);
     int const len0 = len;
@@ -288,7 +288,7 @@ int mkldnn_name_dims( mkldnn_dims_t const dims, char *const buf, int len){ /* no
         {errno=0; printf(" null-branch"); fflush(stdout); int const n = snprintf(b,len,"NULL"); CHKBUF;}
     }else{
         printf(" C %s %d %d",buf,ret,len); fflush(stdout);
-#if 1
+#if 0
         int lastnz=-1;
         SCAN_LASTNZ( dims, TENSOR_MAX_DIMS );
         for(int i=0; i<=lastnz; ++i){
@@ -310,6 +310,20 @@ int mkldnn_name_dims( mkldnn_dims_t const dims, char *const buf, int len){ /* no
     return ret;
 #undef DBG
 }
+#else
+int mkldnn_name_dims( mkldnn_dims_t const dims, char *const buf, int len){ /* no macro - mkldnn_dims_t is already a ptr */
+    int ret = 0;
+    char * b = buf; b[0]='\0';
+    {int const n = snprintf(b,len, "dims:"); CHKBUF;}
+    if(dims == nullptr){
+        {int const n = snprintf(b,len,"NULL"); CHKBUF;}
+    }else{
+        ARR_NZ( dims, TENSOR_MAX_DIMS, "%d" );
+    }
+    return ret;
+}
+#endif
+
 int mkldnn_name_dims_sz( mkldnn_dims_t const dims, size_t sz, char *const buf, int len){ /* no macro - mkldnn_dims_t is already a ptr */
     int ret = 0;
     char * b = buf; b[0]='\0';
@@ -494,6 +508,14 @@ NAMEFUNC_T(convolution_relu_desc,crd){
         {int n = snprintf(buf,len,"NULL"); CHKBUF;}
     }else{
     }
+    return ret;
+}
+NAMEFUNC_T(primitive_at,prat){
+    int ret = 0;
+    char *b = buf;
+    {int n = snprintf(b,len, "primitive_at:"); CHKBUF;}
+    {int n = snprintf(b,len, "%p", (void*)prat->primitive); CHKBUF;}
+    {int n = snprintf(b,len, ",output_size=%lu",(long unsigned)prat->output_index); CHKBUF;}
     return ret;
 }
 #undef NAMEFUNC_T
