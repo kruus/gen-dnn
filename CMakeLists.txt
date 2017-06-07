@@ -141,7 +141,10 @@ if(NECSX)
     message(STATUS "testing : CMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}")
     #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -fopenmp")
     #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -f90lib")
-    set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -DUSE_CBLAS")
+    #
+    # disable to force examples through ref_convolution.cpp code...
+    ###set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -DUSE_CBLAS")
+    #
     #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Wl,-M") # or maybe as linker flags?
     set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -wfatal=47")     # macro redefinition
     set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -woff=1")        # last line of input file doesn't end with newline

@@ -1,0 +1,17 @@
+
+SX likely has a possible initialization bug where some memory descriptors are
+getting garbage output_index values for primitive_at... and this triggers an
+assertion in input_memory about memory being always associated with
+"index 0".
+
+For now I've added a slew of debug, that looks great on Intel, but shows
+garbage on SX.  (also should check reinterpret_cast and static_cast stuff
+for correctness?)
+
+--------------------------------------------------------------------------
+
+Intel compilation without USE_CBLAS should NOT include the im2col-gemm version.
+(Yes, I want things to be slow, to detect which
+	mkldnn::impl::memory_desc_wrapper::off_v(int const*, bool) const
+ templates should be inlined, because a huge amount of time is spent
+ inside the function calls to calculate offsets.)

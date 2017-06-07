@@ -98,6 +98,46 @@ the additional convolutions onto the existing "engine" lists of primitives.
 
 ## SX Performance
 
+### Intel:
+
+- ./build.sh -dq
+- operf ./build/examples/simple-net-c
+- opreport -l ./build/tests/simple-net-c ./build/src/libmkldnn.so.0
+```
+Using /local/kruus/sx/sx-dnn/oprofile_data/samples/ for samples directory.
+
+WARNING! Some of the events were throttled. Throttling occurs when
+the initial sample rate is too high, causing an excessive number of
+interrupts.  Decrease the sampling frequency. Check the directory
+/local/kruus/sx/sx-dnn/oprofile_data/samples/current/stats/throttled
+for the throttled event names.
+
+CPU: Intel Broadwell microarchitecture, speed 3600 MHz (estimated)
+Counted CPU_CLK_UNHALTED events (Clock cycles when not halted) with a unit mask of 0x00 (No unit mask) count 100000
+samples  %        image name               symbol name
+30596    56.7833  libmkldnn.so.0.9.0       mkldnn::impl::memory_desc_wrapper::off_v(int const*, bool) const
+6938     12.8763  libmkldnn.so.0.9.0       mkldnn::impl::cpu::ref_lrn_fwd_t<(mkldnn_data_type_t)1>::execute_forward()::{lambda(float*, int, int, int, int)#1}::operator()(float*, int, int, int, int) const
+4133      7.6705  libmkldnn.so.0.9.0       unsigned long mkldnn::impl::memory_desc_wrapper::off<int, int, int, int>(int, int, int, int) const
+3095      5.7440  libmkldnn.so.0.9.0       mkldnn::impl::memory_desc_wrapper::ndims() const
+2673      4.9608  libmkldnn.so.0.9.0       mkldnn::impl::cpu::jit_gemm_convolution_utils::im2col(mkldnn::impl::cpu::any_gemm_conv_conf_t&, float const*, float*) [clone ._omp_fn.0]
+2647      4.9126  libmkldnn.so.0.9.0       mkldnn::impl::memory_desc_wrapper::format() const
+1612      2.9917  libmkldnn.so.0.9.0       mkldnn::impl::cpu::nchw_pooling_fwd_t<(mkldnn_data_type_t)1>::execute_forward()::{lambda(float*, int, int, int, int)#2}::operator()(float*, int, int, int, int) const
+621       1.1525  libmkldnn.so.0.9.0       mkldnn::impl::memory_desc_wrapper::blocking_desc() const
+486       0.9020  libmkldnn.so.0.9.0       mkldnn::impl::cpu::jit_gemm_convolution_utils::prepare_workspace(mkldnn::impl::cpu::any_gemm_conv_conf_t&, float**, bool, unsigned long)
+276       0.5122  libmkldnn.so.0.9.0       mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>::execute_forward_dense() [clone ._omp_fn.0]
+241       0.4473  libmkldnn.so.0.9.0       mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>::execute_forward() [clone ._omp_fn.1]
+195       0.3619  libmkldnn.so.0.9.0       mkldnn::impl::cpu::ref_lrn_fwd_t<(mkldnn_data_type_t)1>::execute_forward() [clone ._omp_fn.0]
+195       0.3619  libmkldnn.so.0.9.0       mkldnn::impl::lrn_fwd_pd_t::desc() const
+105       0.1949  libmkldnn.so.0.9.0       std::pow(float, float)
+52        0.0965  libmkldnn.so.0.9.0       mkldnn::impl::cpu::nchw_pooling_fwd_t<(mkldnn_data_type_t)1>::execute_forward() [clone ._omp_fn.0]
+12        0.0223  libmkldnn.so.0.9.0       mkldnn::impl::nstl::numeric_limits<float>::lowest()
+1         0.0019  libmkldnn.so.0.9.0       mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>::pd_t::~pd_t()
+1         0.0019  libmkldnn.so.0.9.0       mkldnn_name_memory_desc
+1         0.0019  libmkldnn.so.0.9.0       mkldnn_primitive** std::__copy_move_a2<true, mkldnn_primitive**, mkldnn_primitive**>(mkldnn_primitive**, mkldnn_primitive**, mkldnn_primitive**)
+1         0.0019  libmkldnn.so.0.9.0       std::_Vector_base<mkldnn_primitive const*, std::allocator<mkldnn_primitive const*> >::_M_get_Tp_allocator()
+1         0.0019  libmkldnn.so.0.9.0       std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t> >::size() const
+```
+
 ### SX segfault
 
 - examples/simple-net-cpp and simple-net-c both segfault
