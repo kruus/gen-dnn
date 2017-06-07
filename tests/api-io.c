@@ -25,7 +25,10 @@
 #include "mkldnn.h"
 #include "mkldnn_io.h"
 
-// SX compile will define BAD_SNPRINTF because it does not follow c++11 std
+/** SX compile will define BAD_SNPRINTF because it does not follow c++11 std.
+ * \deprecated -- traced to compiler issue with -Cdebug or -Cnoopt
+ * that silently, incorrectly changes the language semantics.
+ */
 #if defined(BAD_SNPRINTF)
 #define SNPRINTF_OK 1
 #else

@@ -213,6 +213,16 @@ NAMEENUM_T(stream_kind){
 
 #define NAMEFUNC_T( TYPENAME, VAR ) int kldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const *VAR, char * const buf, int len )
 
+#define SCAN_LASTNZ( ARR, SZ ) do{lastnz= -1; for(int i=0; i<(SZ); ++i){ if( ARR[i] > 0 ){ lastnz=i; }}}while(0)
+
+/** debug flag for SX compiler bug with -Cdebug or -Cnoopt */
+// - C99 behavior always returns the # of chars that would have been written.
+// - Format conversion errors MIGHT still return -ve (error), so these lib
+//   functions will just *assert* that no conversion errors happen.
+// - and release-mode will just do-nothing (just in case)
+#define SNPRINTF_DBG 0
+
+#if SNPRINTF_DBG
 // paranoia: set NUL into last char explicitly (*all* snprintfs should do this already)
 //#define CHKBUF do{ assert(n>0); printf(" n,ret,len_in,errno=%d,%d,%d,%d ",n,ret,len); ret+=n; if( n>len ){b[len-1]='\0'; len=0;} else {b+=n; len-=n;} printf("-->ret,len=%d,%d\n",ret,len);}while(0)
 #define CHKBUF do{ \
@@ -226,19 +236,6 @@ NAMEENUM_T(stream_kind){
     printf("-->ret,off,len=%d,%ld,%d, written=<%s>[%lu]\n",ret,off,len,b0,(long unsigned)(strlen(b0))); \
     fflush(stdout); \
 }while(0)
-// actually, it seems that snprintf always zero-terminates string overflow properly (GOOD)
-//#if defined(BAD_SNPRINTF)
-// TODO replace snprintf, if sxc++ is going to NOT implement c++11 standard correctly XXX
-//#define CHKBUF do{ assert(n>=0); if(n<0){len=0; errno=0;/*ignore*/;} else { assert(n<len); ret+=n; b+=n; len-=n; }}while(0)
-//#else
-// - C99 behavior always returns the # of chars that would have been written.
-// - Format conversion errors MIGHT still return -ve (error), so these lib
-//   functions will just *assert* that no conversion errors happen.
-// - and release-mode will just do-nothing (just in case)
-//#define CHKBUF do{ assert(n>=0); if(n<0){len=0; errno=0;}else{ret+=n; if( n>=len ){/*b[len-1]='\0';*/ len=0;} else {b+=n; len-=n;}}}while(0)
-//#endif
-
-#define SCAN_LASTNZ( ARR, SZ ) do{lastnz= -1; for(int i=0; i<(SZ); ++i){ if( ARR[i] > 0 ){ lastnz=i; }}}while(0)
 #define ARR_NZ( ARR, NSCAN, FMTSPEC ) do{ \
     int lastnz= -1; SCAN_LASTNZ( ARR, NSCAN ); \
     printf(" lastnz=%d",lastnz); fflush(stdout); \
@@ -253,6 +250,27 @@ NAMEENUM_T(stream_kind){
         {errno=0; int const n = snprintf(b,len,"}"); CHKBUF;} \
     } \
 }while(0)
+
+#else // silent version of macros
+#define CHKBUF do{ \
+    assert(n>0); \
+    ret+=n; \
+    if( n>len ){ /*b[len-1]='\0';*/ len=0;} \
+    else {b+=n; len-=n;} \
+}while(0)
+#define ARR_NZ( ARR, NSCAN, FMTSPEC ) do{ \
+    int lastnz= -1; SCAN_LASTNZ( ARR, NSCAN ); \
+    if(lastnz < 0){ \
+        int const n = snprintf(b,len, "ZEROS" ); CHKBUF; \
+    }else{ \
+        for(int i=0; i<=lastnz; ++i){ \
+            {int const n = snprintf(b,len, "%c" FMTSPEC,(i==0?'{':','),ARR[i]); CHKBUF;} \
+        } \
+        {int const n = snprintf(b,len,"}"); CHKBUF;} \
+    } \
+}while(0)
+#endif
+
 
 int mkldnn_name_dims( mkldnn_dims_t const dims, char *const buf, int len){ /* no macro - mkldnn_dims_t is already a ptr */
 #define DBG 1
