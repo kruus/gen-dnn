@@ -34,8 +34,16 @@ namespace mkldnn {
         os<<" primitive{kind="<<prim->kind();
         return os;
     }
+    std::ostream& operator<<(std::ostream& os, mkldnn_primitive const& prim){
+        // this is a pure virtual base class
+        os<<" "<<prim.kind()
+            <<",inputs["<<prim.inputs().size()<<"]"
+            <<",outputs["<<prim.outputs().size()<<"]"
+            ;
+        return os;
+    }
     std::ostream& operator<<(std::ostream& os, mkldnn_primitive_at_t const& prim) {
-        os<<prim.primitive;
+        os<<*prim.primitive;
         os<<",output_index="<<prim.output_index;
         return os;
     }

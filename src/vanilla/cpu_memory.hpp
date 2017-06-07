@@ -27,8 +27,7 @@
 #include "utils.hpp"
 
 #ifndef NDEBUG
-#include <iostream>
-#include "mkldnn_io.h"
+#include "mkldnn_io.hpp"
 #endif
 
 #if defined(_SX)
@@ -86,12 +85,19 @@ struct cpu_memory_t: public cpu_primitive_t {
 #ifndef NDEBUG
         // sxc++ triggers this assertion !!!
         /*assert(output_index == 0);*/
+#if 0
         printf(" cpu_memory_t::const_memory(%lu)\n",(long unsigned)output_index);
-        printf("              conf_.kind() = %s",
+        printf("\n               conf_.kind() = %s",
                mkldnn_name_primitive_kind(conf_.kind()));
         char buf[1024];
         mkldnn_name_memory_desc(conf_.desc(), buf, 1024);
-        printf("              conf_.desc() = %s", buf);
+        printf("\n               conf_.desc() = %s", buf);
+#else
+        using namespace std;
+        cout<<" cpu_memory_t::const_memory("<<output_index<<") :\n"
+            <<"               conf_.kind() = "<<conf_.kind()<<"\n"
+            <<"              *conf_.desc() = "<<*conf_.desc()<<endl;
+#endif
         if(output_index!=0) {
             printf(" ERROR: cpu_memory_t::const_memory(output_index=%lu) called with non-zero output_index", (long unsigned)output_index);
 #if defined(_SX)

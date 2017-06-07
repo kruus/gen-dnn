@@ -59,9 +59,9 @@ struct cpu_primitive_t: public primitive_t {
         }
 #ifndef NDEBUG
         using ::mkldnn::operator<<;
-        std::cout<<" cpu_primitive.hpp input_memory(index="<<index<<")"
-            <<this->inputs()[index]
-            <<std::endl;
+        using namespace std;
+        cout<<" cpu_primitive.hpp input_memory(index="<<index<<") :\n"
+            <<"    this->inputs()[index] = "<<this->inputs()[index]<<endl;
 #endif
         const size_t oi = this->inputs()[index].output_index;
         auto p = static_cast<const cpu_primitive_t *>(

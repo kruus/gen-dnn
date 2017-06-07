@@ -40,14 +40,17 @@ ref_relu_fwd_t<data_type>::ref_relu_fwd_t(const pd_t *pd,
     cout<<"\n+relu_fwd_t:"
         <<"\n            kind()="<<this->kind() // mkldnn:impl::primitive_kind_t
         <<"\n            inputs,outputs.size()="<<this->inputs().size()<<","<<this->outputs().size()
-        <<"\n            conf_.n_inputs(),n_outputs()"<<conf_.n_inputs()<<","<<conf_.n_outputs()
-        ;
-#if 0
+        <<"\n            conf_.n_inputs(),n_outputs()"<<conf_.n_inputs()<<","<<conf_.n_outputs();
+#if 1
     if(conf_.n_inputs() > 0){
-        cout<<"\n            input_pd(0)="<<conf_.input_pd(0);
+        cout<<"\n            input_pd(0)->kind() "<<conf_.input_pd(0)->kind()
+            <<"\n           *           ->desc() "<<*conf_.input_pd(0)->desc()
+            ;
     }
     if(conf_.n_outputs() > 0){
-        cout<<"\n            output_pd(0)="<<conf_.output_pd(0);
+        cout<<"\n            output_pd(0)->kind() "<<conf_.output_pd(0)->kind()
+            <<"\n           *            ->desc() "<<*conf_.output_pd(0)->desc()
+            ;
     }
 #endif
     cout<<endl;
