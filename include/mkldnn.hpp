@@ -91,6 +91,9 @@ public:
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
 namespace c_api {
 #include "mkldnn.h"
+#ifndef NDEBUG
+#include "mkldnn_io.h"
+#endif
 }
 #endif
 
@@ -115,8 +118,19 @@ public:
         /// @param aprimitive The target primitive.
         /// @param at The output index.
 
+#ifndef NDEBUG // for SX debug of primitives gettinc constructed with nonzero "output_index"
+        // Note: this is not necessarily even used.  The error may be comming
+        //       from POD initialization that varies between compilers!
         at(const primitive &aprimitive, size_t at = 0)
             : data(c_api::mkldnn_primitive_at(aprimitive.get(), at)) {}
+#else
+        at(const primitive &aprimitive, size_t at = 0)
+            : data(c_api::mkldnn_primitive_at(aprimitive.get(), at)) {
+                using namespace std;
+                if(at != 0U){ cout<<" primitive.at("<<primitive<<"\n\t, at="<<at<<")"<<endl; }
+                assert(false); // seems this is never encountered in simple_net.cpp
+            }
+#endif
         /// Returns the specified output.
         inline operator primitive() const;
     };

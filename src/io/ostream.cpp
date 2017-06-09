@@ -1,5 +1,6 @@
 
 #include "mkldnn_io.hpp"
+#include "primitive.hpp"
 
 #include <iostream>
 

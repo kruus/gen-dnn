@@ -1,6 +1,7 @@
-
+/** \file
+ * implement C functions to print various things in mkldnn.h
+ */
 #include "mkldnn_io.h"
-#include "mkldnn.h"
 
 #include <cstdio> // snprintf
 #include <cstring>
