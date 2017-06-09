@@ -38,7 +38,7 @@ NAMEENUM_T(query);
 /** int[TENSOR_MAX_DIMS (already a ptr type) */
 int MKLDNN_API mkldnn_name_dims( mkldnn_dims_t const dims, char *const buf, int len);
 /** print \c dims with \c sz elements. */
-int mkldnn_name_dims_sz( mkldnn_dims_t const dims, size_t sz, char *const buf, int len);
+int MKLDNN_API mkldnn_name_dims_sz( mkldnn_dims_t const dims, size_t sz, char *const buf, int len);
 /** ptrdiff_t[TENSOR_MAX_DIMS (already a ptr type) */
 int MKLDNN_API mkldnn_name_strides( mkldnn_strides_t const strides, char *const buf, int len);
 /** print \c strides with \c sz elements. */

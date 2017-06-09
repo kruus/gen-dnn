@@ -54,6 +54,16 @@ void *aligned_malloc(size_t size, size_t alignment) {
 }
 #endif
 
+#ifndef NDEBUG
+#include "mkldnn_io.h"
+#define PRT_PRIMITIVE_AT( MSG, PRIMITIVE_AT ) do{ \
+    int len = 1024; char buf[1024]; \
+    mkldnn_name_primitive_at( PRIMITIVE_AT, buf, len ); \
+    if( PRIMITIVE_AT.output_index != 0 ) printf(" ***Huh?*** "); \
+    printf(" %s mkldnnat': %s\n",buf); \
+}while(0) 
+#endif
+
 static size_t product(int *arr, size_t size) {
     size_t prod = 1;
     for (size_t i = 0; i < size; ++i) prod *= arr[i];
@@ -278,6 +288,9 @@ mkldnn_status_t simple_net(){
     /* finally create a relu primitive */
     mkldnn_primitive_t relu;
     mkldnn_primitive_at_t relu_srcs = { conv_internal_dst_memory };
+#ifndef NDEBUG
+    PRT_PRIMITIVE_AT( "relu_srcs", &relu_srcs );
+#endif
     const_mkldnn_primitive_t relu_dsts[] = { relu_dst_memory };
 
     CHECK(mkldnn_primitive_create(&relu, relu_pd, &relu_srcs, relu_dsts));
@@ -333,7 +346,6 @@ mkldnn_status_t simple_net(){
             lrn_scratch_buffer));
 
     mkldnn_primitive_at_t lrn_srcs = { relu_dst_memory };
-
     const_mkldnn_primitive_t lrn_dsts[] = { lrn_dst_memory,
             lrn_scratch_memory };
 
