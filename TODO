@@ -1,4 +1,33 @@
+--------------------------------------------------------------------------
+Why are the examples not finding/using the im2col convolutions?
+Trace through the data types to find why it is not begin used.
+- check that the im2col version is being compiled and what gemm is being used,
+  for Intel and SX
+- make an im2col example work on Intel first, then on SX.
 
+--------------------------------------------------------------------------
+- Add templated convolution impls, so that **remaining** particular cases can be
+  done quickly
+  - i.e. with inlined offset calculations,
+  - maybe even special-cased for subsampling strides of 1 or 2.
+- Look at how simple_reorder is implemented, so that specific cases get
+  special 'inlining' attention.
+  - Follow a similar design pattern for convolutions
+
+--------------------------------------------------------------------------
+SX support for integer-valued data will never be fast.  Should they be removed?
+
+--------------------------------------------------------------------------
+
+Intel compilation without USE_CBLAS should NOT include the im2col-gemm version.
+(Yes, I want things to be slow, to detect which
+	mkldnn::impl::memory_desc_wrapper::off_v(int const*, bool) const
+ templates should be inlined, because a huge amount of time is spent
+ inside the function calls to calculate offsets.)
+
+--------------------------
+-----   DONE -------------
+--------------------------
 SX likely has a possible initialization bug where some memory descriptors are
 getting garbage output_index values for primitive_at... and this triggers an
 assertion in input_memory about memory being always associated with
@@ -8,10 +37,5 @@ For now I've added a slew of debug, that looks great on Intel, but shows
 garbage on SX.  (also should check reinterpret_cast and static_cast stuff
 for correctness?)
 
---------------------------------------------------------------------------
+This is a real sxcc bug
 
-Intel compilation without USE_CBLAS should NOT include the im2col-gemm version.
-(Yes, I want things to be slow, to detect which
-	mkldnn::impl::memory_desc_wrapper::off_v(int const*, bool) const
- templates should be inlined, because a huge amount of time is spent
- inside the function calls to calculate offsets.)

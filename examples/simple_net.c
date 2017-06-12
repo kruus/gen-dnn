@@ -149,12 +149,20 @@ mkldnn_status_t simple_net(){
     mkldnn_engine_t engine;
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0 /* idx */));
 
+#ifndef NDEBUG
+#define SRC_PIX 227
+#define CNV_WID 11
+#define SRC_STRIDE 4
+#define CNV_OSZ 55
+#define POOL_OSZ 27
+#else
 /** reduce from original 227 for faster debug runs... */
 #define SRC_PIX 67/*227*/
 #define CNV_WID 11/*11*/
 #define SRC_STRIDE 4
 #define CNV_OSZ ((SRC_PIX - (CNV_WID/2 + 2))/SRC_STRIDE)/*55*/
 #define POOL_OSZ ((CNV_OSZ)/2)/*27*/
+#endif
 
 #if SRC_PIX==227 && CNV_WID==11 && SRC_STRIDE==4
 #if   CNV_OSZ != 55
