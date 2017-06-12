@@ -33,6 +33,7 @@ namespace mkldnn {
     std::ostream& operator<<(std::ostream& os, mkldnn_blocking_desc_t const& bd);
     std::ostream& operator<<(std::ostream& os, mkldnn_memory_desc_t const& md);
 
+    std::ostream& operator<<(std::ostream& os, mkldnn_primitive const& prim);
     /** print a 'typedef mkldnn_primitive* mkldn_primitive_t' */
     std::ostream& operator<<(std::ostream& os, mkldnn_primitive_t const prim);
     std::ostream& operator<<(std::ostream& os, mkldnn_primitive_at_t const& prim);

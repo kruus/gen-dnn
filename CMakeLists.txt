@@ -33,6 +33,9 @@ set(PROJECT_VERSION "0.9")
 set(LIB_NAME mkldnn)
 
 project(${PROJECT_NAME} C CXX) # This runs any CMAKE_TOOLCHAIN_FILE (twice)
+# If enabled, generate a compile_commands.json file of the exact compiler
+# commands (for Makefile and Ninja generators)
+add_definitions(-DCMAKE_EXPORT_COMPILE_COMMANDS=1)
 
 # Want -lcblas *after* -lmkldnn ... How?
 set(LINK_LIBRARIES "${LINK_LIBRARIES} ${SX_LINK_LIBRARIES}" CACHE STRING "will this go after -lmkldnn?")
