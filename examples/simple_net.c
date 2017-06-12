@@ -19,13 +19,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "mkldnn.h"
+#include "mkldnn_io.h"
+
+#include <assert.h>
 
 #define BATCH 8
 
 #define CHECK(f) do { \
     mkldnn_status_t s = f; \
     if (s != mkldnn_success) { \
-        printf("[%s:%d] error: %s returns %d\n", __FILE__, __LINE__, #f, s); \
+        printf("[%s:%d] error: %s returns %d : %s\n", __FILE__, __LINE__, #f, s, mkldnn_name_status(s)); \
         exit(2); \
     } \
 } while(0)
@@ -57,10 +60,19 @@ void *aligned_malloc(size_t size, size_t alignment) {
 #ifndef NDEBUG
 #include "mkldnn_io.h"
 #define PRT_PRIMITIVE_AT( MSG, PRIMITIVE_AT ) do{ \
+    printf("\n%s ",MSG); \
     int len = 1024; char buf[1024]; \
-    mkldnn_name_primitive_at( PRIMITIVE_AT, buf, len ); \
-    if( PRIMITIVE_AT.output_index != 0 ) printf(" ***Huh?*** "); \
-    printf(" %s mkldnnat': %s\n",buf); \
+    mkldnn_name_primitive_at( &PRIMITIVE_AT, buf, len ); \
+    size_t const output_index = (PRIMITIVE_AT.output_index); \
+    if( (long unsigned)(output_index) != 0UL ) printf(" ***Huh?*** output_index=%lu",(long unsigned)(output_index)); \
+    printf(" %s\n",buf); \
+}while(0) 
+#define PRT_PRIMITIVE( MSG, PRIMITIVE ) do{ \
+    if(strlen(MSG)){ printf("\n%s %s ",MSG, #PRIMITIVE); } \
+    else printf("\n%s", #PRIMITIVE); \
+    int len = 1024; char buf[1024]; \
+    mkldnn_name_primitive( PRIMITIVE, buf, len ); \
+    printf(" %s\n",buf); \
 }while(0) 
 #endif
 
@@ -110,6 +122,7 @@ mkldnn_status_t prepare_reorder(
             CHECK(mkldnn_reorder_primitive_desc_create(&reorder_pd,
                         user_memory_pd, *prim_memory_pd));
             mkldnn_primitive_at_t inputs = { *user_memory };
+            assert( inputs.output_index == 0U ); // so far OK for SX
             const_mkldnn_primitive_t outputs[] = { *prim_memory };
             CHECK(mkldnn_primitive_create(reorder, reorder_pd, &inputs,
                         outputs));
@@ -117,6 +130,7 @@ mkldnn_status_t prepare_reorder(
             CHECK(mkldnn_reorder_primitive_desc_create(&reorder_pd,
                         *prim_memory_pd, user_memory_pd));
             mkldnn_primitive_at_t inputs = { *prim_memory };
+            assert( inputs.output_index == 0U ); // so far OK for SX
             const_mkldnn_primitive_t outputs[] = { *user_memory };
             CHECK(mkldnn_primitive_create(reorder, reorder_pd, &inputs,
                         outputs));
@@ -135,18 +149,33 @@ mkldnn_status_t simple_net(){
     mkldnn_engine_t engine;
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0 /* idx */));
 
-    float *net_src = (float*)aligned_malloc(BATCH*3*227*227*sizeof(float), 64);
-    float *net_dst = (float*)aligned_malloc(BATCH*96*27*27*sizeof(float), 64);
+/** reduce from original 227 for faster debug runs... */
+#define SRC_PIX 67/*227*/
+#define CNV_WID 11/*11*/
+#define SRC_STRIDE 4
+#define CNV_OSZ ((SRC_PIX - (CNV_WID/2 + 2))/SRC_STRIDE)/*55*/
+#define POOL_OSZ ((CNV_OSZ)/2)/*27*/
+
+#if SRC_PIX==227 && CNV_WID==11 && SRC_STRIDE==4
+#if   CNV_OSZ != 55
+#error "oops. bad CNV_OSZ setting"
+#endif
+#if   POOL_OSZ != 27
+#error "oops. bad POOL_OSZ setting"
+#endif
+#endif
+    float *net_src = (float*)aligned_malloc(BATCH*3*SRC_PIX*SRC_PIX*sizeof(float), 64);
+    float *net_dst = (float*)aligned_malloc(BATCH*96*POOL_OSZ*POOL_OSZ*sizeof(float), 64);
 
     /* AlexNet: conv
      * {BATCH, 3, 227, 227} (x) {96, 3, 11, 11} -> {BATCH, 96, 55, 55}
      * strides: {4, 4}
      */
-    int conv_src_sizes[4] = {BATCH, 3, 227, 227};
-    int conv_weights_sizes[4] = {96, 3, 11, 11};
+    int conv_src_sizes[4] = {BATCH, 3, SRC_PIX, SRC_PIX};
+    int conv_weights_sizes[4] = {96, 3, CNV_WID, CNV_WID};
     int conv_bias_sizes[4] = {96};
-    int conv_dst_sizes[4] = {BATCH, 96, 55, 55};
-    int conv_strides[2] = {4, 4};
+    int conv_dst_sizes[4] = {BATCH, 96, CNV_OSZ, CNV_OSZ};
+    int conv_strides[2] = {SRC_STRIDE, SRC_STRIDE};
     int conv_padding[2] = {0, 0};
 
     float *conv_src = net_src;
@@ -210,8 +239,14 @@ mkldnn_status_t simple_net(){
     CHECK(mkldnn_primitive_create(&conv_internal_dst_memory,
             mkldnn_primitive_desc_query_pd(conv_pd, mkldnn_query_dst_pd, 0),
             NULL, NULL));
+#ifndef NDEBUG
+    PRT_PRIMITIVE("", conv_internal_dst_memory);
+#endif
     CHECK(mkldnn_memory_set_data_handle(
             conv_internal_dst_memory, conv_dst_buffer));
+#ifndef NDEBUG
+    PRT_PRIMITIVE("(after set_data_handle)", conv_internal_dst_memory);
+#endif
 
     TRACE("create reorder primitives user data --> conv src");
     /* create reorder primitives between user data and convolution srcs
@@ -240,6 +275,9 @@ mkldnn_status_t simple_net(){
         mkldnn_primitive_at(conv_weights_memory, 0),
         mkldnn_primitive_at(conv_user_bias_memory, 0)
     };
+    assert( conv_srcs[0].output_index == 0 ); // OK for SX
+    assert( conv_srcs[1].output_index == 0 ); // OK for SX
+    assert( conv_srcs[2].output_index == 0 ); // OK for SX
 
     const_mkldnn_primitive_t conv_dsts[] = { conv_internal_dst_memory };
 
@@ -287,10 +325,29 @@ mkldnn_status_t simple_net(){
     TRACE("create relu primitive");
     /* finally create a relu primitive */
     mkldnn_primitive_t relu;
-    mkldnn_primitive_at_t relu_srcs = { conv_internal_dst_memory };
-#ifndef NDEBUG
-    PRT_PRIMITIVE_AT( "relu_srcs", &relu_srcs );
+    //printf("conv_internal_dst_memory.outputs().size-1U = %lu\n",
+    //       (long unsigned)(conv_internal_dst_memory->outputs.size()-1U));
+    //       (oops, this is an OPAQUE type)
+#if ! defined(_SX)
+    // original code, ok for gcc/g++, but **NOT** sxcc :
+    mkldnn_primitive_at_t relu_srcs = { conv_internal_dst_memory, 0 };
+#else
+    //
+    // *** WARNING ***
+    //   If compiled by sxcc then you can fall into a trap of uninitialized values
+    //   for sxc++, it (sometimes) does NOT zero-initialize the final data to zero !!!
+    //
+    mkldnn_primitive_at_t relu_srcs = { conv_internal_dst_memory, 0 };
 #endif
+#ifndef NDEBUG
+    {
+        size_t const output_index = (relu_srcs.output_index);
+        printf(" relu_srcs.output_index = %lu\n",(long unsigned)output_index);
+        PRT_PRIMITIVE_AT( "\nrelu_srcs", relu_srcs );
+    }
+#endif
+    assert( relu_srcs.output_index == 0U ); // **FAIL** for SX unless explicitly initialize the full struct (sxcc compiler bug)
+
     const_mkldnn_primitive_t relu_dsts[] = { relu_dst_memory };
 
     CHECK(mkldnn_primitive_create(&relu, relu_pd, &relu_srcs, relu_dsts));
@@ -345,7 +402,12 @@ mkldnn_status_t simple_net(){
     CHECK(mkldnn_memory_set_data_handle(lrn_scratch_memory,
             lrn_scratch_buffer));
 
+#if ! defined(_SX)
     mkldnn_primitive_at_t lrn_srcs = { relu_dst_memory };
+#else
+    mkldnn_primitive_at_t lrn_srcs = { relu_dst_memory, 0 };
+#endif
+    assert( lrn_srcs.output_index == 0 );
     const_mkldnn_primitive_t lrn_dsts[] = { lrn_dst_memory,
             lrn_scratch_memory };
 
@@ -359,7 +421,7 @@ mkldnn_status_t simple_net(){
      * kernel: {3, 3}
      * strides: {2, 2}
      */
-    int32_t pool_dst_sizes[4] = {BATCH, 96, 27, 27};
+    int32_t pool_dst_sizes[4] = {BATCH, 96, POOL_OSZ, POOL_OSZ};
     int32_t pool_kernel[2] = {3, 3};
     int32_t pool_strides[2] = {2, 2};
     int32_t pool_padding[2] = {0, 0};
@@ -418,7 +480,12 @@ mkldnn_status_t simple_net(){
     CHECK(prepare_reorder(&pool_user_dst_memory, &pool_dst_pd, 0,
             &pool_internal_dst_memory, &pool_reorder_dst, pool_dst_buffer));
 
+#if ! defined(_SX)
     mkldnn_primitive_at_t pool_srcs = { lrn_dst_memory };
+#else
+    mkldnn_primitive_at_t pool_srcs = { lrn_dst_memory, 0 };
+#endif
+    assert( pool_srcs.output_index == 0 );
 
     pool_dst_memory = pool_internal_dst_memory ? pool_internal_dst_memory
         : pool_user_dst_memory;

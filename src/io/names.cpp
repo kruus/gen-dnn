@@ -2,16 +2,18 @@
  * implement C functions to print various things in mkldnn.h
  */
 #include "mkldnn_io.h"
+#include "mkldnn_io.hpp"
 
 #include <cstdio> // snprintf
 #include <cstring>
 #include <cerrno>
 #include <assert.h>     // debug mode array bounds check (silently trimmed in Release mode)
+#include <sstream>
 
-//#ifdef __cplusplus
-//extern "C"
-//{
-//#endif
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
 // nonexistent on SX
 //using std::snprintf;    // C11 snprintf specifices C99 behavior (always return # chars that would have been written)
@@ -213,6 +215,8 @@ NAMEENUM_T(stream_kind){
 
 
 #define NAMEFUNC_T( TYPENAME, VAR ) int mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const *VAR, char * const buf, int len )
+
+#define NAMEFUNC_TPTR( TYPENAME, VAR ) int mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const VAR, char * const buf, int len )
 
 #define SCAN_LASTNZ( ARR, SZ ) do{lastnz= -1; for(int i=0; i<(SZ); ++i){ if( ARR[i] > 0 ){ lastnz=i; }}}while(0)
 
@@ -511,22 +515,41 @@ NAMEFUNC_T(convolution_relu_desc,crd){
     }
     return ret;
 }
+NAMEFUNC_TPTR(primitive,prim){
+    // mkldnn_primitive_t prim is a pointer-to mkldnn_primitive
+    // =  mkldnn::impl::primitive_t *
+    // = mkldnn_primitive *  (a virtual base class)
+    int ret = 0;
+    char *b = buf;
+    std::ostringstream oss;
+    using mkldnn::operator<<;
+    oss<<*prim;
+    {int n=snprintf(b,len,"\nmkldnn_primitive_t:%s",oss.str().c_str()); CHKBUF;}
+    return ret;
+}
 NAMEFUNC_T(primitive_at,prat){
     int ret = 0;
     char *b = buf;
     {int n = snprintf(b,len, "primitive_at:"); CHKBUF;}
     {int n = snprintf(b,len, "%p", (void*)prat->primitive); CHKBUF;}
-    {int n = snprintf(b,len, ",output_size=%lu",(long unsigned)prat->output_index); CHKBUF;}
+    {int n = snprintf(b,len, ",output_index=%lu",(long unsigned)prat->output_index); CHKBUF;}
+    {
+        std::ostringstream oss;
+        using mkldnn::operator<<;
+        oss<<*prat->primitive;
+        {int n=snprintf(b,len,"\n...primitive:%s",oss.str().c_str()); CHKBUF;}
+    }
     return ret;
 }
 #undef NAMEFUNC_T
 #define NAMEFUNC_T2( SUFFIX, TYPENAME ) char const* mkldnn_name_##SUFFIX ( TYPENAME const e )
 // /* opaque pointer types */
+// /* These can now refer to the C++ printing routines */
 //NAMEFUNC_T2(primitive_desc_iterator, const_mkldnn_primitive_desc_iterator_t);
 //NAMEFUNC_T2(primitive_desc, const_mkldnn_primitive_desc_t);
 //NAMEFUNC_T2(primitive, const_mkldnn_primitive_t);
 //NAMEFUNC_T2(stream, const_mkldnn_stream_t);
 #undef NAMEFUNC_T2
-//#ifdef __cplusplus
-//} // "C"
-//#endif
+#ifdef __cplusplus
+} // "C"
+#endif

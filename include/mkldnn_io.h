@@ -55,6 +55,9 @@ NAMEFUNC_T(batch_normalization_desc);
 NAMEFUNC_T(inner_product_desc);
 NAMEFUNC_T(convolution_relu_desc);
 NAMEFUNC_T(primitive_at); // this is mostly opaque at C level (use C++ version for details)
+#define NAMEFUNC_TPTR( TYPENAME ) int MKLDNN_API mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const, char * const buf, int len )
+NAMEFUNC_TPTR(primitive); // mkldnn_primitive_t is a ptr-to-opaque-type (mkldnn_primitive*)
+#undef NAMEFUNC_TPTR
 #undef NAMEFUNC_T
 /* */
 //#define NAMEFUNC( TYPENAME ) char const* mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME const *e ) MKLDNN_API
@@ -63,11 +66,14 @@ NAMEFUNC_T(primitive_at); // this is mostly opaque at C level (use C++ version f
 
 #define NAMEFUNC_T2( SUFFIX, TYPENAME ) char const* mkldnn_name_##SUFFIX ( TYPENAME const e ) MKLDNN_API
 /* opaque pointer types */
+/* These can now refer to the C++ printing routines */
+#if 0
 NAMEFUNC_T2(op_desc, const_mkldnn_op_desc_t); // this is void*, so might be tough to print
 NAMEFUNC_T2(primitive_desc_iterator, const_mkldnn_primitive_desc_iterator_t);
 NAMEFUNC_T2(primitive_desc, const_mkldnn_primitive_desc_t);
 NAMEFUNC_T2(primitive, const_mkldnn_primitive_t);
 NAMEFUNC_T2(stream, const_mkldnn_stream_t);
+#endif
 #undef NAMEFUNC_T2
 /** @} */
 
