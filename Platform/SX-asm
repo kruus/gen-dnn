@@ -20,10 +20,15 @@
 # - move the tmpfile to the desired "-o <dest>" location
 #
 # TODO: /bin/sh version of this script ?
+# TODO: remove any -g option (gives error with -S)
 #
 nargs=$#
 dohelp=0
-echo "No. args = $#"
+# For detailed debug, set ECHO=echo for sections that present difficulty
+#   true always succeeds, and ignores any args
+ECHO=true
+#ECHO=echo
+${ECHO} "No. args = $#"
 if [ $nargs -gt 2 ]; then
 	#
 	# find position of "-S" argument and "-o" optional final arg
@@ -33,26 +38,35 @@ if [ $nargs -gt 2 ]; then
 	cmd=()
 	files=()
 	ocnt=0
-	pcnt=0
 	for opt in ${@}; do
-		echo "opt ${opt}, ocnt=${ocnt}, pcnt=${pcnt}, Spos=${Spos}"
-		if [ $Spos -lt 0 -a "${opt}" == "-S" ]; then Spos=${ocnt};  echo "**-S**";
-		elif [ $Spos -lt 0 ]; then cmd[$ocnt]="${opt}"; echo "cmd->${cmd}";
-		elif [ $Dpos -lt 0 -a "${opt}" == "-o" ]; then Dpos=${ocnt};
-		elif [ $Dpos -lt 0 ]; then files[$pcnt]="${opt}"; pcnt=$((pcnt + 1)); echo "files->${files}";
+		${ECHO} "opt ${opt}, ocnt=${ocnt}, pcnt=${pcnt}, Spos=${Spos}"
+		#
+		# When we find warnings like
+		#   sxcc: Warning: "-S" is ignored.
+		# Then one possibility is to remove them HERE ...
+		#
+		if false; then :;
+		elif [ "${opt}" == "-g" ]; then ${ECHO} "ignoring -g";
+		elif [ "${opt}" == "-Cdebug" ]; then ${ECHO} "ignoring -Cdebug";
+		elif [ $Spos -lt 0 -a "${opt}" == "-S" ]; then Spos=${ocnt};  ${ECHO} "**Spos**${Spos}";
+		elif [ $Spos -lt 0 ]; then cmd[${#cmd}]="${opt}"; ${ECHO} "cmd->${cmd[@]}";
+		elif [ $Dpos -lt 0 -a "${opt}" == "-o" ]; then Dpos=${ocnt}; ${ECHO} "**Dpos**${Dpos}";
+		elif [ $Dpos -lt 0 ]; then files[${#files}]="${opt}"; ${ECHO} "files->${files[@]}";
 		elif [ "${dest}" == "" ]; then dest="${opt}";
-		else dohelp=1; echo "OHOH"; break;
+		else dohelp=1; echo "OHOH: only supports a single [-o <dest>]"; break;
 		fi
-		Scnt=$((Scnt + 1))
+		ocnt=$((ocnt + 1))
 	done
-	echo "Spos=${Spos}"
-	echo "Dpos=${Spos}"
-	echo " cmd=<${cmd}>"
-	echo " files=<${files}>"
-	echo " dest=<${dest}>"
+	${ECHO} "Spos=${Spos}"
+	${ECHO} "Dpos=${Spos}"
+	${ECHO} " cmd=<${cmd[@]}>"
+	${ECHO} " files=<${files[@]}>"
+	${ECHO} " dest=<${dest}>"
 else
 	dohelp=1
 fi
+ECHO=true
+#ECHO=echo
 if [ $dohelp -eq 0 ]; then
 	if [ ${#cmd} -le 0 ]; then
 		echo "Error parsing cmd portion of <cmd> -S <files> [-o <dest>]";
@@ -68,26 +82,41 @@ if [ $dohelp -eq 0 ]; then
 	fi
 fi
 sfiles=()
+ECHO=true
+#ECHO=echo
 if [ $dohelp -eq 0 ]; then
 	for ifile in ${files[@]}; do
 		#sfile=`echo "${ifile}" | sed -e 's/\(.c$\)/.s/'`
 		sfile=`echo "${ifile}" | sed -e 's/\(.c$\)\|\(.cc$\)\|\(.cxx$\)\|\(.cpp$\)/.s/'`
-		echo "ifile $ifile --> sfile $sfile --> ${sfile%[.]s}"
+		${ECHO} "ifile $ifile --> sfile $sfile --> ${sfile%[.]s}"
 		if [ "${sfile%[.]s}" != "${sfile}" ]; then
 			sfiles[${#sfiles}]="${sfile}";
 		fi
 	done
-	echo "sfiles : ${sfiles[@]}"
+	${ECHO} "sfiles : ${sfiles[@]}"
 fi
+ECHO=true
+#ECHO=echo
 if [ $dohelp -eq 0 ]; then
 	compile_err=0 
 	tmpfile=/tmp/${files[0]}.SX-asm
-	${cmd[@]} -S ${files[@]} > "${tmpfile}"
+	${cmd[@]} -S ${files[@]} >& "${tmpfile}"
 	compile_err=$?
-	if [ $? -eq 0 ]; then
+	if [ $compile_err -eq 0 ]; then
+		# Treat this warning as if it were an error
+		if grep -q '"-S" is ignored' "${tmpfile}"; then
+			echo "Error: compiler options were incompatible with assembler output"
+			echo "  Cmd: ${cmd[@]}"
+			echo "       Please find and add the incompatible options to Platform/SX-asm"
+			compile_err=1
+		fi
+	fi
+	outputs="outputs"
+	if [ $compile_err -eq 0 ]; then
+		# append all the .s files we think should be produced
 		for s in ${sfiles[@]}; do
 			if [ -f "${s}" ]; then
-				echo "cat ${s} >> ${tmpfile}";
+				${ECHO} "cat ${s} >> ${tmpfile}";
 				{ echo ""; echo "--->>> SX assembly output ${s}"; echo "";
 				cat "${s}"; } >> "${tmpfile}";
 				#rm "${s}"
@@ -95,8 +124,25 @@ if [ $dohelp -eq 0 ]; then
 				echo "Ohoh: did not find ${sfile}";
 			fi
 		done
+	else
+		outputs="error outputs"
+		echo ""
+		echo "SX-asm Command:"
+		echo "    ${cmd[@]} -S ${files[@]} >& ${tmpfile}"       
+		echo "SX-asm error: compilation issues"
 	fi
-	mv -v "${tmpfile}" "${dest}"
+	if [ "${dest}" != "" ]; then
+		if [ "${ECHO}" != "true" ]; \
+		then mv -v "${tmpfile}" "${dest}"; \
+		else mv    "${tmpfile}" "${dest}"; fi
+		if [ $? -eq 0 ]; \
+		then echo "SX-asm: ${outputs} for ${sfiles[@]} --> ${dest}"; \
+		else echo "SX-asm: ${outputs} for ${sfiles[@]} --> ${tmpfile}"; fi
+	else
+		if [ $compile_err -eq 0 ]; \
+		then echo "SX-asm: [no -o <dest>] ${outputs}: ${sfiles[@]}"; \
+		else echo "SX-asm: [no -o <dest>] ${outputs}: ${tmpfile}"; cat "${tmpfile}"; fi # likely a short-ish error output?
+	fi
 fi
 if [ $dohelp -ne 0 ]; then
 	echo "SX-asm <cmd> [opts] -S <files> [-o <dest>] -- Need more arguments"

@@ -25,18 +25,32 @@ void simple_net(){
 
     const uint32_t batch = 8;
 
-    std::vector<float> net_src(batch * 3 * 227 * 227);
+#ifndef NDEBUG
+#define SRC_PIX 227
+#define CNV_WID 11
+#define SRC_STRIDE 4
+#define CNV_OSZ 55
+#define POOL_OSZ 27
+#else
+/** reduce from original 227 for faster debug runs... */
+#define SRC_PIX 67/*227*/
+#define CNV_WID 11/*11*/
+#define SRC_STRIDE 4
+#define CNV_OSZ ((SRC_PIX - (CNV_WID/2 + 2))/SRC_STRIDE)/*55*/
+#define POOL_OSZ ((CNV_OSZ)/2)/*27*/
+#endif
+    std::vector<float> net_src(batch * 3 * SRC_PIX * SRC_PIX);
     std::vector<float> net_dst(batch * 96 * 27 * 27);
 
     /* AlexNet: conv
      * {batch, 3, 227, 227} (x) {96, 3, 11, 11} -> {batch, 96, 55, 55}
      * strides: {4, 4}
      */
-    memory::dims conv_src_tz = {batch, 3, 227, 227};
-    memory::dims conv_weights_tz = {96, 3, 11, 11};
+    memory::dims conv_src_tz = {batch, 3, SRC_PIX, SRC_PIX};
+    memory::dims conv_weights_tz = {96, 3, CNV_WID, CNV_WID};
     memory::dims conv_bias_tz = {96};
-    memory::dims conv_dst_tz = {batch, 96, 55, 55};
-    memory::dims conv_strides = {4, 4};
+    memory::dims conv_dst_tz = {batch, 96, CNV_OSZ, CNV_OSZ};
+    memory::dims conv_strides = {CNV_STRIDE, CNV_STRIDE};
     auto conv_padding = {0, 0};
 
     std::vector<float> conv_weights(std::accumulate(conv_weights_tz.begin(),

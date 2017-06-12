@@ -123,14 +123,14 @@ prepare_reorder(mkldnn_primitive_t *user_memory,               /** in */
              * already appeared in in- and out- memory primitive descriptors */
             CHECK(mkldnn_reorder_primitive_desc_create(
                     &reorder_pd, user_memory_pd, *prim_memory_pd));
-            mkldnn_primitive_at_t inputs = { *user_memory };
+            mkldnn_primitive_at_t inputs = { *user_memory, 0 };
             const_mkldnn_primitive_t outputs[] = { *prim_memory };
             CHECK(mkldnn_primitive_create(reorder, reorder_pd, &inputs,
                                           outputs));
         } else {
             CHECK(mkldnn_reorder_primitive_desc_create(
                     &reorder_pd, *prim_memory_pd, user_memory_pd));
-            mkldnn_primitive_at_t inputs = { *prim_memory };
+            mkldnn_primitive_at_t inputs = { *prim_memory, 0 };
             const_mkldnn_primitive_t outputs[] = { *user_memory };
             CHECK(mkldnn_primitive_create(reorder, reorder_pd, &inputs,
                                           outputs));
@@ -149,8 +149,22 @@ mkldnn_status_t simple_net()
     mkldnn_engine_t engine;
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0 /* idx */));
 
-    int net_src_sizes[4] = { BATCH, 3, 227, 227 };
-    int net_dst_sizes[4] = { BATCH, 96, 27, 27 };
+#ifndef NDEBUG
+#define SRC_PIX 227
+#define CNV_WID 11
+#define SRC_STRIDE 4
+#define CNV_OSZ 55
+#define POOL_OSZ 27
+#else
+/** reduce from original 227 for faster debug runs... */
+#define SRC_PIX 67/*227*/
+#define CNV_WID 11/*11*/
+#define SRC_STRIDE 4
+#define CNV_OSZ ((SRC_PIX - (CNV_WID/2 + 2))/SRC_STRIDE)/*55*/
+#define POOL_OSZ ((CNV_OSZ)/2)/*27*/
+#endif
+    int net_src_sizes[4] = { BATCH, 3, SRC_PIX, SRC_PIX };
+    int net_dst_sizes[4] = { BATCH, 96, POOL_OSZ, POOL_OSZ };
 
     float *net_src =
         (float *)aligned_malloc(product(net_src_sizes,4)*sizeof(float), 64);
@@ -167,9 +181,9 @@ mkldnn_status_t simple_net()
      * strides: {4, 4}
      */
     int *conv_src_sizes = net_src_sizes;
-    int conv_weights_sizes[4] = { 96, 3, 11, 11 };
+    int conv_weights_sizes[4] = { 96, 3, CNV_WID, CNV_WID };
     int conv_bias_sizes[4] = { 96 };
-    int conv_dst_sizes[4] = { BATCH, 96, 55, 55 };
+    int conv_dst_sizes[4] = { BATCH, 96, CNV_OSZ, CNV_OSZ };
     int conv_strides[2] = { 4, 4 };
     int conv_padding[2] = { 0, 0 };
 
@@ -266,7 +280,7 @@ mkldnn_status_t simple_net()
                 mkldnn_primitive_at(conv_weights_memory, 0),
                 mkldnn_primitive_at(conv_user_bias_memory, 0) };
 
-    const_mkldnn_primitive_t conv_dsts[] = { conv_internal_dst_memory };
+    const_mkldnn_primitive_t conv_dsts[] = { conv_internal_dst_memory, 0 };
 
     /* finally create a convolution primitive */
     mkldnn_primitive_t conv;
@@ -308,7 +322,7 @@ mkldnn_status_t simple_net()
 
     /* finally create a relu primitive */
     mkldnn_primitive_t relu;
-    mkldnn_primitive_at_t relu_srcs = { conv_internal_dst_memory };
+    mkldnn_primitive_at_t relu_srcs = { conv_internal_dst_memory, 0 };
     const_mkldnn_primitive_t relu_dsts[] = { relu_dst_memory };
 
     CHECK(mkldnn_primitive_create(&relu, relu_pd, &relu_srcs, relu_dsts));
@@ -368,7 +382,7 @@ mkldnn_status_t simple_net()
     CHECK(mkldnn_memory_set_data_handle(lrn_workspace_memory,
                                         lrn_workspace_buffer));
 
-    mkldnn_primitive_at_t lrn_srcs = { relu_dst_memory };
+    mkldnn_primitive_at_t lrn_srcs = { relu_dst_memory, 0 };
 
     const_mkldnn_primitive_t lrn_dsts[]
             = { lrn_dst_memory, lrn_workspace_memory };
@@ -382,7 +396,7 @@ mkldnn_status_t simple_net()
      * kernel: {3, 3}
      * strides: {2, 2}
      */
-    int32_t pool_src_sizes[4] = { BATCH, 96, 55, 55 };
+    int32_t pool_src_sizes[4] = { BATCH, 96, CNV_OSZ, CNV_OSZ };
     int32_t *pool_dst_sizes = net_dst_sizes;
     int32_t pool_kernel[2] = { 3, 3 };
     int32_t pool_strides[2] = { 2, 2 };
@@ -443,7 +457,7 @@ mkldnn_status_t simple_net()
                           &pool_internal_dst_memory, &pool_reorder_dst,
                           pool_dst_buffer));
 
-    mkldnn_primitive_at_t pool_srcs = { lrn_dst_memory };
+    mkldnn_primitive_at_t pool_srcs = { lrn_dst_memory, 0 };
 
     pool_dst_memory = pool_internal_dst_memory ? pool_internal_dst_memory
                                                : pool_user_dst_memory;
@@ -591,7 +605,7 @@ mkldnn_status_t simple_net()
                 mkldnn_primitive_at(pool_diff_src_memory, 0),
                 mkldnn_primitive_at(lrn_workspace_memory, 0) };
 
-    const_mkldnn_primitive_t lrn_diff_srcs[] = { lrn_diff_src_memory };
+    const_mkldnn_primitive_t lrn_diff_srcs[] = { lrn_diff_src_memory, 0 };
 
     /* finally create backward lrn primitive */
     mkldnn_primitive_t lrn_bwd;

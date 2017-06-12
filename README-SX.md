@@ -8,6 +8,7 @@ Intel: ./build.sh -tt # build and run all tests (no jit)</BR>
            --> build/    and build.log
 SX:    ./build.sh -ST # build for *S*X and *T*race cmake setup</BR>
            --> build-sx/ and build-sx.log
+  or   ./build.sh -SdqT # debug build (no doxygen) for SX
 ```
 
 ## Purpose
@@ -48,6 +49,7 @@ This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
   - linking now OK
   - most tests OK (some memory formats do not need support for non-JIT)
   - snprintf does not follow C99 conventions: it does not return "the length that would have been written"
+
 
 ## Github repos
 
@@ -95,6 +97,30 @@ the additional convolutions onto the existing "engine" lists of primitives.
   - # ... resolve merge conflicts ...
   - git commit # use default message
   - git push # ... origin master ... update gen-dnn on Github.
+
+### SX debug
+
+in debugger:
+
+```
+$  dbx -I src/vanilla -I src/include -I src/common -I src/io ./build-sx/examples/simple-net-c
+run # wait for failed assertion
+where # note things in backtrace
+up 2
+print output_index # or maybe display to set a watchpoint on the variable
+stop in cpu_engine.const_memory__Q4_6mkldnn4impl3cpu12cpu_memory_tCFUL
+stop in ref_relu.input_memory__Q4_6mkldnn4impl3cpu15cpu_primitive_tCFUL
+stop in execute_forward_dense__Q4_6mkldnn4impl3cpu50ref_relu_fwd_t__tm__28_XC18mkldnn_data_type_tL_1_1Fv_v
+display ref_relu.input_memory__Q4_6mkldnn4impl3cpu15cpu_primitive_tCFUL.index
+cpu_engine.const_memory__Q4_6mkldnn4impl3cpu12cpu_memory_tCFUL.output_index
+run # try again
+```
+
+run the examples/ test programs and get run statistics:
+```
+( cd build-sx/examples; export C_PROGINF=DETAIL; for f in simple*; do echo ">>>> $f"; ./$f 2>&1 | tee $f.log; done; ) 2>&1 | tee guest/examples.log
+
+```
 
 ## SX Performance
 
