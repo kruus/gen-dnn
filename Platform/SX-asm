@@ -1,0 +1,111 @@
+#! /bin/bash
+# Function:
+#  For -S assembler output, allow SX compilation to handle a terminal -o <dest> option
+#  similar to most other compilers.
+#
+# Arguments: Full sxcc or sxc++ command of following form:
+#            {cmd [options...]} -S {filenames...} -o {dest}
+#
+# Output: A {dest} file containing SX assembler outputs for .c|.cc|.cpp|.cxx filenames
+#
+# Details:
+# - unlike most other compilers, sxcc does not accept -o option for -S (assembler output)
+# - we handle commands like sxcc ... -S <filenames> -o <dest>
+# - parse and remove the -o <dest> option
+# - convert <filenames> to the ".s" default sx output filenames
+# - remove duplicate sx output filenames (for safety, if headers might be there)
+# - pipe command output into a tmpfile
+# - cat the default sx output filenames to the tmpfile (no err if missing)
+# - [opt.] rm the default sx output files
+# - move the tmpfile to the desired "-o <dest>" location
+#
+# TODO: /bin/sh version of this script ?
+#
+nargs=$#
+dohelp=0
+echo "No. args = $#"
+if [ $nargs -gt 2 ]; then
+	#
+	# find position of "-S" argument and "-o" optional final arg
+	dest=""
+	Dpos=-1
+	Spos=-1
+	cmd=()
+	files=()
+	ocnt=0
+	pcnt=0
+	for opt in ${@}; do
+		echo "opt ${opt}, ocnt=${ocnt}, pcnt=${pcnt}, Spos=${Spos}"
+		if [ $Spos -lt 0 -a "${opt}" == "-S" ]; then Spos=${ocnt};  echo "**-S**";
+		elif [ $Spos -lt 0 ]; then cmd[$ocnt]="${opt}"; echo "cmd->${cmd}";
+		elif [ $Dpos -lt 0 -a "${opt}" == "-o" ]; then Dpos=${ocnt};
+		elif [ $Dpos -lt 0 ]; then files[$pcnt]="${opt}"; pcnt=$((pcnt + 1)); echo "files->${files}";
+		elif [ "${dest}" == "" ]; then dest="${opt}";
+		else dohelp=1; echo "OHOH"; break;
+		fi
+		Scnt=$((Scnt + 1))
+	done
+	echo "Spos=${Spos}"
+	echo "Dpos=${Spos}"
+	echo " cmd=<${cmd}>"
+	echo " files=<${files}>"
+	echo " dest=<${dest}>"
+else
+	dohelp=1
+fi
+if [ $dohelp -eq 0 ]; then
+	if [ ${#cmd} -le 0 ]; then
+		echo "Error parsing cmd portion of <cmd> -S <files> [-o <dest>]";
+		dohelp=1
+	fi
+	if [ $Spos -lt 0 -o ${#files} -le 0 ]; then
+		echo "Error parsing files portion of <cmd> -S <files>[-o <dest>]";
+		dohelp=1
+	fi
+	if [ $Dpos -ge 0 -a "${dest}" == "" ]; then
+		echo "Error parsing dest portion of <cmd> -S <files> [-o <dest>]";
+		dohelp=1
+	fi
+fi
+sfiles=()
+if [ $dohelp -eq 0 ]; then
+	for ifile in ${files[@]}; do
+		#sfile=`echo "${ifile}" | sed -e 's/\(.c$\)/.s/'`
+		sfile=`echo "${ifile}" | sed -e 's/\(.c$\)\|\(.cc$\)\|\(.cxx$\)\|\(.cpp$\)/.s/'`
+		echo "ifile $ifile --> sfile $sfile --> ${sfile%[.]s}"
+		if [ "${sfile%[.]s}" != "${sfile}" ]; then
+			sfiles[${#sfiles}]="${sfile}";
+		fi
+	done
+	echo "sfiles : ${sfiles[@]}"
+fi
+if [ $dohelp -eq 0 ]; then
+	compile_err=0 
+	tmpfile=/tmp/${files[0]}.SX-asm
+	${cmd[@]} -S ${files[@]} > "${tmpfile}"
+	compile_err=$?
+	if [ $? -eq 0 ]; then
+		for s in ${sfiles[@]}; do
+			if [ -f "${s}" ]; then
+				echo "cat ${s} >> ${tmpfile}";
+				{ echo ""; echo "--->>> SX assembly output ${s}"; echo "";
+				cat "${s}"; } >> "${tmpfile}";
+				#rm "${s}"
+			else
+				echo "Ohoh: did not find ${sfile}";
+			fi
+		done
+	fi
+	mv -v "${tmpfile}" "${dest}"
+fi
+if [ $dohelp -ne 0 ]; then
+	echo "SX-asm <cmd> [opts] -S <files> [-o <dest>] -- Need more arguments"
+	false
+fi
+true
+#opt=$1; shift
+#file=$1; shift
+#
+#(echo $opt; echo $file; echo $*) > /tmp/log
+#sxc++ -prelink -Wl,-M $*
+#sxar $opt $file $*
