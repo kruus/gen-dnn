@@ -84,6 +84,15 @@ the additional convolutions onto the existing "engine" lists of primitives.
       - git pull upstream master
     - Push to github (public repo):
       - git push
+  - If Japan git gets confused:
+    - snake10:$ make gen-dnn.src.tar.gz
+    - snake10:$ scp gen-dnn.src.tar.gz sapphire2:wrk/simd/gen-dnn/
+    - sapphire2:$  # unpack, overwriting current sources
+    - sapphire2:$ git status
+    - sapphire2:$  # deleted files? new files?
+    - sapphire2:$ ./build.sh -Sdq   # test
+    - sapphire2:$  # ... until OK
+    - sapphire2:$ git add -u; git commit
 
 ### upstream merges
 
