@@ -177,7 +177,7 @@ static void fill_data(const size_t size, data_t *data, double sparsity = 1.,
         data[n] = set_value<data_t>(n, data_t(1), data_t(2e-1), sparsity);
 
         if (init_negs && n%4 == 0U)
-            data[n] = -data[n];
+            data[n] = static_cast<data_t>(-data[n]); // weird for unsigned types!
     }
 }
 
