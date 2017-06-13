@@ -17,6 +17,7 @@ BUILDOK="y"
 SIZE_T=32 # or 64, for -s or -S SX compile
 JOBS="-j8"
 CMAKETRACE=""
+USE_CBLAS=1
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -28,7 +29,7 @@ usage() {
     echo "Debug: Individual tests can be run like build-sx/tests/gtests/test_relu"
     exit 0
 }
-while getopts ":htvjdDqQpsST" arg; do
+while getopts ":htvjdDqQpsSTb" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
@@ -68,6 +69,9 @@ while getopts ":htvjdDqQpsST" arg; do
             echo "*** WARNING ***"
             echo "-s --> -size_t32 compilation NOT SUPPORTED (-S is recommended)"
             echo "***************"
+            ;;
+        r) # reference impls only: no -DUSE_CBLAS compile flag (->no im2col gemm)
+            USE_CBLAS=0
             ;;
         T) # cmake --trace
             CMAKETRACE="--trace"
@@ -136,6 +140,10 @@ timeoutPID() { # unused
     #
     CMAKEOPT=''
     CMAKEOPT="${CMAKEOPT} -DCMAKE_CCXX_FLAGS=-DJITFUNCS=${DOJIT}"
+    if [ $USE_CBLAS -ne 0 ]; then
+        export CFLAGS="${CFLAGS} -DUSE_CBLAS"
+        export CXXFLAGS="${CXXFLAGS} -DUSE_CBLAS"
+    fi
     if [ ! "$DOTARGET" == "j" ]; then
         CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
     fi
@@ -149,7 +157,8 @@ timeoutPID() { # unused
         #CMAKEOPT="${CMAKEOPT} -DCMAKE_C_FLAGS=-g\ -ftrace\ -Cdebug" # override Cvopt
         SXOPT="-DTARGET_VANILLA -D__STDC_LIMIT_MACROS"
         SXOPT="${SXOPT} -wall -woff=1097 -woff=4038" # turn off warnings about not using 'attributes'
-        SXOPT="${SXOPT} -wnolongjmp"           # turn off warnings about setjmp/longjmp (and tracing)
+        SXOPT="${SXOPT} -woff=1901"  # turn off sxcc warning defining arr[len0] for constant len0
+        SXOPT="${SXOPT} -wnolongjmp" # turn off warnings about setjmp/longjmp (and tracing)
         export CFLAGS="${CFLAGS} -size_t${SIZE_T} -Kc99,gcc ${SXOPT}"
         # An object file that is generated with -Kexceptions and an object file
         # that is generated with -Knoexceptions must not be linked together. In

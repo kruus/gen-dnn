@@ -149,7 +149,7 @@ mkldnn_status_t simple_net(){
     mkldnn_engine_t engine;
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0 /* idx */));
 
-#ifndef NDEBUG
+#if defined(NDEBUG)
 #define SRC_PIX 227
 #define CNV_WID 11
 #define SRC_STRIDE 4

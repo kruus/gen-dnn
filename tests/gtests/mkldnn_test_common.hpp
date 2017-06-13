@@ -60,7 +60,7 @@ inline size_t map_index(const mkldnn::memory::desc &md, size_t index) {
     auto *strides_within_block = md.data.layout_desc.blocking.strides[1];
 
     size_t ph_index = 0;
-    int oc_16 = 0, ic_2 = 0;
+    size_t oc_16 = 0, ic_2 = 0;
 
     for (int rd = 0; rd < ndims; ++rd) {
         int d = ndims - rd - 1;
@@ -68,13 +68,16 @@ inline size_t map_index(const mkldnn::memory::desc &md, size_t index) {
         EXPECT_LE(dims[d], pdims[d]);
 
         int cur_dim = dims[d];
+        assert( cur_dim > 0 );
         int cur_block = md.data.layout_desc.blocking.block_dims[d];
 
-        int pos_d = index % cur_dim;
-        int cur_pos = optd[d] + pos_d;
+        assert( index > 0 && cur_dim > 0 );
+        size_t pos_d = /*static_cast<ssize_t>*/(index % cur_dim);
+        assert(optd[d] >= 0);
+        size_t cur_pos = optd[d] + pos_d;
 
-        int cur_pos_block = cur_pos / cur_block;
-        int cur_pos_within_block = cur_pos % cur_block;
+        size_t cur_pos_block = cur_pos / cur_block;
+        size_t cur_pos_within_block = cur_pos % cur_block;
 
         if (d == (with_groups + 0)) oc_16 = pos_d % 16;
         if (d == (with_groups + 1)) ic_2  = pos_d % 2;
@@ -85,7 +88,8 @@ inline size_t map_index(const mkldnn::memory::desc &md, size_t index) {
         index /= cur_dim;
     }
     if (md.data.format == f_weights_g || md.data.format == f_weights) {
-        ph_index += -16 * ic_2 + oc_16 + ic_2;
+        assert( ph_index > oc_16 + ic_2 - 16*ic_2 );
+        ph_index += oc_16 + ic_2 - 16*ic_2;
     }
     ph_index += md.data.layout_desc.blocking.offset_padding;
 
@@ -144,7 +148,8 @@ static inline data_t set_value(size_t index, data_t mean, data_t deviation,
         const size_t group = index / group_size;
         const size_t in_group = index % group_size;
         const bool fill = in_group == ((group % 1637) % group_size);
-        return fill ? mean + deviation * sin(data_t(index % 37)) : 0;
+        return fill ? static_cast<data_t>(mean + deviation * sin(data_t(index % 37)))
+            : data_t{0};
     } else if (data_traits<data_t>::data_type == mkldnn::memory::data_type::s32
         || data_traits<data_t>::data_type == mkldnn::memory::data_type::s16) {
         return data_t(rand()%11);
@@ -154,24 +159,24 @@ static inline data_t set_value(size_t index, data_t mean, data_t deviation,
 }
 
 template <typename data_t>
-static void fill_data(const int size, data_t *data, data_t mean,
+static void fill_data(const size_t size, data_t *data, data_t mean,
         data_t deviation, double sparsity = 1.)
 {
 #   pragma omp parallel for schedule(static)
-    for (int n = 0; n < size; n++) {
+    for (size_t n = 0; n < size; n++) {
         data[n] = set_value<data_t>(n, mean, deviation, sparsity);
     }
 }
 
 template <typename data_t>
-static void fill_data(const int size, data_t *data, double sparsity = 1.,
+static void fill_data(const size_t size, data_t *data, double sparsity = 1.,
         bool init_negs = false)
 {
 #   pragma omp parallel for schedule(static)
-    for (int n = 0; n < size; n++) {
+    for (size_t n = 0; n < size; n++) {
         data[n] = set_value<data_t>(n, data_t(1), data_t(2e-1), sparsity);
 
-        if (init_negs && n%4 == 0)
+        if (init_negs && n%4 == 0U)
             data[n] = -data[n];
     }
 }

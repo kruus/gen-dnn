@@ -27,7 +27,7 @@ void simple_net()
 
     const uint32_t batch = 32;
 
-#ifndef NDEBUG
+#if defined(NDEBUG)
 #define SRC_PIX 227
 #define CNV_WID 11
 #define SRC_STRIDE 4

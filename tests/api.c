@@ -57,6 +57,7 @@ void test1() {
     const int len0 = 100;
     mkldnn_dims_t dims = {len0};
     real_t data[len0]; // SX: const variable in a constant expression is nonstandard in C
+    // disable with -woff=1901
 
     mkldnn_memory_desc_t md;
     mkldnn_primitive_desc_t mpd;
@@ -365,7 +366,7 @@ void test3() {
     {
         size_t off = ((n*C + c)*H + h)*W + w;
         real_t e = (real_t)((off % 13) + 1);
-        real_t diff = fabs((real_t)(out_mem[off] - e));
+        real_t diff = fabs((real_t)(out_mem[off]) - e);
         if (diff/fabs(e) > 0.0125)
             printf("exp: %g, got: %g\n", e, out_mem[off]);
         CHECK_TRUE(diff/fabs(e) < 0.0125);
