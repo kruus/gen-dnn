@@ -32,6 +32,8 @@ namespace impl {
 template <data_type_t> struct prec_traits {}; /* ::type -> float */
 template <typename> struct data_traits {}; /* ::data_type -> f32 */
 template <primitive_kind_t> struct pkind_traits {}; /* ::desc_type, ::query_d */
+template <data_type_t> struct accum_traits {}; /* --> float_t and accsqr_t */
+
 
 template <> struct prec_traits<data_type::f32> { typedef float type; };
 template <> struct prec_traits<data_type::s32> { typedef int32_t type; };
@@ -49,6 +51,19 @@ template <> struct data_traits<int8_t>
 { static constexpr data_type_t data_type = data_type::s8; };
 template <> struct data_traits<uint8_t>
 { static constexpr data_type_t data_type = data_type::u8; };
+
+/** float_t for calcs like pow, accsqr_t for summing squares.
+ *  traits-like in case you want to go to double someday. */
+template <> struct accum_traits<data_type::f32>
+{ typedef float float_t; typedef float accsqr_t; };
+template <> struct accum_traits<data_type::s32>
+{ typedef float float_t; typedef float accsqr_t; };
+template <> struct accum_traits<data_type::s16>
+{ typedef float float_t; typedef float/*int64_t?*/ accsqr_t; };
+template <> struct accum_traits<data_type::s8>
+{ typedef float float_t; typedef uint32_t accsqr_t; };
+template <> struct accum_traits<data_type::u8>
+{ typedef float float_t; typedef uint32_t accsqr_t; };
 
 #define PKIND_TRAITS_INST(op) \
 template <> struct pkind_traits<primitive_kind::op> { \

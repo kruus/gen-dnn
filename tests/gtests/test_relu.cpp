@@ -71,7 +71,7 @@ void check_relu_bwd(data_t negative_slope, const memory::desc &md,
     for (size_t i = 0; i < N * C * H * W; ++i) {
         data_t ref_s = src_data[map_index(data_d, i)];
         data_t ref_dd = diff_dst_data[map_index(diff_data_d, i)];
-        data_t ref_ds = ref_dd * ((ref_s > 0) ? 1. : negative_slope);
+        data_t ref_ds = ref_dd * ((ref_s > 0) ? data_t{1} : negative_slope);
         EXPECT_NEAR(diff_src_data[map_index(diff_data_d, i)], ref_ds, 1.e-7);
     }
 }

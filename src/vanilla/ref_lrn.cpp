@@ -25,23 +25,13 @@ namespace mkldnn {
 namespace impl {
 
 // in future, could move to mkldnn_traits.hpp ?    
-template <data_type_t> struct lrn_promote {}; /* ::type -> promoted float type */
-
-/** float_t for calcs like pow, accsqr_t for summing squares.
- *  traits-like in case you want to go to double someday. */
-template <> struct lrn_promote<data_type::f32> { typedef float float_t; typedef float accsqr_t; };
-template <> struct lrn_promote<data_type::s32> { typedef float float_t; typedef float accsqr_t; };
-template <> struct lrn_promote<data_type::s16> { typedef float float_t; typedef float accsqr_t; };
-template <> struct lrn_promote<data_type::s8>  { typedef float float_t; typedef uint32_t accsqr_t; };
-template <> struct lrn_promote<data_type::u8>  { typedef float float_t; typedef uint32_t accsqr_t; };
-
 namespace cpu {
 
 template <impl::data_type_t data_type>
 void ref_lrn_fwd_t<data_type>::execute_forward() {
     using namespace alg_kind;
-    typedef typename impl::lrn_promote<data_type>::float_t float_t;
-    typedef typename impl::lrn_promote<data_type>::accsqr_t accsqr_t;
+    typedef typename impl::accum_traits<data_type>::float_t float_t;
+    typedef typename impl::accum_traits<data_type>::accsqr_t accsqr_t;
 
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto dst = reinterpret_cast<data_t*>(this->memory(0));
@@ -104,8 +94,8 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
 template <impl::data_type_t data_type>
 void ref_lrn_bwd_t<data_type>::execute_backward() {
     using namespace alg_kind;
-    typedef typename impl::lrn_promote<data_type>::float_t float_t;
-    typedef typename impl::lrn_promote<data_type>::accsqr_t accsqr_t;
+    typedef typename impl::accum_traits<data_type>::float_t float_t;
+    typedef typename impl::accum_traits<data_type>::accsqr_t accsqr_t;
 
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));

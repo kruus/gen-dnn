@@ -51,7 +51,7 @@ void compute_ref_conv_relu_fwd(const test_convolution_sizes_t &c,
                                 bias_data[map_index(
                                         bias.get_primitive_desc().desc(),
                                         g * c.oc / c.ng + oc)] :
-                                0.0;
+                                data_t{0};
                         for (int ic = 0; ic < c.ic / c.ng; ic++) {
                             for (int kh = 0; kh < c.kh; kh++) {
                                 for (int kw = 0; kw < c.kw; kw++) {
@@ -125,9 +125,9 @@ protected:
                 / sizeof(data_t), (data_t *)c_src.get_data_handle());
         // TODO: Temporary workaround for testing of convolution + relu
         data_t *src_data = (data_t *)c_src.get_data_handle();
-        const int mb_chunk =
+        const int mb_chunk = static_cast<int>(
             (c_src.get_primitive_desc().get_size() / sizeof(data_t))
-            / cd.mb;
+            / cd.mb );
         for (int i = 0; i < cd.mb * mb_chunk; ++i) {
             if ((i / mb_chunk) % 2) src_data[i] *= -1.;
         }
