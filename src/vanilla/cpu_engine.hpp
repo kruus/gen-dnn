@@ -24,6 +24,15 @@
 #include "c_types_map.hpp"
 #include "../common/engine.hpp"
 
+#ifndef VERBOSE_PRIMITIVE_CREATE
+/** May depend on rtti compilation, for the \c typeid function. */
+#if defined(NDEBUG)
+#define VERBOSE_PRIMITIVE_CREATE 0
+#else
+#define VERBOSE_PRIMITIVE_CREATE 1
+#endif
+#endif
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {

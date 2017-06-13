@@ -1,9 +1,13 @@
 --------------------------------------------------------------------------
+Should add vanilla routines for mkl_gemm_convolution_1x1_{fwd_t|bwd_data_t|bwd_weights_t}
+
+--------------------------------------------------------------------------
 Why are the examples not finding/using the im2col convolutions?
 Trace through the data types to find why it is not begin used.
 - check that the im2col version is being compiled and what gemm is being used,
   for Intel and SX
 - make an im2col example work on Intel first, then on SX.
+o added -DUSE_CBLAS compile flag to enable im2col gemm
 
 --------------------------------------------------------------------------
 - Add templated convolution impls, so that **remaining** particular cases can be

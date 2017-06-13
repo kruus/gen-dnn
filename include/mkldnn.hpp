@@ -36,6 +36,10 @@ namespace mkldnn {
 /// @addtogroup cpp_api_utils Utils
 /// @{
 
+/// signed size_t type (promotion of some 'int' calcs)    
+typedef intptr_t ssize_t;
+static_assert(sizeof(intptr_t) == sizeof(size_t)," ssize_t must be set by hand for this system");
+
 /// A class that provides the destructor for an Intel(R) MKL-DNN C handle
 template <typename T> class handle_traits {};
 

@@ -16,3 +16,4 @@ test*.log
 log-*
 old*
 *.diff
+snprintf*

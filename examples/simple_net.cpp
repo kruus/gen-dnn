@@ -25,7 +25,7 @@ void simple_net(){
 
     const uint32_t batch = 8;
 
-#ifndef NDEBUG
+#if defined(NDEBUG)
 #define SRC_PIX 227
 #define CNV_WID 11
 #define SRC_STRIDE 4
@@ -40,7 +40,7 @@ void simple_net(){
 #define POOL_OSZ ((CNV_OSZ)/2)/*27*/
 #endif
     std::vector<float> net_src(batch * 3 * SRC_PIX * SRC_PIX);
-    std::vector<float> net_dst(batch * 96 * 27 * 27);
+    std::vector<float> net_dst(batch * 96 * POOL_OSZ * POOL_OSZ);
 
     /* AlexNet: conv
      * {batch, 3, 227, 227} (x) {96, 3, 11, 11} -> {batch, 96, 55, 55}
@@ -50,7 +50,7 @@ void simple_net(){
     memory::dims conv_weights_tz = {96, 3, CNV_WID, CNV_WID};
     memory::dims conv_bias_tz = {96};
     memory::dims conv_dst_tz = {batch, 96, CNV_OSZ, CNV_OSZ};
-    memory::dims conv_strides = {CNV_STRIDE, CNV_STRIDE};
+    memory::dims conv_strides = {SRC_STRIDE, SRC_STRIDE};
     auto conv_padding = {0, 0};
 
     std::vector<float> conv_weights(std::accumulate(conv_weights_tz.begin(),
@@ -155,7 +155,7 @@ void simple_net(){
      * kernel: {3, 3}
      * strides: {2, 2}
      */
-    memory::dims pool_dst_tz = {batch, 96, 27, 27};
+    memory::dims pool_dst_tz = {batch, 96, POOL_OSZ, POOL_OSZ};
     memory::dims pool_kernel = {3, 3};
     memory::dims pool_strides = {2, 2};
     auto pool_padding = {0, 0};
@@ -192,6 +192,7 @@ void simple_net(){
     }
 
     stream(stream::kind::eager).submit(net).wait();
+    std::cout<<" simple_net.cpp stream(eager).submit(net).wait() DONE (yay)"<<std::endl;
 }
 
 #if defined(_SX)
@@ -205,5 +206,6 @@ int main(int argc, char **argv) {
         std::cerr << "status: " << e.status << std::endl;
         std::cerr << "message: " << e.message << std::endl;
     }
+    std::cout<<" \nGoodbye"<<std::endl;
     return 0;
 }

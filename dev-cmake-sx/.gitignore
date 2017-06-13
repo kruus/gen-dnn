@@ -4,4 +4,7 @@ build-rel
 cmake.log
 dbg.log
 rel.log
+a.out
+x.cpp
+mk.log
 

@@ -30,6 +30,10 @@
 #endif
 #include "gemm_convolution_utils.hpp"
 
+#if VERBOSE_PRIMITIVE_CREATE
+#include <iostream>
+#endif
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -77,6 +81,13 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
 
             assert(this->engine()->kind() == engine_kind::cpu);
 
+#if VERBOSE_PRIMITIVE_CREATE
+            char const* last_tested=nullptr;
+#define AND_REQUIRE(...) && ( (last_tested = #__VA_ARGS__), __VA_ARGS__ )
+#else
+#define AND_REQUIRE(...) && __VA_ARGS__
+#endif
+#if 0
             bool ok = true
                 && _gemm_convolution_implemented< run_jit, isa >()
                 && this->set_default_params() == status::success
@@ -96,6 +107,37 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
                 && this->dst_pd_.desc()->format == nchw
                 && (this->weights_pd_.desc()->format == this->with_groups()
                     ? goihw : oihw);
+#else
+            bool ok = true
+                AND_REQUIRE( _gemm_convolution_implemented< run_jit, isa >() )
+                AND_REQUIRE( this->set_default_params() == status::success )
+                AND_REQUIRE( utils::one_of(this->cdesc_().prop_kind, forward_training,
+                        forward_inference) )
+                AND_REQUIRE( utils::implication(
+                        this->base_pkind == primitive_kind::convolution_relu,
+                        this->cdesc_().prop_kind == forward_inference) )
+                AND_REQUIRE( this->cdesc_().alg_kind == alg_kind::convolution_direct )
+                AND_REQUIRE( utils::everyone_is(data_type::f32,
+                        this->cdesc_().src_desc.data_type,
+                        this->cdesc_().weights_desc.data_type,
+                        this->cdesc_().dst_desc.data_type) )
+                AND_REQUIRE( utils::implication(this->with_bias(),
+                        data_type::f32 == this->cdesc_().bias_desc.data_type) )
+                AND_REQUIRE( this->src_pd_.desc()->format == nchw )
+                AND_REQUIRE( this->dst_pd_.desc()->format == nchw )
+                AND_REQUIRE( (this->weights_pd_.desc()->format == this->with_groups()
+                    ? goihw : oihw) )
+                ;
+#endif
+            std::cout<<" VERBOSE_PRIMITIVE_CREATE = "<<VERBOSE_PRIMITIVE_CREATE<<std::endl;
+#if VERBOSE_PRIMITIVE_CREATE
+            if( !ok && last_tested != nullptr ){
+                std::cout
+                    //<<"_gemm_convolution_fwd_t failed precondition:\n\t"
+                    <<" "<<typeid(*this).name()<<" failed precondition:\n\t"
+                    <<last_tested<<std::endl;
+            }
+#endif
             return ok ? status::success : status::unimplemented;
         }
 
