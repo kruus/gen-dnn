@@ -29,7 +29,7 @@
 #if defined(NDEBUG)
 #define VERBOSE_PRIMITIVE_CREATE 0
 #else
-#define VERBOSE_PRIMITIVE_CREATE 1
+#define VERBOSE_PRIMITIVE_CREATE 0
 #endif
 #endif
 

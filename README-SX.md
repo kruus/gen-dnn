@@ -107,6 +107,18 @@ the additional convolutions onto the existing "engine" lists of primitives.
   - git commit # use default message
   - git push # ... origin master ... update gen-dnn on Github.
 
+### SX cross-compile
+
+- My own setup is like:
+```
+ssh japan       # setup in my .ssh/ssh.config to auto-navigate a chain of servers
+. bashrc-local
+cd wrk
+. bashrc-sx
+cd simd/gen-dnn
+```
+and then work on the mkl-dnn cross-compile stuff with _./build.sh -SdqT_ or something similar
+
 ### SX debug
 
 in debugger:

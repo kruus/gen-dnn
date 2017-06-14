@@ -1,4 +1,5 @@
 >>>> simple-net-c
+tee: cannot access simple-net-c.log
  SX aligned_malloc --> malloc(430944)
  SX aligned_malloc --> malloc(150528)
  SX aligned_malloc --> malloc(139392)
@@ -6,38 +7,44 @@
 
 T:create memory 
 T:create data descriptors for convolutions, mkldnn_any 
-T:create convolution  SX aligned_malloc --> malloc(430944)
+T:create convolution  VERBOSE_PRIMITIVE_CREATE = 1
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+ SX aligned_malloc --> malloc(430944)
  SX aligned_malloc --> malloc(139392)
  SX aligned_malloc --> malloc(691200)
 
 T:create mem for dst data (no need to reorder it same as user) 
 conv_internal_dst_memory 
-mkldnn_primitive_t: C  primitive_kind:memory@404353d50,inputs[0],outputs[1] M:
-             outputs[0]=@404353d50
+mkldnn_primitive_t: C  primitive_kind:memory@404356260,inputs[0],outputs[1] M:
+             outputs[0]=@404356260
 
 (after set_data_handle) conv_internal_dst_memory  
-mkldnn_primitive_t: C  primitive_kind:memory@404353d50,inputs[0],outputs[1] M:
-             outputs[0]=@404353d50
+mkldnn_primitive_t: C  primitive_kind:memory@404356260,inputs[0],outputs[1] M:
+             outputs[0]=@404356260
 
 T:create reorder primitives user data --> conv src 
 T:create convolution primitive 
- ***** NEW CONVOLUTION TYPES *****
- _ref_conv( src        :fmt=memory_format:nchw : memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,3,67,67}
-          , weight/bias:fmt=memory_format:oihw : memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:oihw,dims=dims:{96,3,11,11}
-          , dst        :fmt=memory_format:nchw : memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,15,15} )
-
 T:AlexNet: relu {BATCH,96,55,55} -> {BATCH,96,55,55}  SX aligned_malloc --> malloc(691200)
 
 T:create relu 
 T:mkldnn_relu_forward_desc_init,,, 
-T:mkldnn_primitive_desc_create... 
+T:mkldnn_primitive_desc_create...  create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+
 T:mkldnn_primitive_desc_query_pd... 
 T:create relu primitive  relu_srcs.output_index = 0
 
 
-relu_srcs  primitive_at:404353d50,output_index=0
-...primitive: C  primitive_kind:memory@404353d50,inputs[0],outputs[1] M:
-             outputs[0]=@404353d50
+relu_srcs  primitive_at:404356260,output_index=0
+...primitive: C  primitive_kind:memory@404356260,inputs[0],outputs[1] M:
+             outputs[0]=@404356260
 
 +relu_fwd_t:
             kind()=primitive_kind:relu
@@ -49,11 +56,51 @@ relu_srcs  primitive_at:404353d50,output_index=0
            *            ->desc() memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,15,15}
 
 T:AlexNet: lrn (local response normalization  SX aligned_malloc --> malloc(691200)
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)4>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)5>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_softmax_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)4, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)5, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)6, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_lrn_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
  SX aligned_malloc --> malloc(691200)
 
 T:lrn primitive  SX aligned_malloc --> malloc(150528)
 
-T:pooling descriptor 
+T:pooling descriptor  create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)4>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)5>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_softmax_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+
 T:pooling workspace  SX aligned_malloc --> malloc(150528)
 
 T:reorder primitives user data -> pooling dsts 
@@ -61,40 +108,40 @@ T:pooling primitive
 T:connect primitives 
 T:create 
 T:submit  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4043532c0,inputs[0],outputs[1] M:
-             outputs[0]=@4043532c0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@4043557d0,inputs[0],outputs[1] M:
+             outputs[0]=@4043557d0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,3,67,67}
  cpu_primitive.hpp input_memory(index=1) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4043536e0,inputs[0],outputs[1] M:
-             outputs[0]=@4043536e0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404355bf0,inputs[0],outputs[1] M:
+             outputs[0]=@404355bf0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:oihw,dims=dims:{96,3,11,11}
  cpu_primitive.hpp input_memory(index=2) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@404353b00,inputs[0],outputs[1] M:
-             outputs[0]=@404353b00 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404356010,inputs[0],outputs[1] M:
+             outputs[0]=@404356010 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,1,data_type:f32,memory_format:x,dims=dims:{96}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@404353d50,inputs[0],outputs[1] M:
-             outputs[0]=@404353d50 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404356260,inputs[0],outputs[1] M:
+             outputs[0]=@404356260 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,15,15}
 
 ref_relu_fwd_t<>::execut_forward_dense() data_d = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,15,15}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@404353fa0,inputs[0],outputs[1] M:
-             outputs[0]=@404353fa0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@4043564b0,inputs[0],outputs[1] M:
+             outputs[0]=@4043564b0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,15,15}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4045dd380,inputs[0],outputs[1] M:
-             outputs[0]=@4045dd380 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@40462f630,inputs[0],outputs[1] M:
+             outputs[0]=@40462f630 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,15,15}
@@ -104,124 +151,185 @@ T:clean-up
 T:simple_net() DONE passed
 
      ******  Program Information  ******
-  Real Time (sec)               :            67.357417
-  User Time (sec)               :            67.351904
-  Sys  Time (sec)               :             0.004734
-  Vector Time (sec)             :             0.000043
-  Inst. Count                   :          65894312574.
-  V. Inst. Count                :                  780.
-  V. Element Count              :                57394.
-  V. Load Element Count         :                24313.
-  FLOP Count                    :            134237333.
-  MOPS                          :           978.359412
-  MFLOPS                        :             1.993074
-  A. V. Length                  :            73.582051
-  V. Op. Ratio (%)              :             0.000087
+  Real Time (sec)               :             0.898613
+  User Time (sec)               :             0.890481
+  Sys  Time (sec)               :             0.006127
+  Vector Time (sec)             :             0.002378
+  Inst. Count                   :            882727119.
+  V. Inst. Count                :               751516.
+  V. Element Count              :            161604980.
+  V. Load Element Count         :              4393506.
+  FLOP Count                    :            133891787.
+  MOPS                          :          1171.929084
+  MFLOPS                        :           150.358949
+  A. V. Length                  :           215.038642
+  V. Op. Ratio (%)              :            15.485625
   Memory Size (MB)              :           192.000000
-  MIPS                          :           978.358571
-  I-Cache (sec)                 :             0.001933
-  O-Cache (sec)                 :             0.189706
+  MIPS                          :           991.292480
+  I-Cache (sec)                 :             0.002118
+  O-Cache (sec)                 :             0.004142
   Bank Conflict Time
-    CPU Port Conf. (sec)        :             0.000001
-    Memory Network Conf. (sec)  :             0.000005
-  ADB Hit Element Ratio (%)     :             0.000000
+    CPU Port Conf. (sec)        :             0.000009
+    Memory Network Conf. (sec)  :             0.000079
+  ADB Hit Element Ratio (%)     :            87.419205
 
-  Start Time (date)    :  Mon Jun 12 19:41:58 GMT 2017
-  End   Time (date)    :  Mon Jun 12 19:43:05 GMT 2017
+  Start Time (date)    :  Tue Jun 13 19:45:34 GMT 2017
+  End   Time (date)    :  Tue Jun 13 19:45:35 GMT 2017
 >>>> simple-net-cpp
-
- ***** NEW CONVOLUTION TYPES *****
- _ref_conv( src        :fmt=memory_format:nchw : memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,3,227,227}
-          , weight/bias:fmt=memory_format:oihw : memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:oihw,dims=dims:{96,3,11,11}
-          , dst        :fmt=memory_format:nchw : memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,55,55} )
+tee: cannot access simple-net-cpp.log
+simple_net() creates a cpu_engine
+setting various layer dimension
+create memory for user data
+create memory descriptors for convolution data w/ no specified format
+create a convolution
+ VERBOSE_PRIMITIVE_CREATE = 1
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+create reorders between src data and conv input [if req'd]
+create conv primitive and add it to net
+create relu primitive and add it to net
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
 
 +relu_fwd_t:
             kind()=primitive_kind:relu
             inputs,outputs.size()=1,1
             conf_.n_inputs(),n_outputs()1,1
             input_pd(0)->kind() primitive_kind:memory
-           *           ->desc() memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,55,55}
+           *           ->desc() memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,15,15}
             output_pd(0)->kind() primitive_kind:memory
-           *            ->desc() memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,55,55}
+           *            ->desc() memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,15,15}
+create lrn primitive and add it to net
+retrieve lrn memory descriptor
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)4>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)5>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_softmax_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)4, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)5, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)6, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_lrn_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+create lrn scratch memory from lrn primitive descriptor
+push lrn onto net
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)4>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)5>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_softmax_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+create pooling primitive an add it to net
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4049a0ad0,inputs[0],outputs[1] M:
-             outputs[0]=@4049a0ad0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404357aa0,inputs[0],outputs[1] M:
+             outputs[0]=@404357aa0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,3,227,227}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,3,67,67}
  cpu_primitive.hpp input_memory(index=1) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4049a0d20,inputs[0],outputs[1] M:
-             outputs[0]=@4049a0d20 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404357cf0,inputs[0],outputs[1] M:
+             outputs[0]=@404357cf0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:oihw,dims=dims:{96,3,11,11}
  cpu_primitive.hpp input_memory(index=2) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4049a0f70,inputs[0],outputs[1] M:
-             outputs[0]=@4049a0f70 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404357f40,inputs[0],outputs[1] M:
+             outputs[0]=@404357f40 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,1,data_type:f32,memory_format:x,dims=dims:{96}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4049a11c0,inputs[0],outputs[1] M:
-             outputs[0]=@4049a11c0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404358190,inputs[0],outputs[1] M:
+             outputs[0]=@404358190 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,55,55}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,15,15}
 
-ref_relu_fwd_t<>::execut_forward_dense() data_d = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,55,55}
+ref_relu_fwd_t<>::execut_forward_dense() data_d = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,15,15}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@405281bd0,inputs[0],outputs[1] M:
-             outputs[0]=@405281bd0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@4043583e0,inputs[0],outputs[1] M:
+             outputs[0]=@4043583e0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,55,55}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,15,15}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@405b5ea30,inputs[0],outputs[1] M:
-             outputs[0]=@405b5ea30 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404358630,inputs[0],outputs[1] M:
+             outputs[0]=@404358630 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,55,55}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{8,96,15,15}
+ simple_net.cpp stream(eager).submit(net).wait() DONE (yay)
+ 
+Goodbye
 
      ******  Program Information  ******
-  Real Time (sec)               :           907.296045
-  User Time (sec)               :           907.015159
-  Sys  Time (sec)               :             0.143101
-  Vector Time (sec)             :             0.000047
-  Inst. Count                   :         885885214970.
-  V. Inst. Count                :                  812.
-  V. Element Count              :                61364.
-  V. Load Element Count         :                26298.
-  FLOP Count                    :           1805228563.
-  MOPS                          :           976.703936
-  MFLOPS                        :             1.990296
-  A. V. Length                  :            75.571429
-  V. Op. Ratio (%)              :             0.000007
+  Real Time (sec)               :             0.910565
+  User Time (sec)               :             0.891133
+  Sys  Time (sec)               :             0.008548
+  Vector Time (sec)             :             0.002394
+  Inst. Count                   :            882036013.
+  V. Inst. Count                :               751576.
+  V. Element Count              :            161609070.
+  V. Load Element Count         :              4395551.
+  FLOP Count                    :            133891664.
+  MOPS                          :          1170.300625
+  MFLOPS                        :           150.248800
+  A. V. Length                  :           215.026917
+  V. Op. Ratio (%)              :            15.496220
   Memory Size (MB)              :           192.000000
-  MIPS                          :           976.703869
-  I-Cache (sec)                 :             0.020518
-  O-Cache (sec)                 :             4.367836
+  MIPS                          :           989.791662
+  I-Cache (sec)                 :             0.003061
+  O-Cache (sec)                 :             0.004641
   Bank Conflict Time
-    CPU Port Conf. (sec)        :             0.000001
-    Memory Network Conf. (sec)  :             0.000006
-  ADB Hit Element Ratio (%)     :             0.000000
+    CPU Port Conf. (sec)        :             0.000009
+    Memory Network Conf. (sec)  :             0.000095
+  ADB Hit Element Ratio (%)     :            74.868429
 
-  Start Time (date)    :  Mon Jun 12 19:43:05 GMT 2017
-  End   Time (date)    :  Mon Jun 12 19:58:12 GMT 2017
+  Start Time (date)    :  Tue Jun 13 19:45:35 GMT 2017
+  End   Time (date)    :  Tue Jun 13 19:45:36 GMT 2017
 >>>> simple-training-net-c
-
- ***** NEW CONVOLUTION TYPES *****
- _ref_conv( src        :fmt=memory_format:nchw : memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,3,67,67}
-          , weight/bias:fmt=memory_format:oihw : memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:oihw,dims=dims:{96,3,11,11}
-          , dst        :fmt=memory_format:nchw : memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15} )
-
-+relu_fwd_t:
-            kind()=primitive_kind:relu
-            inputs,outputs.size()=1,1
-            conf_.n_inputs(),n_outputs()1,1
-            input_pd(0)->kind() primitive_kind:memory
-           *           ->desc() memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
-            output_pd(0)->kind() primitive_kind:memory
-           *            ->desc() memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
+tee: cannot access simple-training-net-c.log
+ VERBOSE_PRIMITIVE_CREATE = 1
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
 
 +relu_fwd_t:
             kind()=primitive_kind:relu
@@ -231,240 +339,452 @@ ref_relu_fwd_t<>::execut_forward_dense() data_d = memory_desc:primitive_kind:mem
            *           ->desc() memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
             output_pd(0)->kind() primitive_kind:memory
            *            ->desc() memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)4>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)5>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_softmax_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)4, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)5, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)6, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_lrn_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)4>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)5>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_softmax_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)4>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)5>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_softmax_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:unimplemented
+ create<mkldnn::impl::cpu::nchw_pooling_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)4>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)5>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_softmax_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)4, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)5, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)6, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_lrn_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:unimplemented
+ create<mkldnn::impl::cpu::ref_lrn_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:unimplemented
+ create<mkldnn::impl::cpu::ref_relu_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+
++relu_fwd_t:
+            kind()=primitive_kind:relu
+            inputs,outputs.size()=1,1
+            conf_.n_inputs(),n_outputs()1,1
+            input_pd(0)->kind() primitive_kind:memory
+           *           ->desc() memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
+            output_pd(0)->kind() primitive_kind:memory
+           *            ->desc() memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
+ VERBOSE_PRIMITIVE_CREATE = 1
+ mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>::pd_t failed precondition:
+	utils::one_of(this->cdesc_().prop_kind, forward_training, forward_inference)
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:unimplemented
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:unimplemented
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4044fd3c0,inputs[0],outputs[1] M:
-             outputs[0]=@4044fd3c0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@4044ff8d0,inputs[0],outputs[1] M:
+             outputs[0]=@4044ff8d0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,3,67,67}
  cpu_primitive.hpp input_memory(index=1) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4044fd7e0,inputs[0],outputs[1] M:
-             outputs[0]=@4044fd7e0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@4044ffcf0,inputs[0],outputs[1] M:
+             outputs[0]=@4044ffcf0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:oihw,dims=dims:{96,3,11,11}
  cpu_primitive.hpp input_memory(index=2) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4044fdc00,inputs[0],outputs[1] M:
-             outputs[0]=@4044fdc00 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404500110,inputs[0],outputs[1] M:
+             outputs[0]=@404500110 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,1,data_type:f32,memory_format:x,dims=dims:{96}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4044fde50,inputs[0],outputs[1] M:
-             outputs[0]=@4044fde50 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404500360,inputs[0],outputs[1] M:
+             outputs[0]=@404500360 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
 
 ref_relu_fwd_t<>::execut_forward_dense() data_d = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@404c0ea90,inputs[0],outputs[1] M:
-             outputs[0]=@404c0ea90 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@4045005b0,inputs[0],outputs[1] M:
+             outputs[0]=@4045005b0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@404eb2ad0,inputs[0],outputs[1] M:
-             outputs[0]=@404eb2ad0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404f04d60,inputs[0],outputs[1] M:
+             outputs[0]=@404f04d60 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4051ea2e0,inputs[0],outputs[1] M:
-             outputs[0]=@4051ea2e0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@40523c570,inputs[0],outputs[1] M:
+             outputs[0]=@40523c570 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,7,7}
  cpu_primitive.hpp input_memory(index=1) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4051ea090,inputs[0],outputs[1] M:
-             outputs[0]=@4051ea090 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@40523c320,inputs[0],outputs[1] M:
+             outputs[0]=@40523c320 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:s32,memory_format:nchw,dims=dims:{32,96,7,7}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@404c0ea90,inputs[0],outputs[1] M:
-             outputs[0]=@404c0ea90 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@4045005b0,inputs[0],outputs[1] M:
+             outputs[0]=@4045005b0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
  cpu_primitive.hpp input_memory(index=1) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4051ea530,inputs[0],outputs[1] M:
-             outputs[0]=@4051ea530 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@40523c7c0,inputs[0],outputs[1] M:
+             outputs[0]=@40523c7c0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4044fde50,inputs[0],outputs[1] M:
-             outputs[0]=@4044fde50 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404500360,inputs[0],outputs[1] M:
+             outputs[0]=@404500360 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
 
 ref_relu_fwd_t<>::execut_forward_dense() data_d = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4044fd3c0,inputs[0],outputs[1] M:
-             outputs[0]=@4044fd3c0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@4044ff8d0,inputs[0],outputs[1] M:
+             outputs[0]=@4044ff8d0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,3,67,67}
  cpu_primitive.hpp input_memory(index=1) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4055b6050,inputs[0],outputs[1] M:
-             outputs[0]=@4055b6050 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@4056082e0,inputs[0],outputs[1] M:
+             outputs[0]=@4056082e0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
 passed
 
      ******  Program Information  ******
-  Real Time (sec)               :           549.203834
-  User Time (sec)               :           549.172744
-  Sys  Time (sec)               :             0.016766
-  Vector Time (sec)             :             0.000091
-  Inst. Count                   :         539470234298.
-  V. Inst. Count                :                 1540.
-  V. Element Count              :               112590.
-  V. Load Element Count         :                51911.
-  FLOP Count                    :           1234188712.
-  MOPS                          :           982.332702
-  MFLOPS                        :             2.247360
-  A. V. Length                  :            73.110390
-  V. Op. Ratio (%)              :             0.000021
+  Real Time (sec)               :            18.607766
+  User Time (sec)               :            18.585364
+  Sys  Time (sec)               :             0.010068
+  Vector Time (sec)             :             0.018317
+  Inst. Count                   :          18368813747.
+  V. Inst. Count                :              6650638.
+  V. Element Count              :           1293908542.
+  V. Load Element Count         :             35004895.
+  FLOP Count                    :           1232771803.
+  MOPS                          :          1057.610260
+  MFLOPS                        :            66.330248
+  A. V. Length                  :           194.554048
+  V. Op. Ratio (%)              :             6.582742
   Memory Size (MB)              :           192.000000
-  MIPS                          :           982.332500
-  I-Cache (sec)                 :             0.004334
-  O-Cache (sec)                 :             2.754700
+  MIPS                          :           988.348345
+  I-Cache (sec)                 :             0.003613
+  O-Cache (sec)                 :             0.036114
   Bank Conflict Time
-    CPU Port Conf. (sec)        :             0.000002
-    Memory Network Conf. (sec)  :             0.000012
-  ADB Hit Element Ratio (%)     :             0.000000
+    CPU Port Conf. (sec)        :             0.000108
+    Memory Network Conf. (sec)  :             0.000577
+  ADB Hit Element Ratio (%)     :            89.355640
 
-  Start Time (date)    :  Mon Jun 12 19:58:12 GMT 2017
-  End   Time (date)    :  Mon Jun 12 20:07:22 GMT 2017
+  Start Time (date)    :  Tue Jun 13 19:45:36 GMT 2017
+  End   Time (date)    :  Tue Jun 13 19:45:54 GMT 2017
 >>>> simple-training-net-cpp
-
- ***** NEW CONVOLUTION TYPES *****
- _ref_conv( src        :fmt=memory_format:nchw : memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,3,227,227}
-          , weight/bias:fmt=memory_format:oihw : memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:oihw,dims=dims:{96,3,11,11}
-          , dst        :fmt=memory_format:nchw : memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,55,55} )
+tee: cannot access simple-training-net-cpp.log
+ VERBOSE_PRIMITIVE_CREATE = 1
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
 
 +relu_fwd_t:
             kind()=primitive_kind:relu
             inputs,outputs.size()=1,1
             conf_.n_inputs(),n_outputs()1,1
             input_pd(0)->kind() primitive_kind:memory
-           *           ->desc() memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,55,55}
+           *           ->desc() memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
             output_pd(0)->kind() primitive_kind:memory
-           *            ->desc() memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,55,55}
+           *            ->desc() memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)4>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)5>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_softmax_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)4, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)5, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)6, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_lrn_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)4>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)5>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_softmax_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)4>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)5>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_softmax_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:unimplemented
+ create<mkldnn::impl::cpu::nchw_pooling_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)4>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)5>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_softmax_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::nchw_pooling_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)4, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)5, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_pooling_fwd_t<(mkldnn_data_type_t)6, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_lrn_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:unimplemented
+ create<mkldnn::impl::cpu::ref_lrn_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1, (mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_data_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_convolution_bwd_weights_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)6, (mkldnn_data_type_t)5, (mkldnn_data_type_t)2, (mkldnn_data_type_t)6>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)4, (mkldnn_data_type_t)4, (mkldnn_data_type_t)2, (mkldnn_data_type_t)2>>::pd_t(pd,adesc,engine,hint_fwd) --> status:invalid_arguments
+ create<mkldnn::impl::cpu::ref_relu_fwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:unimplemented
+ create<mkldnn::impl::cpu::ref_relu_bwd_t<(mkldnn_data_type_t)1>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+ VERBOSE_PRIMITIVE_CREATE = 1
+ mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>::pd_t failed precondition:
+	utils::one_of(this->cdesc_().prop_kind, forward_training, forward_inference)
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:unimplemented
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_data_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:unimplemented
+ create<mkldnn::impl::cpu::_gemm_convolution_bwd_weights_t<false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@405e315b0,inputs[0],outputs[1] M:
-             outputs[0]=@405e315b0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404501ac0,inputs[0],outputs[1] M:
+             outputs[0]=@404501ac0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,3,227,227}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,3,67,67}
  cpu_primitive.hpp input_memory(index=1) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@405e31800,inputs[0],outputs[1] M:
-             outputs[0]=@405e31800 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404501d10,inputs[0],outputs[1] M:
+             outputs[0]=@404501d10 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:oihw,dims=dims:{96,3,11,11}
  cpu_primitive.hpp input_memory(index=2) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@405e31a50,inputs[0],outputs[1] M:
-             outputs[0]=@405e31a50 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404501f60,inputs[0],outputs[1] M:
+             outputs[0]=@404501f60 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
               *conf_.desc() = memory_desc:primitive_kind:memory,1,data_type:f32,memory_format:x,dims=dims:{96}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@405e31ca0,inputs[0],outputs[1] M:
-             outputs[0]=@405e31ca0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@4045021b0,inputs[0],outputs[1] M:
+             outputs[0]=@4045021b0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,55,55}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
 
-ref_relu_fwd_t<>::execut_forward_dense() data_d = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,55,55}
+ref_relu_fwd_t<>::execut_forward_dense() data_d = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4081a8ab0,inputs[0],outputs[1] M:
-             outputs[0]=@4081a8ab0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404502400,inputs[0],outputs[1] M:
+             outputs[0]=@404502400 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,55,55}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4081a8d00,inputs[0],outputs[1] M:
-             outputs[0]=@4081a8d00 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404503430,inputs[0],outputs[1] M:
+             outputs[0]=@404503430 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,55,55}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@40ec040b0,inputs[0],outputs[1] M:
-             outputs[0]=@40ec040b0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404a9d220,inputs[0],outputs[1] M:
+             outputs[0]=@404a9d220 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,27,27}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,7,7}
  cpu_primitive.hpp input_memory(index=1) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@40a51cf90,inputs[0],outputs[1] M:
-             outputs[0]=@40a51cf90 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404a9cfd0,inputs[0],outputs[1] M:
+             outputs[0]=@404a9cfd0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:s32,memory_format:nchw,dims=dims:{32,96,27,27}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:s32,memory_format:nchw,dims=dims:{32,96,7,7}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@4081a8ab0,inputs[0],outputs[1] M:
-             outputs[0]=@4081a8ab0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404502400,inputs[0],outputs[1] M:
+             outputs[0]=@404502400 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,55,55}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
  cpu_primitive.hpp input_memory(index=1) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@40ec04300,inputs[0],outputs[1] M:
-             outputs[0]=@40ec04300 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404fe4340,inputs[0],outputs[1] M:
+             outputs[0]=@404fe4340 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,55,55}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@405e31ca0,inputs[0],outputs[1] M:
-             outputs[0]=@405e31ca0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@4045021b0,inputs[0],outputs[1] M:
+             outputs[0]=@4045021b0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,55,55}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
  cpu_primitive.hpp input_memory(index=1) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@40ec04550,inputs[0],outputs[1] M:
-             outputs[0]=@40ec04550 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404fe4590,inputs[0],outputs[1] M:
+             outputs[0]=@404fe4590 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,55,55}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
  cpu_primitive.hpp input_memory(index=0) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@405e315b0,inputs[0],outputs[1] M:
-             outputs[0]=@405e315b0 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404501ac0,inputs[0],outputs[1] M:
+             outputs[0]=@404501ac0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,3,227,227}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,3,67,67}
  cpu_primitive.hpp input_memory(index=1) :
-    this->inputs()[index] =  A  C  primitive_kind:memory@40fd1d060,inputs[0],outputs[1] M:
-             outputs[0]=@40fd1d060 B ,output_index=0
+    this->inputs()[index] =  A  C  primitive_kind:memory@404fe47e0,inputs[0],outputs[1] M:
+             outputs[0]=@404fe47e0 B ,output_index=0
  cpu_memory_t::const_memory(0) :
                conf_.kind() = primitive_kind:memory
-              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,55,55}
+              *conf_.desc() = memory_desc:primitive_kind:memory,4,data_type:f32,memory_format:nchw,dims=dims:{32,96,15,15}
 passed
 
      ******  Program Information  ******
-  Real Time (sec)               :          7380.576662
-  User Time (sec)               :          7380.366686
-  Sys  Time (sec)               :             0.175179
-  Vector Time (sec)             :             0.000094
-  Inst. Count                   :        7253451485942.
-  V. Inst. Count                :                 1616.
-  V. Element Count              :               122826.
-  V. Load Element Count         :                57029.
-  FLOP Count                    :          16743170814.
-  MOPS                          :           982.803689
-  MFLOPS                        :             2.268610
-  A. V. Length                  :            76.006188
-  V. Op. Ratio (%)              :             0.000002
-  Memory Size (MB)              :           448.000000
-  MIPS                          :           982.803673
-  I-Cache (sec)                 :             0.022861
-  O-Cache (sec)                 :            29.737508
+  Real Time (sec)               :            18.940667
+  User Time (sec)               :            18.912898
+  Sys  Time (sec)               :             0.010102
+  Vector Time (sec)             :             0.018323
+  Inst. Count                   :          18590125719.
+  V. Inst. Count                :              6650712.
+  V. Element Count              :           1293918768.
+  V. Load Element Count         :             35010008.
+  FLOP Count                    :           1245408265.
+  MOPS                          :          1050.996721
+  MFLOPS                        :            65.849679
+  A. V. Length                  :           194.553420
+  V. Op. Ratio (%)              :             6.509499
+  Memory Size (MB)              :           192.000000
+  MIPS                          :           982.933748
+  I-Cache (sec)                 :             0.004714
+  O-Cache (sec)                 :             0.165281
   Bank Conflict Time
-    CPU Port Conf. (sec)        :             0.000002
-    Memory Network Conf. (sec)  :             0.000010
-  ADB Hit Element Ratio (%)     :             0.000000
+    CPU Port Conf. (sec)        :             0.000109
+    Memory Network Conf. (sec)  :             0.000568
+  ADB Hit Element Ratio (%)     :            89.122493
 
-  Start Time (date)    :  Mon Jun 12 20:07:22 GMT 2017
-  End   Time (date)    :  Mon Jun 12 22:10:22 GMT 2017
+  Start Time (date)    :  Tue Jun 13 19:45:54 GMT 2017
+  End   Time (date)    :  Tue Jun 13 19:46:13 GMT 2017

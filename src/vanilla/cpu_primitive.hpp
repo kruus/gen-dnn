@@ -23,7 +23,8 @@
 #include "event.hpp"
 #include "primitive.hpp"
 
-#ifndef NDEBUG
+#define CPU_PRIMITIVE_HPP_DBG 0
+#if CPU_PRIMITIVE_HPP_DBG
 #include "mkldnn_io.hpp"
 #endif
 
@@ -52,12 +53,12 @@ struct cpu_primitive_t: public primitive_t {
     }
     const char *input_memory(size_t index = 0) const {
         if (index >= this->inputs().size()) {
-#ifndef NDEBUG
+#if CPU_PRIMITIVE_HPP_DBG
             std::cout<<" cpu_primitive.hpp input_memory(index="<<index<<") does not exist (return nullptr)"<<std::endl;
 #endif
             return nullptr;
         }
-#ifndef NDEBUG
+#if CPU_PRIMITIVE_HPP_DBG
         using ::mkldnn::operator<<;
         using namespace std;
         cout<<" cpu_primitive.hpp input_memory(index="<<index<<") :\n"

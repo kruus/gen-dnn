@@ -26,14 +26,14 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
-#ifndef NDEBUG
+#define CPU_MEMORY_HPP_DBG 0
+#if CPU_MEMORY_HPP_DBG
 #include "mkldnn_io.hpp"
 #endif
 
-#if defined(_SX)
-#include <stdio.h>
+#if CPU_MEMORY_HPP_DBG && defined(_SX)
 inline void cpu_memory_brk(size_t output_index){
-    printf(" cpu_memory_t::const_memory(%lu)!!!\n",(long unsigned)output_index);
+    std::cout<<" cpu_memory_t::const_memory("<<output_index<<")!!!"<<std::endl;
 }
 #endif
 
@@ -82,33 +82,30 @@ struct cpu_memory_t: public cpu_primitive_t {
     virtual const char* const_memory(size_t output_index = 0) const
     //{ assert(output_index == 0); return data_; }
     {
-#ifndef NDEBUG
-        // sxc++ triggers this assertion !!!
-        /*assert(output_index == 0);*/
-#if 0
-        printf(" cpu_memory_t::const_memory(%lu)\n",(long unsigned)output_index);
-        printf("\n               conf_.kind() = %s",
-               mkldnn_name_primitive_kind(conf_.kind()));
-        char buf[1024];
-        mkldnn_name_memory_desc(conf_.desc(), buf, 1024);
-        printf("\n               conf_.desc() = %s", buf);
-#else
+#if ! CPU_MEMORY_HPP_DBG
+        assert(output_index == 0);
+        return data_;
+#else // sxc++ triggered above assertion
+        // debugging uncovered an sxcc compiler bug in C struct initializers
+        // that left uninitialized garbage values.
+        // fix was to fully specify struct initializers
+        // Example:    mem_at_t x={a}   -->      mem_at_t x={a,0}
         using namespace std;
         cout<<" cpu_memory_t::const_memory("<<output_index<<") :\n"
             <<"               conf_.kind() = "<<conf_.kind()<<"\n"
             <<"              *conf_.desc() = "<<*conf_.desc()<<endl;
-#endif
         if(output_index!=0) {
-            printf(" ERROR: cpu_memory_t::const_memory(output_index=%lu) called with non-zero output_index", (long unsigned)output_index);
+            std::cout<<" ERROR: cpu_memory_t::const_memory(output_index="<<output_index
+                <<") called with non-zero output_index"<<std::endl;
 #if defined(_SX)
-            ::cpu_memory_brk(output_index);
+            ::cpu_memory_brk(output_index); // provide a convenient debugger breakpoint
 #endif
             assert(conf_.kind() == mkldnn_memory);
             assert(output_index==0);
-            }
-#endif
-            return data_;
-            }
+        }
+        return data_;
+#endif // CPU_MEMORY_HPP_DBG
+    }
 
 private:
     pd_t conf_;

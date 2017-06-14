@@ -68,12 +68,11 @@ inline size_t map_index(const mkldnn::memory::desc &md, size_t index) {
         EXPECT_LE(dims[d], pdims[d]);
 
         int cur_dim = dims[d];
-        assert( cur_dim > 0 );
+        EXPECT_GT(cur_dim, 0);
         int cur_block = md.data.layout_desc.blocking.block_dims[d];
 
-        assert( index > 0 && cur_dim > 0 );
         size_t pos_d = /*static_cast<ssize_t>*/(index % cur_dim);
-        assert(optd[d] >= 0);
+        EXPECT_GE(optd[d], 0);
         size_t cur_pos = optd[d] + pos_d;
 
         size_t cur_pos_block = cur_pos / cur_block;
@@ -88,8 +87,9 @@ inline size_t map_index(const mkldnn::memory::desc &md, size_t index) {
         index /= cur_dim;
     }
     if (md.data.format == f_weights_g || md.data.format == f_weights) {
-        assert( ph_index > oc_16 + ic_2 - 16*ic_2 );
-        ph_index += oc_16 + ic_2 - 16*ic_2;
+        ph_index += oc_16 + ic_2;
+        EXPECT_GE(ph_index, 16*ic_2);
+        ph_index -= 16*ic_2;
     }
     ph_index += md.data.layout_desc.blocking.offset_padding;
 

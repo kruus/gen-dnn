@@ -180,9 +180,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     nullptr,
 };
 
-#if 0 // original
-#define INSTANCE(...) &primitive_desc_t::create<__VA_ARGS__::pd_t>
-#else
+#if VERBOSE_PRIMITIVE_CREATE
 /** A verbose version of primitive_desc_t::create<pd_t>. \sa primitive_desc.hpp */
 template<typename prim>
 static mkldnn::impl::status_t verbose_primitive_desc_create(
@@ -198,6 +196,8 @@ static mkldnn::impl::status_t verbose_primitive_desc_create(
     return ret;
 }
 #define INSTANCE(...) &verbose_primitive_desc_create<__VA_ARGS__>
+#else // original
+#define INSTANCE(...) &primitive_desc_t::create<__VA_ARGS__::pd_t>
 #endif
 static const pd_create_f cpu_impl_list[] = {
     /* conv */
