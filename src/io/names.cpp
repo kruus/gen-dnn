@@ -17,6 +17,10 @@ extern "C"
 
 // nonexistent on SX
 //using std::snprintf;    // C11 snprintf specifices C99 behavior (always return # chars that would have been written)
+#if defined(_SX) // internal routine, suggested by Kazuhisa Ishizaka
+extern int __c_snprintf  (char *s, size_t maxsize, const  char  *format, ...);
+#define snprintf __c_snprintf/*guaranteed to have correct c99 behavior*/
+#endif
 
 #define NAMEENUM_T( TYPENAME ) char const* mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const e )
 /*NAMEENUM_T(status){*/
@@ -277,7 +281,7 @@ NAMEENUM_T(stream_kind){
 #endif
 
 
-#if 0
+#if 0 /* debug uncovered erroneous snprintf behavior with sxc++ -Cdebug */
 int mkldnn_name_dims( mkldnn_dims_t const dims, char *const buf, int len){ /* no macro - mkldnn_dims_t is already a ptr */
 #if DBG
     fflush(stdout);
@@ -550,6 +554,9 @@ NAMEFUNC_T(primitive_at,prat){
 //NAMEFUNC_T2(primitive, const_mkldnn_primitive_t);
 //NAMEFUNC_T2(stream, const_mkldnn_stream_t);
 #undef NAMEFUNC_T2
+#if defined(_SX)
+#undef snprintf
+#endif
 #ifdef __cplusplus
 } // "C"
 #endif

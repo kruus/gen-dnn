@@ -25,15 +25,13 @@
 #include "mkldnn.h"
 #include "mkldnn_io.h"
 
-/** SX compile will define BAD_SNPRINTF because it does not follow c++11 std.
+/* SX compile will define BAD_SNPRINTF because it does not follow c++11 std.
  * \deprecated -- traced to compiler issue with -Cdebug or -Cnoopt
  * that silently, incorrectly changes the language semantics.
+ * sx compilation now replaces -Cdebug with a long list of compile flags that avoid
+ * the bug.
  */
-#if defined(BAD_SNPRINTF)
-#define SNPRINTF_OK 1
-#else
-#define SNPRINTF_OK 1
-#endif
+/*#define SNPRINTF_OK 0*/
 
 #define CHECK(f) do { \
     mkldnn_status_t const s = (f); \
@@ -106,9 +104,7 @@ void io0() {
 #else
         printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
 #endif
-#if SNPRINTF_OK
         CHECK_TRUE(sz0 == len);
-#endif
         CHECK_TRUE(buf[len-1] == '\0');
 #undef len
     }
@@ -123,9 +119,7 @@ void io0() {
 #else
         printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
 #endif
-#if SNPRINTF_OK
         CHECK_TRUE(sz0 > len);
-#endif
         CHECK_TRUE(buf[len-1] == '\0');
 #undef len
     }
@@ -175,13 +169,11 @@ void test1() {
     // CHECK(mkldnn_engine_create(&engine, mkldnn_any_engine, 0)); // NOT mkldnn_any
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0));
 
-    const int len0 = 100;
+#define len0 100
+    //const int len0 = 100; // sxcc warning about non-standard C "real_t data[len0]"*/
+    // OK to leave garbage in rest of dims[].
     mkldnn_dims_t dims = {len0};
-#ifndef _SX // SX warns about non-standard C
     real_t data[len0];
-#else
-    real_t *data = (float*)malloc(product(dims,1)*sizeof(float));
-#endif
 
     mkldnn_memory_desc_t md;
     mkldnn_primitive_desc_t mpd;
@@ -210,9 +202,7 @@ void test1() {
     CHECK(mkldnn_primitive_desc_destroy(mpd));
 
     CHECK(mkldnn_engine_destroy(engine));
-#ifdef _SX
-    free(data);
-#endif
+#undef len0
 }
 
 void test2() {

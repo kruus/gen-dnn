@@ -1956,11 +1956,11 @@ Scanning dependencies of target mkldnn_gtest
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/gtests/gtest/CMakeFiles/mkldnn_gtest.dir/build.make tests/gtests/gtest/CMakeFiles/mkldnn_gtest.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[  1%] Building CXX object tests/gtests/gtest/CMakeFiles/mkldnn_gtest.dir/src/gtest-all.cc.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/gtest && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest/..  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/mkldnn_gtest.dir/src/gtest-all.cc.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest/src/gtest-all.cc
 Scanning dependencies of target mkldnn
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f src/CMakeFiles/mkldnn.dir/build.make src/CMakeFiles/mkldnn.dir/build
+[  1%] Building CXX object tests/gtests/gtest/CMakeFiles/mkldnn_gtest.dir/src/gtest-all.cc.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/gtest && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest/..  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/mkldnn_gtest.dir/src/gtest-all.cc.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest/src/gtest-all.cc
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 [  4%] Building CXX object src/CMakeFiles/mkldnn.dir/common/convolution.cpp.o
 [  4%] Building CXX object src/CMakeFiles/mkldnn.dir/common/batch_normalization.cpp.o
@@ -1996,8 +1996,8 @@ cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++  -DCMAKE
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/mkldnn.dir/common/relu.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/relu.cpp
 [ 17%] Building CXX object src/CMakeFiles/mkldnn.dir/common/softmax.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/mkldnn.dir/common/softmax.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/softmax.cpp
-[ 19%] Building CXX object src/CMakeFiles/mkldnn.dir/io/names.cpp.o
 [ 19%] Building CXX object src/CMakeFiles/mkldnn.dir/common/stream.cpp.o
+[ 19%] Building CXX object src/CMakeFiles/mkldnn.dir/io/names.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/mkldnn.dir/common/stream.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common/stream.cpp
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/src/common  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/mkldnn.dir/io/names.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/src/io/names.cpp
 [ 20%] Building CXX object src/CMakeFiles/mkldnn.dir/io/ostream.cpp.o
@@ -2052,45 +2052,45 @@ make -f examples/CMakeFiles/simple-training-net-c.dir/build.make examples/CMakeF
 make -f examples/CMakeFiles/simple-net-cpp.dir/build.make examples/CMakeFiles/simple-net-cpp.dir/depend
 make -f examples/CMakeFiles/simple-net-c.dir/build.make examples/CMakeFiles/simple-net-c.dir/depend
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-net-cpp.dir/DependInfo.cmake --color=
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-net-c.dir/DependInfo.cmake --color=
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-training-net-cpp.dir/DependInfo.cmake --color=
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-net-cpp.dir/DependInfo.cmake --color=
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-training-net-c.dir/DependInfo.cmake --color=
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-net-c.dir/DependInfo.cmake --color=
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-net-c.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-net-c.dir/depend.internal".
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-net-c.dir/depend.internal".
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-net-cpp.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-net-cpp.dir/depend.internal".
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-net-cpp.dir/depend.internal".
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-training-net-cpp.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-training-net-cpp.dir/depend.internal".
-Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-net-c.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-net-c.dir/depend.internal".
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-training-net-c.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-training-net-c.dir/depend.internal".
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-training-net-cpp.dir/depend.internal".
-Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-net-c.dir/depend.internal".
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-training-net-c.dir/depend.internal".
-Scanning dependencies of target simple-net-c
-Scanning dependencies of target simple-training-net-c
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f examples/CMakeFiles/simple-net-c.dir/build.make examples/CMakeFiles/simple-net-c.dir/build
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f examples/CMakeFiles/simple-training-net-c.dir/build.make examples/CMakeFiles/simple-training-net-c.dir/build
 Scanning dependencies of target simple-net-cpp
-Scanning dependencies of target simple-training-net-cpp
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f examples/CMakeFiles/simple-net-cpp.dir/build.make examples/CMakeFiles/simple-net-cpp.dir/build
+Scanning dependencies of target simple-net-c
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+make -f examples/CMakeFiles/simple-net-c.dir/build.make examples/CMakeFiles/simple-net-c.dir/build
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+Scanning dependencies of target simple-training-net-cpp
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f examples/CMakeFiles/simple-training-net-cpp.dir/build.make examples/CMakeFiles/simple-training-net-cpp.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 36%] Building CXX object examples/CMakeFiles/simple-training-net-cpp.dir/simple_training_net.cpp.o
-[ 36%] Building C object examples/CMakeFiles/simple-net-c.dir/simple_net.c.o
-[ 36%] Building C object examples/CMakeFiles/simple-training-net-c.dir/simple_training_net.c.o
-[ 36%] Building CXX object examples/CMakeFiles/simple-net-cpp.dir/simple_net.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/simple-training-net-cpp.dir/simple_training_net.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples/simple_training_net.cpp
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples && /SX/usr/bin/sxcc -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include  -DUSE_CBLAS -size_t64 -Kc99,gcc -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kc99,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/simple-net-c.dir/simple_net.c.o   -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples/simple_net.c
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples && /SX/usr/bin/sxcc -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include  -DUSE_CBLAS -size_t64 -Kc99,gcc -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kc99,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/simple-training-net-c.dir/simple_training_net.c.o   -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples/simple_training_net.c
+[ 34%] Building CXX object examples/CMakeFiles/simple-net-cpp.dir/simple_net.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/simple-net-cpp.dir/simple_net.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples/simple_net.cpp
+[ 35%] Building CXX object examples/CMakeFiles/simple-training-net-cpp.dir/simple_training_net.cpp.o
+[ 35%] Building C object examples/CMakeFiles/simple-net-c.dir/simple_net.c.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples && /SX/usr/bin/sxcc -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include  -DUSE_CBLAS -size_t64 -Kc99,gcc -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kc99,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/simple-net-c.dir/simple_net.c.o   -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples/simple_net.c
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/simple-training-net-cpp.dir/simple_training_net.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples/simple_training_net.cpp
+Scanning dependencies of target simple-training-net-c
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+make -f examples/CMakeFiles/simple-training-net-c.dir/build.make examples/CMakeFiles/simple-training-net-c.dir/build
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 36%] Building C object examples/CMakeFiles/simple-training-net-c.dir/simple_training_net.c.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples && /SX/usr/bin/sxcc -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include  -DUSE_CBLAS -size_t64 -Kc99,gcc -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kc99,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/simple-training-net-c.dir/simple_training_net.c.o   -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples/simple_training_net.c
 [ 37%] Linking CXX executable simple-net-c
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/simple-net-c.dir/link.txt --verbose=1
 /SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace CMakeFiles/simple-net-c.dir/simple_net.c.o  -o simple-net-c ../src/libmkldnn.a -llapack -lcblas -lblas -lm 
@@ -2104,27 +2104,27 @@ make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-
 [ 39%] Generating test_c_symbols.c
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests && /bin/bash /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/generate_c_symbols_refs.sh /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/.. /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/test_c_symbols.c
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/test_c_symbols-c.dir/DependInfo.cmake --color=
-Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/test_c_symbols-c.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/test_c_symbols-c.dir/depend.internal".
-Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/test_c_symbols-c.dir/depend.internal".
 [ 39%] Built target simple-training-net-c
 make -f tests/CMakeFiles/api-io-c.dir/build.make tests/CMakeFiles/api-io-c.dir/depend
-Scanning dependencies of target test_c_symbols-c
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f tests/CMakeFiles/test_c_symbols-c.dir/build.make tests/CMakeFiles/test_c_symbols-c.dir/build
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/test_c_symbols-c.dir/DependInfo.cmake --color=
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/api-io-c.dir/DependInfo.cmake --color=
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/test_c_symbols-c.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/test_c_symbols-c.dir/depend.internal".
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/test_c_symbols-c.dir/depend.internal".
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/api-io-c.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/api-io-c.dir/depend.internal".
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/api-io-c.dir/depend.internal".
-[ 40%] Building C object tests/CMakeFiles/test_c_symbols-c.dir/test_c_symbols.c.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests && /SX/usr/bin/sxcc -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include  -DUSE_CBLAS -size_t64 -Kc99,gcc -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kc99,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_c_symbols-c.dir/test_c_symbols.c.o   -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/test_c_symbols.c
+Scanning dependencies of target test_c_symbols-c
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 Scanning dependencies of target api-io-c
+make -f tests/CMakeFiles/test_c_symbols-c.dir/build.make tests/CMakeFiles/test_c_symbols-c.dir/build
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/CMakeFiles/api-io-c.dir/build.make tests/CMakeFiles/api-io-c.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 41%] Building C object tests/CMakeFiles/test_c_symbols-c.dir/test_c_symbols.c.o
 [ 41%] Building C object tests/CMakeFiles/api-io-c.dir/api-io.c.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests && /SX/usr/bin/sxcc -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include  -DUSE_CBLAS -size_t64 -Kc99,gcc -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kc99,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/api-io-c.dir/api-io.c.o   -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/api-io.c
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests && /SX/usr/bin/sxcc -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include  -DUSE_CBLAS -size_t64 -Kc99,gcc -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kc99,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_c_symbols-c.dir/test_c_symbols.c.o   -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/test_c_symbols.c
 [ 42%] Linking CXX executable test_c_symbols-c
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_c_symbols-c.dir/link.txt --verbose=1
 /SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace CMakeFiles/test_c_symbols-c.dir/test_c_symbols.c.o  -o test_c_symbols-c ../src/libmkldnn.a -llapack -lcblas -lblas -lm 
@@ -2149,11 +2149,8 @@ cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests && /SX/usr/bin/sxcc -DCMAKE
           real_t diff = fabs((real_t)(out_mem[off]) - e);
                         ^
 
-[ 44%] Linking CXX executable api-c
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/api-c.dir/link.txt --verbose=1
-/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace CMakeFiles/api-c.dir/api.c.o  -o api-c ../src/libmkldnn.a -llapack -lcblas -lblas -lm 
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 44%] Built target api-io-c
+[ 43%] Built target api-io-c
 make -f tests/gtests/CMakeFiles/test_sum.dir/build.make tests/gtests/CMakeFiles/test_sum.dir/depend
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_sum.dir/DependInfo.cmake --color=
@@ -2163,14 +2160,19 @@ Scanning dependencies of target test_sum
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/gtests/CMakeFiles/test_sum.dir/build.make tests/gtests/CMakeFiles/test_sum.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 45%] Linking CXX executable api-c
 [ 45%] Building CXX object tests/gtests/CMakeFiles/test_sum.dir/main.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_sum.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/api-c.dir/link.txt --verbose=1
+/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace CMakeFiles/api-c.dir/api.c.o  -o api-c ../src/libmkldnn.a -llapack -lcblas -lblas -lm 
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 46%] Built target api-c
-[ 46%] Linking CXX executable simple-net-cpp
+[ 47%] Linking CXX executable simple-net-cpp
+[ 47%] Building CXX object tests/gtests/CMakeFiles/test_sum.dir/test_sum.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/simple-net-cpp.dir/link.txt --verbose=1
-make -f tests/gtests/CMakeFiles/test_lrn_forward.dir/build.make tests/gtests/CMakeFiles/test_lrn_forward.dir/depend
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_sum.dir/test_sum.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_sum.cpp
 /SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace CMakeFiles/simple-net-cpp.dir/simple_net.cpp.o  -o simple-net-cpp ../src/libmkldnn.a -llapack -lcblas -lblas -lm 
+[ 47%] Built target api-c
+make -f tests/gtests/CMakeFiles/test_lrn_forward.dir/build.make tests/gtests/CMakeFiles/test_lrn_forward.dir/depend
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_lrn_forward.dir/DependInfo.cmake --color=
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_lrn_forward.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_lrn_forward.dir/depend.internal".
@@ -2179,22 +2181,20 @@ Scanning dependencies of target test_lrn_forward
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/gtests/CMakeFiles/test_lrn_forward.dir/build.make tests/gtests/CMakeFiles/test_lrn_forward.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 47%] Building CXX object tests/gtests/CMakeFiles/test_lrn_forward.dir/main.cpp.o
+[ 48%] Building CXX object tests/gtests/CMakeFiles/test_lrn_forward.dir/main.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_lrn_forward.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
-[ 48%] Building CXX object tests/gtests/CMakeFiles/test_sum.dir/test_sum.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_sum.dir/test_sum.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_sum.cpp
 [ 49%] Linking CXX executable simple-training-net-cpp
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/simple-training-net-cpp.dir/link.txt --verbose=1
 /SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace CMakeFiles/simple-training-net-cpp.dir/simple_training_net.cpp.o  -o simple-training-net-cpp ../src/libmkldnn.a -lm -llapack -lcblas -lblas -lm 
+[ 50%] Building CXX object tests/gtests/CMakeFiles/test_lrn_forward.dir/test_lrn_forward.cpp.o
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 49%] Built target simple-net-cpp
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_lrn_forward.dir/test_lrn_forward.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_lrn_forward.cpp
+[ 50%] Built target simple-net-cpp
 make -f tests/gtests/CMakeFiles/test_reorder.dir/build.make tests/gtests/CMakeFiles/test_reorder.dir/depend
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_reorder.dir/DependInfo.cmake --color=
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_reorder.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_reorder.dir/depend.internal".
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_reorder.dir/depend.internal".
-[ 50%] Building CXX object tests/gtests/CMakeFiles/test_lrn_forward.dir/test_lrn_forward.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_lrn_forward.dir/test_lrn_forward.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_lrn_forward.cpp
 Scanning dependencies of target test_reorder
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/gtests/CMakeFiles/test_reorder.dir/build.make tests/gtests/CMakeFiles/test_reorder.dir/build
@@ -2203,6 +2203,8 @@ make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_reorder.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 [ 51%] Built target simple-training-net-cpp
+[ 52%] Building CXX object tests/gtests/CMakeFiles/test_reorder.dir/test_reorder.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_reorder.dir/test_reorder.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_reorder.cpp
 make -f tests/gtests/CMakeFiles/test_convolution_relu_forward.dir/build.make tests/gtests/CMakeFiles/test_convolution_relu_forward.dir/depend
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_convolution_relu_forward.dir/DependInfo.cmake --color=
@@ -2212,12 +2214,8 @@ Scanning dependencies of target test_convolution_relu_forward
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/gtests/CMakeFiles/test_convolution_relu_forward.dir/build.make tests/gtests/CMakeFiles/test_convolution_relu_forward.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 52%] Building CXX object tests/gtests/CMakeFiles/test_convolution_relu_forward.dir/main.cpp.o
+[ 53%] Building CXX object tests/gtests/CMakeFiles/test_convolution_relu_forward.dir/main.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_convolution_relu_forward.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
-[ 53%] Building CXX object tests/gtests/CMakeFiles/test_reorder.dir/test_reorder.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_reorder.dir/test_reorder.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_reorder.cpp
-[ 54%] Building CXX object tests/gtests/CMakeFiles/test_convolution_relu_forward.dir/test_convolution_relu_forward.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_convolution_relu_forward.dir/test_convolution_relu_forward.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_relu_forward.cpp
 "/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_reorder.cpp", line 76:
           warning(177): variable "prec_i" was declared but never referenced
           memory::data_type prec_i = data_traits<data_i_t>::data_type;
@@ -2254,39 +2252,58 @@ cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++
             instantiation of class "mkldnn::reorder_simple_test<reorder_types>
                       [with reorder_types=mkldnn::f32_f32]" at line 117
 
+[ 54%] Building CXX object tests/gtests/CMakeFiles/test_convolution_relu_forward.dir/test_convolution_relu_forward.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_convolution_relu_forward.dir/test_convolution_relu_forward.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_relu_forward.cpp
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
 [ 55%] Linking CXX executable test_lrn_forward
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_lrn_forward.dir/link.txt --verbose=1
 /SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_lrn_forward.dir/main.cpp.o CMakeFiles/test_lrn_forward.dir/test_lrn_forward.cpp.o  -o test_lrn_forward ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
 re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_lrn_forward.cpp
 "/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_lrn_forward.cpp", line
-          75: fatal(65): expected a ";"
-          data_t norm_coef = std::pow(ld.k + ld.alpha * sum / summands, ld.beta);
-                           ^
+          74: warning(2361): invalid narrowing conversion from "double" to
+          "float"
+          data_t norm_coef = std::pow(float{ld.k + ld.alpha * sum / summands}, float{ld.beta});
+                                                                                     ^
 
 "/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_lrn_forward.cpp", line
-          76: fatal(254): type name is not allowed
-          data_t ref_out = src_ptr[map_index(src_d, off(n, oc, oh, ow))]/norm_coef;
-                                                                         ^
+          74: warning(2463): conversion may change the value
+          data_t norm_coef = std::pow(float{ld.k + ld.alpha * sum / summands}, float{ld.beta});
+                                                                                     ^
 
-sxprelink: error: re-compilation is terminated with status 1
-sxprelink: Warning: "/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_lrn_forward.dir/test_lrn_forward.cpp.o" is removed
-make[2]: *** [tests/gtests/test_lrn_forward] Error 4
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[1]: *** [tests/gtests/CMakeFiles/test_lrn_forward.dir/all] Error 2
-make[1]: *** Waiting for unfinished jobs....
+"/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_lrn_forward.cpp", line
+          74: warning(2361): invalid narrowing conversion from "double" to
+          "float"
+          data_t norm_coef = std::pow(float{ld.k + ld.alpha * sum / summands}, float{ld.beta});
+                                            ^
+          detected during instantiation of "void
+                    mkldnn::check_lrn_fwd<data_t>(const mkldnn::test_lrn_desc_t
+                    &, const mkldnn::memory::desc &, const mkldnn::memory::desc
+                    &, const mkldnn::memory &, const mkldnn::memory &) [with
+                    data_t=float]" at line 169
+
+"/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_lrn_forward.cpp", line
+          74: warning(2463): conversion may change the value
+          data_t norm_coef = std::pow(float{ld.k + ld.alpha * sum / summands}, float{ld.beta});
+                                            ^
+          detected during instantiation of "void
+                    mkldnn::check_lrn_fwd<data_t>(const mkldnn::test_lrn_desc_t
+                    &, const mkldnn::memory::desc &, const mkldnn::memory::desc
+                    &, const mkldnn::memory &, const mkldnn::memory &) [with
+                    data_t=float]" at line 169
+
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
 [ 56%] Linking CXX executable test_convolution_relu_forward
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_convolution_relu_forward.dir/link.txt --verbose=1
 /SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_convolution_relu_forward.dir/main.cpp.o CMakeFiles/test_convolution_relu_forward.dir/test_convolution_relu_forward.cpp.o  -o test_convolution_relu_forward ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
 re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_relu_forward.cpp
-[ 57%] Linking CXX executable test_reorder
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_reorder.dir/link.txt --verbose=1
-/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_reorder.dir/main.cpp.o CMakeFiles/test_reorder.dir/test_reorder.cpp.o  -o test_reorder ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
-re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_reorder.cpp
-[ 58%] Linking CXX executable test_sum
+[ 57%] Linking CXX executable test_sum
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_sum.dir/link.txt --verbose=1
 /SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_sum.dir/main.cpp.o CMakeFiles/test_sum.dir/test_sum.cpp.o  -o test_sum ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
 re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_sum.cpp
+[ 58%] Linking CXX executable test_reorder
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_reorder.dir/link.txt --verbose=1
+/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_reorder.dir/main.cpp.o CMakeFiles/test_reorder.dir/test_reorder.cpp.o  -o test_reorder ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
+re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_reorder.cpp
 "/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_reorder.cpp", line 76:
           warning(177): variable "prec_i" was declared but never referenced
           memory::data_type prec_i = data_traits<data_i_t>::data_type;
@@ -2324,176 +2341,54 @@ re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabh
                       [with reorder_types=mkldnn::f32_f32]" at line 117
 
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 58%] Built target test_convolution_relu_forward
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 58%] Built target test_sum
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 58%] Built target test_reorder
-make[1]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make: *** [all] Error 2
-+ set +x
-FINISHED:     ./build.sh -SdqT
-/gfs/nlabhpg/local/cmake3.8/bin/cmake -H/home/4gi/nlabhpg/wrk/simd/gen-dnn -B/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx --check-build-system CMakeFiles/Makefile.cmake 0
-/gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_progress_start /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/CMakeFiles /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/CMakeFiles/progress.marks
-make -f CMakeFiles/Makefile2 all
-make[1]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f src/CMakeFiles/mkldnn.dir/build.make src/CMakeFiles/mkldnn.dir/depend
-make -f tests/gtests/gtest/CMakeFiles/mkldnn_gtest.dir/build.make tests/gtests/gtest/CMakeFiles/mkldnn_gtest.dir/depend
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/gtest /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/gtest/CMakeFiles/mkldnn_gtest.dir/DependInfo.cmake --color=
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/src /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/src/CMakeFiles/mkldnn.dir/DependInfo.cmake --color=
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f tests/gtests/gtest/CMakeFiles/mkldnn_gtest.dir/build.make tests/gtests/gtest/CMakeFiles/mkldnn_gtest.dir/build
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Nothing to be done for `tests/gtests/gtest/CMakeFiles/mkldnn_gtest.dir/build'.
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[  2%] Built target mkldnn_gtest
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f src/CMakeFiles/mkldnn.dir/build.make src/CMakeFiles/mkldnn.dir/build
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Nothing to be done for `src/CMakeFiles/mkldnn.dir/build'.
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 33%] Built target mkldnn
-make -f examples/CMakeFiles/simple-training-net-cpp.dir/build.make examples/CMakeFiles/simple-training-net-cpp.dir/depend
-make -f examples/CMakeFiles/simple-training-net-c.dir/build.make examples/CMakeFiles/simple-training-net-c.dir/depend
-make -f examples/CMakeFiles/simple-net-cpp.dir/build.make examples/CMakeFiles/simple-net-cpp.dir/depend
-make -f examples/CMakeFiles/simple-net-c.dir/build.make examples/CMakeFiles/simple-net-c.dir/depend
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-training-net-c.dir/DependInfo.cmake --color=
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-net-c.dir/DependInfo.cmake --color=
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-training-net-cpp.dir/DependInfo.cmake --color=
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/examples/CMakeFiles/simple-net-cpp.dir/DependInfo.cmake --color=
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f examples/CMakeFiles/simple-training-net-cpp.dir/build.make examples/CMakeFiles/simple-training-net-cpp.dir/build
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f examples/CMakeFiles/simple-training-net-c.dir/build.make examples/CMakeFiles/simple-training-net-c.dir/build
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f examples/CMakeFiles/simple-net-c.dir/build.make examples/CMakeFiles/simple-net-c.dir/build
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f examples/CMakeFiles/simple-net-cpp.dir/build.make examples/CMakeFiles/simple-net-cpp.dir/build
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Nothing to be done for `examples/CMakeFiles/simple-training-net-cpp.dir/build'.
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Nothing to be done for `examples/CMakeFiles/simple-training-net-c.dir/build'.
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Nothing to be done for `examples/CMakeFiles/simple-net-c.dir/build'.
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Nothing to be done for `examples/CMakeFiles/simple-net-cpp.dir/build'.
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 38%] Built target simple-training-net-cpp
-make -f tests/CMakeFiles/test_c_symbols-c.dir/build.make tests/CMakeFiles/test_c_symbols-c.dir/depend
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/test_c_symbols-c.dir/DependInfo.cmake --color=
-[ 40%] Built target simple-training-net-c
-[ 40%] Built target simple-net-cpp
-[ 40%] Built target simple-net-c
-make -f tests/CMakeFiles/api-io-c.dir/build.make tests/CMakeFiles/api-io-c.dir/depend
-make -f tests/CMakeFiles/api-c.dir/build.make tests/CMakeFiles/api-c.dir/depend
-make -f tests/gtests/CMakeFiles/test_sum.dir/build.make tests/gtests/CMakeFiles/test_sum.dir/depend
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f tests/CMakeFiles/test_c_symbols-c.dir/build.make tests/CMakeFiles/test_c_symbols-c.dir/build
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Nothing to be done for `tests/CMakeFiles/test_c_symbols-c.dir/build'.
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/api-io-c.dir/DependInfo.cmake --color=
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/CMakeFiles/api-c.dir/DependInfo.cmake --color=
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_sum.dir/DependInfo.cmake --color=
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f tests/CMakeFiles/api-io-c.dir/build.make tests/CMakeFiles/api-io-c.dir/build
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f tests/CMakeFiles/api-c.dir/build.make tests/CMakeFiles/api-c.dir/build
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Nothing to be done for `tests/CMakeFiles/api-io-c.dir/build'.
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Nothing to be done for `tests/CMakeFiles/api-c.dir/build'.
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f tests/gtests/CMakeFiles/test_sum.dir/build.make tests/gtests/CMakeFiles/test_sum.dir/build
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Nothing to be done for `tests/gtests/CMakeFiles/test_sum.dir/build'.
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 45%] Built target test_c_symbols-c
-make -f tests/gtests/CMakeFiles/test_lrn_forward.dir/build.make tests/gtests/CMakeFiles/test_lrn_forward.dir/depend
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_lrn_forward.dir/DependInfo.cmake --color=
-[ 46%] Built target api-c
-make -f tests/gtests/CMakeFiles/test_reorder.dir/build.make tests/gtests/CMakeFiles/test_reorder.dir/depend
-Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_lrn_forward.cpp" is newer than depends file "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_lrn_forward.dir/depend.internal".
-Clearing dependencies in "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_lrn_forward.dir/depend.make".
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_reorder.dir/DependInfo.cmake --color=
-[ 47%] Built target api-io-c
-make -f tests/gtests/CMakeFiles/test_convolution_relu_forward.dir/build.make tests/gtests/CMakeFiles/test_convolution_relu_forward.dir/depend
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f tests/gtests/CMakeFiles/test_reorder.dir/build.make tests/gtests/CMakeFiles/test_reorder.dir/build
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_convolution_relu_forward.dir/DependInfo.cmake --color=
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Nothing to be done for `tests/gtests/CMakeFiles/test_reorder.dir/build'.
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f tests/gtests/CMakeFiles/test_convolution_relu_forward.dir/build.make tests/gtests/CMakeFiles/test_convolution_relu_forward.dir/build
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Nothing to be done for `tests/gtests/CMakeFiles/test_convolution_relu_forward.dir/build'.
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 50%] Built target test_sum
+[ 58%] Built target test_lrn_forward
 make -f tests/gtests/CMakeFiles/test_softmax_forward.dir/build.make tests/gtests/CMakeFiles/test_softmax_forward.dir/depend
-Scanning dependencies of target test_lrn_forward
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_softmax_forward.dir/DependInfo.cmake --color=
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f tests/gtests/CMakeFiles/test_lrn_forward.dir/build.make tests/gtests/CMakeFiles/test_lrn_forward.dir/build
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_softmax_forward.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_softmax_forward.dir/depend.internal".
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_softmax_forward.dir/depend.internal".
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 55%] Built target test_reorder
-make -f tests/gtests/CMakeFiles/test_pooling_forward.dir/build.make tests/gtests/CMakeFiles/test_pooling_forward.dir/depend
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_forward.dir/DependInfo.cmake --color=
-[ 56%] Built target test_convolution_relu_forward
-[ 56%] Building CXX object tests/gtests/CMakeFiles/test_lrn_forward.dir/test_lrn_forward.cpp.o
-make -f tests/gtests/CMakeFiles/test_pooling_backward.dir/build.make tests/gtests/CMakeFiles/test_pooling_backward.dir/depend
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_lrn_forward.dir/test_lrn_forward.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_lrn_forward.cpp
-Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_forward.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_forward.dir/depend.internal".
-Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_forward.dir/depend.internal".
 Scanning dependencies of target test_softmax_forward
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/gtests/CMakeFiles/test_softmax_forward.dir/build.make tests/gtests/CMakeFiles/test_softmax_forward.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_backward.dir/DependInfo.cmake --color=
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_backward.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_backward.dir/depend.internal".
-Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_backward.dir/depend.internal".
-[ 57%] Building CXX object tests/gtests/CMakeFiles/test_softmax_forward.dir/main.cpp.o
+[ 59%] Building CXX object tests/gtests/CMakeFiles/test_softmax_forward.dir/main.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_softmax_forward.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
+[ 60%] Building CXX object tests/gtests/CMakeFiles/test_softmax_forward.dir/test_softmax_forward.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_softmax_forward.dir/test_softmax_forward.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_softmax_forward.cpp
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 60%] Built target test_convolution_relu_forward
+make -f tests/gtests/CMakeFiles/test_pooling_forward.dir/build.make tests/gtests/CMakeFiles/test_pooling_forward.dir/depend
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_forward.dir/DependInfo.cmake --color=
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_forward.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_forward.dir/depend.internal".
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_forward.dir/depend.internal".
 Scanning dependencies of target test_pooling_forward
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/gtests/CMakeFiles/test_pooling_forward.dir/build.make tests/gtests/CMakeFiles/test_pooling_forward.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 61%] Building CXX object tests/gtests/CMakeFiles/test_pooling_forward.dir/main.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_pooling_forward.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
+[ 62%] Building CXX object tests/gtests/CMakeFiles/test_pooling_forward.dir/test_pooling_forward.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_pooling_forward.dir/test_pooling_forward.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_pooling_forward.cpp
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
+[ 63%] Linking CXX executable test_softmax_forward
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_softmax_forward.dir/link.txt --verbose=1
+/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_softmax_forward.dir/main.cpp.o CMakeFiles/test_softmax_forward.dir/test_softmax_forward.cpp.o  -o test_softmax_forward ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
+re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_softmax_forward.cpp
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 63%] Built target test_sum
+make -f tests/gtests/CMakeFiles/test_pooling_backward.dir/build.make tests/gtests/CMakeFiles/test_pooling_backward.dir/depend
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_backward.dir/DependInfo.cmake --color=
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_backward.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_backward.dir/depend.internal".
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_pooling_backward.dir/depend.internal".
 Scanning dependencies of target test_pooling_backward
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/gtests/CMakeFiles/test_pooling_backward.dir/build.make tests/gtests/CMakeFiles/test_pooling_backward.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 58%] Building CXX object tests/gtests/CMakeFiles/test_pooling_forward.dir/main.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_pooling_forward.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
-[ 59%] Building CXX object tests/gtests/CMakeFiles/test_pooling_backward.dir/main.cpp.o
+[ 64%] Building CXX object tests/gtests/CMakeFiles/test_pooling_backward.dir/main.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_pooling_backward.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
-[ 60%] Building CXX object tests/gtests/CMakeFiles/test_softmax_forward.dir/test_softmax_forward.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_softmax_forward.dir/test_softmax_forward.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_softmax_forward.cpp
-[ 61%] Building CXX object tests/gtests/CMakeFiles/test_pooling_forward.dir/test_pooling_forward.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_pooling_forward.dir/test_pooling_forward.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_pooling_forward.cpp
-[ 62%] Building CXX object tests/gtests/CMakeFiles/test_pooling_backward.dir/test_pooling_backward.cpp.o
+[ 65%] Building CXX object tests/gtests/CMakeFiles/test_pooling_backward.dir/test_pooling_backward.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_pooling_backward.dir/test_pooling_backward.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_pooling_backward.cpp
 "/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_pooling_backward.cpp",
           line 246: warning(177): variable "pd" was declared but never
@@ -2515,34 +2410,46 @@ cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++
                       data_t=float]" at line 319
 
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
-sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
-sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
-[ 63%] Linking CXX executable test_softmax_forward
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_softmax_forward.dir/link.txt --verbose=1
-/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_softmax_forward.dir/main.cpp.o CMakeFiles/test_softmax_forward.dir/test_softmax_forward.cpp.o  -o test_softmax_forward ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
-re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_softmax_forward.cpp
-[ 64%] Linking CXX executable test_lrn_forward
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_lrn_forward.dir/link.txt --verbose=1
-/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_lrn_forward.dir/main.cpp.o CMakeFiles/test_lrn_forward.dir/test_lrn_forward.cpp.o  -o test_lrn_forward ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
-re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_lrn_forward.cpp
-"/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_lrn_forward.cpp", line
-          74: warning(2463): conversion may change the value
-          data_t norm_coef = std::pow(ld.k + ld.alpha * sum / summands, ld.beta);
-                             ^
-          detected during instantiation of "void
-                    mkldnn::check_lrn_fwd<data_t>(const mkldnn::test_lrn_desc_t
-                    &, const mkldnn::memory::desc &, const mkldnn::memory::desc
-                    &, const mkldnn::memory &, const mkldnn::memory &) [with
-                    data_t=float]" at line 169
-
-[ 65%] Linking CXX executable test_pooling_forward
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 65%] Built target test_reorder
+make -f tests/gtests/CMakeFiles/test_batch_normalization.dir/build.make tests/gtests/CMakeFiles/test_batch_normalization.dir/depend
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_batch_normalization.dir/DependInfo.cmake --color=
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_batch_normalization.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_batch_normalization.dir/depend.internal".
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_batch_normalization.dir/depend.internal".
+Scanning dependencies of target test_batch_normalization
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+make -f tests/gtests/CMakeFiles/test_batch_normalization.dir/build.make tests/gtests/CMakeFiles/test_batch_normalization.dir/build
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 66%] Building CXX object tests/gtests/CMakeFiles/test_batch_normalization.dir/main.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_batch_normalization.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
+[ 67%] Building CXX object tests/gtests/CMakeFiles/test_batch_normalization.dir/test_batch_normalization.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_batch_normalization.dir/test_batch_normalization.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_batch_normalization.cpp
+[ 68%] Linking CXX executable test_pooling_forward
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_pooling_forward.dir/link.txt --verbose=1
 /SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_pooling_forward.dir/main.cpp.o CMakeFiles/test_pooling_forward.dir/test_pooling_forward.cpp.o  -o test_pooling_forward ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
 re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_pooling_forward.cpp
-[ 65%] Linking CXX executable test_pooling_backward
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 68%] Built target test_softmax_forward
+make -f tests/gtests/CMakeFiles/test_inner_product_forward.dir/build.make tests/gtests/CMakeFiles/test_inner_product_forward.dir/depend
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_forward.dir/DependInfo.cmake --color=
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_forward.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_forward.dir/depend.internal".
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_forward.dir/depend.internal".
+Scanning dependencies of target test_inner_product_forward
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+make -f tests/gtests/CMakeFiles/test_inner_product_forward.dir/build.make tests/gtests/CMakeFiles/test_inner_product_forward.dir/build
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 69%] Building CXX object tests/gtests/CMakeFiles/test_inner_product_forward.dir/main.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_inner_product_forward.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
+[ 70%] Building CXX object tests/gtests/CMakeFiles/test_inner_product_forward.dir/test_inner_product_forward.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_inner_product_forward.dir/test_inner_product_forward.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_inner_product_forward.cpp
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
+[ 70%] Linking CXX executable test_pooling_backward
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_pooling_backward.dir/link.txt --verbose=1
 /SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_pooling_backward.dir/main.cpp.o CMakeFiles/test_pooling_backward.dir/test_pooling_backward.cpp.o  -o test_pooling_backward ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
-sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
 re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_pooling_backward.cpp
 "/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_pooling_backward.cpp",
           line 246: warning(177): variable "pd" was declared but never
@@ -2564,39 +2471,13 @@ re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabh
                       data_t=float]" at line 319
 
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
+[ 71%] Linking CXX executable test_batch_normalization
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_batch_normalization.dir/link.txt --verbose=1
+/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_batch_normalization.dir/main.cpp.o CMakeFiles/test_batch_normalization.dir/test_batch_normalization.cpp.o  -o test_batch_normalization ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
+re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_batch_normalization.cpp
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 65%] Built target test_softmax_forward
-make -f tests/gtests/CMakeFiles/test_batch_normalization.dir/build.make tests/gtests/CMakeFiles/test_batch_normalization.dir/depend
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_batch_normalization.dir/DependInfo.cmake --color=
-Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_batch_normalization.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_batch_normalization.dir/depend.internal".
-Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_batch_normalization.dir/depend.internal".
-Scanning dependencies of target test_batch_normalization
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f tests/gtests/CMakeFiles/test_batch_normalization.dir/build.make tests/gtests/CMakeFiles/test_batch_normalization.dir/build
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 66%] Building CXX object tests/gtests/CMakeFiles/test_batch_normalization.dir/main.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_batch_normalization.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 67%] Built target test_lrn_forward
-[ 68%] Building CXX object tests/gtests/CMakeFiles/test_batch_normalization.dir/test_batch_normalization.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_batch_normalization.dir/test_batch_normalization.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_batch_normalization.cpp
-make -f tests/gtests/CMakeFiles/test_inner_product_forward.dir/build.make tests/gtests/CMakeFiles/test_inner_product_forward.dir/depend
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_forward.dir/DependInfo.cmake --color=
-Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_forward.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_forward.dir/depend.internal".
-Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_forward.dir/depend.internal".
-Scanning dependencies of target test_inner_product_forward
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f tests/gtests/CMakeFiles/test_inner_product_forward.dir/build.make tests/gtests/CMakeFiles/test_inner_product_forward.dir/build
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 69%] Building CXX object tests/gtests/CMakeFiles/test_inner_product_forward.dir/main.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_inner_product_forward.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
-[ 70%] Building CXX object tests/gtests/CMakeFiles/test_inner_product_forward.dir/test_inner_product_forward.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_inner_product_forward.dir/test_inner_product_forward.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_inner_product_forward.cpp
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 70%] Built target test_pooling_forward
+[ 71%] Built target test_pooling_forward
 make -f tests/gtests/CMakeFiles/test_relu.dir/build.make tests/gtests/CMakeFiles/test_relu.dir/depend
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_relu.dir/DependInfo.cmake --color=
@@ -2606,14 +2487,17 @@ Scanning dependencies of target test_relu
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/gtests/CMakeFiles/test_relu.dir/build.make tests/gtests/CMakeFiles/test_relu.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 71%] Building CXX object tests/gtests/CMakeFiles/test_relu.dir/main.cpp.o
+[ 72%] Building CXX object tests/gtests/CMakeFiles/test_relu.dir/main.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_relu.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
-sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
-[ 72%] Building CXX object tests/gtests/CMakeFiles/test_relu.dir/test_relu.cpp.o
+[ 73%] Building CXX object tests/gtests/CMakeFiles/test_relu.dir/test_relu.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_relu.dir/test_relu.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_relu.cpp
+[ 74%] Linking CXX executable test_inner_product_forward
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_inner_product_forward.dir/link.txt --verbose=1
+/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_inner_product_forward.dir/main.cpp.o CMakeFiles/test_inner_product_forward.dir/test_inner_product_forward.cpp.o  -o test_inner_product_forward ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
+re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_inner_product_forward.cpp
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 72%] Built target test_pooling_backward
+[ 74%] Built target test_pooling_backward
 make -f tests/gtests/CMakeFiles/test_convolution_backward_weights.dir/build.make tests/gtests/CMakeFiles/test_convolution_backward_weights.dir/depend
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_convolution_backward_weights.dir/DependInfo.cmake --color=
@@ -2623,32 +2507,17 @@ Scanning dependencies of target test_convolution_backward_weights
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/gtests/CMakeFiles/test_convolution_backward_weights.dir/build.make tests/gtests/CMakeFiles/test_convolution_backward_weights.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 73%] Building CXX object tests/gtests/CMakeFiles/test_convolution_backward_weights.dir/main.cpp.o
+[ 75%] Building CXX object tests/gtests/CMakeFiles/test_convolution_backward_weights.dir/main.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_convolution_backward_weights.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
-[ 74%] Building CXX object tests/gtests/CMakeFiles/test_convolution_backward_weights.dir/test_convolution_backward_weights.cpp.o
+[ 76%] Building CXX object tests/gtests/CMakeFiles/test_convolution_backward_weights.dir/test_convolution_backward_weights.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_convolution_backward_weights.dir/test_convolution_backward_weights.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_backward_weights.cpp
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
-[ 76%] Linking CXX executable test_inner_product_forward
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_inner_product_forward.dir/link.txt --verbose=1
-/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_inner_product_forward.dir/main.cpp.o CMakeFiles/test_inner_product_forward.dir/test_inner_product_forward.cpp.o  -o test_inner_product_forward ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
-[ 76%] Linking CXX executable test_batch_normalization
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_batch_normalization.dir/link.txt --verbose=1
-/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_batch_normalization.dir/main.cpp.o CMakeFiles/test_batch_normalization.dir/test_batch_normalization.cpp.o  -o test_batch_normalization ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
-re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_inner_product_forward.cpp
-re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_batch_normalization.cpp
 [ 77%] Linking CXX executable test_relu
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_relu.dir/link.txt --verbose=1
 /SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_relu.dir/main.cpp.o CMakeFiles/test_relu.dir/test_relu.cpp.o  -o test_relu ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
 re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_relu.cpp
-[ 77%] Linking CXX executable test_convolution_backward_weights
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_convolution_backward_weights.dir/link.txt --verbose=1
-/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_convolution_backward_weights.dir/main.cpp.o CMakeFiles/test_convolution_backward_weights.dir/test_convolution_backward_weights.cpp.o  -o test_convolution_backward_weights ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
-sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
-sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
-re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_backward_weights.cpp
-sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 77%] Built target test_inner_product_forward
+[ 77%] Built target test_batch_normalization
 make -f tests/gtests/CMakeFiles/test_inner_product_backward_data.dir/build.make tests/gtests/CMakeFiles/test_inner_product_backward_data.dir/depend
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_backward_data.dir/DependInfo.cmake --color=
@@ -2664,7 +2533,7 @@ cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_inner_product_backward_data.dir/test_inner_product_backward_data.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_inner_product_backward_data.cpp
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 79%] Built target test_batch_normalization
+[ 79%] Built target test_inner_product_forward
 make -f tests/gtests/CMakeFiles/test_convolution_forward_f32.dir/build.make tests/gtests/CMakeFiles/test_convolution_forward_f32.dir/depend
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_convolution_forward_f32.dir/DependInfo.cmake --color=
@@ -2678,6 +2547,17 @@ make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_convolution_forward_f32.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
 [ 81%] Building CXX object tests/gtests/CMakeFiles/test_convolution_forward_f32.dir/test_convolution_forward_f32.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_convolution_forward_f32.dir/test_convolution_forward_f32.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_forward_f32.cpp
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
+[ 81%] Linking CXX executable test_convolution_backward_weights
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_convolution_backward_weights.dir/link.txt --verbose=1
+/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_convolution_backward_weights.dir/main.cpp.o CMakeFiles/test_convolution_backward_weights.dir/test_convolution_backward_weights.cpp.o  -o test_convolution_backward_weights ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
+re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_backward_weights.cpp
+[ 81%] Linking CXX executable test_inner_product_backward_data
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_inner_product_backward_data.dir/link.txt --verbose=1
+/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_inner_product_backward_data.dir/main.cpp.o CMakeFiles/test_inner_product_backward_data.dir/test_inner_product_backward_data.cpp.o  -o test_inner_product_backward_data ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
+re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_inner_product_backward_data.cpp
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 [ 81%] Built target test_relu
 make -f tests/gtests/CMakeFiles/test_lrn_backward.dir/build.make tests/gtests/CMakeFiles/test_lrn_backward.dir/depend
@@ -2689,40 +2569,50 @@ Scanning dependencies of target test_lrn_backward
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/gtests/CMakeFiles/test_lrn_backward.dir/build.make tests/gtests/CMakeFiles/test_lrn_backward.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 82%] Building CXX object tests/gtests/CMakeFiles/test_lrn_backward.dir/main.cpp.o
+[ 82%] Linking CXX executable test_convolution_forward_f32
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_convolution_forward_f32.dir/link.txt --verbose=1
+/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_convolution_forward_f32.dir/main.cpp.o CMakeFiles/test_convolution_forward_f32.dir/test_convolution_forward_f32.cpp.o  -o test_convolution_forward_f32 ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
+[ 83%] Building CXX object tests/gtests/CMakeFiles/test_lrn_backward.dir/main.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_lrn_backward.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
-[ 83%] Building CXX object tests/gtests/CMakeFiles/test_lrn_backward.dir/test_lrn_backward.cpp.o
+re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_forward_f32.cpp
+[ 84%] Building CXX object tests/gtests/CMakeFiles/test_lrn_backward.dir/test_lrn_backward.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_lrn_backward.dir/test_lrn_backward.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_lrn_backward.cpp
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 83%] Built target test_convolution_backward_weights
+[ 84%] Built target test_inner_product_backward_data
 make -f tests/gtests/CMakeFiles/test_convolution_format_any.dir/build.make tests/gtests/CMakeFiles/test_convolution_format_any.dir/depend
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_convolution_format_any.dir/DependInfo.cmake --color=
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_convolution_format_any.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_convolution_format_any.dir/depend.internal".
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_convolution_format_any.dir/depend.internal".
-[ 83%] Linking CXX executable test_inner_product_backward_data
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_inner_product_backward_data.dir/link.txt --verbose=1
-/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_inner_product_backward_data.dir/main.cpp.o CMakeFiles/test_inner_product_backward_data.dir/test_inner_product_backward_data.cpp.o  -o test_inner_product_backward_data ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
 Scanning dependencies of target test_convolution_format_any
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/gtests/CMakeFiles/test_convolution_format_any.dir/build.make tests/gtests/CMakeFiles/test_convolution_format_any.dir/build
-re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_inner_product_backward_data.cpp
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 84%] Building CXX object tests/gtests/CMakeFiles/test_convolution_format_any.dir/main.cpp.o
+[ 85%] Building CXX object tests/gtests/CMakeFiles/test_convolution_format_any.dir/main.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_convolution_format_any.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
-[ 85%] Building CXX object tests/gtests/CMakeFiles/test_convolution_format_any.dir/test_convolution_format_any.cpp.o
+[ 86%] Building CXX object tests/gtests/CMakeFiles/test_convolution_format_any.dir/test_convolution_format_any.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_convolution_format_any.dir/test_convolution_format_any.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_format_any.cpp
-sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
-[ 86%] Linking CXX executable test_convolution_forward_f32
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_convolution_forward_f32.dir/link.txt --verbose=1
-/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_convolution_forward_f32.dir/main.cpp.o CMakeFiles/test_convolution_forward_f32.dir/test_convolution_forward_f32.cpp.o  -o test_convolution_forward_f32 ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
-re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_forward_f32.cpp
-[ 87%] Linking CXX executable test_lrn_backward
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 86%] Built target test_convolution_backward_weights
+make -f tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/build.make tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/depend
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/DependInfo.cmake --color=
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/depend.internal".
+Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/depend.internal".
+Scanning dependencies of target test_inner_product_backward_weights
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+make -f tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/build.make tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/build
+make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 87%] Building CXX object tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/main.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_inner_product_backward_weights.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
+[ 88%] Linking CXX executable test_lrn_backward
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_lrn_backward.dir/link.txt --verbose=1
 /SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_lrn_backward.dir/main.cpp.o CMakeFiles/test_lrn_backward.dir/test_lrn_backward.cpp.o  -o test_lrn_backward ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
 re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_lrn_backward.cpp
+[ 89%] Building CXX object tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/test_inner_product_backward_weights.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_inner_product_backward_weights.dir/test_inner_product_backward_weights.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_inner_product_backward_weights.cpp
 "/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_lrn_backward.cpp", line
           85: warning(2463): conversion may change the value
           data_t norm_coef = std::pow(p.test_ld.k + p.test_ld.alpha * sum / summands,
@@ -2753,28 +2643,8 @@ re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabh
 
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
-[ 88%] Linking CXX executable test_convolution_format_any
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_convolution_format_any.dir/link.txt --verbose=1
-/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_convolution_format_any.dir/main.cpp.o CMakeFiles/test_convolution_format_any.dir/test_convolution_format_any.cpp.o  -o test_convolution_format_any ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
-re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_format_any.cpp
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 88%] Built target test_inner_product_backward_data
-make -f tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/build.make tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/depend
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/DependInfo.cmake --color=
-Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/depend.internal".
-Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/depend.internal".
-Scanning dependencies of target test_inner_product_backward_weights
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make -f tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/build.make tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/build
-make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 89%] Building CXX object tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/main.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_inner_product_backward_weights.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
-[ 90%] Building CXX object tests/gtests/CMakeFiles/test_inner_product_backward_weights.dir/test_inner_product_backward_weights.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_inner_product_backward_weights.dir/test_inner_product_backward_weights.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_inner_product_backward_weights.cpp
-sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 90%] Built target test_convolution_format_any
+[ 89%] Built target test_convolution_forward_f32
 make -f tests/gtests/CMakeFiles/test_convolution_forward_s16s16s32.dir/build.make tests/gtests/CMakeFiles/test_convolution_forward_s16s16s32.dir/depend
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_convolution_forward_s16s16s32.dir/DependInfo.cmake --color=
@@ -2784,27 +2654,43 @@ Scanning dependencies of target test_convolution_forward_s16s16s32
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/gtests/CMakeFiles/test_convolution_forward_s16s16s32.dir/build.make tests/gtests/CMakeFiles/test_convolution_forward_s16s16s32.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 91%] Building CXX object tests/gtests/CMakeFiles/test_convolution_forward_s16s16s32.dir/main.cpp.o
+[ 90%] Building CXX object tests/gtests/CMakeFiles/test_convolution_forward_s16s16s32.dir/main.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_convolution_forward_s16s16s32.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
-[ 92%] Building CXX object tests/gtests/CMakeFiles/test_convolution_forward_s16s16s32.dir/test_convolution_forward_s16s16s32.cpp.o
+[ 91%] Building CXX object tests/gtests/CMakeFiles/test_convolution_forward_s16s16s32.dir/test_convolution_forward_s16s16s32.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_convolution_forward_s16s16s32.dir/test_convolution_forward_s16s16s32.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_forward_s16s16s32.cpp
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
+[ 92%] Linking CXX executable test_convolution_format_any
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_convolution_format_any.dir/link.txt --verbose=1
+/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_convolution_format_any.dir/main.cpp.o CMakeFiles/test_convolution_format_any.dir/test_convolution_format_any.cpp.o  -o test_convolution_format_any ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
+re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_format_any.cpp
+[ 93%] Linking CXX executable test_inner_product_backward_weights
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_inner_product_backward_weights.dir/link.txt --verbose=1
+/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_inner_product_backward_weights.dir/main.cpp.o CMakeFiles/test_inner_product_backward_weights.dir/test_inner_product_backward_weights.cpp.o  -o test_inner_product_backward_weights ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
+re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_inner_product_backward_weights.cpp
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 92%] Built target test_lrn_backward
+[ 93%] Built target test_lrn_backward
 make -f tests/gtests/CMakeFiles/test_convolution_backward_data.dir/build.make tests/gtests/CMakeFiles/test_convolution_backward_data.dir/depend
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_convolution_backward_data.dir/DependInfo.cmake --color=
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_convolution_backward_data.dir/DependInfo.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_convolution_backward_data.dir/depend.internal".
 Dependee "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_convolution_backward_data.dir/depend.internal".
-sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
-sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
 Scanning dependencies of target test_convolution_backward_data
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/gtests/CMakeFiles/test_convolution_backward_data.dir/build.make tests/gtests/CMakeFiles/test_convolution_backward_data.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 93%] Building CXX object tests/gtests/CMakeFiles/test_convolution_backward_data.dir/main.cpp.o
+[ 94%] Building CXX object tests/gtests/CMakeFiles/test_convolution_backward_data.dir/main.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_convolution_backward_data.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
-[ 93%] Built target test_convolution_forward_f32
+[ 95%] Building CXX object tests/gtests/CMakeFiles/test_convolution_backward_data.dir/test_convolution_backward_data.cpp.o
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_convolution_backward_data.dir/test_convolution_backward_data.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_backward_data.cpp
+sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
+[ 96%] Linking CXX executable test_convolution_forward_s16s16s32
+cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_convolution_forward_s16s16s32.dir/link.txt --verbose=1
+/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_convolution_forward_s16s16s32.dir/main.cpp.o CMakeFiles/test_convolution_forward_s16s16s32.dir/test_convolution_forward_s16s16s32.cpp.o  -o test_convolution_forward_s16s16s32 ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
+re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_forward_s16s16s32.cpp
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 96%] Built target test_convolution_format_any
 make -f tests/gtests/CMakeFiles/test_concat.dir/build.make tests/gtests/CMakeFiles/test_concat.dir/depend
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_depends "Unix Makefiles" /home/4gi/nlabhpg/wrk/simd/gen-dnn /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests/CMakeFiles/test_concat.dir/DependInfo.cmake --color=
@@ -2814,40 +2700,31 @@ Scanning dependencies of target test_concat
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 make -f tests/gtests/CMakeFiles/test_concat.dir/build.make tests/gtests/CMakeFiles/test_concat.dir/build
 make[2]: Entering directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[ 94%] Building CXX object tests/gtests/CMakeFiles/test_concat.dir/main.cpp.o
+[ 97%] Building CXX object tests/gtests/CMakeFiles/test_concat.dir/main.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_concat.dir/main.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/main.cpp
-[ 95%] Building CXX object tests/gtests/CMakeFiles/test_convolution_backward_data.dir/test_convolution_backward_data.cpp.o
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_convolution_backward_data.dir/test_convolution_backward_data.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_backward_data.cpp
-[ 96%] Building CXX object tests/gtests/CMakeFiles/test_concat.dir/test_concat.cpp.o
+[ 98%] Building CXX object tests/gtests/CMakeFiles/test_concat.dir/test_concat.cpp.o
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /SX/usr/bin/sxc++  -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg   -o CMakeFiles/test_concat.dir/test_concat.cpp.o -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_concat.cpp
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
-[ 97%] Linking CXX executable test_inner_product_backward_weights
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_inner_product_backward_weights.dir/link.txt --verbose=1
-/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_inner_product_backward_weights.dir/main.cpp.o CMakeFiles/test_inner_product_backward_weights.dir/test_inner_product_backward_weights.cpp.o  -o test_inner_product_backward_weights ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
-re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_inner_product_backward_weights.cpp
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
-[ 98%] Linking CXX executable test_convolution_forward_s16s16s32
-cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_convolution_forward_s16s16s32.dir/link.txt --verbose=1
-/SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_convolution_forward_s16s16s32.dir/main.cpp.o CMakeFiles/test_convolution_forward_s16s16s32.dir/test_convolution_forward_s16s16s32.cpp.o  -o test_convolution_forward_s16s16s32 ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
-re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_forward_s16s16s32.cpp
-sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
-sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 98%] Built target test_inner_product_backward_weights
 [ 99%] Linking CXX executable test_convolution_backward_data
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_convolution_backward_data.dir/link.txt --verbose=1
 /SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_convolution_backward_data.dir/main.cpp.o CMakeFiles/test_convolution_backward_data.dir/test_convolution_backward_data.cpp.o  -o test_convolution_backward_data ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
 re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_convolution_backward_data.cpp
 sxc++: opt(1317): /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/mkldnn_test_common.hpp, line 179: Logical clause simplified.
+make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
+[ 99%] Built target test_convolution_forward_s16s16s32
 [100%] Linking CXX executable test_concat
 cd /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/gtests && /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_link_script CMakeFiles/test_concat.dir/link.txt --verbose=1
 /SX/usr/bin/sxc++  -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -f90lib -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg  -g -ftrace -Wl,-h,muldefs,-h,lib_cyclic CMakeFiles/test_concat.dir/main.cpp.o CMakeFiles/test_concat.dir/test_concat.cpp.o  -o test_concat ../../src/libmkldnn.a gtest/libmkldnn_gtest.a -llapack -lcblas -lblas -lm -lpthread 
 re-compiling: -K_sysver=2110 -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/include -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/gtest -I/home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/in -DUSE_CBLAS -size_t64 -Kcpp11,gcc,rtti,exceptions -DTARGET_VANILLA -D__STDC_LIMIT_MACROS -wall -woff=1097 -woff=4038 -woff=1901 -wnolongjmp -DJITFUNCS=0 -wfatal=47 -woff=1 -Kexceptions,cpp11,gcc -g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg -c /home/4gi/nlabhpg/wrk/simd/gen-dnn/tests/gtests/test_concat.cpp
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[100%] Built target test_inner_product_backward_weights
-make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
-[100%] Built target test_convolution_forward_s16s16s32
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 [100%] Built target test_convolution_backward_data
 make[2]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 [100%] Built target test_concat
 make[1]: Leaving directory `/mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn/build-sx'
 /gfs/nlabhpg/local/cmake3.8/bin/cmake -E cmake_progress_start /home/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/CMakeFiles 0
++ BUILDOK=y
++ set +x
+FINISHED:     ./build.sh -SdqT

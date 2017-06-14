@@ -22,7 +22,8 @@
 
 #include "ref_relu.hpp"
 
-#ifndef NDEBUG
+#define REF_RELU_DBG 0
+#if REF_RELU_DBG
 #include <iostream>
 #include "mkldnn_io.h"
 #endif
@@ -35,13 +36,13 @@ template <impl::data_type_t data_type>
 ref_relu_fwd_t<data_type>::ref_relu_fwd_t(const pd_t *pd,
         const input_vector &inputs, const output_vector &outputs)
 : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {
-#ifndef NDEBUG
+#if REF_RELU_DBG
     using namespace std;
     cout<<"\n+relu_fwd_t:"
         <<"\n            kind()="<<this->kind() // mkldnn:impl::primitive_kind_t
         <<"\n            inputs,outputs.size()="<<this->inputs().size()<<","<<this->outputs().size()
         <<"\n            conf_.n_inputs(),n_outputs()"<<conf_.n_inputs()<<","<<conf_.n_outputs();
-#if 1
+#if REF_RELU_DBG > 1
     if(conf_.n_inputs() > 0){
         cout<<"\n            input_pd(0)->kind() "<<conf_.input_pd(0)->kind()
             <<"\n           *           ->desc() "<<*conf_.input_pd(0)->desc()
@@ -90,7 +91,7 @@ void ref_relu_fwd_t<data_type>::execute_forward_dense() {
     auto dst = reinterpret_cast<data_t*>(this->memory(0));
 
     const memory_desc_wrapper data_d(conf_.src_pd());
-#ifndef NDEBUG
+#if REF_RELU_DBG
     { char buf[1024]; mkldnn_name_memory_desc(data_d._md,buf,1024); std::cout<<"\nref_relu_fwd_t<>::execut_forward_dense() data_d = "<<buf<<std::endl; }
 #endif
 

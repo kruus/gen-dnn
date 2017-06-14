@@ -33,7 +33,6 @@ namespace mkldnn {
     }
     std::ostream& operator<<(std::ostream& os, mkldnn_primitive const& prim){
         // this is a pure virtual base class
-        os<<" C ";
         os<<" "<<prim.kind()<<"@"<<(void*)&prim
             <<",inputs["<<prim.inputs().size()<<"]"
             <<",outputs["<<prim.outputs().size()<<"]"
@@ -44,7 +43,7 @@ namespace mkldnn {
             os<<" M:";
             for(size_t i=0; i<prim.inputs().size(); ++i){
                 mkldnn_primitive_at_t const& x=prim.inputs()[i];
-                os<<"\n             inputs["<<i<<"]=";
+                os<<"\n                     inputs["<<i<<"]=";
                 os<<"{@"<<(void*)(x.primitive)<<",output_index="<<x.output_index<<"}";
 #if 0
                 os<<x;
@@ -52,12 +51,12 @@ namespace mkldnn {
                 os.flush();
             }
             for(size_t i=0; i<prim.outputs().size(); ++i){
-                os<<"\n             outputs["<<i<<"]="; os.flush();
+                os<<"\n                     outputs["<<i<<"]="; os.flush();
                 //mkldnn::impl::primitive_t const *x=prim.outputs()[i];
                 if(i>=1U) {os<<" (break)"; break;}
                 mkldnn_primitive const *x=prim.outputs()[i];
                 os<<"@"<<(void*)x;
-#if 0 // bombs on SX
+#if 0 // bombed on SX
                 os<<*x;
 #endif
                 os.flush();
@@ -72,10 +71,8 @@ namespace mkldnn {
         return os;
     }
     std::ostream& operator<<(std::ostream& os, mkldnn_primitive_at_t const& prim) {
-        os<<" A ";
         mkldnn_primitive const &x = *prim.primitive;
         os<<x;
-        os<<" B ";
         os<<",output_index="<<prim.output_index;
         return os;
     }
