@@ -85,7 +85,7 @@ void check_lrn_fwd(const lrn_test_params &p, const memory &src, const memory &ds
         data_t norm_coef = std::pow(p.test_ld.k + p.test_ld.alpha * sum / summands,
                 p.test_ld.beta);
         data_t ref_out = static_cast<data_t>(src_ptr[map_index(src_d, off(n, oc, oh, ow))]/norm_coef);
-        data_t eps = data_t{1.e-7*(2*summands+5)};
+        data_t eps = static_cast<data_t>(1.e-7f*(2*summands+5));
         data_t out = d[0];
         data_t norm_max = std::max(fabs(out), fabs(ref_out));
         if (norm_max < eps) norm_max = 1.;

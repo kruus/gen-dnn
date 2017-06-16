@@ -71,7 +71,8 @@ void check_lrn_fwd(const test_lrn_desc_t &ld,
                 }
             }
         }
-        data_t norm_coef = std::pow(float{ld.k + ld.alpha * sum / summands}, float{ld.beta});
+        data_t norm_coef = std::pow(static_cast<float>(ld.k + ld.alpha * sum / summands),
+                                    static_cast<float>(ld.beta));
         data_t ref_out = src_ptr[map_index(src_d, off(n, oc, oh, ow))]/norm_coef;
         data_t eps = static_cast<data_t>(1.e-7*(2*summands+5));
         data_t out = d[0];
