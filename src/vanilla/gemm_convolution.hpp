@@ -129,7 +129,7 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
                         ? goihw : oihw) )
                 ;
 #endif
-            std::cout<<" VERBOSE_PRIMITIVE_CREATE = "<<VERBOSE_PRIMITIVE_CREATE<<std::endl;
+            //std::cout<<" VERBOSE_PRIMITIVE_CREATE = "<<VERBOSE_PRIMITIVE_CREATE<<std::endl;
 #if VERBOSE_PRIMITIVE_CREATE
             if( !ok && last_tested != nullptr ){
                 std::cout

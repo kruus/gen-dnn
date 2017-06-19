@@ -81,6 +81,22 @@ the additional convolutions onto the existing "engine" lists of primitives.
     - snake10:$ git push japan master:necla  # push to a tmp branch
     - sapphire2:$ git merge necla            # merge from branch
     - sapphire2:$ git branch -d necla        # delete tmp branch
+  - [NEW] with ssh RemoteForward set up in snake10:~/.ssh/config as ```
+Host zoro # was japan17
+  User nlabhpg
+  HostName 10.34.154.187
+  RemoteForward 22222 localhost:22
+    ```
+    - and a zoro:~/.ssh/config of ```
+host snake10
+    User kruus
+    Hostname localhost
+    Port 22222
+```
+    - so that passwordless ssh to AND from snake10<-->zoro works, we can
+    - zoro:$ git remote add snake10 git+ssh://snake10/local/kruus/sx/simd/sx-dnngit+ssh://snake10/local/kruus/sx/sx-dnn
+    - and THEN:
+      - `zoro:$ pull snake10 master` "just works"
   - For public-domain SX work:
     - Pull from upstream:
       - git pull upstream master
@@ -118,6 +134,15 @@ cd wrk
 cd simd/gen-dnn
 ```
 and then work on the mkl-dnn cross-compile stuff with _./build.sh -SdqT_ or something similar
+
+### SX testing
+
+- `build-sx/tests/gtests/test_convolution*` take a *long* time to run.
+  - so you can do something like ```
+( cd build-sx/tests/gtests; export C_PROGINF=DETAIL; for f in test_conv*; do echo '>>>> '"$f"; ./$f --gtest_filter=*/0:*/1:*/2:*/3:*/4:*/5 2>&1 | tee "../../../guest/$f-test0-5.log"; done; )  2>&1 | tee guest/gtest-conv0-5.log
+  ```
+  - to run a subset of the convolution tests.
+
 
 ### SX debug
 
