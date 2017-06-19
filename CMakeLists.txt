@@ -219,6 +219,9 @@ elseif(UNIX OR APPLE)
 
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
         set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -xHOST")
+    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -ffast-math")
+        # maybe also -ffinite-math or -funsafe-math-optimizations
     endif()
 
 endif()

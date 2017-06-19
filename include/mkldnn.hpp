@@ -125,15 +125,16 @@ public:
 #ifndef NDEBUG // for SX debug of primitives gettinc constructed with nonzero "output_index"
         // Note: this is not necessarily even used.  The error may be comming
         //       from POD initialization that varies between compilers!
-        at(const primitive &aprimitive, size_t at = 0)
-            : data(c_api::mkldnn_primitive_at(aprimitive.get(), at)) {}
-#else
+        // Verified: this seems to be and sxcc compiler bug
         at(const primitive &aprimitive, size_t at = 0)
             : data(c_api::mkldnn_primitive_at(aprimitive.get(), at)) {
                 using namespace std;
-                if(at != 0U){ cout<<" primitive.at("<<primitive<<"\n\t, at="<<at<<")"<<endl; }
+                if(at != 0U){ cout<<" primitive.at("<<aprimitive<<"\n\t, at="<<at<<")"<<endl; }
                 assert(false); // seems this is never encountered in simple_net.cpp
             }
+#else
+        at(const primitive &aprimitive, size_t at = 0)
+            : data(c_api::mkldnn_primitive_at(aprimitive.get(), at)) {}
 #endif
         /// Returns the specified output.
         inline operator primitive() const;

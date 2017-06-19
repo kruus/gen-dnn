@@ -189,7 +189,9 @@ INST_TEST_CASE(SimpleZeroNegativeSlope_NCHW,
     PARAMS(nchw, nchw, 0.f, 10, 10, 10, 10),
     PARAMS(nchw, nchw, 0.f, 256, 64, 8, 16),
     PARAMS(nchw, nchw, 0.f, 1, 1, 1, 1),
-    PARAMS(nchw, nchw, 0.f, 3, 5, 7, 11)
+    PARAMS(nchw, nchw, 0.f, 3, 5, 7, 11),
+    //PARAMS(nchw, nchw, 0.f, 1, 8, 10000, 10000) // is a tensor of 3 Gb data ok? YES (330 s runtime, slow)
+    //PARAMS(nchw, nchw, 0.f, 1, 12, 10000, 10000) // is a tensor of >4 Gb data ok? worked once (release mode)
 );
 
 INST_TEST_CASE(Simple_NCHW,

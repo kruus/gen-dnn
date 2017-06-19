@@ -25,7 +25,7 @@
 #define REF_RELU_DBG 0
 #if REF_RELU_DBG
 #include <iostream>
-#include "mkldnn_io.h"
+#include "mkldnn_io.hpp"
 #endif
 
 namespace mkldnn {
