@@ -109,6 +109,7 @@ inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
         ndims = 2; break;
     case f::nchw:
     case f::nhwc:
+    case f::chwn:
     case f::nChw8c:
     case f::nChw16c:
     case f::oihw:
@@ -184,28 +185,49 @@ static void fill_data(const size_t size, data_t *data, double sparsity = 1.,
 template <typename data_t>
 static void compare_data(mkldnn::memory& ref, mkldnn::memory& dst)
 {
+    using data_type = mkldnn::memory::data_type;
+
+    ASSERT_TRUE(data_traits<data_t>::data_type == data_type::f32 ||
+            data_traits<data_t>::data_type == data_type::s32);
+
     // Only true for dense format
-    size_t num = ref.get_primitive_desc().get_size() / sizeof(data_t);
+    /* Note: size_t incompatible with MSVC++ */
+    ptrdiff_t num = ref.get_primitive_desc().get_size() / sizeof(data_t);
     data_t *ref_data = (data_t *)ref.get_data_handle();
     data_t *dst_data = (data_t *)dst.get_data_handle();
 #   pragma omp parallel for schedule(static)
-    for (size_t i = 0; i < num; ++i) {
-        if (data_traits<data_t>::data_type == mkldnn::memory::data_type::f32) {
+    for (ptrdiff_t i = 0; i < num; ++i) {
         data_t ref = ref_data[i];
         data_t got = dst_data[i];
-        data_t diff = got - ref;
-        data_t e = std::abs(ref) > 1e-4 ? diff / ref : diff;
-        EXPECT_NEAR(e, 0.0, 1e-4) << "Index: " << i << " Total: " << num;
-       }  else if (data_traits<data_t>::data_type
-                    == mkldnn::memory::data_type::s32) {
-           data_t ref = ref_data[i];
-           data_t got = dst_data[i];
-           EXPECT_EQ(ref, got) << "Index: " << i << " Total: " << num;
-       }
+        if (data_traits<data_t>::data_type == data_type::f32) {
+            data_t diff = got - ref;
+            data_t e = std::abs(ref) > 1e-4 ? diff / ref : diff;
+            EXPECT_NEAR(e, 0.0, 1e-4) << "Index: " << i << " Total: " << num;
+        } else if (data_traits<data_t>::data_type == data_type::s32) {
+            EXPECT_EQ(ref, got) << "Index: " << i << " Total: " << num;
+        }
     }
 }
 
 struct test_convolution_sizes_t {
+    test_convolution_sizes_t(
+        int mb,
+        int ng,
+        int ic, int ih, int iw,
+        int oc, int oh, int ow,
+        int kh, int kw,
+        int padh, int padw,
+        int strh, int strw,
+        int dilh=0, int dilw=0
+    ) :
+        mb(mb),
+        ng(ng),
+        ic(ic), ih(ih), iw(iw),
+        oc(oc), oh(oh), ow(ow),
+        kh(kh), kw(kw),
+        padh(padh), padw(padw),
+        strh(strh), strw(strw),
+        dilh(dilh), dilw(dilw) {}
     int mb;
     int ng;
     int ic, ih, iw;
@@ -213,6 +235,7 @@ struct test_convolution_sizes_t {
     int kh, kw;
     int padh, padw;
     int strh, strw;
+    int dilh, dilw;
 };
 
 struct test_convolution_formats_t {

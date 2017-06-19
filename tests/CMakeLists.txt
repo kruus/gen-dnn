@@ -19,6 +19,18 @@ if(POLICY CMP0065)
 endif()
 
 #[ejk] library not found for cygwin -- it links with lib${LIB_NAME}.dll.a
+if(UNIX OR APPLE)
+    # workaround for Intel Compiler 16.0 that doesn't suppress warning on
+    # deprecation with "-Wno-deprecated" compiler flag
+    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel" AND
+            CMAKE_CXX_COMPILER_VERSION VERSION_LESS "17.0")
+        set(SUPPRESS_DEPRECATE_WARNS "-diag-disable:1478")
+    else()
+        set(SUPPRESS_DEPRECATE_WARNS "-Wno-deprecated-declarations")
+    endif()
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SUPPRESS_DEPRECATE_WARNS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SUPPRESS_DEPRECATE_WARNS}")
+endif()
 
 #add_executable(api-check-c api_check.c)
 #target_link_libraries(api-check-c ${LIB_NAME})
@@ -34,22 +46,29 @@ set_property(TARGET api-c PROPERTY C_STANDARD 99)
 target_link_libraries(api-c ${LIB_NAME})
 add_test(api-c api-c)
 
-add_executable(api-io-c api-io.c)
-set_property(TARGET api-io-c PROPERTY C_STANDARD 99)
-target_link_libraries(api-io-c ${LIB_NAME})
-add_test(api-io-c api-io-c)
+if(UNIX OR APPLE) # Is NECSX a UNIX ?
+    set(test_c_symbols "${CMAKE_CURRENT_BINARY_DIR}/test_c_symbols.c")
+    add_executable(test_c_symbols-c ${test_c_symbols})
+    add_custom_command(
+        OUTPUT ${test_c_symbols}
+        COMMAND /bin/bash ${CMAKE_CURRENT_SOURCE_DIR}/generate_c_symbols_refs.sh
+        ${CMAKE_CURRENT_SOURCE_DIR}/.. ${test_c_symbols}
+    )
+    target_link_libraries(test_c_symbols-c ${LIB_NAME})
+    add_test(test_c_symbols-c test_c_symbols-c)
 
-set(test_c_symbols "${CMAKE_CURRENT_BINARY_DIR}/test_c_symbols.c")
-add_executable(test_c_symbols-c ${test_c_symbols})
-add_custom_command(
-    OUTPUT ${test_c_symbols}
-    COMMAND /bin/bash ${CMAKE_CURRENT_SOURCE_DIR}/generate_c_symbols_refs.sh
-    ${CMAKE_CURRENT_SOURCE_DIR}/.. ${test_c_symbols}
-)
-target_link_libraries(test_c_symbols-c ${LIB_NAME})
+    add_executable(api-io-c api-io.c)
+    set_property(TARGET api-io-c PROPERTY C_STANDARD 99)
+    target_link_libraries(api-io-c ${LIB_NAME})
+    add_test(api-io-c api-io-c)
+# elseif(WIN32)
+# No Windows support for: test_c_symbols.c
+endif()
 
-add_test(test_c_symbols-c test_c_symbols-c)
+
 
 
 
 add_subdirectory(gtests)
+
+add_subdirectory(benchdnn)

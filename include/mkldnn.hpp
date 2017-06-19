@@ -23,9 +23,7 @@
 #include <memory>
 #include <vector>
 #include <algorithm>
-#if defined(_SX)
-#include <iterator> // std::back_inserter
-#endif
+#include <iterator>
 #endif
 
 namespace mkldnn {
@@ -215,10 +213,49 @@ template <> struct handle_traits<c_api::mkldnn_engine_t> {
 };
 #endif
 
+enum query {
+    undef = c_api::mkldnn_query_undef,
+
+    eengine = c_api::mkldnn_query_engine,
+    primitive_kind = c_api::mkldnn_query_primitive_kind,
+
+    num_of_inputs_s32 = c_api::mkldnn_query_num_of_inputs_s32,
+    num_of_outputs_s32 = c_api::mkldnn_query_num_of_outputs_s32,
+
+    time_estimate_f64 = c_api::mkldnn_query_time_estimate_f64,
+    memory_consumption_s64 = c_api::mkldnn_query_memory_consumption_s64,
+
+    impl_info_str = c_api::mkldnn_query_impl_info_str,
+
+    memory_d = c_api::mkldnn_query_memory_d,
+    convolution_d = c_api::mkldnn_query_convolution_d,
+    eltwise_d = c_api::mkldnn_query_eltwise_d,
+    relu_d = c_api::mkldnn_query_relu_d,
+    softmax_d = c_api::mkldnn_query_softmax_d,
+    pooling_d = c_api::mkldnn_query_pooling_d,
+    lrn_d = c_api::mkldnn_query_lrn_d,
+    batch_normalization_d = c_api::mkldnn_query_batch_normalization_d,
+    inner_product_d = c_api::mkldnn_query_inner_product_d,
+    convolution_relu_d = c_api::mkldnn_query_convolution_relu_d,
+
+    input_pd = c_api::mkldnn_query_input_pd,
+    output_pd = c_api::mkldnn_query_output_pd,
+    src_pd = c_api::mkldnn_query_src_pd,
+    diff_src_pd = c_api::mkldnn_query_diff_src_pd,
+    weights_pd = c_api::mkldnn_query_weights_pd,
+    diff_weights_pd = c_api::mkldnn_query_diff_weights_pd,
+    dst_pd = c_api::mkldnn_query_dst_pd,
+    diff_dst_pd = c_api::mkldnn_query_diff_dst_pd,
+    workspace_pd = c_api::mkldnn_query_workspace_pd,
+};
+inline c_api::mkldnn_query_t convert_to_c(query aquery) {
+    return static_cast<c_api::mkldnn_query_t>(aquery);
+}
+
 /// An execution engine.
 struct engine: public handle<c_api::mkldnn_engine_t> {
     friend class primitive;
-    using handle::handle;
+    // gcc bug??? using handle::handle;
 
     /// Kinds of engines
     enum kind {
@@ -253,6 +290,26 @@ struct engine: public handle<c_api::mkldnn_engine_t> {
 
     explicit engine(const c_api::mkldnn_engine_t& aengine)
         : handle(aengine, true) {}
+
+    engine(const handle<c_api::mkldnn_primitive_desc_t> &pd) {
+        c_api::mkldnn_engine_t engine_q;
+        error::wrap_c_api(
+                c_api::mkldnn_primitive_desc_query(pd.get(),
+                    mkldnn::convert_to_c(eengine), 0, &engine_q),
+                "could not get engine from primitive_desc");
+        reset(engine_q, true);
+    }
+
+    template <class primitive_desc>
+    static engine query(const primitive_desc &pd) {
+        c_api::mkldnn_engine_t engine_q;
+        error::wrap_c_api(
+                c_api::mkldnn_primitive_desc_query(pd.get(),
+                    mkldnn::convert_to_c(eengine), 0, &engine_q),
+                "could not get engine from primitive_desc");
+
+        return engine(engine_q);
+    }
 
 private:
     static c_api::mkldnn_engine_kind_t convert_to_c(kind akind) {
@@ -396,6 +453,8 @@ struct memory: public primitive  {
         bool operator!=(const primitive_desc &other) const {
             return !operator==(other);
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     /// Constructs a memory primitive from a generic primitive.
@@ -414,6 +473,12 @@ struct memory: public primitive  {
 #if defined(_SX) // changed my mind. let's just ignore all alignment for SX
         // XXX check other posix_memalign and do this too!
         //     (Alt: posix_memalign0 and free0 as in simd/sx/ code)
+        // SX: During _free,
+        // /SX/usr/include/c++/memory warns about void* --> char* conversion
+        // why? "argument of type "void *"
+        //          is incompatible with parameter of type "char *"
+        //_handle.reset(static_cast<char*>(_malloc(adesc.get_size(), 64)), _free);
+        //  ... modified _malloc lambda instead !!!
         auto _malloc = [](size_t size, int /*alignment*/) -> char* {
             void *ptr = ::malloc(size);
             return static_cast<char*>(ptr);
@@ -422,17 +487,23 @@ struct memory: public primitive  {
 #else
         auto _malloc = [](size_t size, int alignment) {
             void *ptr;
+#ifdef _WIN32
+            ptr = _aligned_malloc(size, alignment);
+            int rc = ((ptr)? 0 : errno);
+#else
             int rc = ::posix_memalign(&ptr, alignment, size);
+#endif /* _WIN32 */
             return (rc == 0) ? (char*)ptr : nullptr;
         };
-        auto _free = [](char* p) { ::free((void*)p); };
-#endif
-        // /SX/usr/include/c++/memory warns about void* --> char* conversion
-        // why? "argument of type "void *"
-        //          is incompatible with parameter of type "char *"
-        //_handle.reset(static_cast<char*>(_malloc(adesc.get_size(), 64)), _free);
-        //  ... modified _malloc lambda instead !!!
-        _handle.reset(_malloc(adesc.get_size(), 64), _free);
+        auto _free = [](char* p) {
+#ifdef _WIN32
+            _aligned_free((void*)p);
+#else
+            ::free((void*)p);
+#endif /* _WIN32 */
+        };
+#endif // _SX
+        _handle.reset(_malloc(adesc.get_size(), 4096), _free);
         set_data_handle(_handle.get());
     }
 
@@ -481,42 +552,6 @@ struct memory: public primitive  {
 
 };
 
-enum query {
-    undef = c_api::mkldnn_query_undef,
-
-    eengine = c_api::mkldnn_query_engine,
-    primitive_kind = c_api::mkldnn_query_primitive_kind,
-
-    num_of_inputs_s32 = c_api::mkldnn_query_num_of_inputs_s32,
-    num_of_outputs_s32 = c_api::mkldnn_query_num_of_outputs_s32,
-
-    time_estimate_f64 = c_api::mkldnn_query_time_estimate_f64,
-    memory_consumption_s64 = c_api::mkldnn_query_memory_consumption_s64,
-
-    memory_d = c_api::mkldnn_query_memory_d,
-    convolution_d = c_api::mkldnn_query_convolution_d,
-    relu_d = c_api::mkldnn_query_relu_d,
-    softmax_d = c_api::mkldnn_query_softmax_d,
-    pooling_d = c_api::mkldnn_query_pooling_d,
-    lrn_d = c_api::mkldnn_query_lrn_d,
-    batch_normalization_d = c_api::mkldnn_query_batch_normalization_d,
-    inner_product_d = c_api::mkldnn_query_inner_product_d,
-    convolution_relu_d = c_api::mkldnn_query_convolution_relu_d,
-
-    input_pd = c_api::mkldnn_query_input_pd,
-    output_pd = c_api::mkldnn_query_output_pd,
-    src_pd = c_api::mkldnn_query_src_pd,
-    diff_src_pd = c_api::mkldnn_query_diff_src_pd,
-    weights_pd = c_api::mkldnn_query_weights_pd,
-    diff_weights_pd = c_api::mkldnn_query_diff_weights_pd,
-    dst_pd = c_api::mkldnn_query_dst_pd,
-    diff_dst_pd = c_api::mkldnn_query_diff_dst_pd,
-    workspace_pd = c_api::mkldnn_query_workspace_pd,
-};
-inline c_api::mkldnn_query_t convert_to_c(query aquery) {
-    return static_cast<c_api::mkldnn_query_t>(aquery);
-}
-
 enum padding_kind {
     zero = c_api::mkldnn_padding_zero
 };
@@ -540,6 +575,10 @@ inline c_api::mkldnn_prop_kind_t convert_to_c(prop_kind kind) {
 
 enum algorithm {
     convolution_direct = c_api::mkldnn_convolution_direct,
+    convolution_winograd = c_api::mkldnn_convolution_winograd,
+    eltwise_relu = c_api::mkldnn_eltwise_relu,
+    eltwise_tanh = c_api::mkldnn_eltwise_tanh,
+    eltwise_elu = c_api::mkldnn_eltwise_elu,
     lrn_across_channels = c_api::mkldnn_lrn_across_channels,
     lrn_within_channel  = c_api::mkldnn_lrn_within_channel,
     pooling_max = c_api::mkldnn_pooling_max,
@@ -568,6 +607,8 @@ struct reorder : public primitive {
                     "could not create a reorder primitive descriptor");
             reset(result);
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     reorder(const primitive_desc &aprimitive_desc,
@@ -621,6 +662,8 @@ struct view : public primitive {
             adesc.reset(cdesc);
             return adesc;
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     view(const primitive_desc &view_pd, primitive::at input) {
@@ -694,6 +737,7 @@ struct concat : public primitive {
             return adesc;
         }
 
+        engine get_engine() { return engine::query(*this); }
     };
 
     concat(const primitive_desc &concat_pd,
@@ -763,6 +807,7 @@ struct sum : public primitive {
             return adesc;
         }
 
+        engine get_engine() { return engine::query(*this); }
     };
 
     sum(const primitive_desc &sum_pd,
@@ -896,6 +941,51 @@ struct convolution_forward: public primitive {
                         mkldnn::convert_to_c(apadding_kind)),
                     "could not create a convolution forward descriptor");
         }
+        desc(prop_kind aprop_kind, algorithm aalgorithm,
+                const memory::desc &src_desc,
+                const memory::desc &weights_desc,
+                const memory::desc &bias_desc,
+                const memory::desc &dst_desc,
+                const memory::dims strides,
+                const memory::dims dilates,
+                const memory::dims padding_l,
+                const memory::dims padding_r,
+                const padding_kind apadding_kind) {
+            memory::validate_dims(strides);
+            memory::validate_dims(dilates);
+            memory::validate_dims(padding_l);
+            memory::validate_dims(padding_r);
+            error::wrap_c_api(
+                c_api::mkldnn_dilated_convolution_forward_desc_init(&data,
+                    mkldnn::convert_to_c(aprop_kind), convert_to_c(aalgorithm),
+                        &src_desc.data, &weights_desc.data, &bias_desc.data,
+                        &dst_desc.data, &strides[0], &dilates[0],
+                        &padding_l[0], &padding_r[0],
+                        mkldnn::convert_to_c(apadding_kind)),
+                    "could not create a dilated convolution forward descriptor");
+        }
+        desc(prop_kind aprop_kind, algorithm aalgorithm,
+                const memory::desc &src_desc,
+                const memory::desc &weights_desc,
+                const memory::desc &dst_desc,
+                const memory::dims strides,
+                const memory::dims dilates,
+                const memory::dims padding_l,
+                const memory::dims padding_r,
+                const padding_kind apadding_kind) {
+            memory::validate_dims(strides);
+            memory::validate_dims(dilates);
+            memory::validate_dims(padding_l);
+            memory::validate_dims(padding_r);
+            error::wrap_c_api(
+                c_api::mkldnn_dilated_convolution_forward_desc_init(&data,
+                    mkldnn::convert_to_c(aprop_kind), convert_to_c(aalgorithm),
+                        &src_desc.data, &weights_desc.data, nullptr,
+                        &dst_desc.data, &strides[0], &dilates[0],
+                        &padding_l[0], &padding_r[0],
+                        mkldnn::convert_to_c(apadding_kind)),
+                    "could not create a dilated convolution forward descriptor");
+        }
     };
     struct primitive_desc : public handle<c_api::mkldnn_primitive_desc_t> {
         primitive_desc(const desc &adesc, const engine &aengine) {
@@ -953,6 +1043,8 @@ struct convolution_forward: public primitive {
             adesc.reset(cdesc);
             return adesc;
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     convolution_forward(const primitive_desc &aprimitive_desc,
@@ -1049,6 +1141,8 @@ struct convolution_backward_data : public primitive {
             adesc.reset(cdesc);
             return adesc;
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     convolution_backward_data(const primitive_desc &aprimitive_desc,
@@ -1165,6 +1259,8 @@ struct convolution_backward_weights : public primitive {
             adesc.reset(cdesc);
             return adesc;
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     convolution_backward_weights(const primitive_desc &aprimitive_desc,
@@ -1212,6 +1308,8 @@ struct convolution_relu_forward : public primitive {
                 "could not create a convolution relu forward descriptor");
             reset(result);
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     convolution_relu_forward(const primitive_desc &aprimitive_desc,
@@ -1306,6 +1404,8 @@ struct lrn_forward : public primitive {
             adesc.reset(cdesc);
             return adesc;
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     lrn_forward(const primitive_desc &aprimitive_desc,
@@ -1404,6 +1504,8 @@ struct lrn_backward : public primitive {
             adesc.reset(cdesc);
             return adesc;
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     lrn_backward(const primitive_desc &aprimitive_desc,
@@ -1490,6 +1592,8 @@ struct pooling_forward : public primitive {
             adesc.reset(cdesc);
             return adesc;
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     pooling_forward(const primitive_desc &aprimitive_desc, const primitive::at &src,
@@ -1562,6 +1666,8 @@ struct pooling_backward : public primitive {
             adesc.reset(cdesc);
             return adesc;
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     pooling_backward(const primitive_desc &aprimitive_desc, const primitive::at &diff_dst,
@@ -1587,17 +1693,25 @@ struct pooling_backward : public primitive {
     }
 };
 
-struct relu_forward : public primitive {
+struct eltwise_forward : public primitive {
     struct desc {
-        c_api::mkldnn_relu_desc_t data;
+        c_api::mkldnn_eltwise_desc_t data;
         template <typename T>
-        desc(prop_kind aprop_kind, const memory::desc &src_desc,
-                T negative_slope) {
-            error::wrap_c_api(c_api::mkldnn_relu_forward_desc_init(&data,
-                        mkldnn::convert_to_c(aprop_kind), &src_desc.data,
-                        static_cast<double>(negative_slope)),
-                    "could not create a relu forward descriptor");
+        desc(prop_kind aprop_kind, algorithm alg_kind,
+                const memory::desc &src_desc, T alpha = 0, T beta = 0) {
+            error::wrap_c_api(c_api::mkldnn_eltwise_forward_desc_init(&data,
+                        mkldnn::convert_to_c(aprop_kind),
+                        mkldnn::convert_to_c(alg_kind), &src_desc.data,
+                        static_cast<double>(alpha), static_cast<double>(beta)),
+                    "could not create a eltwise forward descriptor");
         }
+
+        /** @deprecated: api backward compatibility for relu */
+        template <typename T>
+        MKLDNN_DEPRECATED
+        desc(prop_kind aprop_kind, const memory::desc &src_desc,
+                T negative_slope)
+        : desc(aprop_kind, eltwise_relu, src_desc, negative_slope) {}
     };
 
     struct primitive_desc : public handle<c_api::mkldnn_primitive_desc_t> {
@@ -1605,7 +1719,7 @@ struct relu_forward : public primitive {
             c_api::mkldnn_primitive_desc_t result;
             error::wrap_c_api(c_api::mkldnn_primitive_desc_create(
                         &result, &adesc.data, aengine.get(), nullptr),
-                    "could not create a relu forward primitive descriptor");
+                    "could not create a eltwise forward primitive descriptor");
             reset(result);
         }
 
@@ -1614,63 +1728,61 @@ struct relu_forward : public primitive {
             c_api::mkldnn_primitive_desc_t cdesc;
             c_api::const_mkldnn_primitive_desc_t const_cdesc =
                 c_api::mkldnn_primitive_desc_query_pd(get(),
-                               mkldnn::convert_to_c(dst_pd), 0);
-            error::wrap_c_api(c_api::mkldnn_primitive_desc_clone(&cdesc, const_cdesc),
+                        mkldnn::convert_to_c(dst_pd), 0);
+            error::wrap_c_api(
+                    c_api::mkldnn_primitive_desc_clone(&cdesc, const_cdesc),
                     "could not clone a dst primitive descriptor");
             adesc.reset(cdesc);
             return adesc;
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
-    relu_forward(const primitive_desc &aprimitive_desc,
+    eltwise_forward(const primitive_desc &aprimitive_desc,
             const primitive::at &src, const memory &dst) {
         c_api::mkldnn_primitive_t result;
         c_api::mkldnn_primitive_at_t inputs[] = { src.data };
         c_api::const_mkldnn_primitive_t outputs[] = { dst.get() };
         error::wrap_c_api(c_api::mkldnn_primitive_create(&result,
                 aprimitive_desc.get(), inputs, outputs),
-            "could not create a relu forward primitive");
+            "could not create a eltwise forward primitive");
         reset(result);
     }
-
-    /*
-    relu_forward(prop_kind aprop_kind, double negative_slope,
-            const primitive::at &src, const memory &dst) {
-        auto src_md = memory(src).get_primitive_desc();
-        auto dst_md = memory(dst).get_primitive_desc();
-
-        auto relu_d = desc(aprop_kind, negative_slope, src_md.desc(),
-                dst_md.desc());
-        auto relu_pd = primitive_desc(relu_d, engine(src_md.data.base.engine));
-        c_api::mkldnn_primitive_t result;
-        error::wrap_c_api(c_api::mkldnn_relu_create(&result,
-                    &relu_pd.data, src.data, dst.get()),
-                "could not create a relu primitive");
-        reset(result);
-    }
-    */
 };
 
-struct relu_backward : public primitive {
+typedef eltwise_forward relu_forward;
+
+struct eltwise_backward : public primitive {
     struct desc {
-        c_api::mkldnn_relu_desc_t data;
+        c_api::mkldnn_eltwise_desc_t data;
+
         template <typename T>
-        desc(const memory::desc &diff_data_desc, const memory::desc &data_desc,
-            T negative_slope) {
-            error::wrap_c_api(c_api::mkldnn_relu_backward_desc_init(&data,
-                        &diff_data_desc.data, &data_desc.data,
-                        static_cast<double>(negative_slope)),
-                    "could not create a relu backward descriptor");
+        desc(algorithm alg_kind, const memory::desc &diff_data_desc,
+                const memory::desc &data_desc, T alpha = 0, T beta = 0) {
+            error::wrap_c_api(c_api::mkldnn_eltwise_backward_desc_init(&data,
+                        mkldnn::convert_to_c(alg_kind), &diff_data_desc.data,
+                        &data_desc.data, static_cast<double>(alpha),
+                        static_cast<double>(beta)),
+                    "could not create a eltwise backward descriptor");
         }
+
+        /** @deprecated: api backward compatibility for relu */
+        template <typename T>
+        MKLDNN_DEPRECATED
+        desc(const memory::desc &diff_data_desc, const memory::desc &data_desc,
+            T negative_slope): desc(eltwise_relu, diff_data_desc, data_desc,
+                negative_slope) {}
     };
+
     struct primitive_desc : public handle<c_api::mkldnn_primitive_desc_t> {
         primitive_desc(const desc &adesc, const engine &aengine,
-        const relu_forward::primitive_desc &hint_fwd_primitive_desc) {
+        const eltwise_forward::primitive_desc &hint_fwd_primitive_desc) {
             c_api::mkldnn_primitive_desc_t result;
             error::wrap_c_api(c_api::mkldnn_primitive_desc_create(
                         &result, &adesc.data, aengine.get(),
                         hint_fwd_primitive_desc.get()),
-                    "could not create a relu backward primitive descriptor");
+                    "could not create a eltwise backward primitive descriptor");
             reset(result);
         }
 
@@ -1685,8 +1797,11 @@ struct relu_backward : public primitive {
             adesc.reset(cdesc);
             return adesc;
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
-    relu_backward(const primitive_desc &aprimitive_desc,
+
+    eltwise_backward(const primitive_desc &aprimitive_desc,
             const primitive::at &src, const primitive::at &diff_dst,
             const memory &diff_src) {
         c_api::mkldnn_primitive_t result;
@@ -1694,10 +1809,12 @@ struct relu_backward : public primitive {
         c_api::const_mkldnn_primitive_t outputs[] = { diff_src.get() };
         error::wrap_c_api(c_api::mkldnn_primitive_create(&result,
                 aprimitive_desc.get(), inputs, outputs),
-            "could not create a relu backward primitive");
+            "could not create a eltwise backward primitive");
         reset(result);
     }
 };
+
+typedef eltwise_backward relu_backward;
 
 struct softmax_forward : public primitive {
     struct desc {
@@ -1719,6 +1836,8 @@ struct softmax_forward : public primitive {
                 "could not create a softmax forward primitive descriptor");
             reset(result);
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     softmax_forward(const primitive_desc &aprimitive_desc,
@@ -1821,6 +1940,8 @@ struct batch_normalization_forward : public primitive {
             adesc.reset(cdesc);
             return adesc;
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     batch_normalization_forward(const primitive_desc &aprimitive_desc,
@@ -1991,6 +2112,8 @@ struct batch_normalization_backward : public primitive {
             adesc.reset(cdesc);
             return adesc;
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     // Prop_kind == backward
@@ -2122,6 +2245,8 @@ struct inner_product_forward: public primitive {
             adesc.reset(cdesc);
             return adesc;
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     inner_product_forward(const primitive_desc &aprimitive_desc,
@@ -2210,6 +2335,8 @@ struct inner_product_backward_data: public primitive {
             adesc.reset(cdesc);
             return adesc;
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     inner_product_backward_data(const primitive_desc &aprimitive_desc,
@@ -2307,6 +2434,8 @@ struct inner_product_backward_weights: public primitive {
             adesc.reset(cdesc);
             return adesc;
         }
+
+        engine get_engine() { return engine::query(*this); }
     };
 
     inner_product_backward_weights(const primitive_desc &aprimitive_desc,

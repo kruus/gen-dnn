@@ -55,6 +55,9 @@ void _ref_convolution_fwd_t<with_relu, src_type, wei_type, acc_type, dst_type>
     const int KSH = conf_.KSH();
     const int KSW = conf_.KSW();
 
+    const int KDH = conf_.KDH();
+    const int KDW = conf_.KDW();
+
     const int padT = conf_.padT();
     const int padL = conf_.padL();
 
@@ -64,8 +67,8 @@ void _ref_convolution_fwd_t<with_relu, src_type, wei_type, acc_type, dst_type>
         for (int ic = 0; ic < IC; ++ic) {
             for (int kh = 0; kh < KH; ++kh) {
                 for (int kw = 0; kw < KW; ++kw) {
-                    const int ih = oh * KSH - padT + kh;
-                    const int iw = ow * KSW - padL + kw;
+                    const int ih = oh * KSH - padT + kh * (1 + KDH);
+                    const int iw = ow * KSW - padL + kw * (1 + KDW);
 
                     if (ih < 0 || ih >= IH) continue;
                     if (iw < 0 || iw >= IW) continue;
@@ -80,13 +83,16 @@ void _ref_convolution_fwd_t<with_relu, src_type, wei_type, acc_type, dst_type>
     };
 
     auto get_bias = [=](size_t off) -> acc_data_t {
+#       define CASE(dt) case dt: \
+            return (acc_data_t)(*((const prec_traits<dt>::type *)bias + off))
         switch (conf_.cdesc()->bias_desc.data_type) {
-        case data_type::s8: return *((const int8_t *)bias + off);
-        case data_type::u8: return *((const uint8_t *)bias + off);
-        case data_type::s32: return *((const int *)bias + off);
-        case data_type::f32: return *((const float *)bias + off);
+        CASE(data_type::s8);
+        CASE(data_type::u8);
+        CASE(data_type::s32);
+        CASE(data_type::f32);
         default: assert(!"unimplemented");
         }
+#       undef CASE
         return 0;
     };
 
@@ -141,7 +147,6 @@ void ref_convolution_bwd_data_t<data_type>::execute_backward_data() {
 
     const int padT = conf_.padT();
     const int padL = conf_.padL();
-
 
     auto ker = [=](data_t *d, int g, int mb, int ic, int ih, int iw) {
         for (int oc = 0; oc < OC; ++oc) {

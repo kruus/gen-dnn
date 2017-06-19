@@ -20,14 +20,41 @@
 #include "c_types_map.hpp"
 #include "type_helpers.hpp"
 
-#include "ref_relu.hpp"
+#include "ref_eltwise.hpp"
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
+using namespace alg_kind;
+
+namespace {
+template <typename T, typename A> T relu_fwd(T s, A alpha) {
+    return s > 0 ? s : s * alpha;
+}
+template <typename T, typename A> T relu_bwd(T dd, T s, A alpha) {
+    return s > 0 ? dd : dd * alpha;
+}
+
+template <typename T> T tanh_fwd(T s) {
+    T e = ::expf(2*s); /* maybe replace with -2*s? */
+    return (e - 1) / (e + 1);
+}
+template <typename T> T tanh_bwd(T dd, T s) {
+    T th = tanh_fwd(s);
+    return dd * (1 - th * th);
+}
+
+template <typename T, typename A> T elu_fwd(T s, A alpha) {
+    return s > 0 ? s : alpha * (::expf(s) - 1);
+}
+template <typename T, typename A> T elu_bwd(T dd, T s, A alpha) {
+    return dd * (s > 0 ? 1. : alpha * ::expf(s));
+}
+}
+
 template <impl::data_type_t data_type>
-void ref_relu_fwd_t<data_type>::execute_forward_generic() {
+void ref_eltwise_fwd_t<data_type>::execute_forward_generic() {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto dst = reinterpret_cast<data_t*>(this->memory(0));
 
@@ -37,7 +64,8 @@ void ref_relu_fwd_t<data_type>::execute_forward_generic() {
     const int C = conf_.C();
     const int H = conf_.H();
     const int W = conf_.W();
-    const double negative_slope = conf_.desc()->negative_slope;
+    const auto alg_kind = conf_.desc()->alg_kind;
+    const double alpha = conf_.desc()->alpha;
 
 #   pragma omp parallel for collapse(4) schedule(static)
     for (int n = 0; n < MB; ++n) {
@@ -47,7 +75,12 @@ void ref_relu_fwd_t<data_type>::execute_forward_generic() {
                     auto d_off = data_d.off(n, c, h, w);
                     data_t s = src[d_off];
                     data_t &d = dst[d_off];
-                    d = (s > 0) ? s : s * negative_slope;
+                    switch (alg_kind) {
+                    case eltwise_relu: d = relu_fwd(s, alpha); break;
+                    case eltwise_tanh: d = tanh_fwd(s); break;
+                    case eltwise_elu: d = elu_fwd(s, alpha); break;
+                    default: assert(!"unknown eltwise alg_kind");
+                    }
                 }
             }
         }
@@ -55,26 +88,32 @@ void ref_relu_fwd_t<data_type>::execute_forward_generic() {
 }
 
 template <impl::data_type_t data_type>
-void ref_relu_fwd_t<data_type>::execute_forward_dense() {
+void ref_eltwise_fwd_t<data_type>::execute_forward_dense() {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto dst = reinterpret_cast<data_t*>(this->memory(0));
 
     const memory_desc_wrapper data_d(conf_.src_pd());
 
     const size_t nelems = data_d.nelems();
-    const double negative_slope = conf_.desc()->negative_slope;
+    const auto alg_kind = conf_.desc()->alg_kind;
+    const double alpha = conf_.desc()->alpha;
 
     src += data_d.blocking_desc().offset_padding;
     dst += data_d.blocking_desc().offset_padding;
 
 #   pragma omp parallel for schedule(static)
-    for (size_t e = 0; e < nelems; ++e) {
-        dst[e] = src[e] * ((src[e] > 0) ? 1. : negative_slope);
+    for (int e = 0; e < nelems; ++e) {
+        switch (alg_kind) {
+        case eltwise_relu: dst[e] = relu_fwd(src[e], alpha); break;
+        case eltwise_tanh: dst[e] = tanh_fwd(src[e]); break;
+        case eltwise_elu: dst[e] = elu_fwd(src[e], alpha); break;
+        default: assert(!"unknown eltwise alg_kind");
+        }
     }
 }
 
 template <impl::data_type_t data_type>
-void ref_relu_bwd_t<data_type>::execute_backward_generic() {
+void ref_eltwise_bwd_t<data_type>::execute_backward_generic() {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
     auto diff_src = reinterpret_cast<data_t*>(this->memory(0));
@@ -86,7 +125,8 @@ void ref_relu_bwd_t<data_type>::execute_backward_generic() {
     const int C = conf_.C();
     const int H = conf_.H();
     const int W = conf_.W();
-    const double negative_slope = conf_.desc()->negative_slope;
+    const auto alg_kind = conf_.desc()->alg_kind;
+    const double alpha = conf_.desc()->alpha;
 
 #   pragma omp parallel for collapse(4) schedule(static)
     for (int n = 0; n < MB; ++n) {
@@ -98,7 +138,12 @@ void ref_relu_bwd_t<data_type>::execute_backward_generic() {
                     data_t s = src[data_off];
                     data_t dd = diff_dst[diff_data_off];
                     data_t &ds = diff_src[diff_data_off];
-                    ds = dd * ((s > 0) ? 1. : negative_slope);
+                    switch (alg_kind) {
+                    case eltwise_relu: ds = relu_bwd(dd, s, alpha); break;
+                    case eltwise_tanh: ds = tanh_bwd(dd, s); break;
+                    case eltwise_elu: ds = elu_bwd(dd, s, alpha); break;
+                    default: assert(!"unknown eltwise alg_kind");
+                    }
                 }
             }
         }
@@ -106,7 +151,7 @@ void ref_relu_bwd_t<data_type>::execute_backward_generic() {
 }
 
 template <impl::data_type_t data_type>
-void ref_relu_bwd_t<data_type>::execute_backward_dense() {
+void ref_eltwise_bwd_t<data_type>::execute_backward_dense() {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
     auto diff_src = reinterpret_cast<data_t*>(this->memory(0));
@@ -115,25 +160,34 @@ void ref_relu_bwd_t<data_type>::execute_backward_dense() {
     const memory_desc_wrapper diff_data_d(conf_.diff_src_pd());
 
     const size_t nelems = data_d.nelems();
-    const double negative_slope = conf_.desc()->negative_slope;
+    const auto alg_kind = conf_.desc()->alg_kind;
+    const double alpha = conf_.desc()->alpha;
 
     src += data_d.blocking_desc().offset_padding;
     diff_dst += diff_data_d.blocking_desc().offset_padding;
     diff_src += diff_data_d.blocking_desc().offset_padding;
 
 #   pragma omp parallel for schedule(static)
-    for (size_t e = 0; e < nelems; ++e) {
-        diff_src[e] = diff_dst[e] * ((src[e] > 0) ? 1. : negative_slope);
+    for (int e = 0; e < nelems; ++e) {
+        diff_src[e] = diff_dst[e] * ((src[e] > 0) ? 1. : alpha);
+        switch (alg_kind) {
+        case eltwise_relu: diff_src[e] = relu_bwd(diff_dst[e], src[e], alpha);
+                           break;
+        case eltwise_tanh: diff_src[e] = tanh_bwd(diff_dst[e], src[e]); break;
+        case eltwise_elu: diff_src[e] = elu_bwd(diff_dst[e], src[e], alpha);
+                           break;
+        default: assert(!"unknown eltwise alg_kind");
+        }
     }
 }
 
-template struct ref_relu_fwd_t<data_type::f32>;
-template struct ref_relu_fwd_t<data_type::s32>;
-template struct ref_relu_fwd_t<data_type::s16>;
-template struct ref_relu_fwd_t<data_type::s8>;
-template struct ref_relu_fwd_t<data_type::u8>;
+template struct ref_eltwise_fwd_t<data_type::f32>;
+template struct ref_eltwise_fwd_t<data_type::s32>;
+template struct ref_eltwise_fwd_t<data_type::s16>;
+template struct ref_eltwise_fwd_t<data_type::s8>;
+template struct ref_eltwise_fwd_t<data_type::u8>;
 
-template struct ref_relu_bwd_t<data_type::f32>;
+template struct ref_eltwise_bwd_t<data_type::f32>;
 
 }
 }

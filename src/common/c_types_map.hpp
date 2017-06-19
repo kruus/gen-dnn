@@ -59,6 +59,10 @@ namespace prop_kind {
 using alg_kind_t = mkldnn_alg_kind_t;
 namespace alg_kind {
     const alg_kind_t convolution_direct = mkldnn_convolution_direct;
+    const alg_kind_t convolution_winograd = mkldnn_convolution_winograd;
+    const alg_kind_t eltwise_relu = mkldnn_eltwise_relu;
+    const alg_kind_t eltwise_tanh = mkldnn_eltwise_tanh;
+    const alg_kind_t eltwise_elu = mkldnn_eltwise_elu;
     const alg_kind_t pooling_max = mkldnn_pooling_max;
     const alg_kind_t pooling_avg = mkldnn_pooling_avg;
     const alg_kind_t pooling_avg_include_padding = mkldnn_pooling_avg_include_padding;
@@ -139,7 +143,7 @@ namespace primitive_kind {
     const primitive_kind_t concat_inplace = mkldnn_concat_inplace;
     const primitive_kind_t sum = mkldnn_sum;
     const primitive_kind_t convolution = mkldnn_convolution;
-    const primitive_kind_t relu = mkldnn_relu;
+    const primitive_kind_t eltwise = mkldnn_eltwise;
     const primitive_kind_t softmax = mkldnn_softmax;
     const primitive_kind_t pooling = mkldnn_pooling;
     const primitive_kind_t lrn = mkldnn_lrn;
@@ -161,10 +165,12 @@ namespace query {
     const query_t time_estimate_f64 = mkldnn_query_time_estimate_f64;
     const query_t memory_consumption_s64 = mkldnn_query_memory_consumption_s64;
 
+    const query_t impl_info_str = mkldnn_query_impl_info_str;
+
     const query_t some_d = mkldnn_query_some_d;
     const query_t memory_d = mkldnn_query_memory_d;
     const query_t convolution_d = mkldnn_query_convolution_d;
-    const query_t relu_d = mkldnn_query_relu_d;
+    const query_t eltwise_d = mkldnn_query_eltwise_d;
     const query_t softmax_d = mkldnn_query_softmax_d;
     const query_t pooling_d = mkldnn_query_pooling_d;
     const query_t lrn_d = mkldnn_query_lrn_d;
@@ -189,7 +195,7 @@ using blocking_desc_t = mkldnn_blocking_desc_t;
 using memory_desc_t = mkldnn_memory_desc_t;
 using convolution_desc_t = mkldnn_convolution_desc_t;
 using pooling_desc_t = mkldnn_pooling_desc_t;
-using relu_desc_t = mkldnn_relu_desc_t;
+using eltwise_desc_t = mkldnn_eltwise_desc_t;
 using softmax_desc_t = mkldnn_softmax_desc_t;
 using lrn_desc_t = mkldnn_lrn_desc_t;
 using batch_normalization_desc_t = mkldnn_batch_normalization_desc_t;
@@ -206,7 +212,7 @@ struct op_desc_t {
         memory_desc_t memory;
         convolution_desc_t convolution;
         pooling_desc_t pooling;
-        relu_desc_t relu;
+        eltwise_desc_t eltwise;
         softmax_desc_t softmax;
         lrn_desc_t lrn;
         batch_normalization_desc_t batch_normalization;
@@ -226,7 +232,7 @@ struct op_desc_t {
     DECL_CTOR_AND_CONVERTERS(memory_desc_t, memory);
     DECL_CTOR_AND_CONVERTERS(convolution_desc_t, convolution);
     DECL_CTOR_AND_CONVERTERS(pooling_desc_t, pooling);
-    DECL_CTOR_AND_CONVERTERS(relu_desc_t, relu);
+    DECL_CTOR_AND_CONVERTERS(eltwise_desc_t, eltwise);
     DECL_CTOR_AND_CONVERTERS(softmax_desc_t, softmax);
     DECL_CTOR_AND_CONVERTERS(lrn_desc_t, lrn);
     DECL_CTOR_AND_CONVERTERS(batch_normalization_desc_t, batch_normalization);

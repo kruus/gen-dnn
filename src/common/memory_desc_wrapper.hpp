@@ -232,6 +232,12 @@ private:
     template<typename ...Void> // from ptrdiff_t
     inline size_t _blk_off() const { return static_cast<size_t>(blocking_desc().offset_padding); }
 
+#ifdef _MSVC_LANG
+    template<typename T> inline size_t _blk_off(T x0) const {
+        return size_t(x0)*blocking_desc().strides[0][0] + _blk_off();
+    }
+#endif
+
     template<typename T, typename ...Args>
     inline size_t _blk_off(Args ...args, T xn) const {
         return static_cast<size_t>(size_t(xn)*blocking_desc().strides[0][sizeof...(args)] +

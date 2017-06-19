@@ -53,7 +53,11 @@ void *aligned_malloc(size_t size, size_t alignment) {
 }
 #else
 void *aligned_malloc(size_t size, size_t alignment) {
+#ifdef WIN32
+    return _aligned_malloc(size, alignment);
+#else
     return memalign(alignment, size);
+#endif
 }
 #endif
 
@@ -74,6 +78,12 @@ void *aligned_malloc(size_t size, size_t alignment) {
     mkldnn_name_primitive( PRIMITIVE, buf, len ); \
     printf(" %s\n",buf); \
 }while(0) 
+#endif
+
+#ifdef WIN32
+void __cdecl free(void *ptr) {
+    _aligned_free(ptr);
+}
 #endif
 
 static size_t product(int *arr, size_t size) {
@@ -314,10 +324,10 @@ mkldnn_status_t simple_net(){
 
     TRACE("create relu");
     /* create a relu */
-    mkldnn_relu_desc_t relu_desc;
-    TRACE("mkldnn_relu_forward_desc_init,,,");
-    CHECK(mkldnn_relu_forward_desc_init(&relu_desc, mkldnn_forward,
-            relu_src_md, negative_slope));
+    mkldnn_eltwise_desc_t relu_desc;
+    TRACE("mkldnn_eltwise_forward_desc_init (for relu)");
+    CHECK(mkldnn_eltwise_forward_desc_init(&relu_desc, mkldnn_forward,
+                mkldnn_eltwise_relu, relu_src_md, negative_slope, 0));
 
     mkldnn_primitive_desc_t relu_pd;
     TRACE("mkldnn_primitive_desc_create...");
