@@ -19,7 +19,7 @@ if(POLICY CMP0065)
 endif()
 
 #[ejk] library not found for cygwin -- it links with lib${LIB_NAME}.dll.a
-if(UNIX OR APPLE)
+if((UNIX OR APPLE) AND NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "SX")
     # workaround for Intel Compiler 16.0 that doesn't suppress warning on
     # deprecation with "-Wno-deprecated" compiler flag
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel" AND
