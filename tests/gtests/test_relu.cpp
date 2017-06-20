@@ -181,6 +181,8 @@ TEST_P(relu_test_float, TestsReLU)
         str, relu_test_float, ::testing::Values(__VA_ARGS__))
 
 INST_TEST_CASE(SimpleZeroNegativeSlope_NCHW,
+    //PARAMS(nchw, nchw, 0.f, 1, 8, 10000, 10000),  // is a tensor of 3 Gb data ok? YES (330 s runtime, slow)
+    //PARAMS(nchw, nchw, 0.f, 1, 12, 10000, 10000), // is a tensor of >4 Gb data ok? worked once (release mode)
     PARAMS(nchw, nchw, 0.f, 2, 8, 4, 4),
     PARAMS(nchw, nchw, 0.f, 2, 16, 4, 4),
     PARAMS(nchw, nchw, 0.f, 2, 16, 8, 8),
@@ -189,9 +191,7 @@ INST_TEST_CASE(SimpleZeroNegativeSlope_NCHW,
     PARAMS(nchw, nchw, 0.f, 10, 10, 10, 10),
     PARAMS(nchw, nchw, 0.f, 256, 64, 8, 16),
     PARAMS(nchw, nchw, 0.f, 1, 1, 1, 1),
-    PARAMS(nchw, nchw, 0.f, 3, 5, 7, 11),
-    //PARAMS(nchw, nchw, 0.f, 1, 8, 10000, 10000) // is a tensor of 3 Gb data ok? YES (330 s runtime, slow)
-    //PARAMS(nchw, nchw, 0.f, 1, 12, 10000, 10000) // is a tensor of >4 Gb data ok? worked once (release mode)
+    PARAMS(nchw, nchw, 0.f, 3, 5, 7, 11)
 );
 
 INST_TEST_CASE(Simple_NCHW,

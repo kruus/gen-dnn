@@ -146,6 +146,8 @@ timeoutPID() { # unused
     fi
     if [ ! "$DOTARGET" == "j" ]; then
         CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
+        export CFLAGS="${CFLAGS} -DTARGET_VANILLA"
+        export CXXFLAGS="${CXXFLAGS} -DTARGET_VANILLA"
     fi
     if [ "$DOTARGET" == "s" ]; then
         TOOLCHAIN=../cmake/sx.cmake

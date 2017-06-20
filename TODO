@@ -43,3 +43,9 @@ for correctness?)
 
 This is a real sxcc bug
 
+--------------------------------------------------------------------------
+Can we speed up test_relu speed-up for float?  Testing a big array (3.2 Gb)
+took 335.1 s.  Tried float calc... NO DIFFERENCE.
+UPSTREAM merge : relu is an example of "eltwise" primitive now
+--------------------------------------------------------------------------
+

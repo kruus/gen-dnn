@@ -24,6 +24,9 @@
 #include <vector>
 #include <algorithm>
 #include <iterator>
+#ifndef NDEBUG
+#include "mkldnn_io.hpp" // tracing an initialization error [turned out it was sxcc compiler bug]
+#endif
 #endif
 
 namespace mkldnn {
@@ -111,6 +114,8 @@ class primitive: public handle<c_api::mkldnn_primitive_t> {
     using handle::handle;
 public:
     /// A wrapper structure to specify a particular output of a primitive.
+    /// [ejk] Not used, but probably should be. Explicitly sets output_index,
+    ///       which was a thorny compiler bug for sxcc.
     struct at {
         /// The underlying C API structure.
         c_api::mkldnn_primitive_at_t data;

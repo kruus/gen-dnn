@@ -23,13 +23,15 @@
 
 #include "ref_convolution.hpp"
 
-#include <unordered_set> // XXX REMOVE THIS XXX [ejk]
+#ifndef NDEBUG
+#include <unordered_set> // to track new ref_convolutions (potential to optimize?)
+#endif
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-#if 1
+#ifndef NDEBUG
 // There are mkldnn_memory_format_max^3 possible combinations, of which only
 // a small percentage commonly occur.  We can restrict register optimized cases
 // into a lookup table XXX eventually.
@@ -117,6 +119,9 @@ void _ref_convolution_fwd_t<with_relu, src_type, wei_type, acc_type, dst_type>
     const int KSH = conf_.KSH();
     const int KSW = conf_.KSW();
 
+    const int KDH = conf_.KDH();
+    const int KDW = conf_.KDW();
+
     const int padT = conf_.padT();
     const int padL = conf_.padL();
 
@@ -126,8 +131,8 @@ void _ref_convolution_fwd_t<with_relu, src_type, wei_type, acc_type, dst_type>
         for (int ic = 0; ic < IC; ++ic) {
             for (int kh = 0; kh < KH; ++kh) {
                 for (int kw = 0; kw < KW; ++kw) {
-                    const int ih = oh * KSH - padT + kh;
-                    const int iw = ow * KSW - padL + kw;
+                    const int ih = oh * KSH - padT + kh * (1 + KDH);
+                    const int iw = ow * KSW - padL + kw * (1 + KDW);
 
                     if (ih < 0 || ih >= IH) continue;
                     if (iw < 0 || iw >= IW) continue;
@@ -143,26 +148,13 @@ void _ref_convolution_fwd_t<with_relu, src_type, wei_type, acc_type, dst_type>
 
     auto get_bias = [=](size_t off) -> acc_data_t {
         switch (conf_.cdesc()->bias_desc.data_type) {
-#if 1
-#define SUPPORTED_CASE( DTYPE ) case DTYPE: return static_cast<acc_data_t> \
+#define CASE( DTYPE ) case DTYPE: return static_cast<acc_data_t> \
             (*((const impl::prec_traits<DTYPE>::type *)bias + off));
-        SUPPORTED_CASE(data_type::s8)
-        SUPPORTED_CASE(data_type::u8)
-        SUPPORTED_CASE(data_type::s32)
-        //case data_type::s32: return *((const int *)bias + off);
-        SUPPORTED_CASE(data_type::f32)
-#undef SUPPORTED_CASE
-#elif 1
-        case data_type::s8:  return static_cast<acc_data_t>(*((const int8_t *)bias + off));
-        case data_type::u8:  return static_cast<acc_data_t>(*((const uint8_t *)bias + off));
-        case data_type::s32: return static_cast<acc_data_t>(*((const int *)bias + off));
-        case data_type::f32: return static_cast<acc_data_t>(*((const float *)bias + off));
-#else
-        case data_type::s8: return *((const int8_t *)bias + off);
-        case data_type::u8: return *((const uint8_t *)bias + off);
-        case data_type::s32: return *((const int *)bias + off);
-        case data_type::f32: return *((const float *)bias + off);
-#endif
+        CASE(data_type::s8)
+        CASE(data_type::u8)
+        CASE(data_type::s32)
+        CASE(data_type::f32)
+#undef CASE
         default: assert(!"unimplemented");
         }
         return 0;

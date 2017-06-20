@@ -25,8 +25,15 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
+//enum conv_version_t {ver_unused, ver_fma, ver_4fma, ver_4vnni};
+//enum conv_loop_order_t {loop_cgn, loop_gnc, loop_ngc};
+//enum conv_1x1_loop_order_t {loop_rbl, loop_rlb, loop_lbr, loop_lrb, loop_blr,
+//                            loop_brl};
+
 struct any_conv_conf_t {
     prop_kind_t prop_kind;
+    //conv_version_t ver;
+    //conv_loop_order_t loop_order;
 
     int mb;
     int ngroups, ic, oc;
@@ -35,6 +42,7 @@ struct any_conv_conf_t {
     int r_pad, b_pad;
     int kh, kw;
     int stride_h, stride_w;
+    int dilate_h, dilate_w;
     memory_format_t src_fmt;
     bool with_bias, with_relu;
     double relu_negative_slope;
@@ -49,8 +57,49 @@ struct any_conv_conf_t {
     bool is_1stconv;
 };
 
+struct any_conv_winograd_conf_t : public any_conv_conf_t {
+    //Winograd specific attributes
+    //alpha determines the tile size
+    int alpha;
+    //number of tiles in x dimension
+    int itiles;
+    //number of tiles in y dimension
+    int jtiles;
+    //number of images in a block
+    int bimg;
+
+    int nb_Xc;
+    int dim_kernel;
+    int nb_iter;
+
+    bool double_buffering;
+    bool load_U;
+    int zmm_start;
+    int nb_reg;
+};
+
+/* needed for any??? */
+//struct any_conv_call_s {
+//    const void *src; /* hack, non-const for backward_data */
+//    const void *dst; /* hack, non-const for forward */
+//    const void *filt; /* hack, non-const for backward_weights */
+//    const void *bias; /* hack, non-const for backward_bias */
+//    const void *src_prf;
+//    const void *dst_prf;
+//    const void *filt_prf;
+//    const void *bias_prf;
+//    size_t kh_padding;
+//    size_t kh_padding_prf;
+//    size_t kw_padding;
+//    size_t channel;
+//    size_t channel_prf;
+//    size_t oc_blocks;
+//    int ic_flag;
+//};
+
 struct any_1x1_conv_conf_t {
     prop_kind_t prop_kind;
+    //conv_version_t ver;
 
     int mb;
     int ngroups, ic, oc;
@@ -74,10 +123,15 @@ struct any_1x1_conv_conf_t {
     int bcast_dim, bcast_block, nb_bcast,
         nb_bcast_blocking, nb_bcast_blocking_max;
 
+    // needed for "any" ?
     int reduce_loop_unroll, reduce_loop_bcast_step, reduce_loop_load_step;
     int load_loop_load_step, load_loop_iter_step;
     int bcast_loop_output_step, bcast_loop_output_substep;
     int bcast_loop_bcast_step, bcast_loop_bcast_substep;
+    //int fma_step;
+    //int load_grp_count;
+    //conv_1x1_loop_order_t loop_order;
+    //bool use_vmovntps;
 };
 
 struct any_gemm_conv_conf_t {
@@ -89,6 +143,7 @@ struct any_gemm_conv_conf_t {
     int l_pad, t_pad;
     int kh, kw;
     int stride_h, stride_w;
+    int dilate_h, dilate_w;
     memory_format_t src_fmt;
     bool with_bias, with_relu;
     double relu_negative_slope;
@@ -98,6 +153,21 @@ struct any_gemm_conv_conf_t {
     bool need_im2col;
     size_t im2col_size;
 };
+
+//struct any_1x1_conv_call_s {
+//    const float *bcast_data;
+//    const float *load_data;
+//    const float *output_data;
+//    const float *bias_data; // used in forward and backward_weights only
+//
+//    size_t load_dim;
+//    size_t bcast_dim;
+//    size_t reduce_dim;
+//
+//    size_t output_stride; // used in backward_weights only
+//
+//    size_t reduce_pos_flag;
+//};
 
 }
 }
