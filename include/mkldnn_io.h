@@ -3,6 +3,13 @@
 /** \file
  * i/o utilities extending basic mkldnn API.
  */
+#ifndef MKLDNN_IO
+#define MKLDNN_IO 0 // until namespace bugs fixed
+#endif
+
+#if ! MKLDNN_IO
+#error "mkldnn_io.h not available"
+#else
 #include "mkldnn.h"
 
 #ifdef __cplusplus
@@ -81,5 +88,6 @@ NAMEFUNC_T2(stream, const_mkldnn_stream_t);
 } // "C"
 #endif
 
+#endif // MKLDNN_IO
 // vim: et ts=4 sw=4 cindent
 #endif // MKLDNN_IO_H

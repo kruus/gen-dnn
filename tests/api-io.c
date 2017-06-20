@@ -23,6 +23,7 @@
 #include <string.h> // strlen ??
 
 #include "mkldnn.h"
+#define MKLDNN_IO 1 // awaiting bugfixes
 #include "mkldnn_io.h"
 
 /* SX compile will define BAD_SNPRINTF because it does not follow c++11 std.

@@ -1,4 +1,5 @@
 
+#define MKLDNN_IO 1 // allow it, just here
 #include "mkldnn_io.hpp"
 #include "primitive.hpp"
 

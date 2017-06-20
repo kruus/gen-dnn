@@ -17,13 +17,19 @@
 #include "c_types_map.hpp"
 #include "type_helpers.hpp"
 #include "mkldnn_traits.hpp"
-#ifndef NDEBUG
+
+#define DBG_CONV 0
+#if !defined(DBG_CONV) && !defined(NDEBUG)
+#define DBG_CONV 1
+#endif
+
+#if DBG_CONV
 #include "mkldnn_io.h"
 #endif
 
 #include "ref_convolution.hpp"
 
-#ifndef NDEBUG
+#if DBG_CONV
 #include <unordered_set> // to track new ref_convolutions (potential to optimize?)
 #endif
 
@@ -31,7 +37,7 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-#ifndef NDEBUG
+#if DBG_CONV
 // There are mkldnn_memory_format_max^3 possible combinations, of which only
 // a small percentage commonly occur.  We can restrict register optimized cases
 // into a lookup table XXX eventually.
@@ -55,7 +61,7 @@ _ref_convolution_fwd_t<with_relu, src_type, wei_type, acc_type, dst_type>
 ::_ref_convolution_fwd_t (const pd_t *pd, const input_vector &inputs,
                           const output_vector &outputs)
 : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {
-#ifndef NDEBUG
+#if DBG_CONV
     using namespace std;
     // debug data_type info for deciding which cases to optimize...
     // Eventually, common cases can be "switched" into memory-format-optimized

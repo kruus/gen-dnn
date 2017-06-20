@@ -1,5 +1,12 @@
 #ifndef MKLDNN_IO_HPP
 #define MKLDNN_IO_HPP
+#ifndef MKLDNN_IO
+#define MKLDNN_IO 0 // until namespace bugs fixed
+#endif
+
+#if ! MKLDNN_IO
+#error "mkldnn_io.h not available"
+#else
 //#include "mkldnn.h"
 #include "mkldnn_io.h"
 // You will likely need the following include in .cpp codes :
@@ -38,4 +45,5 @@ namespace mkldnn {
     std::ostream& operator<<(std::ostream& os, mkldnn_primitive_t const prim);
     std::ostream& operator<<(std::ostream& os, mkldnn_primitive_at_t const& prim);
 }//mkldnn::
+#endif // MKLDNN_IO
 #endif // MKLDNN_IO_HPP

@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "mkldnn.h"
+#define MKLDNN_IO 1 // awaiting bugfixes
 #include "mkldnn_io.h"
 
 #include <assert.h>
