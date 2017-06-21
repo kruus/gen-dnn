@@ -33,6 +33,14 @@
 #endif
 #endif
 
+#ifdef TARGET_VANILLA
+#define JITFUNCS 0
+#endif
+
+#ifndef JITFUNCS
+#define JITFUNCS 0
+#endif
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {

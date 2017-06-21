@@ -54,12 +54,12 @@
 #include "mkldnn_types.h"
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 
+/** @addtogroup c_api C API
+ *  @{ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/** @addtogroup c_api C API
- *  @{ */
 
 /** @addtogroup c_api_primitive Primitive operations
  * @{ */
@@ -728,10 +728,10 @@ mkldnn_status_t MKLDNN_API mkldnn_stream_destroy(mkldnn_stream_t stream);
 
 /** @} */
 
-/** @} */
-
 #ifdef __cplusplus
 }
 #endif
+
+/** @} */
 
 #endif

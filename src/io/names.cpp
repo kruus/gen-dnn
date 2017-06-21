@@ -1,6 +1,7 @@
 /** \file
  * implement C functions to print various things in mkldnn.h
  */
+#define MKLDNN_IO 1 // allow it, just here
 #include "mkldnn_io.h"
 #include "mkldnn_io.hpp"
 

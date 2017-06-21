@@ -24,6 +24,9 @@
 #include <vector>
 #include <algorithm>
 #include <iterator>
+//#ifndef NDEBUG
+//#include "mkldnn_io.hpp" // tracing an initialization error [turned out it was sxcc compiler bug]
+//#endif
 #endif
 
 namespace mkldnn {
@@ -93,9 +96,9 @@ public:
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
 namespace c_api {
 #include "mkldnn.h"
-#ifndef NDEBUG
-#include "mkldnn_io.h"
-#endif
+//#ifndef NDEBUG
+//#include "mkldnn_io.h"  // this now has namespace issues
+//#endif
 }
 #endif
 
@@ -111,6 +114,8 @@ class primitive: public handle<c_api::mkldnn_primitive_t> {
     using handle::handle;
 public:
     /// A wrapper structure to specify a particular output of a primitive.
+    /// [ejk] Not used, but probably should be. Explicitly sets output_index,
+    ///       which was a thorny compiler bug for sxcc.
     struct at {
         /// The underlying C API structure.
         c_api::mkldnn_primitive_at_t data;
@@ -120,7 +125,7 @@ public:
         /// @param aprimitive The target primitive.
         /// @param at The output index.
 
-#ifndef NDEBUG // for SX debug of primitives gettinc constructed with nonzero "output_index"
+#if 0 // for SX debug of primitives gettinc constructed with nonzero "output_index"
         // Note: this is not necessarily even used.  The error may be comming
         //       from POD initialization that varies between compilers!
         // Verified: this seems to be and sxcc compiler bug
@@ -558,6 +563,8 @@ enum padding_kind {
 inline c_api::mkldnn_padding_kind_t convert_to_c(padding_kind kind) {
     return static_cast<c_api::mkldnn_padding_kind_t>(kind);
 }
+
+/// @}
 
 enum prop_kind {
     forward_training = c_api::mkldnn_forward_training,
@@ -2463,6 +2470,8 @@ struct inner_product_backward_weights: public primitive {
         reset(result);
     }
 };
+
+/// @} C++ API
 } // namespace mkldnn
 
 #endif
