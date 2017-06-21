@@ -19,6 +19,9 @@
 #include <stdio.h>
 #include <float.h>
 #include <math.h>
+#if defined(_SX)
+#include <libgen.h>	/* dirname and strnlen tucked away here! */
+#endif
 
 #include "mkldnn.h"
 

@@ -54,7 +54,7 @@ double get_trust_nz_level(const prb_t *p, int what, bool final_compare) {
 
 inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
         dnn_mem_t &mem_fp, res_t *r, bool final_compare = false) {
-    int nelems = mem_dt.nelems();
+    int nelems = static_cast<int>(mem_dt.nelems()); // making 'i' size_t is not as easy as in ip/ip.cpp
 
     const char *swhat = inp_type2str(what);
 
@@ -197,8 +197,8 @@ inline int fill_src(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
             && gen % (p->kh * p->kw) <= c.f_sparsity * (p->kh * p->kw);
 //            && (17 * ih + 13 * mb) % p->kh == 0
 //            && (13 * iw + 19 * ic) % p->kw == 0;
-        const float value =
-            non_base ? c.f_min + gen * c.f_step % range : c.f_base;
+        const float value = static_cast<float>(
+            non_base ? c.f_min + gen * c.f_step % range : c.f_base);
 
         ((float*)mem_00)[src_off_f(p, mb, 0, ic, ih, iw)] = value;
     }
@@ -236,8 +236,8 @@ inline int fill_wei(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
             && gen % (p->kh * p->kw) <= c.f_sparsity * (p->kh * p->kw);
 //            && (17 * kh + 13 * oc) % p->kh == 0
 //            && (13 * kw + 19 * ic) % p->kw == 0;
-        const float value =
-            non_base ? c.f_min + gen * c.f_step % range : c.f_base;
+        const float value = static_cast<float>(
+            non_base ? c.f_min + gen * c.f_step % range : c.f_base);
 
         ((float*)mem_00)[wei_off_f(p, g, oc, ic, kh, kw)] = value;
     }
@@ -263,13 +263,13 @@ inline int fill_bia(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
     const auto &c = p->cfg[BIA];
     const int range = c.f_max - c.f_min + 1;
 
-    const int sz = mem_00.nelems();
+    const int sz = static_cast<int>(mem_00.nelems());
     for (int i = 0; i < sz; ++i) {
         const int gen = 19 * i;
         const bool non_base = true
             && gen % (p->kh * p->kw) <= c.f_sparsity * (p->kh * p->kw);
-        const float value =
-            non_base ? c.f_min + gen * c.f_step % range : c.f_base;
+        const float value = static_cast<float>(
+            non_base ? c.f_min + gen * c.f_step % range : c.f_base);
 
         ((float*)mem_00)[i] = value;
     }
@@ -306,8 +306,8 @@ inline int fill_dst(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
             && gen % (p->kh * p->kw) <= c.f_sparsity * (p->kh * p->kw);
 //            && (19 * oh + 13 * mb) % p->kh == 0
 //            && (17 * ow + 13 * oc) % p->kw == 0;
-        const float value =
-            non_base ? c.f_min + gen * c.f_step % range : c.f_base;
+        const float value = static_cast<float>(
+            non_base ? c.f_min + gen * c.f_step % range : c.f_base);
 
         ((float*)mem_00)[dst_off_f(p, mb, 0, oc, oh, ow)] = value;
     }

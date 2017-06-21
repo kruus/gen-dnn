@@ -55,11 +55,17 @@ enum { CRIT = 1, WARN = 2 };
 #define CONCAt2(a,b) a ## b
 #define CONCAT2(a,b) CONCAt2(a,b)
 
+#if ! defined(_SX)
 inline void *zmalloc(size_t size, int align) {
     void *p;
     int rc = ::posix_memalign(&p, align, size);
     return rc == 0 ? p : 0;
 }
+#else // SX architecture does not have/need posix_memalign
+inline void *zmalloc(size_t size, int align) {
+    return ::malloc(size);
+}
+#endif
 inline void zfree(void *ptr) { return ::free(ptr); }
 
 extern int verbose;

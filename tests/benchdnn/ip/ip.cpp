@@ -99,7 +99,7 @@ inline int compare_dat(dnn_mem_t &mem_dt, dnn_mem_t &mem_fp, res_t *r) {
     double eps = 1e-4;
 
     r->errors = 0;
-    r->total = nelems;
+    r->total = static_cast<int>(nelems);
     float max_rel_diff = 0;
     for (size_t i = 0; i < nelems; ++i) {
         float dt = ((float*)mem_dt)[i];
@@ -124,7 +124,7 @@ inline void fill_src(dnn_mem_t &mem_dt, dnn_mem_t &mem_fp, res_t *r) {
     const size_t sz = mem_00.nelems();
 #   pragma omp parallel for
     for (size_t i = 0; i < sz; ++i)
-        ((float*)mem_00)[i] = 1 + (i % 3); // 1 + sin(0.2* (i % 17));
+        ((float*)mem_00)[i] = (float)(1 + (i % 3)); // 1 + sin(0.2* (i % 17));
 
     mem_dt.reorder(mem_00);
     mem_fp.reorder(mem_dt);
@@ -140,7 +140,7 @@ inline void fill_wei(dnn_mem_t &mem_dt, dnn_mem_t &mem_fp, res_t *r) {
     const size_t sz = mem_00.nelems();
 #   pragma omp parallel for
     for (size_t i = 0; i < sz; ++i)
-        ((float*)mem_00)[i] = (i % 4) - 1 ; // 1 + sin(0.2* (i % 17));
+        ((float*)mem_00)[i] = (float)((i % 4) - 1) ; // 1 + sin(0.2* (i % 17));
 
     mem_dt.reorder(mem_00);
     mem_fp.reorder(mem_dt);
@@ -171,7 +171,7 @@ inline void fill_dst(dnn_mem_t &mem_dt, dnn_mem_t &mem_fp, res_t *r) {
     const size_t sz = mem_00.nelems();
 #   pragma omp parallel for
     for (size_t i = 0; i < sz; ++i)
-        ((float*)mem_00)[i] = 1 + (i % 3); // 1 + sin(0.2* (i % 17));
+        ((float*)mem_00)[i] = (float)(1 + (i % 3)); // 1 + sin(0.2* (i % 17));
 
     mem_dt.reorder(mem_00);
     mem_fp.reorder(mem_dt);

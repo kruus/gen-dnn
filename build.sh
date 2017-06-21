@@ -92,7 +92,7 @@ if [ "$DOJUSTDOC" == "y" ]; then
     (
         if [ ! -d build ]; then mkdir build; fi
         if [ ! -f build/Doxyfile ]; then
-            # doxygen doesn't much care HOW to build, just WHERE
+            # doxygen does not much care HOW to build, just WHERE
             (cd build && cmake -DCMAKE_INSTALL_PREFIX=../${INSTALL_DIR} -DFAIL_WITHOUT_MKL=OFF ..)
         fi
         echo "Doxygen (please be patient)"
@@ -119,7 +119,7 @@ timeoutPID() { # unused
         done
 
         # Be nice, post SIGTERM first.
-        # The 'exit 0' below will be executed if any preceeding command fails.
+        # The exit 0 below will be executed if any preceeding command fails.
         kill -s SIGTERM $$ && kill -0 $$ || exit 0
         sleep $delay
         kill -s SIGKILL $$
@@ -138,7 +138,7 @@ timeoutPID() { # unused
     mkdir "${BUILDDIR}"
     cd "${BUILDDIR}"
     #
-    CMAKEOPT=''
+    CMAKEOPT=""
     CMAKEOPT="${CMAKEOPT} -DCMAKE_CCXX_FLAGS=-DJITFUNCS=${DOJIT}"
     if [ $USE_CBLAS -ne 0 ]; then
         export CFLAGS="${CFLAGS} -DUSE_CBLAS"
@@ -146,6 +146,8 @@ timeoutPID() { # unused
     fi
     if [ ! "$DOTARGET" == "j" ]; then
         CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
+        export CFLAGS="${CFLAGS} -DTARGET_VANILLA"
+        export CXXFLAGS="${CXXFLAGS} -DTARGET_VANILLA"
     fi
     if [ "$DOTARGET" == "s" ]; then
         TOOLCHAIN=../cmake/sx.cmake
@@ -156,13 +158,13 @@ timeoutPID() { # unused
         #      Solution: do these changes within CMakeLists.txt
         #CMAKEOPT="${CMAKEOPT} -DCMAKE_C_FLAGS=-g\ -ftrace\ -Cdebug" # override Cvopt
         SXOPT="-DTARGET_VANILLA -D__STDC_LIMIT_MACROS"
-        SXOPT="${SXOPT} -wall -woff=1097 -woff=4038" # turn off warnings about not using 'attributes'
+        SXOPT="${SXOPT} -wall -woff=1097 -woff=4038" # turn off warnings about not using attributes
         SXOPT="${SXOPT} -woff=1901"  # turn off sxcc warning defining arr[len0] for constant len0
         SXOPT="${SXOPT} -wnolongjmp" # turn off warnings about setjmp/longjmp (and tracing)
         export CFLAGS="${CFLAGS} -size_t${SIZE_T} -Kc99,gcc ${SXOPT}"
         # An object file that is generated with -Kexceptions and an object file
         # that is generated with -Knoexceptions must not be linked together. In
-        # such a case, the exception may not be thrown correctly Therefore, do
+        # such conditions the exception may not be thrown correctly Therefore, do
         # not specify -Kexceptions if the program does not use the try, catch
         # and throw keywords.
         export CXXFLAGS="${CXXFLAGS} -size_t${SIZE_T} -Kcpp11,gcc,rtti,exceptions ${SXOPT}"
@@ -190,18 +192,18 @@ timeoutPID() { # unused
         echo "${CMAKEENV}; cmake ${CMAKEOPT} ${CMAKETRACE} .."
         set -x
         { if [ x"${CMAKEENV}" == x"" ]; then ${CMAKEENV}; fi; \
-        cmake ${CMAKEOPT} ${CMAKETRACE} .. \
-        && make VERBOSE=1 ${JOBS} \
-        && BUILDOK="y"; }
+            cmake ${CMAKEOPT} ${CMAKETRACE} .. \
+                && make VERBOSE=1 ${JOBS} \
+                && BUILDOK="y"; }
         set +x
     else # skip the build, just run cmake ...
         echo "CMAKEENV   <${CMAKEENV}>"
         echo "CMAKEOPT   <${CMAKEOPT}>"
         echo "CMAKETRACE <${CMAKETRACE}>"
-        set +x
-        { if [ x"${CMAKEENV}" == x"" ]; then ${CMAKEENV}; fi; \
-        cmake ${CMAKEOPT} ${CMAKETRACE} .. ; }
         set -x
+        { if [ x"${CMAKEENV}" == x"" ]; then ${CMAKEENV}; fi; \
+            cmake ${CMAKEOPT} ${CMAKETRACE} .. ; }
+        set +x
     fi
     if [ "$BUILDOK" == "y" -a ! "$DOTARGET" == "s" ]; then
         echo "DOTARGET  $DOTARGET"
@@ -233,21 +235,17 @@ timeoutPID() { # unused
     fi
 ) 2>&1 | tee "${BUILDDIR}".log
 ls -l "${BUILDDIR}"
-BUILDOK="n"; if [ -f "${BUILDDIR}"/stamp-BUILDOK ]; then BUILDOK="y"; fi # check last thing produced for OK build
+BUILDOK="n"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="Y"; fi
 if [ "$BUILDOK" == "y" ]; then
-    (
+    echo "BUILDOK !"
     cd "${BUILDDIR}"
-    # cmake "COMPONENTS" are not working properly? Is this a cmake version issue?
-    # not sure about whether I need to go into subdirs for components...
-    #if [ "${DOTARGET}" == "s" ]; then
-        { echo "Installing ..."; make install; }
-    #else
-    #    { echo "Installing ..."; make install-bin install-dev; } # in src/, tried install COMPONENTS
-    #fi
-    if [ "$DODOC" == "y" ]; then
-        { echo "Installing docs ..."; make install-doc; }
-    fi
-    ) 2>&1 >> "${BUILDDIR}".log
+    {
+        # trouble with cmake COMPONENTs ...
+        echo "Installing :"; make install;
+        #if [ "$DODOC" == "y" ]; then { echo "Installing docs ..."; make install-doc; } fi
+    } 2>&1 >> "${BUILDDIR}".log
+    cd ..
+    echo "Testing ?"
     if [ ! $DOTEST -eq 0 -a ! "$DOTARGET" == "s" ]; then
         rm -f test1.log test2.log
         echo "Testing ... test1"
@@ -258,6 +256,9 @@ if [ "$BUILDOK" == "y" ]; then
             && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test2.log || true
         fi
         echo "Tests done"
+    fi
+    if [ ! $DOTEST -eq 0 -a "$DOTARGET" == "s" ]; then
+        echo 'SX testing should be done manually (ex. ~/tosx script to log in to SX)'
     fi
 else
     echo "Build NOT OK..."

@@ -32,7 +32,11 @@ include_directories(
 
 add_executable(benchdnn ${SOURCES})
 set_property(TARGET benchdnn PROPERTY CXX_STANDARD 11)
+if(NECSX) # dirname and strnlen extensions in a special library:
+target_link_libraries(benchdnn ${LIB_NAME} libgen.a)
+else()
 target_link_libraries(benchdnn ${LIB_NAME})
+endif()
 # add_test(benchdnn benchdnn)
 
 file(COPY inputs DESTINATION .)
