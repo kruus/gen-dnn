@@ -132,7 +132,11 @@ mkldnn_status_t prepare_reorder(
              * already appeared in in- and out- memory primitive descriptors */
             CHECK(mkldnn_reorder_primitive_desc_create(&reorder_pd,
                         user_memory_pd, *prim_memory_pd));
+#if !defined(SX)
             mkldnn_primitive_at_t inputs = { *user_memory };
+#else
+            mkldnn_primitive_at_t inputs = { *user_memory, 0 };
+#endif
             assert( inputs.output_index == 0U ); // so far OK for SX
             const_mkldnn_primitive_t outputs[] = { *prim_memory };
             CHECK(mkldnn_primitive_create(reorder, reorder_pd, &inputs,
@@ -140,7 +144,11 @@ mkldnn_status_t prepare_reorder(
         } else {
             CHECK(mkldnn_reorder_primitive_desc_create(&reorder_pd,
                         *prim_memory_pd, user_memory_pd));
+#if !defined(SX)
             mkldnn_primitive_at_t inputs = { *prim_memory };
+#else
+            mkldnn_primitive_at_t inputs = { *prim_memory, 0 };
+#endif
             assert( inputs.output_index == 0U ); // so far OK for SX
             const_mkldnn_primitive_t outputs[] = { *user_memory };
             CHECK(mkldnn_primitive_create(reorder, reorder_pd, &inputs,
@@ -160,7 +168,7 @@ mkldnn_status_t simple_net(){
     mkldnn_engine_t engine;
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0 /* idx */));
 
-#if defined(NDEBUG)
+#if defined(NDEBUG) && !defined(_SX)
 #define SRC_PIX 227
 #define CNV_WID 11
 #define SRC_STRIDE 4

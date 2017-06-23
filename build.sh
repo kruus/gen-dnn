@@ -87,7 +87,7 @@ BUILDDIR=build
 if [ "$DOTARGET" == "j" ]; then DOJIT=100; INSTALLDIR='install-jit'; BUILDDIR='build-jit'; fi
 if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx'; fi
 #if [ "$DOTARGET" == "v" ]; then ; fi
-if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; fi
+if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; BUILDDIR="${BUILDDIR}d"; fi
 if [ "$DOJUSTDOC" == "y" ]; then
     (
         if [ ! -d build ]; then mkdir build; fi
@@ -161,6 +161,10 @@ timeoutPID() { # unused
         SXOPT="${SXOPT} -wall -woff=1097 -woff=4038" # turn off warnings about not using attributes
         SXOPT="${SXOPT} -woff=1901"  # turn off sxcc warning defining arr[len0] for constant len0
         SXOPT="${SXOPT} -wnolongjmp" # turn off warnings about setjmp/longjmp (and tracing)
+
+        # REMOVE WHEN FINISHED SX DEBUGGING
+        SXOPT="${SXOPT} -g -traceback" # enable source code tracing ALWAYS
+
         export CFLAGS="${CFLAGS} -size_t${SIZE_T} -Kc99,gcc ${SXOPT}"
         # An object file that is generated with -Kexceptions and an object file
         # that is generated with -Knoexceptions must not be linked together. In
