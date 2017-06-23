@@ -163,7 +163,7 @@ void check_lrn_bwd(const lrn_test_params &p, const memory &src,
 
             if (ks == kernel_size/2) omega_mid = omega;
 
-            data_t t = src_ptr[map_index(src_d, off(mb, _t, oh, ow))] / std::pow((float)omega, (float)beta);
+            data_t t = src_ptr[map_index(src_d, off(mb, _t, oh, ow))] / powf((float)omega, (float)beta);
             B +=  (1.0f / omega) * t * diff_dst_ptr[map_index(diff_dst_d, off(mb, _t, oh, ow))];
         }
 
