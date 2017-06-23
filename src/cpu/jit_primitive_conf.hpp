@@ -65,6 +65,7 @@ struct jit_conv_conf_t {
     int ur_ow_max, ur_ow, ur_ow_tail;
     int ur_ow_nsteps;
     data_type_t bia_dt;
+    data_type_t dst_dt;
 };
 
 
@@ -141,6 +142,9 @@ struct jit_1x1_conv_conf_t {
     int load_grp_count;
     conv_1x1_loop_order_t loop_order;
     bool use_vmovntps;
+    /* 4vnni */
+    size_t typesize_in;
+    size_t typesize_out;
 };
 
 struct jit_gemm_conv_conf_t {
@@ -164,10 +168,10 @@ struct jit_gemm_conv_conf_t {
 };
 
 struct jit_1x1_conv_call_s {
-    const float *bcast_data;
-    const float *load_data;
-    const float *output_data;
-    const float *bias_data; // used in forward and backward_weights only
+    const void *bcast_data;
+    const void *load_data;
+    const void *output_data;
+    const void *bias_data; // used in forward and backward_weights only
 
     size_t load_dim;
     size_t bcast_dim;
