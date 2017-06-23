@@ -37,7 +37,7 @@ This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
 
 - SX cmake support is developed in subdirectory dev-cmake-sx
   - changes to SX platform spec go into a tarfile that get untarred in gen-dnn root dir
-  - *** cmake-3.8 *** is OK, cmake-3.0 is not
+  - *cmake-3.8* is OK, cmake-3.0 is not
     - because cmake-3.8 has a handy call to Platform/SX-Initialize that I require
   - ./build.sh -ST      SX, TRACE [cmake --trace]
     - ---> build-sx/ and build-sx.log
@@ -133,23 +133,34 @@ cd wrk
 . bashrc-sx
 cd simd/gen-dnn
 ```
-and then work on the mkl-dnn cross-compile stuff with _./build.sh -SdqT_ or something similar
+and then work on the mkl-dnn cross-compile stuff with _./build.sh -SdqT_ or something similar.
+
+Remember to also test release mode, via _../buid.sh -Sq_ before rejoicing!
+You might uncover even more segfaults in release mode.
 
 ### SX testing
 
-- `build-sx/tests/gtests/test_convolution*` take a *long* time to run.
+Begin by making a writable directory for log files (e.g. from sapphire2 or zero)
+```
+mkdir guest; chmod ugo+w guest
+```
+Then log in to the SX, start bash and cd to the project root (`~/tosx`, etc.)
+
+- Just running a program in release mode can print nothing if assertions fail!
+- recompile in debug mode `./build.sh -Sdq` to allow nicer tracing of issues (typically segfaults)
+
+- `build-sx/tests/gtests/test_convolution\*` take a *long* time to run.
   - so you can do something like ```
 ( cd build-sx/tests/gtests; export C_PROGINF=DETAIL; for f in test_conv*; do echo '>>>> '"$f"; ./$f --gtest_filter=*/0:*/1:*/2:*/3:*/4:*/5 2>&1 | tee "../../../guest/$f-test0-5.log"; done; )  2>&1 | tee guest/gtest-conv0-5.log
   ```
   - to run a subset of the convolution tests.
 
-
 ### SX debug
 
-in debugger:
+Not on the SX, run in debugger:
 
 ```
-$  dbx -I src/vanilla -I src/include -I src/common -I src/io ./build-sx/examples/simple-net-c
+$  dbx -I src/vanilla -I src/include -I src/common -I src/io -I examples ./build-sx/examples/simple-net-c
 run # wait for failed assertion
 where # note things in backtrace
 up 2
@@ -161,10 +172,11 @@ display ref_relu.input_memory__Q4_6mkldnn4impl3cpu15cpu_primitive_tCFUL.index
 cpu_engine.const_memory__Q4_6mkldnn4impl3cpu12cpu_memory_tCFUL.output_index
 run # try again
 ```
+The first readable part is a function name, and the first mangled part is often a `this` name, for C++ functions.
 
-run the examples/ test programs and get run statistics:
+Run the examples/ test programs and get run statistics:
 ```
-( cd build-sx/examples; export C_PROGINF=DETAIL; for f in simple*; do echo ">>>> $f"; ./$f 2>&1 | tee $f.log; done; ) 2>&1 | tee guest/examples.log
+( cd build-sx/examples; export C_PROGINF=DETAIL; for f in simple*; do echo ">>>> $f"; ./$f 2>&1 | tee guest/$f.log; done; ) 2>&1 | tee guest/examples.log
 
 ```
 

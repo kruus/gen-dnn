@@ -62,9 +62,9 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
                 oihw, ihwo,
 #if 1 // defined(TARGET_JIT)
                 oIhw8i, oIhw16i, OIhw8i8o, OIhw16i16o, OIhw8i16o2i,
-                OIhw8o8i, OIhw16o16i, Ohwi8o, Ohwi16o, OhIw16o4i, /*goihw,*/
-                gOIhw8i8o, gOIhw16i16o, gOIhw8i16o2i, gOIhw8o8i, gOIhw16o16i,
-                gOhwi8o, gOhwi16o, gOhIw16o4i,
+                OIhw8o16i2o, OIhw8o8i, OIhw16o16i, Ohwi8o, Ohwi16o, OhIw16o4i,
+                /*goihw,*/ gOIhw8i8o, gOIhw16i16o, gOIhw8i16o2i, gOIhw8o16i2o,
+                gOIhw8o8i, gOIhw16o16i, gOhwi8o, gOhwi16o, gOhIw16o4i,
 #endif
                 goihw))
         return blocked;
@@ -126,7 +126,7 @@ inline data_type_t default_accum_data_type(data_type_t src_dt,
         return s32;
 
     if (one_of(src_dt, s8, u8) && one_of(wei_dt, s8, u8, data_type::undef)
-            && one_of(dst_dt, s8, u8, data_type::undef))
+            && one_of(dst_dt, s8, u8, s32, data_type::undef))
         return s32;
 
 #ifndef NDEBUG
