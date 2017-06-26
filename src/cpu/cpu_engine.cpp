@@ -62,7 +62,7 @@
 #include "cpu/jit_uni_inner_product.hpp"
 
 #include "cpu/jit_reorder.hpp"
-#include "simple_reorder.hpp"
+#include "cpu/simple_reorder.hpp"
 
 namespace mkldnn {
 namespace impl {
