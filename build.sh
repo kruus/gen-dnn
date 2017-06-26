@@ -239,7 +239,7 @@ timeoutPID() { # unused
     fi
 ) 2>&1 | tee "${BUILDDIR}".log
 ls -l "${BUILDDIR}"
-BUILDOK="n"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="Y"; fi
+BUILDOK="n"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="y"; fi
 if [ "$BUILDOK" == "y" ]; then
     echo "BUILDOK !"
     cd "${BUILDDIR}"
