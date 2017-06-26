@@ -21,27 +21,29 @@
 
 namespace mkldnn {
 
-template <typename T> T relu_fwd(T s, T alpha) {
-    return s > 0 ? s : s * alpha;
+template <typename T, typename A> inline T relu_fwd(T s, A alpha) {
+    return s > 0 ? s : static_cast<T>(s * alpha);
 }
-template <typename T> T relu_bwd(T dd, T s, T alpha) {
-    return s > 0 ? dd : dd * alpha;
+template <typename T, typename A> inline T relu_bwd(T dd, T s, A alpha) {
+    return s > 0 ? dd : static_cast<T>(dd * alpha);
 }
 
 template <typename T> T tanh_fwd(T s) {
-    T e = ::expf(2*s); /* maybe replace with -2*s? */
-    return (e - 1) / (e + 1);
+    double e = ::exp(2*s); /* maybe replace with -2*s? */
+    return static_cast<T>((e - 1.0) / (e + 1.0));
 }
 template <typename T> T tanh_bwd(T dd, T s) {
-    T th = tanh_fwd(s);
-    return dd * (1 - th * th);
+    //T th = tanh_fwd(s);
+    double const e = ::expf((float)(2*s)); /* maybe replace with -2*s? */
+    double const th = ((e - 1) / (e + 1));
+    return static_cast<T>(dd * (1 - th * th));
 }
 
 template <typename T, typename A> T elu_fwd(T s, A alpha) {
-    return s > 0 ? s : alpha * (::expf(s) - 1);
+    return s > 0 ? s : static_cast<T>(alpha * (::exp(s) - 1));
 }
 template <typename T, typename A> T elu_bwd(T dd, T s, A alpha) {
-    return static_cast<T>(dd * (s > 0 ? 1 : alpha * ::expf((float)s)));
+    return static_cast<T>(dd * (s > 0 ? 1 : alpha * ::exp(s)));
 }
 
 template <typename data_t>
@@ -72,8 +74,8 @@ void check_eltwise_fwd(const eltwise_test_params<data_t> &p,
         data_t s = src_data[i];
         data_t ref_d = 0;
         switch (p.alg_kind) {
-        case eltwise_relu: ref_d = relu_fwd(s, p.alpha); break;
-        case eltwise_tanh: ref_d = tanh_fwd(s); break;
+        case eltwise_relu: ref_d = relu_fwd(s, p.alpha); break; // static_cast?
+        case eltwise_tanh: ref_d = tanh_fwd(s); break;		// static_cast?
         case eltwise_elu: ref_d = elu_fwd(s, p.alpha); break;
         default: assert(!"unknown alg_kind");
         }

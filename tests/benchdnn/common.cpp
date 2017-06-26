@@ -124,17 +124,21 @@ unsigned long long ticks_now() {
 
     return (unsigned long long)eax | (unsigned long long)edx << 32;
 }
-#else // SX has a microsecond timer. Don't know if it is much different from clock_gettime.
+#else // I only found one method, for SXa (same as for ms_now())
 #include <second.h>
-unsigned long long ticks_now() {
-    return static_cast<unsigned long long>( second()/*double, microseconds*/ );
-}
+//unsigned long long ticks_now() { // remove, since equiv to ms_now
+//    return static_cast<unsigned long long>( second()*1000000.0/*double, microseconds*/ );
+//}
 #endif
 
 static inline double ms_now() {
+#if ! defined(_SX)
     struct timespec tv;
     clock_gettime(CLOCK_MONOTONIC, &tv);
     return (1000000000ll * tv.tv_sec + tv.tv_nsec) / 1e6;
+#else
+    return second() * 1000.0/* ms / second */; // SX has microsecond resolutions
+#endif
 }
 
 void benchdnn_timer_t::reset() {
@@ -148,13 +152,23 @@ void benchdnn_timer_t::reset() {
 }
 
 void benchdnn_timer_t::start() {
+#if ! defined(_SX)
     ticks_start_ = ticks_now();
     ms_start_ = ms_now();
+#else // ok, just make them equiv
+    ms_start_ = ms_now();
+    ticks_start_ = static_cast<typeof(ticks_start_)>(ms_start_ * 1000.0);
+#endif
 }
 
 void benchdnn_timer_t::stop() {
+#if ! defined(_SX)
     long long d_ticks = ticks_now() - ticks_start_; /* FIXME: overflow? */
     double d_ms = ms_now() - ms_start_;
+#else
+    double d_ms = ms_now() - ms_start_;
+    long long d_ticks = static_cast<long long>( d_ms*1000.0 );
+#endif
 
     ticks_start_ += d_ticks;
     ms_start_ += d_ms;
