@@ -128,6 +128,7 @@ unsigned long long ticks_now() {
 #include <second.h>
 unsigned long long ticks_now() {
     return static_cast<unsigned long long>( second()/*double, microseconds*/ );
+}
 #endif
 
 static inline double ms_now() {
