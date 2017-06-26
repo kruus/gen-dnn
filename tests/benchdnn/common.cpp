@@ -115,6 +115,7 @@ bool match_regex(const char *str, const char *pattern) { return true; }
 #include <sys/types.h>
 #include <time.h>
 
+#if ! defined(_SX)
 unsigned long long ticks_now() {
     unsigned eax, edx, ecx;
 
@@ -123,6 +124,11 @@ unsigned long long ticks_now() {
 
     return (unsigned long long)eax | (unsigned long long)edx << 32;
 }
+#else // SX has a microsecond timer. Don't know if it is much different from clock_gettime.
+#include <second.h>
+unsigned long long ticks_now() {
+    return static_cast<unsigned long long>( second()/*double, microseconds*/ );
+#endif
 
 static inline double ms_now() {
     struct timespec tv;
