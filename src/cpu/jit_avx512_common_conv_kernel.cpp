@@ -556,7 +556,10 @@ status_t jit_avx512_common_conv_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
         jcp.ver = ver_4vnni;
         jcp.typesize_in = sizeof(int16_t);
         jcp.typesize_out = sizeof(int32_t);
-    } else if (mayiuse(avx512_common)) {
+    } else if (mayiuse(avx512_common) &&
+            src_d.data_type() == data_type::f32
+         && weights_d.data_type() == data_type::f32
+         && dst_d.data_type() == data_type::f32) {
         bool args_ok = true
             && implication(flat, one_of(src_d.format(), nchw, nhwc)
                     && one_of(weights_d.format(), Ohwi16o, gOhwi16o))
@@ -1129,7 +1132,10 @@ status_t jit_avx512_common_conv_bwd_data_kernel_f32::init_conf(
         jcp.ver = ver_4vnni;
         jcp.typesize_in = sizeof(int16_t);
         jcp.typesize_out = sizeof(int32_t);
-    } else if (mayiuse(avx512_common)) {
+    } else if (mayiuse(avx512_common) &&
+            diff_dst_d.data_type() == data_type::f32
+         && weights_d.data_type() == data_type::f32
+         && diff_src_d.data_type() == data_type::f32) {
         if (weights_d.format() != (with_groups ? gOIhw16o16i : OIhw16o16i))
             return status::unimplemented;
         jcp.ver = ver_fma;
@@ -1139,6 +1145,8 @@ status_t jit_avx512_common_conv_bwd_data_kernel_f32::init_conf(
             && jcp.stride_w == 1 && jcp.stride_h == 1) {
                 jcp.ver = ver_4fma;
             }
+    } else {
+        return status::unimplemented;
     }
 
     jcp.nb_ic_blocking = jcp.nb_oc_blocking = 1;
@@ -1774,8 +1782,6 @@ status_t jit_avx512_common_conv_bwd_weights_kernel_f32::init_conf(
     }
 
     if (mayiuse(avx512_mic_4ops)
-            && jcp.iw >= small_spatial
-            && jcp.ih >= small_spatial
             && jcp.stride_w == 1 // transposing output and diff_filter can help
             && !jcp.is_1stconv)
         jcp.ver = ver_4fma;
@@ -1785,10 +1791,12 @@ status_t jit_avx512_common_conv_bwd_weights_kernel_f32::init_conf(
     jcp.transpose_src = (jcp.ver == ver_4fma);
     if (jcp.transpose_src) {
         jcp.ur_w = jcp.ow;
-        if (jcp.ver == ver_4fma) // double check
-            jcp.tr_iw = rnd_up(jcp.iw + jcp.l_pad + 4, 4);
-        else
+        if (jcp.ver == ver_4fma) { // double check
+            int right_pad = (jcp.r_pad > 1) ? 4 : jcp.r_pad;
+            jcp.tr_iw = rnd_up(jcp.iw + jcp.l_pad + right_pad, 4);
+        } else {
             jcp.tr_iw = jcp.iw;
+        }
     }
 
     return status::success;

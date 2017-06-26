@@ -195,6 +195,23 @@ void jit_avx512_common_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 vmovups(vreg_load(i_load, i_fma),
                     load_ptr(load_scale * i_fma, i_load));
     };
+
+    auto vcmp = [=](Xbyak::Opmask kmask,
+        Xbyak::Zmm zmm_src1, Xbyak::Zmm zmm_src2, const unsigned char cmp) {
+        if (jcp.ver == ver_4vnni)
+            vpcmpd(kmask, zmm_src1, zmm_src2, cmp);
+        else
+            vcmpps(kmask, zmm_src1, zmm_src2, cmp);
+    };
+
+    auto vmul = [=](Xbyak::Zmm zmm_dst, Xbyak::Opmask kmask,
+                     Xbyak::Zmm zmm_src1, Xbyak::Zmm zmm_src2) {
+        if (jcp.ver == ver_4vnni)
+            vpmulld(zmm_dst | kmask, zmm_src1, zmm_src2);
+        else
+            vmulps(zmm_dst | kmask, zmm_src1, zmm_src2);
+    };
+
     auto store = [=]() {
 
         Label store_noadd;
@@ -231,9 +248,9 @@ void jit_avx512_common_1x1_conv_kernel::reduce_loop(int load_loop_blk,
 
             for (int i_ur = 0; i_ur < ur; ++i_ur)
                 for (int i_load = 0; i_load < load_loop_blk; ++i_load) {
-                    vcmpps(vmask, vreg_accum(i_load, i_ur), zmm_zero,
+                    vcmp(vmask, vreg_accum(i_load, i_ur), zmm_zero,
                         _cmp_lt_os);
-                    vmulps(vreg_accum(i_load, i_ur) | vmask,
+                    vmul(vreg_accum(i_load, i_ur), vmask,
                         vreg_accum(i_load, i_ur), zmm_relu_ns);
             }
             L(store_norelu);
@@ -565,25 +582,32 @@ status_t jit_avx512_common_1x1_conv_kernel::init_conf(
     jcp.ic_block = jcp.oc_block = simd_w;
 
     if (mayiuse(avx512_mic_4ops)
-        && one_of(jcp.prop_kind, forward_training, forward_inference)
-        && src_d.data_type() == data_type::s16
-        && weights_d.data_type() == data_type::s16
-        && dst_d.data_type() == data_type::s32)
+        && ((one_of(jcp.prop_kind, forward_training, forward_inference)
+            && src_d.data_type() == data_type::s16
+            && weights_d.data_type() == data_type::s16
+            && dst_d.data_type() == data_type::s32)
+        || (jcp.prop_kind == backward_data
+            && src_d.data_type() == data_type::s32
+            && weights_d.data_type() == data_type::s16
+            && dst_d.data_type() == data_type::s16)))
     {
         constexpr memory_format_t weights_formats[2][2] = {
-            { OIhw8i16o2i, undef },
-            { gOIhw8i16o2i, undef }
+            { OIhw8i16o2i, OIhw8o16i2o },
+            { gOIhw8i16o2i, gOIhw8o16i2o }
         };
         memory_format_t weights_format
             = weights_formats[with_groups][jcp.prop_kind == backward_data];
-        if (weights_d.format() != weights_format) {
+        if (weights_d.format() != weights_format)
             return status::unimplemented;
-        }
+
         jcp.ver = ver_4vnni;
         jcp.fma_step = 4;
         jcp.typesize_in = sizeof(prec_traits<data_type::s16>::type);
         jcp.typesize_out = sizeof(prec_traits<data_type::s32>::type);
-    } else {
+    }
+    else if (everyone_is(data_type::f32, src_d.data_type(),
+                            weights_d.data_type(), dst_d.data_type()))
+    {
         constexpr memory_format_t weights_formats[2][2] = {
             { OIhw16i16o, OIhw16o16i },
             { gOIhw16i16o, gOIhw16o16i }
@@ -604,6 +628,8 @@ status_t jit_avx512_common_1x1_conv_kernel::init_conf(
         }
         jcp.typesize_in = sizeof(prec_traits<data_type::f32>::type);
         jcp.typesize_out = sizeof(prec_traits<data_type::f32>::type);
+    } else {
+        return status::unimplemented;
     }
 
     jcp.ur = 1;
