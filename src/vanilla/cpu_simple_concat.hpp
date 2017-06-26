@@ -35,6 +35,7 @@ static void catch_me() {}
 template <impl::data_type_t data_type>
 struct cpu_simple_concat_t: public c_compatible {
     typedef typename prec_traits<data_type>::type data_t;
+    enum { max_num_arrs = 16 };
 
     static bool applicable(const nstl::vector<cpu_memory_t::pd_t> &src_pds_,
             const nstl::vector<cpu_memory_t::pd_t> &dst_pds_, int concat_dim) {
@@ -42,13 +43,15 @@ struct cpu_simple_concat_t: public c_compatible {
             return nelems_no_dim_0(data_d) == _size_no_dim_0(data_d);
         };
 
-        bool ok = concat_dim != 0;
+        bool ok = concat_dim != 0 && src_pds_.size() <= max_num_arrs;
+
         for (size_t i = 0; i < src_pds_.size(); ++i) {
             const memory_desc_wrapper i_d(&src_pds_[i]);
             const memory_desc_wrapper o_d(&dst_pds_[i]);
             ok = ok && i_d.data_type() == data_type
                 && o_d.data_type() == data_type && i_d.format() == o_d.format()
-                && is_dense_no_0(i_d) && is_dense_no_0(o_d);
+                && is_dense_no_0(i_d) && is_dense_no_0(o_d)
+                && (src_pds_.size()==0 || i_d.blocking_desc().strides[0][0] > 0);
         }
         return ok;
     }
@@ -56,15 +59,15 @@ struct cpu_simple_concat_t: public c_compatible {
     static void execute(const nstl::vector<cpu_memory_t::pd_t> &src_pds_,
             const nstl::vector<cpu_memory_t::pd_t> &dst_pds_,
             cpu_primitive_t *concat) {
-        const size_t num_arrs = src_pds_.size();
-        const data_t *input_ptrs[num_arrs];
-        data_t *output_ptrs[num_arrs];
-        size_t nelems_no_d0[num_arrs];
-        size_t is[num_arrs];
+        const int num_arrs = int(src_pds_.size()); // safe because <= max_num_arrs
+        const data_t *input_ptrs[max_num_arrs];
+        data_t *output_ptrs[max_num_arrs];
+        size_t nelems_no_d0[max_num_arrs];
+        size_t is[max_num_arrs];
 
         auto o_base_ptr = reinterpret_cast<data_t *>(concat->memory());
 
-        for (size_t a = 0U; a < num_arrs; ++a) {
+        for (int a = 0; a < num_arrs; ++a) {
             const memory_desc_wrapper i_d(&src_pds_[a]);
             const memory_desc_wrapper o_d(&dst_pds_[a]);
 
@@ -73,19 +76,18 @@ struct cpu_simple_concat_t: public c_compatible {
             output_ptrs[a] = o_base_ptr + o_d.blk_off(0);
 
             nelems_no_d0[a] = nelems_no_dim_0(i_d);
-            assert( i_d.blocking_desc().strides[0][0] > 0 );
-            is[a] = static_cast<size_t>(i_d.blocking_desc().strides[0][0]);
+            is[a] = size_t(i_d.blocking_desc().strides[0][0]);
         }
 
         const memory_desc_wrapper o_d(&dst_pds_[0]);
         const size_t N = o_d.dims()[0];
-        const size_t os = static_cast<size_t>(o_d.blocking_desc().strides[0][0]);
+        const size_t os = size_t(o_d.blocking_desc().strides[0][0]);
 
         catch_me();
 
 #       pragma omp parallel for collapse(2) schedule(static)
         for (size_t n = 0; n < N; ++n) {
-            for (size_t a = 0; a < num_arrs; ++a) {
+            for (int a = 0; a < num_arrs; ++a) {
                 /* do coping */
                 const data_t *i = &input_ptrs[a][is[a]*n];
                 data_t *o = &output_ptrs[a][os*n];
@@ -107,7 +109,7 @@ private:
         for (int d = 1; d < data_d.ndims(); ++d) {
             auto block = blk.block_dims[d];
             max_size = nstl::max(max_size,
-                    static_cast<size_t>((blk.padding_dims[d]/block)*blk.strides[0][d]));
+                    size_t(blk.padding_dims[d]/block)*blk.strides[0][d]);
             if (block > 1)
                 max_size = nstl::max(max_size,
                         size_t(block*blk.strides[1][d]));

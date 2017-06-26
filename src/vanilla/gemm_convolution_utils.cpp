@@ -79,7 +79,7 @@ void col2im(
 
             for (int ow = 0; ow < jcp.ow; ++ow) {
             for (int kw = 0; kw < jcp.kw; ++kw) {
-                const int iw = ow * jcp.stride_w - jcp.l_pad + kw * (1 + jcp.dilate_h);
+                const int iw = ow * jcp.stride_w - jcp.l_pad + kw * (1 + jcp.dilate_w);
                 if (iw < 0 || iw >= jcp.iw) continue;
 
                 const size_t col_idx = ((kh*jcp.kw + kw)*jcp.oh+oh)*jcp.ow+ow;
@@ -141,14 +141,14 @@ void init_conf(
 status_t prepare_workspace(
         jit_gemm_conv_conf_t &jcp, float **ws, bool is_bwd_weights,
         const size_t weights_size) {
-    const size_t nthr = omp_get_max_threads(); // unsigned for convenience
+    const size_t nthr = omp_get_max_threads();
     if (jcp.need_im2col) {
         const size_t sz_per_thread = jcp.ic*jcp.ks*jcp.os;
         jcp.im2col_size = utils::rnd_up(nthr*sz_per_thread, 16);
     } else {
         jcp.im2col_size = 0;
     }
-    size_t weights_reduce_size = 0U;
+    size_t weights_reduce_size = 0;
     if (is_bwd_weights && jcp.mb != 1 && nthr != 1) {
         const size_t sz_per_thread = jcp.ngroups * weights_size;
         weights_reduce_size = nthr * sz_per_thread;

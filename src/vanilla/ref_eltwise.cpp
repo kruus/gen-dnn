@@ -171,7 +171,8 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_dense() {
 
 #   pragma omp parallel for schedule(static)
     for (int e = 0; e < nelems; ++e) {
-        diff_src[e] = static_cast<data_t>(diff_dst[e] * ((src[e] > 0) ? 1. : alpha));
+        diff_src[e] = static_cast<data_t>(diff_dst[e]
+            * ((src[e] > 0) ? 1. : alpha));
         switch (alg_kind) {
         case eltwise_relu: diff_src[e] = relu_bwd(diff_dst[e], src[e], alpha);
                            break;
@@ -190,6 +191,8 @@ template struct ref_eltwise_fwd_t<data_type::s8>;
 template struct ref_eltwise_fwd_t<data_type::u8>;
 
 template struct ref_eltwise_bwd_t<data_type::f32>;
+template struct ref_eltwise_bwd_t<data_type::s32>;
+template struct ref_eltwise_bwd_t<data_type::s16>;
 
 }
 }

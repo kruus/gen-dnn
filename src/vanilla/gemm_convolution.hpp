@@ -105,8 +105,8 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
                         data_type::f32 == this->cdesc_().bias_desc.data_type)
                 && this->src_pd_.desc()->format == nchw
                 && this->dst_pd_.desc()->format == nchw
-                && (this->weights_pd_.desc()->format == this->with_groups()
-                         ? goihw : oihw);
+                && this->weights_pd_.desc()->format == (this->with_groups()
+                        ? goihw : oihw);
 #else
             bool ok = true
                 AND_NEED( _gemm_convolution_implemented< run_jit, isa >() )
@@ -125,7 +125,7 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
                         data_type::f32 == this->cdesc_().bias_desc.data_type) )
                 AND_NEED( this->src_pd_.desc()->format == nchw )
                 AND_NEED( this->dst_pd_.desc()->format == nchw )
-                AND_NEED( (this->weights_pd_.desc()->format == this->with_groups()
+                AND_NEED( this->weights_pd_.desc()->format == (this->with_groups()
                           ? goihw : oihw) );
 #endif
             //std::cout<<" VERBOSE_PRIMITIVE_CREATE = "<<VERBOSE_PRIMITIVE_CREATE<<std::endl;

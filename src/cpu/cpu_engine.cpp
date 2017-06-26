@@ -340,9 +340,6 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_sse42_convolution_relu_t),
 #endif
     INSTANCE(mkl_gemm_convolution_relu_t),
-    // [ejk] what about mkl_gemm_convolution_fwd_t ?
-    //                  mkl_gemm_convolution_bwd_data_t ?
-    //                  mkl_gemm_convolution_bwd_weights_t ?
 #if JITFUNCS > 99
     INSTANCE(jit_avx512_common_gemm_convolution_relu_t),
     INSTANCE(jit_avx2_gemm_convolution_relu_t),

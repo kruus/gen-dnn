@@ -34,13 +34,14 @@ namespace cpu {
 template <impl::data_type_t data_type>
 struct cpu_simple_sum_t: public c_compatible {
     typedef typename prec_traits<data_type>::type data_t;
+    enum { max_num_arrs = 16 };
 
     static bool applicable(const nstl::vector<cpu_memory_t::pd_t> &src_pds_,
                             const nstl::vector<double> &scale_,
                             cpu_memory_t::pd_t &dst_pds_)
     {
         const memory_desc_wrapper o_d(&dst_pds_);
-        bool ok = true;
+        bool ok = true && src_pds_.size() <= max_num_arrs;
         for (size_t i = 0; i < src_pds_.size(); ++i) {
             const memory_desc_wrapper i_d(&src_pds_[i]);
             ok = ok && i_d.data_type() == data_type
@@ -55,22 +56,22 @@ struct cpu_simple_sum_t: public c_compatible {
                         cpu_memory_t::pd_t &dst_pds_,
                         cpu_primitive_t *sum)
     {
-        const size_t num_arrs = src_pds_.size();
+        const int num_arrs = int(src_pds_.size());
 
         auto output = reinterpret_cast<data_t *>(sum->memory());
         const memory_desc_wrapper o_d(&dst_pds_);
         output += o_d.blk_off(0);
         const size_t nelems = o_d.nelems();
+        const data_t *input_ptrs[max_num_arrs];
 
-        const data_t *input_ptrs[num_arrs];
-        for (size_t a = 0; a < num_arrs; ++a) {
+        for (int a = 0; a < num_arrs; ++a) {
             const memory_desc_wrapper i_d(&src_pds_[a]);
 
             input_ptrs[a] = reinterpret_cast<const data_t *>(
                     sum->input_memory(a)) + i_d.blk_off(0);
         }
 
-        const size_t block_size =  16U * 1024U/sizeof(data_type);
+        unsigned block_size =  int(16 * 1024/sizeof(data_type));
         const size_t blocks_number = nelems / block_size;
         const size_t tail = nelems % block_size;
 
@@ -87,7 +88,7 @@ struct cpu_simple_sum_t: public c_compatible {
                 for (size_t e = start_e; e < end_e; e++) {
                     output[e] = static_cast<data_t>(scale_[0] * input_ptrs[0][e]);
                 }
-                for (size_t a = 1; a < num_arrs; a++) {
+                for (int a = 1; a < num_arrs; a++) {
                     for (size_t e = start_e; e < end_e; e++) {
                         output[e] += static_cast<data_t>(scale_[a] * input_ptrs[a][e]);
                     }
@@ -100,7 +101,7 @@ struct cpu_simple_sum_t: public c_compatible {
                 for (size_t e = start_e; e < end_e; e++) {
                     output[e] = static_cast<data_t>(scale_[0] * input_ptrs[0][e]);
                 }
-                for (size_t a = 1; a < num_arrs; a++) {
+                for (int a = 1; a < num_arrs; a++) {
                     for (size_t e = start_e; e < end_e; e++) {
                         output[e] += static_cast<data_t>(scale_[a] * input_ptrs[a][e]);
                     }

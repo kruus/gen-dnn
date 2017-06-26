@@ -1,7 +1,8 @@
 build
 build.bak
-build-sx
+build-sx-*
 build-sx.bak
+build-sxd*
 build-jit
 build-jit.bak
 install
