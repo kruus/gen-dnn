@@ -34,7 +34,7 @@ template <typename T> T tanh_fwd(T s) {
 }
 template <typename T> T tanh_bwd(T dd, T s) {
     //T th = tanh_fwd(s);
-    double const e = ::expf((float)(2*s)); /* maybe replace with -2*s? */
+    double const e = ::exp(2*s); /* maybe replace with -2*s? */
     double const th = ((e - 1) / (e + 1));
     return static_cast<T>(dd * (1 - th * th));
 }
@@ -74,8 +74,8 @@ void check_eltwise_fwd(const eltwise_test_params<data_t> &p,
         data_t s = src_data[i];
         data_t ref_d = 0;
         switch (p.alg_kind) {
-        case eltwise_relu: ref_d = relu_fwd(s, p.alpha); break; // static_cast?
-        case eltwise_tanh: ref_d = tanh_fwd(s); break;		// static_cast?
+        case eltwise_relu: ref_d = relu_fwd(s, p.alpha); break;
+        case eltwise_tanh: ref_d = tanh_fwd(s); break;
         case eltwise_elu: ref_d = elu_fwd(s, p.alpha); break;
         default: assert(!"unknown alg_kind");
         }
