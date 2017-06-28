@@ -27,6 +27,8 @@
 #include "cpu_primitive.hpp"
 #include "mkldnn_thread.hpp"
 
+#include <stdio.h>
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -38,34 +40,54 @@ struct cpu_simple_sum_t: public c_compatible {
 
     static bool applicable(const nstl::vector<cpu_memory_t::pd_t> &src_pds_,
                             const nstl::vector<double> &scale_,
-                            cpu_memory_t::pd_t &dst_pds_)
+                            cpu_memory_t::pd_t &dst_pd_)
     {
-        const memory_desc_wrapper o_d(&dst_pds_);
+#if 1 || ! defined(_SX)
+        const memory_desc_wrapper o_d(&dst_pd_);
+#else // sxc++ compiler bug workaround
+        const memory_desc_wrapper o_d(dst_pd_.desc()); // OK for SX
+#endif
+
+        assert( o_d._md != nullptr );
         bool ok = true && src_pds_.size() <= max_num_arrs;
         for (size_t i = 0; i < src_pds_.size(); ++i) {
+#if 1 || ! defined(_SX)
             const memory_desc_wrapper i_d(&src_pds_[i]);
+#else
+            const memory_desc_wrapper i_d(src_pds_[i].desc()); // OK for SX
+#endif
+            assert( i_d._md != nullptr );
             ok = ok && i_d.data_type() == data_type
                 && o_d.data_type() == data_type && i_d.format() == o_d.format()
                 && i_d.is_dense() && o_d.is_dense();
         }
+        printf(" ok=%d", (int)ok); fflush(stdout);
         return ok;
     }
 
     static void execute(const nstl::vector<cpu_memory_t::pd_t> &src_pds_,
                         const nstl::vector<double> &scale_,
-                        cpu_memory_t::pd_t &dst_pds_,
+                        cpu_memory_t::pd_t &dst_pd_,
                         cpu_primitive_t *sum)
     {
         const int num_arrs = int(src_pds_.size());
 
         auto output = reinterpret_cast<data_t *>(sum->memory());
-        const memory_desc_wrapper o_d(&dst_pds_);
+#if 1 || ! defined(_SX)
+        const memory_desc_wrapper o_d(&dst_pd_);     // OK, but FAIL for SX
+#else
+        const memory_desc_wrapper o_d(dst_pd_.desc()); // for SX
+#endif
         output += o_d.blk_off(0);
         const size_t nelems = o_d.nelems();
         const data_t *input_ptrs[max_num_arrs];
 
         for (int a = 0; a < num_arrs; ++a) {
-            const memory_desc_wrapper i_d(&src_pds_[a]);
+#if 1 || ! defined(_SX)
+            const memory_desc_wrapper i_d(&src_pds_[a]); // OK, but FAIL for SX
+#else
+            const memory_desc_wrapper i_d(src_pds_[a].desc()); // for SX
+#endif
 
             input_ptrs[a] = reinterpret_cast<const data_t *>(
                     sum->input_memory(a)) + i_d.blk_off(0);

@@ -28,6 +28,8 @@
 namespace mkldnn {
 namespace impl {
 
+struct memory_pd_t; // fwd declaration
+
 // What effect on vanilla runtimes ...
 //  fast_memory_desc_wrapper< memory_format_t >
 //  - with size and off_v and off_l specialized.
@@ -51,7 +53,9 @@ struct memory_desc_wrapper: public c_compatible {
      * descriptor \param md */
     memory_desc_wrapper(const memory_desc_t &md) : _md(&md) {}
     memory_desc_wrapper(const memory_desc_t *md) : _md(md) {}
-    memory_desc_wrapper(const memory_pd_t *m_pd);
+    memory_desc_wrapper(const memory_pd_t *m_pd); // do not want memory_pd.hpp header here
+    //memory_desc_wrapper(const memory_pd_t *m_pd)
+    //    : _md(m_pd == nullptr ? nullptr : m_pd->desc()) {}
 
     /* implementing attributes */
     inline int ndims() const { return _md->ndims; }

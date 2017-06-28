@@ -98,10 +98,60 @@ function(set_cmake_ccxx SUFFIX OPT)
 	endif()
 endfunction()
 # vsafe < vopt < aopt < hopt
+# In roughly decrease optimization level ...
+##set(SX_OPTFLAGS_INIT "-Caopt") # sX FAIL: traced to base class conversion wrong pointer values (compiler BUG)
+##set(SX_OPTFLAGS_INIT "-Chopt") # SX FAIL: uses -ipa
+##set(SX_OPTFLAGS_INIT "-Chopt") # SX FAIL: also uses -ipa
+##set(SX_OPTFLAGS_INIT "-Cvopt")
+#set(SX_OPTFLAGS_INIT "-Cvsafe")	# SX OK
+## -Cvsafe + ADD allowed vectorizations ----> OK
+#set(SX_OPTFLAGS_INIT "-Cvsafe -pvctl,assume,nocompress,divloop,expand=4,lstval,outerunroll,n,osplit,novchg,verrchk,vlchk")
+## -Cvopt + REMOVE -O flags		---> FAIL
+#set(SX_OPTFLAGS_INIT "-Cvopt -O,nochg,nodiv,nomove,overlap,restrict=this,nounroll")
+## restrict optimizations even more	---> FAIL
+#set(SX_OPTFLAGS_INIT "-Cvopt -O,nochg,nodiv,nomove,overlap,restrict=keyword,nounroll -pvctl,noaltcode,noassoc,noassume,nocollapse,nocompress,divloop,noexpand,noloopchg,lstval,noouterunroll,nosplit,novchg,verrchk,vlchk -struct,no_loop -P,multi")
+## -Cvsafe + ADD many -Chopt options (or aggressive) (some will be ignored)	--->  FAIL (yay)
+#set(SX_OPTFLAGS_INIT "-Cvsafe -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,verrchk,vlchk -O,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline -P,auto -Kexceptions")
+## note: sxc++: Warning: "-Ounroll" cannot be specified with "-Cvsafe" and ignored
+##					---> FAIL
+#set(SX_OPTFLAGS_INIT "-Cvsafe -O,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline -P,auto -Kexceptions")
+##					---> OK
+#set(SX_OPTFLAGS_INIT "-Cvsafe -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,verrchk,vlchk -O,chg,div,move,nooverlap,restrict=arg,unroll")
+##					---> OK
+#set(SX_OPTFLAGS_INIT "-Cvsafe -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,verrchk,vlchk -O,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline")
+## -P,auto ----> fail
+#set(SX_OPTFLAGS_INIT "-Cvsafe -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,verrchk,vlchk -O,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline -P,auto")
+## -P,multi ---				--> OK ???
+#set(sx_optflags_init "-Cvsafe -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,verrchk,vlchk -o,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline -p,multi")
+## 					---> FAIL
+#set(SX_OPTFLAGS_INIT "-Chopt -P,multi")
+## disable more optimizations...		----> FAIL
+#set(SX_OPTFLAGS_INIT "-Cvopt -P,multi -pvctl,noaltcode,noassoc,noassume,nocollapse,nocompress,divloop,noexpand,noloopchg,lstval,noouterunroll,nosplit,novchg,verrchk,vlchk -O,nochg,nodiv,nomove,overlap,restrict=keyword,nounroll -pi,inline")
+## all options "by hand			----> FAIL -- #pragma omp **simd** not supported
+#set(SX_OPTFLAGS_INIT "-math,vector -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,noverrchk,vlchk -O,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline -P,multi -Popenmp")
+##					----> FAIL
+#set(SX_OPTFLAGS_INIT "-math,vector -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,noverrchk,vlchk -O,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline -P,multi")
+#
+# -P,multi ---				--> FAIL
+#set(sx_optflags_init "-Cvsafe -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,verrchk,vlchk -o,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline -P,multi")
+#					---> 
+set(SX_OPTFLAGS_INIT "-Cvsafe -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,verrchk,vlchk -O,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline")
+#set(SX_OPTFLAGS_INIT "-Csopt")	 # normal optimization, no vectorization
+#set(SX_OPTFLAGS_INIT "-Cssafe") # safe optimization (minimal side effects), no vectorization
+####### The following I think correspond to -Cvsafe
+#
+#set(SX_OPTFLAGS_INIT "")
+#set(SX_OPTFLAGS_INIT "${SX_OPTFLAGS_INIT} -xint")
+#set(SX_OPTFLAGS_INIT "${SX_OPTFLAGS_INIT} -Nipa")
+#set(SX_OPTFLAGS_INIT "${SX_OPTFLAGS_INIT} -pi,copy_arg,inline")
+#set(SX_OPTFLAGS_INIT "${SX_OPTFLAGS_INIT} -pvctl,noaltcode,noassoc,noassume,nocollapse,noexpand,noloopchg,noloop_eq,nomatmul,noon_adb,noouterstrip,noouterunroll,noreplace_induction,verrchk,vlchk")
+#set(SX_OPTFLAGS_INIT "${SX_OPTFLAGS_INIT} -Onochg,nodiv,noignore_volatile,nomove,overlap,restrict=no,safe_longjmp,nounroll")
+#set(SX_OPTFLAGS_INIT "${SX_OPTFLAGS_INIT} -math,inline,vector,strict_prototype") # defaults
 set_cmake_ccxx("FLAGS_DEBUG_INIT"          "-g -ftrace -Cvopt")
-set_cmake_ccxx("FLAGS_RELEASE_INIT"        "-Caopt -math,vector,nostrict_prototype -DNDEBUG")
-set_cmake_ccxx("FLAGS_MINSIZEREL_INIT"     "-Caopt -math,vector,nostrict_prototype -DNDEBUG")
-set_cmake_ccxx("FLAGS_RELWITHDEBINFO_INIT" "-g -Caopt -math vector nostrict_prototype -DNDEBUG")
+#set_cmake_ccxx("FLAGS_RELEASE_INIT"        "${SX_OPTFLAGS_INIT} -math,inline,vector,nostrict_prototype -DNDEBUG")
+set_cmake_ccxx("FLAGS_RELEASE_INIT"        "${SX_OPTFLAGS_INIT} -DNDEBUG")
+set_cmake_ccxx("FLAGS_MINSIZEREL_INIT"     "${SX_OPTFLAGS_INIT} -DNDEBUG")
+set_cmake_ccxx("FLAGS_RELWITHDEBINFO_INIT" "-g ${SX_OPTFLAGS_INIT} -math vector nostrict_prototype -DNDEBUG")
 set(CMAKE_EXE_LINKER_FLAGS_DEBUG_INIT "-g -ftrace")
 set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO_INIT "-g")
 

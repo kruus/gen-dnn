@@ -125,6 +125,15 @@ timeoutPID() { # unused
         kill -s SIGKILL $$
     ) 2> /dev/null &
 }
+if [ -d "${BUILDDIR}" ]; then
+    rm -rf "${BUILDDIR}".bak && mv -v "${BUILDDIR}" "${BUILDDIR}".bak
+    if [ -f "${BUILDDIR}.log" ]; then
+       mv "${BUILDDIR.log}" "${BUILDDIR}".bak/
+    fi
+fi
+if [ -d "$INSTALLDIR}" ]; then
+    rm -rf "$INSTALLDIR}".bak && mv -v "$INSTALLDIR}" "$INSTALLDIR}".bak
+fi
 (
     echo "DOTARGET   $DOTARGET"
     echo "DOJIT      $DOJIT"
@@ -133,8 +142,6 @@ timeoutPID() { # unused
     echo "DODOC      $DODOC"
     echo "BUILDDIR   ${BUILDDIR}"
     echo "INSTALLDIR ${INSTALLDIR}"
-    if [ -d "${BUILDDIR}" ]; then rm -rf "${BUILDDIR}".bak && mv -v "${BUILDDIR}" "${BUILDDIR}".bak; fi
-    if [ -d "$INSTALLDIR}" ]; then rm -rf "$INSTALLDIR}".bak && mv -v "$INSTALLDIR}" "$INSTALLDIR}".bak; fi
     mkdir "${BUILDDIR}"
     cd "${BUILDDIR}"
     #

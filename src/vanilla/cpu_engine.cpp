@@ -118,8 +118,8 @@ status_t cpu_engine_t::sum_primitive_desc_create(sum_pd_t **sum_pd,
         const memory_pd_t **input_pds) {
     assert(input_pds[0]->engine() == this);
     auto i_pds = (const cpu_memory_t::pd_t **)input_pds;
-    return safe_ptr_assign<sum_pd_t>(*sum_pd,
-            new cpu_sum_t::pd_t(this, output_d, n, scale, i_pds));
+    auto const pd = new cpu_sum_t::pd_t(this, output_d, n, scale, i_pds);
+    return safe_ptr_assign<sum_pd_t>(*sum_pd, pd);
 }
 
 using rpd_create_f = mkldnn::impl::engine_t::reorder_primitive_desc_create_f;
