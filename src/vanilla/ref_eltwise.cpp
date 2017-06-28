@@ -28,7 +28,7 @@ namespace cpu {
 
 using namespace alg_kind;
 
-namespace { // [ejk] roughly equiv to 'static' on these funcs, in case not inlined
+namespace {
 template <typename T, typename A> inline T relu_fwd(T s, A alpha) {
     return s > 0 ? s : static_cast<T>(s * alpha);
 }
@@ -36,21 +36,20 @@ template <typename T, typename A> inline T relu_bwd(T dd, T s, A alpha) {
     return s > 0 ? dd : static_cast<T>(dd * alpha);
 }
 
-template <typename T> inline T tanh_fwd(T s) {
-    float const e = ::expf((float)(2*s)); /* maybe replace with -2*s? */
+template <typename T> T tanh_fwd(T s) {
+    const float e = ::expf(2*s); /* maybe replace with -2*s? */
     return static_cast<T>((e - 1) / (e + 1));
 }
-template <typename T> inline T tanh_bwd(T dd, T s) {
-    //T th = tanh_fwd(s);
-    float const e = ::expf((float)(2*s)); /* maybe replace with -2*s? */
-    float const th = ((e - 1) / (e + 1));
+template <typename T> T tanh_bwd(T dd, T s) {
+    const float e = ::expf(2*s); /* maybe replace with -2*s? */
+    const float th = (e - 1.f) / (e + 1.f);
     return static_cast<T>(dd * (1 - th * th));
 }
 
-template <typename T, typename A> inline T elu_fwd(T s, A alpha) {
-    return s > 0 ? s : static_cast<T>(alpha * (::expf((float)(s)) - 1));
+template <typename T, typename A> T elu_fwd(T s, A alpha) {
+    return s > 0 ? s : static_cast<T>(alpha * (::expf((float)s) - 1.f));
 }
-template <typename T, typename A> inline T elu_bwd(T dd, T s, A alpha) {
+template <typename T, typename A> T elu_bwd(T dd, T s, A alpha) {
     return static_cast<T>(dd * (s > 0 ? 1 : alpha * ::expf((float)s)));
 }
 }

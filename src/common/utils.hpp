@@ -222,6 +222,9 @@ inline T nd_iterator_init(T start, U &x, const W &X, Args &&... tuple) {
     start = nd_iterator_init(start, utils::forward<Args>(tuple)...);
     x = static_cast<U>(start % static_cast<T>(X));  // ? do in "larger-of" type ?
     return start / static_cast<T>(X);
+    //typedef decltype(start + x) TU_t;
+    //x = static_cast<U>( TU_t(start) % TU_t(X));
+    //return static_cast<T>(start / X);
 }
 
 inline bool nd_iterator_step() { return true; }

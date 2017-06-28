@@ -29,13 +29,12 @@ template <typename T, typename A> inline T relu_bwd(T dd, T s, A alpha) {
 }
 
 template <typename T> T tanh_fwd(T s) {
-    double e = ::exp(2*s); /* maybe replace with -2*s? */
+    const double e = ::exp(2*s); /* maybe replace with -2*s? */
     return static_cast<T>((e - 1.0) / (e + 1.0));
 }
 template <typename T> T tanh_bwd(T dd, T s) {
-    //T th = tanh_fwd(s);
-    double const e = ::exp(2*s); /* maybe replace with -2*s? */
-    double const th = ((e - 1) / (e + 1));
+    const double e = ::exp(2*s); /* maybe replace with -2*s? */
+    const double th = ((e - 1) / (e + 1));
     return static_cast<T>(dd * (1 - th * th));
 }
 
@@ -64,7 +63,7 @@ void check_eltwise_fwd(const eltwise_test_params<data_t> &p,
     data_t *dst_data = (data_t *)dst.get_data_handle();
 
     ASSERT_EQ(md.data.ndims, 4);
-    ASSERT_EQ(md.data.data_type, memory::convert_to_c(memory::data_type::f32)); // TODO: type assert
+    ASSERT_EQ(md.data.data_type, memory::data_type::f32); // TODO: type assert
 
     size_t N = md.data.dims[0];
     size_t C = md.data.dims[1];
@@ -96,7 +95,7 @@ void check_eltwise_bwd(const eltwise_test_params<data_t> &p,
     const memory::desc diff_data_d = diff_src.get_primitive_desc().desc();
 
     ASSERT_EQ(md.data.ndims, 4);
-    ASSERT_EQ(md.data.data_type, memory::convert_to_c(memory::data_type::f32)); // TODO: type assert
+    ASSERT_EQ(md.data.data_type, memory::data_type::f32); // TODO: type assert
 
     size_t N = md.data.dims[0];
     size_t C = md.data.dims[1];
