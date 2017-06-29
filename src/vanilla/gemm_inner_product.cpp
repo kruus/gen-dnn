@@ -40,15 +40,6 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-#if defined(USE_MKL) && defined(USE_CBLAS)
-typedef MKL_INT cblas_int;
-#elif defined(USE_CBLAS) // modify for your particular cblas.h ...
-typedef int cblas_int;
-#if defined(_SX) // this cblas.h is peculiar...
-typedef CBLAS_ORDER CBLAS_LAYOUT;
-#endif //SX
-#endif
-
 #ifdef USE_CBLAS
 namespace {
 
