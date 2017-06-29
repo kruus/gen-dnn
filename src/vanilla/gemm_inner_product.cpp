@@ -18,23 +18,33 @@
 #include "type_helpers.hpp"
 
 #include "gemm_inner_product.hpp"
-
-#if defined(USE_MKL) && defined(USE_CBLAS)
-#include "mkl_cblas.h"
-#elif defined(_SX) || defined(USE_CBLAS)
-#include "cblas.h"
-#endif
+#include "os-blas.hpp"
+//
+// TODO: check if jit gemm should be made available for inner_product
+//       Should this decision be consistent with gemm_convolution ?
+//
+// USE_MKL      USE_CBLAS       effect
+// -------      ---------       ------
+// yes          yes             use mkl cblas (NO JJIT - why?)
+// yes          no              no jit, so not possible(?) (provide stubs)
+// no           yes             system-dependent (non-MKL) cblas
+// no           no              gemm inner product not possible (provide stubs)
+//
+//#if defined(USE_MKL) && defined(USE_CBLAS)
+//#include "mkl_cblas.h"
+//#elif defined(_SX) || defined(USE_CBLAS)
+//#include "cblas.h"
+//#endif
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-// TODO: move BLAS wrappers to a separate header?
 #if defined(USE_MKL) && defined(USE_CBLAS)
 typedef MKL_INT cblas_int;
-#elif defined(_SX) || defined(USE_CBLAS)
-typedef int cblas_int; // also OK for SX cblas.h
-#if defined(_SX) // this cblas is peculiar...
+#elif defined(USE_CBLAS) // modify for your particular cblas.h ...
+typedef int cblas_int;
+#if defined(_SX) // this cblas.h is peculiar...
 typedef CBLAS_ORDER CBLAS_LAYOUT;
 #endif //SX
 #endif
@@ -165,5 +175,4 @@ template struct gemm_inner_product_bwd_weights_t<data_type::f32>;
 }
 }
 }
-
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

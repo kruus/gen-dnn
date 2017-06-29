@@ -38,27 +38,32 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-#ifdef TARGET_VANILLA
+#if defined(TARGET_VANILLA)
 typedef enum { isa_any } cpu_isa_t;
-#endif
-
 template<bool run_jit, cpu_isa_t isa>
 inline bool constexpr _gemm_convolution_implemented() {
-#ifdef TARGET_VANILLA
     static_assert( run_jit == false, "TARGET_VANILLA does not support run_jit" );
     static_assert( isa == isa_any,   "TARGET_VANILLA only allows isa_any cpu type" );
-#endif
-#ifndef TARGET_VANILLA
-            if (run_jit) {
-                return mayiuse(isa);
-            }
-#endif
-#ifdef USE_CBLAS
+#if defined(USE_MKL) || defined(USE_CBLAS)
             return true;
 #else
             return false;
 #endif
 }
+#else // jit-enabled compile
+
+template<bool run_jit, cpu_isa_t isa>
+inline bool constexpr _gemm_convolution_implemented() {
+            if (run_jit) {
+                return mayiuse(isa);
+            }
+#if defined(USE_MKL) || defined(USE_CBLAS)
+            return true;
+#else
+            return false;
+#endif
+}
+#endif // jist-enabled?
 
 template <bool with_relu, bool run_jit, cpu_isa_t isa>
 struct _gemm_convolution_fwd_t: public cpu_primitive_t {

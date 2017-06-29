@@ -21,22 +21,7 @@
 #include "utils.hpp"
 #include "type_helpers.hpp"
 #include "mkldnn_thread.hpp"
-
-#if defined(_SX)
-// CHECK: does SX also have a fortran API, a la USE_MKL ?
-extern "C" {
-#include "cblas.h"
-}
-
-#else
-#ifdef USE_MKL
-#include "mkl_cblas.h"
-#endif
-
-#ifndef USE_CBLAS
-#define cblas_sgemm(...) assert(!"CBLAS is unavailable")
-#endif
-#endif //SX
+#include "os-blas.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -45,6 +30,19 @@ namespace cpu {
 using namespace mkldnn::impl::status;
 using namespace mkldnn::impl::memory_format;
 using namespace mkldnn::impl::utils;
+
+#if ! USE_MKL && ! USE_CBLAS // provide empty stubs (init always will say "NO")
+
+template <bool with_relu, bool run_jit, cpu_isa_t isa>
+void _gemm_convolution_fwd_t<with_relu, run_jit, isa>::execute_forward() {}
+
+template <bool run_jit, cpu_isa_t isa>
+void _gemm_convolution_bwd_data_t<run_jit, isa>::execute_backward_data() {}
+
+template <bool run_jit, cpu_isa_t isa>
+void _gemm_convolution_bwd_weights_t<run_jit, isa>::execute_backward_weights() {}
+
+#else // some sort of gemm is available
 
 template <bool with_relu, bool run_jit, cpu_isa_t isa>
 void _gemm_convolution_fwd_t<with_relu, run_jit, isa>::execute_forward() {
@@ -298,6 +296,9 @@ template struct _gemm_convolution_bwd_weights_t<true, avx2>;
 #endif
 template struct _gemm_convolution_bwd_weights_t<false, isa_any>;
 
+#endif // some sort of gemm is available
+
 }
 }
 }
+// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

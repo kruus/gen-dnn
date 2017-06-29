@@ -19,15 +19,15 @@
 
 #include "gemm_inner_product.hpp"
 
-namespace mkldnn {
-namespace impl {
-namespace cpu {
-
 // TODO: move BLAS wrappers to a separate header?
 #ifdef USE_MKL
 #include "mkl_cblas.h"
 typedef MKL_INT cblas_int;
 #endif
+
+namespace mkldnn {
+namespace impl {
+namespace cpu {
 
 #ifdef USE_CBLAS
 namespace {
