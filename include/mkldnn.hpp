@@ -24,6 +24,7 @@
 #include <vector>
 #include <algorithm>
 #include <iterator>
+#include "mkldnn.h"
 //#ifndef NDEBUG
 //#include "mkldnn_io.hpp" // tracing an initialization error [turned out it was sxcc compiler bug]
 //#endif
@@ -93,14 +94,6 @@ public:
     bool operator!=(const handle &other) const { return !(*this == other); }
 };
 
-#ifndef DOXYGEN_SHOULD_SKIP_THIS
-#include "mkldnn.h"
-//#ifndef NDEBUG
-//#include "mkldnn_io.h"  // this now has namespace issues
-//#endif
-}
-#endif
-
 template <> struct handle_traits<mkldnn_primitive_t> {
     static constexpr auto destructor = &mkldnn_primitive_destroy;
 };
@@ -113,8 +106,6 @@ class primitive: public handle<mkldnn_primitive_t> {
     using handle::handle;
 public:
     /// A wrapper structure to specify a particular output of a primitive.
-    /// [ejk] Not used, but probably should be. Explicitly sets output_index,
-    ///       which was a thorny compiler bug for sxcc.
     struct at {
         /// The underlying C API structure.
         mkldnn_primitive_at_t data;
@@ -132,7 +123,6 @@ public:
             : data(c_api::mkldnn_primitive_at(aprimitive.get(), at)) {
                 using namespace std;
                 if(at != 0U){ cout<<" primitive.at("<<aprimitive<<"\n\t, at="<<at<<")"<<endl; }
-                assert(false); // seems this is never encountered in simple_net.cpp
             }
 #else
         at(const primitive &aprimitive, size_t at = 0)
@@ -410,13 +400,9 @@ struct memory: public primitive  {
                 format aformat) {
             validate_dims(adims);
             error::wrap_c_api(
-<<<<<<< HEAD
-                    c_api::mkldnn_memory_desc_init(&data, static_cast<int>(adims.size()),
-=======
-                    mkldnn_memory_desc_init(&data, adims.size(),
->>>>>>> src-cpu-typeconversions
+                    mkldnn_memory_desc_init(&data, (int)adims.size(),
                         adims.size() == 0 ? nullptr : &adims[0],
-                         convert_to_c(adata_type), convert_to_c(aformat)),
+                        convert_to_c(adata_type), convert_to_c(aformat)),
                     "could not initialize a memory descriptor");
         }
 
@@ -743,13 +729,8 @@ struct concat : public primitive {
 
             auto c_api_inputs = cpp_to_c(inputs);
 
-<<<<<<< HEAD
-            error::wrap_c_api(c_api::mkldnn_concat_primitive_desc_create(
-                    &result, &output.data, static_cast<int>(c_api_inputs.size()),
-=======
             error::wrap_c_api(mkldnn_concat_primitive_desc_create(
-                    &result, &output.data, c_api_inputs.size(),
->>>>>>> src-cpu-typeconversions
+                    &result, &output.data, (int)c_api_inputs.size(),
                     concat_dimension, &c_api_inputs[0]),
                 "could not create a concat primitive descriptor");
             reset(result);
@@ -761,15 +742,9 @@ struct concat : public primitive {
 
             auto c_api_inputs = cpp_to_c(inputs);
 
-<<<<<<< HEAD
-            error::wrap_c_api(c_api::mkldnn_concat_primitive_desc_create(
-                    &result, nullptr, static_cast<int>(c_api_inputs.size()),
-                    concat_dimension, &c_api_inputs[0]),
-=======
             error::wrap_c_api(mkldnn_concat_primitive_desc_create(
-                    &result, nullptr, c_api_inputs.size(), concat_dimension,
-                    &c_api_inputs[0]),
->>>>>>> src-cpu-typeconversions
+                    &result, nullptr, (int)c_api_inputs.size(),
+                    concat_dimension, &c_api_inputs[0]),
                 "could not create a concat primitive descriptor");
             reset(result);
         }
@@ -823,13 +798,8 @@ struct sum : public primitive {
 
             auto c_api_inputs = cpp_to_c(inputs);
 
-<<<<<<< HEAD
-            error::wrap_c_api(c_api::mkldnn_sum_primitive_desc_create(
-                    &result, &output.data, static_cast<int>(c_api_inputs.size()),
-=======
             error::wrap_c_api(mkldnn_sum_primitive_desc_create(
-                    &result, &output.data, c_api_inputs.size(),
->>>>>>> src-cpu-typeconversions
+                    &result, &output.data, (int)c_api_inputs.size(),
                     &scale[0], &c_api_inputs[0]),
                 "could not create a sum primitive descriptor");
             reset(result);
@@ -841,15 +811,9 @@ struct sum : public primitive {
 
             auto c_api_inputs = cpp_to_c(inputs);
 
-<<<<<<< HEAD
-            error::wrap_c_api(c_api::mkldnn_sum_primitive_desc_create(
-                    &result, nullptr, static_cast<int>(c_api_inputs.size()),
-                    &scale[0], &c_api_inputs[0]),
-=======
             error::wrap_c_api(mkldnn_sum_primitive_desc_create(
-                    &result, nullptr, c_api_inputs.size(), &scale[0],
+                    &result, nullptr, (int)c_api_inputs.size(), &scale[0],
                     &c_api_inputs[0]),
->>>>>>> src-cpu-typeconversions
                 "could not create a sum primitive descriptor");
             reset(result);
         }
