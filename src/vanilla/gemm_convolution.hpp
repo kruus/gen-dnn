@@ -248,7 +248,7 @@ struct _gemm_convolution_bwd_data_t: public cpu_primitive_t {
                         this->desc()->diff_dst_desc.data_type)
                 && this->diff_src_pd_.desc()->format == nchw
                 && this->diff_dst_pd_.desc()->format == nchw
-                && (this->weights_pd_.desc()->format == this->with_groups()
+                && this->weights_pd_.desc()->format == (this->with_groups()
                      ? goihw : oihw);
             return ok ? status::success : status::unimplemented;
         }
