@@ -27,10 +27,6 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-using namespace mkldnn::impl::status;
-using namespace mkldnn::impl::memory_format;
-using namespace mkldnn::impl::utils;
-
 #if ! USE_MKL && ! USE_CBLAS // provide empty stubs (init always will say "NO")
 
 template <bool with_relu, bool run_jit, cpu_isa_t isa>
@@ -43,6 +39,10 @@ template <bool run_jit, cpu_isa_t isa>
 void _gemm_convolution_bwd_weights_t<run_jit, isa>::execute_backward_weights() {}
 
 #else // some sort of gemm is available
+
+using namespace mkldnn::impl::status;
+using namespace mkldnn::impl::memory_format;
+using namespace mkldnn::impl::utils;
 
 template <bool with_relu, bool run_jit, cpu_isa_t isa>
 void _gemm_convolution_fwd_t<with_relu, run_jit, isa>::execute_forward() {

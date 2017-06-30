@@ -38,32 +38,36 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
+namespace {
 #if defined(TARGET_VANILLA)
 typedef enum { isa_any } cpu_isa_t;
+#endif
+
+/** Common code logic --> single point of change.
+ * Can be more complicated to support other OSes
+ * (e.g. without JIT support, no mayiuse available).
+ * Some compilers (my gcc) still insist on one-liner returns here :(
+ */
 template<bool run_jit, cpu_isa_t isa>
-inline bool constexpr _gemm_convolution_implemented() {
+static inline bool constexpr _gemm_convolution_implemented() {
+#if ! defined(TARGET_VANILLA)
+#if defined(USE_MKL) || defined(USE_CBLAS)
+    return run_jit? mayiuse(isa): true;
+#else
+    return run_jit? mayiuse(isa): false;
+#endif
+
+#else // TARGET_VANILLA, no jit possible and only isa_any
     static_assert( run_jit == false, "TARGET_VANILLA does not support run_jit" );
     static_assert( isa == isa_any,   "TARGET_VANILLA only allows isa_any cpu type" );
 #if defined(USE_MKL) || defined(USE_CBLAS)
-            return true;
+    return true;
 #else
-            return false;
+    return false;
+#endif
 #endif
 }
-#else // jit-enabled compile
-
-template<bool run_jit, cpu_isa_t isa>
-inline bool constexpr _gemm_convolution_implemented() {
-            if (run_jit) {
-                return mayiuse(isa);
-            }
-#if defined(USE_MKL) || defined(USE_CBLAS)
-            return true;
-#else
-            return false;
-#endif
 }
-#endif // jist-enabled?
 
 template <bool with_relu, bool run_jit, cpu_isa_t isa>
 struct _gemm_convolution_fwd_t: public cpu_primitive_t {

@@ -30,11 +30,6 @@
 // no           yes             system-dependent (non-MKL) cblas
 // no           no              gemm inner product not possible (provide stubs)
 //
-//#if defined(USE_MKL) && defined(USE_CBLAS)
-//#include "mkl_cblas.h"
-//#elif defined(_SX) || defined(USE_CBLAS)
-//#include "cblas.h"
-//#endif
 
 namespace mkldnn {
 namespace impl {
