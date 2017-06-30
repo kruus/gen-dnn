@@ -153,6 +153,10 @@ Then log in to the SX, start bash and cd to the project root (`~/tosx`, etc.)
   - so you can do something like ```
 ( cd build-sx/tests/gtests; export C_PROGINF=DETAIL; for f in test_conv*; do echo '>>>> '"$f"; ./$f --gtest_filter=*/0:*/1:*/2:*/3:*/4:*/5 2>&1 | tee "../../../guest/$f-test0-5.log"; done; )  2>&1 | tee guest/gtest-conv0-5.log
   ```
+Run the examples/ test programs and get run statistics:
+```
+for f in ./build-sx/examples/sim*; do echo ""; echo "%%% $f"; C_PROGINF=DETAIL ./$f 2>&1 | tee guest/`basename $f`.log; done
+```
   - to run a subset of the convolution tests.
 
 ### SX debug
@@ -174,11 +178,17 @@ run # try again
 ```
 The first readable part is a function name, and the first mangled part is often a `this` name, for C++ functions.
 
-Run the examples/ test programs and get run statistics:
+Run a single test in the SX debugger (for debug build, under build-sxd)
 ```
-( cd build-sx/examples; export C_PROGINF=DETAIL; for f in simple*; do echo ">>>> $f"; ./$f 2>&1 | tee guest/$f.log; done; ) 2>&1 | tee guest/examples.log
+[guest@ps6s0005 gen-dnn]$  dbx -I src/vanilla -I src/include -I src/common -I src/io -I examples -I tests -I tests/gtests ./build-sxd/tests/gtests/test_sum
+```
 
+Run part of a gtests test in the SX debugger (using release mode build-sx/)
 ```
+[guest@ps6s0005 gen-dnn]$  dbx -I src/vanilla -I src/include -I src/common -I src/io -I examples -I tests -I tests/gtests -r ./build-sx/tests/gtests/test_convolution_relu_forward_f32 --gtest_filter=*/0
+```
+- The `-r` (run) allows dbx to pass --gtest_filter= option to the test program, instead of trying interpret it as a dbx option
+- Even this subset takes quite some time to run!
 
 ## SX Performance
 
