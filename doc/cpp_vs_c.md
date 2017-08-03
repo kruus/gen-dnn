@@ -89,71 +89,71 @@ So let''s look at some exemplary enums from [mkldnn_types.h](https://github.com/
 type | enum | value | comment
 :--- |:--- |:--- |:---
 mkldnn_status_t | mkldnn_success | 0 | operation successful
- | mkldnn_out_of_memory | 1 | failure
- | ... |
+| | mkldnn_out_of_memory | 1 | failure
+| | ... |
 mkldnn_data_type_t | mkldnn_f32 | 1 | 32-bit floating point
- | ...s32,s16,s8,u8 | | integer types
- | ... |
+| | ...s32,s16,s8,u8 | | integer types
+| | ... |
 mkldnn_memory_format_t | mkldnn_format_undef | 0 | empty/uninitialized
- | mkldnn_any | | primitive selects memory format automatically
- | mkldnn_nchw | | Caffe-style image (batch, channels, height, width)
- | mkldnn_nhwc | | Tensorflow/Milde-ish
- | mkldnn_chwn | | Neon layout
- | ... | | perhaps 20 more memory formats (many blocked by 8/16 elements)
- | |
+| | mkldnn_any  | | primitive selects memory format automatically
+| | mkldnn_nchw | | Caffe-style image (batch, channels, height, width)
+| | mkldnn_nhwc | | Tensorflow/Milde-ish
+| | mkldnn_chwn | | Neon layout
+| | ... | | | perhaps 20 more memory formats (many blocked by 8/16 elements)
+| | |
 mkldnn_padding_kind_t | mkldnn_padding_zero | | How to interpret data in padding regions
 mkdnn_prop_kind_t | mkldnn_forward_training | 64 | fprop (maintain info for bprop
- | mkldnn_forward_inference | 96 | fprop, with no bprop
- | mkldnn_backward | | wrt. all parameters
- | mkldnn_backward_data | |
- | mkldnn_backward_weights | |
- | mkldnn_ackward_bias | |
- | ... |
+| | mkldnn_forward_inference | 96 | fprop, with no bprop
+| | mkldnn_backward | | wrt. all parameters
+| | mkldnn_backward_data | |
+| | mkldnn_backward_weights | |
+| | mkldnn_ackward_bias | |
+| | ... |
 mkldnn_primitive_kind_t | mkldnn_memory |
- | mkldnn_view |
- | mkldnn_reorder |
- | mkldnn_concat |
- | mkldnn_concat_inplace |
- | mkldnn_sum |
- | mkldnn_convolution |
- | mkldnn_eltwise | | for univariate functions
- | mkldnn_softmax |
- | mkldnn_pooling |
- | mkldnn_lrn |
- | mkldnn_batch_normalization |
- | mkldnn_inner_product |
- | mkldnn_convolution_relu |
- | |
+| | mkldnn_view |
+| | mkldnn_reorder |
+| | mkldnn_concat |
+| | mkldnn_concat_inplace |
+| | mkldnn_sum |
+| | mkldnn_convolution |
+| | mkldnn_eltwise | | for univariate functions
+| | mkldnn_softmax |
+| | mkldnn_pooling |
+| | mkldnn_lrn |
+| | mkldnn_batch_normalization |
+| | mkldnn_inner_product |
+| | mkldnn_convolution_relu |
+| | |
 mkldnn_algorithm_t | mkldnn_convolution_direct | 1 | im2col gemm
- | mkldnn_convolution_winograd | 2 | winograd convolution
- | mkldnn_eltwise_relu/tanh/elu | | various element-wise funcs
- | mkldnn_lrn_across_channels |
- | mkldnn_lrn_within_channel |
- | ... |
+| | mkldnn_convolution_winograd | 2 | winograd convolution
+| | mkldnn_eltwise_relu/tanh/elu | | various element-wise funcs
+| | mkldnn_lrn_across_channels |
+| | mkldnn_lrn_within_channel |
+| | ... |
 mkldnn_batch_normalization_flag_t | | | global/omit stats? scaleshift?
- | ... |
-mkldnn_blocking_desc_t | struct | | blocking strides, padding offsets, ...
-mkldnn_op_desc_t | void * | | opaque op descriptor (resolve to some private data type)
-mkldnn_memory_desc_t | struct | | dims, data_type, mkldnn_memory_format_t, p opt. block layout]
-mkldnn_convolution_desc_t | struct | | many, many parameters
-mkldnn_eltwise_desc_t | struct | |
-mkldnn_softmax_desc_t | struct | |
-mkldnn_pooling_desc_t | struct | |
-mkldnn_lrn_desc_t | struct |
-mkldnn_batch_normalization_desc_t | struct
-mkldnn_inner_product_desc_t | struct
-mkldnn_convolution_relu_desc_t | struct
- | ... |
+| | ... |
+| mkldnn_blocking_desc_t | struct | | blocking strides, padding offsets, ...
+| mkldnn_op_desc_t | void * | | opaque op descriptor (resolve to some private data type)
+| mkldnn_memory_desc_t | struct | | dims, data_type, mkldnn_memory_format_t, p opt. block layout]
+| mkldnn_convolution_desc_t | struct | | many, many parameters
+| mkldnn_eltwise_desc_t | struct | |
+| mkldnn_softmax_desc_t | struct | |
+| mkldnn_pooling_desc_t | struct | |
+| mkldnn_lrn_desc_t | struct |
+| mkldnn_batch_normalization_desc_t | struct
+| mkldnn_inner_product_desc_t | struct
+| mkldnn_convolution_relu_desc_t | struct
+| | ... |
 mkldnn_engine_kind_t | mkldnn_cpu | 1 | Intel CPU
- | ... | 
+| | ... | 
 mkldnn_primitive_desc | struct | | opaque
 mkldnn_primitive | struct | | opaque
 mkldnn_primitive_at | struct | | to iterate looking for applicable implementations
- | ... |
+| | ... |
 mkldnn_query_t | | enums for property queries
 mkldnn_stream_kind_t | mkldnn_lazy | | stream processing heuristic
 mkldnn_stream | struct | | opaque network execution stream
- | ... | | layers connected their in/out mem descriptors
+| | ... | | layers connected their in/out mem descriptors
 
 OK, so have lots of enum values, mostly used to populate
 structs describing: memory, primiives (layer ops)
