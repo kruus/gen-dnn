@@ -9,14 +9,15 @@ Intel: ./build.sh -tt # build and run all tests (no jit)</BR>
 Platform XX:
        ./build.sh -sdttT    # s:other system, d:debug compile, T:trace cmake decisions
 
-This public branch is a not-up-to-date repo that reflects some work
-done on an internal git repository porting mkl-dnn to:
+This public branch reflects some work done on an internal git repository
+porting mkl-dnn to:
 - non-JIT cpu
 - HPC-style cpu with 32-bit int
 
-When clearance is obtained, I intend to upload the full mods here.
-I also have some decently fast "other" C/C++ impls of convolutions
-that might eventually be contributed.  [Erik Kruus, NEC Labs America]
+I intend also to port some fast C/C++ impls of convolutions suited
+for machines with very long SIMD registers.
+
+[Erik Kruus, NEC Labs America]
 ```
 
 ### Purpose
