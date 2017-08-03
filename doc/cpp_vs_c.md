@@ -86,7 +86,7 @@ Example: [Intel-Caffe](https://github.com/intel/caffe)
 
 So let''s look at some exemplary enums from [mkldnn_types.h](https://github.com/kruus/gen-dnn/blob/master/include/mkldnn_types.h)
 
-type | enum | value | comment
+type name | enum/type | value | comment
 :--- |:--- |:--- |:---
 mkldnn_status_t | mkldnn_success | 0 | operation successful
 | | mkldnn_out_of_memory | 1 | failure
@@ -150,7 +150,7 @@ mkldnn_primitive_desc | struct | | opaque
 mkldnn_primitive | struct | | opaque
 mkldnn_primitive_at | struct | | to iterate looking for applicable implementations
 | | ... |
-mkldnn_query_t | | enums for property queries
+mkldnn_query_t | enum | | many property queries
 mkldnn_stream_kind_t | mkldnn_lazy | | stream processing heuristic
 mkldnn_stream | struct | | opaque network execution stream
 | | ... | | layers connected their in/out mem descriptors
