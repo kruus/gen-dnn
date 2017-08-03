@@ -56,6 +56,13 @@ This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
   - has many conversion warnings.
   - linking now OK
   - most tests OK (some memory formats don't need support for non-JIT)
+  - Non-SX-specific mods have mostly been accepted by [upstream mkl-dnn](https://github.com/01org/mkl-dnn)
+    - Many warning-removal SX patches identical to those for the Windows mkl-dnn port.
+  - At some point it might be nice to push a compilation flag limiting supported
+    CPU types...
+    - especially for a 'none' flag that uses only C/C++ code and no JIT code at all
+
+  - For SX-specific details, see [README-SX.md](./README-SX.md)
 
 ## Original README.md ...
 
