@@ -31,9 +31,8 @@ Example: time a full test run for a debug compilation --- time ./build.sh -dtt
 Debug: Individual tests can be run like build-sx/tests/gtests/test_relu
 ```
 
-Example commands:
-
-|:--- |:---
+| System | Example
+|:------ |:--------
 | Intel: | ./build.sh -tt # build and run all tests (no jit)
 |        | --> build/    and build.log<
 |        | ./build.sh -tt # build and run all tests (with jit)
