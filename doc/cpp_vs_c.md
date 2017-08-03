@@ -170,12 +170,13 @@ Functions are in [mkldnn.h](https://github.com/kruus/gen-dnn/blob/master/include
 ##### Comments about API functions:
 
 1. iteration: mostly done automatically by engine !
-  - implementation corresponds to primitive descriptor
+  - to find an implementation corresponds to primitive descriptor, check
+    - available on your CPU
     - correct data type,
     - compatible/convertible memory layout,
     - compatible with descriptor 'algorithm' specs
-    - available on your CPU
-  - typically happens in background, by ordering tables of layer ops in order of decreasing speed, so the first "match" is likely to be the fastest
+  - typically happens in background, by ordering tables of layer ops in order
+    of decreasing speed, so the first "match" is likely to be the fastest
     - so all-C++ kernels may be very slow
 2. query functions
   - tedious to use; C++ API can use getters for private data (nicer)
@@ -193,7 +194,7 @@ Functions are in [mkldnn.h](https://github.com/kruus/gen-dnn/blob/master/include
      - e.g. no sophisticated mechanisms to re-use memory regions, or optimize choice of data reordering operations.  (If you ever hit a non-optimized reordering op, things get very very slow)
 7. General comments:
   - Not good for readability, or robustness
-  - Possible issues with ordering of _destroy ops
+  - Possible issues with ordering of \_destroy ops
     - all restrictions/assumptions not documented
   - Does an excellent job at only a few opaque objects for 'details'
   - Excellent checking (during 'init' phase) whether a primitive can be correctly applied under current conditions.
@@ -207,8 +208,6 @@ Functions are in [mkldnn.h](https://github.com/kruus/gen-dnn/blob/master/include
 - providing inlinable C++ impls for simple_reorder, as slow
   data reorderings get discovered.
   - (most generic reordering kernel has an unavoidable function call in the inner loop of the kernel for "offset of" calculation)
-
-
 
 
 ----------
