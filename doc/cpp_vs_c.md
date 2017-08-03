@@ -26,6 +26,12 @@ Consider the [simple_net.cpp example](https://software.intel.com/en-us/articles/
     net.push_back(mkldnn::relu_forward(relu_prim_desc, conv_dst_memory,
     relu_dst_memory));
 
+Even this is a bit much for a _user_ API -- hopefully memory allocation would
+be done by Torch/Caffer/Tensorflow/...
+
+However, the C++ API already streamlines a lot of boilerplate code. Compare with
+the C API code:
+
 #### C
 
     /* create a relu */
