@@ -2,14 +2,45 @@
 
 ## Quickstart:
 
+Start with `./build.sh -h         # help</BR>`
+
 ```
-./build.sh -h         # help</BR>
-Intel: ./build.sh -tt # build and run all tests (no jit)</BR>
-           --> build/    and build.log
-SX:    ./build.sh -ST # build for *S*X and *T*race cmake setup</BR>
-           --> build-sx/ and build-sx.log
-  or   ./build.sh -SdqT # debug build (no doxygen) for SX
+./build.sh usage:
+        t) # [0] increment test level: (1) examples, (2) tests (longer), ...
+            # Apr-14-2017 build timings:
+            # 0: build    ~ ?? min  (jit), 1     min  (vanilla)
+            # 1: examples ~  1 min  (jit), 13-16 mins (vanilla)
+            # 2: test_*   ~ 10 mins (jit), 108   mins (vanilla)
+        v) # [yes] (vanilla C/C++ only: no src/cpu/ JIT assembler)
+        j) # force Intel JIT (src/cpu/ JIT assembly code)
+        d) # [no] debug release
+        D) # [no] Doxygen : force a full rebuild of only the doc component
+        q) # quick: skip doxygen docs [default: run doxygen if build OK]
+        Q) # really quick: skip build and doxygen docs [JUST run cmake and stop]
+        p) # permissive: disable the FAIL_WITHOUT_MKL switch
+        S) # SX cross-compile (size_t=64, built in build-sx/)
+        s) # SX cross-compile (size_t=32, built in build-sx/) DISCOURAGED
+            # -s is NOT GOOD: sizeof(ptrdiff_t) is still 8 bytes!
+        r) # reference impls only: no -DUSE_CBLAS compile flag (->no im2col gemm)
+        T) # cmake --trace
+    h | *) # help
+Example: time a full test run for a debug compilation --- time ./build.sh -dtt
+         SX debug compile, quick (no doxygen)         --- time ./build.sh -Sdq
+         *just* run cmake, for SX debug compile       ---      ./build.sh -SdQ
+         *just* create doxygen docs                   ---      ./build.sh -D
+Debug: Individual tests can be run like build-sx/tests/gtests/test_relu
 ```
+
+Example commands:
+
+|:--- |:---
+| Intel: | ./build.sh -tt # build and run all tests (no jit)
+|        | --> build/    and build.log<
+|        | ./build.sh -tt # build and run all tests (with jit)
+|        |
+| SX:    | ./build.sh -ST # build for *S*X and *T*race cmake setup
+|        |   --> build-sx/ and build-sx.log
+|  or    | ./build.sh -SdqT # debug build (no doxygen) for SX
 
 ## Purpose
 
