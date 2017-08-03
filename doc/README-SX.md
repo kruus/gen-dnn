@@ -84,7 +84,7 @@ the additional convolutions onto the existing "engine" lists of primitives.
   - [NEW] with ssh RemoteForward set up in snake10:~/.ssh/config as ```
 Host zoro # was japan17
   User nlabhpg
-  HostName 10.34.154.187
+  HostName XXXXXXXXXXX
   RemoteForward 22222 localhost:22
     ```
     - and a zoro:~/.ssh/config of ```
@@ -252,6 +252,10 @@ dbx ./simple-net-c
    7 _start(0x1, 0x80000003f8, 0x8000000408) at 0x4000005c4
 ```
 
+- Resolved by finding some workarounds (eventually!) for SX compiler bugs.
+  - some bugs simple and fixed in next SX compiler versions.
+- One bug I could not reduce to a simple test case.
+
 ### Convolution is abysmally slow
 
 - Even though im2col gemm is there, `[guest@ps6s0000 tests]$ ./api-io-c` take "forever".
@@ -288,4 +292,5 @@ void mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mk
 - Why is SX not using the im2col gemm convolution?
   - OK, time to come back to Intel desktop and gdb the primitive settings (it should be nchw
     and I need to check if this format is supported for the gemm_convolution)
+- Rationalize compiler flag usage esp. for USE_CBLAS
 
