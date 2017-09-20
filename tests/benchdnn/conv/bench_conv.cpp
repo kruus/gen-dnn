@@ -34,68 +34,6 @@
 
 namespace conv {
 
-/* cfgs definition
- * arrays: SRC, WEI, BIA, DST, ACC
- * params: {data_type, min, max, f_min, f_max, f_base, f_step, f_sparsity, eps}
- */
-
-const int int_max_exact = 1<<24;
-const _dt_conf_t conf_f32 = {
-    {mkldnn_f32, -int_max_exact, int_max_exact,  -64,  64, 0, 1, .25, 0.},
-    {mkldnn_f32, -int_max_exact, int_max_exact,  -32,  32, 0, 1, 1.0, 0.},
-    {mkldnn_f32, -int_max_exact, int_max_exact, -512, 512, 0, 1, 1.0, 0.},
-    {mkldnn_f32, -int_max_exact, int_max_exact,  -64,  64, 0, 1, .25, 0.},
-    {mkldnn_f32,},
-};
-
-const _dt_conf_t conf_f32_full = {
-    {mkldnn_f32, -int_max_exact, int_max_exact,  -64,  64, 0, 1, 1.0, 0.},
-    {mkldnn_f32, -int_max_exact, int_max_exact,  -32,  32, 0, 1, 1.0, 0.},
-    {mkldnn_f32, -int_max_exact, int_max_exact, -512, 512, 0, 1, 1.0, 0.},
-    {mkldnn_f32, -int_max_exact, int_max_exact,  -64,  64, 0, 1, 1.0, 0.},
-    {mkldnn_f32,},
-};
-
-const _dt_conf_t conf_f32_wino = {
-    {mkldnn_f32, -int_max_exact, int_max_exact,   0,  16, 3, 1, .25, 1e-5},
-    {mkldnn_f32, -int_max_exact, int_max_exact,   2,  64, 2, 1, .75, 5e-5},
-    {mkldnn_f32, -int_max_exact, int_max_exact,   1, 128, 1, 1, .25,   0.},
-    {mkldnn_f32, -int_max_exact, int_max_exact,   0,  16, 3, 1, .25, 1e-5},
-    {mkldnn_f32,},
-};
-
-const _dt_conf_t conf_s16s32 = {
-    {mkldnn_s16, INT16_MIN, INT16_MAX, -4,  4, 0, 1, .25, 0.},
-    {mkldnn_s16, INT16_MIN, INT16_MAX, -5,  5, 0, 1, .25, 0.},
-    {mkldnn_s32, INT32_MIN, INT32_MAX, -8, 32, 0, 1, .25, 0.},
-    {mkldnn_s32, INT32_MIN, INT32_MAX, -4,  4, 0, 1, .25, 0.},
-    {mkldnn_s32,},
-};
-
-const _dt_conf_t conf_u8s8s32s32 = {
-    {mkldnn_u8,          0, UINT8_MAX,    0,   4, 0, 1, .25, 0.},
-    {mkldnn_s8,   INT8_MIN,  INT8_MAX,   -5,   5, 0, 1, .25, 0.},
-    {mkldnn_s32, INT32_MIN, INT32_MAX,   -8,  32, 0, 1, .25, 0.},
-    {mkldnn_s32, INT32_MIN, INT32_MAX, -255, 255, 0, 1, .25, 0.},
-    {mkldnn_s32,},
-};
-
-const _dt_conf_t conf_u8s8s32s8 = {
-    {mkldnn_u8,          0, UINT8_MAX,    0,   4, 0, 1, .25, 0.},
-    {mkldnn_s8,   INT8_MIN,  INT8_MAX,   -5,   5, 0, 1, .25, 0.},
-    {mkldnn_s32, INT32_MIN, INT32_MAX,   -8,  32, 0, 1, .25, 0.},
-    {mkldnn_s8,   INT8_MIN,  INT8_MAX, -127, 127, 0, 1, .25, 0.},
-    {mkldnn_s32,},
-};
-
-const _dt_conf_t conf_u8s8s32u8 = {
-    {mkldnn_u8,          0, UINT8_MAX,    0,   4, 0, 1, .25, 0.},
-    {mkldnn_s8,   INT8_MIN,  INT8_MAX,   -5,   5, 0, 1, .25, 0.},
-    {mkldnn_s32, INT32_MIN, INT32_MAX,   -8,  32, 0, 1, .25, 0.},
-    {mkldnn_u8,          0, UINT8_MAX,    0, 255, 0, 1, .25, 0.},
-    {mkldnn_s32,},
-};
-
 /* global driver parameters */
 const dt_conf_t *cfg = conf_f32;
 const char *pattern = NULL;
@@ -184,7 +122,7 @@ void check_correctness(const desc_t *c) {
 
 int batch(const char *fname);
 
-int bench(int argc, char **argv) {
+int bench(int argc, char **argv, bool main_bench) {
     for (int arg = 0; arg < argc; ++arg) {
         if (!strncmp("--batch=", argv[arg], 8))
             SAFE(batch(argv[arg] + 8), CRIT);
@@ -226,7 +164,7 @@ int bench(int argc, char **argv) {
     }
 
     /* deprecated? */
-    if (benchdnn_stat.tests == 0) {
+    if (main_bench && benchdnn_stat.tests == 0) {
         /* use default list of problems */
         int N = sizeof(default_list) / sizeof(default_list[0]);
         for (int n = 0; n < N; ++n)
@@ -236,7 +174,22 @@ int bench(int argc, char **argv) {
     return OK;
 }
 
+#ifdef _WIN32
+#include <windows.h>
+#define PATH_MAX MAX_PATH
+static char *dirname(char *path) {
+    char drive[_MAX_DRIVE];
+    char dir[_MAX_DIR];
+    _splitpath(path, drive, dir, NULL, NULL);
+    path[0] = '\0';
+    if (drive != NULL) strncat(path, drive, _MAX_DRIVE);
+    if (dir != NULL) strncat(path, dir, MAX_PATH);
+    if (path[0] == '\0') strcat(path, ".");
+    return path;
+}
+#else
 #include <libgen.h>
+#endif /* WIN32 */
 
 FILE *open_batch_file(const char *fname) {
     const int max_paths = 4;
@@ -298,7 +251,7 @@ int batch(const char *fname) {
             l += offset;
         }
     }
-    bench(n_opts, opts);
+    bench(n_opts, opts, false);
 
     for (int n = 0; n < n_opts; ++n)
         free(opts[n]);

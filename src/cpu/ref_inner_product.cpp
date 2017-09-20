@@ -16,6 +16,7 @@
 
 #include "c_types_map.hpp"
 #include "type_helpers.hpp"
+#include "mkldnn_thread.hpp"
 
 #include "ref_inner_product.hpp"
 
@@ -23,9 +24,11 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-template <data_type_t src_type, data_type_t wei_type, data_type_t acc_type,
-         data_type_t dst_type>
-void ref_inner_product_fwd_t<src_type, wei_type, acc_type, dst_type>
+using namespace mkldnn::impl::data_type;
+
+template <data_type_t src_type, data_type_t wei_type, data_type_t dst_type,
+         data_type_t acc_type>
+void ref_inner_product_fwd_t<src_type, wei_type, dst_type, acc_type>
         ::execute_forward() {
     auto src = reinterpret_cast<const src_data_t *>(this->input_memory(0));
     auto weights = reinterpret_cast<const wei_data_t *>(this->input_memory(1));
@@ -76,18 +79,16 @@ void ref_inner_product_fwd_t<src_type, wei_type, acc_type, dst_type>
     }
 }
 
-template struct ref_inner_product_fwd_t<data_type::f32>;
-template struct ref_inner_product_fwd_t<data_type::s16, data_type::s16,
-         data_type::s32, data_type::s32>;
-template struct ref_inner_product_fwd_t<data_type::u8, data_type::s8,
-         data_type::s32, data_type::u8>;
+template struct ref_inner_product_fwd_t<f32>;
+template struct ref_inner_product_fwd_t<s16, s16, s32, s32>;
+template struct ref_inner_product_fwd_t<u8, s8, u8, s32>;
 
-template <data_type_t src_type, data_type_t wei_type, data_type_t acc_type,
-         data_type_t dst_type>
-void ref_inner_product_bwd_data_t<src_type, wei_type, acc_type, dst_type>
-    ::execute_backward_data() {
-    auto diff_dst = reinterpret_cast<const diff_dst_data_t *>
-                                                       (this->input_memory(0));
+template <data_type_t diff_src_type, data_type_t wei_type,
+         data_type_t diff_dst_type, data_type_t acc_type>
+void ref_inner_product_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
+     acc_type>::execute_backward_data() {
+    auto diff_dst = reinterpret_cast<const diff_dst_data_t *>(
+            this->input_memory(0));
     auto weights = reinterpret_cast<const wei_data_t *>(this->input_memory(1));
     auto diff_src = reinterpret_cast<diff_src_data_t*>(this->memory());
 
@@ -131,10 +132,8 @@ void ref_inner_product_bwd_data_t<src_type, wei_type, acc_type, dst_type>
     }
 }
 
-template struct ref_inner_product_bwd_data_t<data_type::f32>;
-template struct ref_inner_product_bwd_data_t<data_type::s32>;
-template struct ref_inner_product_bwd_data_t<data_type::s16, data_type::s16,
-                data_type::s32, data_type::s32>;
+template struct ref_inner_product_bwd_data_t<f32, f32, f32, f32>;
+template struct ref_inner_product_bwd_data_t<s32, s16, s16, s32>;
 
 template <impl::data_type_t data_type>
 void ref_inner_product_bwd_weights_t<data_type>::execute_backward_weights() {
@@ -147,6 +146,8 @@ void ref_inner_product_bwd_weights_t<data_type>::execute_backward_weights() {
     const memory_desc_wrapper diff_dst_d(conf_.diff_dst_pd());
     const memory_desc_wrapper diff_weights_d(conf_.diff_weights_pd(0));
     const memory_desc_wrapper diff_bias_d(conf_.diff_weights_pd(1));
+
+    diff_dst += diff_dst_d.blocking_desc().offset_padding;
 
     const int MB = conf_.MB();
     const int OC = conf_.OC();
@@ -183,12 +184,39 @@ void ref_inner_product_bwd_weights_t<data_type>::execute_backward_weights() {
     }
 
     if (diff_bias) {
-#       pragma omp parallel for schedule(static)
-        for (int oc = 0; oc < OC; ++oc) {
-            data_t *db = &diff_bias[diff_bias_d.off(oc)];
-            *db = data_t(0);
-            for (int mb = 0; mb < MB; ++mb) {
-                *db += diff_dst[diff_dst_d.off(mb, oc)];
+        diff_bias += diff_bias_d.blocking_desc().offset_padding;
+        constexpr int blksize = 8;
+        size_t OC_blocks = OC / blksize;
+        int rem_OC = OC % blksize;
+#       pragma omp parallel
+        {
+            const int ithr = omp_get_thread_num();
+            const int nthr = omp_get_num_threads();
+            size_t oc_st{0}, oc_e{0};
+            balance211(OC_blocks, nthr, ithr, oc_st, oc_e);
+            oc_st = oc_st * blksize;
+            oc_e = oc_e * blksize;
+
+#           pragma simd
+            for (int oc = oc_st; oc < oc_e; ++oc) {
+                diff_bias[oc] = diff_dst[oc];
+            }
+
+            for (int mb = 1; mb < MB; ++mb) {
+#               pragma simd
+                for (int oc = oc_st; oc < oc_e; ++oc) {
+                    diff_bias[oc] += diff_dst[mb * OC + oc];
+                }
+            }
+
+            if (rem_OC != 0 && ithr == nthr-1) {
+                for (int oc = OC_blocks * blksize; oc < OC; oc++)
+                    diff_bias[oc] = diff_dst[oc];
+                for (int mb = 1; mb < MB; ++mb) {
+                    for (int oc = OC_blocks * blksize; oc < OC; oc++) {
+                        diff_bias[oc] += diff_dst[mb * OC + oc];
+                    }
+                }
             }
         }
     }

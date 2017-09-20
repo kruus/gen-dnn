@@ -35,9 +35,7 @@
 
 // JITFUNCS removed -- frequent updates here make merges difficult
 #include "cpu/jit_avx512_common_1x1_convolution.hpp"
-#ifndef _WIN32
 #include "cpu/jit_avx512_common_convolution_winograd.hpp"
-#endif
 #include "cpu/jit_avx512_common_convolution.hpp"
 #include "cpu/jit_avx2_1x1_convolution.hpp"
 #include "cpu/jit_sse42_1x1_convolution.hpp"
@@ -61,9 +59,6 @@
 #include "cpu/ref_inner_product.hpp"
 #include "cpu/gemm_inner_product.hpp"
 #include "cpu/jit_uni_inner_product.hpp"
-
-#include "cpu/jit_reorder.hpp"
-#include "cpu/simple_reorder.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -105,11 +100,11 @@ status_t cpu_engine_t::sum_primitive_desc_create(sum_pd_t **sum_pd,
             new cpu_sum_t::pd_t(this, output_d, n, scale, i_pds));
 }
 
-using rpd_create_f = mkldnn::impl::engine_t::reorder_primitive_desc_create_f;
 using pd_create_f = mkldnn::impl::engine_t::primitive_desc_create_f;
 
 namespace {
 using namespace mkldnn::impl::data_type;
+#if 0
 using namespace mkldnn::impl::memory_format;
 
 static const rpd_create_f cpu_reorder_impl_list[] = {
@@ -184,6 +179,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     /* eol */
     nullptr,
 };
+#endif // this has been separated to new files
 
 #define INSTANCE(...) &primitive_desc_t::create<__VA_ARGS__::pd_t>
 static const pd_create_f cpu_impl_list[] = {
@@ -194,13 +190,11 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_avx512_common_1x1_convolution_bwd_weights_t),
     INSTANCE(jit_avx512_common_1x1_convolution_fwd_s16s16s32_t),
     INSTANCE(jit_avx512_common_1x1_convolution_bwd_data_s16s16s32_t),
-#ifndef _WIN32
     INSTANCE(jit_avx512_common_convolution_winograd_fwd_t),
     INSTANCE(jit_avx512_common_convolution_winograd_bwd_data_t),
     INSTANCE(jit_avx512_common_convolution_winograd_bwd_weights_t),
-#endif
-    INSTANCE(jit_avx512_common_convolution_fwd_t<data_type::f32>),
-    INSTANCE(jit_avx512_common_convolution_bwd_data_t<data_type::f32>),
+    INSTANCE(jit_avx512_common_convolution_fwd_t<f32>),
+    INSTANCE(jit_avx512_common_convolution_bwd_data_t<f32>),
     INSTANCE(jit_avx512_common_convolution_bwd_weights_t),
     INSTANCE(jit_avx2_1x1_convolution_fwd_t),
     INSTANCE(jit_avx2_1x1_convolution_bwd_data_t),
@@ -222,31 +216,25 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_avx2_gemm_convolution_bwd_data_t),
     INSTANCE(jit_avx2_gemm_convolution_bwd_weights_t),
 #endif
-    INSTANCE(ref_convolution_fwd_t<data_type::f32>),
-    INSTANCE(ref_convolution_bwd_data_t<data_type::f32>),
-    INSTANCE(ref_convolution_bwd_weights_t<data_type::f32>),
+    INSTANCE(ref_convolution_fwd_t<f32>),
+    INSTANCE(ref_convolution_bwd_data_t<f32, f32, f32, f32>),
+    INSTANCE(ref_convolution_bwd_weights_t<f32, f32, f32, f32>),
     /* conv (int) */
 #if JITFUNCS > 99
-    INSTANCE(jit_avx512_common_convolution_fwd_t<data_type::s16,
-             data_type::s16, data_type::s32>),
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, data_type::s32>),
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, data_type::s8>),
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, data_type::u8>),
-    INSTANCE(jit_avx512_common_convolution_bwd_data_t<data_type::s16,
-             data_type::s16, data_type::s32>),
+    INSTANCE(jit_avx512_common_convolution_fwd_t<s16, s16, s32>),
+    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, s32>),
+    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, s8>),
+    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, u8>),
+    INSTANCE(jit_avx512_common_convolution_bwd_data_t<s16, s16, s32>),
 #endif
-    INSTANCE(ref_convolution_fwd_t<data_type::s16,data_type::s16,
-            data_type::s32, data_type::s32>),
-    INSTANCE(ref_convolution_fwd_t<data_type::u8, data_type::s8,
-            data_type::s32, data_type::s32>),
-    INSTANCE(ref_convolution_fwd_t<data_type::u8, data_type::s8,
-            data_type::s32, data_type::s8>),
-    INSTANCE(ref_convolution_fwd_t<data_type::u8, data_type::s8,
-            data_type::s32, data_type::u8>),
-    INSTANCE(ref_convolution_bwd_data_t<data_type::s16,data_type::s16,
-            data_type::s32, data_type::s32>),
-#if JITFUNCS > 99 /*was relu*/
+    INSTANCE(ref_convolution_fwd_t<s16,s16, s32, s32>),
+    INSTANCE(ref_convolution_fwd_t<u8, s8, s32, s32>),
+    INSTANCE(ref_convolution_fwd_t<u8, s8, s8, s32>),
+    INSTANCE(ref_convolution_fwd_t<u8, s8, u8, s32>),
+    INSTANCE(ref_convolution_bwd_data_t<s32, s16, s16, s32>),
+    INSTANCE(ref_convolution_bwd_weights_t<s16, s32, s16, s32>),
     /* eltwise */
+#if JITFUNCS > 99
     INSTANCE(jit_uni_eltwise_fwd_t<avx512_common>),
     INSTANCE(jit_uni_eltwise_bwd_t<avx512_common>),
     INSTANCE(jit_uni_eltwise_fwd_t<avx2>),
@@ -254,17 +242,17 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_uni_eltwise_fwd_t<sse42>),
     INSTANCE(jit_uni_eltwise_bwd_t<sse42>),
 #endif
-    INSTANCE(ref_eltwise_fwd_t<data_type::f32>),
-    INSTANCE(ref_eltwise_bwd_t<data_type::f32>),
+    INSTANCE(ref_eltwise_fwd_t<f32>),
+    INSTANCE(ref_eltwise_bwd_t<f32>),
     /* eltwise (int) */
-    INSTANCE(ref_eltwise_fwd_t<data_type::s32>),
-    INSTANCE(ref_eltwise_fwd_t<data_type::s16>),
-    INSTANCE(ref_eltwise_fwd_t<data_type::s8>),
-    INSTANCE(ref_eltwise_fwd_t<data_type::u8>),
-    INSTANCE(ref_eltwise_bwd_t<data_type::s32>),
-    INSTANCE(ref_eltwise_bwd_t<data_type::s16>),
+    INSTANCE(ref_eltwise_fwd_t<s32>),
+    INSTANCE(ref_eltwise_fwd_t<s16>),
+    INSTANCE(ref_eltwise_fwd_t<s8>),
+    INSTANCE(ref_eltwise_fwd_t<u8>),
+    INSTANCE(ref_eltwise_bwd_t<s32>),
+    INSTANCE(ref_eltwise_bwd_t<s16>),
     /* softmax */
-    INSTANCE(ref_softmax_fwd_t<data_type::f32>),
+    INSTANCE(ref_softmax_fwd_t<f32>),
     /* pool */
 #if JITFUNCS > 99
     INSTANCE(jit_uni_pooling_fwd_t<avx512_common>),
@@ -274,18 +262,20 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_uni_pooling_fwd_t<sse42>),
     INSTANCE(jit_uni_pooling_bwd_t<sse42>),
 #endif
-    INSTANCE(nchw_pooling_fwd_t<data_type::f32>),
-    INSTANCE(nchw_pooling_bwd_t<data_type::f32>),
-    INSTANCE(ref_pooling_fwd_t<data_type::f32>),
-    INSTANCE(ref_pooling_bwd_t<data_type::f32>),
+    INSTANCE(nchw_pooling_fwd_t<f32>),
+    INSTANCE(nchw_pooling_bwd_t<f32>),
+    INSTANCE(ref_pooling_fwd_t<f32>),
+    INSTANCE(ref_pooling_bwd_t<f32>),
     /* pool (int) */
+#if JITFUNCS > 99
     INSTANCE(jit_avx512_core_i8i8_pooling_fwd_t),
-    INSTANCE(ref_pooling_fwd_t<data_type::s32>),
-    INSTANCE(ref_pooling_fwd_t<data_type::s16, data_type::s32>),
-    INSTANCE(ref_pooling_fwd_t<data_type::s8, data_type::s32>),
-    INSTANCE(ref_pooling_fwd_t<data_type::u8, data_type::s32>),
-    INSTANCE(ref_pooling_bwd_t<data_type::s32>),
-    INSTANCE(ref_pooling_bwd_t<data_type::s16, data_type::s32>),
+#endif
+    INSTANCE(ref_pooling_fwd_t<s32>),
+    INSTANCE(ref_pooling_fwd_t<s16, s32>),
+    INSTANCE(ref_pooling_fwd_t<s8, s32>),
+    INSTANCE(ref_pooling_fwd_t<u8, s32>),
+    INSTANCE(ref_pooling_bwd_t<s32>),
+    INSTANCE(ref_pooling_bwd_t<s16, s32>),
     /* lrn */
 #if JITFUNCS > 99
     INSTANCE(jit_avx512_common_lrn_fwd_t),
@@ -294,8 +284,8 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_uni_lrn_bwd_t<avx2>),
     INSTANCE(jit_uni_lrn_fwd_t<sse42>),
 #endif
-    INSTANCE(ref_lrn_fwd_t<data_type::f32>),
-    INSTANCE(ref_lrn_bwd_t<data_type::f32>),
+    INSTANCE(ref_lrn_fwd_t<f32>),
+    INSTANCE(ref_lrn_bwd_t<f32>),
     /* batch normalization */
 #if JITFUNCS > 99
     INSTANCE(jit_uni_batch_normalization_fwd_t<avx512_common>),
@@ -304,12 +294,12 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_uni_batch_normalization_bwd_t<avx2>),
     INSTANCE(jit_uni_batch_normalization_fwd_t<sse42>),
 #endif
-    INSTANCE(ref_batch_normalization_fwd_t<data_type::f32>),
-    INSTANCE(ref_batch_normalization_bwd_t<data_type::f32>),
+    INSTANCE(ref_batch_normalization_fwd_t<f32>),
+    INSTANCE(ref_batch_normalization_bwd_t<f32>),
     /* inner product */
-    INSTANCE(gemm_inner_product_fwd_t<data_type::f32>),
-    INSTANCE(gemm_inner_product_bwd_data_t<data_type::f32>),
-    INSTANCE(gemm_inner_product_bwd_weights_t<data_type::f32>),
+    INSTANCE(gemm_inner_product_fwd_t<f32>),
+    INSTANCE(gemm_inner_product_bwd_data_t<f32>),
+    INSTANCE(gemm_inner_product_bwd_weights_t<f32>),
 #if JITFUNCS > 99
     INSTANCE(jit_uni_inner_product_fwd_t<avx512_common>),
     INSTANCE(jit_uni_inner_product_bwd_weights_t<avx512_common>),
@@ -318,24 +308,19 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_uni_inner_product_bwd_weights_t<avx2>),
     INSTANCE(jit_uni_inner_product_bwd_data_t<avx2>),
 #endif
-    INSTANCE(ref_inner_product_fwd_t<data_type::f32>),
-    INSTANCE(ref_inner_product_bwd_data_t<data_type::f32>),
-    INSTANCE(ref_inner_product_bwd_weights_t<data_type::f32>),
+    INSTANCE(ref_inner_product_fwd_t<f32>),
+    INSTANCE(ref_inner_product_bwd_data_t<f32, f32, f32, f32>),
+    INSTANCE(ref_inner_product_bwd_weights_t<f32>),
     /* inner product (int) */
-    INSTANCE(ref_inner_product_fwd_t<data_type::s16, data_type::s16,
-            data_type::s32, data_type::s32>),
-    INSTANCE(ref_inner_product_bwd_data_t<data_type::s16, data_type::s16,
-            data_type::s32, data_type::s32>),
-    INSTANCE(ref_inner_product_fwd_t<data_type::u8, data_type::s8,
-            data_type::s32, data_type::u8>),
-#if JITFUNCS > 99
+    INSTANCE(ref_inner_product_fwd_t<s16, s16, s32, s32>),
+    INSTANCE(ref_inner_product_bwd_data_t<s32, s16, s16, s32>),
+    INSTANCE(ref_inner_product_fwd_t<u8, s8, u8, s32>),
     /* conv_eltwise */
-#ifndef _WIN32
+#if JITFUNCS > 99
     INSTANCE(jit_avx512_common_convolution_winograd_relu_t),
-#endif
     INSTANCE(jit_avx512_common_1x1_convolution_relu_f32_t),
     INSTANCE(jit_avx512_common_1x1_convolution_relu_s16s16s32_t),
-    INSTANCE(jit_avx512_common_convolution_relu_t<data_type::f32>),
+    INSTANCE(jit_avx512_common_convolution_relu_t<f32>),
     INSTANCE(jit_avx2_1x1_convolution_relu_t),
     INSTANCE(jit_sse42_1x1_convolution_relu_t),
     INSTANCE(jit_avx2_convolution_relu_t),
@@ -346,31 +331,22 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_avx512_common_gemm_convolution_relu_t),
     INSTANCE(jit_avx2_gemm_convolution_relu_t),
 #endif
-    INSTANCE(ref_convolution_relu_t<data_type::f32>),
+    INSTANCE(ref_convolution_relu_t<f32>),
     /* conv_eltwise (int) */
 #if JITFUNCS > 99
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, data_type::s32>),
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, data_type::s8>),
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, data_type::u8>),
-    INSTANCE(jit_avx512_common_convolution_relu_t<data_type::s16,
-            data_type::s16, data_type::s32>),
+    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, s32>),
+    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, s8>),
+    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, u8>),
+    INSTANCE(jit_avx512_common_convolution_relu_t<s16, s16, s32>),
 #endif
-    INSTANCE(ref_convolution_relu_t<data_type::s16, data_type::s16,
-            data_type::s32, data_type::s32>),
-    INSTANCE(ref_convolution_relu_t<data_type::u8, data_type::s8,
-            data_type::s32, data_type::s32>),
-    INSTANCE(ref_convolution_relu_t<data_type::u8, data_type::s8,
-            data_type::s32, data_type::s8>),
-    INSTANCE(ref_convolution_relu_t<data_type::u8, data_type::s8,
-            data_type::s32, data_type::u8>),
+    INSTANCE(ref_convolution_relu_t<s16, s16, s32, s32>),
+    INSTANCE(ref_convolution_relu_t<u8, s8, s32, s32>),
+    INSTANCE(ref_convolution_relu_t<u8, s8, s8, s32>),
+    INSTANCE(ref_convolution_relu_t<u8, s8, u8, s32>),
     /* eol */
     nullptr,
 };
 #undef INSTANCE
-}
-
-const rpd_create_f* cpu_engine_t::get_reorder_implementation_list() const {
-    return cpu_reorder_impl_list;
 }
 
 const pd_create_f* cpu_engine_t::get_implementation_list() const {

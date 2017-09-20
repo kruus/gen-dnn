@@ -18,6 +18,8 @@
 #include "type_helpers.hpp"
 #include "nstl.hpp"
 #include "utils.hpp"
+#include "jit_generator.hpp"
+#include "cpu_barrier.hpp"
 
 #include "jit_transpose_src_utils.hpp"
 
@@ -27,7 +29,45 @@ namespace cpu {
 
 using namespace Xbyak;
 
-void jit_transpose_src::transpose(int nrows, int l_pad, int r_pad, bool nontemporal_stores) {
+#define GET_OFF(x) offsetof(ctx_t, x)
+
+struct jit_trans_iw_ic_t: public jit_trans_src_t, public jit_generator {
+    jit_trans_iw_ic_t(const jit_conv_conf_t *conf): jit_trans_src_t(conf) {
+        generate();
+        ker_ = (decltype(ker_))this->getCode();
+    }
+
+private:
+    using reg64_t = const Xbyak::Reg64;
+    using reg32_t = const Xbyak::Reg32;
+    using opmask_t = const Xbyak::Opmask;
+
+    enum { typesize = sizeof(float), transpose_size = 16, small_spatial = 14 };
+    int src_stride, tr_src_stride;
+    int tail;
+    bool enable_prefetch;
+
+    opmask_t k3333 = k1;
+    opmask_t k5555 = k2;
+    opmask_t kAAAA = k3;
+    opmask_t kCCCC = k4;
+    opmask_t k0F0F = k5;
+    opmask_t kF0F0 = k6;
+    opmask_t kTail = k7;
+
+    reg64_t reg_src = r8;
+    reg64_t reg_tr_src = r9;
+    reg64_t reg_src_prf = r10;
+    reg64_t reg_tr_src_prf = r11;
+    reg64_t reg_loop = r12;
+    reg64_t reg_tr_src_tmp = r13;
+    reg32_t regw_tmp = r14d;
+
+    void transpose(int nrows, int l_pad, int r_pad, bool nontemporal_stores);
+    void generate();
+};
+
+void jit_trans_iw_ic_t::transpose(int nrows, int l_pad, int r_pad, bool nontemporal_stores) {
     assert(nrows >= 0 && nrows <= transpose_size);
     static_assert(transpose_size == 16, "Unsupported transpose size");
     if (!nrows)
@@ -112,7 +152,6 @@ void jit_transpose_src::transpose(int nrows, int l_pad, int r_pad, bool nontempo
         if (l_pad > 0) {
             padding(reg_tr_src, l_pad);
         }
-
     };
 
     auto transpose16x8 = [=](int base_idx) {
@@ -187,7 +226,6 @@ void jit_transpose_src::transpose(int nrows, int l_pad, int r_pad, bool nontempo
     };
 
     auto fixup16x16 = [=]() {
-
         // swap 8
         for (int i = 0; i < 8; i++) {
             auto tmp = tmp_zmm(i);
@@ -217,16 +255,14 @@ void jit_transpose_src::transpose(int nrows, int l_pad, int r_pad, bool nontempo
     transpose16x8(0);
     transpose16x8(8);
     fixup16x16();
-
 }
 
-void jit_transpose_src::generate()
-{
+void jit_trans_iw_ic_t::generate() {
     preamble();
 
-    const int ic_block = params->ic_block;
-    const int iw = params->iw;
-    const int tr_iw = params->tr_iw;
+    const int ic_block = conf_->ic_block;
+    const int iw = conf_->iw;
+    const int tr_iw = conf_->tr_iw;
     const int transposes = utils::div_up(iw, transpose_size);
     int loop_iters = nstl::max(0, transposes - 1);
     tail = iw - loop_iters * transpose_size;
@@ -242,15 +278,13 @@ void jit_transpose_src::generate()
     const int src_step = ic_block * transpose_size * typesize;
     const int tr_src_step = ic_block * typesize;
 
-    const int left_pad = params->l_pad;
+    const int left_pad = conf_->l_pad;
     const int right_pad = tr_iw - iw - left_pad;
 
-#define GET_TR_OFF(x) offsetof(jit_src_transpose_s, x)
-    mov(reg_src, ptr [param1 + GET_TR_OFF(src)]);
-    mov(reg_tr_src, ptr [param1 + GET_TR_OFF(tr_src)]);
-    mov(reg_src_prf, ptr [param1 + GET_TR_OFF(src_prf)]);
-    mov(reg_tr_src_prf, ptr [param1 + GET_TR_OFF(tr_src_prf)]);
-#undef GET_TR_OFF
+    mov(reg_src, ptr [param1 + GET_OFF(src)]);
+    mov(reg_tr_src, ptr [param1 + GET_OFF(tr_src)]);
+    mov(reg_src_prf, ptr [param1 + GET_OFF(src_prf)]);
+    mov(reg_tr_src_prf, ptr [param1 + GET_OFF(tr_src_prf)]);
 
     auto kmovw = [=](Opmask k, unsigned w) {
         mov(regw_tmp, w);
@@ -291,6 +325,364 @@ void jit_transpose_src::generate()
         transpose(tail, left_pad, right_pad, nontemporal_stores);
 
     postamble();
+}
+
+struct jit_trans_iw_x4_4x_t: public jit_trans_src_t, public jit_generator {
+    jit_trans_iw_x4_4x_t(const jit_conv_conf_t *conf): jit_trans_src_t(conf) {
+        generate();
+        ker_ = (decltype(ker_))this->getCode();
+    }
+
+    void generate();
+    enum { typesize = (int)sizeof(float) };
+};
+
+/** @brief transposition of the form [:][iw/4][4] -> [:][4][iw/4]
+ * required for 1st 4fma backward by weights convolution */
+void jit_trans_iw_x4_4x_t::generate() {
+    using namespace utils;
+
+    /* TODO: put into code */
+    static int mask[16] = {
+        0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15, };
+
+    const auto &c = *conf_;
+    const int simd_w = cpu_isa_traits<avx512_common>::vlen / typesize;
+    const int niters = c.tr_ld / simd_w;
+
+    assert(niters <= 4); /* [bwd_w:tr_src:r1] */
+
+    Reg64 reg_ptr_src = r8;
+    Reg64 reg_ptr_tr_src = r9;
+
+    Reg64 reg_ih = rax;
+    Reg64 reg_ih_end = rbx;
+
+    Reg64 reg_nthr_oc_b = rsi;
+    Reg64 reg_ptr_tr_src_bctx = abi_not_param1;
+
+    Reg64 reg_tmp = rdx;
+
+    Zmm vmsk = Zmm(31);
+    Opmask kmsk = k7;
+
+    auto emit_tr_sync = [&]() {
+        simple_barrier::generate(*this, reg_ptr_tr_src_bctx, reg_nthr_oc_b);
+    };
+
+    auto emit_tr_iw = [&]() {
+        auto vreg = [](int iter, int i) {
+            assert(4 * iter + i < 24);
+            return Zmm(4 * iter + i);
+        };
+        auto vtmp = [](int i) { return Zmm(24 + i); };
+
+        auto emit_load = [&](int iter) {
+            for (int i = 0; i < 4; ++i) {
+                auto v = vreg(iter, i);
+                const size_t off = (iter * 4 + i) * simd_w;
+
+                if (off + simd_w <= c.iw)
+                    vmovups(v, ptr[reg_ptr_src + off * typesize]);
+                else if (off < c.iw)
+                    vmovups(v | kmsk | T_z, ptr[reg_ptr_src + off * typesize]);
+                else
+                    vpxord(v, v, v);
+            }
+        };
+
+        auto emit_tr = [&](int iter) {
+            for (int i = 0; i < 4; ++i)
+                vpermps(vreg(iter, i), vmsk, vreg(iter, i));
+
+            vshuff32x4(vtmp(0), vreg(iter, 0), vreg(iter, 1), 0x88);
+            vshuff32x4(vtmp(1), vreg(iter, 0), vreg(iter, 1), 0xdd);
+            vshuff32x4(vtmp(2), vreg(iter, 2), vreg(iter, 3), 0x88);
+            vshuff32x4(vtmp(3), vreg(iter, 2), vreg(iter, 3), 0xdd);
+
+            vshuff32x4(vreg(iter, 0), vtmp(0), vtmp(2), 0x88);
+            vshuff32x4(vreg(iter, 2), vtmp(0), vtmp(2), 0xdd);
+            vshuff32x4(vreg(iter, 1), vtmp(1), vtmp(3), 0x88);
+            vshuff32x4(vreg(iter, 3), vtmp(1), vtmp(3), 0xdd);
+        };
+
+        auto emit_store = [&]() {
+            for (int i = 0; i < 4; ++i) {
+                for (int iter = 0; iter < niters; ++iter) {
+                    const size_t off = i * c.tr_ld + iter * simd_w;
+                    vmovups(ptr[reg_ptr_tr_src + off * typesize], vreg(iter, i));
+                }
+            }
+        };
+
+        for (int iter = 0; iter < niters; ++iter)
+            emit_load(iter);
+
+        for (int iter = 0; iter < niters; ++iter)
+            emit_tr(iter);
+
+        emit_store();
+    };
+
+    preamble();
+
+    mov(reg_ptr_src, ptr[abi_param1 + GET_OFF(src)]);
+    mov(reg_ptr_tr_src, ptr[abi_param1 + GET_OFF(tr_src)]);
+
+    mov(reg_nthr_oc_b.cvt32(), ptr[abi_param1 + GET_OFF(nthr_oc_b)]);
+    mov(reg_ih.cvt32(), ptr[abi_param1 + GET_OFF(tr_src_ih_start)]);
+    mov(reg_ih_end.cvt32(), ptr[abi_param1 + GET_OFF(tr_src_ih_end)]);
+    mov(reg_ptr_tr_src_bctx, ptr[abi_param1 + GET_OFF(tr_src_bctx)]);
+
+    emit_tr_sync();
+
+    Label l_ih_loop, l_tr_done;
+    cmp(reg_ih, reg_ih_end);
+    je(l_tr_done, T_NEAR);
+
+    mov(reg_tmp, (size_t)&mask[0]);
+    vmovups(vmsk, ptr[reg_tmp]);
+
+    if (c.iw % simd_w) {
+        const char load_mask = (1 << (c.iw % simd_w)) - 1;
+        mov(reg_tmp, load_mask);
+        kmovw(kmsk, reg_tmp.cvt32());
+    }
+
+    /* src += ih_start * c.iw; */
+    imul(reg_tmp, reg_ih, c.iw * typesize);
+    add(reg_ptr_src, reg_tmp);
+    /* tr_src += ih_start * c.stride_w * c.tr_ld; */
+    imul(reg_tmp, reg_ih, c.stride_w * c.tr_ld * typesize);
+    add(reg_ptr_tr_src, reg_tmp);
+
+    L(l_ih_loop); {
+        emit_tr_iw();
+
+        add(reg_ptr_src, c.iw * typesize);
+        add(reg_ptr_tr_src, c.stride_w * c.tr_ld * typesize);
+
+        inc(reg_ih);
+        cmp(reg_ih, reg_ih_end);
+        jl(l_ih_loop, T_NEAR);
+    }
+
+    L(l_tr_done);
+
+    emit_tr_sync();
+
+    postamble();
+}
+
+/*
+// -------------------------------------------------
+// jit_transpose4x16_src
+// -------------------------------------------------
+*/
+
+void jit_transpose4x16_src::transpose(int nrows)
+{
+    assert(nrows >= 0 && nrows <= transpose_size);
+    static_assert(transpose_size == 4, "Unsupported transpose size");
+    if (!nrows)
+        return;
+
+    auto pf_src_t0 = [=](int i) {
+        if (tparams->src_pf0_distance)
+            prefetcht0(EVEX_compress_addr(
+                    reg_src, (tparams->src_pf0_distance + i) * src_stride));
+    };
+
+    auto pf_tr_src_t0 = [=](int i) {
+        if (tparams->tr_src_pf0_distance)
+            prefetcht0(EVEX_compress_addr(reg_tr_src,
+                    (tparams->tr_src_pf0_distance + i) * src_stride));
+    };
+
+    auto pf_src_t1 = [=](int i) {
+        if (tparams->src_pf1)
+            prefetcht1(EVEX_compress_addr(reg_src_prf, i * src_stride));
+    };
+
+    auto pf_tr_src_t1 = [=](int i) {
+        if (tparams->tr_src_pf1)
+            prefetchwt1(EVEX_compress_addr(reg_tr_src_prf, i * tr_src_stride));
+    };
+
+    auto src_zmm = [=](int i) {
+        assert(i >= 0 && i < 4);
+        return Zmm(i);
+    };
+
+    auto tmp_zmm = [=](int i) {
+        assert(i >= 0 && i < 4);
+        return Zmm(4 + i);
+    };
+
+    auto load = [=](int i) {
+        vmovups(src_zmm(i), EVEX_compress_addr(reg_src, i * src_stride));
+    };
+
+    auto store = [=](Zmm r, int i) {
+        vmovntps(EVEX_compress_addr(reg_tr_src, i * tr_src_stride), r);
+    };
+
+    auto tmp0 = tmp_zmm(0);
+    auto tmp1 = tmp_zmm(1);
+    auto tmp2 = tmp_zmm(2);
+    auto tmp3 = tmp_zmm(3);
+
+    auto src0 = src_zmm(0);
+    auto src1 = src_zmm(1);
+    auto src2 = src_zmm(2);
+    auto src3 = src_zmm(3);
+    for (size_t i = 0; i < nrows; i++) {
+        load(i);
+    }
+
+    for (size_t i = nrows; i < 4; i++) {
+        vpxord(src_zmm(i), src_zmm(i), src_zmm(i));
+    }
+
+    vmovupd(tmp0, src0);
+    vmovupd(tmp1, src1);
+    pf_src_t0(0);
+    vpermpd(tmp0 | kF0, vidx01, src2);
+    vpermpd(tmp1 | kF0, vidx01, src3);
+
+    valignd(src0, src0, src0, 8);
+    valignd(src1, src1, src1, 8);
+    pf_src_t0(1);
+    vmovupd(tmp2, src0);
+    vmovupd(tmp3, src1);
+    pf_src_t0(2);
+    vpermpd(tmp2 | kF0, vidx10, src2);
+    vpermpd(tmp3 | kF0, vidx10, src3);
+    pf_src_t0(3);
+
+    vmovupd(src0, tmp0);
+    pf_src_t1(0);
+    vmovupd(src1, tmp2);
+    pf_src_t1(1);
+    vmovupd(src2, tmp1);
+    pf_src_t1(2);
+    vmovupd(src3, tmp3);
+    pf_src_t1(3);
+    vpermpd(src0 | kCC, vidx1, tmp1);
+    vpermpd(src1 | kCC, vidx1, tmp3);
+    pf_tr_src_t0(0);
+    vpermpd(src2 | k33, vidx1, tmp0);
+    vpermpd(src3 | k33, vidx1, tmp2);
+    pf_tr_src_t0(1);
+
+    vmovupd(tmp0, src0);
+    vmovupd(tmp1, src2);
+    pf_tr_src_t0(2);
+    vmovupd(tmp2, src1);
+    vmovupd(tmp3, src3);
+    pf_tr_src_t0(3);
+    vpermps(tmp0 | kFFFF, vidxP, src0);
+    pf_tr_src_t1(0);
+    vpermps(tmp1 | kFFFF, vidxP, src2);
+    pf_tr_src_t1(1);
+    vpermps(tmp2 | kFFFF, vidxP, src1);
+    pf_tr_src_t1(3);
+    vpermps(tmp3 | kFFFF, vidxP, src3);
+    pf_tr_src_t1(4);
+
+    store(tmp0, 0);
+    store(tmp1, 1);
+    store(tmp2, 2);
+    store(tmp3, 3);
+}
+
+alignas(64) static constexpr const int64_t idx01[8]
+        = { 0, 0, 0, 0, 0, 1, 2, 3 };
+alignas(64) static constexpr const int64_t idx10[8]
+        = { 0, 0, 0, 0, 4, 5, 6, 7 };
+alignas(64) static constexpr const int64_t idx1[8] = { 2, 3, 0, 1, 6, 7, 4, 5 };
+alignas(64) static constexpr const int32_t idxP[16]
+        = { 0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15 };
+
+void jit_transpose4x16_src::generate()
+{
+    preamble();
+
+    const int ic_block = params->ic_block;
+    const int is = params->is;
+    int tail = is % transpose_size;
+
+    src_stride = ic_block * typesize;
+    assert(src_stride == 64);
+    tr_src_stride = ic_block * typesize;
+
+    const int src_step = ic_block * transpose_size * typesize;
+    const int tr_src_step = ic_block * transpose_size * typesize;
+
+#define GET_TR_OFF(x) offsetof(jit_src_transpose_s, x)
+    mov(reg_loop, ptr[param1 + GET_TR_OFF(size)]);
+    mov(reg_src, ptr[param1 + GET_TR_OFF(src)]);
+    mov(reg_tr_src, ptr[param1 + GET_TR_OFF(tr_src)]);
+    mov(reg_src_prf, ptr[param1 + GET_TR_OFF(src_prf)]);
+    mov(reg_tr_src_prf, ptr[param1 + GET_TR_OFF(tr_src_prf)]);
+#undef GET_TR_OFF
+
+    auto kmovw = [=](Opmask k, unsigned w) {
+        mov(regw_tmp, w);
+        jit_generator::kmovw(k, regw_tmp);
+    };
+
+    auto vmovdqa64 = [=](Zmm z, const int64_t *addr) {
+        mov(imm_addr64, reinterpret_cast<size_t>(addr));
+        jit_generator::vmovdqa64(z, ptr[imm_addr64]);
+    };
+
+    auto vmovdqa32 = [=](Zmm z, const int32_t *addr) {
+        mov(imm_addr64, reinterpret_cast<size_t>(addr));
+        jit_generator::vmovdqa32(z, ptr[imm_addr64]);
+    };
+
+    kmovw(kF0, 0xf0); // 11110000
+    kmovw(kCC, 0xcc); // 11001100
+    kmovw(k33, 0x33); // 00110011
+    kmovw(kFFFF, 0xffff); // 1111111111111111
+
+    vmovdqa64(vidx01, idx01);
+    vmovdqa64(vidx10, idx10);
+    vmovdqa64(vidx1, idx1);
+    vmovdqa32(vidxP, idxP);
+
+    Label loop_label;
+    Label tail_label;
+
+    cmp(reg_loop, transpose_size);
+    jl(tail_label, T_NEAR);
+
+
+    L(loop_label);
+    {
+        transpose(transpose_size);
+        add(reg_src, src_step);
+        add(reg_tr_src, tr_src_step);
+        add(reg_src_prf, src_step);
+        add(reg_tr_src_prf, tr_src_step);
+        sub(reg_loop, transpose_size);
+        cmp(reg_loop, transpose_size);
+        jge(loop_label, T_NEAR);
+    }
+    L(tail_label);
+    transpose(tail);
+
+    postamble();
+}
+
+jit_trans_src_t *create_trans_src(const jit_conv_conf_t *conf) {
+    if (conf->ver == ver_4fma && !conf->is_1stconv)
+        return new jit_trans_iw_ic_t(conf);
+    if (conf->ver == ver_4fma && conf->is_1stconv)
+        return new jit_trans_iw_x4_4x_t(conf);
+    assert(!"unsupported configuration");
+    return nullptr;
 }
 
 }

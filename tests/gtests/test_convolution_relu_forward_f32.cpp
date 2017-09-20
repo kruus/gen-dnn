@@ -12,7 +12,7 @@
 * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 * See the License for the specific language governing permissions and
 * limitations under the License.
-+*******************************************************************************/
+*******************************************************************************/
 
 #include "mkldnn_test_common.hpp"
 #include "gtest/gtest.h"
@@ -31,4 +31,7 @@ TEST_P(convolution_test, TestConvolution)
 #define DIRECTION_FORWARD
 #include "convolution_common.h"
 
+#undef NEGATIVE_SLOPE
+#define NEGATIVE_SLOPE 0.2
+#include "convolution_common.h"
 }

@@ -83,6 +83,7 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     case io:
     case oihw:
     case ihwo:
+    case hwio:
 #if 1 // defined(TARGET_JIT)
     case OIhw8i8o:
     case OIhw16i16o:
@@ -90,6 +91,8 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     case OIhw8o16i2o:
     case OIhw8o8i:
     case OIhw16o16i:
+    case Oihw8o:
+    case Oihw16o:
     case Ohwi8o:
     case Ohwi16o:
     case OhIw16o4i:
@@ -102,6 +105,8 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     case gOIhw8o16i2o:
     case gOIhw8o8i:
     case gOIhw16o16i:
+    case gOihw8o:
+    case gOihw16o:
     case gOhwi8o:
     case gOhwi16o:
     case gOhIw16o4i:

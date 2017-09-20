@@ -1,6 +1,6 @@
 # vim: et ts=4 sw=4
 #===============================================================================
-# Copyright 2016 Intel Corporation
+# Copyright 2016-2017 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ endif()
 
 set(PROJECT_NAME "GEN-DNN generic MKL-DNN)")
 set(PROJECT_FULL_NAME "Generic (Intel(R) MKL-DNN)")
-set(PROJECT_VERSION "0.9")
+set(PROJECT_VERSION "0.10")
 
 set(LIB_NAME mkldnn)
 
@@ -207,6 +207,9 @@ elseif(UNIX OR APPLE)
     #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} ${OPENMP_FLAGS} ${CCXX_EXTRADEBUG_FLAGS} ${CCXX_WARN_FLAGS} ${TARGET_DEFS} -DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS -fvisibility=internal")
 endif()
 
+# UNIT8_MAX like macros are part of C99 standard and not C++ (see C99 standard 7.18.2 and 7.18.4)
+add_definitions(-D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS)
+
 ####################################
 # [ejk] (might be needed for -DUSE_CBLAS compiles, CHECKME) ok for gcc, others ???
 #if(HAVE_MKL)
@@ -214,17 +217,28 @@ endif()
 #    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-rpath=${MKLLIBPATH}")
 #    message(STATUS "   MKL: shared linker flags: ${CMAKE_SHARED_LINKER_FLAGS}")
 #endif()
+####################################
 message(STATUS "initial CMAKE_CCXX_FLAGS: ${CMAKE_CCXX_FLAGS}")
 message(STATUS "initial CMAKE_CCXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 if(NECSX)
     show_cmake_stuff("NECSX, CMAKE settings before subdirectories...")
-else()
-if(WIN32 AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
-    # Current implementation - OpenMP: sequential code
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS} /Qopenmp_stubs")
-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS} /Qopenmp_stubs")
+elseif(WIN32)
+    add_definitions(-DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS)
+    add_definitions(/MP)
+    set(dir ${CMAKE_CURRENT_BINARY_DIR})
+    set (CMAKE_RUNTIME_OUTPUT_DIRECTORY ${dir})
+    if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
+        set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS} /Qopenmp")
+        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS} -std=c++11 /Qopenmp")
+    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+        add_definitions(/Qpar)
+    endif()
 elseif(UNIX OR APPLE)
     set(OPENMP_FLAGS "-fopenmp")
+    set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} ${OPENMP_FLAGS} ${CCXX_WARN_FLAGS} -DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS -fvisibility=internal")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c99")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c++11 -fvisibility-inlines-hidden")
+    set(CCXX_WARN_FLAGS "-Wall -Werror -Wno-unknown-pragmas")
 endif()
 
 if(HAVE_MKL)
@@ -234,22 +248,12 @@ if(HAVE_MKL)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -liomp5 -Wl,--as-needed")
 endif()
 
-set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} ${OPENMP_FLAGS} ${CCXX_WARN_FLAGS} -DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS -fvisibility=internal")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c99")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} -std=c++11 -fvisibility-inlines-hidden")
-
-if(UNIX OR APPLE)
-    set(CCXX_WARN_FLAGS "-Wall -Werror -Wno-unknown-pragmas")
-endif()
-
 if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -xHOST")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -ffast-math")
     # maybe also -ffinite-math or -funsafe-math-optimizations
 endif()
-endif() # NECSX
-####################################
 
 enable_testing()
 

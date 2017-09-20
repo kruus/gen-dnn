@@ -160,7 +160,7 @@ void jit_sse42_conv_fwd_kernel_f32::width_blk_step(int ur_w,
 
     L(init_simd_iter_label);
 
-    test(reg_ci_flag, IC_FLAG_FIRST);
+    test(reg_ci_flag, FLAG_IC_FIRST);
     jne(init_first_label, T_NEAR);
 
     for (int ii = 0; ii < oc_blocks; ii++)
@@ -216,11 +216,17 @@ void jit_sse42_conv_fwd_kernel_f32::width_blk_step(int ur_w,
 
     if (this->jcp.with_relu) {
         assert(oc_blocks * ur_w < 15);
-        test(reg_ci_flag, IC_FLAG_LAST);
+        test(reg_ci_flag, FLAG_IC_LAST);
         je(regular_store_label, T_NEAR);
 
-        Xmm xzero = xmm15, xmask = xmm0;
         pxor(xzero, xzero);
+        if (jcp.relu_negative_slope == 0) {
+           xmm_relu_ns = xzero;
+        } else {
+           mov(imm_addr64, float2int(jcp.relu_negative_slope));
+           movq(xmm_relu_ns, imm_addr64);
+           shufps(xmm_relu_ns, xmm_relu_ns, 0x0);
+        }
         for (int ii = 0; ii < oc_blocks; ii++) {
             for (int jj = 0; jj < ur_w; jj++) {
                 const size_t o_off = (ii * oh * ow + jj) * oc_blk;
@@ -230,7 +236,9 @@ void jit_sse42_conv_fwd_kernel_f32::width_blk_step(int ur_w,
 
                 pxor(xmask, xmask);
                 cmpps(xmask, reg_out, _cmp_gt_os);
-                blendvps(reg_out, xzero);
+                movups(xmm_res_ns, reg_out);
+                mulps(xmm_res_ns, xmm_relu_ns);
+                blendvps(reg_out, xmm_res_ns);
                 movups(xword[reg_output + sizeof(float) * o_off], reg_out);
             }
         }
@@ -335,7 +343,7 @@ void jit_sse42_conv_fwd_kernel_f32::generate()
     if (jcp.with_bias)
         mov(reg_bias, ptr[this->param1 + GET_OFF(bias)]);
     mov(reg_kh, ptr[this->param1 + GET_OFF(kh_padding)]);
-    mov(reg_ci_flag, ptr[this->param1 + GET_OFF(ic_flag)]);
+    mov(reg_ci_flag, ptr[this->param1 + GET_OFF(flags)]);
     mov(reg_oc_blocks, ptr[this->param1 + GET_OFF(oc_blocks)]);
 
     int nb_oc_tail = jcp.nb_oc % jcp.nb_oc_blocking;

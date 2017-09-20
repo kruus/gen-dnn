@@ -23,6 +23,8 @@ file(GLOB_RECURSE HEADERS
 file(GLOB_RECURSE SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/*.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/*.h
     )
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -32,10 +34,18 @@ include_directories(
 
 add_executable(benchdnn ${SOURCES})
 set_property(TARGET benchdnn PROPERTY CXX_STANDARD 11)
-if(NECSX) # dirname and strnlen extensions in a special library:
-target_link_libraries(benchdnn ${LIB_NAME} libgen.a)
-else()
+set_property(TARGET benchdnn PROPERTY C_STANDARD 11)
 target_link_libraries(benchdnn ${LIB_NAME})
+if(UNIX AND NOT APPLE)
+    find_library(LIBRT rt)
+    if(LIBRT)
+        target_link_libraries(benchdnn ${LIBRT})
+    endif()
+elseif(NECSX) # dirname and strnlen extensions in a special library:
+    find_library(LIBGEN gen) # NEW [ejk] XXX
+    if(LIBGEN)
+        target_link_libraries(benchdnn ${LIB_NAME} libgen.a)
+    endif()
 endif()
 # add_test(benchdnn benchdnn)
 

@@ -18,13 +18,16 @@
 #define CPU_SIMPLE_REORDER_HPP
 
 #include <assert.h>
-#include "c_types_map.hpp"
-#include "cpu_reorder_pd.hpp"
-#include "type_helpers.hpp"
-#include "cpu_primitive.hpp"
-#include "cpu_engine.hpp"
 
-#if (defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1600) || defined(__MSC_VER)
+#include "c_types_map.hpp"
+#include "type_helpers.hpp"
+#include "mkldnn_thread.hpp"
+#include "utils.hpp"
+
+#include "cpu_reorder_pd.hpp"
+#include "cpu_primitive.hpp"
+
+#if (defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1600) || defined(_MSC_VER)
 /* Excluding ICC 16.0 from adding simd because it results in accuracy issues.
  * MSC doesn't support simd in _pragma */
 #    define pragma_simd
@@ -39,6 +42,8 @@ namespace cpu {
 using namespace mkldnn::impl::status;
 using namespace mkldnn::impl::memory_format;
 using namespace mkldnn::impl::data_type;
+
+using namespace mkldnn::impl::utils;
 
 template<impl::data_type_t type>
 using data_t = typename prec_traits<type>::type;
@@ -61,6 +66,12 @@ struct reference {};
 #define SIMPLE_REORDER_TEMPL_CALL \
     type_i, fmt_i, type_o, fmt_o, order_keep
 
+#define DECLARE_COMMON_PARAMS() \
+        const memory_desc_wrapper &input_d = pd->input_pd(); \
+        const memory_desc_wrapper &output_d = pd->output_pd(); \
+        const double alpha_ = pd->alpha(); \
+        const double beta_ = pd->beta();
+
 /* specific reorders: common template */
 template <SIMPLE_REORDER_TEMPL_DECL, typename spec = void>
 struct simple_reorder_impl {};
@@ -79,13 +90,15 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             && output_d.format() == (order_keep ? fmt_o : fmt_i);
     }
 
-    static status_t execute(const memory_desc_wrapper &input_d,
-        const memory_desc_wrapper &output_d, const data_t<type_i> *input,
-        data_t<type_o> *output,
-        const double alpha, const double beta) {
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
         const auto &nchw_d = order_keep ? input_d : output_d;
         const auto &dims = input_d.dims();
         constexpr int blksize = fmt_o == nChw8c ? 8 : 16;
+
+        const float alpha = alpha_, beta = beta_;
 
         auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o) {
             if (alpha == 1.0 && beta == 0.0) {
@@ -138,6 +151,71 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
+    typename utils::enable_if<
+        fmt_i == nhwc && (fmt_o == nChw8c || fmt_o == nChw16c)
+    >::type>
+{
+    static bool is_applicable(const memory_desc_wrapper &input_d,
+            const memory_desc_wrapper &output_d) {
+        return input_d.format() == (order_keep ? fmt_i : fmt_o)
+            && output_d.format() == (order_keep ? fmt_o : fmt_i);
+    }
+
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
+        const float alpha = alpha_, beta = beta_;
+        const auto &nchw_d = order_keep ? input_d : output_d;
+        const auto &dims = input_d.dims();
+        constexpr int blksize = fmt_o == nChw8c ? 8 : 16;
+        const auto is = input_d.blocking_desc().strides[0];
+        const auto os = output_d.blocking_desc().strides[0];
+
+        auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o) {
+            if (alpha == 1.0 && beta == 0.0) {
+#               pragma omp simd collapse(2)
+                for (int C = 0; C < dims[1] / blksize; ++C) {
+                    for (int c = 0; c < blksize; ++c) {
+                        if (order_keep) {
+                            o[C * os[1] + c] = data_t<type_o>(i[C * blksize + c]);
+                        } else {
+                            o[C * blksize + c] = data_t<type_o>(i[C * is[1] + c]);
+                        }
+                    }
+                }
+            } else {
+#               pragma omp simd collapse(2)
+                for (int C = 0; C < dims[1] / blksize; ++C) {
+                    for (int c = 0; c < blksize; ++c) {
+                        const auto dst_off = order_keep ? C * os[1] + c :
+                                                          C * blksize + c;
+                        const auto src_off = order_keep ? C * blksize + c :
+                                                          C * is[1] + c;
+                        o[dst_off] = data_t<type_o>(alpha * i[src_off]
+                                     + (beta ? beta * o[dst_off] : 0));
+                    }
+                }
+            }
+        };
+
+#       pragma omp parallel for collapse(3) schedule(static)
+        for (int n = 0; n < dims[0]; ++n) {
+            for (int h = 0; h < dims[2]; ++h) {
+                for (int w = 0; w < dims[3]; ++w) {
+                    auto i = &input[input_d.blk_off(n, 0, h, w)];
+                    auto o = &output[output_d.blk_off(n, 0, h, w)];
+                    ker(i, o);
+                }
+            }
+        }
+
+        return success;
+    }
+};
+
+template <SIMPLE_REORDER_TEMPL_DECL>
+struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<fmt_i == chwn
     && (fmt_o == nChw8c || fmt_o == nChw16c)>::type>
 {
@@ -147,13 +225,15 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             && output_d.format() == (order_keep ? fmt_o : fmt_i);
     }
 
-    static status_t execute(const memory_desc_wrapper &input_d,
-            const memory_desc_wrapper &output_d, const data_t<type_i> *input,
-        data_t<type_o> *output, const double alpha, const double beta) {
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
         const auto &dims = input_d.dims();
         const auto i_st = input_d.blocking_desc().strides[0];
         const auto o_st = output_d.blocking_desc().strides[0];
 
+        const float alpha = alpha_, beta = beta_;
         constexpr int blksize = fmt_o == nChw8c ? 8 : 16;
         constexpr int tsize = 16;
 
@@ -216,9 +296,10 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             && output_d.format() == (order_keep ? fmt_o : fmt_i);
     }
 
-    static status_t execute(const memory_desc_wrapper &input_d,
-        const memory_desc_wrapper &output_d, const data_t<type_i> *input,
-        data_t<type_o> *output, const double alpha, const double beta) {
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
         const auto &dims = input_d.dims();
 
         constexpr int blksize_16c = 16;
@@ -226,6 +307,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         constexpr int ic_mult = order_keep ? 2 : 1;
         constexpr int oc_mult = order_keep ? 1 : 2;
 
+        const float alpha = alpha_, beta = beta_;
         const auto stride_8c = order_keep ? input_d.blocking_desc().strides[0]
             : output_d.blocking_desc().strides[0];
 
@@ -282,18 +364,20 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             && output_d.format() == (order_keep ? fmt_o : fmt_i);
     }
 
-    static status_t execute(const memory_desc_wrapper &input_d,
-        const memory_desc_wrapper &output_d, const data_t<type_i> *input,
-        data_t<type_o> *output,
-        const double alpha, const double beta) {
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
         const auto &dims = input_d.dims();
+        const auto is = input_d.blocking_desc().strides[0];
+        const auto os = output_d.blocking_desc().strides[0];
+
+        const float alpha = alpha_, beta = beta_;
 
         auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o) {
             if (alpha == 1.0 && beta == 0.0) {
                 for (int w = 0; w < dims[3]; ++w) {
                     for (int c = 0; c < dims[1]; ++c) {
-                        const auto &is = input_d.blocking_desc().strides[0];
-                        const auto &os = output_d.blocking_desc().strides[0];
                         if (order_keep) {
                             o[w * os[3] + c] = data_t<type_o>(i[c * is[1] + w]);
                         } else {
@@ -304,8 +388,6 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             } else {
                 for (int w = 0; w < dims[3]; ++w) {
                     for (int c = 0; c < dims[1]; ++c) {
-                        const auto &is = input_d.blocking_desc().strides[0];
-                        const auto &os = output_d.blocking_desc().strides[0];
                         if (order_keep) {
                             o[w * os[3] + c] = data_t<type_o>(
                                 alpha * i[c * is[1] + w]
@@ -335,6 +417,63 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
+    typename utils::enable_if<fmt_i == hwio && fmt_o == oihw>::type>
+{
+    static bool is_applicable(const memory_desc_wrapper &input_d,
+            const memory_desc_wrapper &output_d) {
+        return input_d.format() == (order_keep ? fmt_i : fmt_o)
+            && output_d.format() == (order_keep ? fmt_o : fmt_i);
+    }
+
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
+        const float alpha = alpha_, beta = beta_;
+        const auto &dims = input_d.dims();
+        const auto is = input_d.blocking_desc().strides[0];
+        const auto os = output_d.blocking_desc().strides[0];
+
+        auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o) {
+            if (alpha == 1.0 && beta == 0) {
+                for (int oc = 0; oc < dims[0]; ++oc) {
+                    for (int kw = 0; kw < dims[3]; ++kw) {
+                        if (order_keep) {
+                            o[oc * os[0] + kw] = data_t<type_o>(i[kw*is[3]+oc]);
+                        } else {
+                            o[kw * os[3] + oc] = data_t<type_o>(i[oc*is[0]+kw]);
+                        }
+                    }
+                }
+            } else {
+                for (int oc = 0; oc < dims[0]; ++oc) {
+                    for (int kw = 0; kw < dims[3]; ++kw) {
+                        const auto dst_off = order_keep ? oc * os[0] + kw :
+                                                          kw * os[3] + oc;
+                        const auto src_off = order_keep ? kw * is[3] + oc :
+                                                          oc * is[0] + kw;
+                        o[dst_off] = data_t<type_o>(alpha * i[src_off]
+                                     + (beta ? beta * o[dst_off] : 0));
+                    }
+                }
+            }
+        };
+
+#       pragma omp parallel for collapse(2) schedule(static)
+        for (int ic = 0; ic < dims[1]; ++ic) {
+            for (int kh = 0; kh < dims[2]; ++kh) {
+                auto i = &input[input_d.blk_off(0, ic, kh)];
+                auto o = &output[output_d.blk_off(0, ic, kh)];
+                ker(i, o);
+            }
+        }
+
+        return success;
+    }
+};
+
+template <SIMPLE_REORDER_TEMPL_DECL>
+struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<fmt_i == nchw && fmt_o == chwn>::type>
 {
     static bool is_applicable(const memory_desc_wrapper &input_d,
@@ -343,9 +482,10 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             && output_d.format() == (order_keep ? fmt_o : fmt_i);
     }
 
-    static status_t execute(const memory_desc_wrapper &input_d,
-        const memory_desc_wrapper &output_d, const data_t<type_i> *input,
-        data_t<type_o> *output, const double alpha, const double beta) {
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
         const auto &dims = input_d.dims();
 
         constexpr int tsize = 16;
@@ -353,6 +493,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         const auto istrides = input_d.blocking_desc().strides[0];
         const auto ostrides = output_d.blocking_desc().strides[0];
         const auto CHW = dims[1] * dims[2] * dims[3];
+        const float alpha = alpha_, beta = beta_;
 
         auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o,
                 const int nrows, const int ncols) {
@@ -400,6 +541,72 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
+    typename utils::enable_if<fmt_i == hwio
+    && (fmt_o == Ohwi8o || fmt_o == Ohwi16o)>::type>
+{
+    static bool is_applicable(const memory_desc_wrapper &input_d,
+            const memory_desc_wrapper &output_d) {
+        return input_d.format() == (order_keep ? fmt_i : fmt_o)
+            && output_d.format() == (order_keep ? fmt_o : fmt_i);
+    }
+
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
+        const float alpha = alpha_, beta = beta_;
+        const auto &dims = input_d.dims();
+        const auto is = input_d.blocking_desc().strides[0];
+        const auto os = output_d.blocking_desc().strides[0];
+
+        constexpr int blksize = fmt_o == Ohwi8o ? 8 : 16;
+
+        auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o) {
+            if (alpha == 1.0 && beta == 0) {
+#               pragma omp simd collapse(2)
+                for (int O = 0; O < dims[0] / blksize; ++O) {
+                    for (int oc = 0; oc < blksize; ++oc) {
+                        if (order_keep) {
+                            o[O * os[0] + oc] =
+                                data_t<type_o>(i[O * blksize + oc]);
+                        } else {
+                            o[O * blksize + oc] =
+                                data_t<type_o>(i[O * is[0] + oc]);
+                        }
+                    }
+                }
+            } else {
+#               pragma omp simd collapse(2)
+                for (int O = 0; O < dims[0] / blksize; ++O) {
+                    for (int oc = 0; oc < blksize; ++oc) {
+                        const auto dst_off = order_keep ? O * os[0] + oc :
+                                                          O * blksize + oc;
+                        const auto src_off = order_keep ? O * blksize + oc :
+                                                          O * is[0] + oc;
+                        o[dst_off] = data_t<type_o>(alpha * i[src_off]
+                                     + (beta ? beta * o[dst_off] : 0));
+                    }
+                }
+            }
+        };
+
+#       pragma omp parallel for collapse(3) schedule(static)
+        for (int h = 0; h < dims[2]; ++h) {
+            for (int w = 0; w < dims[3]; ++w) {
+                for (int ic = 0; ic < dims[1]; ++ic) {
+                    auto i = &input[input_d.blk_off(0, ic, h, w)];
+                    auto o = &output[output_d.blk_off(0, ic, h, w)];
+                    ker(i, o);
+                }
+            }
+        }
+
+        return success;
+    }
+};
+
+template <SIMPLE_REORDER_TEMPL_DECL>
+struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<
         (fmt_i == goihw && (fmt_o == gOIhw8i8o || fmt_o == gOIhw16i16o))
         || (fmt_i == oihw && (fmt_o == OIhw8i8o || fmt_o == OIhw16i16o))
@@ -411,16 +618,18 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             && output_d.format() == (order_keep ? fmt_o : fmt_i);
     }
 
-    static status_t execute(const memory_desc_wrapper &input_d,
-        const memory_desc_wrapper &output_d, const data_t<type_i> *input,
-        data_t<type_o> *output,
-        const double alpha, const double beta) {
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
         constexpr bool w_groups = fmt_i == goihw;
 
         const auto &_g_oihw_d = order_keep ? input_d : output_d;
         const auto &dims = input_d.dims();
         constexpr int blksize =
             (fmt_o == OIhw8i8o || fmt_o == gOIhw8i8o) ? 8 : 16;
+
+        const float alpha = alpha_, beta = beta_;
 
         auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o) {
             if (alpha == 1.0 && beta == 0.0) {
@@ -486,6 +695,237 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<
+        (fmt_i == goihw && (fmt_o == gOIhw8o8i || fmt_o == gOIhw16o16i))
+        || (fmt_i == oihw && (fmt_o == OIhw8o8i || fmt_o == OIhw16o16i))
+    >::type>
+{
+    static bool is_applicable(const memory_desc_wrapper &input_d,
+            const memory_desc_wrapper &output_d) {
+        return input_d.format() == (order_keep ? fmt_i : fmt_o)
+            && output_d.format() == (order_keep ? fmt_o : fmt_i);
+    }
+
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
+        constexpr bool w_groups = fmt_i == goihw;
+
+        const auto &_g_oihw_d = order_keep ? input_d : output_d;
+        const auto &dims = input_d.dims();
+        constexpr int blksize =
+            (fmt_o == OIhw8o8i || fmt_o == gOIhw8o8i) ? 8 : 16;
+
+        const float alpha = alpha_, beta = beta_;
+
+        auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o) {
+            if (alpha == 1.0 && beta == 0.0) {
+                for (int oc = 0; oc < blksize; ++oc) {
+                for (int ic = 0; ic < blksize; ++ic) {
+                    const auto _g_oihw_off =
+                        oc * _g_oihw_d.blocking_desc().strides[0][w_groups + 0]
+                        + ic * _g_oihw_d.blocking_desc().strides[0]
+                            [w_groups + 1];
+                    if (order_keep) {
+                        o[oc * blksize + ic] = data_t<type_o>(i[_g_oihw_off]);
+                    } else {
+                        o[_g_oihw_off] = data_t<type_o>(i[oc * blksize + ic]);
+                    }
+                }
+                }
+            } else {
+                for (int oc = 0; oc < blksize; ++oc) {
+                for (int ic = 0; ic < blksize; ++ic) {
+                    const auto _g_oihw_off =
+                        oc * _g_oihw_d.blocking_desc().strides[0][w_groups + 0]
+                        + ic * _g_oihw_d.blocking_desc().strides[0]
+                            [w_groups + 1];
+                    if (order_keep) {
+                        o[oc * blksize + ic] =
+                            data_t<type_o>(alpha * i[_g_oihw_off]
+                            + (beta ? beta * o[oc * blksize + ic] : 0));
+                    } else {
+                        o[_g_oihw_off] =
+                            data_t<type_o>(alpha * i[oc * blksize + ic]
+                            + (beta ? beta * o[_g_oihw_off] : 0));
+                    }
+                }
+                }
+            }
+        };
+
+        const int _G = w_groups ? dims[0] : 1;
+
+#       pragma omp parallel for collapse(5) schedule(static)
+        for (int g = 0; g < _G; ++g) {
+            for (int O = 0; O < dims[w_groups + 0] / blksize; ++O) {
+                for (int I = 0; I < dims[w_groups + 1] / blksize; ++I) {
+                    for (int h = 0; h < dims[w_groups + 2]; ++h) {
+                        for (int w = 0; w < dims[w_groups + 3]; ++w) {
+                            constexpr int i_mult = order_keep ? blksize : 1;
+                            constexpr int o_mult = order_keep ? 1 : blksize;
+                            auto i = &input[input_d.blk_off<!w_groups>(g,
+                                    i_mult * O, i_mult * I, h, w)];
+                            auto o = &output[output_d.blk_off<!w_groups>(
+                                    g, o_mult * O, o_mult * I, h, w)];
+                            ker(i, o);
+                        }
+                    }
+                }
+            }
+        }
+
+        return success;
+    }
+};
+
+template <SIMPLE_REORDER_TEMPL_DECL>
+struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
+    typename utils::enable_if<
+        (fmt_i == goihw && fmt_o == gOihw16o)
+        || (fmt_i == oihw && fmt_o == Oihw16o)
+    >::type>
+{
+    static bool is_applicable(const memory_desc_wrapper &input_d,
+            const memory_desc_wrapper &output_d) {
+        return input_d.format() == (order_keep ? fmt_i : fmt_o)
+            && output_d.format() == (order_keep ? fmt_o : fmt_i);
+    }
+
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
+        constexpr bool w_groups = fmt_i == goihw;
+
+        const auto &_g_oihw_d = order_keep ? input_d : output_d;
+        const auto strd_oc = _g_oihw_d.blocking_desc().strides[0][w_groups];
+        const auto &dims = input_d.dims();
+        const int blksize = 16;
+
+        const float alpha = alpha_, beta = beta_;
+        const int _G = w_groups ? dims[0] : 1;
+        constexpr int i_mult = order_keep ? blksize : 1;
+        constexpr int o_mult = order_keep ? 1 : blksize;
+
+#       pragma omp parallel for collapse(5) schedule(static)
+        for (int g = 0; g < _G; ++g) {
+            for (int O = 0; O < dims[w_groups + 0] / blksize; ++O) {
+                for (int i = 0; i < dims[w_groups + 1]; ++i) {
+                    for (int h = 0; h < dims[w_groups + 2]; ++h) {
+                        for (int w = 0; w < dims[w_groups + 3]; ++w) {
+                            auto inp = &input [input_d.blk_off<!w_groups>(g,
+                                    i_mult * O, i, h, w)];
+                            auto out = &output[output_d.blk_off<!w_groups>(g,
+                                    o_mult * O, i, h, w)];
+                            if (alpha == 1.0 && beta == 0.0) {
+                                for (int oc = 0; oc < blksize; ++oc) {
+                                    const auto off = oc * strd_oc;
+                                    if (order_keep) {
+                                        out[oc] = data_t<type_o>(inp[off]);
+                                    } else {
+                                        out[off] = data_t<type_o>(inp[oc]);
+                                    }
+                                }
+                            } else {
+                                for (int oc = 0; oc < blksize; ++oc) {
+                                    const auto off = oc * strd_oc;
+                                    if (order_keep) {
+                                        out[oc] = data_t<type_o>(
+                                                alpha * inp[off] + (beta
+                                                    ? beta * out[oc] : 0));
+                                    } else {
+                                        out[off] = data_t<type_o>(
+                                                alpha * inp[oc] + (beta
+                                                    ? beta * out[off] : 0));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return success;
+    }
+};
+
+template <SIMPLE_REORDER_TEMPL_DECL>
+struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
+    typename utils::enable_if<
+        fmt_i == hwio && (fmt_o == OIhw8i8o || fmt_o == OIhw16i16o)
+    >::type>
+{
+    static bool is_applicable(const memory_desc_wrapper &input_d,
+            const memory_desc_wrapper &output_d) {
+        return input_d.format() == (order_keep ? fmt_i : fmt_o)
+            && output_d.format() == (order_keep ? fmt_o : fmt_i);
+    }
+
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
+        const float alpha = alpha_, beta = beta_;
+        const auto &_hwio_d = order_keep ? input_d : output_d;
+        const auto &dims = input_d.dims();
+        constexpr int blksize = fmt_o == OIhw8i8o ? 8 : 16;
+        const auto _hwio_st = _hwio_d.blocking_desc().strides[0];
+
+        auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o) {
+            if (alpha == 1.0 && beta == 0.0) {
+#               pragma omp simd collapse(2)
+                for (int ic = 0; ic < blksize; ++ic) {
+                    for (int oc = 0; oc < blksize; ++oc) {
+                        if (order_keep) {
+                            o[ic * blksize + oc] =
+                                data_t<type_o>(i[oc + ic * _hwio_st[1]]);
+                        } else {
+                            o[oc + ic * _hwio_st[1]] =
+                                data_t<type_o>(i[ic * blksize + oc]);
+                        }
+                    }
+                }
+            } else {
+#               pragma omp simd collapse(2)
+                for (int ic = 0; ic < blksize; ++ic) {
+                    for (int oc = 0; oc < blksize; ++oc) {
+                        const auto dst_off = order_keep ? ic * blksize + oc :
+                                                          ic * _hwio_st[1] + oc;
+                        const auto src_off = order_keep ? ic * _hwio_st[1] + oc :
+                                                          ic * blksize + oc;
+                        o[dst_off] = data_t<type_o>(alpha * i[src_off]
+                                     + (beta ? beta * o[dst_off] : 0));
+                    }
+                }
+            }
+        };
+
+#       pragma omp parallel for collapse(4) schedule(static)
+        for (int h = 0; h < dims[2]; ++h) {
+            for (int w = 0; w < dims[3]; ++w) {
+                for (int O = 0; O < dims[0] / blksize; ++O) {
+                    for (int I = 0; I < dims[1] / blksize; ++I) {
+                        constexpr int i_mult = order_keep ? blksize : 1;
+                        constexpr int o_mult = order_keep ? 1 : blksize;
+                        auto i = &input[input_d.blk_off(
+                                i_mult * O, i_mult * I, h, w)];
+                        auto o = &output[output_d.blk_off(
+                                o_mult * O, o_mult * I, h, w)];
+                        ker(i, o);
+                    }
+                }
+            }
+        }
+
+        return success;
+    }
+};
+
+template <SIMPLE_REORDER_TEMPL_DECL>
+struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
+    typename utils::enable_if<
           (fmt_i == goihw && (fmt_o == gOIhw8i16o2i))
           || (fmt_i == oihw && (fmt_o == OIhw8i16o2i))
     >::type>
@@ -496,15 +936,17 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             && output_d.format() == (order_keep ? fmt_o : fmt_i);
     }
 
-    static status_t execute(const memory_desc_wrapper &input_d,
-        const memory_desc_wrapper &output_d, const data_t<type_i> *input,
-        data_t<type_o> *output,
-        const double alpha, const double beta) {
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
         constexpr bool w_groups = fmt_i == goihw;
 
         const auto &_g_oihw_d = order_keep ? input_d : output_d;
         const auto &dims = input_d.dims();
         const int blksize = 16;
+
+        const float alpha = alpha_, beta = beta_;
 
         auto index = [&](const int ic, const int oc) {
             return ((ic / 2) * blksize * 2 + 2 * oc + ic % 2);
@@ -531,8 +973,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 for (int oc = 0; oc < blksize; ++oc) {
                     const auto _g_oihw_off =
                         oc * _g_oihw_d.blocking_desc().strides[0][w_groups + 0]
-                        + 2 * ic * _g_oihw_d.blocking_desc().strides[0]
-                            [w_groups + 1];
+                      + ic * _g_oihw_d.blocking_desc().strides[0][w_groups + 1];
                     if (order_keep) {
                         o[index(ic, oc)] = data_t<type_o>(
                             alpha * i[_g_oihw_off]
@@ -584,10 +1025,11 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             && output_d.format() == (order_keep ? fmt_o : fmt_i);
     }
 
-    static status_t execute(const memory_desc_wrapper &input_d,
-        const memory_desc_wrapper &output_d, const data_t<type_i> *input,
-        data_t<type_o> *output,
-        const double alpha, const double beta) {
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
+        const double alpha = alpha_, beta = beta_;
         constexpr bool w_groups = fmt_i == gOIhw8i16o2i;
 
         const auto &dims = input_d.dims();
@@ -656,16 +1098,17 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             && output_d.format() == (order_keep ? fmt_o : fmt_i);
     }
 
-    static status_t execute(const memory_desc_wrapper &input_d,
-        const memory_desc_wrapper &output_d, const data_t<type_i> *input,
-        data_t<type_o> *output,
-        const double alpha, const double beta) {
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
         constexpr bool w_groups = (fmt_i == gOIhw8i8o || fmt_i == gOIhw16i16o);
 
         const auto &dims = input_d.dims();
         constexpr int blksize =
             (fmt_i == OIhw8i8o || fmt_i == gOIhw8i8o) ? 8 : 16;
 
+        const float alpha = alpha_, beta = beta_;
         auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o) {
             for (int ic = 0; ic < blksize; ++ic) {
                 for (int oc = 0; oc < blksize; ++oc) {
@@ -705,20 +1148,70 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<
+        (fmt_i == Oihw16o && fmt_o == Ohwi16o)
+        || (fmt_i == gOihw16o && fmt_o == gOhwi16o)
+    >::type>
+{
+    static bool is_applicable(const memory_desc_wrapper &input_d,
+            const memory_desc_wrapper &output_d) {
+        return input_d.format() == (order_keep ? fmt_i : fmt_o)
+            && output_d.format() == (order_keep ? fmt_o : fmt_i);
+    }
+
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
+        const bool w_groups = fmt_i == gOihw16o;
+
+        const auto &dims = input_d.dims();
+        const int blksize = 16;
+
+        const float alpha = alpha_, beta = beta_;
+        const int _G = w_groups ? dims[0] : 1;
+
+#       pragma omp parallel for collapse(5) schedule(static)
+        for (int g = 0; g < _G; ++g) {
+            for (int o = 0; o < dims[w_groups + 0] / blksize; ++o) {
+                for (int i = 0; i < dims[w_groups + 1]; ++i) {
+                    for (int h = 0; h < dims[w_groups + 2]; ++h) {
+                        for (int w = 0; w < dims[w_groups + 3]; ++w) {
+                            auto i_ptr = &input[input_d.blk_off<!w_groups>(g,
+                                    o, i, h, w)];
+                            auto o_ptr = &output[output_d.blk_off<!w_groups>(g,
+                                    o, i, h, w)];
+                            for (int oc = 0; oc < blksize; ++oc) {
+                                o_ptr[oc] = (alpha == 1.0 && beta == 0.0)
+                                    ? data_t<type_o>(i_ptr[oc])
+                                    : data_t<type_o>(alpha * i_ptr[oc]
+                                        + (beta ? beta * o_ptr[oc] : 0));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return success;
+    }
+};
+template <SIMPLE_REORDER_TEMPL_DECL>
+struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
+    typename utils::enable_if<
         fmt_i == any && fmt_o == any && order_keep == fmt_order::any,
     spec::direct_copy>::type>
 {
     static bool is_applicable(const memory_desc_wrapper &input_d,
             const memory_desc_wrapper &output_d) {
-        /* FIXME: is the formule correct? */
-        return input_d.format() == output_d.format() && input_d.is_dense()
-            && output_d.is_dense();
+        /* FIXME: is the formula correct? */
+        return input_d.similar_to(output_d, true, false, 0)
+            && input_d.is_dense() && output_d.is_dense();
     }
 
-    static status_t execute(const memory_desc_wrapper &input_d,
-        const memory_desc_wrapper &output_d, const data_t<type_i> *input,
-        data_t<type_o> *output,
-        const double alpha, const double beta) {
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
         assert(input_d.is_dense());
 
         input += input_d.blk_off(0);
@@ -726,21 +1219,41 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         const size_t nelems = input_d.nelems();
 
-        if (alpha == 1.0 && beta == 0.0) {
-#           pragma omp parallel for schedule(static)
-            pragma_simd
-            for (int e = 0; e < nelems; ++e) {
-                output[e] = data_t<type_o>(input[e]);
+        constexpr int block_size = 16;
+        const auto num_blocks = nelems / block_size;
+        const auto rem_elems = nelems % block_size;
+
+        const float alpha = alpha_, beta = beta_;
+
+#       pragma omp parallel
+        {
+            const int ithr = omp_get_thread_num();
+            const int nthr = omp_get_num_threads();
+            size_t start{0}, end{0};
+            balance211(num_blocks, nthr, ithr, start, end);
+            start = start * block_size;
+            end = end * block_size;
+            if (alpha == 1.0 && beta == 0.0) {
+#               pragma omp simd
+                for (size_t e = start; e < end; ++e) {
+                    output[e] = data_t<type_o>(input[e]);
+                }
+            } else{
+#               pragma omp simd
+                for (size_t e = start; e < end; ++e) {
+                    output[e] = data_t<type_o>(alpha * input[e]
+                        + (beta ? beta * output[e] : 0));
+                }
             }
-        } else {
-#           pragma omp parallel for schedule(static)
-            pragma_simd
-            for (size_t e = 0; e < nelems; ++e) {
-                output[e] = data_t<type_o>(
-                    alpha * input[e] + (beta ? beta * output[e] : 0));
+
+            if (rem_elems != 0 && ithr == nthr - 1){
+                for (int e = nelems - rem_elems; e < nelems; ++e){
+                    output[e] = data_t<type_o>((alpha == 1.0 && beta == 0.0) ?
+                            input[e]
+                            : alpha * input[e] + (beta ? beta * output[e] : 0));
+                }
             }
         }
-
         return success;
     }
 };
@@ -757,39 +1270,66 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             return nelems_no_dim_0(data_d) == _size_no_dim_0(data_d);
         };
         /* FIXME: is the formula correct? */
-        return input_d.format() == output_d.format() && is_dense_no_0(input_d)
-            && is_dense_no_0(output_d);
+        return input_d.similar_to(output_d, true, false, 1)
+            && is_dense_no_0(input_d) && is_dense_no_0(output_d);
     }
 
-    static status_t execute(const memory_desc_wrapper &input_d,
-        const memory_desc_wrapper &output_d, const data_t<type_i> *input,
-        data_t<type_o> *output,
-        const double alpha, const double beta) {
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
 
         input += input_d.blk_off(0);
         output += output_d.blk_off(0);
+        const float alpha = alpha_, beta = beta_;
 
         const int N = input_d.dims()[0];
         const size_t is = input_d.blocking_desc().strides[0][0];
         const size_t os = output_d.blocking_desc().strides[0][0];
         const size_t nelems_no_d0 = nelems_no_dim_0(input_d);
+        const size_t work_amount = N * nelems_no_d0;
 
         if (alpha == 1.0 && beta == 0.0) {
-#           pragma omp parallel for collapse(2) schedule(static)
-            pragma_simd
-            for (int n = 0; n < N; ++n) {
-                for (size_t e = 0; e < nelems_no_d0; ++e) {
-                    output[os * n + e] = data_t<type_o>(input[is * n + e]);
+#           pragma omp parallel
+            {
+                const int ithr = omp_get_thread_num();
+                const int nthr = omp_get_num_threads();
+                size_t n{0}, dim1_s{0};
+                size_t start{0}, end{0};
+                balance211(work_amount, nthr, ithr, start, end);
+                nd_iterator_init(start, n, N, dim1_s, nelems_no_d0);
+                while(start < end) {
+                    size_t work_rem = end - start;
+                    size_t dim1_e =
+                        dim1_s + work_rem > nelems_no_d0 ? nelems_no_d0
+                        : dim1_s + work_rem;
+#                   pragma omp simd
+                    for (size_t e = dim1_s; e < dim1_e; ++e){
+                        output[os * n + e] = data_t<type_o>(input[is * n + e]);
+                    }
+                    nd_iterator_jump(start, end, n, N, dim1_s, nelems_no_d0);
                 }
             }
         } else {
-#           pragma omp parallel for collapse(2) schedule(static)
-            pragma_simd
-            for (int n = 0; n < N; ++n) {
-                for (size_t e = 0; e < nelems_no_d0; ++e) {
-                    output[os * n + e] = data_t<type_o>(
-                        alpha * input[is * n + e]
-                        + (beta ? beta * output[os * n + e] : 0));
+#           pragma omp parallel
+            {
+                const int ithr = omp_get_thread_num();
+                const int nthr = omp_get_num_threads();
+                size_t n{0}, dim1_s{0};
+                size_t start{0}, end{0};
+                balance211(work_amount, nthr, ithr, start, end);
+                nd_iterator_init(start, n, N, dim1_s, nelems_no_d0);
+                while(start < end) {
+                    size_t work_rem = end - start;
+                    size_t dim1_e =
+                        dim1_s + work_rem > nelems_no_d0 ? nelems_no_d0
+                        : dim1_s + work_rem;
+#                   pragma omp simd
+                    for (size_t e = dim1_s; e < dim1_e; ++e){
+                        output[os * n + e] = data_t<type_o>(
+                                alpha * input[is * n + e]
+                                + beta ? beta * output[os * n + e] : 0);
+                    }
+                    nd_iterator_jump(start, end, n, N, dim1_s, nelems_no_d0);
                 }
             }
         }
@@ -810,7 +1350,8 @@ private:
         for (int d = 1; d < data_d.ndims(); ++d) {
             auto block = blk.block_dims[d];
             max_size = nstl::max(max_size,
-                    size_t(blk.padding_dims[d] / block) * blk.strides[0][d]);
+                    size_t(size_t(blk.padding_dims[d] / block)
+                        * blk.strides[0][d]));
             if (block > 1)
                 max_size = nstl::max(max_size,
                         size_t(block * blk.strides[1][d]));
@@ -830,20 +1371,23 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         return true;
     }
 
-    static status_t execute(const memory_desc_wrapper &input_d,
-        const memory_desc_wrapper &output_d, const data_t<type_i> *input,
-        data_t<type_o> *output,
-        const double alpha, const double beta) {
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output) {
+        DECLARE_COMMON_PARAMS();
+
         const size_t nelems = input_d.nelems();
 
+        const float alpha = alpha_, beta = beta_;
         if (alpha == 1.0 && beta == 0.0) {
 #           pragma omp parallel for schedule(static)
+#           pragma simd
             for (int e = 0; e < nelems; ++e) {
                 output[output_d.off_l(e)] =
                     data_t<type_o>(input[input_d.off_l(e)]);
             }
         } else {
 #           pragma omp parallel for schedule(static)
+#           pragma simd
             for (int e = 0; e < nelems; ++e) {
                 output[output_d.off_l(e)] = data_t<type_o>(
                     alpha * input[input_d.off_l(e)]
@@ -897,8 +1441,7 @@ struct simple_reorder_t: public cpu_primitive_t {
                 this->input_memory(0));
         auto output = reinterpret_cast<data_t<type_o> *>(this->memory());
         simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL, spec>::execute(
-                conf_.input_pd()->desc(), conf_.output_pd()->desc(),
-                input, output, conf_.alpha(), conf_.beta());
+                &conf_, input, output);
         e->set_state(event_t::ready);
     }
 

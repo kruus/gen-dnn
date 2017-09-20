@@ -64,7 +64,7 @@ struct jit_uni_pooling_fwd_t: public cpu_primitive_t {
             bool is_training = desc_.prop_kind == forward_training;
             if (desc()->alg_kind == pooling_max && is_training) {
                 auto indices_desc = *dst_pd()->desc();
-                indices_desc.data_type = data_type::s32;
+                indices_desc.data_type = pooling_index_data_type(desc());
                 ws_pd_ = cpu_memory_t::pd_t(engine_, &indices_desc);
             }
 
@@ -134,14 +134,15 @@ struct jit_uni_pooling_bwd_t: public cpu_primitive_t {
                 && everyone_is(desired_fmt, diff_src_pd()->desc()->format,
                         diff_dst_pd()->desc()->format)
                 && everyone_is(data_type::f32, diff_src_pd()->desc()->data_type,
-                        diff_dst_pd()->desc()->data_type);
+                        diff_dst_pd()->desc()->data_type)
+                && utils::implication(desc()->alg_kind == pooling_max,
+                        hint_fwd_pd_ && hint_fwd_pd_->workspace_pd()
+                        && hint_fwd_pd_->workspace_pd()->desc()->format
+                                == desired_fmt);
             if (!ok) return status::unimplemented;
 
-            if (desc()->alg_kind == pooling_max) {
-                auto indices_desc = *diff_dst_pd()->desc();
-                indices_desc.data_type = data_type::s32;
-                ws_pd_ = cpu_memory_t::pd_t(engine_, &indices_desc);
-            }
+            if (desc()->alg_kind == pooling_max)
+                ws_pd_ = *(cpu_memory_t::pd_t*)hint_fwd_pd_->workspace_pd();
 
             return jit_uni_pool_kernel_f32<isa>::init_conf(jpp_, desc_,
                     diff_src_pd_.desc(), diff_dst_pd_.desc());

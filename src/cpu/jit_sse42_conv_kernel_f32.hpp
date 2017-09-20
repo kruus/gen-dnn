@@ -26,8 +26,6 @@ namespace impl {
 namespace cpu {
 
 struct jit_sse42_conv_fwd_kernel_f32: public jit_generator {
-    enum { IC_FLAG_FIRST = 1, IC_FLAG_LAST = 2 };
-
     jit_sse42_conv_fwd_kernel_f32(jit_conv_conf_t ajcp): jcp(ajcp)
     {
         this->generate();
@@ -58,7 +56,12 @@ private:
     reg64_t reg_kh = rcx;
     reg64_t simd_iter = r15;
     reg64_t reg_oc_blocks = r14;
+    reg64_t imm_addr64 = reg_oc_blocks;
     Xbyak::Reg32 reg_ci_flag = r13d;
+    Xbyak::Xmm xmm_relu_ns = Xbyak::Xmm(14);
+    Xbyak::Xmm xmm_res_ns = Xbyak::Xmm(13);
+    Xbyak::Xmm xzero = Xbyak::Xmm(15);
+    Xbyak::Xmm xmask = Xbyak::Xmm(0);
 
     inline void oh_step_unroll_kw(int ur_w, int pad_l, int pad_r,
             int oc_blocks);

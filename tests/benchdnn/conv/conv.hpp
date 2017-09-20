@@ -83,10 +83,12 @@ typedef struct dt_conf_t {
 extern const _dt_conf_t conf_f32;
 extern const _dt_conf_t conf_f32_full;
 extern const _dt_conf_t conf_f32_wino;
-extern const _dt_conf_t conf_s16s32;
+extern const _dt_conf_t conf_s16s16s32s32;
+extern const _dt_conf_t conf_s32s16s16s32;
+extern const _dt_conf_t conf_s16s32s16s32;
 extern const _dt_conf_t conf_u8s8s32s32;
-extern const _dt_conf_t conf_u8s8s32s8;
-extern const _dt_conf_t conf_u8s8s32u8;
+extern const _dt_conf_t conf_u8s8s8s32;
+extern const _dt_conf_t conf_u8s8u8s32;
 
 const dt_conf_t *str2cfg(const char *str);
 const char *cfg2str(const dt_conf_t *cfg);
@@ -183,7 +185,7 @@ void perf_report(const prb_t *p, const res_t *r, const char *pstr);
 
 bool maybe_skip(const char *impl_str);
 int doit(const prb_t *p, res_t *res);
-int bench(int argc, char **argv);
+int bench(int argc, char **argv, bool main_bench = true);
 
 }
 

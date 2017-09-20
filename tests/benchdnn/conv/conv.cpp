@@ -24,6 +24,8 @@
 #include "mkldnn_common.hpp"
 #include "mkldnn_memory.hpp"
 
+#include "norm.hpp"
+
 #include "conv/conv.hpp"
 
 namespace conv {
@@ -62,6 +64,7 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
     int in_ok = 0, below_ok = 0, above_ok = 0;
     int non_zero = 0;
 
+    diff_norm_t diff_norm;
     float max_rel_diff = 0;
 
     r->errors = 0;
@@ -76,14 +79,17 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
 
         bool ok = true;
         if (fp < p->cfg[what].min) {
+            diff_norm.update(p->cfg[what].min, dt);
             ok = dt == p->cfg[what].min;
             below += 1;
             below_ok += ok;
         } else if (fp > p->cfg[what].max) {
+            diff_norm.update(p->cfg[what].max, dt);
             ok = dt == p->cfg[what].max;
             above += 1;
             above_ok += ok;
         } else {
+            diff_norm.update(fp, dt);
             ok = (fabs(fp) > 1e-5 ? rel_diff : diff) <= p->cfg[what].eps;
             in += 1;
             in_ok += ok;
@@ -123,8 +129,23 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
         non_zero += fp != 0;
     }
 
-    if (final_compare || r->errors)
-        print(2, "[%s] max_rel_diff:%g\n", swhat, max_rel_diff);
+    diff_norm.done();
+
+    if (final_compare || r->errors) {
+        const int vl = r->errors ? 0 : 2;
+        print(vl, "@@@ [%s] %sdiff: l0(``%g``) "
+                "l1:(%g,%g,%g,``%g``) "
+                "l2:(%g,%g,%g,``%g``) "
+                "l8:(%g,%g,%g,``%g``)\n",
+                swhat, final_compare ? "final: " : "",
+                diff_norm.rel_diff(norm_t::L0),
+                diff_norm.a_[norm_t::L1], diff_norm.b_[norm_t::L1],
+                diff_norm.diff_[norm_t::L1], diff_norm.rel_diff(norm_t::L1),
+                diff_norm.a_[norm_t::L2], diff_norm.b_[norm_t::L2],
+                diff_norm.diff_[norm_t::L2], diff_norm.rel_diff(norm_t::L2),
+                diff_norm.a_[norm_t::L8], diff_norm.b_[norm_t::L8],
+                diff_norm.diff_[norm_t::L8], diff_norm.rel_diff(norm_t::L8));
+    }
 
     const double trust_rg_level = 0.3;
     const double trust_nz_level = get_trust_nz_level(p, what, final_compare);
@@ -138,13 +159,14 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
 
     const bool dump = verbose >= 20
         || (verbose >= 10 && (trust_rg < 1. || trust_nz < 1.));
-    if (dump)
+    if (dump) {
         print(0, "@@@ [%s] %strust range:%.2f nz:%.2f "
                 "(level range:%.2f nz:%.2f). "
                 "in:%d (ok:%d) below:%d (ok:%d) above:%d (ok:%d) nz:%d "
                 "total:%d\n", swhat, final_compare ? "final: " : "",
                 trust_rg, trust_nz, trust_rg_level, trust_nz_level, in, in_ok,
                 below, below_ok, above, above_ok, non_zero, r->total);
+    }
 
     if (no_trust) {
         r->state = MISTRUSTED;
@@ -393,7 +415,7 @@ inline int init_pd(const prb_t *p, mkldnn_convolution_desc_t &cd,
         DNN_SAFE(mkldnn_primitive_desc_destroy(cpd), WARN);
         return r->state = SKIPPED, OK;
     } else {
-        print(50, "mkldnn implementation: %s\n", impl_str);
+        print(5, "mkldnn implementation: %s\n", impl_str);
     }
 
     auto q = [=](mkldnn_query_t query, int index = 0) {
@@ -432,7 +454,7 @@ int doit(const prb_t *p, res_t *r) {
 
     mkldnn_convolution_desc_t cd;
     mkldnn_primitive_desc_t cpd;
-    mkldnn_primitive_t c;
+    mkldnn_primitive_t c{};
 
     SAFE(init_pd(p, cd, cpd, r), WARN);
     if (r->state == SKIPPED || r->state == UNIMPLEMENTED)
@@ -446,15 +468,17 @@ int doit(const prb_t *p, res_t *r) {
     dnn_mem_t src_dt(src_dt_d, p->cfg[SRC].dt);
     dnn_mem_t wei_dt(wei_dt_d, p->cfg[WEI].dt);
     dnn_mem_t dst_dt(dst_dt_d, p->cfg[DST].dt);
-    dnn_mem_t bia_dt = p->dir & FLAG_BIA
-        ? dnn_mem_t(bia_dt_d, p->cfg[BIA].dt) : dnn_mem_t();
+    dnn_mem_t *p_bia_dt = p->dir & FLAG_BIA
+        ? new dnn_mem_t(bia_dt_d, p->cfg[BIA].dt) : new dnn_mem_t();
+    dnn_mem_t &bia_dt = *p_bia_dt;
 
     const auto fp = mkldnn_f32;
     dnn_mem_t src_fp(src_dt_d, fp, mkldnn_nchw);
     dnn_mem_t wei_fp(wei_dt_d, fp, mkldnn_goihw);
     dnn_mem_t dst_fp(dst_dt_d, fp, mkldnn_nchw);
-    dnn_mem_t bia_fp = p->dir & FLAG_BIA
-        ? dnn_mem_t(bia_dt_d, fp, mkldnn_x) : dnn_mem_t();
+    dnn_mem_t *p_bia_fp = p->dir & FLAG_BIA
+        ? new dnn_mem_t(bia_dt_d, fp, mkldnn_x) : new dnn_mem_t();
+    dnn_mem_t &bia_fp = *p_bia_fp;
 
     SAFE(fill_src(p, src_dt, src_fp, r), WARN);
     SAFE(fill_wei(p, wei_dt, wei_fp, r), WARN);
@@ -504,6 +528,10 @@ int doit(const prb_t *p, res_t *r) {
                 SAFE(compare_bia(p, bia, bia_fp, r, true), WARN);
             }
         }
+    } else {
+        delete p_bia_dt;
+        delete p_bia_fp;
+        SAFE(FAIL, CRIT);
     }
 
     if (bench_mode & PERF) {
@@ -520,6 +548,9 @@ int doit(const prb_t *p, res_t *r) {
             if (stop) break;
         }
     }
+
+    delete p_bia_dt;
+    delete p_bia_fp;
 
     return OK;
 }

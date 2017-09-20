@@ -261,7 +261,6 @@ mkldnn_status_t MKLDNN_API mkldnn_concat_primitive_desc_create(
         mkldnn_primitive_desc_t *concat_primitive_desc,
         const mkldnn_memory_desc_t *output_desc, int n, int concat_dimension,
         const_mkldnn_primitive_desc_t *input_pds);
-// int n ? int concat_dimension ?   ... or size_t ???
 
 #if 0
 /** Creates in-place @p concat_primitive_desc for given @p n @p inputs memory
@@ -441,7 +440,7 @@ mkldnn_status_t MKLDNN_API mkldnn_eltwise_backward_desc_init(
  * @p negative_slope and memory descriptor @p data_desc.
  *
  * @deprecated use mkldnn_eltwise_forward_desc_init() instead, with @p alpha
- * equals @negative_slope */
+ * equals @p negative_slope */
 MKLDNN_DEPRECATED
 mkldnn_status_t MKLDNN_API mkldnn_relu_forward_desc_init(
         mkldnn_relu_desc_t *relu_desc, mkldnn_prop_kind_t prop_kind,
@@ -451,7 +450,7 @@ mkldnn_status_t MKLDNN_API mkldnn_relu_forward_desc_init(
  * and memory descriptors @p diff_data_desc and @p data_desc.
  *
  * @deprecated use mkldnn_eltwise_backward_desc_init() instead, with @p alpha
- * equals @negative_slope */
+ * equals @p negative_slope */
 MKLDNN_DEPRECATED
 mkldnn_status_t MKLDNN_API mkldnn_relu_backward_desc_init(
         mkldnn_relu_desc_t *relu_desc,

@@ -17,64 +17,99 @@
 #ifndef CPU_JIT_TRANSPOSE_SRC_HPP
 #define CPU_JIT_TRANSPOSE_SRC_HPP
 
-#include "jit_generator.hpp"
+#include "cpu_barrier.hpp"
 #include "jit_primitive_conf.hpp"
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
+struct jit_trans_src_t {
+    struct ctx_t {
+        const void *src;
+        const void *tr_src;
+        const void *src_prf;
+        const void *tr_src_prf;
+
+        /* 1st conv 4fma: backward by weights */
+        int nthr_oc_b; /* number of threads process given src image */
+        int tr_src_ih_start, tr_src_ih_end; /* thread's transposition bounds */
+        simple_barrier::ctx_t *tr_src_bctx; /* transposition synchronization */
+    };
+
+    jit_trans_src_t(const jit_conv_conf_t *conf)
+        : conf_(conf), ker_(nullptr) {}
+    virtual ~jit_trans_src_t() {}
+
+    void operator()(const ctx_t *ctx)
+    { assert(ker_); ker_(ctx); }
+
+    const jit_conv_conf_t *conf_;
+    void (*ker_)(const ctx_t *);
+};
+
 struct jit_src_transpose_s {
+    int size;
     const void *src;
     const void *tr_src;
     const void *src_prf;
     const void *tr_src_prf;
 };
 
-struct jit_transpose_src: public jit_generator
-{
-    jit_transpose_src(jit_conv_conf_t *aparams)
-        : params(aparams)
+struct jit_transpose4x16_src_t {
+    int src_pf0_distance;
+    int tr_src_pf0_distance;
+    bool src_pf1;
+    bool tr_src_pf1;
+};
+
+struct jit_transpose4x16_src : public jit_generator {
+    jit_transpose4x16_src(const jit_1x1_conv_conf_t *aparams,
+            jit_transpose4x16_src_t *tparams_)
+        : params(aparams), tparams(tparams_)
     {
         this->generate();
         jit_ker = (decltype(jit_ker))this->getCode();
     }
 
-    jit_conv_conf_t *params;
+    const jit_1x1_conv_conf_t *params;
+    const jit_transpose4x16_src_t *tparams;
     void (*jit_ker)(jit_src_transpose_s *);
 
     void operator()(jit_src_transpose_s *arg) { jit_ker(arg); }
 
+    static const int transpose_size = 4;
 private:
-    using reg64_t = const Xbyak::Reg64;
-    using reg32_t = const Xbyak::Reg32;
-    using opmask_t = const Xbyak::Opmask;
+    static const int typesize = sizeof(float);
 
-    enum { typesize = sizeof(float), transpose_size = 16, small_spatial = 14 };
     int src_stride, tr_src_stride;
-    int tail;
-    bool enable_prefetch;
 
-    opmask_t k3333 = k1;
-    opmask_t k5555 = k2;
-    opmask_t kAAAA = k3;
-    opmask_t kCCCC = k4;
-    opmask_t k0F0F = k5;
-    opmask_t kF0F0 = k6;
-    opmask_t kTail = k7;
+    Xbyak::Reg64 imm_addr64 = rbx;
 
-    reg64_t reg_src = r8;
-    reg64_t reg_tr_src = r9;
-    reg64_t reg_src_prf = r10;
-    reg64_t reg_tr_src_prf = r11;
-    reg64_t reg_loop = r12;
-    reg64_t reg_tr_src_tmp = r13;
-    reg32_t regw_tmp = r14d;
+    Xbyak::Opmask kF0 = k1;
+    Xbyak::Opmask kCC = k2;
+    Xbyak::Opmask k33 = k3;
+    Xbyak::Opmask kFFFF = k4;
 
-    void transpose(int nrows, int l_pad, int r_pad, bool nontemporal_stores);
+    Xbyak::Zmm vidx01 = zmm31;
+    Xbyak::Zmm vidx10 = zmm30;
+    Xbyak::Zmm vidx1 = zmm29;
+    Xbyak::Zmm vidxP = zmm28;
+
+    Xbyak::Reg64 reg_src = r8;
+    Xbyak::Reg64 reg_tr_src = r9;
+    Xbyak::Reg64 reg_src_prf = r10;
+    Xbyak::Reg64 reg_tr_src_prf = r11;
+    Xbyak::Reg64 reg_loop = r12;
+    Xbyak::Reg64 reg_tr_src_tmp = r13;
+    Xbyak::Reg32 regw_tmp = r14d;
+
+    void transpose_block(int ur, int nrows);
+    void transpose(int nrows);
     void generate();
-
 };
+
+jit_trans_src_t *create_trans_src(const jit_conv_conf_t *conf);
 
 }
 }

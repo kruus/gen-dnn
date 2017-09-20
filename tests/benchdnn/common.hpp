@@ -28,6 +28,12 @@
 #define OK 0
 #define FAIL 1
 
+#ifdef _WIN32
+#define strncasecmp _strnicmp
+#define strcasecmp _stricmp
+#define __PRETTY_FUNCTION__ __FUNCSIG__
+#endif
+
 enum { CRIT = 1, WARN = 2 };
 
 #define SAFE(f, s) do { \
@@ -43,6 +49,8 @@ enum { CRIT = 1, WARN = 2 };
     } \
 } while(0)
 
+#define ABS(a) ((a)>0?(a):(-(a)))
+
 #define MIN2(a,b) ((a)<(b)?(a):(b))
 #define MAX2(a,b) ((a)>(b)?(a):(b))
 
@@ -57,16 +65,29 @@ enum { CRIT = 1, WARN = 2 };
 
 #if ! defined(_SX)
 inline void *zmalloc(size_t size, int align) {
-    void *p;
-    int rc = ::posix_memalign(&p, align, size);
-    return rc == 0 ? p : 0;
+    void *ptr;
+#ifdef _WIN32
+    ptr = _aligned_malloc(size, align);
+    int rc = ((ptr) ? 0 : errno);
+#else
+    int rc = ::posix_memalign(&ptr, align, size);
+#endif /* _WIN32 */
+    return rc == 0 ? ptr : 0;
 }
+inline void zfree(void *ptr) {
+#ifdef _WIN32
+    _aligned_free(ptr);
+#else
+    return ::free(ptr);
+#endif /* _WIN32 */
+}
+
 #else // SX architecture does not have/need posix_memalign
 inline void *zmalloc(size_t size, int align) {
     return ::malloc(size);
 }
-#endif
 inline void zfree(void *ptr) { return ::free(ptr); }
+#endif
 
 enum bench_mode_t { MODE_UNDEF = 0x0, CORR = 0x1, PERF = 0x2, };
 const char *bench_mode2str(bench_mode_t mode);

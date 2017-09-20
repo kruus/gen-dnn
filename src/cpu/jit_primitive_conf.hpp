@@ -29,6 +29,14 @@ enum conv_loop_order_t {loop_cgn, loop_gnc, loop_ngc};
 enum conv_1x1_loop_order_t {loop_rbl, loop_rlb, loop_lbr, loop_lrb, loop_blr,
                             loop_brl};
 
+enum {
+    FLAG_MB_FIRST = 1 << 0, FLAG_MB_LAST = 1 << 1,
+    FLAG_OC_FIRST = 1 << 2, FLAG_OC_LAST = 1 << 3,
+    FLAG_IC_FIRST = 1 << 4, FLAG_IC_LAST = 1 << 5,
+    FLAG_SP_FIRST = 1 << 6, FLAG_SP_LAST = 1 << 7,
+    FLAG_REDUCE_FIRST = 1<<8, FLAG_REDUCE_LAST = 1<<9,
+};
+
 struct jit_conv_conf_t {
     prop_kind_t prop_kind;
     conv_version_t ver;
@@ -55,8 +63,11 @@ struct jit_conv_conf_t {
     int ur_w_tail;
     bool is_1stconv;
     /* 4fma */
-    bool transpose_src;
     int tr_iw;
+    int tr_src_num_guard_elems;
+    /* 1st conv: 4fma */
+    int tr_ld;
+    int kh_step;
     /* 4vnni */
     size_t typesize_in;
     size_t typesize_out;
@@ -106,7 +117,7 @@ struct jit_conv_call_s {
     size_t channel;
     size_t channel_prf;
     size_t oc_blocks;
-    int ic_flag;
+    int flags;
 };
 
 struct jit_1x1_conv_conf_t {
@@ -146,6 +157,11 @@ struct jit_1x1_conv_conf_t {
     /* 4vnni */
     size_t typesize_in;
     size_t typesize_out;
+
+    /* 4fma */
+    bool transpose_src;
+    int tr_is;
+
 };
 
 struct jit_gemm_conv_conf_t {
@@ -194,6 +210,7 @@ struct jit_pool_conf_t {
     bool is_training;
     bool pad_w_is_null;
     bool is_backward;
+    data_type_t ind_dt;
 
     int c_block, c_tail, nb_c;
     int ur_c, ur_c_tail;
@@ -207,10 +224,11 @@ struct jit_pool_conf_t {
 struct jit_pool_call_s {
     const float *src;
     const float *dst;
-    const int *indices;
+    const void *indices;
     const float *src_prf;
     const float *dst_prf;
-    const int *indices_prf;
+    const void *indices_prf;
+    size_t oh;
     size_t kh_padding;
     size_t kh_padding_shift;
     size_t kw_padding;

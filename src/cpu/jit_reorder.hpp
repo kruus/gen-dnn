@@ -19,13 +19,14 @@
 
 #include <assert.h>
 
-#include "jit_generator.hpp"
 #include "c_types_map.hpp"
-#include "cpu_reorder_pd.hpp"
 #include "type_helpers.hpp"
+#include "cpu_reorder_pd.hpp"
 #include "cpu_primitive.hpp"
-#include "cpu_engine.hpp"
+
 #include "simple_reorder.hpp"
+
+#include "jit_generator.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -63,7 +64,8 @@ struct jit_reorder_kernel_f32<JIT_REORDER_TEMPL_INST,
 
     static bool is_applicable(const memory_desc_wrapper &input_d,
             const memory_desc_wrapper &output_d) {
-        return input_d.format() == (order_keep ? fmt_i : fmt_o)
+        return mayiuse(avx2)
+            && input_d.format() == (order_keep ? fmt_i : fmt_o)
             && output_d.format() == (order_keep ? fmt_o : fmt_i);
     }
 

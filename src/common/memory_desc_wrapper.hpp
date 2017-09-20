@@ -85,10 +85,11 @@ struct memory_desc_wrapper: public c_compatible {
         using namespace mkldnn::impl::memory_format;
         if (is_zero() || format() == memory_format::any) return 0;
         assert(utils::one_of(format(), x, nc, nchw, nhwc, chwn, nChw8c,
-                    nChw16c, oi, io, oihw, ihwo, oIhw8i, oIhw16i, OIhw8i8o,
-                    OIhw16i16o, OIhw8i16o2i, OIhw8o16i2o, OIhw8o8i, OIhw16o16i,
-                    Ohwi8o, Ohwi16o, OhIw16o4i, goihw, gOIhw8i8o, gOIhw16i16o,
-                    gOIhw8i16o2i, gOIhw8o16i2o, gOIhw8o8i, gOIhw16o16i, gOhwi8o,
+                    nChw16c, oi, io, oihw, ihwo, hwio, oIhw8i, oIhw16i,
+                    OIhw8i8o, OIhw16i16o, OIhw8i16o2i, OIhw8o16i2o, OIhw8o8i,
+                    OIhw16o16i, Oihw8o, Oihw16o, Ohwi8o, Ohwi16o, OhIw16o4i,
+                    goihw, gOIhw8i8o, gOIhw16i16o, gOIhw8i16o2i, gOIhw8o16i2o,
+                    gOIhw8o8i, gOIhw16o16i, gOihw8o, gOihw16o, gOhwi8o,
                     gOhwi16o, gOhIw16o4i));
 
         if (blocking_desc().offset_padding != 0) return 0;
@@ -125,14 +126,16 @@ struct memory_desc_wrapper: public c_compatible {
     { return !operator==(rhs); }
 
     /** returns true if data (w/o padding if with_padding == false and w/
-     * padding otherwise) have the same dimension, strides, and blocked
-     * structure. depending on with_data_type flag data_type is taken or not
-     * taken into account.
+     * padding otherwise) have the same physical structure, i.e. dimensions,
+     * strides, and blocked structure. depending on with_data_type flag
+     * data_type is taken or not taken into account. dim_start allows to chech
+     * similarity for the logical part of data [dim_start .. ndims()].
      * CAUTION: format any and undef are not similiar to whatever, hence the
-     * followign statement might be true: lhs == rhs && !lhs.similar_to(rhs) */
+     * following statement might be true: lhs == rhs && !lhs.similar_to(rhs) */
     /* TODO: revise */
     inline bool similar_to(const memory_desc_wrapper &rhs,
-            bool with_padding = true, bool with_data_type = true) const;
+            bool with_padding = true, bool with_data_type = true,
+            int dim_start = 0) const;
 
     /** returns true if one memory can be reordered to another */
     inline bool consistent_with(const memory_desc_wrapper &rhs) const;
@@ -243,7 +246,7 @@ private:
     template<typename ...Void> // from ptrdiff_t
     inline size_t _blk_off() const { return static_cast<size_t>(blocking_desc().offset_padding); }
 
-#ifdef _MSVC_LANG
+#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
     template<typename T> inline size_t _blk_off(T x0) const {
         return size_t(x0)*blocking_desc().strides[0][0] + _blk_off();
     }
@@ -275,26 +278,29 @@ inline bool memory_desc_wrapper::operator==(const memory_desc_wrapper &rhs)
 }
 
 inline bool memory_desc_wrapper::similar_to(const memory_desc_wrapper &rhs,
-        bool with_padding, bool with_data_type) const {
+        bool with_padding, bool with_data_type, int dim_start) const {
     using namespace impl::types;
     using namespace utils;
     if (utils::one_of(format(), memory_format::undef, memory_format::any))
         return false;
 
+    const int ds = dim_start;
     const auto &blk = blocking_desc();
     const auto &r_blk = rhs.blocking_desc();
 
     return ndims() == rhs.ndims()
-        && array_cmp(dims(), rhs.dims(), ndims())
+        && dim_start <= ndims() /* guard */
+        && array_cmp(dims() + ds, rhs.dims() + ds, ndims() - ds)
         && format_normalize(format()) == format_normalize(rhs.format())
         && implication(with_data_type, data_type() == rhs.data_type())
-        && array_cmp(blk.block_dims, r_blk.block_dims, ndims())
-        && array_cmp(blk.strides[0], r_blk.strides[0], ndims())
-        && array_cmp(blk.strides[1], r_blk.strides[1], ndims())
+        && array_cmp(blk.block_dims + ds, r_blk.block_dims + ds, ndims() - ds)
+        && array_cmp(blk.strides[0] + ds, r_blk.strides[0] + ds, ndims() - ds)
+        && array_cmp(blk.strides[1] + ds, r_blk.strides[1] + ds, ndims() - ds)
         && implication(with_padding,
-                array_cmp(blk.padding_dims, r_blk.padding_dims, ndims())
-                && array_cmp(blk.offset_padding_to_data,
-                    r_blk.offset_padding_to_data, ndims()));
+                array_cmp(blk.padding_dims + ds, r_blk.padding_dims + ds,
+                    ndims() - ds)
+                && array_cmp(blk.offset_padding_to_data + ds,
+                    r_blk.offset_padding_to_data + ds, ndims() - ds));
 }
 
 inline bool memory_desc_wrapper::consistent_with(

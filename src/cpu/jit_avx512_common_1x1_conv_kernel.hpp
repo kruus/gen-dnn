@@ -26,8 +26,6 @@ namespace impl {
 namespace cpu {
 
 struct jit_avx512_common_1x1_conv_kernel : public jit_generator {
-    enum { REDUCE_FLAG_FIRST = 1, REDUCE_FLAG_LAST = 2 };
-
     jit_avx512_common_1x1_conv_kernel(jit_1x1_conv_conf_t ajcp) : jcp(ajcp)
     {
         this->generate();
@@ -67,25 +65,25 @@ struct jit_avx512_common_1x1_conv_kernel : public jit_generator {
     reg64_t aux_reg_bcast_data = r14;
     reg64_t aux1_reg_bcast_data = rbx;
     reg64_t aux_reg_load_data = r15;
+    reg64_t imm_addr64 = aux_reg_load_data;
     reg64_t aux_reg_output_data = rcx;
     reg64_t reg_load_loop_work = rsi;
     reg64_t reg_reduce_loop_work = r11;
     reg64_t bcast_loop_iter = rdx;
     reg64_t reduce_loop_iter = rdi;
     reg64_t reg_reduce_pos_flag = rax;
-    reg64_t reg_output_stride = r12;
+    reg64_t reg_output_stride = r13;
     reg64_t reg_bias_data = r12;
     reg64_t reg_relu_ns = r13;
     reg64_t reg_bcast_loop_work = aux1_reg_bcast_data;
-    reg64_t reg_diff_bias_data = bcast_loop_iter;
     mask_t vmask = k7;
 
+    Xbyak::Xmm xmm_relu_ns = Xbyak::Xmm(30);
     Xbyak::Zmm zmm_relu_ns = Xbyak::Zmm(30);
     Xbyak::Zmm zmm_zero = Xbyak::Zmm(31);
 
-    int reg_diff_bias_data_stack_offt = 0;
-    int bcast_loop_work_offt = 16;
-    int stack_space_needed = 32;
+    int bcast_loop_work_offt = 0;
+    int stack_space_needed = 16;
 
     void bcast_loop(int load_loop_blk);
     void reduce_loop(int load_loop_blk, int ur, int substep, bool wraparound);

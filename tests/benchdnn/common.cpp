@@ -16,11 +16,15 @@
 
 #include "common.hpp"
 
+#ifdef _WIN32
+#include <chrono>
+#else
 #define HAVE_REGEX
 #if defined(HAVE_REGEX)
 #include <sys/types.h>
 #include <regex.h>
-#endif
+#endif /* HAVE_REGEX */
+#endif /* _WIN32 */
 
 const char *bench_mode2str(bench_mode_t mode) {
     const char *modes[] = {
@@ -111,11 +115,36 @@ bool match_regex(const char *str, const char *pattern) { return true; }
 
 /* perf */
 
-#include <unistd.h>
 #include <sys/types.h>
 #include <time.h>
 
-#if ! defined(_SX)
+#ifdef _WIN32
+unsigned long long ticks_now() {
+    /* Not allowed on user-mode, privileged instruction */
+    return (unsigned long long)0;
+}
+
+static inline double ms_now() {
+    auto timePointTmp
+        = std::chrono::high_resolution_clock::now().time_since_epoch();
+    return std::chrono::duration<double, std::micro>(timePointTmp).count();
+}
+
+#elif defined(_SX)
+// I only found one method, for SX (so making ticks_now equiv to ms_now())
+#include <second.h>
+//unsigned long long ticks_now() { // remove, since equiv to ms_now
+//    return static_cast<unsigned long long>( second()*1000000.0/*double, microseconds*/ );
+//}
+
+#else
+
+#include <unistd.h>
+
+// [ejk] this segfaulted for me until I added perf_begin and perf_end
+//       that actually open a perf_event fd and mmap it.
+// Note: if perf_event "can_user_time", you could also get the conversion to nanoseconds
+//       in a single call!
 unsigned long long ticks_now() {
     unsigned eax, edx, ecx;
 
@@ -124,12 +153,6 @@ unsigned long long ticks_now() {
 
     return (unsigned long long)eax | (unsigned long long)edx << 32;
 }
-#else // I only found one method, for SXa (same as for ms_now())
-#include <second.h>
-//unsigned long long ticks_now() { // remove, since equiv to ms_now
-//    return static_cast<unsigned long long>( second()*1000000.0/*double, microseconds*/ );
-//}
-#endif
 
 static inline double ms_now() {
 #if ! defined(_SX)
@@ -140,6 +163,7 @@ static inline double ms_now() {
     return second() * 1000.0/* ms / second */; // SX has microsecond resolutions
 #endif
 }
+#endif /* _WIN32 */
 
 void benchdnn_timer_t::reset() {
     times_ = 0;

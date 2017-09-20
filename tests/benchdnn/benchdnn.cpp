@@ -14,6 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include "perf.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -57,6 +59,9 @@ int main(int argc, char **argv) {
     }
 
     init();
+    perf_t const * perf_data = perf_begin();
+    if(perf_data == nullptr) // [ejk] may need some timing system init
+        exit(-1);
 
     switch (prim) {
     case CONV: conv::bench(argc, argv); break;
@@ -64,6 +69,7 @@ int main(int argc, char **argv) {
     default: fprintf(stderr, "err: unknown driver\n");
     }
 
+    perf_end(perf_data);
     finalize();
 
     printf("tests:%d passed:%d "
@@ -72,10 +78,6 @@ int main(int argc, char **argv) {
             benchdnn_stat.tests, benchdnn_stat.passed,
             benchdnn_stat.skipped, benchdnn_stat.mistrusted,
             benchdnn_stat.unimplemented, benchdnn_stat.failed);
-
-    assert(benchdnn_stat.tests <= benchdnn_stat.passed + benchdnn_stat.skipped
-            + benchdnn_stat.mistrusted + benchdnn_stat.unimplemented
-            + benchdnn_stat.failed);
 
     return !!benchdnn_stat.failed;
 }

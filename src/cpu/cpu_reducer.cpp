@@ -96,6 +96,7 @@ struct reducer_2d_driver_t: public c_compatible {
             size_t src_step, size_t dst_step, bool nullify_dst)
         : n_src_(n_src), src_ld_(src_ld), src_step_(src_step)
         , dst_step_(dst_step), nullify_dst_(nullify_dst), ker_(nullptr) {}
+    virtual ~reducer_2d_driver_t() {}
     void operator()(data_t *dst, const data_t *srcs, size_t ny, size_t nx)
     { assert(ker_); ker_(dst, srcs, ny, nx); }
 
@@ -528,6 +529,26 @@ void cpu_reducer_2d_t<data_type>::reduce_nolock(int ithr, data_t *dst) {
 }
 
 template struct cpu_reducer_2d_t<data_type::f32>;
+
+/* accumulator section */
+
+template <impl::data_type_t data_type>
+cpu_accumulator_1d_t<data_type>::cpu_accumulator_1d_t(): drv_(nullptr) {
+    drv_ = create_reduce_2d_drv<data_type>(1, 0, 0, 0, false);
+}
+
+template <impl::data_type_t data_type>
+cpu_accumulator_1d_t<data_type>::~cpu_accumulator_1d_t() {
+    delete drv_;
+}
+
+template <impl::data_type_t data_type>
+void cpu_accumulator_1d_t<data_type>::accumulate(data_t *dst,
+        const data_t *src, size_t size) {
+    (*drv_)(dst, src, 1, size);
+}
+
+template struct cpu_accumulator_1d_t<data_type::f32>;
 
 }
 }

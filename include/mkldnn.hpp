@@ -362,6 +362,7 @@ struct memory: public primitive  {
         io = mkldnn_io,
         oihw = mkldnn_oihw,
         ihwo = mkldnn_ihwo,
+        hwio = mkldnn_hwio,
         oIhw8i = mkldnn_oIhw8i,
         oIhw16i = mkldnn_oIhw16i,
         OIhw8i8o = mkldnn_OIhw8i8o,
@@ -370,6 +371,8 @@ struct memory: public primitive  {
         OIhw16o16i = mkldnn_OIhw16o16i,
         OIhw8i16o2i = mkldnn_OIhw8i16o2i,
         OIhw8o16i2o = mkldnn_OIhw8o16i2o,
+        Oihw8o = mkldnn_Oihw8o,
+        Oihw16o = mkldnn_Oihw16o,
         Ohwi8o = mkldnn_Ohwi8o,
         Ohwi16o = mkldnn_Ohwi16o,
         OhIw16o4i = mkldnn_OhIw16o4i,
@@ -378,6 +381,8 @@ struct memory: public primitive  {
         gOIhw16i16o = mkldnn_gOIhw16i16o,
         gOIhw8i16o2i = mkldnn_gOIhw8i16o2i,
         gOIhw8o16i2o = mkldnn_gOIhw8o16i2o,
+        gOihw8o = mkldnn_gOihw8o,
+        gOihw16o = mkldnn_gOihw16o,
         gOhwi8o = mkldnn_gOhwi8o,
         gOhwi16o = mkldnn_gOhwi16o,
         gOIhw8o8i = mkldnn_gOIhw8o8i,
@@ -434,8 +439,6 @@ struct memory: public primitive  {
             auto memory_d = mkldnn_primitive_desc_query_memory_d(get());
             return memory::desc(*memory_d); }
 
-        /// Returns the number of data elements in the memory described.
-        ///
         /// Returns the number of bytes required to allocate the memory described
         /// including the padding area.
         size_t get_size() const {

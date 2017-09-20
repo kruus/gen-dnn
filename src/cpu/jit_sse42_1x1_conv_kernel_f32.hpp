@@ -26,8 +26,6 @@ namespace impl {
 namespace cpu {
 
 struct jit_sse42_1x1_conv_kernel_f32: public jit_generator {
-    enum { REDUCE_FLAG_FIRST = 1, REDUCE_FLAG_LAST = 2 };
-
     jit_sse42_1x1_conv_kernel_f32(jit_1x1_conv_conf_t ajcp): jcp(ajcp) {
         this->generate();
         jit_ker = (void (*)(jit_1x1_conv_call_s *))this->getCode();
@@ -67,6 +65,7 @@ private:
     reg64_t reg_bcast_loop_work = r10;
     reg64_t reg_reduce_loop_work = r11;
     reg64_t load_loop_iter = r13;
+    reg64_t imm_addr64 = load_loop_iter;
     reg64_t bcast_loop_iter = r14;
     reg64_t reduce_loop_iter = r15;
     reg64_t reg_reduce_pos_flag = r8;
@@ -78,6 +77,9 @@ private:
     int stack_space_needed = 8;
 
     xmm_t reg_bcast = xmm_t(15);
+    Xbyak::Xmm xmm_relu_ns = Xbyak::Xmm(14);
+    Xbyak::Xmm xmm_res_ns = Xbyak::Xmm(13);
+    Xbyak::Xmm xmask = Xbyak::Xmm(0);
 
     void bcast_loop(int load_loop_blk, char load_loop_tag);
     void reduce_loop(int load_loop_blk, int ur, char load_loop_tag,

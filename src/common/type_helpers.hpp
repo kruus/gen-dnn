@@ -60,11 +60,13 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
     using namespace memory_format;
     if (utils::one_of(fmt, x, nc, nchw, nhwc, chwn, nChw8c, nChw16c, oi, io,
                 oihw, ihwo,
-#if 1 // defined(TARGET_JIT)
-                oIhw8i, oIhw16i, OIhw8i8o, OIhw16i16o, OIhw8i16o2i,
-                OIhw8o16i2o, OIhw8o8i, OIhw16o16i, Ohwi8o, Ohwi16o, OhIw16o4i,
-                /*goihw,*/ gOIhw8i8o, gOIhw16i16o, gOIhw8i16o2i, gOIhw8o16i2o,
-                gOIhw8o8i, gOIhw16o16i, gOhwi8o, gOhwi16o, gOhIw16o4i,
+#if 1 /* defined(TARGET_JIT) */
+                /* ... these format mostly exist for JIT algorithms, I think */
+                hwio, oIhw8i, oIhw16i, OIhw8i8o, OIhw16i16o,
+                OIhw8i16o2i, OIhw8o16i2o, OIhw8o8i, OIhw16o16i, Oihw8o,
+                Oihw16o, Ohwi8o, Ohwi16o, OhIw16o4i, /*goihw,*/ gOIhw8i8o,
+                gOIhw16i16o, gOIhw8i16o2i, gOIhw8o16i2o, gOIhw8o8i,
+                gOIhw16o16i, gOihw8o, gOihw16o, gOhwi8o, gOhwi16o, gOhIw16o4i,
 #endif
                 goihw))
         return blocked;
@@ -113,21 +115,41 @@ inline status_t set_default_format(memory_desc_t &md, memory_format_t fmt) {
 }
 
 inline data_type_t default_accum_data_type(data_type_t src_dt,
-        data_type_t wei_dt, data_type_t dst_dt) {
+        data_type_t dst_dt) {
     using namespace utils;
     using namespace data_type;
 
-    if (src_dt == f32 && one_of(wei_dt, f32, data_type::undef)
-            && one_of(dst_dt, f32, data_type::undef))
-        return f32;
+    if (one_of(f32, src_dt, dst_dt)) return f32;
+    if (one_of(s16, src_dt, dst_dt)) return s32;
 
-    if (src_dt == s16 && one_of(wei_dt, s16, data_type::undef)
-            && one_of(dst_dt, s32, data_type::undef))
-        return s32;
+    if (one_of(s8, src_dt, dst_dt) || one_of(u8, src_dt, dst_dt)) return s32;
 
-    if (one_of(src_dt, s8, u8) && one_of(wei_dt, s8, u8, data_type::undef)
-            && one_of(dst_dt, s8, u8, s32, data_type::undef))
-        return s32;
+    assert(!"unimplemented use-case: no default parameters available");
+    return dst_dt;
+}
+
+inline data_type_t default_accum_data_type(data_type_t src_dt,
+        data_type_t wei_dt, data_type_t dst_dt, prop_kind_t prop_kind) {
+    using namespace utils;
+    using namespace data_type;
+    using namespace prop_kind;
+
+    /* prop_kind doesn't matter */
+    if (everyone_is(f32, src_dt, wei_dt, dst_dt)) return f32;
+
+    if (one_of(prop_kind, forward_training, forward_inference)) {
+        if (src_dt == s16 && wei_dt == s16 && dst_dt == s32)
+            return s32;
+
+        if (src_dt == u8 && wei_dt == s8 && one_of(dst_dt, s32, s8, u8))
+            return s32;
+    } else if (prop_kind == backward_data) {
+        if (src_dt == s32 && wei_dt == s16 && dst_dt == s16)
+            return s32;
+    } else if (prop_kind == backward_weights) {
+        if (src_dt == s16 && wei_dt == s32 && dst_dt == s16)
+            return s32;
+    }
 
 #ifndef NDEBUG
     std::cout<<"Oh? src_dt="<<src_dt<<" wei_dt="<<wei_dt<<" dst_dt="<<dst_dt<<std::endl;

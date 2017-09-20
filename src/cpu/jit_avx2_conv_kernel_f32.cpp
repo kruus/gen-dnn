@@ -142,7 +142,7 @@ void jit_avx2_conv_fwd_kernel_f32::width_blk_step(int ur_w,
     jit_tagged_label init_done_label("init", pad_tag, oc_blocks_tag);
     jit_tagged_label init_first_label("first", pad_tag, oc_blocks_tag);
 
-    test(reg_ci_flag, IC_FLAG_FIRST);
+    test(reg_ci_flag, FLAG_IC_FIRST);
     jne(init_first_label, T_NEAR);
 
     for (int ii = 0; ii < oc_blocks; ii++)
@@ -200,18 +200,26 @@ void jit_avx2_conv_fwd_kernel_f32::width_blk_step(int ur_w,
 
     if (this->jcp.with_relu) {
         assert(oc_blocks * ur_w < 15);
-        test(reg_ci_flag, IC_FLAG_LAST);
+        test(reg_ci_flag, FLAG_IC_LAST);
         je(regular_store_label, T_NEAR);
 
-        Ymm yzero = ymm15, ymask = ymm14;
         vxorps(yzero, yzero, yzero);
+        if (jcp.relu_negative_slope == 0) {
+           ymm_relu_ns = yzero;
+        } else {
+           mov(imm_addr64, float2int(jcp.relu_negative_slope));
+           movq(xmm_relu_ns, imm_addr64);
+           uni_vbroadcastss(ymm_relu_ns, xmm_relu_ns);
+        }
+
         for (int ii = 0; ii < oc_blocks; ii++) {
             for (int jj = 0; jj < ur_w; jj++) {
                 const size_t o_off = (ii * oh * ow + jj) * oc_blk;
                 Ymm reg_out = Ymm(ur_w * ii + jj);
 
                 vcmpgtps(ymask, reg_out, yzero);
-                vblendvps(reg_out, yzero, reg_out, ymask);
+                vmulps(ymm_res_ns, ymm_relu_ns, reg_out);
+                vblendvps(reg_out, ymm_res_ns, reg_out, ymask);
                 vmovups(yword[reg_output + sizeof(float) * o_off], reg_out);
             }
         }
@@ -300,7 +308,7 @@ void jit_avx2_conv_fwd_kernel_f32::generate()
     if (jcp.with_bias)
         mov(reg_bias, ptr[this->param1 + GET_OFF(bias)]);
     mov(reg_kh, ptr[this->param1 + GET_OFF(kh_padding)]);
-    mov(reg_ci_flag, ptr[this->param1 + GET_OFF(ic_flag)]);
+    mov(reg_ci_flag, ptr[this->param1 + GET_OFF(flags)]);
     mov(reg_oc_blocks, ptr[this->param1 + GET_OFF(oc_blocks)]);
 
     int nb_oc_tail = jcp.nb_oc % jcp.nb_oc_blocking;
