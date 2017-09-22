@@ -21,6 +21,7 @@
 #include "utils.hpp"
 #include "type_helpers.hpp"
 #include "mkldnn_thread.hpp"
+
 #include "os-blas.hpp"
 
 namespace mkldnn {
@@ -113,15 +114,6 @@ void _gemm_convolution_fwd_t<with_relu, run_jit, isa>::execute_forward() {
     }
 }
 
-#ifndef TARGET_VANILLA
-template struct _gemm_convolution_fwd_t<true, true, avx512_common>;
-template struct _gemm_convolution_fwd_t<true, true, avx2>;
-template struct _gemm_convolution_fwd_t<false, true, avx512_common>;
-template struct _gemm_convolution_fwd_t<false, true, avx2>;
-#endif
-template struct _gemm_convolution_fwd_t<true, false, isa_any>;
-template struct _gemm_convolution_fwd_t<false, false, isa_any>;
-
 template <bool run_jit, cpu_isa_t isa>
 void _gemm_convolution_bwd_data_t<run_jit, isa>::execute_backward_data() {
 #ifdef TARGET_VANILLA
@@ -178,12 +170,6 @@ void _gemm_convolution_bwd_data_t<run_jit, isa>::execute_backward_data() {
         }
     }
 }
-
-#ifndef TARGET_VANILLA
-template struct _gemm_convolution_bwd_data_t<true, avx512_common>;
-template struct _gemm_convolution_bwd_data_t<true, avx2>;
-#endif
-template struct _gemm_convolution_bwd_data_t<false, isa_any>;
 
 template <bool run_jit, cpu_isa_t isa>
 void _gemm_convolution_bwd_weights_t<run_jit, isa>::execute_backward_weights() {
@@ -289,6 +275,21 @@ void _gemm_convolution_bwd_weights_t<run_jit, isa>::execute_backward_weights() {
         }
     }
 }
+
+#ifndef TARGET_VANILLA
+template struct _gemm_convolution_fwd_t<true, true, avx512_common>;
+template struct _gemm_convolution_fwd_t<true, true, avx2>;
+template struct _gemm_convolution_fwd_t<false, true, avx512_common>;
+template struct _gemm_convolution_fwd_t<false, true, avx2>;
+#endif
+template struct _gemm_convolution_fwd_t<true, false, isa_any>;
+template struct _gemm_convolution_fwd_t<false, false, isa_any>;
+
+#ifndef TARGET_VANILLA
+template struct _gemm_convolution_bwd_data_t<true, avx512_common>;
+template struct _gemm_convolution_bwd_data_t<true, avx2>;
+#endif
+template struct _gemm_convolution_bwd_data_t<false, isa_any>;
 
 #ifndef TARGET_VANILLA
 template struct _gemm_convolution_bwd_weights_t<true, avx512_common>;

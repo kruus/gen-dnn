@@ -137,6 +137,8 @@ TEST_P(conv_any_fmt_test_float, TestsConvolutionAnyFmt)
                  { fmt::oihw, fmt::format_undef, fmt::format_undef } }
 
 #if !defined(TARGET_VANILLA)
+// Typically jit-related to Intel SIMD register lengths
+// These tests compile in VANILLA mode, but 'make test' fails them.
 #define ANY_OHWIxO { fmt::any,   \
                    { fmt::Ohwi8o, fmt::Ohwi16o, fmt::Oihw16o } }
 #define ANY_NCHWxC { fmt::any,   \
@@ -153,13 +155,12 @@ INSTANTIATE_TEST_CASE_P(TestConvolutionAnyFmtForward, conv_any_fmt_test_float,
     /* src     weights  bias    dst    */
     { 2, 1, 4, 4, 4, 6, 4, 4, 3, 3, 1, 1, 1, 1 }/* conv sizes */ }));
 
-// OK, NCHWxC is supported by *some* ref primitives, but apparently not by convolution [yet]
+#if !defined(TARGET_VANILLA)
 INSTANTIATE_TEST_CASE_P(TestConvolutionAnyFmtForward_NCHWxC, conv_any_fmt_test_float,
     ::testing::Values(conv_any_fmt_test_params_float{ PROP_KIND, ENGINE, ALG,
     ANY_NCHWxC, ANY_OIHW, ANY_X, ANY_NCHWxC,
     { 2, 1, 4, 4, 4, 6, 4, 4, 3, 3, 1, 1, 1, 1 } }));
 
-#if !defined(TARGET_VANILLA)
 /* For now, these formats all require JIT (cpu/) code */
 INSTANTIATE_TEST_CASE_P(
         TestConvolutionAlexnetAnyFmtForwardxlocked, conv_any_fmt_test_float,

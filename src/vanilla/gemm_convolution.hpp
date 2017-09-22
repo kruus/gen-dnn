@@ -17,16 +17,18 @@
  * run_jit template parameter coerced to true (alway)
  */
 
-#ifndef CPU_JIT_GEMM_CONVOLUTION_HPP
-#define CPU_JIT_GEMM_CONVOLUTION_HPP
+#ifndef CPU_GEMM_CONVOLUTION_HPP
+#define CPU_GEMM_CONVOLUTION_HPP
 
 #include "c_types_map.hpp"
 #include "cpu_convolution_pd.hpp"
 #include "cpu_engine.hpp"
-#if JITFUNCS > 0
+#ifndef TARGET_VANILLA
 #include "jit_avx2_gemm_f32.hpp"
 #include "jit_avx512_common_gemm_f32.hpp"
 #include "jit_primitive_conf.hpp"
+#else
+#include "cpu_isa.hpp"
 #endif
 #include "gemm_convolution_utils.hpp"
 
@@ -39,32 +41,22 @@ namespace impl {
 namespace cpu {
 
 namespace {
-#if defined(TARGET_VANILLA)
-typedef enum { isa_any } cpu_isa_t;
-#endif
 
-/** Common code logic --> single point of change.
- * Can be more complicated to support other OSes
+/** Can be more complicated to support other OSes
  * (e.g. without JIT support, no mayiuse available).
- * Some compilers (my gcc) still insist on one-liner returns here :(
- */
+ * Some compilers (gcc) still insist on one-liner returns here :( */
 template<bool run_jit, cpu_isa_t isa>
 static inline bool constexpr _gemm_convolution_implemented() {
-#if ! defined(TARGET_VANILLA)
-#if defined(USE_MKL) || defined(USE_CBLAS)
-    return run_jit? mayiuse(isa): true;
-#else
-    return run_jit? mayiuse(isa): false;
+#if defined(TARGET_VANILLA)
+    static_assert(run_jit == false, "TARGET_VANILLA does not support run_jit" );
+    static_assert(isa == isa_any,   "TARGET_VANILLA only allows isa_any cpu type");
+    // and mayiuse(isa) returns a true constexpr
 #endif
 
-#else // TARGET_VANILLA, no jit possible and only isa_any
-    static_assert( run_jit == false, "TARGET_VANILLA does not support run_jit" );
-    static_assert( isa == isa_any,   "TARGET_VANILLA only allows isa_any cpu type" );
 #if defined(USE_MKL) || defined(USE_CBLAS)
-    return true;
+    return run_jit ? mayiuse(isa) : true;
 #else
-    return false;
-#endif
+    return run_jit ? mayiuse(isa) : false;
 #endif
 }
 }
@@ -98,13 +90,10 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
 #endif
 #if 0
             bool ok = true
-                && _gemm_convolution_implemented< run_jit, isa >()
+                && _gemm_convolution_implemented<run_jit, isa>()
                 && this->set_default_params() == status::success
                 && utils::one_of(this->cdesc_().prop_kind, forward_training,
                         forward_inference)
-                && utils::implication(
-                        this->base_pkind == primitive_kind::convolution_relu,
-                        this->cdesc_().prop_kind == forward_inference)
                 && this->cdesc_().alg_kind == alg_kind::convolution_direct
                 && utils::everyone_is(data_type::f32,
                         this->cdesc_().src_desc.data_type,
@@ -116,15 +105,12 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
                 && this->dst_pd_.desc()->format == nchw
                 && this->weights_pd_.desc()->format == (this->with_groups()
                         ? goihw : oihw);
-#else
+#else // debug "why not?"
             bool ok = true
-                AND_NEED( _gemm_convolution_implemented< run_jit, isa >() )
+                AND_NEED( _gemm_convolution_implemented<run_jit, isa>() )
                 AND_NEED( this->set_default_params() == status::success )
                 AND_NEED( utils::one_of(this->cdesc_().prop_kind, forward_training,
                         forward_inference) )
-                AND_NEED( utils::implication(
-                        this->base_pkind == primitive_kind::convolution_relu,
-                        this->cdesc_().prop_kind == forward_inference) )
                 AND_NEED( this->cdesc_().alg_kind == alg_kind::convolution_direct )
                 AND_NEED( utils::everyone_is(data_type::f32,
                         this->cdesc_().src_desc.data_type,
@@ -146,6 +132,7 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
                     <<last_tested<<std::endl;
             }
 #endif
+#undef AND_NEED
             return ok ? status::success : status::unimplemented;
         }
 
@@ -246,7 +233,7 @@ struct _gemm_convolution_bwd_data_t: public cpu_primitive_t {
             assert(this->engine()->kind() == engine_kind::cpu);
 
             bool ok = true
-                && _gemm_convolution_implemented< run_jit, isa >()
+                && _gemm_convolution_implemented<run_jit, isa>()
                 && this->set_default_params() == status::success
                 && utils::one_of(this->desc()->prop_kind, backward,
                         backward_data)
@@ -360,7 +347,7 @@ struct _gemm_convolution_bwd_weights_t: public cpu_primitive_t {
             assert(this->engine()->kind() == engine_kind::cpu);
 
             bool ok = true
-            && _gemm_convolution_implemented< run_jit, isa >()
+            && _gemm_convolution_implemented<run_jit, isa>()
             && this->set_default_params() == status::success
             && utils::one_of(this->desc()->prop_kind, backward,
                     backward_weights)
@@ -373,7 +360,7 @@ struct _gemm_convolution_bwd_weights_t: public cpu_primitive_t {
                     data_type::f32 == this->desc()->diff_bias_desc.data_type)
             && this->src_pd_.desc()->format == nchw
             && this->diff_dst_pd_.desc()->format == nchw
-            && (this->diff_weights_pd_.desc()->format == this->with_groups()
+            && this->diff_weights_pd_.desc()->format == (this->with_groups()
                  ? goihw : oihw);
             return ok ? status::success : status::unimplemented;
         }

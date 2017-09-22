@@ -16,6 +16,7 @@ DOJUSTDOC="n"
 BUILDOK="y"
 SIZE_T=32 # or 64, for -s or -S SX compile
 JOBS="-j8"
+#JOBS="-j1"
 CMAKETRACE=""
 USE_CBLAS=1
 usage() {
@@ -34,9 +35,10 @@ while getopts ":htvjdDqQpsSTb" arg; do
     case $arg in
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
             # Apr-14-2017 build timings:
-            # 0: build    ~ ?? min  (jit), 1     min  (vanilla)
-            # 1: examples ~  1 min  (jit), 13-16 mins (vanilla)
-            # 2: test_*   ~ 10 mins (jit), 108   mins (vanilla)
+            # 0   : build    ~ ?? min  (jit), 1     min  (vanilla)
+            # >=1 : examples ~  1 min  (jit), 13-16 mins (vanilla)
+            # >=2 : test_*   ~ 10 mins (jit), 108   mins (vanilla)
+            # >=3 : benchdnn (bench.sh) performance/correctness tests (long)
             DOTEST=$(( DOTEST + 1 ))
             ;;
         v) # [yes] (vanilla C/C++ only: no src/cpu/ JIT assembler)
@@ -258,13 +260,18 @@ if [ "$BUILDOK" == "y" ]; then
     cd ..
     echo "Testing ?"
     if [ ! $DOTEST -eq 0 -a ! "$DOTARGET" == "s" ]; then
-        rm -f test1.log test2.log
+        rm -f test1.log test2.log test3.log
         echo "Testing ... test1"
-        (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log || true
-        if [ $DOTEST -gt 1 ]; then
-            echo "Testing ... test1"
+        if [ true ]; then
+            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log || true
+        if [ $DOTEST -ge 2 ]; then
+            echo "Testing ... test2"
             (cd "${BUILDDIR}" && ARGS='-VV -N' make test \
             && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test2.log || true
+        if [ $DOTEST -ge 3 ]; then
+            if [ -x ./bench.sh ]; then
+                /usr/bin/time -v ./bench.sh 2>&1 | tee test3.log || true
+            fi
         fi
         echo "Tests done"
     fi
@@ -285,7 +292,7 @@ if [ "${BUILDOK}" == "y" ]; then
     if [ $DOTEST -gt 0 ]; then
         if [ -d "${LOGDIR}" ]; then rm -f "${LOGIDR}.bak"; mv -v "${LOGDIR}" "${LOGDIR}.bak"; fi
         mkdir ${LOGDIR}
-        for f in "${BUILDDIR}.log" test1.log test2.log doxygen.log; do
+        for f in "${BUILDDIR}.log" test1.log test2.log test3.log doxygen.log; do
             cp -av "${f}" "${LOGDIR}/" || true
         done
     fi
