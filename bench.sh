@@ -22,7 +22,7 @@ fi
 BENCHDIR=${BUILD}/tests/benchdnn
 echo "BUILD    directory : ${BUILD}"
 echo "benchdnn directory : ${BENCHDIR}"
-echo <<EOF
+cat <<EOF
 Here are the output fields for performance benchmarks:
 	string: perf
 	convolution name

@@ -420,6 +420,7 @@ INST_TEST_CASE(Simple_NCHW,
     PARAMS_N(2, 10, 4, 4, EPS)
 );
 
+#if !defined(_SX)
 INST_TEST_CASE(Simple_Blocked,
     PARAMS_B8(2, 8, 1, 1, EPS),
     PARAMS_B8(2, 8, 4, 4, EPS),
@@ -441,6 +442,7 @@ INST_TEST_CASE(Simple_Blocked,
     PARAMS_B16(2, 16, 10, 8, EPS),
     PARAMS_B16(2, 16, 10, 8, EPS)
 );
+#endif
 
 INST_TEST_CASE(GoogleNet_NCHW,
     PARAMS_N(2, 64, 112, 112, EPS),
@@ -481,6 +483,7 @@ INST_TEST_CASE(GoogleNet_NCHW,
     PARAMS_N(2, 384, 7, 7, EPS)
 );
 
+#if !defined(_SX)
 INST_TEST_CASE(GoogleNet_Blocked_8,
     PARAMS_B8(2, 64, 112, 112, EPS),
     PARAMS_B8(2, 64, 56, 56, EPS),
@@ -518,7 +521,9 @@ INST_TEST_CASE(GoogleNet_Blocked_8,
     PARAMS_B8(2, 48, 7, 7, EPS),
     PARAMS_B8(2, 384, 7, 7, EPS)
 );
+#endif
 
+#if !defined(_SX)
 INST_TEST_CASE(GoogleNet_Blocked_16,
     PARAMS_B16(2, 64, 112, 112, EPS),
     PARAMS_B16(2, 64, 56, 56, EPS),
@@ -556,6 +561,7 @@ INST_TEST_CASE(GoogleNet_Blocked_16,
     PARAMS_B16(2, 48, 7, 7, EPS),
     PARAMS_B16(2, 384, 7, 7, EPS)
 );
+#endif
 
 
 }
