@@ -1,0 +1,33 @@
+benchdnn init ... OK
+run: mb1ic3ih227oc96oh55kh11sh4nalexnet:conv1
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+perf,alexnet:conv1,mb1ic3ih227oc96oh55kh11sh4nalexnet:conv1,0.21083,0,18229,0.0115657,18281.4,0.0115325
+tests:1 passed:0 skipped:0 mistrusted:0 unimplemented:0 failed:0
+benchdnn init ... OK
+run: mb12ic3ih227oc96oh55kh11sh4nalexnet:conv1
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+perf,alexnet:conv1,mb12ic3ih227oc96oh55kh11sh4nalexnet:conv1,2.52996,0,217299,0.0116428,217497,0.0116322
+tests:1 passed:0 skipped:0 mistrusted:0 unimplemented:0 failed:0
+benchdnn init ... OK
+run: mb32ic3ih227oc96oh55kh11sh4nalexnet:conv1
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+perf,alexnet:conv1,mb32ic3ih227oc96oh55kh11sh4nalexnet:conv1,6.74657,0,580243,0.0116272,580641,0.0116192
+tests:1 passed:0 skipped:0 mistrusted:0 unimplemented:0 failed:0
+benchdnn init ... OK
+run: mb1ic3ih227oc96oh55kh11sh4nalexnet:conv1
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+@@@ [DST] final: diff: l0(``0``) l1:(7.11314e+09,7.11314e+09,0,``0``) l2:(1.67643e+07,1.67643e+07,0,``0``) l8:(124722,124722,0,``0``)
+0:PASSED __REPRO: mb1ic3ih227oc96oh55kh11sh4nalexnet:conv1
+tests:1 passed:1 skipped:0 mistrusted:0 unimplemented:0 failed:0
+benchdnn init ... OK
+run: mb12ic3ih227oc96oh55kh11sh4nalexnet:conv1
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+@@@ [DST] final: diff: l0(``0``) l1:(8.52806e+10,8.52806e+10,0,``0``) l2:(5.80311e+07,5.80311e+07,0,``0``) l8:(125529,125529,0,``0``)
+0:PASSED __REPRO: mb12ic3ih227oc96oh55kh11sh4nalexnet:conv1
+tests:1 passed:1 skipped:0 mistrusted:0 unimplemented:0 failed:0
+benchdnn init ... OK
+run: mb32ic3ih227oc96oh55kh11sh4nalexnet:conv1
+ create<mkldnn::impl::cpu::_gemm_convolution_fwd_t<false, false, (mkldnn::impl::cpu::cpu_isa_t)0>>::pd_t(pd,adesc,engine,hint_fwd) --> status:success
+@@@ [DST] final: diff: l0(``0``) l1:(2.27592e+11,2.27592e+11,0,``0``) l2:(9.48299e+07,9.48299e+07,0,``0``) l8:(125529,125529,0,``0``)
+0:PASSED __REPRO: mb32ic3ih227oc96oh55kh11sh4nalexnet:conv1
+tests:1 passed:1 skipped:0 mistrusted:0 unimplemented:0 failed:0

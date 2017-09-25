@@ -18,7 +18,7 @@
 #include "mkldnn_traits.hpp"
 #include "math_utils.hpp"
 
-#define DBG_CONV 0
+#define DBG_CONV 1
 #if !defined(DBG_CONV) && !defined(NDEBUG)
 #define DBG_CONV 1
 #endif
@@ -26,6 +26,7 @@
 #if DBG_CONV
 #include "mkldnn_io.h"
 #include <unordered_set> // to track new ref_convolutions (potential to optimize?)
+#include <iostream>
 #endif
 
 namespace mkldnn {

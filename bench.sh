@@ -1,14 +1,27 @@
 #!/bin/bash
 #
 #################
-#     select one:
-BUILD=build
-#BUILD=buildd
-#BUILD=build-jit
-#BUILD=build-jitd
+if [ `uname` == 'SUPER-UX' ]; then
+	#BUILD=build-sx
+	# let's take the MOST RECENT of build-sx or build-sxd directories ...
+	BUILD=`ls -ldst build-sx* | grep ' drwx' | head -1 | sed 's/.*\(build.*\)/\1/'`
+	LOGDIR=guest/sx
+	mkdir -p guest/sx
+	chmod ugo+w guest/sx
+else
+	#     select one:
+	BUILD=build
+	#BUILD=buildd
+	#BUILD=build-jit
+	#BUILD=build-jitd
+	(cd ${BUILD}/tests/benchdnn && VERBOSE=1 make) || { echo "Compile issues?"; exit; }
+	LOGDIR=./
+fi
 #################
 #
-(cd ${BUILD}/tests/benchdnn && VERBOSE=1 make) || { echo "Compile issues?"; exit; }
+BENCHDIR=${BUILD}/tests/benchdnn
+echo "BUILD    directory : ${BUILD}"
+echo "benchdnn directory : ${BENCHDIR}"
 echo <<EOF
 Here are the output fields for performance benchmarks:
 	string: perf
@@ -24,14 +37,21 @@ as reported by the default output template
 	perf,%n,%d,%GO,%GF,%-t,%-Gp,%0t,%0Gp
 EOF
 echo "Bench Convolution Performance for just fwd alexnet:conv1 ..."
-(cd ${BUILD}/tests/benchdnn && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B mb1_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
-(cd ${BUILD}/tests/benchdnn && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B mb12_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
-(cd ${BUILD}/tests/benchdnn && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B mb32_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
+{
+(cd ${BENCHDIR} && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B mb1_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
+(cd ${BENCHDIR} && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B mb12_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
+(cd ${BENCHDIR} && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B mb32_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
+(cd ${BENCHDIR} && ./benchdnn --conv --mode=C -v3 --cfg=f32 --dir=FWD_B mb1_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
+(cd ${BENCHDIR} && ./benchdnn --conv --mode=C -v3 --cfg=f32 --dir=FWD_B mb12_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
+(cd ${BENCHDIR} && ./benchdnn --conv --mode=C -v3 --cfg=f32 --dir=FWD_B mb32_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
+} 2>&1 | tee ${LOGDIR}/bench-quick.log
 
 echo "Bench Convolution Performance for default fwd conv layers (many!) ..."
-(cd ${BUILD}/tests/benchdnn && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B ) 2>&1 | tee bench-conv-tmp.log || { echo "Ohoh"; exit; }
-mv bench-conv-tmp.log bench-conv.log
+(cd ${BENCHDIR} && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B ) 2>&1 | tee ${LOGDIR}/bench-conv-tmp.log \
+&& mv ${LOGDIR}/bench-conv-tmp.log ${LOGDIR}/bench-conv.log \
+|| { echo "Ohoh"; exit; }
 echo "Bench Convolution Correctness for default fwd conv layers (many!) ..."
-(cd ${BUILD}/tests/benchdnn && ./benchdnn --conv          -v3 --cfg=f32 --dir=FWD_B ) 2>&1 | tee bench-conv-tmp.log || { echo "Ohoh"; exit; }
-mv bench-conv-tmp.log bench-conv-correct.log
+(cd ${BENCHDIR} && ./benchdnn --conv          -v3 --cfg=f32 --dir=FWD_B ) 2>&1 | tee ${LOGDIR}/bench-conv-tmp.log \
+&& mv ${LOGDIR}/bench-conv-tmp.log ${LOGDIR}/bench-conv-correct.log \
+|| { echo "Ohoh"; exit; }
 

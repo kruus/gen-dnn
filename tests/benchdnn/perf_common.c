@@ -1,3 +1,6 @@
+#if defined(_WIN32)
+#elif defined(_SX)
+#else // linux ...
 #include "perf_common.h"
 #include <stdio.h>
 
@@ -34,4 +37,5 @@ int eprintf(int level, int var, const char *fmt, ...)
         return ret;
 }
 
-
+#endif // linux ...
+/* vim: set sw=4,et: */

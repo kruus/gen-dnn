@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 typedef struct { int fd; long page_size; void* addr; } perf_t;
-perf_t* perf_begin();
+perf_t const* perf_begin();
 void perf_end(perf_t const* perf_ctx);
 
 #if defined(__cplusplus)

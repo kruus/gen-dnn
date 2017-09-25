@@ -16,8 +16,12 @@
 
 #include "common.hpp"
 
-#ifdef _WIN32
-#include <chrono>
+#if defined(_WIN32) || defined(_SX)
+#include <chrono> // new: SX timer now follow the WIN32 approach
+#if defined(_SX)
+//#include <second.h> // old ?
+#endif
+
 #else
 #define HAVE_REGEX
 #if defined(HAVE_REGEX)
@@ -118,26 +122,31 @@ bool match_regex(const char *str, const char *pattern) { return true; }
 #include <sys/types.h>
 #include <time.h>
 
-#ifdef _WIN32
+// NEW: _SX timer treatment can follow _WIND32 approach ...
+#if defined(_WIN32) || defined(_SX)
+
 unsigned long long ticks_now() {
     /* Not allowed on user-mode, privileged instruction */
     return (unsigned long long)0;
 }
 
+#if 0 && defined(_SX)
+#include <second.h>
+//unsigned long long ticks_now() { // remove, since equiv to ms_now
+//    return static_cast<unsigned long long>( second()*1000000.0/*double, microseconds*/ );
+//}
+static inline double ms_now() {
+    return second() * 1000000.0;
+}
+#else
 static inline double ms_now() {
     auto timePointTmp
         = std::chrono::high_resolution_clock::now().time_since_epoch();
     return std::chrono::duration<double, std::micro>(timePointTmp).count();
 }
+#endif
 
-#elif defined(_SX)
-// I only found one method, for SX (so making ticks_now equiv to ms_now())
-#include <second.h>
-//unsigned long long ticks_now() { // remove, since equiv to ms_now
-//    return static_cast<unsigned long long>( second()*1000000.0/*double, microseconds*/ );
-//}
-
-#else
+#else // linux ...
 
 #include <unistd.h>
 
@@ -155,13 +164,13 @@ unsigned long long ticks_now() {
 }
 
 static inline double ms_now() {
-#if ! defined(_SX)
+//#if ! defined(_SX)
     struct timespec tv;
     clock_gettime(CLOCK_MONOTONIC, &tv);
     return (1000000000ll * tv.tv_sec + tv.tv_nsec) / 1e6;
-#else
-    return second() * 1000.0/* ms / second */; // SX has microsecond resolutions
-#endif
+//#else
+//    return second() * 1000.0/* ms / second */; // SX has microsecond resolutions
+//#endif
 }
 #endif /* _WIN32 */
 
@@ -176,23 +185,23 @@ void benchdnn_timer_t::reset() {
 }
 
 void benchdnn_timer_t::start() {
-#if ! defined(_SX)
+//#if ! defined(_SX)
     ticks_start_ = ticks_now();
     ms_start_ = ms_now();
-#else // ok, just make them equiv
-    ms_start_ = ms_now();
-    ticks_start_ = static_cast<typeof(ticks_start_)>(ms_start_ * 1000.0);
-#endif
+//#else // ok, just make them equiv
+//    ms_start_ = ms_now();
+//    ticks_start_ = static_cast<typeof(ticks_start_)>(ms_start_ * 1000.0);
+//#endif
 }
 
 void benchdnn_timer_t::stop() {
-#if ! defined(_SX)
+//#if ! defined(_SX)
     long long d_ticks = ticks_now() - ticks_start_; /* FIXME: overflow? */
     double d_ms = ms_now() - ms_start_;
-#else
-    double d_ms = ms_now() - ms_start_;
-    long long d_ticks = static_cast<long long>( d_ms*1000.0 );
-#endif
+//#else
+//    double d_ms = ms_now() - ms_start_;
+//    long long d_ticks = static_cast<long long>( d_ms*1000.0 );
+//#endif
 
     ticks_start_ += d_ticks;
     ms_start_ += d_ms;

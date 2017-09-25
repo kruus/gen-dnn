@@ -15,8 +15,8 @@ DONEEDMKL="y"
 DOJUSTDOC="n"
 BUILDOK="y"
 SIZE_T=32 # or 64, for -s or -S SX compile
-JOBS="-j8"
-#JOBS="-j1"
+#JOBS="-j8"
+JOBS="-j1"
 CMAKETRACE=""
 USE_CBLAS=1
 usage() {
@@ -173,6 +173,7 @@ fi
 
         # REMOVE WHEN FINISHED SX DEBUGGING
         SXOPT="${SXOPT} -g -traceback" # enable source code tracing ALWAYS
+        SXOPT="${SXOPT} -DVERBOSE_PRIMITIVE_CREATE"
 
         export CFLAGS="${CFLAGS} -size_t${SIZE_T} -Kc99,gcc ${SXOPT}"
         # An object file that is generated with -Kexceptions and an object file
@@ -201,7 +202,7 @@ fi
     #    TODO: cblas / mathkeisan alternatives?
     if [ "$BUILDOK" == "y" ]; then
         BUILDOK="n"
-        rm -f ./stamp-BUILDOK ./CMakeCache.txt
+        rm -f ${BUILDDIR}/stamp-BUILDOK ./CMakeCache.txt
         echo "${CMAKEENV}; cmake ${CMAKEOPT} ${CMAKETRACE} .."
         set -x
         { if [ x"${CMAKEENV}" == x"" ]; then ${CMAKEENV}; fi; \
@@ -218,6 +219,7 @@ fi
             cmake ${CMAKEOPT} ${CMAKETRACE} .. ; }
         set +x
     fi
+    set -x
     if [ "$BUILDOK" == "y" -a ! "$DOTARGET" == "s" ]; then
         echo "DOTARGET  $DOTARGET"
         echo "DOJIT     $DOJIT"
@@ -240,12 +242,13 @@ fi
         { cd ..; find "${BUILDDIR}" -type d -exec chmod o+w {} \; ; }
     fi
     if [ "$BUILDOK" == "y" ]; then
-        touch ./stamp-BUILDOK
+        touch ${BUILDDIR}/stamp-BUILDOK
         if [ "$DODOC" == "y" ]; then
             echo "Build OK... Doxygen (please be patient)"
             make VERBOSE=1 doc >& ../doxygen.log
         fi
     fi
+    set +x
 ) 2>&1 | tee "${BUILDDIR}".log
 ls -l "${BUILDDIR}"
 BUILDOK="n"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="y"; fi
@@ -264,10 +267,12 @@ if [ "$BUILDOK" == "y" ]; then
         echo "Testing ... test1"
         if [ true ]; then
             (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log || true
+        fi
         if [ $DOTEST -ge 2 ]; then
             echo "Testing ... test2"
             (cd "${BUILDDIR}" && ARGS='-VV -N' make test \
             && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test2.log || true
+        fi
         if [ $DOTEST -ge 3 ]; then
             if [ -x ./bench.sh ]; then
                 /usr/bin/time -v ./bench.sh 2>&1 | tee test3.log || true

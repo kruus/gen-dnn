@@ -58,10 +58,14 @@ int main(int argc, char **argv) {
         ++argv;
     }
 
+    printf("benchdnn init ..."); fflush(stdout);
     init();
+    printf(" OK\n"); fflush(stdout);
     perf_t const * perf_data = perf_begin();
-    if(perf_data == nullptr) // [ejk] may need some timing system init
+    if(perf_data == nullptr) { // [ejk] may need some timing system init
+        printf("ERROR: perf_begin failed!\n");
         exit(-1);
+    }
 
     switch (prim) {
     case CONV: conv::bench(argc, argv); break;

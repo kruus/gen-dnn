@@ -1,7 +1,8 @@
 #ifndef MKLDNN_IO_HPP
 #define MKLDNN_IO_HPP
 #ifndef MKLDNN_IO
-#define MKLDNN_IO 0 // until namespace bugs fixed
+//#define MKLDNN_IO 0 // until namespace bugs fixed
+#define MKLDNN_IO 1
 #endif
 
 #if ! MKLDNN_IO
@@ -34,8 +35,8 @@ namespace mkldnn {
         CIO_OP(stream_kind)
         CIO_OP(query)
 #undef CIO_OP
-        // ------------- more complex types ------------------
-        std::ostream& operator<<(std::ostream& os, mkldnn_dims_t const dims);
+    // ------------- more complex types ------------------
+    std::ostream& operator<<(std::ostream& os, mkldnn_dims_t const dims);
     std::ostream& operator<<(std::ostream& os, mkldnn_strides_t const strides);
     std::ostream& operator<<(std::ostream& os, mkldnn_blocking_desc_t const& bd);
     std::ostream& operator<<(std::ostream& os, mkldnn_memory_desc_t const& md);

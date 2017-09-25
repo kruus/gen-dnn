@@ -4,7 +4,8 @@
  * i/o utilities extending basic mkldnn API.
  */
 #ifndef MKLDNN_IO
-#define MKLDNN_IO 0 // until namespace bugs fixed
+//#define MKLDNN_IO 0 // until namespace bugs fixed
+#define MKLDNN_IO 1
 #endif
 
 #if ! MKLDNN_IO

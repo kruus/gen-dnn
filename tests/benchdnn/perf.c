@@ -1,11 +1,9 @@
 #include "perf.h"
 
-#if defined(_SX)
-void perf_begin() {}
-void perf_end() {}
-#elif defined(WIN32)
-void perf_begin() {}
-void perf_end() {}
+#if defined(_WIN32) || defined(_SX)
+static perf_t perf_ctx_unused = {.fd=0, .page_size=0, .addr = (void*)0 };
+perf_t const* perf_begin() { return &perf_ctx_unused; }
+void perf_end(perf_t const* perf_ctx) {}
 #else // linux ...
 
 /* This code was snarfed from linux kernel "perf" tools and it
@@ -221,9 +219,8 @@ int main(int argc __attribute__((unused)), char**argv __attribute__((unused)) )
 	return 0;
 }
 #endif
-#endif
 
-perf_t* perf_begin()
+perf_t const* perf_begin()
 {
     int fd;
     void *addr = 0;
@@ -267,5 +264,7 @@ void perf_end(perf_t const* perf)
         munmap( perf->addr, perf->page_size );
         close( perf->fd );
     }
+    free(perf);
 }
+#endif // linux ...
 /* vim: set sw=4,et: */
