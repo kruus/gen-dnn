@@ -147,8 +147,8 @@ inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
     case f::OIhw16o16i:
     case f::Ohwi8o:
     case f::Ohwi16o:
-        ndims = 4; break;
 #endif
+        ndims = 4; break;
     case f::goihw:
 #if MKLDNN_JIT_TYPES > 0
     case f::gOIhw8i8o:
@@ -157,8 +157,8 @@ inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
     case f::gOIhw8o16i2o:
     case f::gOIhw8o8i:
     case f::gOIhw16o16i:
-        ndims = 5; break;
 #endif
+        ndims = 5; break;
     case f::format_undef:
         ndims = 0; break;
     case f::any:

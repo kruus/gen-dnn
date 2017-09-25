@@ -134,7 +134,10 @@ static mkldnn::impl::status_t verbose_primitive_desc_create(
     using namespace std;
     typedef typename prim::pd_t pd_t;
     mkldnn::impl::status_t ret = primitive_desc_t::create<pd_t>( pd, adesc, engine, hint_fwd );
-    cout<<" create<"<<typeid(prim).name()<<">::pd_t(pd,adesc,engine,hint_fwd) --> "<<ret<<endl;
+    // printing the full failuer chain can be quite lengthy ...
+    if( ret == success )
+        cout<<" create<"<<typeid(prim).name()
+            <<">::pd_t(pd,adesc,engine,hint_fwd) --> "<<ret<<endl;
     return ret;
 }
 #define INSTANCE(...) &verbose_primitive_desc_create<__VA_ARGS__>
