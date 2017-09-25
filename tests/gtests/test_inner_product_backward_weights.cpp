@@ -196,8 +196,9 @@ INSTANTIATE_TEST_CASE_P(
                 inprod_test_params_float{ engine::kind::cpu,
                         memory::format::nchw, memory::format::oihw,
                         memory::format::format_undef, memory::format::nc,
-                        { 2, 32, 48, 6, 6 } },
-                inprod_test_params_float{ engine::kind::cpu,
+                        { 2, 32, 48, 6, 6 } }
+#if MKLDNN_JIT_TYPES > 0
+                , inprod_test_params_float{ engine::kind::cpu,
                         memory::format::nChw8c, memory::format::oIhw8i,
                         memory::format::format_undef, memory::format::nc,
                         { 2, 32, 48, 6, 6 } },
@@ -212,7 +213,9 @@ INSTANTIATE_TEST_CASE_P(
                 inprod_test_params_float{ engine::kind::cpu,
                         memory::format::nc, memory::format::oi,
                         memory::format::format_undef, memory::format::nc,
-                        { 2, 2, 4, 1, 1 } }));
+                        { 2, 2, 4, 1, 1 } }
+#endif
+));
 
 INSTANTIATE_TEST_CASE_P(
         TestInnerProductBackwardWeights, inner_product_test_float,
@@ -220,8 +223,9 @@ INSTANTIATE_TEST_CASE_P(
                 inprod_test_params_float{ engine::kind::cpu,
                         memory::format::nchw, memory::format::oihw,
                         memory::format::x, memory::format::nc,
-                        { 2, 32, 48, 6, 6 } },
-                inprod_test_params_float{ engine::kind::cpu,
+                        { 2, 32, 48, 6, 6 } }
+#if MKLDNN_JIT_TYPES > 0
+                , inprod_test_params_float{ engine::kind::cpu,
                         memory::format::nChw8c, memory::format::oIhw8i,
                         memory::format::x, memory::format::nc,
                         { 2, 32, 48, 6, 6 } },
@@ -236,5 +240,7 @@ INSTANTIATE_TEST_CASE_P(
                 inprod_test_params_float{ engine::kind::cpu,
                         memory::format::nc, memory::format::oi,
                         memory::format::x, memory::format::nc,
-                        { 2, 2, 4, 1, 1 } }));
+                        { 2, 2, 4, 1, 1 } }
+#endif
+));
 }

@@ -245,9 +245,23 @@ void test2() {
     mkldnn_primitive_desc_t c3_src_pd, c3_weights_pd, c3_bias_pd, c3_dst_pd, out_pd;
     mkldnn_primitive_t c3_src, c3_weights, c3_bias, c3_dst, out;
 
+#if MKLDNN_JIT_TYPES > 0
+    mkldnn_memory_format_t lay_src     = mkldnn_nChw8c;
+    mkldnn_memory_format_t lay_weights = (groups == 1 ? mkldnn_OIhw8i8o : mkldnn_gOIhw8i8o);
+    mkldnn_memory_format_t lay_bias    = mkldnn_x;
+    mkldnn_memory_format_t lay_c3dst   = mkldnn_nChw8c;
+    mkldnn_memory_format_t lay_out     = mkldnn_nChw;
+#else
+    mkldnn_memory_format_t lay_src     = mkldnn_nchw;
+    mkldnn_memory_format_t lay_weights = (groups == 1 ? mkldnn_oihw : mkldnn_goihw);
+    mkldnn_memory_format_t lay_bias    = mkldnn_x;
+    mkldnn_memory_format_t lay_c3dst   = mkldnn_nchw;
+    mkldnn_memory_format_t lay_out     = mkldnn_nchw;
+#endif
+
     // src
     {
-        CHECK(mkldnn_memory_desc_init(&c3_src_md, 4, c3_src_sizes, mkldnn_f32, mkldnn_nChw8c));
+        CHECK(mkldnn_memory_desc_init(&c3_src_md, 4, c3_src_sizes, mkldnn_f32, lay_src));
         CHECK(mkldnn_memory_primitive_desc_create(&c3_src_pd, &c3_src_md, engine));
         CHECK(mkldnn_primitive_create(&c3_src, c3_src_pd, NULL, NULL));
         CHECK(mkldnn_memory_set_data_handle(c3_src, src));
@@ -257,7 +271,7 @@ void test2() {
     {
         CHECK(mkldnn_memory_desc_init(&c3_weights_md, 4 + (groups != 1),
                     c3_weights_sizes + (groups == 1), mkldnn_f32,
-                    groups == 1 ? mkldnn_OIhw8i8o : mkldnn_gOIhw8i8o));
+                    lay_weights));
         CHECK(mkldnn_memory_primitive_desc_create(&c3_weights_pd, &c3_weights_md, engine));
         CHECK(mkldnn_primitive_create(&c3_weights, c3_weights_pd, NULL, NULL));
         CHECK(mkldnn_memory_set_data_handle(c3_weights, weights));
@@ -265,7 +279,7 @@ void test2() {
 
     // bias
     {
-        CHECK(mkldnn_memory_desc_init(&c3_bias_md, 1, c3_bias_sizes, mkldnn_f32, mkldnn_x));
+        CHECK(mkldnn_memory_desc_init(&c3_bias_md, 1, c3_bias_sizes, mkldnn_f32, lay_bias));
         CHECK(mkldnn_memory_primitive_desc_create(&c3_bias_pd, &c3_bias_md, engine));
         CHECK(mkldnn_primitive_create(&c3_bias, c3_bias_pd, NULL, NULL));
         CHECK(mkldnn_memory_set_data_handle(c3_bias, bias));
@@ -273,7 +287,7 @@ void test2() {
 
     // c3_dst
     {
-        CHECK(mkldnn_memory_desc_init(&c3_dst_md, 4, c3_dst_sizes, mkldnn_f32, mkldnn_nChw8c));
+        CHECK(mkldnn_memory_desc_init(&c3_dst_md, 4, c3_dst_sizes, mkldnn_f32, lay_c3dst));
         CHECK(mkldnn_memory_primitive_desc_create(&c3_dst_pd, &c3_dst_md, engine));
         CHECK(mkldnn_primitive_create(&c3_dst, c3_dst_pd, NULL, NULL));
         CHECK(mkldnn_memory_set_data_handle(c3_dst, dst));
@@ -281,7 +295,7 @@ void test2() {
 
     // out
     {
-        CHECK(mkldnn_memory_desc_init(&out_md, 4, c3_dst_sizes, mkldnn_f32, mkldnn_nchw));
+        CHECK(mkldnn_memory_desc_init(&out_md, 4, c3_dst_sizes, mkldnn_f32, lay_out));
         CHECK(mkldnn_memory_primitive_desc_create(&out_pd, &out_md, engine));
         CHECK(mkldnn_primitive_create(&out, out_pd, NULL, NULL));
         CHECK(mkldnn_memory_set_data_handle(out, out_mem));

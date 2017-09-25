@@ -53,8 +53,10 @@ struct gemm_inner_product_fwd_t: public cpu_primitive_t {
                         desc()->dst_desc.data_type)
                 && implication(this->with_bias(),
                         data_type == desc()->bias_desc.data_type)
+#if MKLDNN_JIT_TYPES > 0
                 && implication(src_pd_.desc()->format == nChw8c,
                         weights_pd_.desc()->format == oIhw8i)
+#endif
                 && implication(src_pd_.desc()->format == nchw,
                         weights_pd_.desc()->format == oihw)
                 && implication(src_pd_.desc()->format == nc,
@@ -106,8 +108,10 @@ struct gemm_inner_product_bwd_data_t: public cpu_primitive_t {
                 && everyone_is(data_type, desc()->diff_src_desc.data_type,
                         desc()->weights_desc.data_type,
                         desc()->diff_dst_desc.data_type)
+#if MKLDNN_JIT_TYPES > 0
                 && implication(diff_src_pd_.desc()->format == nChw8c,
                         weights_pd_.desc()->format == oIhw8i)
+#endif
                 && implication(diff_src_pd_.desc()->format == nchw,
                         weights_pd_.desc()->format == oihw)
                 && implication(diff_src_pd_.desc()->format == nc,
@@ -159,8 +163,10 @@ struct gemm_inner_product_bwd_weights_t: public cpu_primitive_t {
                 && everyone_is(data_type, desc()->src_desc.data_type,
                         desc()->diff_weights_desc.data_type,
                         desc()->diff_dst_desc.data_type)
+#if MKLDNN_JIT_TYPES > 0
                 && implication(src_pd_.desc()->format == nChw8c,
                         diff_weights_pd_.desc()->format == oIhw8i)
+#endif
                 && implication(src_pd_.desc()->format == nchw,
                         diff_weights_pd_.desc()->format == oihw)
                 && implication(src_pd_.desc()->format == nc,

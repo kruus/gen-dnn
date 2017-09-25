@@ -356,13 +356,16 @@ struct memory: public primitive  {
         nchw = mkldnn_nchw,
         nhwc = mkldnn_nhwc,
         chwn = mkldnn_chwn,
+#if MKLDNN_JIT_TYPES > 0
         nChw8c = mkldnn_nChw8c,
         nChw16c = mkldnn_nChw16c,
+#endif
         oi = mkldnn_oi,
         io = mkldnn_io,
         oihw = mkldnn_oihw,
         ihwo = mkldnn_ihwo,
         hwio = mkldnn_hwio,
+#if MKLDNN_JIT_TYPES > 0
         oIhw8i = mkldnn_oIhw8i,
         oIhw16i = mkldnn_oIhw16i,
         OIhw8i8o = mkldnn_OIhw8i8o,
@@ -376,7 +379,9 @@ struct memory: public primitive  {
         Ohwi8o = mkldnn_Ohwi8o,
         Ohwi16o = mkldnn_Ohwi16o,
         OhIw16o4i = mkldnn_OhIw16o4i,
+#endif
         goihw = mkldnn_goihw,
+#if MKLDNN_JIT_TYPES > 0
         gOIhw8i8o = mkldnn_gOIhw8i8o,
         gOIhw16i16o = mkldnn_gOIhw16i16o,
         gOIhw8i16o2i = mkldnn_gOIhw8i16o2i,
@@ -388,6 +393,7 @@ struct memory: public primitive  {
         gOIhw8o8i = mkldnn_gOIhw8o8i,
         gOIhw16o16i = mkldnn_gOIhw16o16i,
         gOhIw16o4i = mkldnn_gOhIw16o4i,
+#endif
     };
 
     /// A memory descriptor.

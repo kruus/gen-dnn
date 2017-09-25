@@ -433,13 +433,15 @@ status_t memory_desc_wrapper::compute_blocking(memory_desc_t &memory_desc)
     case nchw: return fill_nchw(memory_desc);
     case nhwc: return fill_nhwc(memory_desc);
     case chwn: return fill_chwn(memory_desc);
+#if MKLDNN_JIT_TYPES > 0
     case nChw8c: return fill_nChw8c(memory_desc);
     case nChw16c: return fill_nChw16c(memory_desc);
+#endif
     case oi: return fill_oi(memory_desc);
     case io: return fill_io(memory_desc);
     case oihw: return fill_oihw(memory_desc);
     case ihwo: return fill_ihwo(memory_desc);
-#if 1 // defined(TARGET_JIT)
+#if MKLDNN_JIT_TYPES > 0
     case hwio: return fill_hwio(memory_desc);
     case OIhw8i8o: return fill_OIhw8i8o(memory_desc);
     case OIhw16i16o: return fill_OIhw16i16o(memory_desc);
@@ -454,7 +456,7 @@ status_t memory_desc_wrapper::compute_blocking(memory_desc_t &memory_desc)
     case OhIw16o4i: return fill_OhIw16o4i(memory_desc);
 #endif
     case goihw: return fill_goihw(memory_desc);
-#if 1 // defined(TARGET_JIT)
+#if MKLDNN_JIT_TYPES > 0
     case gOIhw8i8o: return fill_gOIhw8i8o(memory_desc);
     case gOIhw16i16o: return fill_gOIhw16i16o(memory_desc);
     case gOIhw8i16o2i: return fill_gOIhw8i16o2i(memory_desc);

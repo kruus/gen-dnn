@@ -163,6 +163,7 @@ struct memory_desc_wrapper: public c_compatible {
             phys_offset += pos_block * blk.strides[0][d];
             phys_offset += pos_within_block * blk.strides[1][d];
         }
+#if MKLDNN_JIT_TYPES > 0
         if (format() == gOIhw8i16o2i || format() == OIhw8i16o2i) {
             // TODO: Fix temporary workaround for formats with double blocking
             const bool with_groups = format() == gOIhw8i16o2i;
@@ -177,6 +178,7 @@ struct memory_desc_wrapper: public c_compatible {
             const int oc_2  = pos[with_groups + 0] % 2;
             phys_offset += -16 * oc_2 + ic_16 + oc_2;
         }
+#endif
         return phys_offset;
     }
 

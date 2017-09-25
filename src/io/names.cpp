@@ -63,13 +63,15 @@ NAMEENUM_T(memory_format){
     case(mkldnn_nchw): ret = "memory_format:nchw"; break;
     case(mkldnn_nhwc): ret = "memory_format:nhwc"; break;
     case(mkldnn_chwn): ret = "memory_format:chwn"; break;
+#if MKLDNN_JIT_TYPES > 0
     case(mkldnn_nChw8c): ret = "memory_format:nChw8c"; break;
     case(mkldnn_nChw16c): ret = "memory_format:nChw16c"; break;
+#endif
     case(mkldnn_oi): ret = "memory_format:oi"; break;
     case(mkldnn_io): ret = "memory_format:io"; break;
     case(mkldnn_oihw): ret = "memory_format:oihw"; break;
     case(mkldnn_ihwo): ret = "memory_format:ihwo"; break;
-#if 1 // defined(TARGET_JIT)
+#if MKLDNN_JIT_TYPES > 0
     case(mkldnn_OIhw8i8o): ret = "memory_format:OIhw8i8o"; break;
     case(mkldnn_OIhw16i16o): ret = "memory_format:OIhw16i16o"; break;
     case(mkldnn_OIhw8i16o2i): ret = "memory_format:OIhw8i16o2i"; break;
@@ -80,7 +82,7 @@ NAMEENUM_T(memory_format){
     case(mkldnn_OhIw16o4i): ret = "memory_format:OhIw16o4i"; break;
 #endif
     case(mkldnn_goihw): ret = "memory_format:goihw"; break;
-#if 1 // defined(TARGET_JIT)
+#if MKLDNN_JIT_TYPES > 0
     case(mkldnn_gOIhw8i8o): ret = "memory_format:gOIhw8i8o"; break;
     case(mkldnn_gOIhw16i16o): ret = "memory_format:gOIhw16i16o"; break;
     case(mkldnn_gOIhw8i16o2i): ret = "memory_format:gOIhw8i16o2i"; break;

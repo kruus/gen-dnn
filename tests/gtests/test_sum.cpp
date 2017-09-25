@@ -138,40 +138,46 @@ TEST_P(sum_test_float, TestsSum)
 INSTANTIATE_TEST_CASE_P(TestSum, sum_test_float, ::testing::Values(
     sum_test_params_float{engine::kind::cpu,
     {memory::format::nchw, memory::format::nchw}, memory::format::nchw,
-    {{2, 8, 3, 4}, {2, 8, 3, 4}}, {2, 8, 3, 4}, {1.0, 1.0}},
-    sum_test_params_float{engine::kind::cpu,
+    {{2, 8, 3, 4}, {2, 8, 3, 4}}, {2, 8, 3, 4}, {1.0, 1.0}}
+#if MKLDNN_JIT_TYPES > 0
+    , sum_test_params_float{engine::kind::cpu,
     {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 16, 1, 1}, {1.0, 1.0}},
-    sum_test_params_float{engine::kind::cpu,
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 16, 1, 1}, {1.0, 1.0}}
+    , sum_test_params_float{engine::kind::cpu,
     {memory::format::nchw, memory::format::nchw}, memory::format::nChw8c,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 16, 1, 1}, {1.0, 1.0}},
-    sum_test_params_float{engine::kind::cpu,
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 16, 1, 1}, {1.0, 1.0}}
+    , sum_test_params_float{engine::kind::cpu,
     {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nchw,
     {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 16, 1, 1}, {1.0, 1.0}},
+#endif
 
-    sum_test_params_float{engine::kind::cpu,
+    , sum_test_params_float{engine::kind::cpu,
     {memory::format::nchw, memory::format::nchw}, memory::format::nchw,
-    {{2, 8, 3, 4}, {2, 8, 3, 4}}, {2, 8, 3, 4}, {2.0, 3.0}},
-    sum_test_params_float{engine::kind::cpu,
+    {{2, 8, 3, 4}, {2, 8, 3, 4}}, {2, 8, 3, 4}, {2.0, 3.0}}
+#if MKLDNN_JIT_TYPES > 0
+    , sum_test_params_float{engine::kind::cpu,
     {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 16, 1, 1}, {2.0, 3.0}},
-    sum_test_params_float{engine::kind::cpu,
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 16, 1, 1}, {2.0, 3.0}}
+    , sum_test_params_float{engine::kind::cpu,
     {memory::format::nchw, memory::format::nchw}, memory::format::nChw8c,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 16, 1, 1}, {2.0, 3.0}},
-    sum_test_params_float{engine::kind::cpu,
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 16, 1, 1}, {2.0, 3.0}}
+    , sum_test_params_float{engine::kind::cpu,
     {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nchw,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 16, 1, 1}, {2.0, 3.0}},
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 16, 1, 1}, {2.0, 3.0}}
+#endif
 
-    sum_test_params_float{engine::kind::cpu,
+#if MKLDNN_JIT_TYPES > 0
+    , sum_test_params_float{engine::kind::cpu,
     {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw,
-    {{5, 8, 3, 3}, {5, 8, 3, 3}}, {5, 8, 3, 3}, {2.0, 3.0}},
-    sum_test_params_float{engine::kind::cpu,
+    {{5, 8, 3, 3}, {5, 8, 3, 3}}, {5, 8, 3, 3}, {2.0, 3.0}}
+    , sum_test_params_float{engine::kind::cpu,
     {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw,
     {{32, 32, 13, 14}, {32, 32, 13, 14}}, {32, 32, 13, 14}, {2.0, 3.0}},
 
-    sum_test_params_float{engine::kind::cpu,
+    , sum_test_params_float{engine::kind::cpu,
     {memory::format::nChw16c, memory::format::nChw8c}, memory::format::nChw16c,
     {{2, 16, 3, 3}, {2, 16, 3, 3}}, {2, 16, 3, 3}, {2.0, 3.0}}
+#endif
 ));
 
 }

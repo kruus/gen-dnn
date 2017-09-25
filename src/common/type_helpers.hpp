@@ -58,17 +58,23 @@ inline size_t data_type_size(data_type_t data_type) {
 
 inline memory_format_t format_normalize(const memory_format_t fmt) {
     using namespace memory_format;
-    if (utils::one_of(fmt, x, nc, nchw, nhwc, chwn, nChw8c, nChw16c, oi, io,
-                oihw, ihwo,
-#if 1 /* defined(TARGET_JIT) */
-                /* ... these format mostly exist for JIT algorithms, I think */
-                hwio, oIhw8i, oIhw16i, OIhw8i8o, OIhw16i16o,
-                OIhw8i16o2i, OIhw8o16i2o, OIhw8o8i, OIhw16o16i, Oihw8o,
-                Oihw16o, Ohwi8o, Ohwi16o, OhIw16o4i, /*goihw,*/ gOIhw8i8o,
-                gOIhw16i16o, gOIhw8i16o2i, gOIhw8o16i2o, gOIhw8o8i,
-                gOIhw16o16i, gOihw8o, gOihw16o, gOhwi8o, gOhwi16o, gOhIw16o4i,
+    if (utils::one_of(fmt, x, nc, nchw, nhwc, chwn
+#if MKLDNN_JIT_TYPES > 0
+                , nChw8c, nChw16c
 #endif
-                goihw))
+                , oi, io, oihw, ihwo
+#if MKLDNN_JIT_TYPES > 0
+                , hwio, oIhw8i, oIhw16i, OIhw8i8o, OIhw16i16o
+                , OIhw8i16o2i, OIhw8o16i2o, OIhw8o8i, OIhw16o16i, Oihw8o
+                , Oihw16o, Ohwi8o, Ohwi16o, OhIw16o4i
+#endif
+                , goihw
+#if MKLDNN_JIT_TYPES > 0
+                , gOIhw8i8o, gOIhw16i16o, gOIhw8i16o2i, gOIhw8o16i2o
+                , gOIhw8o8i, gOIhw16o16i, gOihw8o, gOihw16o, gOhwi8o
+                , gOhwi16o, gOhIw16o4i
+#endif
+                ))
         return blocked;
     return fmt;
 }
