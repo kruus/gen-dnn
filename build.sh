@@ -62,7 +62,7 @@ while getopts ":htvjdDqQpsSTb" arg; do
         p) # permissive: disable the FAIL_WITHOUT_MKL switch
             DONEEDMKL="n"
             ;;
-        S) # SX cross-compile (size_t=64, built in build-sx/)
+        S) # SX cross-compile (size_t=64, built in build-sx/, NEW: default if $CC==sxcc)
             DOTARGET="s"; DOJIT=0; SIZE_T=64; JOBS="-j4"
             ;;
         s) # SX cross-compile (size_t=32, built in build-sx/) DISCOURAGED
@@ -86,6 +86,10 @@ done
 DOJIT=0
 INSTALLDIR=install
 BUILDDIR=build
+if [ "`echo ${CC}`" == 'sxcc' -a ! "$DOTARGET" == "s" ]; then
+    echo 'Detected $CC == sxcc --> SX compilation with 64-bit size_t'
+    DOTARGET="s"; DOJIT=0; SIZE_T=64; JOBS="-j4"
+fi
 if [ "$DOTARGET" == "j" ]; then DOJIT=100; INSTALLDIR='install-jit'; BUILDDIR='build-jit'; fi
 if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx'; fi
 #if [ "$DOTARGET" == "v" ]; then ; fi
@@ -130,7 +134,7 @@ timeoutPID() { # unused
 if [ -d "${BUILDDIR}" ]; then
     rm -rf "${BUILDDIR}".bak && mv -v "${BUILDDIR}" "${BUILDDIR}".bak
     if [ -f "${BUILDDIR}.log" ]; then
-       mv "${BUILDDIR.log}" "${BUILDDIR}".bak/
+       mv "${BUILDDIR}.log" "${BUILDDIR}".bak/
     fi
 fi
 if [ -d "$INSTALLDIR}" ]; then
