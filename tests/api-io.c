@@ -250,7 +250,7 @@ void test2() {
     mkldnn_memory_format_t lay_weights = (groups == 1 ? mkldnn_OIhw8i8o : mkldnn_gOIhw8i8o);
     mkldnn_memory_format_t lay_bias    = mkldnn_x;
     mkldnn_memory_format_t lay_c3dst   = mkldnn_nChw8c;
-    mkldnn_memory_format_t lay_out     = mkldnn_nChw;
+    mkldnn_memory_format_t lay_out     = mkldnn_nchw;
 #else
     mkldnn_memory_format_t lay_src     = mkldnn_nchw;
     mkldnn_memory_format_t lay_weights = (groups == 1 ? mkldnn_oihw : mkldnn_goihw);
