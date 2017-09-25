@@ -74,6 +74,11 @@ typedef enum {
     mkldnn_u8 = 6,
 } mkldnn_data_type_t;
 
+#if defined(_SX)
+#define MKLDNN_JIT_TYPES 0
+#else
+#define MKLDNN_JIT_TYPES 1
+#endif
 /** Memory format specification.
  *
  * Intel(R) MKL-DNN uses the following notation for memory format names:
@@ -116,12 +121,14 @@ typedef enum {
     mkldnn_nhwc,
     /** 4D data tensor in the @c chwn format typically used in Neon. */
     mkldnn_chwn,
+#if MKLDNN_JIT_TYPES > 0
     /** 4D data tensor in the @c nchw format with channels data laid out in
      * memory in 8-element blocks. */
     mkldnn_nChw8c,
     /** 4D data tensor in the @c nchw format with channels data laid out in
      * memory in 16-element blocks. */
     mkldnn_nChw16c,
+#endif
     /** 2D weights tensor in the format (input channels, output channels). */
     mkldnn_oi,
     /** 2D weights tensor in the format (input channels, output channels). */
@@ -135,8 +142,7 @@ typedef enum {
     /** 4D weights tensor in the format (height, width, input channels,
      * output channels). */
     mkldnn_hwio,
-#if 1 //defined(TARGET_JIT) ... but tests cover too many of the formats
-    // jit-related types have a capital O (at least for now)
+#if MKLDNN_JIT_TYPES > 0
     /** 4D weights tensor in the @c oihw format with both input and output
      * channels data laid out in memory in 8-element blocks. */
     mkldnn_OIhw8i8o,
@@ -180,7 +186,7 @@ typedef enum {
     /** 5D weights tensor in the @c oihw format with extra outer dimension for
      * groups. */
     mkldnn_goihw,
-#if 1 //defined(TARGET_JIT) ... but tests cover too many of the formats
+#if MKLDNN_JIT_TYPES > 0
     /** 5D weights tensor in the blocked version of @c goihw format with both
      * input and output channels data laid out in memory in 8-element blocks.
      */
@@ -220,7 +226,6 @@ typedef enum {
     /** 5D weights tensor in the @c goihw format with both input and output
      * channels data laid out in memory in 16-element and 4-element blocks. */
     mkldnn_gOhIw16o4i,
-#endif
     /** 4D weights tensor in the oihw format with input channels data laid out
      * in memory in 8-element blocks. */
     mkldnn_oIhw8i = mkldnn_nChw8c,
@@ -228,6 +233,9 @@ typedef enum {
      * in memory in 16-element blocks. */
     mkldnn_oIhw16i = mkldnn_nChw16c,
     mkldnn_memory_format_max = mkldnn_gOhIw16o4i,
+#else
+    mkldnn_memory_format_max = mkldnn_goihw,
+#endif
 } mkldnn_memory_format_t;
 
 /** Kinds of padding. Define how to interpret the data in padding regions. */

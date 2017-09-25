@@ -9,7 +9,7 @@ BUILD=build
 #################
 #
 (cd ${BUILD}/tests/benchdnn && VERBOSE=1 make) || { echo "Compile issues?"; exit; }
-echo <<EOF
+cat <<EOF
 Here are the output fields for performance benchmarks:
 	string: perf
 	convolution name
