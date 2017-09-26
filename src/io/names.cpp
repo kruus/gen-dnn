@@ -23,6 +23,19 @@ extern int __c_snprintf  (char *s, size_t maxsize, const  char  *format, ...);
 #define snprintf __c_snprintf/*guaranteed to have correct c99 behavior*/
 #endif
 
+/** get the primitive name from query API.
+ * Any error just returns "noname" */
+char const* mkldnn_name_primitive_impl( const_mkldnn_primitive_t prim )
+{
+    const_mkldnn_primitive_desc_t pdesc = nullptr;
+    char const* result = "noname";
+    if( mkldnn_primitive_get_primitive_desc( prim, &pdesc ) == mkldnn_success ){
+        mkldnn_primitive_desc_query( pdesc, mkldnn_query_impl_info_str,
+                                     0, (void*)&result );
+    }
+    return result;
+}
+
 #define NAMEENUM_T( TYPENAME ) char const* mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const e )
 /*NAMEENUM_T(status){*/
 char const* mkldnn_name_status( mkldnn_status_t const e ){
@@ -90,6 +103,7 @@ NAMEENUM_T(memory_format){
     case(mkldnn_gOIhw8i8o): ret = "memory_format:gOIhw8i8o"; break;
     case(mkldnn_gOIhw16i16o): ret = "memory_format:gOIhw16i16o"; break;
     case(mkldnn_gOIhw8i16o2i): ret = "memory_format:gOIhw8i16o2i"; break;
+    case(mkldnn_gOIhw8o16i2o): ret = "memory_format:gOIhw8i16o2i"; break;
     case(mkldnn_gOIhw8o8i): ret = "memory_format:gOIhw8o8i"; break;
     case(mkldnn_gOIhw16o16i): ret = "memory_format:gOIhw16o16i"; break;
     case(mkldnn_gOihw8o): ret = "memory_format:gOIhwi8o"; break;
@@ -542,8 +556,8 @@ NAMEFUNC_TPTR(primitive,prim){
     char *b = buf;
     std::ostringstream oss;
     using mkldnn::operator<<;
-    oss<<*prim;
-    {int n=snprintf(b,len,"\nmkldnn_primitive_t:%s",oss.str().c_str()); CHKBUF;}
+    oss<<*prim; //<<"\n\t...impl: "<<mkldnn_name_primitive_impl(prim);
+    {int n=snprintf(b,len," mkldnn_primitive_t:%s",oss.str().c_str()); CHKBUF;}
     return ret;
 }
 NAMEFUNC_T(primitive_at,prat){

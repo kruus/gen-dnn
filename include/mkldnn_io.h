@@ -63,10 +63,18 @@ NAMEFUNC_T(batch_normalization_desc);
 NAMEFUNC_T(inner_product_desc);
 NAMEFUNC_T(convolution_relu_desc);
 NAMEFUNC_T(primitive_at); // this is mostly opaque at C level (use C++ version for details)
+
+/** get primitive name from mkldnn query API.
+ * Any error just returns "noname".
+ * This can add detail to mkldnn_name_primitive_(...) result.
+ */
+char const* mkldnn_name_primitive_impl( const_mkldnn_primitive_t prim ) MKLDNN_API;
+
 #define NAMEFUNC_TPTR( TYPENAME ) int MKLDNN_API mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const, char * const buf, int len )
 NAMEFUNC_TPTR(primitive); // mkldnn_primitive_t is a ptr-to-opaque-type (mkldnn_primitive*)
 #undef NAMEFUNC_TPTR
 #undef NAMEFUNC_T
+
 /* */
 //#define NAMEFUNC( TYPENAME ) char const* mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME const *e ) MKLDNN_API
 //NAMEFUNC(primitive_at);

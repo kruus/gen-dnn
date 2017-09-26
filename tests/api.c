@@ -349,6 +349,7 @@ void test3() {
         const_mkldnn_primitive_desc_t l2_primdesc = NULL ;
         //char *tmp = "tmp";
         //char **result = &tmp;
+        // modified get_primitive_desc to allow NULL **primitive_desc
         char *result = NULL;
         CHECK(mkldnn_primitive_get_primitive_desc( l2,
                                                    &l2_primdesc ));

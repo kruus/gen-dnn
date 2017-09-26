@@ -23,7 +23,7 @@
 #include <string.h> // strlen ??
 
 #include "mkldnn.h"
-#define MKLDNN_IO 1 // awaiting bugfixes
+//#define MKLDNN_IO 1 // awaiting bugfixes
 #include "mkldnn_io.h"
 
 /* SX compile will define BAD_SNPRINTF because it does not follow c++11 std.
@@ -471,6 +471,15 @@ void test3() {
 
     /* let us build a net */
     mkldnn_primitive_t net[] = {l2, r};
+    for(unsigned i=0U; i<sizeof(net)/sizeof(mkldnn_primitive_t); ++i){
+        /* print the names of each network layer */
+        size_t const len=1024U;
+        char buf[len];
+        int sz0 = mkldnn_name_primitive( net[i], buf, len );
+        printf("net[%u] %s, len=%d\n\t...impl %s\n",
+               i, buf, sz0, mkldnn_name_primitive_impl( net[i] ));
+    }
+
     mkldnn_stream_t stream;
     CHECK(mkldnn_stream_create(&stream, mkldnn_eager));
     CHECK(mkldnn_stream_submit(stream, 2, net, NULL));
