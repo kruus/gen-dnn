@@ -71,12 +71,16 @@ NAMEENUM_T(memory_format){
     case(mkldnn_io): ret = "memory_format:io"; break;
     case(mkldnn_oihw): ret = "memory_format:oihw"; break;
     case(mkldnn_ihwo): ret = "memory_format:ihwo"; break;
+    case(mkldnn_hwio): ret = "memory_format:hwio"; break;
 #if MKLDNN_JIT_TYPES > 0
     case(mkldnn_OIhw8i8o): ret = "memory_format:OIhw8i8o"; break;
     case(mkldnn_OIhw16i16o): ret = "memory_format:OIhw16i16o"; break;
     case(mkldnn_OIhw8i16o2i): ret = "memory_format:OIhw8i16o2i"; break;
+    case(mkldnn_OIhw8o16i2o): ret = "memory_format:OIhw8o16i2o"; break;
     case(mkldnn_OIhw8o8i): ret = "memory_format:OIhw8o8i"; break;
     case(mkldnn_OIhw16o16i): ret = "memory_format:OIhw16o16i"; break;
+    case(mkldnn_Oihw8o): ret = "memory_format:Ohwi8o"; break;
+    case(mkldnn_Oihw16o): ret = "memory_format:Ohwi16o"; break;
     case(mkldnn_Ohwi8o): ret = "memory_format:Ohwi8o"; break;
     case(mkldnn_Ohwi16o): ret = "memory_format:Ohwi16o"; break;
     case(mkldnn_OhIw16o4i): ret = "memory_format:OhIw16o4i"; break;
@@ -88,6 +92,8 @@ NAMEENUM_T(memory_format){
     case(mkldnn_gOIhw8i16o2i): ret = "memory_format:gOIhw8i16o2i"; break;
     case(mkldnn_gOIhw8o8i): ret = "memory_format:gOIhw8o8i"; break;
     case(mkldnn_gOIhw16o16i): ret = "memory_format:gOIhw16o16i"; break;
+    case(mkldnn_gOihw8o): ret = "memory_format:gOIhwi8o"; break;
+    case(mkldnn_gOihw16o): ret = "memory_format:gOIhwi16o"; break;
     case(mkldnn_gOhwi8o): ret = "memory_format:gOIhwi8o"; break;
     case(mkldnn_gOhwi16o): ret = "memory_format:gOIhwi16o"; break;
     case(mkldnn_gOhIw16o4i): ret = "memory_format:gOhIw16o4i"; break;
@@ -144,10 +150,13 @@ NAMEENUM_T(alg_kind){
     char const * ret = "Huh?";
     switch(e){
       case(mkldnn_convolution_direct): ret = "alg_kind:convolution_direct"; break;
+      case(mkldnn_convolution_winograd): ret = "alg_kind:convolution_winograd"; break;
+      case(mkldnn_eltwise_relu): ret = "alg_kind:eltwise_relu"; break;
+      case(mkldnn_eltwise_tanh): ret = "alg_kind:eltwise_tanh"; break;
+      case(mkldnn_eltwise_elu): ret = "alg_kind:eltwise_elu"; break;
       case(mkldnn_pooling_max): ret = "alg_kind:pooling_max"; break;
       case(mkldnn_pooling_avg_include_padding): ret = "alg_kind:pooling_avg+padding"; break;
       case(mkldnn_pooling_avg_exclude_padding): ret = "alg_kind:pooling_avg-padding"; break;
-      //case(mkldnn_pooling_avg): ret = "alg_kind:pooling_avg"; break; // short for avg-padding
       case(mkldnn_lrn_across_channels): ret = "alg_kind:lrn_across_channels"; break;
       case(mkldnn_lrn_within_channel): ret = "alg_kind:lrn_within_channel"; break;
     }
@@ -183,6 +192,9 @@ NAMEENUM_T(query){
 
       case(mkldnn_query_time_estimate_f64): ret = "query:time_estimate_f64"; break;
       case(mkldnn_query_memory_consumption_s64): ret = "query:memory_consumption_s64"; break;
+
+      case(mkldnn_query_impl_info_str): ret = "query:impl_info_str"; break;
+
                                                  /* memory and op descriptor section */
       case(mkldnn_query_some_d): ret = "query:some_d"; break;
       case(mkldnn_query_memory_d): ret = "query:memory_d"; break;

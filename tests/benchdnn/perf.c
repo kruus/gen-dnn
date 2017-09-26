@@ -3,7 +3,7 @@
 #if defined(_WIN32) || defined(_SX)
 static perf_t perf_ctx_unused = {.fd=0, .page_size=0, .addr = (void*)0 };
 perf_t const* perf_begin() { return &perf_ctx_unused; }
-void perf_end(perf_t const* perf_ctx) {}
+void perf_end(perf_t const* /*perf_ctx*/) {}
 #else // linux ...
 
 /* This code was snarfed from linux kernel "perf" tools and it
@@ -48,7 +48,15 @@ typedef __s8  s8;
 //#include <signal.h>
 //#include <linux/a.out.h>        // page_size
 
-#if 1
+#if 0
+/** Interestingly, all we need to do is open the fd and mmap the perf counter page.
+ *
+ * If all we need is to use the exc=(1<<30)+1 timing rdpmc instruction,
+ * then we do not need to ever access or call the generic rdpmc instruction
+ * that uses the mapped page.
+ *
+ * All we want is to avoid the illegal instruction segfault.
+ */
 static u64 rdpmc(unsigned int counter)
 {
 	unsigned int low, high;
@@ -68,6 +76,7 @@ static u64 rdtsc(void)
 }
 #endif
 
+#if 0
 static u64 mmap_read_self(void *addr)
 {
 	struct perf_event_mmap_page *pc = addr;
@@ -115,7 +124,9 @@ static u64 mmap_read_self(void *addr)
 
 	return count;
 }
+#endif
 
+#if 0
 /*
  * If the RDPMC instruction faults then signal this back to the test parent task:
  */
@@ -126,7 +137,9 @@ static void segfault_handler(int sig __maybe_unused,
         fprintf(stderr, "Ohoh!  caught signal %d\n", sig);
 	exit(-1);
 }
+#endif
 
+#if 0
 static int __test__rdpmc(void)
 {
 	volatile int tmp = 0;
@@ -191,7 +204,6 @@ out_close:
 	return 0;
 }
 
-#if 0
 //int test__rdpmc(void)
 int verbose = 0;
 int main(int argc __attribute__((unused)), char**argv __attribute__((unused)) )
@@ -220,10 +232,16 @@ int main(int argc __attribute__((unused)), char**argv __attribute__((unused)) )
 }
 #endif
 
+/** Minimal approach to having rdpmc not give an illegal instruction segfault.
+ * Maybe too minimal?  But seems to work on my linux box.
+ *
+ * Could always add a more "full" perf page usage.  This hack is based on
+ * simplifying the linux kernel 'perf' tools impl as much as possible for rdpmc
+ * timing (and using the magic CX timing value).
+ */
 perf_t const* perf_begin()
 {
     int fd;
-    void *addr = 0;
     perf_t* ret = 0;
     char sbuf[STRERR_BUFSIZE];
     struct perf_event_attr attr = {
@@ -255,7 +273,10 @@ perf_t const* perf_begin()
     return ret;
 close_fd:
     close(fd);
-    ret = 0;
+    if( ret != 0 ){
+        free(ret);
+        ret = 0;
+    }
     return ret;
 }
 void perf_end(perf_t const* perf)
@@ -264,7 +285,7 @@ void perf_end(perf_t const* perf)
         munmap( perf->addr, perf->page_size );
         close( perf->fd );
     }
-    free(perf);
+    free((perf_t*)perf);
 }
 #endif // linux ...
-/* vim: set sw=4,et: */
+/* vim: set sw=4 et: */

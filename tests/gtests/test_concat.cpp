@@ -145,13 +145,13 @@ INSTANTIATE_TEST_CASE_P(TestConcat, concat_test_float, ::testing::Values(
 #if MKLDNN_JIT_TYPES > 0
     , concat_test_params_float{engine::kind::cpu, 1,
     {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 32, 1, 1}},
-    concat_test_params_float{engine::kind::cpu, 1,
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 32, 1, 1}}
+    , concat_test_params_float{engine::kind::cpu, 1,
     {memory::format::nchw, memory::format::nchw}, memory::format::nChw8c,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 32, 1, 1}},
-    concat_test_params_float{engine::kind::cpu, 1,
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 32, 1, 1}}
+    , concat_test_params_float{engine::kind::cpu, 1,
     {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nchw,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 32, 1, 1}},
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 32, 1, 1}}
 #endif
 
     , concat_test_params_float{engine::kind::cpu, 0,
@@ -160,11 +160,11 @@ INSTANTIATE_TEST_CASE_P(TestConcat, concat_test_float, ::testing::Values(
 #if MKLDNN_JIT_TYPES > 0
     , concat_test_params_float{engine::kind::cpu, 0,
     {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {4, 16, 1, 1}},
-    concat_test_params_float{engine::kind::cpu, 0,
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {4, 16, 1, 1}}
+    , concat_test_params_float{engine::kind::cpu, 0,
     {memory::format::nchw, memory::format::nchw}, memory::format::nChw8c,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {4, 16, 1, 1}},
-    concat_test_params_float{engine::kind::cpu, 0,
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {4, 16, 1, 1}}
+    , concat_test_params_float{engine::kind::cpu, 0,
     {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nchw,
     {{2, 16, 1, 1}, {2, 16, 1, 1}}, {4, 16, 1, 1}}
 #endif
@@ -172,9 +172,9 @@ INSTANTIATE_TEST_CASE_P(TestConcat, concat_test_float, ::testing::Values(
 #if MKLDNN_JIT_TYPES > 0
     , concat_test_params_float{engine::kind::cpu, 1,
     {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c,
-    {{2, 8, 1, 1}, {2, 8, 1, 1}}, {2, 16, 1, 1}},
+    {{2, 8, 1, 1}, {2, 8, 1, 1}}, {2, 16, 1, 1}}
 
-    concat_test_params_float{engine::kind::cpu, 1,
+    , concat_test_params_float{engine::kind::cpu, 1,
     {memory::format::nChw8c, memory::format::nChw16c}, memory::format::nChw8c,
     {{2, 8, 1, 1}, {2, 16, 1, 1}}, {2, 24, 1, 1}}
 #endif

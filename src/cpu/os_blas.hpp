@@ -38,7 +38,7 @@
 #else /* defined(USE_MKL) */
 
 #if defined(_SX)
-/* TODO: _SX should also define USE_CBLAS in case the later is available */
+/* _SX compilation also defines USE_CBLAS */
 extern "C" {
 #include "cblas.h" // CHECK: does SX also have a fortran API sgemm?
 }

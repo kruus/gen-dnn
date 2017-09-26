@@ -13,6 +13,7 @@ DODEBUG="n"
 DODOC="y"
 DONEEDMKL="y"
 DOJUSTDOC="n"
+DOWARN="y"
 BUILDOK="y"
 SIZE_T=32 # or 64, for -s or -S SX compile
 #JOBS="-j8"
@@ -74,6 +75,12 @@ while getopts ":htvjdDqQpsSTb" arg; do
             ;;
         r) # reference impls only: no -DUSE_CBLAS compile flag (->no im2col gemm)
             USE_CBLAS=0
+            ;;
+        w) # reduce compiler warnings
+            DOWARN=0
+            ;;
+        W) # lots of compiler warnings (default)
+            DOWARN=1
             ;;
         T) # cmake --trace
             CMAKETRACE="--trace"
@@ -162,6 +169,15 @@ fi
         export CFLAGS="${CFLAGS} -DTARGET_VANILLA"
         export CXXFLAGS="${CXXFLAGS} -DTARGET_VANILLA"
     fi
+    if [ ${DOWARN} == 'y' ]; then
+        DOWARNFLAGS=""
+        if [ "$DOTARGET" == "s" ]; then DOWARNFLAGS="-Wall"
+        else DOWARNFLAGS="-Wall"; fi
+        export CFLAGS="${CFLAGS} ${DOWARNFLAGS}"
+        export CXXFLAGS="${CXXFLAGS} ${DOWARNFLAGS}"
+        #echo "DOWARN --> CFLAGS   = ${CFLAGS}"
+        #echo "DOWARN --> CXXFLAGS = ${CXXFLAGS}"
+    fi
     if [ "$DOTARGET" == "s" ]; then
         TOOLCHAIN=../cmake/sx.cmake
         if [ ! -f "${TOOLCHAIN}" ]; then echo "Ohoh. ${TOOLCHAIN} not found?"; BUILDOK="n"; fi
@@ -171,7 +187,7 @@ fi
         #      Solution: do these changes within CMakeLists.txt
         #CMAKEOPT="${CMAKEOPT} -DCMAKE_C_FLAGS=-g\ -ftrace\ -Cdebug" # override Cvopt
         SXOPT="-DTARGET_VANILLA -D__STDC_LIMIT_MACROS"
-        SXOPT="${SXOPT} -wall -woff=1097 -woff=4038" # turn off warnings about not using attributes
+        SXOPT="${SXOPT} -woff=1097 -woff=4038" # turn off warnings about not using attributes
         SXOPT="${SXOPT} -woff=1901"  # turn off sxcc warning defining arr[len0] for constant len0
         SXOPT="${SXOPT} -wnolongjmp" # turn off warnings about setjmp/longjmp (and tracing)
 

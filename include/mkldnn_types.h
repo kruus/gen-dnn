@@ -74,11 +74,16 @@ typedef enum {
     mkldnn_u8 = 6,
 } mkldnn_data_type_t;
 
-#if defined(_SX)
+/** Some platforms do not need all memory layouts.
+ * - 0 : no blocked (8,16) or grouped data layouts for mkldnn_memory_format_t
+ * - 1 : full spectrum of data layouts (jit expects this)
+ */
+#if defined(TARGET_VANILLA) && (0 || defined(_SX))
 #define MKLDNN_JIT_TYPES 0
 #else
 #define MKLDNN_JIT_TYPES 1
 #endif
+
 /** Memory format specification.
  *
  * Intel(R) MKL-DNN uses the following notation for memory format names:

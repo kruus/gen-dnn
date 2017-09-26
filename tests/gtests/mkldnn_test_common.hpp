@@ -49,8 +49,8 @@ template <> inline void assert_eq<float>(float a, float b) {
 }
 
 inline size_t map_index(const mkldnn::memory::desc &md, size_t index) {
-    using fmt = mkldnn::memory::format;
 #if MKLDNN_JIT_TYPES > 0
+    using fmt = mkldnn::memory::format;
     const fmt fwd_weights_g = fmt::gOIhw8i16o2i;
     const fmt fwd_weights = fmt::OIhw8i16o2i;
     const fmt bwd_weights_g = fmt::gOIhw8o16i2o;

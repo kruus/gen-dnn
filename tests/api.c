@@ -344,6 +344,20 @@ void test3() {
 
     CHECK(mkldnn_primitive_desc_destroy(l2_pd));
 
+    /* demo querying the impl info */
+    {
+        const_mkldnn_primitive_desc_t l2_primdesc = NULL ;
+        //char *tmp = "tmp";
+        //char **result = &tmp;
+        char *result = NULL;
+        CHECK(mkldnn_primitive_get_primitive_desc( l2,
+                                                   &l2_primdesc ));
+        CHECK(mkldnn_primitive_desc_query( l2_primdesc,
+                                           mkldnn_query_impl_info_str,
+                                           0, (void*)&result ));
+        printf("\nlrn impl info str is %s\n", result);
+    }
+
     mkldnn_primitive_at_t r_srcs[] = {mkldnn_primitive_at(l2_dst, 0)};
     const_mkldnn_primitive_t r_dsts[] = {out};
     mkldnn_primitive_desc_t r_pd;

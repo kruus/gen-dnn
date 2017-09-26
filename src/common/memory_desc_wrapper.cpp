@@ -80,6 +80,7 @@ status_t fill_nonblocked(memory_desc_t &md, const int perm[]) {
     return success;
 }
 
+#if MKLDNN_JIT_TYPES > 0
 status_t fill_contiguous_blocked(memory_desc_t &md, const dims_t block_dims,
         const int perm[]) {
     const int ndims = md.ndims;
@@ -106,6 +107,7 @@ status_t fill_contiguous_blocked(memory_desc_t &md, const dims_t block_dims,
     blk.offset_padding = 0;
     return success;
 }
+#endif
 
 status_t fill_nc(memory_desc_t &md) {
     if (md.ndims != 2) return invalid_arguments;
@@ -135,6 +137,7 @@ status_t fill_chwn(memory_desc_t &md) {
     return fill_nonblocked(md, perm);
 }
 
+#if MKLDNN_JIT_TYPES > 0
 status_t fill_nChw8c(memory_desc_t &md) {
     if (md.ndims != 4) return invalid_arguments;
 
@@ -154,6 +157,7 @@ status_t fill_nChw16c(memory_desc_t &md) {
         4, 5, 6, 7};
     return fill_contiguous_blocked(md, block_dims, perm);
 }
+#endif
 
 status_t fill_oi(memory_desc_t &md) {
     if (md.ndims != 2) return invalid_arguments;
@@ -190,7 +194,7 @@ status_t fill_hwio(memory_desc_t &md) {
     return fill_nonblocked(md, perm);
 }
 
-#if 1 // defined(TARGET_JIT)
+#if MKLDNN_JIT_TYPES > 0
 status_t fill_OIhw8i8o(memory_desc_t &md) {
     if (md.ndims != 4) return invalid_arguments;
 
@@ -309,7 +313,7 @@ status_t fill_goihw(memory_desc_t &md) {
     return fill_nonblocked(md, perm);
 }
 
-#if 1 // defined(TARGET_JIT)
+#if MKLDNN_JIT_TYPES > 0
 status_t fill_gOIhw8i8o(memory_desc_t &md) {
     if (md.ndims != 5) return invalid_arguments;
 
@@ -441,8 +445,8 @@ status_t memory_desc_wrapper::compute_blocking(memory_desc_t &memory_desc)
     case io: return fill_io(memory_desc);
     case oihw: return fill_oihw(memory_desc);
     case ihwo: return fill_ihwo(memory_desc);
-#if MKLDNN_JIT_TYPES > 0
     case hwio: return fill_hwio(memory_desc);
+#if MKLDNN_JIT_TYPES > 0
     case OIhw8i8o: return fill_OIhw8i8o(memory_desc);
     case OIhw16i16o: return fill_OIhw16i16o(memory_desc);
     case OIhw8i16o2i: return fill_OIhw8i16o2i(memory_desc);
@@ -469,7 +473,10 @@ status_t memory_desc_wrapper::compute_blocking(memory_desc_t &memory_desc)
     case gOhwi16o: return fill_gOhwi16o(memory_desc);
     case gOhIw16o4i: return fill_gOhIw16o4i(memory_desc);
 #endif
-    default: break;
+    case mkldnn_any: break;
+    case mkldnn_blocked: break;
+    case mkldnn_format_undef: break;
+    //default: break;
     }
 
     return invalid_arguments;
