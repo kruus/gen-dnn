@@ -521,7 +521,6 @@ void test4() {
         const_mkldnn_primitive_t r_dsts[] = {out};
         mkldnn_primitive_desc_t r_pd;
         CHECK(mkldnn_reorder_primitive_desc_create(&r_pd, c3_dst_pd, out_pd));
-        CHECK(mkldnn_primitive_desc_destroy(c3_dst_pd));
         CHECK(mkldnn_primitive_desc_destroy(out_pd));
         CHECK(mkldnn_primitive_create(&r, r_pd, r_srcs, r_dsts));
         CHECK(mkldnn_primitive_desc_destroy(r_pd));
@@ -552,6 +551,7 @@ void test4() {
         mkldnn_primitive_t c3;
         {
             /* create convolution primitive descriptor */
+            TRACE("4:c3_pd");
             mkldnn_primitive_desc_t c3_pd;
 
 #if CONV_ITER
@@ -569,6 +569,7 @@ void test4() {
             }
 
             /* create convolution primitive */
+            TRACE("4:c3_prim");
             CHECK(mkldnn_primitive_create(&c3, c3_pd, c3_srcs, c3_dsts));
 
             CHECK_TRUE(mkldnn_memory_primitive_desc_equal(
@@ -583,7 +584,7 @@ void test4() {
             CHECK_TRUE(mkldnn_memory_primitive_desc_equal(
                         mkldnn_primitive_desc_query_pd(
                             c3_pd, mkldnn_query_dst_pd, 0), c3_dst_pd));
-            CHECK(mkldnn_primitive_desc_destroy(c3_pd));
+            //CHECK(mkldnn_primitive_desc_destroy(c3_pd));
         }
 
         /* let us build a net and run it */
@@ -598,6 +599,7 @@ void test4() {
         }
 
         /* check results */
+        TRACE("4:check");
         const int N = c3_dst_sizes[0], C = c3_dst_sizes[1],
               H = c3_dst_sizes[2], W = c3_dst_sizes[3];
         for (int n = 0; n < N; ++n)
@@ -609,6 +611,7 @@ void test4() {
             CHECK_TRUE(out_mem[off] == bias[c]);
         }
 
+        TRACE("4:-conv");
         CHECK(mkldnn_primitive_destroy(c3));
     }
 #if CONV_ITER
@@ -618,6 +621,7 @@ void test4() {
     /* clean-up */
     TRACE("4:clean");
     CHECK(mkldnn_primitive_desc_destroy(c3_src_pd));
+    CHECK(mkldnn_primitive_desc_destroy(c3_dst_pd));
     CHECK(mkldnn_primitive_desc_destroy(c3_weights_pd));
     CHECK(mkldnn_primitive_desc_destroy(c3_bias_pd));
 
