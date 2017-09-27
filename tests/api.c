@@ -352,10 +352,9 @@ void test3() {
         // modified get_primitive_desc to allow NULL **primitive_desc
         char *result = NULL;
         CHECK(mkldnn_primitive_get_primitive_desc( l2,
-                                                   &l2_primdesc ));
+                    &l2_primdesc ));
         CHECK(mkldnn_primitive_desc_query( l2_primdesc,
-                                           mkldnn_query_impl_info_str,
-                                           0, (void*)&result ));
+                    mkldnn_query_impl_info_str, 0, (void*)&result ));
         printf("\nlrn impl info str is %s\n", result);
     }
 
@@ -410,9 +409,239 @@ void test3() {
     TRACE("-test3");
 }
 
+void test4() {
+    TRACE("\n+test4 : iterate over >= 2 convolution impls");
+    /* AlexNet: c3
+     * {2, 256, 13, 13} (x) {384, 256, 3, 3} -> {2, 384, 13, 13}
+     * pad: {1, 1}
+     * strides: {1, 1}
+     */
+
+    const int mb = 2;
+    //const int groups = 2;
+    const int groups = 1;
+    int c3_src_sizes[4] = {mb, 256, 13, 13};
+    int c3_weights_sizes[] = {groups, 384/groups, 256/groups, 3, 3};
+    int c3_bias_sizes[1] = {384};
+    int strides[] = {1, 1};
+    int32_t  padding[] = {0, 0}; // set proper values
+    int c3_dst_sizes[4] = {mb, 384,
+        (c3_src_sizes[2] + 2*padding[0] - c3_weights_sizes[3])/strides[0] + 1,
+        (c3_src_sizes[3] + 2*padding[1] - c3_weights_sizes[4])/strides[1] + 1
+    };
+
+    real_t *src = (real_t*)calloc(product(c3_src_sizes, 4), sizeof(real_t));
+    real_t *weights = (real_t*)calloc(product(c3_weights_sizes, 5), sizeof(real_t));
+    real_t *bias = (real_t*)calloc(product(c3_bias_sizes, 1), sizeof(real_t));
+    real_t *dst = (real_t*)calloc(product(c3_dst_sizes, 4), sizeof(real_t));
+    real_t *out_mem = (real_t*)calloc(product(c3_dst_sizes, 4), sizeof(real_t));
+    CHECK_TRUE(src && weights && bias && dst && out_mem);
+
+    for (int i = 0; i < c3_bias_sizes[0]; ++i) bias[i] = (real_t)(i);
+
+    TRACE("4:engine");
+    mkldnn_engine_t engine;
+    CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0));
+
+    /* first describe user data and create data descriptors for future
+     * convolution w/ the specified format -- we do not want to do a reorder */
+    mkldnn_memory_desc_t c3_src_md, c3_weights_md, c3_bias_md, c3_dst_md, out_md;
+    mkldnn_primitive_desc_t c3_src_pd, c3_weights_pd, c3_bias_pd, c3_dst_pd, out_pd;
+    mkldnn_primitive_t c3_src, c3_weights, c3_bias, c3_dst, out;
+
+#if 0 && MKLDNN_JIT_TYPES > 0
+    mkldnn_memory_format_t lay_src     = mkldnn_nChw8c;
+    mkldnn_memory_format_t lay_weights = (groups == 1 ? mkldnn_OIhw8i8o : mkldnn_gOIhw8i8o);
+    mkldnn_memory_format_t lay_bias    = mkldnn_x;
+    mkldnn_memory_format_t lay_c3dst   = mkldnn_nChw8c;
+    mkldnn_memory_format_t lay_out     = mkldnn_nchw;
+#else
+    mkldnn_memory_format_t lay_src     = mkldnn_nchw;
+    mkldnn_memory_format_t lay_weights = (groups == 1 ? mkldnn_oihw : mkldnn_goihw);
+    mkldnn_memory_format_t lay_bias    = mkldnn_x;
+    mkldnn_memory_format_t lay_c3dst   = mkldnn_nchw;
+    mkldnn_memory_format_t lay_out     = mkldnn_nchw;
+#endif
+
+    // src
+    {
+        CHECK(mkldnn_memory_desc_init(&c3_src_md, 4, c3_src_sizes, mkldnn_f32, lay_src));
+        CHECK(mkldnn_memory_primitive_desc_create(&c3_src_pd, &c3_src_md, engine));
+        CHECK(mkldnn_primitive_create(&c3_src, c3_src_pd, NULL, NULL));
+        CHECK(mkldnn_memory_set_data_handle(c3_src, src));
+    }
+
+    // weights
+    {
+        CHECK(mkldnn_memory_desc_init(&c3_weights_md, 4 + (groups != 1),
+                    c3_weights_sizes + (groups == 1), mkldnn_f32,
+                    lay_weights));
+        CHECK(mkldnn_memory_primitive_desc_create(&c3_weights_pd, &c3_weights_md, engine));
+        CHECK(mkldnn_primitive_create(&c3_weights, c3_weights_pd, NULL, NULL));
+        CHECK(mkldnn_memory_set_data_handle(c3_weights, weights));
+    }
+
+    // bias
+    {
+        CHECK(mkldnn_memory_desc_init(&c3_bias_md, 1, c3_bias_sizes, mkldnn_f32, lay_bias));
+        CHECK(mkldnn_memory_primitive_desc_create(&c3_bias_pd, &c3_bias_md, engine));
+        CHECK(mkldnn_primitive_create(&c3_bias, c3_bias_pd, NULL, NULL));
+        CHECK(mkldnn_memory_set_data_handle(c3_bias, bias));
+    }
+
+    // c3_dst
+    {
+        CHECK(mkldnn_memory_desc_init(&c3_dst_md, 4, c3_dst_sizes, mkldnn_f32, lay_c3dst));
+        CHECK(mkldnn_memory_primitive_desc_create(&c3_dst_pd, &c3_dst_md, engine));
+        CHECK(mkldnn_primitive_create(&c3_dst, c3_dst_pd, NULL, NULL));
+        CHECK(mkldnn_memory_set_data_handle(c3_dst, dst));
+    }
+
+    // out
+    {
+        CHECK(mkldnn_memory_desc_init(&out_md, 4, c3_dst_sizes, mkldnn_f32, lay_out));
+        CHECK(mkldnn_memory_primitive_desc_create(&out_pd, &out_md, engine));
+        CHECK(mkldnn_primitive_create(&out, out_pd, NULL, NULL));
+        CHECK(mkldnn_memory_set_data_handle(out, out_mem));
+    }
+
+    mkldnn_primitive_at_t c3_srcs[] = {
+        mkldnn_primitive_at(c3_src, 0),
+        mkldnn_primitive_at(c3_weights, 0),
+        mkldnn_primitive_at(c3_bias, 0)
+    };
+
+    const_mkldnn_primitive_t c3_dsts[1] = {c3_dst};
+
+    /* create the reorder layer */
+    TRACE("4:reorder");
+    mkldnn_primitive_t r;
+    {
+        mkldnn_primitive_at_t r_srcs[] = {mkldnn_primitive_at(c3_dst, 0)};
+        const_mkldnn_primitive_t r_dsts[] = {out};
+        mkldnn_primitive_desc_t r_pd;
+        CHECK(mkldnn_reorder_primitive_desc_create(&r_pd, c3_dst_pd, out_pd));
+        CHECK(mkldnn_primitive_desc_destroy(c3_dst_pd));
+        CHECK(mkldnn_primitive_desc_destroy(out_pd));
+        CHECK(mkldnn_primitive_create(&r, r_pd, r_srcs, r_dsts));
+        CHECK(mkldnn_primitive_desc_destroy(r_pd));
+    }
+
+    /* create the convolution descriptor*/
+    TRACE("4:conv_desc");
+    mkldnn_convolution_desc_t c3_desc;
+    CHECK(mkldnn_convolution_forward_desc_init(&c3_desc,
+                mkldnn_forward_training, mkldnn_convolution_direct,
+                &c3_src_md, &c3_weights_md, &c3_bias_md, &c3_dst_md,
+                strides, padding, NULL, mkldnn_padding_zero));
+    
+    /* create a convolution primitive */
+#define CONV_ITER 1
+#if CONV_ITER
+    TRACE("4:conv-iterate");
+    mkldnn_primitive_desc_iterator_t c3_iter;
+    CHECK(mkldnn_primitive_desc_iterator_create(&c3_iter,
+                &c3_desc, engine, NULL));
+    mkldnn_status_t c3st = mkldnn_success;
+    for( ; c3st == mkldnn_success;
+         c3st = mkldnn_primitive_desc_iterator_next( c3_iter ))
+#else
+    TRACE("4:conv");
+#endif
+    {
+        mkldnn_primitive_t c3;
+        {
+            /* create convolution primitive descriptor */
+            mkldnn_primitive_desc_t c3_pd;
+
+#if CONV_ITER
+            c3_pd = mkldnn_primitive_desc_iterator_fetch( c3_iter );
+            CHECK_TRUE( c3_pd != NULL );
+#else
+            CHECK(mkldnn_primitive_desc_create(&c3_pd, &c3_desc, engine, NULL));
+#endif
+            {
+                char *impl_info_str = NULL;
+                CHECK(mkldnn_primitive_desc_query( c3_pd,
+                            mkldnn_query_impl_info_str, 0,
+                            (void*)&impl_info_str ));
+                printf("\n\n4:conv impl : %s\n", impl_info_str);
+            }
+
+            /* create convolution primitive */
+            CHECK(mkldnn_primitive_create(&c3, c3_pd, c3_srcs, c3_dsts));
+
+            CHECK_TRUE(mkldnn_memory_primitive_desc_equal(
+                        mkldnn_primitive_desc_query_pd(
+                            c3_pd, mkldnn_query_src_pd, 0), c3_src_pd));
+            CHECK_TRUE(mkldnn_memory_primitive_desc_equal(
+                        mkldnn_primitive_desc_query_pd(
+                            c3_pd, mkldnn_query_weights_pd, 0), c3_weights_pd));
+            CHECK_TRUE(mkldnn_memory_primitive_desc_equal(
+                        mkldnn_primitive_desc_query_pd(
+                            c3_pd, mkldnn_query_weights_pd, 1), c3_bias_pd));
+            CHECK_TRUE(mkldnn_memory_primitive_desc_equal(
+                        mkldnn_primitive_desc_query_pd(
+                            c3_pd, mkldnn_query_dst_pd, 0), c3_dst_pd));
+            CHECK(mkldnn_primitive_desc_destroy(c3_pd));
+        }
+
+        /* let us build a net and run it */
+        TRACE("4:net");
+        mkldnn_primitive_t net[] = {c3, r};
+        {
+            mkldnn_stream_t stream;
+            CHECK(mkldnn_stream_create(&stream, mkldnn_eager));
+            CHECK(mkldnn_stream_submit(stream, 2, net, NULL));
+            CHECK(mkldnn_stream_wait(stream, 1, NULL));
+            CHECK(mkldnn_stream_destroy(stream));
+        }
+
+        /* check results */
+        const int N = c3_dst_sizes[0], C = c3_dst_sizes[1],
+              H = c3_dst_sizes[2], W = c3_dst_sizes[3];
+        for (int n = 0; n < N; ++n)
+        for (int c = 0; c < C; ++c)
+        for (int h = 0; h < H; ++h)
+        for (int w = 0; w < W; ++w)
+        {
+            size_t off = ((n*C + c)*H + h)*W + w;
+            CHECK_TRUE(out_mem[off] == bias[c]);
+        }
+
+        CHECK(mkldnn_primitive_destroy(c3));
+    }
+#if CONV_ITER
+    CHECK_TRUE( c3st == mkldnn_iterator_ends );
+#endif
+
+    /* clean-up */
+    TRACE("4:clean");
+    CHECK(mkldnn_primitive_desc_destroy(c3_src_pd));
+    CHECK(mkldnn_primitive_desc_destroy(c3_weights_pd));
+    CHECK(mkldnn_primitive_desc_destroy(c3_bias_pd));
+
+    CHECK(mkldnn_primitive_destroy(r));
+    CHECK(mkldnn_primitive_destroy(c3_src));
+    CHECK(mkldnn_primitive_destroy(c3_weights));
+    CHECK(mkldnn_primitive_destroy(c3_bias));
+    CHECK(mkldnn_primitive_destroy(c3_dst));
+    CHECK(mkldnn_primitive_destroy(out));
+    CHECK(mkldnn_engine_destroy(engine));
+
+    TRACE("-test4-a");
+    free(src);
+    free(weights);
+    free(bias);
+    free(dst);
+    free(out_mem);
+    TRACE("-test4");
+}
+
 int main() {
     test1();
     test2();
     test3();
+    test4();
     return 0;
 }
