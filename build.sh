@@ -171,7 +171,7 @@ fi
     fi
     if [ ${DOWARN} == 'y' ]; then
         DOWARNFLAGS=""
-        if [ "$DOTARGET" == "s" ]; then DOWARNFLAGS="-Wall"
+        if [ "$DOTARGET" == "s" ]; then DOWARNFLAGS="-wall"
         else DOWARNFLAGS="-Wall"; fi
         export CFLAGS="${CFLAGS} ${DOWARNFLAGS}"
         export CXXFLAGS="${CXXFLAGS} ${DOWARNFLAGS}"
@@ -190,6 +190,11 @@ fi
         SXOPT="${SXOPT} -woff=1097 -woff=4038" # turn off warnings about not using attributes
         SXOPT="${SXOPT} -woff=1901"  # turn off sxcc warning defining arr[len0] for constant len0
         SXOPT="${SXOPT} -wnolongjmp" # turn off warnings about setjmp/longjmp (and tracing)
+
+        # Generate 'ftrace.out' profiling that can be displayed with ftrace++
+        #  BUT not compatible with POSIX threads
+        #SXOPT="${SXOPT} -Nftrace"
+        SXOPT="${SXOPT} -ftrace demangled"
 
         # REMOVE WHEN FINISHED SX DEBUGGING
         SXOPT="${SXOPT} -g -traceback" # enable source code tracing ALWAYS

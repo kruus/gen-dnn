@@ -136,13 +136,13 @@ unsigned long long ticks_now() {
 //    return static_cast<unsigned long long>( second()*1000000.0/*double, microseconds*/ );
 //}
 static inline double ms_now() {
-    return second() * 1000000.0;
+    return second() * 1000.0 /* ms / second */;
 }
 #else
 static inline double ms_now() {
     auto timePointTmp
         = std::chrono::high_resolution_clock::now().time_since_epoch();
-    return std::chrono::duration<double, std::micro>(timePointTmp).count();
+    return std::chrono::duration<double, std::milli>(timePointTmp).count();
 }
 #endif
 

@@ -7,6 +7,7 @@ if [ `uname` == 'SUPER-UX' ]; then
 	BUILD=`ls -ldst build-sx* | grep ' drwx' | head -1 | sed 's/.*\(build.*\)/\1/'`
 	LOGDIR=guest/sx
 	mkdir -p guest/sx
+	chmod ugo+w guest
 	chmod ugo+w guest/sx
 else
 	#     select one:
@@ -37,6 +38,13 @@ as reported by the default output template
 	perf,%n,%d,%GO,%GF,%-t,%-Gp,%0t,%0Gp
 EOF
 echo "Bench Convolution Performance for just fwd alexnet:conv1 ..."
+RUNME=./benchdnn
+#
+# Comment these out to use system default (all for Intel)
+#
+THREADS=1
+export OMP_NUM_THREADS=${THREADS}
+export MKL_NUM_THREADS=${THREADS}
 {
 (cd ${BENCHDIR} && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B mb1_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
 (cd ${BENCHDIR} && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B mb12_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
@@ -44,14 +52,17 @@ echo "Bench Convolution Performance for just fwd alexnet:conv1 ..."
 (cd ${BENCHDIR} && ./benchdnn --conv --mode=C -v3 --cfg=f32 --dir=FWD_B mb1_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
 (cd ${BENCHDIR} && ./benchdnn --conv --mode=C -v3 --cfg=f32 --dir=FWD_B mb12_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
 (cd ${BENCHDIR} && ./benchdnn --conv --mode=C -v3 --cfg=f32 --dir=FWD_B mb32_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
-} 2>&1 | tee ${LOGDIR}/bench-quick.log
+} 2>&1 | tee ${LOGDIR}/bench-quick-t${THREADS}.log
 
 echo "Bench Convolution Performance for default fwd conv layers (many!) ..."
-(cd ${BENCHDIR} && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B ) 2>&1 | tee ${LOGDIR}/bench-conv-tmp.log \
-&& mv ${LOGDIR}/bench-conv-tmp.log ${LOGDIR}/bench-conv.log \
-|| { echo "Ohoh"; exit; }
+LGBASE="${LOGDIR}/bench-convP-t${THREADS}"
+(cd ${BENCHDIR} && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B ) 2>&1 | tee ${LGBASE}-tmp.log \
+&& mv ${LGBASE}-tmp.log ${LGBASE}.log && echo "${LGBASE}.log OK" \
+|| { echo "${LGBASE}-tmp.log ERROR"; exit; }
+
 echo "Bench Convolution Correctness for default fwd conv layers (many!) ..."
-(cd ${BENCHDIR} && ./benchdnn --conv          -v3 --cfg=f32 --dir=FWD_B ) 2>&1 | tee ${LOGDIR}/bench-conv-tmp.log \
-&& mv ${LOGDIR}/bench-conv-tmp.log ${LOGDIR}/bench-conv-correct.log \
-|| { echo "Ohoh"; exit; }
+LGBASE="${LOGDIR}/bench-convC-t${THREADS}"
+(cd ${BENCHDIR} && ./benchdnn --conv          -v3 --cfg=f32 --dir=FWD_B ) 2>&1 | tee ${LGBASE}-tmp.log \
+&& mv ${LGBASE}-tmp.log ${LGBASE}.log && echo "${LGBASE}.log OK" \
+|| { echo "${LGBASE}-tmp.log ERROR"; exit; }
 
