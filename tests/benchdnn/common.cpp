@@ -142,7 +142,10 @@ static inline double ms_now() {
 static inline double ms_now() {
     auto timePointTmp
         = std::chrono::high_resolution_clock::now().time_since_epoch();
-    return std::chrono::duration<double, std::micro>(timePointTmp).count();
+    return std::chrono::duration<double, std::milli>(timePointTmp).count();
+    // Fix: conv/perf_report.cpp 'F' and 'p' outputs make it clear that
+    //      ms_now returns ms *milli* seconds (not us or microseconds)
+    // This also agrees with existing linux code.
 }
 #endif
 
