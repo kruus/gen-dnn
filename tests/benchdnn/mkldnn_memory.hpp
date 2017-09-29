@@ -22,6 +22,9 @@
 struct dnn_mem_t {
     dnn_mem_t(): active_(false) {}
 
+    /** create a memory block "just like" \c md (same layout, dims and
+     * data-type), owning a zero-initialized \c this->data region or
+     * optionally referring to unowned pre-initialized \c data. */
     dnn_mem_t(const mkldnn_memory_desc_t &md, void *data = NULL): active_(true)
     { initialize(md, data); }
 
@@ -37,6 +40,10 @@ struct dnn_mem_t {
         }();
     }
 
+    /** get dims from \c md but force data type \c dt.
+     * - optionally override layout \c fmt.
+     * - optionally skip creating owned, zero-initialized \c this->data
+     *   by instead referring to unowned pre-initialized \c data */
     dnn_mem_t(const mkldnn_memory_desc_t &md, mkldnn_data_type_t dt,
             mkldnn_memory_format_t fmt = mkldnn_format_undef,
             void *data = NULL): active_(true) {
@@ -62,16 +69,21 @@ struct dnn_mem_t {
 
     ~dnn_mem_t() { cleanup(); }
 
+    /** Make \c this to <em>look like</em> \c rhs, so \c this gets the re-ordered
+     * \em content of \c rhs */
     int reorder(const dnn_mem_t &rhs) {
         if (this == &rhs) return OK;
 
-        mkldnn_primitive_desc_t rpd;
         mkldnn_primitive_t r;
-        DNN_SAFE(mkldnn_reorder_primitive_desc_create(&rpd, rhs.mpd_, mpd_),
-                WARN);
-        mkldnn_primitive_at_t i = {rhs.p_, 0};
-        const_mkldnn_primitive_t o = p_;
-        DNN_SAFE(mkldnn_primitive_create(&r, rpd, &i, &o), WARN);
+        //{
+            mkldnn_primitive_desc_t rpd;
+            DNN_SAFE(mkldnn_reorder_primitive_desc_create(&rpd, rhs.mpd_, mpd_),
+                     WARN);
+            mkldnn_primitive_at_t i = {rhs.p_, 0};
+            const_mkldnn_primitive_t o = p_;
+            DNN_SAFE(mkldnn_primitive_create(&r, rpd, &i, &o), WARN);
+            // perhaps? DNN_SAFE(mkldnn_primitive_desc_destroy(rpd), CRIT);
+        //}
         SAFE(execute(r), WARN);
         DNN_SAFE(mkldnn_primitive_desc_destroy(rpd), CRIT);
         DNN_SAFE(mkldnn_primitive_destroy(r), CRIT);

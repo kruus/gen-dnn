@@ -137,6 +137,10 @@ void _ref_convolution_fwd_t<with_relu, src_type, wei_type, dst_type, acc_type>
                 for (int kw = 0; kw < KW; ++kw) {
                     const int ih = oh * KSH - padT + kh * (1 + KDH);
                     const int iw = ow * KSW - padL + kw * (1 + KDW);
+                    // kh = (**ih** - oh*KSH + padT ) / (1+KDH)
+                    // So lims of 'kh' loop are
+                    // ih==0 --> kh = max(0,  (   - oh*KSH + padT) / (1+KDH)) )
+                    // ih==IH -> kh = min(IH, (IH - oh*KSH + padT) / (1+KDH) )
 
                     if (ih < 0 || ih >= IH) continue;
                     if (iw < 0 || iw >= IW) continue;

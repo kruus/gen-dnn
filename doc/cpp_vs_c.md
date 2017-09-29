@@ -1,4 +1,4 @@
-## C++ vs C
+# C++ vs C
 
 - simple_net is ~ twice as many lines in C. Why?
   - C++ constructors can do some routine tasks:

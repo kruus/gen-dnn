@@ -1,6 +1,5 @@
+## gen-dnn (SX) Quickstart
 # BRANCH for non-jit version of MKL-DNN, to ease porting API to non-Intel platforms
-
-## Quickstart:
 
 Start with `./build.sh -h         # help</BR>`
 
@@ -8,20 +7,23 @@ Start with `./build.sh -h         # help</BR>`
 ./build.sh usage:
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
             # Apr-14-2017 build timings:
-            # 0: build    ~ ?? min  (jit), 1     min  (vanilla)
-            # 1: examples ~  1 min  (jit), 13-16 mins (vanilla)
-            # 2: test_*   ~ 10 mins (jit), 108   mins (vanilla)
+            # 0   : build    ~ ?? min  (jit), 1     min  (vanilla)
+            # >=1 : examples ~  1 min  (jit), 13-16 mins (vanilla)
+            # >=2 : test_*   ~ 10 mins (jit), 108   mins (vanilla)
+            # >=3 : benchdnn (bench.sh) performance/correctness tests (long)
         v) # [yes] (vanilla C/C++ only: no src/cpu/ JIT assembler)
         j) # force Intel JIT (src/cpu/ JIT assembly code)
         d) # [no] debug release
-        D) # [no] Doxygen : force a full rebuild of only the doc component
+        D) # [no] Doxygen-only : build documentation and then stop
         q) # quick: skip doxygen docs [default: run doxygen if build OK]
         Q) # really quick: skip build and doxygen docs [JUST run cmake and stop]
         p) # permissive: disable the FAIL_WITHOUT_MKL switch
-        S) # SX cross-compile (size_t=64, built in build-sx/)
+        S) # SX cross-compile (size_t=64, built in build-sx/, NEW: default if $CC==sxcc)
         s) # SX cross-compile (size_t=32, built in build-sx/) DISCOURAGED
             # -s is NOT GOOD: sizeof(ptrdiff_t) is still 8 bytes!
         r) # reference impls only: no -DUSE_CBLAS compile flag (->no im2col gemm)
+        w) # reduce compiler warnings
+        W) # lots of compiler warnings (default)
         T) # cmake --trace
     h | *) # help
 Example: time a full test run for a debug compilation --- time ./build.sh -dtt
@@ -30,16 +32,21 @@ Example: time a full test run for a debug compilation --- time ./build.sh -dtt
          *just* create doxygen docs                   ---      ./build.sh -D
 Debug: Individual tests can be run like build-sx/tests/gtests/test_relu
 ```
-
 | System | Example
 |:------ |:--------
 | Intel: | ./build.sh -tt # build and run all tests (no jit)
 |        | --> build/    and build.log<
 |        | ./build.sh -tt # build and run all tests (with jit)
-|        |
+| ---    | ---
 | SX:    | ./build.sh -ST # build for *S*X and *T*race cmake setup
 |        |   --> build-sx/ and build-sx.log
 |  or    | ./build.sh -SdqT # debug build (no doxygen) for SX
+| ---    | ---
+
+- :new: -S is auto-detected if \$CC is the sxcc cross compiler.
+  - SX cannot use -t (test) because you need to log in to the SX first
+  - SX always does *vanilla* compile (non-jit)
+  - SX begins with -T verbose cmake trace, since cmake support is incomplete.
 
 ## Purpose
 
@@ -90,9 +97,9 @@ Japan master is on /mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn
        or, for me  ~/wrk/simd/gen-dnn
 
 
-There is also a github master,
+There is also a github master, ~~git+ssh://git@github.com/kruus/gen-dnn.git~~
 
-    git+ssh://git@github.com/kruus/gen-dnn.git
+    git+ssh://git@github.com/necla-ml/gen-dnn.git
 
 which is being left out-of-date until a decision is made on whether SX support
 should enter public domain.  For at least FY17 1st quarter we will target basic
@@ -117,7 +124,8 @@ Host zoro # was japan17
   HostName XXXXXXXXXXX
   RemoteForward 22222 localhost:22
     ```
-    - and a zoro:~/.ssh/config of ```
+    - and a zoro:~/.ssh/config of
+```
 host snake10
     User kruus
     Hostname localhost
@@ -180,14 +188,19 @@ Then log in to the SX, start bash and cd to the project root (`~/tosx`, etc.)
 - recompile in debug mode `./build.sh -Sdq` to allow nicer tracing of issues (typically segfaults)
 
 - `build-sx/tests/gtests/test_convolution\*` take a *long* time to run.
-  - so you can do something like ```
-( cd build-sx/tests/gtests; export C_PROGINF=DETAIL; for f in test_conv*; do echo '>>>> '"$f"; ./$f --gtest_filter=*/0:*/1:*/2:*/3:*/4:*/5 2>&1 | tee "../../../guest/$f-test0-5.log"; done; )  2>&1 | tee guest/gtest-conv0-5.log
-  ```
-Run the examples/ test programs and get run statistics:
+  - so you can do something like
 ```
-for f in ./build-sx/examples/sim*; do echo ""; echo "%%% $f"; C_PROGINF=DETAIL ./$f 2>&1 | tee guest/`basename $f`.log; done
+( cd build-sx/tests/gtests; export C_PROGINF=DETAIL; for f in test_conv*; do echo '>>>> '"$f"; \
+  ./$f --gtest_filter=*/0:*/1:*/2:*/3:*/4:*/5 2>&1 | tee "../../../guest/$f-test0-5.log"; done; \
+)  2>&1 | tee guest/gtest-conv0-5.log
 ```
-  - to run a subset of the convolution tests.
+    to run a subset of the convolution tests.
+  - or run the examples/ test programs and get run statistics:
+```
+for f in ./build-sx/examples/sim*; do echo ""; echo "%%% $f"; \
+C_PROGINF=DETAIL ./$f 2>&1 | tee guest/`basename $f`.log; \
+done
+```
 
 ### SX debug
 
@@ -262,7 +275,7 @@ samples  %        image name               symbol name
 1         0.0019  libmkldnn.so.0.9.0       std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t> >::size() const
 ```
 
-### SX segfault
+### SX segfault example
 
 - examples/simple-net-cpp and simple-net-c both segfault
 - tests/api-io-c does not segfault (linker issue???)
@@ -286,7 +299,7 @@ dbx ./simple-net-c
   - some bugs simple and fixed in next SX compiler versions.
 - One bug I could not reduce to a simple test case.
 
-### Convolution is abysmally slow
+### SX Convolution is abysmally slow
 
 - Even though im2col gemm is there, `[guest@ps6s0000 tests]$ ./api-io-c` take "forever".
 - sxftrace shows that ref_convolution code is running (not the im2col one)
@@ -323,4 +336,12 @@ void mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mk
   - OK, time to come back to Intel desktop and gdb the primitive settings (it should be nchw
     and I need to check if this format is supported for the gemm_convolution)
 - Rationalize compiler flag usage esp. for USE_CBLAS
+
+- NEW:
+  - benchdnn now running on SX
+  - now can use new queries to print algorithm name!
+  - SX is slow because im2col is a *ref* implementation
+    that doesn't allow good loop optimizations
+    - This needs to be special-cased for "nice" layouts.
+
 

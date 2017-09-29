@@ -21,6 +21,15 @@
 #include "type_helpers.hpp"
 #include "gemm_convolution_utils.hpp"
 
+#if defined(_OPENMP)
+#include <omp.h>
+#else
+inline int omp_get_max_threads() { return 1; }
+inline int omp_get_num_threads() { return 1; }
+inline int omp_get_thread_num() { return 0; }
+inline int omp_in_parallel() { return 0; }
+#endif
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -37,7 +46,7 @@ void im2col(
     const size_t col_step = jcp.ks * jcp.os;
 
     int num_thr = (jcp.mb != 1) ? omp_get_max_threads() : 1;
-#pragma omp parallel for  num_threads(num_thr)
+#pragma omp parallel for num_threads(num_thr)
     for (int ic = 0; ic < jcp.ic; ++ic) {
         for (int kh = 0; kh < jcp.kh; ++kh) {
         for (int oh = 0; oh < jcp.oh; ++oh) {

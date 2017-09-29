@@ -278,3 +278,4 @@ bool maybe_skip(const char *impl_str) {
 }
 
 }
+// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

@@ -1,7 +1,8 @@
-# Todo
+# benchdnn Todo
 
 * common:
     - add verbosity control through environment variable
+    - add 'all' flag to bench\_mode to compare all available impls
 
 * correctness:
     - change int to double for cfg->{min, max}

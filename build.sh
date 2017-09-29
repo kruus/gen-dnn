@@ -51,7 +51,7 @@ while getopts ":htvjdDqQpsSTb" arg; do
         d) # [no] debug release
             DODEBUG="y"
             ;;
-        D) # [no] Doxygen : force a full rebuild of only the doc component
+        D) # [no] Doxygen-only : build documentation and then stop
             DOJUSTDOC="y"
             ;;
         q) # quick: skip doxygen docs [default: run doxygen if build OK]
@@ -114,6 +114,8 @@ if [ "$DOJUSTDOC" == "y" ]; then
         #&& make VERBOSE=1 doc \
         #&& cmake -DCOMPONENT=doc -P cmake_install.cmake
         cd build && make VERBOSE=1 install-doc # Doxygen.cmake custom target
+        echo "doxygen.log ends up in gen-dnn project root"
+        echo "Documentation installed under ${INSTALL_DIR}/share/doc/"
     ) 2>&1 | tee ../doxygen.log
     exit 0
 fi
