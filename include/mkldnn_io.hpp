@@ -41,6 +41,8 @@ namespace mkldnn {
     std::ostream& operator<<(std::ostream& os, mkldnn_blocking_desc_t const& bd) MKLDNN_API;
     std::ostream& operator<<(std::ostream& os, mkldnn_memory_desc_t const& md) MKLDNN_API;
 
+    /** print a primitive --- to print the impl name, get its query string
+     * via \c mkldnn_name_primitive_impl(const_mkldnn_primitive_t &prim); */
     std::ostream& operator<<(std::ostream& os, mkldnn_primitive const& prim) MKLDNN_API;
     /** print a 'typedef mkldnn_primitive* mkldn_primitive_t' */
     std::ostream& operator<<(std::ostream& os, mkldnn_primitive_t const prim) MKLDNN_API;
