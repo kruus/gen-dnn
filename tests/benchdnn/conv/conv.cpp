@@ -593,6 +593,7 @@ int doit(const prb_t *p, res_t *r) {
         };
         const_mkldnn_primitive_t outputs[] = { dst_dt.p_ };
         DNN_SAFE(mkldnn_primitive_create(&c, cpd, inputs, outputs), WARN);
+        cout<<c<<", impl "<<mkldnn_name_primitive_impl(c)<<endl;
         SAFE(execute(c), WARN);
         if ((bench_mode & CORR) || (bench_mode & TEST) ) {
             compute_ref_fwd(p, src_fp, wei_fp, bia_fp, dst_fp);
