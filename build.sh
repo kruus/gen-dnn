@@ -191,6 +191,9 @@ fi
         SXOPT="${SXOPT} -woff=1901"  # turn off sxcc warning defining arr[len0] for constant len0
         SXOPT="${SXOPT} -wnolongjmp" # turn off warnings about setjmp/longjmp (and tracing)
 
+        SXOPT="${SXOPT} -Pauto -acct" # enable parallelization (and run with C_PROGINF=YES)
+        #SXOPT="${SXOPT} -Pstack" # disable parallelization
+
         # Generate 'ftrace.out' profiling that can be displayed with ftrace++
         #  BUT not compatible with POSIX threads
         #SXOPT="${SXOPT} -Nftrace"

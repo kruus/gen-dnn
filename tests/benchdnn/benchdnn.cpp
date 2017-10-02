@@ -31,6 +31,15 @@
 #include "conv/conv.hpp"
 #include "ip/ip.hpp"
 
+#if defined(_OPENMP)
+#include <omp.h>
+#else
+inline int omp_get_max_threads() { return 1; }
+inline int omp_get_num_threads() { return 1; }
+inline int omp_get_thread_num() { return 0; }
+inline int omp_in_parallel() { return 0; }
+#endif
+
 int verbose {0};
 bench_mode_t bench_mode {CORR};
 stat_t benchdnn_stat {0};
@@ -58,7 +67,8 @@ int main(int argc, char **argv) {
         ++argv;
     }
 
-    printf("benchdnn init ..."); fflush(stdout);
+    int omp_max_thr = omp_get_max_threads();
+    printf("benchdnn init ... omp_max_thr=%d",omp_max_thr); fflush(stdout);
     init();
     printf(" OK\n"); fflush(stdout);
     perf_t const * perf_data = perf_begin();
