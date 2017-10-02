@@ -35,11 +35,14 @@ namespace conv {
 
 static conv_impls_t conv_impls[] = {
     {compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
-    nullptr
+    {compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w}, // don't have a different set yet
 };
 
 conv_impls_t * get_ref_impls() {
     return conv_impls;
+}
+size_t constexpr get_nref_impls() {
+    return sizeof(conv_impls) / sizeof(conv_impls_t);
 }
 
 double get_trust_nz_level(const prb_t *p, int what, bool final_compare) {
@@ -606,56 +609,69 @@ int doit(const prb_t *p, res_t *r) {
             SAFE(compare_dst(p, dst, dst_fp, r, true), WARN);
         }
         if (bench_mode & TEST){ // XXX not yet working, why?
-            // get new zero-initialized data "just like" the ref fp32 calc.
-            print(0," %s ...\n", "dnn_mem_t src_tt(src_fp)");
-            //print(0," %s ...\n", "compare src_tt to src_fp");
-            // not applicable: SAFE(compare_src(p, src_tt, src_fp, r, false), CRIT);
-            //print(0," %s ...\n", "dnn_mem_t src_tt");
-            dnn_mem_t src_tt(src_fp.md_);
-            dnn_mem_t wei_tt(wei_fp.md_);
-            dnn_mem_t dst_tt(dst_fp.md_);
-            dnn_mem_t bia_tt(bia_fp.md_);
-            {
-                //SAFE(compare_src(p, src_tt, src_fp, r, false), WARN);
-                cout<<"src_fp.md_ : "<<src_fp.md_<<endl;
-                cout<<"wei_fp.md_ : "<<wei_fp.md_<<endl;
-                cout<<"bia_fp.md_ : "<<bia_fp.md_<<endl;
-                cout<<"dst_fp.md_ : "<<dst_fp.md_<<endl;
-                cout<<"src_tt.md_ : "<<src_tt.md_<<endl;
+            size_t const nimp = get_nref_impls();
+            for(size_t imp=0U; imp<nimp; ++imp){
+                // get new zero-initialized data "just like" the ref fp32 calc.
+                if(0) print(0," %s ...\n", "dnn_mem_t src_tt(src_fp)");
+                dnn_mem_t src_tt(src_fp.md_);
+                dnn_mem_t wei_tt(wei_fp.md_);
+                dnn_mem_t dst_tt(dst_fp.md_);
+                dnn_mem_t bia_tt(bia_fp.md_);
+                if(0){
+                    //SAFE(compare_src(p, src_tt, src_fp, r, false), WARN);
+                    cout<<"src_fp.md_ : "<<src_fp.md_<<endl;
+                    cout<<"wei_fp.md_ : "<<wei_fp.md_<<endl;
+                    cout<<"bia_fp.md_ : "<<bia_fp.md_<<endl;
+                    cout<<"dst_fp.md_ : "<<dst_fp.md_<<endl;
+                    cout<<"src_tt.md_ : "<<src_tt.md_<<endl;
+                }
+                // inputs (for a FWD calc) acquire content from ref fp32 calc
+                if(0) cout<<" src_tt.reorder(src_fp)"<<endl;
+                src_tt.reorder(src_fp);
+                wei_tt.reorder(wei_fp);
+                bia_tt.reorder(bia_fp);
+                if(0){
+                    for(unsigned i=0U; i<20U; ++i){ cout<<" src_fp["<<setw(3)<<i<<"] = "
+                        <<setw(8)<<((float*)(src_fp.data_)) [i]<<", "
+                            <<setw(8)<<((float*)(src_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
+                    }
+                    cout<<endl;
+                    for(unsigned i=0U; i<20U; ++i){ cout<<" wei_fp["<<setw(3)<<i<<"] = "
+                        <<setw(8)<<((float*)(wei_fp.data_)) [i]<<", "
+                            <<setw(8)<<((float*)(wei_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
+                    }
+                    cout<<endl;
+                    for(unsigned i=0U; i<20U; ++i){ cout<<" bia_fp["<<setw(3)<<i<<"] = "
+                        <<setw(8)<<((float*)(bia_fp.data_)) [i]<<", "
+                            <<setw(8)<<((float*)(bia_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
+                    }
+                    cout<<endl;
+                    for(unsigned i=0U; i<20U; ++i){ cout<<" dst_fp["<<setw(3)<<i<<"] = "
+                        <<setw(8)<<((float*)(dst_fp.data_)) [i]<<", "
+                            <<setw(8)<<((float*)(dst_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
+                    }
+                    cout<<endl;
+                }
+                // convolution test code : forward
+                if(0) cout<<"convolution forward test imp "<<imp<<endl;
+                //compute_ref_fwd(p, src_tt, wei_tt, bia_tt, dst_tt);
+                benchdnn_timer_t tt;
+                tt.start();
+                get_ref_impls()[imp].fwd(p, src_tt, wei_tt, bia_tt, dst_tt);
+                tt.stop();
+                cout<<"convolution forward test imp "<<imp<<" time "<<tt.total_ms()<<" ms"<<endl;
+                if(0){
+                    for(unsigned i=0U; i<20U; ++i){ cout<<" dst["<<setw(3)<<i<<"] = "
+                        <<setw(8)<<((float*)(dst_fp.data_)) [i]<<", "
+                            <<setw(8)<<((float*)(dst_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
+                    }
+                    cout<<endl;
+                }
+                // compare output of test code with ref floating point calc
+                cout<<"compare_dst, test impl "<<imp<<" vs ref impl 0"<<endl;
+                SAFE(compare_dst(p, dst_tt, dst_fp, r, true), WARN);
+                cout<<endl;
             }
-            // inputs (for a FWD calc) acquire content from ref fp32 calc
-            cout<<" src_tt.reorder(src_fp)"<<endl;
-            src_tt.reorder(src_fp);
-            wei_tt.reorder(wei_fp);
-            bia_tt.reorder(bia_fp);
-            for(unsigned i=0U; i<20U; ++i){ cout<<" src_fp["<<setw(3)<<i<<"] = "
-                <<setw(8)<<((float*)(src_fp.data_)) [i]<<", "
-                    <<setw(8)<<((float*)(src_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
-            }
-            cout<<endl;
-            for(unsigned i=0U; i<20U; ++i){ cout<<" wei_fp["<<setw(3)<<i<<"] = "
-                <<setw(8)<<((float*)(wei_fp.data_)) [i]<<", "
-                    <<setw(8)<<((float*)(wei_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
-            }
-            cout<<endl;
-            for(unsigned i=0U; i<20U; ++i){ cout<<" bia_fp["<<setw(3)<<i<<"] = "
-                <<setw(8)<<((float*)(bia_fp.data_)) [i]<<", "
-                    <<setw(8)<<((float*)(bia_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
-            }
-            cout<<endl;
-            for(unsigned i=0U; i<20U; ++i){ cout<<" dst_fp["<<setw(3)<<i<<"] = "
-                <<setw(8)<<((float*)(dst_fp.data_)) [i]<<", "
-                    <<setw(8)<<((float*)(dst_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
-            }
-            cout<<endl;
-            // convolution test code : forward
-            compute_ref_fwd(p, src_tt, wei_tt, bia_tt, dst_tt);
-            for(unsigned i=0U; i<20U; ++i){ cout<<" dst["<<setw(3)<<i<<"] = "
-                <<setw(8)<<((float*)(dst_fp.data_)) [i]<<", "
-                    <<setw(8)<<((float*)(dst_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
-            } cout.flush();
-            // compare output of test code with ref floating point calc
-            SAFE(compare_dst(p, dst_tt, dst_fp, r, true), WARN);
         }
         if( do_perf(c, r) != OK ) return FAIL;
     } else if (p->dir == BWD_D) {
