@@ -87,7 +87,9 @@ void _gemm_convolution_fwd_t<with_relu, run_jit, isa>::execute_forward() {
                 jit_gemm_convolution_utils::im2col(jcp, _src, _col);
 
             if (run_jit) {
-#ifndef TARGET_VANILLA
+#ifdef TARGET_VANILLA
+                exit(-1);
+#else
                 sgemm_->sgemm("N", "N", &M, &N, &K, &one, jcp.need_im2col ?
                     _col:_src, &M, _weights, &K, &zero, _dst, &M);
 #endif

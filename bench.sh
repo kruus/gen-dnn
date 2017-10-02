@@ -25,6 +25,15 @@ if [ `uname` == 'SUPER-UX' ]; then
 	chmod -R ugo+w ${BUILD}
 	chmod ugo+w ${BENCHDIR}
 fi
+if [ "${MKLROOT}" != "" ]; then
+	module unload icc >& /dev/null || echo "module icc unloaded"
+	if [ "${MKLROOT}" != "" ]; then
+		echo "Please compile in an environment without MKLROOT"
+		exit -1;
+	fi
+	# export -n MKLROOT
+	# export MKL_THREADING_LAYER=INTEL # maybe ???
+fi
 echo "BUILD    directory : ${BUILD}"
 echo "LOGDIR   directory : ${LOGDIR}"
 echo "benchdnn directory : ${BENCHDIR}"

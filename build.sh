@@ -97,6 +97,22 @@ if [ "`echo ${CC}`" == 'sxcc' -a ! "$DOTARGET" == "s" ]; then
     echo 'Detected $CC == sxcc --> SX compilation with 64-bit size_t'
     DOTARGET="s"; DOJIT=0; SIZE_T=64; JOBS="-j4"
 fi
+#
+# I have not yet tried icc.
+# For gcc, we will avoid the full MKL (omp issues)
+#
+if [ "${MKLROOT}" != "" ]; then
+	module unload icc >& /dev/null || echo "module icc unloaded"
+	if [ "${MKLROOT}" != "" ]; then
+		echo "Please compile in an environment without MKLROOT"
+		exit -1;
+	fi
+	# export -n MKLROOT
+	# export MKL_THREADING_LAYER=INTEL # maybe ???
+fi
+#
+#
+#
 if [ "$DOTARGET" == "j" ]; then DOJIT=100; INSTALLDIR='install-jit'; BUILDDIR='build-jit'; fi
 if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx'; fi
 #if [ "$DOTARGET" == "v" ]; then ; fi
