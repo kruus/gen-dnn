@@ -75,10 +75,10 @@ typedef enum {
 } mkldnn_data_type_t;
 
 /** Some platforms do not need all memory layouts.
- * - 0 : no blocked (8,16) or grouped data layouts for mkldnn_memory_format_t
+ * - 0 : no blocked (8,16) or interleaved data layouts for mkldnn_memory_format_t
  * - 1 : full spectrum of data layouts (jit expects this)
  */
-#if defined(TARGET_VANILLA) && (0 || defined(_SX))
+#if defined(TARGET_VANILLA) || defined(_SX)
 #define MKLDNN_JIT_TYPES 0
 #else
 #define MKLDNN_JIT_TYPES 1
@@ -846,5 +846,5 @@ typedef const struct mkldnn_stream *const_mkldnn_stream_t;
 }
 #endif
 
-
+// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
 #endif

@@ -44,6 +44,10 @@ bench_mode_t str2bench_mode(const char *str) {
         mode = (bench_mode_t)((int)mode | (int)CORR);
     if (strchr(str, 'p') || strchr(str, 'P'))
         mode = (bench_mode_t)((int)mode | (int)PERF);
+    if (strchr(str, 'a') || strchr(str, 'A'))
+        mode = (bench_mode_t)((int)mode | (int)ALL);
+    if (strchr(str, 't') || strchr(str, 'T') )
+        mode = (bench_mode_t)((int)mode | ((int)TEST + (int)CORR));
     if (mode == MODE_UNDEF)
         []() { SAFE(FAIL, CRIT); return 0; }();
     return mode;

@@ -19,6 +19,9 @@
 #include <float.h>
 #include <math.h>
 
+#include "mkldnn_io.hpp"
+#include <iomanip>
+
 #include "mkldnn.h"
 
 #include "mkldnn_common.hpp"
@@ -29,6 +32,15 @@
 #include "conv/conv.hpp"
 
 namespace conv {
+
+static conv_impls_t conv_impls[] = {
+    {compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
+    nullptr
+};
+
+conv_impls_t * get_ref_impls() {
+    return conv_impls;
+}
 
 double get_trust_nz_level(const prb_t *p, int what, bool final_compare) {
     if (!final_compare)
@@ -198,12 +210,68 @@ inline int compare_dst(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
         res_t *r, bool final_compare = false)
 { return compare_dat(p, DST, mem_dt, mem_fp, r, final_compare); }
 
+static int fill_src_f32(const prb_t *p, dnn_mem_t &mem_fp)
+{
+    if( mem_fp.dt() != mkldnn_f32 )
+        return FAIL;
+
+    const auto &c = p->cfg[SRC];
+    const int range = c.f_max - c.f_min + 1;
+#   pragma omp parallel for collapse(4)
+    for (int mb = 0; mb < p->mb; ++mb)
+    for (int ic = 0; ic < p->ic; ++ic)
+    for (int ih = 0; ih < p->ih; ++ih)
+    for (int iw = 0; iw < p->iw; ++iw)
+    {
+        const int gen = 17 * ih + 13 * iw + 13 * mb + 19 * ic + 1637;
+        const bool non_base = true
+            && gen % (p->kh * p->kw) <= c.f_sparsity * (p->kh * p->kw);
+//            && (17 * ih + 13 * mb) % p->kh == 0
+//            && (13 * iw + 19 * ic) % p->kw == 0;
+        const float value = static_cast<float>(
+            non_base ? c.f_min + gen * c.f_step % range : c.f_base);
+
+        ((float*)mem_fp)[src_off_f(p, mb, 0, ic, ih, iw)] = value;
+    }
+    return OK;
+}
+
 inline int fill_src(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
         res_t *r) {
+    auto fill_src_args_ok = p && r
+          && mem_fp.dt() == mkldnn_f32
+          && mem_fp.md_.format == mkldnn_nchw
+          ? OK: FAIL;
+    SAFE(fill_src_args_ok, CRIT);
+
     const bool extra_mem = mem_dt.dt() != mem_fp.dt();
     dnn_mem_t *p_mem_00 = extra_mem
         ? new dnn_mem_t(mem_dt.md_, mkldnn_f32, mkldnn_nchw)
         : &mem_fp;
+    dnn_mem_t &mem_00 = *p_mem_00; // ALWAYS f32, nchw
+
+    SAFE(fill_src_f32(p, mem_00), CRIT); // fill (possibly tmp) f32 buffer
+
+    SAFE(mem_dt.reorder(mem_00), WARN); // mem_dt acquires content from mem_00
+    if (extra_mem) {
+        SAFE(mem_fp.reorder(mem_dt), WARN); // mem_fp acquires content from mem_dt
+        SAFE(compare_src(p, mem_fp, mem_00, r), WARN);
+        delete &mem_00;
+    }
+
+    return OK;
+}
+
+// now one of 'mem_dt' or 'mem_fp' may be a nullptr
+inline int fill_src_ouch(const prb_t *p, dnn_mem_t *mem_dt, dnn_mem_t *mem_fp,
+        res_t *r) {
+    if( p == nullptr || r == nullptr || (mem_dt == nullptr && mem_fp == nullptr) )
+        return FAIL;
+
+    dnn_mem_t *p_mem_00 = mem_fp;
+    if( mem_fp == nullptr || mem_dt->dt() != mem_fp->dt())
+        p_mem_00 = new dnn_mem_t(mem_dt->md_, mkldnn_f32, mkldnn_nchw);
+                                 // ouch  //
     dnn_mem_t &mem_00 = *p_mem_00;
 
     const auto &c = p->cfg[SRC];
@@ -226,11 +294,15 @@ inline int fill_src(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
         ((float*)mem_00)[src_off_f(p, mb, 0, ic, ih, iw)] = value;
     }
 
-    SAFE(mem_dt.reorder(mem_00), WARN);
-    if (extra_mem) {
-        SAFE(mem_fp.reorder(mem_dt), WARN);
-        SAFE(compare_src(p, mem_fp, mem_00, r), WARN);
-        delete &mem_00;
+    if( mem_dt )
+        SAFE(mem_dt->reorder(mem_00), WARN);
+
+    if (p_mem_00 != mem_fp) { // i.e. old 'extra_mem' case
+        if (mem_fp && mem_dt) {
+            SAFE(mem_fp->reorder(*mem_dt), WARN);
+            SAFE(compare_src(p, *mem_fp, mem_00, r), WARN);
+        }
+        delete p_mem_00;
     }
 
     return OK;
@@ -448,6 +520,28 @@ inline int init_pd(const prb_t *p, mkldnn_convolution_desc_t &cd,
     return OK;
 }
 
+/** run performance loops if bench_mode \& PERF.
+ * \ret 0/1 OK/FAIL */
+static int do_perf( mkldnn_primitive_t prim, res_t *r )
+{
+
+    if (bench_mode & PERF) {
+        auto &t = r->timer;
+        t.reset();
+        while (true) {
+            SAFE(execute(prim), WARN);
+            t.stamp();
+            const bool stop = false
+                || (fix_times_per_prb && t.times() >= fix_times_per_prb)
+                || (!fix_times_per_prb
+                    && t.total_ms() >= max_ms_per_prb
+                    && t.times() >= min_times_per_prb);
+            if (stop) break;
+        }
+    }
+    return OK;
+}
+
 int doit(const prb_t *p, res_t *r) {
     res_t res_zero{};
     *r = res_zero;
@@ -480,25 +574,90 @@ int doit(const prb_t *p, res_t *r) {
         ? new dnn_mem_t(bia_dt_d, fp, mkldnn_x) : new dnn_mem_t();
     dnn_mem_t &bia_fp = *p_bia_fp;
 
+    //SAFE(fill_src(p, &src_dt, &src_fp, r), WARN);
     SAFE(fill_src(p, src_dt, src_fp, r), WARN);
     SAFE(fill_wei(p, wei_dt, wei_fp, r), WARN);
     SAFE(fill_dst(p, dst_dt, dst_fp, r), WARN);
     if (p->dir & FLAG_BIA)
         SAFE(fill_bia(p, bia_dt, bia_fp, r), WARN);
 
+    // These block run the default mkl-dnn convolution,
+    // TODO and possibly 'A'll other mkl-dnn impls,
+    // and possibly the first (reference) implementation,
+    // WIP and possibly any further reference implementations.
     if (p->dir & FLAG_FWD) {
+        using mkldnn::operator <<;
+        using std::cout; using std::endl; using std::setw;
         mkldnn_primitive_at_t inputs[3] = { {src_dt.p_, 0}, {wei_dt.p_, 0},
             {p->dir & FLAG_BIA ? bia_dt.p_ : NULL, 0}
         };
         const_mkldnn_primitive_t outputs[] = { dst_dt.p_ };
         DNN_SAFE(mkldnn_primitive_create(&c, cpd, inputs, outputs), WARN);
+        cout<<c<<", impl "<<mkldnn_name_primitive_impl(c)<<endl;
         SAFE(execute(c), WARN);
-        if (bench_mode & CORR) {
+        if ((bench_mode & CORR) || (bench_mode & TEST) ) {
             compute_ref_fwd(p, src_fp, wei_fp, bia_fp, dst_fp);
+            //for(unsigned i=0U; i<20U; ++i){ cout<<" dst_fp["<<setw(3)<<i<<"] = "
+            //    <<setw(8)<<((float*)(dst_fp.data_)) [i]<<", "
+            //        <<(i%5U==4U? '\n': ' ');
+            //} cout.flush();
             dnn_mem_t dst(dst_dt, fp, mkldnn_nchw);
             SAFE(dst.reorder(dst_dt), WARN);
             SAFE(compare_dst(p, dst, dst_fp, r, true), WARN);
         }
+        if (bench_mode & TEST){ // XXX not yet working, why?
+            // get new zero-initialized data "just like" the ref fp32 calc.
+            print(0," %s ...\n", "dnn_mem_t src_tt(src_fp)");
+            //print(0," %s ...\n", "compare src_tt to src_fp");
+            // not applicable: SAFE(compare_src(p, src_tt, src_fp, r, false), CRIT);
+            //print(0," %s ...\n", "dnn_mem_t src_tt");
+            dnn_mem_t src_tt(src_fp.md_);
+            dnn_mem_t wei_tt(wei_fp.md_);
+            dnn_mem_t dst_tt(dst_fp.md_);
+            dnn_mem_t bia_tt(bia_fp.md_);
+            {
+                //SAFE(compare_src(p, src_tt, src_fp, r, false), WARN);
+                cout<<"src_fp.md_ : "<<src_fp.md_<<endl;
+                cout<<"wei_fp.md_ : "<<wei_fp.md_<<endl;
+                cout<<"bia_fp.md_ : "<<bia_fp.md_<<endl;
+                cout<<"dst_fp.md_ : "<<dst_fp.md_<<endl;
+                cout<<"src_tt.md_ : "<<src_tt.md_<<endl;
+            }
+            // inputs (for a FWD calc) acquire content from ref fp32 calc
+            cout<<" src_tt.reorder(src_fp)"<<endl;
+            src_tt.reorder(src_fp);
+            wei_tt.reorder(wei_fp);
+            bia_tt.reorder(bia_fp);
+            for(unsigned i=0U; i<20U; ++i){ cout<<" src_fp["<<setw(3)<<i<<"] = "
+                <<setw(8)<<((float*)(src_fp.data_)) [i]<<", "
+                    <<setw(8)<<((float*)(src_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
+            }
+            cout<<endl;
+            for(unsigned i=0U; i<20U; ++i){ cout<<" wei_fp["<<setw(3)<<i<<"] = "
+                <<setw(8)<<((float*)(wei_fp.data_)) [i]<<", "
+                    <<setw(8)<<((float*)(wei_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
+            }
+            cout<<endl;
+            for(unsigned i=0U; i<20U; ++i){ cout<<" bia_fp["<<setw(3)<<i<<"] = "
+                <<setw(8)<<((float*)(bia_fp.data_)) [i]<<", "
+                    <<setw(8)<<((float*)(bia_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
+            }
+            cout<<endl;
+            for(unsigned i=0U; i<20U; ++i){ cout<<" dst_fp["<<setw(3)<<i<<"] = "
+                <<setw(8)<<((float*)(dst_fp.data_)) [i]<<", "
+                    <<setw(8)<<((float*)(dst_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
+            }
+            cout<<endl;
+            // convolution test code : forward
+            compute_ref_fwd(p, src_tt, wei_tt, bia_tt, dst_tt);
+            for(unsigned i=0U; i<20U; ++i){ cout<<" dst["<<setw(3)<<i<<"] = "
+                <<setw(8)<<((float*)(dst_fp.data_)) [i]<<", "
+                    <<setw(8)<<((float*)(dst_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
+            } cout.flush();
+            // compare output of test code with ref floating point calc
+            SAFE(compare_dst(p, dst_tt, dst_fp, r, true), WARN);
+        }
+        if( do_perf(c, r) != OK ) return FAIL;
     } else if (p->dir == BWD_D) {
         mkldnn_primitive_at_t inputs[3] = { {dst_dt.p_, 0}, {wei_dt.p_, 0}, };
         const_mkldnn_primitive_t outputs[] = { src_dt.p_ };
@@ -510,6 +669,7 @@ int doit(const prb_t *p, res_t *r) {
             SAFE(src.reorder(src_dt), WARN);
             SAFE(compare_src(p, src, src_fp, r, true), WARN);
         }
+        if( do_perf(c, r) != OK ) return FAIL;
     } else if (p->dir & FLAG_BWD && p->dir & FLAG_WEI) {
         mkldnn_primitive_at_t inputs[3] = { {src_dt.p_, 0}, {dst_dt.p_, 0}, };
         const_mkldnn_primitive_t outputs[] = { wei_dt.p_,
@@ -528,31 +688,17 @@ int doit(const prb_t *p, res_t *r) {
                 SAFE(compare_bia(p, bia, bia_fp, r, true), WARN);
             }
         }
+        if( do_perf(c, r) != OK ) return FAIL;
     } else {
         delete p_bia_dt;
         delete p_bia_fp;
         SAFE(FAIL, CRIT);
     }
-
-    if (bench_mode & PERF) {
-        auto &t = r->timer;
-        t.reset();
-        while (true) {
-            SAFE(execute(c), WARN);
-            t.stamp();
-            const bool stop = false
-                || (fix_times_per_prb && t.times() >= fix_times_per_prb)
-                || (!fix_times_per_prb
-                        && t.total_ms() >= max_ms_per_prb
-                        && t.times() >= min_times_per_prb);
-            if (stop) break;
-        }
-    }
-
     delete p_bia_dt;
     delete p_bia_fp;
 
     return OK;
 }
 
-}
+} 
+// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

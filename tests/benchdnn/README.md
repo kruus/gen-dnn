@@ -217,8 +217,9 @@ Winograd:
 | ih, iw        | Input height and width
 | oh, ow        | Output height and width
 | kh, kw        | Kernel (filter, weights) height and width
-| sh, sw        | Convolution stride over height and width
-| ph, pw        | Convolution top and left padding
+| sh, sw        | Convolution stride over height and width (0=&gt;stride 1)
+| ph, pw        | Convolution top and left padding (0=none)
+| dh, dw        | Dilation of image region covered by kernel (0=&gt;x1)
 | mb            | Minibatch (amount of images processed at once)
 | g             | Groups (a way to reduce the amount of computations, see Alexnet topology)
 | FWD_{D,B}     | forward w/o and w/ bias
