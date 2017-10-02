@@ -21,8 +21,14 @@ fi
 #################
 #
 BENCHDIR=${BUILD}/tests/benchdnn
+if [ `uname` == 'SUPER-UX' ]; then
+	chmod -R ugo+w ${BUILD}
+	chmod ugo+w ${BENCHDIR}
+fi
 echo "BUILD    directory : ${BUILD}"
+echo "LOGDIR   directory : ${LOGDIR}"
 echo "benchdnn directory : ${BENCHDIR}"
+ls -ld ${BENCHDIR}
 cat <<EOF
 Here are the output fields for performance benchmarks:
 	string: perf
@@ -46,23 +52,24 @@ THREADS=1
 export OMP_NUM_THREADS=${THREADS}
 export MKL_NUM_THREADS=${THREADS}
 {
-(cd ${BENCHDIR} && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B mb1_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
-(cd ${BENCHDIR} && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B mb12_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
-(cd ${BENCHDIR} && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B mb32_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
-(cd ${BENCHDIR} && ./benchdnn --conv --mode=C -v3 --cfg=f32 --dir=FWD_B mb1_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
-(cd ${BENCHDIR} && ./benchdnn --conv --mode=C -v3 --cfg=f32 --dir=FWD_B mb12_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
-(cd ${BENCHDIR} && ./benchdnn --conv --mode=C -v3 --cfg=f32 --dir=FWD_B mb32_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
+(cd ${BENCHDIR} && ./benchdnn --conv --mode=CP -v3 --cfg=f32 --dir=FWD_B mb1_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
+(cd ${BENCHDIR} && ./benchdnn --conv --mode=CP -v3 --cfg=f32 --dir=FWD_B mb12_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
+(cd ${BENCHDIR} && ./benchdnn --conv --mode=CP -v3 --cfg=f32 --dir=FWD_B mb32_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 ) || { echo "Ohoh"; exit; }
 } 2>&1 | tee ${LOGDIR}/bench-quick-t${THREADS}.log
 
-echo "Bench Convolution Performance for default fwd conv layers (many!) ..."
-LGBASE="${LOGDIR}/bench-convP-t${THREADS}"
-(cd ${BENCHDIR} && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B ) 2>&1 | tee ${LGBASE}-tmp.log \
-&& mv ${LGBASE}-tmp.log ${LGBASE}.log && echo "${LGBASE}.log OK" \
-|| { echo "${LGBASE}-tmp.log ERROR"; exit; }
+if [ `uname` == 'SUPER-UX' ]; then
+	echo "Skipping long tests"
+else
+	echo "Bench Convolution Performance for default fwd conv layers (many!) ..."
+	LGBASE="${LOGDIR}/bench-convP-t${THREADS}"
+	(cd ${BENCHDIR} && ./benchdnn --conv --mode=P -v3 --cfg=f32 --dir=FWD_B ) 2>&1 | tee ${LGBASE}-tmp.log \
+	&& mv ${LGBASE}-tmp.log ${LGBASE}.log && echo "${LGBASE}.log OK" \
+	|| { echo "${LGBASE}-tmp.log ERROR"; exit; }
 
-echo "Bench Convolution Correctness for default fwd conv layers (many!) ..."
-LGBASE="${LOGDIR}/bench-convC-t${THREADS}"
-(cd ${BENCHDIR} && ./benchdnn --conv          -v3 --cfg=f32 --dir=FWD_B ) 2>&1 | tee ${LGBASE}-tmp.log \
-&& mv ${LGBASE}-tmp.log ${LGBASE}.log && echo "${LGBASE}.log OK" \
-|| { echo "${LGBASE}-tmp.log ERROR"; exit; }
-
+	echo "Bench Convolution Correctness for default fwd conv layers (many!) ..."
+	LGBASE="${LOGDIR}/bench-convC-t${THREADS}"
+	(cd ${BENCHDIR} && ./benchdnn --conv          -v3 --cfg=f32 --dir=FWD_B ) 2>&1 | tee ${LGBASE}-tmp.log \
+	&& mv ${LGBASE}-tmp.log ${LGBASE}.log && echo "${LGBASE}.log OK" \
+	|| { echo "${LGBASE}-tmp.log ERROR"; exit; }
+fi
+#
