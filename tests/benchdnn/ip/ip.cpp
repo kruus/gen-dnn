@@ -199,13 +199,15 @@ int doit(prb_t *p, res_t *r) {
     dnn_mem_t wei_dt(wei_dt_d, p->wei_dt);
     dnn_mem_t dst_dt(dst_dt_d, p->dst_dt);
     dnn_mem_t bia_dt = p->dir & FLAG_BIA
-        ? dnn_mem_t(bia_dt_d, p->dst_dt) : dnn_mem_t();
+        ? dnn_mem_t(bia_dt_d, p->dst_dt)
+        : dnn_mem_t();
 
     dnn_mem_t src_fp(src_dt_d, fp, mkldnn_nchw);
     dnn_mem_t wei_fp(wei_dt_d, fp, mkldnn_oihw);
     dnn_mem_t dst_fp(dst_dt_d, fp, mkldnn_nc);
     dnn_mem_t bia_fp = p->dir & FLAG_BIA
-        ? dnn_mem_t(bia_dt_d, fp, mkldnn_x) : dnn_mem_t();
+        ? dnn_mem_t(bia_dt_d, fp, mkldnn_x)
+        : dnn_mem_t();
 
     fill_src(src_dt, src_fp, r);
     fill_wei(wei_dt, wei_fp, r);

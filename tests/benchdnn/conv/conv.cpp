@@ -20,8 +20,6 @@
 #include <math.h>
 
 #include "mkldnn_io.hpp"
-#include <iomanip>
-
 #include "mkldnn.h"
 
 #include "mkldnn_common.hpp"
@@ -30,6 +28,10 @@
 #include "norm.hpp"
 
 #include "conv/conv.hpp"
+
+#include <iomanip>
+using mkldnn::operator <<;
+using std::cout; using std::endl; using std::setw;
 
 namespace conv {
 
@@ -523,12 +525,50 @@ inline int init_pd(const prb_t *p, mkldnn_convolution_desc_t &cd,
     return OK;
 }
 
+static void print_mem_desc(dnn_mem_t const &src_fp, dnn_mem_t const &wei_fp,
+            dnn_mem_t const &bia_fp, dnn_mem_t const &dst_fp) {
+    if( src_fp.active_ ) cout<<"src.md_ : "<<src_fp.md_<<endl;
+    else                 cout<<"src inactive"<<endl;
+    if( wei_fp.active_ ) cout<<"wei.md_ : "<<wei_fp.md_<<endl;
+    else                 cout<<"wei inactive"<<endl;
+    if( bia_fp.active_ ) cout<<"bia.md_ : "<<bia_fp.md_<<endl;
+    else                 cout<<"bia inactive"<<endl;
+    if( dst_fp.active_ ) cout<<"dst.md_ : "<<dst_fp.md_<<endl;
+    else                 cout<<"dst inactive"<<endl;
+}
+
+#define RT_ASSERT( COND ) do { \
+    bool const rt_assert_cond = (COND); \
+    if( ! rt_assert_cond ) { \
+        fflush(0), fprintf(stderr, "@@@ error [%s:%d]: '%s' -> false\n", \
+                __PRETTY_FUNCTION__, __LINE__, #COND), fflush(0); \
+        exit(1); \
+    } \
+}while(0)
+
+static void cmp_fp_data(const char* msg, const dnn_mem_t &f32a,
+                        const dnn_mem_t &f32b ) {
+    RT_ASSERT( f32a.active_ );
+    RT_ASSERT( f32b.active_ );
+    RT_ASSERT( (f32a.dt() == mkldnn_f32 ));
+    unsigned const nPrt = [&](){ unsigned n=20U, m;
+        if( (m=f32a.nelems()) < n ) n = m;
+        if( (m=f32b.nelems()) < n ) n = m;
+        return n;
+    }();
+    for(unsigned i=0U; i<nPrt; ++i){
+            cout<<" "<<msg<<"["<<setw(3)<<i<<"] = "
+            <<setw(8)<<((float*)f32a) [i]<<", "
+            <<setw(8)<<((float*)f32b) [i]<<(i%5U==4U? '\n': ' ');
+    }
+    cout<<endl;
+}
 /** run performance loops if bench_mode \& PERF.
  * \ret 0/1 OK/FAIL */
 static int do_perf( mkldnn_primitive_t prim, res_t *r )
 {
 
-    if (bench_mode & PERF) {
+    if (bench_mode & PERF || bench_mode & TEST) {
         auto &t = r->timer;
         t.reset();
         while (true) {
@@ -589,91 +629,59 @@ int doit(const prb_t *p, res_t *r) {
     // and possibly the first (reference) implementation,
     // WIP and possibly any further reference implementations.
     if (p->dir & FLAG_FWD) {
-        using mkldnn::operator <<;
-        using std::cout; using std::endl; using std::setw;
+        int const v = verbose;
+        if (bench_mode & CORR || bench_mode & TEST ) {
+            compute_ref_fwd(p, src_fp, wei_fp, bia_fp, dst_fp);
+        }
         mkldnn_primitive_at_t inputs[3] = { {src_dt.p_, 0}, {wei_dt.p_, 0},
             {p->dir & FLAG_BIA ? bia_dt.p_ : NULL, 0}
         };
-        const_mkldnn_primitive_t outputs[] = { dst_dt.p_ };
-        DNN_SAFE(mkldnn_primitive_create(&c, cpd, inputs, outputs), WARN);
-        cout<<c<<", impl "<<mkldnn_name_primitive_impl(c)<<endl;
-        SAFE(execute(c), WARN);
-        if ((bench_mode & CORR) || (bench_mode & TEST) ) {
-            compute_ref_fwd(p, src_fp, wei_fp, bia_fp, dst_fp);
-            //for(unsigned i=0U; i<20U; ++i){ cout<<" dst_fp["<<setw(3)<<i<<"] = "
-            //    <<setw(8)<<((float*)(dst_fp.data_)) [i]<<", "
-            //        <<(i%5U==4U? '\n': ' ');
-            //} cout.flush();
-            dnn_mem_t dst(dst_dt, fp, mkldnn_nchw);
-            SAFE(dst.reorder(dst_dt), WARN);
-            SAFE(compare_dst(p, dst, dst_fp, r, true), WARN);
+        {
+            const_mkldnn_primitive_t outputs[] = { dst_dt.p_ };
+            DNN_SAFE(mkldnn_primitive_create(&c, cpd, inputs, outputs), WARN);
+            if (v) cout<<c<<", impl ";
+            if (v>=0) {cout<<mkldnn_name_primitive_impl(c); if(v)cout<<endl;}
+            SAFE(execute(c), WARN);
+            if (bench_mode & CORR) {
+                dnn_mem_t dst(dst_dt, fp, mkldnn_nchw);
+                SAFE(dst.reorder(dst_dt), WARN);
+                SAFE(compare_dst(p, dst, dst_fp, r, true), WARN);
+                if(v>=0) cout<<" PASSED"<<endl;
+            }
+            if( do_perf(c, r) != OK ) return FAIL;
         }
         if (bench_mode & TEST){ // XXX not yet working, why?
             size_t const nimp = get_nref_impls();
             for(size_t imp=0U; imp<nimp; ++imp){
                 // get new zero-initialized data "just like" the ref fp32 calc.
-                if(0) print(0," %s ...\n", "dnn_mem_t src_tt(src_fp)");
-                dnn_mem_t src_tt(src_fp.md_);
-                dnn_mem_t wei_tt(wei_fp.md_);
-                dnn_mem_t dst_tt(dst_fp.md_);
-                dnn_mem_t bia_tt(bia_fp.md_);
-                if(0){
-                    //SAFE(compare_src(p, src_tt, src_fp, r, false), WARN);
-                    cout<<"src_fp.md_ : "<<src_fp.md_<<endl;
-                    cout<<"wei_fp.md_ : "<<wei_fp.md_<<endl;
-                    cout<<"bia_fp.md_ : "<<bia_fp.md_<<endl;
-                    cout<<"dst_fp.md_ : "<<dst_fp.md_<<endl;
-                    cout<<"src_tt.md_ : "<<src_tt.md_<<endl;
-                }
+                if(v>1) print(0," %s ...\n", "dnn_mem_t src_tt(src_fp)");
                 // inputs (for a FWD calc) acquire content from ref fp32 calc
-                if(0) cout<<" src_tt.reorder(src_fp)"<<endl;
-                src_tt.reorder(src_fp);
-                wei_tt.reorder(wei_fp);
-                bia_tt.reorder(bia_fp);
-                if(0){
-                    for(unsigned i=0U; i<20U; ++i){ cout<<" src_fp["<<setw(3)<<i<<"] = "
-                        <<setw(8)<<((float*)(src_fp.data_)) [i]<<", "
-                            <<setw(8)<<((float*)(src_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
-                    }
-                    cout<<endl;
-                    for(unsigned i=0U; i<20U; ++i){ cout<<" wei_fp["<<setw(3)<<i<<"] = "
-                        <<setw(8)<<((float*)(wei_fp.data_)) [i]<<", "
-                            <<setw(8)<<((float*)(wei_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
-                    }
-                    cout<<endl;
-                    for(unsigned i=0U; i<20U; ++i){ cout<<" bia_fp["<<setw(3)<<i<<"] = "
-                        <<setw(8)<<((float*)(bia_fp.data_)) [i]<<", "
-                            <<setw(8)<<((float*)(bia_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
-                    }
-                    cout<<endl;
-                    for(unsigned i=0U; i<20U; ++i){ cout<<" dst_fp["<<setw(3)<<i<<"] = "
-                        <<setw(8)<<((float*)(dst_fp.data_)) [i]<<", "
-                            <<setw(8)<<((float*)(dst_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
-                    }
-                    cout<<endl;
+                //dnn_mem_t src_tt(src_fp); // separate, zeroed data
+                //src_tt.reorder(src_fp);   // + acquire data explicitly
+                dnn_mem_t src_tt(src_fp, fp); // same layout, copied data
+                dnn_mem_t wei_tt(wei_fp, fp); // same layout, copied data
+                dnn_mem_t bia_tt(bia_fp, fp); // now OK for !active_
+                dnn_mem_t dst_tt(dst_fp.md_); // separate, ZEROED data
+                if(v){
+                    print_mem_desc(src_fp, wei_fp, bia_fp, dst_fp);
+                    if(v>1) cmp_fp_data("src", src_fp, src_tt);
+                    if(v>1) cmp_fp_data("wei", wei_fp, wei_tt);
+                    if(v>1 && (p->dir & FLAG_BIA)) cmp_fp_data("bia", bia_fp, bia_tt);
+                    if(v>1) cout<<"convolution forward test imp "<<imp<<endl;
                 }
-                // convolution test code : forward
-                if(0) cout<<"convolution forward test imp "<<imp<<endl;
-                //compute_ref_fwd(p, src_tt, wei_tt, bia_tt, dst_tt);
                 benchdnn_timer_t tt;
                 tt.start();
+                //..was..compute_ref_fwd(p, src_tt, wei_tt, bia_tt, dst_tt);
                 get_ref_impls()[imp].fwd(p, src_tt, wei_tt, bia_tt, dst_tt);
                 tt.stop();
-                cout<<"convolution forward test imp "<<imp<<" time "<<tt.total_ms()<<" ms"<<endl;
-                if(0){
-                    for(unsigned i=0U; i<20U; ++i){ cout<<" dst["<<setw(3)<<i<<"] = "
-                        <<setw(8)<<((float*)(dst_fp.data_)) [i]<<", "
-                            <<setw(8)<<((float*)(dst_tt.data_)) [i]<<(i%5U==4U? '\n': ' ');
-                    }
-                    cout<<endl;
-                }
-                // compare output of test code with ref floating point calc
-                cout<<"compare_dst, test impl "<<imp<<" vs ref impl 0"<<endl;
+                if(v) cout<<"compare_dst, impl["<<imp<<"] vs impl[0]"<<endl;
+                if(v) cmp_fp_data("dst", dst_fp, dst_tt);
                 SAFE(compare_dst(p, dst_tt, dst_fp, r, true), WARN);
-                cout<<endl;
+                if(v>=0) cout<<"convolution forward test imp "<<imp
+                        <<" time "<<tt.total_ms()<<" ms PASSED"<<endl;
+                if(v) cout<<endl;
             }
         }
-        if( do_perf(c, r) != OK ) return FAIL;
     } else if (p->dir == BWD_D) {
         mkldnn_primitive_at_t inputs[3] = { {dst_dt.p_, 0}, {wei_dt.p_, 0}, };
         const_mkldnn_primitive_t outputs[] = { src_dt.p_ };

@@ -20,6 +20,21 @@
 #include "mkldnn_common.hpp"
 
 struct dnn_mem_t {
+    /* FIXME: ugly RT assert... need better mkldnn memory handling */
+#if 0
+    dnn_mem_t &operator=(const dnn_mem_t &rhs)
+    { []() { SAFE(FAIL, CRIT); return 0; }(); return *this; }
+#else
+    dnn_mem_t &operator=(const dnn_mem_t &rhs) = delete;
+#endif
+#if 1
+    dnn_mem_t(const dnn_mem_t &rhs)
+    { []() { SAFE(FAIL, CRIT); return 0; }(); }
+#else
+    dnn_mem_t(const dnn_mem_t &rhs) = delete;
+    // Ouch! for gcc, this also deletes the default constructor ??
+#endif
+
     dnn_mem_t(): active_(false) {}
 
     /** create a memory block "just like" \c md (same layout, dims and
@@ -59,13 +74,7 @@ struct dnn_mem_t {
     dnn_mem_t(const dnn_mem_t &rhs, mkldnn_data_type_t dt,
             mkldnn_memory_format_t fmt = mkldnn_format_undef,
             void *data = NULL): dnn_mem_t(rhs.md_, dt, fmt, data)
-    { reorder(rhs); }
-
-    /* FIXME: ugly RT assert... need better mkldnn memory handling */
-    dnn_mem_t &operator=(const dnn_mem_t &rhs)
-    { []() { SAFE(FAIL, CRIT); return 0; }(); return *this; }
-    dnn_mem_t(const dnn_mem_t &rhs)
-    { []() { SAFE(FAIL, CRIT); return 0; }(); }
+    { if((active_ = rhs.active_)) reorder(rhs); }
 
     ~dnn_mem_t() { cleanup(); }
 
@@ -73,6 +82,7 @@ struct dnn_mem_t {
      * \em content of \c rhs */
     int reorder(const dnn_mem_t &rhs) {
         if (this == &rhs) return OK;
+        if (!rhs.active_) return FAIL;
 
         mkldnn_primitive_t r;
         //{
@@ -91,18 +101,18 @@ struct dnn_mem_t {
         return OK;
     }
 
-    int N() { return md_.dims[0]; }
-    int with_G() { return md_.ndims == 5; }
-    int G() { return md_.ndims == 5 ? md_.dims[0] : 1; }
+    int N() const { return md_.dims[0]; }
+    int with_G() const { return md_.ndims == 5; }
+    int G() const { return md_.ndims == 5 ? md_.dims[0] : 1; }
 
-    int C() { return md_.ndims == 1 ? md_.dims[0] : md_.dims[1]; }
-    int OC() { return md_.dims[with_G() + 0]; }
-    int IC() { return md_.dims[with_G() + 1]; }
-    int H() { return md_.dims[with_G() + 2]; } // works for both IH and KH
-    int W() { return md_.dims[with_G() + 3]; } // works for both IW and KW
+    int C() const { return md_.ndims == 1 ? md_.dims[0] : md_.dims[1]; }
+    int OC() const { return md_.dims[with_G() + 0]; }
+    int IC() const { return md_.dims[with_G() + 1]; }
+    int H() const { return md_.dims[with_G() + 2]; } // works for both IH and KH
+    int W() const { return md_.dims[with_G() + 3]; } // works for both IW and KW
 
-    size_t size() { return mkldnn_memory_primitive_desc_get_size(mpd_); }
-    size_t nelems() {
+    size_t size() const { return mkldnn_memory_primitive_desc_get_size(mpd_); }
+    size_t nelems() const {
         DNN_SAFE(md_.data_type != mkldnn_f32
                 ? mkldnn_invalid_arguments : mkldnn_success, CRIT);
         return size() / sizeof(float);

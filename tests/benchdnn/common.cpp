@@ -47,7 +47,7 @@ bench_mode_t str2bench_mode(const char *str) {
     if (strchr(str, 'a') || strchr(str, 'A'))
         mode = (bench_mode_t)((int)mode | (int)ALL);
     if (strchr(str, 't') || strchr(str, 'T') )
-        mode = (bench_mode_t)((int)mode | ((int)TEST + (int)CORR));
+        mode = (bench_mode_t)((int)mode | (int)TEST);
     if (mode == MODE_UNDEF)
         []() { SAFE(FAIL, CRIT); return 0; }();
     return mode;
@@ -129,10 +129,12 @@ bool match_regex(const char *str, const char *pattern) { return true; }
 // NEW: _SX timer treatment can follow _WIND32 approach ...
 #if defined(_WIN32) || defined(_SX)
 
+#if USE_RDPMC || USE_RDTSC
 unsigned long long ticks_now() {
     /* Not allowed on user-mode, privileged instruction */
     return (unsigned long long)0;
 }
+#endif
 
 #if 0 && defined(_SX)
 #include <second.h>
@@ -157,10 +159,12 @@ static inline double ms_now() {
 
 #include <unistd.h>
 
+#if USE_RDPMC
 // [ejk] this segfaulted for me until I added perf_begin and perf_end
 //       that actually open a perf_event fd and mmap it.
 // Note: if perf_event "can_user_time", you could also get the conversion to nanoseconds
 //       in a single call!
+// rdbutso REMOVED the function entirely!
 unsigned long long ticks_now() {
     unsigned eax, edx, ecx;
 
@@ -169,6 +173,7 @@ unsigned long long ticks_now() {
 
     return (unsigned long long)eax | (unsigned long long)edx << 32;
 }
+#endif
 
 static inline double ms_now() {
 //#if ! defined(_SX)
@@ -183,8 +188,10 @@ static inline double ms_now() {
 
 void benchdnn_timer_t::reset() {
     times_ = 0;
+#if USE_RDPMC || USE_RDTSC
     for (int i = 0; i < n_modes; ++i) ticks_[i] = 0;
     ticks_start_ = 0;
+#endif
     for (int i = 0; i < n_modes; ++i) ms_[i] = 0;
     ms_start_ = 0;
 
@@ -192,25 +199,15 @@ void benchdnn_timer_t::reset() {
 }
 
 void benchdnn_timer_t::start() {
-//#if ! defined(_SX)
+#if USE_RDPMC || USE_RDTSC
     ticks_start_ = ticks_now();
+#endif
     ms_start_ = ms_now();
-//#else // ok, just make them equiv
-//    ms_start_ = ms_now();
-//    ticks_start_ = static_cast<typeof(ticks_start_)>(ms_start_ * 1000.0);
-//#endif
 }
 
 void benchdnn_timer_t::stop() {
-//#if ! defined(_SX)
-    long long d_ticks = ticks_now() - ticks_start_; /* FIXME: overflow? */
     double d_ms = ms_now() - ms_start_;
-//#else
-//    double d_ms = ms_now() - ms_start_;
-//    long long d_ticks = static_cast<long long>( d_ms*1000.0 );
-//#endif
 
-    ticks_start_ += d_ticks;
     ms_start_ += d_ms;
 
     ms_[benchdnn_timer_t::min] = times_
@@ -219,20 +216,26 @@ void benchdnn_timer_t::stop() {
     ms_[benchdnn_timer_t::max] = times_
         ? MAX2(ms_[benchdnn_timer_t::min], d_ms) : d_ms;
 
+#if USE_RDPMC || USE_RDTSC
+    long long d_ticks = ticks_now() - ticks_start_; /* FIXME: overflow? */
+    ticks_start_ += d_ticks;
     ticks_[benchdnn_timer_t::min] = times_
         ? MIN2(ticks_[benchdnn_timer_t::min], d_ticks) : d_ticks;
     ticks_[benchdnn_timer_t::avg] += d_ticks;
     ticks_[benchdnn_timer_t::max] = times_
         ? MAX2(ticks_[benchdnn_timer_t::min], d_ticks) : d_ticks;
+#endif
 
-    times_++;
+    ++times_;
 }
 
 benchdnn_timer_t &benchdnn_timer_t::operator=(const benchdnn_timer_t &rhs) {
     if (this == &rhs) return *this;
     times_ = rhs.times_;
+#if USE_RDPMC || USE_RDTSC
     for (int i = 0; i < n_modes; ++i) ticks_[i] = rhs.ticks_[i];
     ticks_start_ = rhs.ticks_start_;
+#endif
     for (int i = 0; i < n_modes; ++i) ms_[i] = rhs.ms_[i];
     ms_start_ = rhs.ms_start_;
     return *this;
