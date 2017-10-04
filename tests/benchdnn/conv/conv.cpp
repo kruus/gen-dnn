@@ -29,6 +29,11 @@
 
 #include "conv/conv.hpp"
 
+#if 1 // from c_types_map.h
+//#include "../../../src/common/c_types_map.hpp"
+//#include "../../../src/common/primitive_desc.hpp"
+#endif
+
 #include <iomanip>
 using mkldnn::operator <<;
 using std::cout; using std::endl; using std::setw;
@@ -422,8 +427,29 @@ inline int fill_dst(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
     return OK;
 }
 
+/** Initialize conv desc as per \c prb_t command-line args */
+static int init_conv_desc(mkldnn_convolution_desc_t &cd, const prb_t *p );
+/** From initial conv desc \c cd, form the conv primitive \c cpd */
+static int init_conv_prim( mkldnn_primitive_desc_t &cpd, const prb_t *p,
+            mkldnn_convolution_desc_t const& cd, res_t *r);
+/** Finalize conv desc \c cd by querying the convolution primitive \c cpd */
+static int update_conv_desc(mkldnn_convolution_desc_t &cd, const prb_t *p,
+            const mkldnn_primitive_desc_t &cpd );
+
+/** Original initialization scheme.  Likely I need to use the
+ * split-up pieces to support iterating over available primitives.
+ */
 inline int init_pd(const prb_t *p, mkldnn_convolution_desc_t &cd,
         mkldnn_primitive_desc_t &cpd, res_t *r) {
+    //r->state = UNTESTED; // (just to be sure)
+    SAFE(init_conv_desc(cd, p), WARN);
+    SAFE(init_conv_prim( cpd, p, cd, r ), WARN);
+    if( r->state != SKIPPED  && r->state != UNIMPLEMENTED )
+        SAFE(update_conv_desc( cd, p, cpd ), CRIT);
+    return OK;
+}
+int init_conv_desc(mkldnn_convolution_desc_t &cd, const prb_t *p )
+{
     mkldnn_memory_desc_t src_d, wei_d, bia_d, dst_d;
 
     mkldnn_dims_t src_dims = {p->mb, p->ic, p->ih, p->iw};
@@ -468,10 +494,38 @@ inline int init_pd(const prb_t *p, mkldnn_convolution_desc_t &cd,
         break;
     default: DNN_SAFE(mkldnn_invalid_arguments, CRIT);
     }
-
     DNN_SAFE(cd.accum_data_type == p->cfg[ACC].dt
-            ? mkldnn_success : mkldnn_unimplemented, CRIT);
+             ? mkldnn_success : mkldnn_unimplemented, CRIT);
 
+    return OK;
+}
+int init_conv_prim_any( mkldnn_primitive_desc_t &cpd, const prb_t *p,
+            mkldnn_convolution_desc_t const& cd, res_t *r)
+{
+    r->state = UNTESTED;
+    mkldnn_status_t init_status = mkldnn_success;
+    if (p->merge == RELU) {
+        mkldnn_convolution_relu_desc_t crd;
+        cout<<" 10";cout.flush();
+        DNN_SAFE(mkldnn_convolution_relu_desc_init(&crd, &cd, 0), WARN);
+        cout<<" 11";cout.flush();
+        init_status = mkldnn_primitive_desc_create(&cpd, &crd, engine, NULL);
+        cout<<" 12";cout.flush();
+    } else {
+        init_status = mkldnn_primitive_desc_create(&cpd, &cd, engine, NULL);
+    }
+
+    if (init_status == mkldnn_unimplemented)
+        return r->state = UNIMPLEMENTED, OK;
+    else
+        SAFE(init_status, WARN);
+
+    return OK;
+}
+int init_conv_prim( mkldnn_primitive_desc_t &cpd, const prb_t *p,
+            mkldnn_convolution_desc_t const& cd, res_t *r)
+{
+#if 0
     mkldnn_status_t init_status = mkldnn_success;
     if (p->merge == RELU) {
         mkldnn_convolution_relu_desc_t crd;
@@ -485,6 +539,9 @@ inline int init_pd(const prb_t *p, mkldnn_convolution_desc_t &cd,
         return r->state = UNIMPLEMENTED, OK;
     else
         SAFE(init_status, WARN);
+#else
+    init_conv_prim_any( cpd, p, cd, r);
+#endif
 
     const char *impl_str = query_impl_info(cpd);
     if (maybe_skip(impl_str)) {
@@ -494,7 +551,13 @@ inline int init_pd(const prb_t *p, mkldnn_convolution_desc_t &cd,
     } else {
         print(5, "mkldnn implementation: %s\n", impl_str);
     }
+    return OK;
+}
 
+
+int update_conv_desc(mkldnn_convolution_desc_t &cd, const prb_t *p,
+            const mkldnn_primitive_desc_t &cpd )
+{
     auto q = [=](mkldnn_query_t query, int index = 0) {
         return *mkldnn_primitive_desc_query_memory_d(
                 mkldnn_primitive_desc_query_pd(cpd, query, index));
@@ -525,6 +588,23 @@ inline int init_pd(const prb_t *p, mkldnn_convolution_desc_t &cd,
     return OK;
 }
 
+static int update_conv_desc( mkldnn_primitive_desc_t it_cpd,
+                              const prb_t *p )
+{
+    cout<<" update_conv_desc not needed (no-op)"<<endl;
+    if (0){
+        mkldnn_convolution_desc_t it_cd;
+        if(p->merge == NONE){
+            DNN_SAFE(mkldnn_primitive_desc_query( it_cpd,
+                                                  mkldnn_query_convolution_d, 0, &it_cd), CRIT);
+            return update_conv_desc( it_cd, p, it_cpd );
+        } else {
+            // RELU is more complicated, conv desc is a subfield.
+        }
+    }
+    return OK;
+}
+
 static void print_mem_desc(dnn_mem_t const &src_fp, dnn_mem_t const &wei_fp,
             dnn_mem_t const &bia_fp, dnn_mem_t const &dst_fp) {
     if( src_fp.active_ ) cout<<"src.md_ : "<<src_fp.md_<<endl;
@@ -548,20 +628,21 @@ static void print_mem_desc(dnn_mem_t const &src_fp, dnn_mem_t const &wei_fp,
 
 static void cmp_fp_data(const char* msg, const dnn_mem_t &f32a,
                         const dnn_mem_t &f32b ) {
-    RT_ASSERT( f32a.active_ );
-    RT_ASSERT( f32b.active_ );
-    RT_ASSERT( (f32a.dt() == mkldnn_f32 ));
-    unsigned const nPrt = [&](){ unsigned n=20U, m;
-        if( (m=f32a.nelems()) < n ) n = m;
-        if( (m=f32b.nelems()) < n ) n = m;
-        return n;
-    }();
-    for(unsigned i=0U; i<nPrt; ++i){
+    if( f32a.active_ && f32b.active_ ){
+        RT_ASSERT( (f32a.dt() == mkldnn_f32 ));
+        RT_ASSERT( (f32b.dt() == mkldnn_f32 ));
+        unsigned const nPrt = [&](){ unsigned n=20U, m;
+            if( (m=f32a.nelems()) < n ) n = m;
+            if( (m=f32b.nelems()) < n ) n = m;
+            return n;
+        }();
+        for(unsigned i=0U; i<nPrt; ++i){
             cout<<" "<<msg<<"["<<setw(3)<<i<<"] = "
-            <<setw(8)<<((float*)f32a) [i]<<", "
-            <<setw(8)<<((float*)f32b) [i]<<(i%5U==4U? '\n': ' ');
+                <<setw(8)<<((float*)f32a) [i]<<", "
+                <<setw(8)<<((float*)f32b) [i]<<(i%5U==4U? '\n': ' ');
+        }
+        cout<<endl;
     }
-    cout<<endl;
 }
 /** run performance loops if bench_mode \& PERF.
  * \ret 0/1 OK/FAIL */
@@ -585,17 +666,136 @@ static int do_perf( mkldnn_primitive_t prim, res_t *r )
     return OK;
 }
 
+#if 1
+/** plain iterator, iterate over "all possible" (version 0).
+ * Perhaps need to template on type of primitive_desc? */
+#if 0
+/** \name Convert operation descriptions into opaque mkldnn_op_desc_t (aka void*) */
+//@{
+#define OPAQUE_OP_DESC_CVT( OP_DESC_T ) \
+inline const_mkldnn_op_desc_t opdesc( const mkldnn_##OP_DESC_T &opdesc ) \
+{ return (const void*)&opdesc; } \
+inline mkldnn_op_desc_t opdesc( mkldnn_##OP_DESC_T &opdesc ) \
+{ return (void*)&opdesc; }
+OPAQUE_OP_DESC_CVT(memory_desc_t);
+OPAQUE_OP_DESC_CVT(convolution_desc_t);
+OPAQUE_OP_DESC_CVT(pooling_desc_t);
+OPAQUE_OP_DESC_CVT(eltwise_desc_t);
+OPAQUE_OP_DESC_CVT(softmax_desc_t);
+OPAQUE_OP_DESC_CVT(lrn_desc_t);
+OPAQUE_OP_DESC_CVT(batch_normalization_desc_t);
+OPAQUE_OP_DESC_CVT(inner_product_desc_t);
+OPAQUE_OP_DESC_CVT(convolution_relu_desc_t);
+//@}
+#endif
+struct plain_prim_iter_t {
+    /** Generic constructor from \c void* C operation descriptor.
+     * \return none but \c (bool) cast false if there were errors,
+     *         and \c status() can tell you what went wrong.
+     */
+    plain_prim_iter_t( const_mkldnn_op_desc_t op_desc,
+                 mkldnn_engine_t engine,
+                 const_mkldnn_primitive_desc_t hint_forward_primitive_desc=NULL )
+        : n_(0U)
+    {
+        iter_status_ = mkldnn_primitive_desc_iterator_create
+            ( &iter_,
+              op_desc,
+              engine,
+              hint_forward_primitive_desc);
+        //cout<<"+plain_prim_iter_t : "<<iter_status_<<endl;
+        //RT_ASSERT(iter_status_ == mkldnn_success);
+    }
+#if 0
+    /** If you know the type before-hand, you can directly construct the iterator. */
+#define CONSTR( OP_DESC_T ) \
+    plain_prim_iter_t( mkldnn_##OP_DESC_T &op_desc, \
+        mkldnn_engine_t engine, \
+        const_mkldnn_primitive_desc_t hint_forward_primitive_desc = nullptr \
+        ) : n_(0U) { \
+    iter_status_ = mkldnn_primitive_desc_iterator_create( &iter_, \
+        (const void*)&op_desc, engine, hint_forward_primitive_desc); \
+    }
+    CONSTR(memory_desc_t);
+    CONSTR(convolution_desc_t);
+    CONSTR(pooling_desc_t);
+    CONSTR(eltwise_desc_t);
+    CONSTR(softmax_desc_t);
+    CONSTR(lrn_desc_t);
+    CONSTR(batch_normalization_desc_t);
+    CONSTR(inner_product_desc_t);
+    CONSTR(convolution_relu_desc_t);
+#endif
+    mkldnn_status_t status() const { return iter_status_; }
+    int n() const { return n_; }
+    ~plain_prim_iter_t()
+    {
+        //cout<<"-plain_prim_iter_t"<<endl;
+        // foo_iterator_destroy always seems to cause a segfault
+        //if (iter_status_)
+        //    mkldnn_primitive_desc_iterator_destroy( iter_ );
+    }
+    /** pre-increment only! */
+    plain_prim_iter_t& operator++()
+    {
+        if( iter_status_ == mkldnn_success ){
+            iter_status_ = mkldnn_primitive_desc_iterator_next( iter_ );
+            ++n_;
+        }
+        return *this;
+    }
+    explicit operator bool() {
+        return iter_status_ == mkldnn_success;
+    }
+    //mkldnn_convolution_desc_t operator*()
+    mkldnn_primitive_desc_t operator*()
+    {
+        //cout<<"op*"<<endl;
+        //mkldnn_convolution_desc_t ret;
+        mkldnn_primitive_desc_t ret = nullptr;
+        if (iter_status_ == mkldnn_success){
+            //cout<<"op*2"<<endl;
+            ret = mkldnn_primitive_desc_iterator_fetch(iter_);
+            if ((void*)ret == nullptr) // how?
+               iter_status_ = mkldnn_iterator_ends;
+        }
+        return ret;
+    }
+private:
+    mkldnn_primitive_desc_iterator_t iter_;
+    mkldnn_status_t iter_status_;
+    unsigned n_;
+};
+#endif
+
 int doit(const prb_t *p, res_t *r) {
     res_t res_zero{};
     *r = res_zero;
 
     mkldnn_convolution_desc_t cd;
-    mkldnn_primitive_desc_t cpd;
     mkldnn_primitive_t c{};
 
+#if 1
+    mkldnn_primitive_desc_t cpd;
     SAFE(init_pd(p, cd, cpd, r), WARN);
-    if (r->state == SKIPPED || r->state == UNIMPLEMENTED)
+    // equiv:
+    //    SAFE(init_conv_desc(cd, p), WARN);
+    //    SAFE(init_conv_prim( cpd, p, cd, r ), WARN);
+    //    SAFE(update_conv_desc( cd, p, cpd ), CRIT);
+ 
+    if (r->state == SKIPPED || r->state == UNIMPLEMENTED){
+        cout<<" doit is no-op (r->state SKIPPED or UNIMPLEMENTED)"<<endl;
         return OK;
+    }
+#else
+    // Intializat convolution in "must-succeed" mode, so that we
+    // can set memory descriptors and initialize them.
+    mkldnn_primitive_desc_t cpd; // remove (eventually)
+    SAFE(init_conv_desc(cd, p), WARN);
+    SAFE(init_conv_prim_any( cpd, p, cd, r ), WARN);
+    RT_ASSERT( r->state != SKIPPED  && r->state != UNIMPLEMENTED );
+    SAFE(update_conv_desc( cd, p, cpd ), CRIT);
+#endif
 
     auto &src_dt_d = p->dir == BWD_D ? cd.diff_src_desc : cd.src_desc;
     auto &wei_dt_d = p->dir & FLAG_WEI ? cd.diff_weights_desc : cd.weights_desc;
@@ -605,19 +805,16 @@ int doit(const prb_t *p, res_t *r) {
     dnn_mem_t src_dt(src_dt_d, p->cfg[SRC].dt);
     dnn_mem_t wei_dt(wei_dt_d, p->cfg[WEI].dt);
     dnn_mem_t dst_dt(dst_dt_d, p->cfg[DST].dt);
-    dnn_mem_t *p_bia_dt = p->dir & FLAG_BIA
-        ? new dnn_mem_t(bia_dt_d, p->cfg[BIA].dt) : new dnn_mem_t();
-    dnn_mem_t &bia_dt = *p_bia_dt;
+    dnn_mem_t bia_dt = dnn_mem_t::optional(p->dir & FLAG_BIA,
+            bia_dt_d, p->cfg[BIA].dt);
 
     const auto fp = mkldnn_f32;
     dnn_mem_t src_fp(src_dt_d, fp, mkldnn_nchw);
     dnn_mem_t wei_fp(wei_dt_d, fp, mkldnn_goihw);
     dnn_mem_t dst_fp(dst_dt_d, fp, mkldnn_nchw);
-    dnn_mem_t *p_bia_fp = p->dir & FLAG_BIA
-        ? new dnn_mem_t(bia_dt_d, fp, mkldnn_x) : new dnn_mem_t();
-    dnn_mem_t &bia_fp = *p_bia_fp;
+    dnn_mem_t bia_fp = dnn_mem_t::optional( p->dir & FLAG_BIA,
+            bia_dt_d, fp, mkldnn_x);
 
-    //SAFE(fill_src(p, &src_dt, &src_fp, r), WARN);
     SAFE(fill_src(p, src_dt, src_fp, r), WARN);
     SAFE(fill_wei(p, wei_dt, wei_fp, r), WARN);
     SAFE(fill_dst(p, dst_dt, dst_fp, r), WARN);
@@ -628,28 +825,80 @@ int doit(const prb_t *p, res_t *r) {
     // TODO and possibly 'A'll other mkl-dnn impls,
     // and possibly the first (reference) implementation,
     // WIP and possibly any further reference implementations.
+    int const v = verbose;
     if (p->dir & FLAG_FWD) {
-        int const v = verbose;
-        if (bench_mode & CORR || bench_mode & TEST ) {
-            compute_ref_fwd(p, src_fp, wei_fp, bia_fp, dst_fp);
-        }
         mkldnn_primitive_at_t inputs[3] = { {src_dt.p_, 0}, {wei_dt.p_, 0},
             {p->dir & FLAG_BIA ? bia_dt.p_ : NULL, 0}
         };
-        {
-            const_mkldnn_primitive_t outputs[] = { dst_dt.p_ };
+        const_mkldnn_primitive_t outputs[] = { dst_dt.p_ };
+        if (bench_mode & CORR || bench_mode & TEST )
+            compute_ref_fwd(p, src_fp, wei_fp, bia_fp, dst_fp);
+#if 0 // iterator version
+        const_mkldnn_op_desc_t copd = &cd;
+        mkldnn_convolution_relu_desc_t *crd = nullptr;
+        if (p->merge == RELU){
+            crd = new mkldnn_convolution_relu_desc_t;
+            DNN_SAFE(mkldnn_convolution_relu_desc_init(crd, &cd, 0), WARN);
+            copd = crd;
+        }
+        for (plain_prim_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
+            cout<<" PIT stop #"<<pit.n();
+            mkldnn_primitive_desc_t it_cpd = *pit;
+            if( it_cpd == nullptr ){ cout<<" it_cpd == nullptr"<<endl; break; }
+            // need to include common/primitive_desc.hpp to access C++ goodies :
+            //cout<<"        type "<<it_cpd->kind()<<endl; // NA in C api
+
+            // update_conv_desc only needs to be run once
+            // but in principle, could drill down and retrieve current descriptor
+            // and then set cd.*_desc fields via update_conv_desc again.
+            if(0) update_conv_desc( it_cpd, p );
+
+            const char *impl_str = query_impl_info(it_cpd);
+            cout<<" conv impl : "<<impl_str<<endl;
+            if (maybe_skip(impl_str)) {
+                //print(2, "Correctness SKIPPED: impl #%u\n\n", pit.n());
+                if(v>=0) cout<<" Correctness SKIPPED: impl #"<<pit.n()<<"\n\n"<<endl;
+                //DNN_SAFE(mkldnn_primitive_desc_destroy(it_cpd), WARN); // segfault!
+                //   perhaps because memory descriptors are still needed ?
+                //r->state = SKIPPED;
+                //continue;
+            } else {
+                print(5, "mkldnn implementation: %s\n", impl_str);
+                DNN_SAFE(mkldnn_primitive_create(&c, it_cpd, inputs, outputs), WARN);
+                { // do something with the conv primitive, c
+                    SAFE(execute(c), WARN);
+                    if( do_perf(c, r) != OK ) return FAIL;
+                    if (bench_mode & CORR) {
+                        dnn_mem_t dst(dst_dt, fp, mkldnn_nchw);
+                        SAFE(dst.reorder(dst_dt), WARN);
+                        SAFE(compare_dst(p, dst, dst_fp, r, true), WARN);
+                        if(v>=0) cout<<" Correctness  PASSED : impl #"<<pit.n()<<"\n"<<endl;
+                    }
+                }
+                mkldnn_primitive_destroy(c);
+            }
+            
+            mkldnn_primitive_desc_destroy(it_cpd);
+
+            if(! (bench_mode & ALL))
+                break; // default is just to test "best avail" mkldnn impl
+        }
+        if (crd) delete crd;
+#else // old version
+        { // create convolution primitive, 'c'
             DNN_SAFE(mkldnn_primitive_create(&c, cpd, inputs, outputs), WARN);
             if (v) cout<<c<<", impl ";
             if (v>=0) {cout<<mkldnn_name_primitive_impl(c); if(v)cout<<endl;}
-            SAFE(execute(c), WARN);
-            if (bench_mode & CORR) {
-                dnn_mem_t dst(dst_dt, fp, mkldnn_nchw);
-                SAFE(dst.reorder(dst_dt), WARN);
-                SAFE(compare_dst(p, dst, dst_fp, r, true), WARN);
-                if(v>=0) cout<<" PASSED"<<endl;
-            }
-            if( do_perf(c, r) != OK ) return FAIL;
         }
+        SAFE(execute(c), WARN);
+        if( do_perf(c, r) != OK ) return FAIL;
+        if (bench_mode & CORR) {
+            dnn_mem_t dst(dst_dt, fp, mkldnn_nchw);
+            SAFE(dst.reorder(dst_dt), WARN);
+            SAFE(compare_dst(p, dst, dst_fp, r, true), WARN);
+            if(v>=0) cout<<" PASSED"<<endl;
+        }
+#endif
         if (bench_mode & TEST){ // XXX not yet working, why?
             size_t const nimp = get_nref_impls();
             for(size_t imp=0U; imp<nimp; ++imp){
@@ -666,7 +915,7 @@ int doit(const prb_t *p, res_t *r) {
                     print_mem_desc(src_fp, wei_fp, bia_fp, dst_fp);
                     if(v>1) cmp_fp_data("src", src_fp, src_tt);
                     if(v>1) cmp_fp_data("wei", wei_fp, wei_tt);
-                    if(v>1 && (p->dir & FLAG_BIA)) cmp_fp_data("bia", bia_fp, bia_tt);
+                    if(v>1) cmp_fp_data("bia", bia_fp, bia_tt);
                     if(v>1) cout<<"convolution forward test imp "<<imp<<endl;
                 }
                 benchdnn_timer_t tt;
@@ -685,24 +934,120 @@ int doit(const prb_t *p, res_t *r) {
     } else if (p->dir == BWD_D) {
         mkldnn_primitive_at_t inputs[3] = { {dst_dt.p_, 0}, {wei_dt.p_, 0}, };
         const_mkldnn_primitive_t outputs[] = { src_dt.p_ };
-        DNN_SAFE(mkldnn_primitive_create(&c, cpd, inputs, outputs), WARN);
-        SAFE(execute(c), WARN);
-        if (bench_mode & CORR) {
+        if (bench_mode & CORR || bench_mode & TEST )
             compute_ref_bwd_d(p, src_fp, wei_fp, dst_fp);
+#if 0
+        const_mkldnn_op_desc_t copd = &cd;
+        mkldnn_convolution_relu_desc_t *crd = nullptr;
+        if (p->merge == RELU){
+            crd = new mkldnn_convolution_relu_desc_t;
+            DNN_SAFE(mkldnn_convolution_relu_desc_init(crd, &cd, 0), WARN);
+            copd = crd;
+        }
+        for (plain_prim_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
+            cout<<" PIT stop #"<<pit.n();
+            mkldnn_primitive_desc_t it_cpd = *pit;
+            if( it_cpd == nullptr ){ cout<<" it_cpd == nullptr"<<endl; break; }
+            if(0) update_conv_desc( it_cpd, p );
+            const char *impl_str = query_impl_info(it_cpd);
+            cout<<" conv impl : "<<impl_str<<endl;
+            if (maybe_skip(impl_str)) {
+                if(v>=0) cout<<" Correctness SKIPPED: impl #"<<pit.n()<<"\n\n"<<endl;
+                //DNN_SAFE(mkldnn_primitive_desc_destroy(it_cpd), WARN); // segfault!
+                //r->state = SKIPPED; //continue;
+            } else {
+                print(5, "mkldnn implementation: %s\n", impl_str);
+                DNN_SAFE(mkldnn_primitive_create(&c, it_cpd, inputs, outputs), WARN);
+                { // do something with the conv primitive, c
+                    SAFE(execute(c), WARN);
+                    if( do_perf(c, r) != OK ) return FAIL;
+                    if (bench_mode & CORR) {
+                        dnn_mem_t src(src_dt, fp, mkldnn_nchw);
+                        SAFE(src.reorder(src_dt), WARN);
+                        SAFE(compare_src(p, src, src_fp, r, true), WARN);
+                        if(v>=0) cout<<" Correctness  PASSED : impl #"<<pit.n()<<"\n"<<endl;
+                    }
+                }
+                mkldnn_primitive_destroy(c);
+            }
+            mkldnn_primitive_desc_destroy(it_cpd);
+            if(! (bench_mode & ALL))
+                break; // default is just to test "best avail" mkldnn impl
+        }
+        if (crd) delete crd;
+#else
+        DNN_SAFE(mkldnn_primitive_create(&c, cpd, inputs, outputs), WARN);
+        if (v) cout<<c<<", impl ";
+        if (v>=0) {cout<<mkldnn_name_primitive_impl(c); if(v)cout<<endl;}
+        SAFE(execute(c), WARN);
+        if( do_perf(c, r) != OK ) return FAIL;
+        if (bench_mode & CORR) {
+            //compute_ref_bwd_d(p, src_fp, wei_fp, dst_fp);
             dnn_mem_t src(src_dt, fp, mkldnn_nchw);
             SAFE(src.reorder(src_dt), WARN);
             SAFE(compare_src(p, src, src_fp, r, true), WARN);
         }
-        if( do_perf(c, r) != OK ) return FAIL;
+        if(v>=0) cout<<" PASSED"<<endl;
+#endif
     } else if (p->dir & FLAG_BWD && p->dir & FLAG_WEI) {
         mkldnn_primitive_at_t inputs[3] = { {src_dt.p_, 0}, {dst_dt.p_, 0}, };
         const_mkldnn_primitive_t outputs[] = { wei_dt.p_,
             p->dir & FLAG_BIA ? bia_dt.p_ : NULL,
         };
-        DNN_SAFE(mkldnn_primitive_create(&c, cpd, inputs, outputs), WARN);
-        SAFE(execute(c), WARN);
-        if (bench_mode & CORR) {
+        if (bench_mode & CORR || bench_mode & TEST )
             compute_ref_bwd_w(p, src_fp, wei_fp, bia_fp, dst_fp);
+#if 0
+        const_mkldnn_op_desc_t copd = &cd;
+        mkldnn_convolution_relu_desc_t *crd = nullptr;
+        if (p->merge == RELU){
+            crd = new mkldnn_convolution_relu_desc_t;
+            DNN_SAFE(mkldnn_convolution_relu_desc_init(crd, &cd, 0), WARN);
+            copd = crd;
+        }
+        for (plain_prim_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
+            cout<<" PIT stop #"<<pit.n();
+            mkldnn_primitive_desc_t it_cpd = *pit;
+            if( it_cpd == nullptr ){ cout<<" it_cpd == nullptr"<<endl; break; }
+            if(0) update_conv_desc( it_cpd, p );
+            const char *impl_str = query_impl_info(it_cpd);
+            cout<<" conv impl : "<<impl_str<<endl;
+            if (maybe_skip(impl_str)) {
+                if(v>=0) cout<<" Correctness SKIPPED: impl #"<<pit.n()<<"\n\n"<<endl;
+                //DNN_SAFE(mkldnn_primitive_desc_destroy(it_cpd), WARN); // segfault!
+                //r->state = SKIPPED; //continue;
+            } else {
+                print(5, "mkldnn implementation: %s\n", impl_str);
+                DNN_SAFE(mkldnn_primitive_create(&c, it_cpd, inputs, outputs), WARN);
+                { // do something with the conv primitive, c
+                    SAFE(execute(c), WARN);
+                    if( do_perf(c, r) != OK ) return FAIL;
+                    if (bench_mode & CORR) {
+                        dnn_mem_t wei(wei_dt, fp, mkldnn_goihw);
+                        SAFE(wei.reorder(wei_dt), WARN);
+                        SAFE(compare_wei(p, wei, wei_fp, r, true), WARN);
+                        if (p->dir & FLAG_BIA) {
+                            dnn_mem_t bia(bia_dt, fp, mkldnn_x);
+                            SAFE(bia.reorder(bia_dt), WARN);
+                            SAFE(compare_bia(p, bia, bia_fp, r, true), WARN);
+                        }
+                        if(v>=0) cout<<" Correctness  PASSED : impl #"<<pit.n()<<"\n"<<endl;
+                    }
+                }
+                mkldnn_primitive_destroy(c);
+            }
+            mkldnn_primitive_desc_destroy(it_cpd);
+            if(! (bench_mode & ALL))
+                break; // default is just to test "best avail" mkldnn impl
+        }
+        if (crd) delete crd;
+#else
+        DNN_SAFE(mkldnn_primitive_create(&c, cpd, inputs, outputs), WARN);
+        if (v) cout<<c<<", impl ";
+        if (v>=0) {cout<<mkldnn_name_primitive_impl(c); if(v)cout<<endl;}
+        SAFE(execute(c), WARN);
+        if( do_perf(c, r) != OK ) return FAIL;
+        if (bench_mode & CORR) {
+            //compute_ref_bwd_w(p, src_fp, wei_fp, bia_fp, dst_fp);
             dnn_mem_t wei(wei_dt, fp, mkldnn_goihw);
             SAFE(wei.reorder(wei_dt), WARN);
             SAFE(compare_wei(p, wei, wei_fp, r, true), WARN);
@@ -711,15 +1056,16 @@ int doit(const prb_t *p, res_t *r) {
                 SAFE(bia.reorder(bia_dt), WARN);
                 SAFE(compare_bia(p, bia, bia_fp, r, true), WARN);
             }
+            if(v>=0) cout<<" PASSED"<<endl;
         }
-        if( do_perf(c, r) != OK ) return FAIL;
+#endif
     } else {
-        delete p_bia_dt;
-        delete p_bia_fp;
+        //delete p_bia_dt;
+        //delete p_bia_fp;
         SAFE(FAIL, CRIT);
     }
-    delete p_bia_dt;
-    delete p_bia_fp;
+    //delete p_bia_dt;
+    //delete p_bia_fp;
 
     return OK;
 }

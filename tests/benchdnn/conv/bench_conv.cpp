@@ -65,7 +65,7 @@ void check_correctness(const desc_t *c) {
         return;
     print(1, "run: %s\n", pstr);
 
-    res_t res{};
+    res_t res{ .state=UNTESTED };
     const int status = conv::doit(&p, &res);
     (void)status;
 

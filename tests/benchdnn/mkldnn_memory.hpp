@@ -20,20 +20,8 @@
 #include "mkldnn_common.hpp"
 
 struct dnn_mem_t {
-    /* FIXME: ugly RT assert... need better mkldnn memory handling */
-#if 0
-    dnn_mem_t &operator=(const dnn_mem_t &rhs)
-    { []() { SAFE(FAIL, CRIT); return 0; }(); return *this; }
-#else
     dnn_mem_t &operator=(const dnn_mem_t &rhs) = delete;
-#endif
-#if 1
-    dnn_mem_t(const dnn_mem_t &rhs)
-    { []() { SAFE(FAIL, CRIT); return 0; }(); }
-#else
     dnn_mem_t(const dnn_mem_t &rhs) = delete;
-    // Ouch! for gcc, this also deletes the default constructor ??
-#endif
 
     dnn_mem_t(): active_(false) {}
 
@@ -122,6 +110,24 @@ struct dnn_mem_t {
 
     template <typename T>
     explicit operator T*() const { return static_cast<T*>(data_); }
+
+    /** Construct an optionally \active dnn_mem_t.
+     * - if ! \c active,  use \c dnn_mem_t()
+     * - else construct using \c args ; i.e. \c dnn_mem_t(args...)
+     * \return rvalue that you can assign to an object.  */
+    template< class... REST >
+    static dnn_mem_t optional(bool const active, REST...args)
+    {
+        return active
+            ? dnn_mem_t(args...)
+            : dnn_mem_t();
+    }
+    /** Move constructor.
+     * use with \c dnn_mem_t::optional(bool, ...) tmp object helper */
+    dnn_mem_t( dnn_mem_t &&rhs ) : md_(rhs.md_), mpd_(rhs.mpd_), p_(rhs.p_),
+            data_(rhs.data_), is_data_owner_(rhs.is_data_owner_),
+            active_(rhs.active_)
+    { rhs.active_ = false; /* avoid cleanup of tmp rvalue */ }
 
     /* fields */
 
