@@ -493,12 +493,17 @@ int init_conv_desc(mkldnn_convolution_desc_t &cd, const prb_t *p )
                     strides, padding, padding_r, mkldnn_padding_zero), WARN);
         break;
     default: DNN_SAFE(mkldnn_invalid_arguments, CRIT);
+             cout<<"bad init_conv_desc call : unsupported p->dir"<<endl;
     }
     DNN_SAFE(cd.accum_data_type == p->cfg[ACC].dt
              ? mkldnn_success : mkldnn_unimplemented, CRIT);
 
+    cout<<"init_conv_desc OK"<<endl;
     return OK;
 }
+/** We need a "first" convolution to succeed (not skipped).
+ * Then we are able to get right-sized memory and initialize it
+ * with test data. */
 int init_conv_prim_any( mkldnn_primitive_desc_t &cpd, const prb_t *p,
             mkldnn_convolution_desc_t const& cd, res_t *r)
 {
@@ -506,42 +511,30 @@ int init_conv_prim_any( mkldnn_primitive_desc_t &cpd, const prb_t *p,
     mkldnn_status_t init_status = mkldnn_success;
     if (p->merge == RELU) {
         mkldnn_convolution_relu_desc_t crd;
-        cout<<" 10";cout.flush();
+        //cout<<" 10";cout.flush();
         DNN_SAFE(mkldnn_convolution_relu_desc_init(&crd, &cd, 0), WARN);
-        cout<<" 11";cout.flush();
+        //cout<<" 11";cout.flush();
         init_status = mkldnn_primitive_desc_create(&cpd, &crd, engine, NULL);
-        cout<<" 12";cout.flush();
+        //cout<<" 12";cout.flush();
     } else {
         init_status = mkldnn_primitive_desc_create(&cpd, &cd, engine, NULL);
     }
 
-    if (init_status == mkldnn_unimplemented)
+    if (init_status == mkldnn_unimplemented){
+        //cout<<" init_conv_prim_any UNIMPLEMENTED"<<endl;
         return r->state = UNIMPLEMENTED, OK;
-    else
+    } else {
+        //cout<<" init_conv_prim_any status="<<r->state<<endl;
         SAFE(init_status, WARN);
+    }
 
     return OK;
 }
+/** skip this impl (return FAIL) if the impl matches any -skip-impl string. */
 int init_conv_prim( mkldnn_primitive_desc_t &cpd, const prb_t *p,
             mkldnn_convolution_desc_t const& cd, res_t *r)
 {
-#if 0
-    mkldnn_status_t init_status = mkldnn_success;
-    if (p->merge == RELU) {
-        mkldnn_convolution_relu_desc_t crd;
-        DNN_SAFE(mkldnn_convolution_relu_desc_init(&crd, &cd, 0), WARN);
-        init_status = mkldnn_primitive_desc_create(&cpd, &crd, engine, NULL);
-    } else {
-        init_status = mkldnn_primitive_desc_create(&cpd, &cd, engine, NULL);
-    }
-
-    if (init_status == mkldnn_unimplemented)
-        return r->state = UNIMPLEMENTED, OK;
-    else
-        SAFE(init_status, WARN);
-#else
-    init_conv_prim_any( cpd, p, cd, r);
-#endif
+    SAFE(init_conv_prim_any( cpd, p, cd, r), WARN);
 
     const char *impl_str = query_impl_info(cpd);
     if (maybe_skip(impl_str)) {
@@ -775,7 +768,7 @@ int doit(const prb_t *p, res_t *r) {
     mkldnn_convolution_desc_t cd;
     mkldnn_primitive_t c{};
 
-#if 1
+#if 0
     mkldnn_primitive_desc_t cpd;
     SAFE(init_pd(p, cd, cpd, r), WARN);
     // equiv:
@@ -833,7 +826,7 @@ int doit(const prb_t *p, res_t *r) {
         const_mkldnn_primitive_t outputs[] = { dst_dt.p_ };
         if (bench_mode & CORR || bench_mode & TEST )
             compute_ref_fwd(p, src_fp, wei_fp, bia_fp, dst_fp);
-#if 0 // iterator version
+#if 1 // iterator version
         const_mkldnn_op_desc_t copd = &cd;
         mkldnn_convolution_relu_desc_t *crd = nullptr;
         if (p->merge == RELU){
@@ -936,7 +929,7 @@ int doit(const prb_t *p, res_t *r) {
         const_mkldnn_primitive_t outputs[] = { src_dt.p_ };
         if (bench_mode & CORR || bench_mode & TEST )
             compute_ref_bwd_d(p, src_fp, wei_fp, dst_fp);
-#if 0
+#if 1
         const_mkldnn_op_desc_t copd = &cd;
         mkldnn_convolution_relu_desc_t *crd = nullptr;
         if (p->merge == RELU){
@@ -996,7 +989,7 @@ int doit(const prb_t *p, res_t *r) {
         };
         if (bench_mode & CORR || bench_mode & TEST )
             compute_ref_bwd_w(p, src_fp, wei_fp, bia_fp, dst_fp);
-#if 0
+#if 1
         const_mkldnn_op_desc_t copd = &cd;
         mkldnn_convolution_relu_desc_t *crd = nullptr;
         if (p->merge == RELU){
