@@ -91,53 +91,51 @@ Example: [Intel-Caffe](https://github.com/intel/caffe)
 ### Public API largely governed by enum values
 
 So let''s look at some exemplary enums from [mkldnn_types.h](https://github.com/kruus/gen-dnn/blob/master/include/mkldnn_types.h)
-
-type name | enum/type | value | comment
-:--- |:--- |:--- |:---
-mkldnn_status_t | mkldnn_success | 0 | operation successful
-| | mkldnn_out_of_memory | 1 | failure
-| | ... |
-mkldnn_data_type_t | mkldnn_f32 | 1 | 32-bit floating point
-| | ...s32,s16,s8,u8 | | integer types
-| | ... |
-mkldnn_memory_format_t | mkldnn_format_undef | 0 | empty/uninitialized
-| | mkldnn_any  | | primitive selects memory format automatically
-| | mkldnn_nchw | | Caffe-style image (batch, channels, height, width)
-| | mkldnn_nhwc | | Tensorflow/Milde-ish
-| | mkldnn_chwn | | Neon layout
-| | ... | | | perhaps 20 more memory formats (many blocked by 8/16 elements)
-| | |
-mkldnn_padding_kind_t | mkldnn_padding_zero | | How to interpret data in padding regions
-mkdnn_prop_kind_t | mkldnn_forward_training | 64 | fprop (maintain info for bprop
-| | mkldnn_forward_inference | 96 | fprop, with no bprop
-| | mkldnn_backward | | wrt. all parameters
-| | mkldnn_backward_data | |
-| | mkldnn_backward_weights | |
-| | mkldnn_ackward_bias | |
-| | ... |
-mkldnn_primitive_kind_t | mkldnn_memory |
-| | mkldnn_view |
-| | mkldnn_reorder |
-| | mkldnn_concat |
-| | mkldnn_concat_inplace |
-| | mkldnn_sum |
-| | mkldnn_convolution |
-| | mkldnn_eltwise | | for univariate functions
-| | mkldnn_softmax |
-| | mkldnn_pooling |
-| | mkldnn_lrn |
-| | mkldnn_batch_normalization |
-| | mkldnn_inner_product |
-| | mkldnn_convolution_relu |
-| | |
-mkldnn_algorithm_t | mkldnn_convolution_direct | 1 | im2col gemm
-| | mkldnn_convolution_winograd | 2 | winograd convolution
-| | mkldnn_eltwise_relu/tanh/elu | | various element-wise funcs
-| | mkldnn_lrn_across_channels |
-| | mkldnn_lrn_within_channel |
-| | ... |
-mkldnn_batch_normalization_flag_t | | | global/omit stats? scaleshift?
-| | ... |
+{
+| type name | enum/type | value | comment
+| :--- |:--- |:--- |:---
+| mkldnn_status_t | mkldnn_success | 0 | operation successful
+|        | mkldnn_out_of_memory | 1 | failure
+|        | ... | | |
+| mkldnn_data_type_t | mkldnn_f32 | 1 | 32-bit floating point
+|        | ...s32,s16,s8,u8 | | integer types
+| mkldnn_memory_format_t | mkldnn_format_undef | 0 | empty/uninitialized
+|        | mkldnn_any  | | primitive selects memory format automatically
+|        | mkldnn_nchw | | Caffe-style image (batch, channels, height, width)
+|        | mkldnn_nhwc | | Tensorflow/Milde-ish
+|        | mkldnn_chwn | | Neon layout
+|        | ... | | perhaps 20 more memory formats (many blocked by 8/16 elements)
+| mkldnn_padding_kind_t | mkldnn_padding_zero | | How to interpret data in padding regions
+| mkdnn_prop_kind_t | mkldnn_forward_training | 64 | fprop (maintain info for bprop
+|        | mkldnn_forward_inference | 96 | fprop, with no bprop
+|        | mkldnn_backward | | wrt all parameters
+|        | ...backward_data | |
+|        | ...backward_weights | |
+|        | ...backward_bias | |
+|        | ... | |
+| mkldnn_primitive_kind_t | mkldnn_memory | |
+|        | mkldnn_view | |
+|        | mkldnn_reorder | |
+|        | mkldnn_concat | |
+|        | mkldnn_concat_inplace | |
+|        | mkldnn_sum | |
+|        | mkldnn_convolution | |
+|        | mkldnn_eltwise | | for univariate functions
+|        | mkldnn_softmax | |
+|        | mkldnn_pooling | |
+|        | mkldnn_lrn | |
+|        | mkldnn_batch_normalization | |
+|        | mkldnn_inner_product | |
+|        | mkldnn_convolution_relu | |
+|        | | |
+| mkldnn_algorithm_t | mkldnn_convolution_direct | 1 | im2col gemm
+|        | mkldnn_convolution_winograd | 2 | winograd convolution
+|        | mkldnn_eltwise_relu/tanh/elu | | various element-wise funcs
+|        | mkldnn_lrn_across_channels | |
+|        | mkldnn_lrn_within_channel | |
+|        | ... | |
+| mkldnn_batch_normalization_flag_t | | | global/omit stats? scaleshift?
+|        | ... | |
 | mkldnn_blocking_desc_t | struct | | blocking strides, padding offsets, ...
 | mkldnn_op_desc_t | void * | | opaque op descriptor (resolve to some private data type)
 | mkldnn_memory_desc_t | struct | | dims, data_type, mkldnn_memory_format_t, p opt. block layout]
@@ -146,20 +144,21 @@ mkldnn_batch_normalization_flag_t | | | global/omit stats? scaleshift?
 | mkldnn_softmax_desc_t | struct | |
 | mkldnn_pooling_desc_t | struct | |
 | mkldnn_lrn_desc_t | struct |
-| mkldnn_batch_normalization_desc_t | struct
-| mkldnn_inner_product_desc_t | struct
-| mkldnn_convolution_relu_desc_t | struct
-| | ... |
-mkldnn_engine_kind_t | mkldnn_cpu | 1 | Intel CPU
-| | ... | 
-mkldnn_primitive_desc | struct | | opaque
-mkldnn_primitive | struct | | opaque
-mkldnn_primitive_at | struct | | to iterate looking for applicable implementations
-| | ... |
-mkldnn_query_t | enum | | many property queries
-mkldnn_stream_kind_t | mkldnn_lazy | | stream processing heuristic
-mkldnn_stream | struct | | opaque network execution stream
-| | ... | | layers connected their in/out mem descriptors
+| mkldnn_batch_normalization_desc_t | struct | |
+| mkldnn_inner_product_desc_t | struct | |
+| mkldnn_convolution_relu_desc_t | struct | |
+|        | ... | |
+| mkldnn_engine_kind_t | mkldnn_cpu | 1 | Intel CPU
+|        | ... |  |
+| mkldnn_primitive_desc | struct | | opaque
+| mkldnn_primitive | struct | | opaque
+| mkldnn_primitive_at | struct | | point to one-of layer inputs? outputs?
+|        | ... | |
+| mkldnn_query_t | enum | | many property queries
+| mkldnn_stream_kind_t | mkldnn_lazy | | stream processing heuristic
+| mkldnn_stream | struct | | opaque network execution stream
+|        | ... | | layers connected by in/out mem descriptors
+}
 
 OK, so have lots of enum values, mostly used to populate
 structs describing: memory, primiives (layer ops)
@@ -194,16 +193,24 @@ Functions are in [mkldnn.h](https://github.com/kruus/gen-dnn/blob/master/include
    - used to also have Phi implementations
    - fast impls all generate JIT assembly code for kernels
      - JIT impls very sophisticated:
-       - Ex. size of loop code, size of loop limits compared with cache sizes on the executing CPU to generate the fastest impls.d
+       - Ex. size of loop code, size of loop limits compared with cache sizes
+         on the executing CPU to generate the fastest impls.d
 6. Stream
    - seems to be lacking overall optimizations
-     - e.g. no sophisticated mechanisms to re-use memory regions, or optimize choice of data reordering operations.  (If you ever hit a non-optimized reordering op, things get very very slow)
+     - e.g. no sophisticated mechanisms to re-use memory regions, or optimize
+       choice of data reordering operations.  (If you ever hit a non-optimized
+       reordering op, things get very very slow)
 7. General comments:
   - Not good for readability, or robustness
+    - ptr lifetimes may be tricky.
+    - C `void*` object misuse might not be catchable at compile-time.
   - Possible issues with ordering of \_destroy ops
     - all restrictions/assumptions not documented
   - Does an excellent job at only a few opaque objects for 'details'
-  - Excellent checking (during 'init' phase) whether a primitive can be correctly applied under current conditions.
+  - Excellent checking (during 'init' phase) whether a primitive can be
+    correctly applied under current conditions.
+  - The C++ API exposes just a little bit of the useful stuff in `src/common`.
+    Think about whether some C++ helper classes might be useful to expose.
 
 ##### Current Intel work:
 

@@ -38,7 +38,7 @@ Debug: Individual tests can be run like build-sx/tests/gtests/test_relu
 |        | --> build/    and build.log<
 |        | ./build.sh -tt # build and run all tests (with jit)
 | ---    | ---
-| SX:    | ./build.sh -ST # build for *S*X and *T*race cmake setup
+| SX:    | ./build.sh -ST # build for <em>S</em>X and <em>T</em>race cmake setup
 |        |   --> build-sx/ and build-sx.log
 |  or    | ./build.sh -SdqT # debug build (no doxygen) for SX
 | ---    | ---
@@ -97,8 +97,7 @@ Japan master is on /mnt/scatefs_bm_nfs/lab/nlabhpg/simd/gen-dnn
        or, for me  ~/wrk/simd/gen-dnn
 
 
-There is also a github master, ~~git+ssh://git@github.com/kruus/gen-dnn.git~~
-
+There is also a github master,
     git+ssh://git@github.com/necla-ml/gen-dnn.git
 
 which is being left out-of-date until a decision is made on whether SX support
@@ -118,12 +117,13 @@ the additional convolutions onto the existing "engine" lists of primitives.
     - snake10:$ git push japan master:necla  # push to a tmp branch
     - sapphire2:$ git merge necla            # merge from branch
     - sapphire2:$ git branch -d necla        # delete tmp branch
-  - [NEW] with ssh RemoteForward set up in snake10:~/.ssh/config as ```
+  - [NEW] with ssh RemoteForward set up in snake10:~/.ssh/config as
+```
 Host zoro # was japan17
   User nlabhpg
   HostName XXXXXXXXXXX
   RemoteForward 22222 localhost:22
-    ```
+```
     - and a zoro:~/.ssh/config of
 ```
 host snake10
@@ -132,7 +132,7 @@ host snake10
     Port 22222
 ```
     - so that passwordless ssh to AND from snake10<-->zoro works, we can
-    - zoro:$ git remote add snake10 git+ssh://snake10/local/kruus/sx/simd/sx-dnngit+ssh://snake10/local/kruus/sx/sx-dnn
+    - zoro:$ `git remote add snake10 git+ssh://snake10/local/kruus/sx/sx-dnn`
     - and THEN:
       - `zoro:$ pull snake10 master` "just works"
   - For public-domain SX work:
@@ -153,7 +153,8 @@ host snake10
 ### upstream merges
 
 - clone this mkl-dnn fork
-  - git clone https://github.com/kruus/gen-dnn.git
+  - git clone https://github.com/necla-ml/gen-dnn.git
+    (or perhaps git+ssh://git@github.com/necla-ml/gen-dnn.git)
 - upstream merge, from within cloned fork:
   - git checkout master # in case you are on a branch
   - git pull https://github.com/01org/mkl-dnn.git
@@ -178,7 +179,7 @@ You might uncover even more segfaults in release mode.
 
 ### SX testing
 
-Begin by making a writable directory for log files (e.g. from sapphire2 or zero)
+Begin by making a writable directory for log files (e.g. from sapphire2 or zoro)
 ```
 mkdir guest; chmod ugo+w guest
 ```
@@ -204,7 +205,7 @@ done
 
 ### SX debug
 
-Not on the SX, run in debugger:
+Logged in to SX, run in debugger:
 
 ```
 $  dbx -I src/vanilla -I src/include -I src/common -I src/io -I examples ./build-sx/examples/simple-net-c
@@ -299,7 +300,7 @@ dbx ./simple-net-c
   - some bugs simple and fixed in next SX compiler versions.
 - One bug I could not reduce to a simple test case.
 
-### SX Convolution with mkl-dnn ref impls is slow.
+### SX Convolution with mkl-dnn ref impls is slow (just like on Intel)
 
 - ref impl is slow "as expected" (function call in innermost loop)
 - newer im2col gemm also slow (im2col has function call in innermost loop)

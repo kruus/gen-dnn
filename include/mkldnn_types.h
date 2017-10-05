@@ -791,11 +791,9 @@ typedef struct {
 typedef enum {
     mkldnn_query_undef = 0,  /**< no query */
 
-    /* for mkldnn_primitive_desc_query */
     mkldnn_query_engine, /**< execution engine */
     mkldnn_query_primitive_kind, /**< primitive kind */
 
-    /* for mkldnn_primitive_desc_query */
     mkldnn_query_num_of_inputs_s32, /**< number of inputs expected */
     mkldnn_query_num_of_outputs_s32, /**< number of outputs expected */
 
@@ -819,8 +817,6 @@ typedef enum {
     mkldnn_query_inner_product_d, /**< inner product descriptor */
     mkldnn_query_convolution_relu_d, /**< convolution-relu descriptor */
 
-    /** \name for mkldnn_primitive_desc_query */
-    /**{ */
     /* (memory) primitive descriptor section */
     mkldnn_query_some_pd = 128, /**< stub */
     mkldnn_query_input_pd, /**< input memory primitive desc */
@@ -832,7 +828,7 @@ typedef enum {
     mkldnn_query_dst_pd, /**< destination memory primitive desc */
     mkldnn_query_diff_dst_pd, /**< destination grad. memory primitive desc */
     mkldnn_query_workspace_pd, /**< workspace memory primitive desc */
-    /**} */
+
 } mkldnn_query_t;
 
 /** @} */

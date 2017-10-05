@@ -695,25 +695,6 @@ OPAQUE_OP_DESC_CVT(batch_normalization_desc_t);
 OPAQUE_OP_DESC_CVT(inner_product_desc_t);
 OPAQUE_OP_DESC_CVT(convolution_relu_desc_t);
 //@}
-#endif
-struct plain_prim_iter_t {
-    /** Generic constructor from \c void* C operation descriptor.
-     * \return none but \c (bool) cast false if there were errors,
-     *         and \c status() can tell you what went wrong.
-     */
-    plain_prim_iter_t( const_mkldnn_op_desc_t op_desc,
-                 mkldnn_engine_t engine,
-                 const_mkldnn_primitive_desc_t hint_forward_primitive_desc=NULL )
-        : n_(0U)
-    {
-        iter_status_ = mkldnn_primitive_desc_iterator_create
-            ( &iter_,
-              op_desc,
-              engine,
-              hint_forward_primitive_desc);
-        //cout<<"+plain_prim_iter_t : "<<iter_status_<<endl;
-        //RT_ASSERT(iter_status_ == mkldnn_success);
-    }
 #if 0
     /** If you know the type before-hand, you can directly construct the iterator. */
 #define CONSTR( OP_DESC_T ) \
@@ -734,38 +715,45 @@ struct plain_prim_iter_t {
     CONSTR(inner_product_desc_t);
     CONSTR(convolution_relu_desc_t);
 #endif
-    mkldnn_status_t status() const { return iter_status_; }
-    int n() const { return n_; }
-    ~plain_prim_iter_t()
+#endif
+struct plain_prim_iter_t {
+    /** Generic constructor from \c void* C operation descriptor.
+     * \return none but \c (bool) cast false if there were errors,
+     *         and \c status() can tell you what went wrong.
+     */
+    plain_prim_iter_t( const_mkldnn_op_desc_t op_desc,
+        mkldnn_engine_t engine,
+        const_mkldnn_primitive_desc_t hint_forward_primitive_desc=nullptr)
+        : n_(0U)
     {
-        //cout<<"-plain_prim_iter_t"<<endl;
-        // foo_iterator_destroy always seems to cause a segfault
-        //if (iter_status_)
-        //    mkldnn_primitive_desc_iterator_destroy( iter_ );
-        mkldnn_primitive_desc_iterator_destroy( iter_ );
+        iter_status_ = mkldnn_primitive_desc_iterator_create
+            ( &iter_,
+              op_desc,
+              engine,
+              hint_forward_primitive_desc);
     }
+    ~plain_prim_iter_t() {
+        RT_ASSERT( mkldnn_primitive_desc_iterator_destroy(iter_)
+                   == mkldnn_success );
+    }
+
+    mkldnn_status_t status() const { return iter_status_; }
+    int n() const { return n_; } // there's another private counter in iter_!
+    explicit operator bool() { return iter_status_ == mkldnn_success; }
+
     /** pre-increment only! */
-    plain_prim_iter_t& operator++()
-    {
+    plain_prim_iter_t& operator++() {
         if( iter_status_ == mkldnn_success ){
             iter_status_ = mkldnn_primitive_desc_iterator_next( iter_ );
             ++n_;
         }
         return *this;
     }
-    explicit operator bool() {
-        return iter_status_ == mkldnn_success;
-    }
-    //mkldnn_convolution_desc_t operator*()
-    mkldnn_primitive_desc_t operator*()
-    {
-        //cout<<"op*"<<endl;
-        //mkldnn_convolution_desc_t ret;
+    mkldnn_primitive_desc_t operator*() {
         mkldnn_primitive_desc_t ret = nullptr;
         if (iter_status_ == mkldnn_success){
-            //cout<<"op*2"<<endl;
             ret = mkldnn_primitive_desc_iterator_fetch(iter_);
-            if ((void*)ret == nullptr) // how?
+            if ((void*)ret == nullptr)
                iter_status_ = mkldnn_iterator_ends;
         }
         return ret;
@@ -853,6 +841,7 @@ int doit(const prb_t *p, res_t *r) {
         for (plain_prim_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
             cout<<" PIT stop #"<<pit.n();
             mkldnn_primitive_desc_t it_cpd = *pit;
+            //RT_ASSERT( it_cpd != nullptr );
             if( it_cpd == nullptr ){ cout<<" it_cpd == nullptr"<<endl; break; }
             // need to include common/primitive_desc.hpp to access C++ goodies :
             //cout<<"        type "<<it_cpd->kind()<<endl; // NA in C api
@@ -865,12 +854,10 @@ int doit(const prb_t *p, res_t *r) {
             const char *impl_str = query_impl_info(it_cpd);
             cout<<" conv impl : "<<impl_str<<endl;
             if (maybe_skip(impl_str)) {
-                //print(2, "Correctness SKIPPED: impl #%u\n\n", pit.n());
-                if(v>=0) cout<<" Correctness SKIPPED: impl #"<<pit.n()<<"\n\n"<<endl;
-                //DNN_SAFE(mkldnn_primitive_desc_destroy(it_cpd), WARN); // segfault!
-                //   perhaps because memory descriptors are still needed ?
-                //r->state = SKIPPED;
-                //continue;
+                print(-1, "Correctness SKIPPED: impl #%u\n\n", pit.n());
+                DNN_SAFE(mkldnn_primitive_desc_destroy(it_cpd), WARN);
+                //r->state = SKIPPED; // ???
+                continue;
             } else {
                 print(5, "mkldnn implementation: %s\n", impl_str);
                 DNN_SAFE(mkldnn_primitive_create(&c, it_cpd, inputs, outputs), WARN);
@@ -962,8 +949,9 @@ int doit(const prb_t *p, res_t *r) {
             cout<<" conv impl : "<<impl_str<<endl;
             if (maybe_skip(impl_str)) {
                 if(v>=0) cout<<" Correctness SKIPPED: impl #"<<pit.n()<<"\n\n"<<endl;
-                //DNN_SAFE(mkldnn_primitive_desc_destroy(it_cpd), WARN); // segfault!
-                //r->state = SKIPPED; //continue;
+                DNN_SAFE(mkldnn_primitive_desc_destroy(it_cpd), WARN);
+                //r->state = SKIPPED;
+                continue;
             } else {
                 print(5, "mkldnn implementation: %s\n", impl_str);
                 DNN_SAFE(mkldnn_primitive_create(&c, it_cpd, inputs, outputs), WARN);
@@ -1022,8 +1010,9 @@ int doit(const prb_t *p, res_t *r) {
             cout<<" conv impl : "<<impl_str<<endl;
             if (maybe_skip(impl_str)) {
                 if(v>=0) cout<<" Correctness SKIPPED: impl #"<<pit.n()<<"\n\n"<<endl;
-                //DNN_SAFE(mkldnn_primitive_desc_destroy(it_cpd), WARN); // segfault!
-                //r->state = SKIPPED; //continue;
+                DNN_SAFE(mkldnn_primitive_desc_destroy(it_cpd), WARN);
+                //r->state = SKIPPED;
+                continue;
             } else {
                 print(5, "mkldnn implementation: %s\n", impl_str);
                 DNN_SAFE(mkldnn_primitive_create(&c, it_cpd, inputs, outputs), WARN);
@@ -1075,6 +1064,7 @@ int doit(const prb_t *p, res_t *r) {
     }
     //delete p_bia_dt;
     //delete p_bia_fp;
+    DNN_SAFE(mkldnn_primitive_desc_destroy(cpd), WARN); // segfault!
 
     return OK;
 }
