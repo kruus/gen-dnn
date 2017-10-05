@@ -202,7 +202,7 @@ struct memory_desc_wrapper: public c_compatible {
     }
 
     /** returns physical offset by logical one. logical offset is represented by
-     * a tuple of indeces (\param xn, ..., \param x1, \param x0) */
+     * a tuple of indeces (\c xn, ..., \c x1, \c x0) */
     template<typename... Args> inline size_t off(Args... args) const {
         assert(sizeof...(args) == ndims());
         dims_t pos = { args... };
@@ -210,8 +210,7 @@ struct memory_desc_wrapper: public c_compatible {
     }
 
     /** returns physical offset by logical one. logical offset is represented by
-     * a tuple of indeces (\param xn, ..., \param x1, \param x0) in already
-     * padded area */
+     * a tuple of indeces (\c xn, ..., \c x1, \c x0) in already padded area */
     template<typename... Args> inline size_t off_padding(Args... args) const {
         assert(sizeof...(args) == ndims());
         dims_t pos = { args... };
@@ -219,7 +218,7 @@ struct memory_desc_wrapper: public c_compatible {
     }
 
     /** returns physical offset by logical one. Logical offset is represented by
-     * a tuple of block indeces (\param bn, ..., \param b1, \param b0). It is a
+     * a tuple of block indeces (\c bn, ..., \c b1, \c b0). It is a
      * user responsibility to adjust the result to get offset within blocks */
     template<typename ...Args> inline size_t blk_off(Args... args) const {
         return _blk_off<Args...>(args...);

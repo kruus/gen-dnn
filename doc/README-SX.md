@@ -299,10 +299,22 @@ dbx ./simple-net-c
   - some bugs simple and fixed in next SX compiler versions.
 - One bug I could not reduce to a simple test case.
 
-### SX Convolution is abysmally slow
+### SX Convolution with mkl-dnn ref impls is slow.
 
-- Even though im2col gemm is there, `[guest@ps6s0000 tests]$ ./api-io-c` take "forever".
-- sxftrace shows that ref_convolution code is running (not the im2col one)
+- ref impl is slow "as expected" (function call in innermost loop)
+- newer im2col gemm also slow (im2col has function call in innermost loop)
+
+- Possibilities:
+  - is_dense specializations for ref and im2col
+  - alt C loops embedding im2col operations within loop
+  - may try: direct convolution, with a layout like nChw128c
+  - may try: Winograd (also should be very nice for massively-SIMD machines)
+
+- Status:
+  - currently working on benchdnn improvements to move some faster SX convolutions
+    from last year, in another codebase, to mkl-dnn.
+
+Here's a sample sxftrace for mkldnn ref convolution 
 
 ```
 Execution Date : Thu Jun  1 04:52:06 2017

@@ -751,17 +751,18 @@ typedef struct {
  *
  * For generic function mkldnn_primitive_desc_query() the type of result must
  * be agreed with queried argument. The correspondence table:
- *      Query                        | type of result
- *      --------------------------------------------------------------
- *      #mkldnn_query_engine         | mkldnn_engine_t *
- *      #mkldnn_query_primitive_kind | mkldnn_primitive_kind_t *
- *      *_s32                        | int *
- *      *_s64                        | ptrdiff_t *
- *      *_f64                        | double *
- *      *_str                        | const char **
- *      *_md                         | const mkldnn_memory_desc_t **
- *      *_${op}_d                    | const mkldnn_${op}_desc_t **
- *      *_pd                         | const_mkldnn_primitive_desc_t *
+ *
+ *    | Query                        | type of result
+ *    |:---------------------------- |:--------------------------------
+ *    | #mkldnn_query_engine         | mkldnn_engine_t *
+ *    | #mkldnn_query_primitive_kind | mkldnn_primitive_kind_t *
+ *    | *_s32                        | int *
+ *    | *_s64                        | ptrdiff_t *
+ *    | *_f64                        | double *
+ *    | *_str                        | const char **
+ *    | *_md                         | const mkldnn_memory_desc_t **
+ *    | *_${op}_d                    | const mkldnn_${op}_desc_t **
+ *    | *_pd                         | const_mkldnn_primitive_desc_t *
  *
  * @note
  *     Rule of thumb: all opaque types and structures are returned by
@@ -772,13 +773,29 @@ typedef struct {
  *     the lifetime of queried primitive descriptor. Returned objects must not
  *     be destroyed by user. If there is a need to keep the object longer than
  *     a lifetime of queried primitive descriptor use
- *     mkldnn_primitive_desc_clone() to make a copy. */
+ *     mkldnn_primitive_desc_clone() to make a copy.
+ *
+ * @sa mkldnn_status_t mkldnn_primitive_desc_query(
+ *                        const_mkldnn_primitive_desc_t primitive_desc,
+ *                        mkldnn_query_t what, int index, void *result)
+ *     for 
+ * @sa const mkldnn_memory_desc_t mkldnn_primitive_desc_query_memory_d(
+ *                        const_mkldnn_primitive_desc_t primitive_desc)
+ * @sa const_mkldnn_primitive_desc_t mkldnn_primitive_desc_query_pd(
+ *                        const_mkldnn_primitive_desc_t primitive_desc,
+ *                        mkldnn_query_t what, int index)
+ * @sa mkldnn_primitive_desc_query_s32(
+ *                        const_mkldnn_primitive_desc_t primitive_desc,
+ *                        mkldnn_query_t what, int index)
+ */
 typedef enum {
     mkldnn_query_undef = 0,  /**< no query */
 
+    /* for mkldnn_primitive_desc_query */
     mkldnn_query_engine, /**< execution engine */
     mkldnn_query_primitive_kind, /**< primitive kind */
 
+    /* for mkldnn_primitive_desc_query */
     mkldnn_query_num_of_inputs_s32, /**< number of inputs expected */
     mkldnn_query_num_of_outputs_s32, /**< number of outputs expected */
 
@@ -802,6 +819,8 @@ typedef enum {
     mkldnn_query_inner_product_d, /**< inner product descriptor */
     mkldnn_query_convolution_relu_d, /**< convolution-relu descriptor */
 
+    /** \name for mkldnn_primitive_desc_query */
+    /**{ */
     /* (memory) primitive descriptor section */
     mkldnn_query_some_pd = 128, /**< stub */
     mkldnn_query_input_pd, /**< input memory primitive desc */
@@ -813,6 +832,7 @@ typedef enum {
     mkldnn_query_dst_pd, /**< destination memory primitive desc */
     mkldnn_query_diff_dst_pd, /**< destination grad. memory primitive desc */
     mkldnn_query_workspace_pd, /**< workspace memory primitive desc */
+    /**} */
 } mkldnn_query_t;
 
 /** @} */

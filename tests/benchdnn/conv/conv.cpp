@@ -501,6 +501,21 @@ int init_conv_desc(mkldnn_convolution_desc_t &cd, const prb_t *p )
     cout<<"init_conv_desc OK"<<endl;
     return OK;
 }
+#if 0 // memory valid checks... musings :
+/** memory pointer exists and non-NULL? */
+mkldnn_status_t memory_notnull( const primitive_t *memory ){
+    void *handle = nullptr;
+    mkldnn_status_t ret = mkldnn_memory_get_handle(memory, &handle);
+    if( ret == mkldnn_success && handle == nullptr )
+        ret = mkldnn_out_of_memory;
+    return ret;
+}
+bool memory_sz( const primitive_desc_t *memory_pd ){
+    size_t const sz = mkldnn_memory_primitive_desc_get_size(memory_pd);
+    return sz > 0U;
+}
+#endif
+
 /** We need a "first" convolution to succeed (not skipped).
  * Then we are able to get right-sized memory and initialize it
  * with test data. */
@@ -727,6 +742,7 @@ struct plain_prim_iter_t {
         // foo_iterator_destroy always seems to cause a segfault
         //if (iter_status_)
         //    mkldnn_primitive_desc_iterator_destroy( iter_ );
+        mkldnn_primitive_desc_iterator_destroy( iter_ );
     }
     /** pre-increment only! */
     plain_prim_iter_t& operator++()

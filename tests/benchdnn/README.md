@@ -120,10 +120,10 @@ table of modifiers below.
 | modifier  | description
 |:--------  |:-----------
 |           | default
-| -         | min (time) -- default
+| -         | min (time) = default
 | 0         | avg (time)
 | +         | max (time)
-| ---       | ---
+| --------- | ----------
 | K         | Kilo (1e3)
 | M         | Mega (1e6)
 | G         | Giga (1e9)
