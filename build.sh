@@ -124,7 +124,7 @@ if [ "$DOJUSTDOC" == "y" ]; then
             # doxygen does not much care HOW to build, just WHERE
             (cd build && cmake -DCMAKE_INSTALL_PREFIX=../${INSTALL_DIR} -DFAIL_WITHOUT_MKL=OFF ..)
         fi
-        echo "Doxygen (please be patient)"
+        echo "Doxygen (please be patient) logging to doxygen.log"
         rm -rf build/doc*stamp build/reference "${INSTALL_DIR}/share/doc"
         #cd build \
         #&& make VERBOSE=1 doc \

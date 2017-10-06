@@ -91,88 +91,99 @@ Example: [Intel-Caffe](https://github.com/intel/caffe)
 ### Public API largely governed by enum values
 
 So let''s look at some exemplary enums from [mkldnn_types.h](https://github.com/kruus/gen-dnn/blob/master/include/mkldnn_types.h)
-{
+ 
 | type name | enum/type | value | comment
 | :--- |:--- |:--- |:---
 | mkldnn_status_t | mkldnn_success | 0 | operation successful
-|        | mkldnn_out_of_memory | 1 | failure
-|        | ... | | |
+|       | mkldnn_out_of_memory  | 1 | failure
+|       | ...                   | | .
+| mkldnn_query_t | many...      | | property queries
 | mkldnn_data_type_t | mkldnn_f32 | 1 | 32-bit floating point
-|        | ...s32,s16,s8,u8 | | integer types
+|       | ...s32,s16,s8,u8      | | integer types
+| mkldnn_primitive_kind_t | mkldnn_memory | | .
+|       | mkldnn_view           | | .
+|       | mkldnn_reorder        | | .
+|       | mkldnn_concat         | | .
+|       | mkldnn_concat_inplace | | .
+|       | mkldnn_sum            | | .
+|       | mkldnn_convolution    | | .
+|       | mkldnn_eltwise        | | for univariate functions
+|       | mkldnn_softmax        | | .
+|       | mkldnn_pooling        | | .
+|       | mkldnn_lrn            | | .
+|       | mkldnn_batch_normalization | | .
+|       | mkldnn_inner_product  | | .
+|       | mkldnn_convolution_relu | | .
+
+| type name | enum/type | value | comment
+| :--- |:--- |:--- |:---
 | mkldnn_memory_format_t | mkldnn_format_undef | 0 | empty/uninitialized
-|        | mkldnn_any  | | primitive selects memory format automatically
-|        | mkldnn_nchw | | Caffe-style image (batch, channels, height, width)
-|        | mkldnn_nhwc | | Tensorflow/Milde-ish
-|        | mkldnn_chwn | | Neon layout
+|        | mkldnn_any  | . | primitive selects memory format automatically
+|        | mkldnn_nchw | . | Caffe-style image (batch, channels, height, width)
+|        | mkldnn_nhwc | . | Tensorflow/Milde-ish
+|        | mkldnn_chwn | . | Neon layout
 |        | ... | | perhaps 20 more memory formats (many blocked by 8/16 elements)
-| mkldnn_padding_kind_t | mkldnn_padding_zero | | How to interpret data in padding regions
 | mkdnn_prop_kind_t | mkldnn_forward_training | 64 | fprop (maintain info for bprop
 |        | mkldnn_forward_inference | 96 | fprop, with no bprop
 |        | mkldnn_backward | | wrt all parameters
-|        | ...backward_data | |
-|        | ...backward_weights | |
-|        | ...backward_bias | |
-|        | ... | |
-| mkldnn_primitive_kind_t | mkldnn_memory | |
-|        | mkldnn_view | |
-|        | mkldnn_reorder | |
-|        | mkldnn_concat | |
-|        | mkldnn_concat_inplace | |
-|        | mkldnn_sum | |
-|        | mkldnn_convolution | |
-|        | mkldnn_eltwise | | for univariate functions
-|        | mkldnn_softmax | |
-|        | mkldnn_pooling | |
-|        | mkldnn_lrn | |
-|        | mkldnn_batch_normalization | |
-|        | mkldnn_inner_product | |
-|        | mkldnn_convolution_relu | |
-|        | | |
+|        | ...backward_data | | .
+|        | ...backward_weights | | .
+|        | ...backward_bias | | .
+|        | ... | | .
 | mkldnn_algorithm_t | mkldnn_convolution_direct | 1 | im2col gemm
 |        | mkldnn_convolution_winograd | 2 | winograd convolution
 |        | mkldnn_eltwise_relu/tanh/elu | | various element-wise funcs
-|        | mkldnn_lrn_across_channels | |
-|        | mkldnn_lrn_within_channel | |
-|        | ... | |
-| mkldnn_batch_normalization_flag_t | | | global/omit stats? scaleshift?
-|        | ... | |
+|        | mkldnn_lrn_across_channels | | .
+|        | mkldnn_lrn_within_channel | | .
+|        | ... | | .
+| mkldnn_padding_kind_t | mkldnn_padding_zero | | How to interpret data in padding regions
+| mkldnn_batch_normalization_flag_t | ... | | global stats? scaleshift?
+| mkldnn_stream_kind_t  | mkldnn_lazy,... | | stream processing heuristic
+| mkldnn_engine_kind_t  | mkldnn_cpu | 1 | Intel CPU
+|        | mkldnn_any_engine | 0 | unspecified engine
+
+structs, mostly opaque
+| type name | enum/type | value | comment
+| :--- |:--- |:--- |:---
 | mkldnn_blocking_desc_t | struct | | blocking strides, padding offsets, ...
 | mkldnn_op_desc_t | void * | | opaque op descriptor (resolve to some private data type)
-| mkldnn_memory_desc_t | struct | | dims, data_type, mkldnn_memory_format_t, p opt. block layout]
+| mkldnn_memory_desc_t      | struct | | dims, data_type, mkldnn_memory_format_t, p opt. block layout]
 | mkldnn_convolution_desc_t | struct | | many, many parameters
-| mkldnn_eltwise_desc_t | struct | |
-| mkldnn_softmax_desc_t | struct | |
-| mkldnn_pooling_desc_t | struct | |
-| mkldnn_lrn_desc_t | struct |
-| mkldnn_batch_normalization_desc_t | struct | |
-| mkldnn_inner_product_desc_t | struct | |
-| mkldnn_convolution_relu_desc_t | struct | |
-|        | ... | |
-| mkldnn_engine_kind_t | mkldnn_cpu | 1 | Intel CPU
-|        | ... |  |
-| mkldnn_primitive_desc | struct | | opaque
-| mkldnn_primitive | struct | | opaque
-| mkldnn_primitive_at | struct | | point to one-of layer inputs? outputs?
-|        | ... | |
-| mkldnn_query_t | enum | | many property queries
-| mkldnn_stream_kind_t | mkldnn_lazy | | stream processing heuristic
-| mkldnn_stream | struct | | opaque network execution stream
+| mkldnn_eltwise_desc_t     | struct | | .
+| mkldnn_softmax_desc_t     | struct | | .
+| mkldnn_pooling_desc_t     | struct | | .
+| mkldnn_lrn_desc_t         | struct | | .
+| mkldnn_batch_normalization_desc_t | struct | | .
+| mkldnn_inner_product_desc_t       | struct | | .
+| mkldnn_convolution_relu_desc_t    | struct | | .
+|        | ... | | .
+| mkldnn_primitive_desc | struct | opaque | .
+| mkldnn_primitive_t    | struct | opaque | ex. layer `outs[]`
+| mkldnn_primitive_at   | struct | opaque | ex. layer `ins[]
+|        | ... | | .
+| mkldnn_stream         | struct | | opaque network execution stream
 |        | ... | | layers connected by in/out mem descriptors
-}
 
 OK, so have lots of enum values, mostly used to populate
 structs describing: memory, primiives (layer ops)
 
-Functions are in [mkldnn.h](https://github.com/kruus/gen-dnn/blob/master/include/mkldnn.h)
+-----------------------------------------------------------------
 
-1. iterate over primitives that "match" the primitive descriptor
-2. query functions (getters)
-3. memory primitive create/destroy/equal
-4. layer operation primitive create/init
-5. a few 'engine' functions
-6. stream create, submit, wait, destroy
+Functions are in \ref mkldnn.h and cover several broad areas:
 
-##### Comments about API functions:
+| \# | Area    | Comment | example
+| ---|:------- | ------- | ------- 
+| 1. | engine  | create engine, primitive factory-function lists | .
+| 2. | memory  | primitive create/destroy/equal | .
+| 3. | layer   | operation primitive create/init | .
+| 4. | query   | "getters" | .
+| 5. | iterate | over primitives that "match" the primitive descriptor | \ref mkldnn_primitive_desc_iterator_create
+| 6. | stream  | create, submit, wait, destroy | .
+( **todo**: perhaps revisit mkldnn.h doxygen wrt above grouping )
+
+The C++ API is described in \ref mkldnn.hpp
+
+### Comments about API functions:
 
 1. iteration: mostly done automatically by engine !
   - to find an implementation corresponds to primitive descriptor, check
@@ -181,7 +192,7 @@ Functions are in [mkldnn.h](https://github.com/kruus/gen-dnn/blob/master/include
     - compatible/convertible memory layout,
     - compatible with descriptor 'algorithm' specs
   - typically happens in background, by ordering tables of layer ops in order
-    of decreasing speed, so the first "match" is likely to be the fastest
+    of decreasing speed, so the **first "match"** is *likely to be the fastest*
     - so all-C++ kernels may be very slow
 2. query functions
   - tedious to use; C++ API can use getters for private data (nicer)
@@ -200,10 +211,11 @@ Functions are in [mkldnn.h](https://github.com/kruus/gen-dnn/blob/master/include
      - e.g. no sophisticated mechanisms to re-use memory regions, or optimize
        choice of data reordering operations.  (If you ever hit a non-optimized
        reordering op, things get very very slow)
-7. General comments:
+7. General comments <SMALL>(just \*my\* personal *first impressions*, yours may
+   vary as code evolves)</SMALL>:
   - Not good for readability, or robustness
     - ptr lifetimes may be tricky.
-    - C `void*` object misuse might not be catchable at compile-time.
+    - C `void\*` object misuse might not be catchable at compile-time.
   - Possible issues with ordering of \_destroy ops
     - all restrictions/assumptions not documented
   - Does an excellent job at only a few opaque objects for 'details'
@@ -212,15 +224,16 @@ Functions are in [mkldnn.h](https://github.com/kruus/gen-dnn/blob/master/include
   - The C++ API exposes just a little bit of the useful stuff in `src/common`.
     Think about whether some C++ helper classes might be useful to expose.
 
-##### Current Intel work:
+### Current Intel work (out of date?)
 
 - Windows support (SX mods accomplished most of the warning reduction)
 - JIT algorithms for integer data types
 - Optimizing JIT algs for different CPUs (AVX2, AVX512, ...)
-- Tweaking #pragma omp settings
+- Tweaking \#pragma omp settings
 - providing inlinable C++ impls for simple_reorder, as slow
   data reorderings get discovered.
-  - (most generic reordering kernel has an unavoidable function call in the inner loop of the kernel for "offset of" calculation)
+  - (most generic reordering kernel has an unavoidable function call in
+    the inner loop of the kernel for "offset of" calculation)
 
 
 ----------

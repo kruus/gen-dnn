@@ -187,7 +187,7 @@ static char *dirname(char *path) {
     if (path[0] == '\0') strcat(path, ".");
     return path;
 }
-#else
+#elif !defined(DOXYGEN_SHOULD_SKIP_THIS)
 #include <libgen.h>
 #endif /* WIN32 */
 

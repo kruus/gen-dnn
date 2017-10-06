@@ -1937,7 +1937,7 @@ SEARCH_INCLUDES        = YES
 INCLUDE_PATH           = @CMAKE_CURRENT_SOURCE_DIR@/tests/gtests \
                          @CMAKE_CURRENT_SOURCE_DIR@/tests/gtests/in \
                          @CMAKE_CURRENT_SOURCE_DIR@/tests/gtests/gtest \
-
+                         @CMAKE_SOURCE_DIR@/include \
 
 # You can use the INCLUDE_FILE_PATTERNS tag to specify one or more wildcard
 # patterns (like *.h and *.hpp) to filter out the header-files in the
