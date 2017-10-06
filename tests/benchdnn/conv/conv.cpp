@@ -654,74 +654,46 @@ static void cmp_fp_data(const char* msg, const dnn_mem_t &f32a,
 }
 /** run performance loops if bench_mode \& PERF.
  * \ret 0/1 OK/FAIL */
-static int do_perf( mkldnn_primitive_t prim, res_t *r )
-{
+static int do_perf( mkldnn_primitive_t prim, res_t *r, const prb_t *p ) {
+    bool want_perf_report = (bench_mode & PERF) || (bench_mode & TEST);
+    if (!want_perf_report)
+        return OK; // iterating, can skip without fail
+    cout<<" +do_perf"<<bench_mode2str(bench_mode);
+    want_perf_report = r->state==UNTESTED || r->state==PASSED;
+    if (!want_perf_report)
+        return OK; // iterating, can skip without fail
 
-    if (bench_mode & PERF || bench_mode & TEST) {
-        auto &t = r->timer;
-        t.reset();
-        while (true) {
-            SAFE(execute(prim), WARN);
-            t.stamp();
-            const bool stop = false
-                || (fix_times_per_prb && t.times() >= fix_times_per_prb)
-                || (!fix_times_per_prb
-                    && t.total_ms() >= max_ms_per_prb
-                    && t.times() >= min_times_per_prb);
-            if (stop) break;
-        }
+    cout<<": r->state="<<state2str(r->state);
+    auto &t = r->timer; // <--- ahaa
+    t.reset();
+    while (true) {
+        SAFE(execute(prim), WARN);
+        t.stamp();
+        const bool stop = false
+            || (fix_times_per_prb && t.times() >= fix_times_per_prb)
+            || (!fix_times_per_prb
+                && t.total_ms() >= max_ms_per_prb
+                && t.times() >= min_times_per_prb);
+        if (stop) break;
     }
+    cout<<": r->state="<<state2str(r->state);
+    char pstr[max_prb_len];
+    prb2str(p, pstr);
+    perf_report(p, r, pstr);
+    cout<<": r->state="<<state2str(r->state);
+    cout<<" -do_perf OK"<<endl;
+    r->state = PASSED;
     return OK;
 }
 
-#if 1
 /** plain iterator, iterate over "all possible" (version 0).
  * Perhaps need to template on type of primitive_desc? */
-#if 0
-/** \name Convert operation descriptions into opaque mkldnn_op_desc_t (aka void*) */
-//@{
-#define OPAQUE_OP_DESC_CVT( OP_DESC_T ) \
-inline const_mkldnn_op_desc_t opdesc( const mkldnn_##OP_DESC_T &opdesc ) \
-{ return (const void*)&opdesc; } \
-inline mkldnn_op_desc_t opdesc( mkldnn_##OP_DESC_T &opdesc ) \
-{ return (void*)&opdesc; }
-OPAQUE_OP_DESC_CVT(memory_desc_t);
-OPAQUE_OP_DESC_CVT(convolution_desc_t);
-OPAQUE_OP_DESC_CVT(pooling_desc_t);
-OPAQUE_OP_DESC_CVT(eltwise_desc_t);
-OPAQUE_OP_DESC_CVT(softmax_desc_t);
-OPAQUE_OP_DESC_CVT(lrn_desc_t);
-OPAQUE_OP_DESC_CVT(batch_normalization_desc_t);
-OPAQUE_OP_DESC_CVT(inner_product_desc_t);
-OPAQUE_OP_DESC_CVT(convolution_relu_desc_t);
-//@}
-#if 0
-    /** If you know the type before-hand, you can directly construct the iterator. */
-#define CONSTR( OP_DESC_T ) \
-    plain_prim_iter_t( mkldnn_##OP_DESC_T &op_desc, \
-        mkldnn_engine_t engine, \
-        const_mkldnn_primitive_desc_t hint_forward_primitive_desc = nullptr \
-        ) : n_(0U) { \
-    iter_status_ = mkldnn_primitive_desc_iterator_create( &iter_, \
-        (const void*)&op_desc, engine, hint_forward_primitive_desc); \
-    }
-    CONSTR(memory_desc_t);
-    CONSTR(convolution_desc_t);
-    CONSTR(pooling_desc_t);
-    CONSTR(eltwise_desc_t);
-    CONSTR(softmax_desc_t);
-    CONSTR(lrn_desc_t);
-    CONSTR(batch_normalization_desc_t);
-    CONSTR(inner_product_desc_t);
-    CONSTR(convolution_relu_desc_t);
-#endif
-#endif
-struct plain_prim_iter_t {
+struct prim_iter_t {
     /** Generic constructor from \c void* C operation descriptor.
      * \return none but \c (bool) cast false if there were errors,
      *         and \c status() can tell you what went wrong.
      */
-    plain_prim_iter_t( const_mkldnn_op_desc_t op_desc,
+    prim_iter_t( const_mkldnn_op_desc_t op_desc,
         mkldnn_engine_t engine,
         const_mkldnn_primitive_desc_t hint_forward_primitive_desc=nullptr)
         : n_(0U)
@@ -732,7 +704,7 @@ struct plain_prim_iter_t {
               engine,
               hint_forward_primitive_desc);
     }
-    ~plain_prim_iter_t() {
+    ~prim_iter_t() {
         RT_ASSERT( mkldnn_primitive_desc_iterator_destroy(iter_)
                    == mkldnn_success );
     }
@@ -742,7 +714,7 @@ struct plain_prim_iter_t {
     explicit operator bool() { return iter_status_ == mkldnn_success; }
 
     /** pre-increment only! */
-    plain_prim_iter_t& operator++() {
+    prim_iter_t& operator++() {
         if( iter_status_ == mkldnn_success ){
             iter_status_ = mkldnn_primitive_desc_iterator_next( iter_ );
             ++n_;
@@ -791,9 +763,46 @@ private:
     mkldnn_status_t iter_status_;
     unsigned n_;
 };
-#endif
+
+static void benchdnn_stat_update( res_t *r, char const* pstr )
+{
+    auto &bs = benchdnn_stat;
+    char const *state = state2str(r->state);
+    switch (r->state) {
+    case UNTESTED:
+        break;
+    case FAILED:
+        bs.failed++;
+        print(0, "%d:%s (errors:%d total:%d) __REPRO: %s\n", bs.tests, state,
+                r->errors, r->total, pstr);
+        break;
+    case SKIPPED:
+        print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
+        bs.skipped++;
+        break;
+    case UNIMPLEMENTED:
+        print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
+        bs.unimplemented++;
+        bs.failed += !allow_unimpl;
+        break;
+    case MISTRUSTED:
+        bs.mistrusted++;
+        print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
+        // bs.failed++; /* temporal workaround for some tests */
+        break;
+    case PASSED:
+        print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
+        bs.passed++;
+        break;
+    default:
+        RT_ASSERT(!"unknown state");
+    }
+}
 
 int doit(const prb_t *p, res_t *r) {
+    auto &bs = benchdnn_stat;
+    char pstr[max_prb_len];
+    prb2str(p, pstr);
     res_t res_zero{};
     *r = res_zero;
 
@@ -850,7 +859,7 @@ int doit(const prb_t *p, res_t *r) {
     // TODO and possibly 'A'll other mkl-dnn impls,
     // and possibly the first (reference) implementation,
     // WIP and possibly any further reference implementations.
-    char const * fmt_impl_skipped = " %s\n Correctness SKIPPED : impl #%u\n\n";
+    char const * fmt_impl_skipped = " %s\n SKIPPED impl #%u\n\n";
     int const v = verbose;
     if (p->dir & FLAG_FWD) {
         mkldnn_primitive_at_t inputs[3] = { {src_dt.p_, 0}, {wei_dt.p_, 0},
@@ -869,8 +878,9 @@ int doit(const prb_t *p, res_t *r) {
             DNN_SAFE(mkldnn_convolution_relu_desc_init(crd, &cd, 0), WARN);
             copd = crd;
         }
-        for (plain_prim_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
+        for (prim_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
             cout<<" PIT stop #"<<pit.n();
+            r->state = UNTESTED;
             // unscoped: mkldnn_primitive_desc_t pd_n = *pit;
             auto pd_n = pit.get(); // a scoped mkldnn_primitive_desc_t
             if( !pd_n ){ print(2," pd_%u==nullptr!?\n",pit.n()); break; }
@@ -886,18 +896,23 @@ int doit(const prb_t *p, res_t *r) {
             const char *impl_str = query_impl_info(pd_n);
             if (maybe_skip(impl_str)) {
                 print(0, fmt_impl_skipped, impl_str, pit.n());
-                // ? r->state = SKIPPED;
+                r->state = SKIPPED; // ?
+                ++bs.skipped;
                 continue; //auto: DNN_SAFE(mkldnn_primitive_desc_destroy(pd_n), WARN);
             } else {
                 print(0, " %s\n", impl_str);
                 DNN_SAFE(mkldnn_primitive_create(&c, pd_n, inputs, outputs), WARN);
                 SAFE(execute(c), WARN);
-                if( do_perf(c, r) != OK ) return FAIL;
+                print(0, "%s", "do_perf...");
+                if( do_perf(c, r, p) != OK ) return FAIL;
                 if (bench_mode & CORR) {
+                    print(0, " %s", "do_corr...");
                     dnn_mem_t dst(dst_dt, fp, mkldnn_nchw);
                     SAFE(dst.reorder(dst_dt), WARN);
                     SAFE(compare_dst(p, dst, dst_fp, r, true), WARN);
                     print(0," Correctness PASSED : impl #%u\n\n",pit.n());
+                    r->state = PASSED;
+                    ++bs.passed;
                 }
                 mkldnn_primitive_destroy(c);
             }
@@ -913,7 +928,8 @@ int doit(const prb_t *p, res_t *r) {
             if (v>=0) {cout<<mkldnn_name_primitive_impl(c); if(v)cout<<endl;}
         }
         SAFE(execute(c), WARN);
-        if( do_perf(c, r) != OK ) return FAIL;
+        if( do_perf(c, r, p) != OK ) return FAIL;
+        cout<<" do_perf OK"<<endl;
         if (bench_mode & CORR) {
             dnn_mem_t dst(dst_dt, fp, mkldnn_nchw);
             SAFE(dst.reorder(dst_dt), WARN);
@@ -921,9 +937,10 @@ int doit(const prb_t *p, res_t *r) {
             if(v>=0) cout<<" PASSED"<<endl;
         }
 #endif
-        if (bench_mode & TEST){ // XXX not yet working, why?
+        if (bench_mode & TEST){
+            size_t const imp0 = 0U; // TBD: use 1U, warn if no 'other' impls
             size_t const nimp = get_nref_impls();
-            for(size_t imp=0U; imp<nimp; ++imp){
+            for(size_t imp=imp0; imp<nimp; ++imp){
                 // get new zero-initialized data "just like" the ref fp32 calc.
                 if(v>1) print(0," %s ...\n", "dnn_mem_t src_tt(src_fp)");
                 // inputs (for a FWD calc) acquire content from ref fp32 calc
@@ -966,7 +983,7 @@ int doit(const prb_t *p, res_t *r) {
             DNN_SAFE(mkldnn_convolution_relu_desc_init(crd, &cd, 0), WARN);
             copd = crd;
         }
-        for (plain_prim_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
+        for (prim_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
             cout<<" PIT stop #"<<pit.n();
             auto pd_n = pit.get(); // a scoped mkldnn_primitive_desc_t
             if( !pd_n ){ print(2," pd_%u==nullptr!?\n",pit.n()); break; }
@@ -978,7 +995,7 @@ int doit(const prb_t *p, res_t *r) {
                 print(0, " %s\n", impl_str);
                 DNN_SAFE(mkldnn_primitive_create(&c, pd_n, inputs, outputs), WARN);
                 SAFE(execute(c), WARN);
-                if( do_perf(c, r) != OK ) return FAIL;
+                if( do_perf(c, r, p) != OK ) return FAIL;
                 if (bench_mode & CORR) {
                     dnn_mem_t src(src_dt, fp, mkldnn_nchw);
                     SAFE(src.reorder(src_dt), WARN);
@@ -991,7 +1008,7 @@ int doit(const prb_t *p, res_t *r) {
                 break; // default is just to test "best avail" mkldnn impl
         }
         if (crd) delete crd;
-        // TODO: TEST
+        if (bench_mode & TEST){} // TODO
     } else if (p->dir & FLAG_BWD && p->dir & FLAG_WEI) {
         mkldnn_primitive_at_t inputs[3] = { {src_dt.p_, 0}, {dst_dt.p_, 0}, };
         const_mkldnn_primitive_t outputs[] = { wei_dt.p_,
@@ -1007,7 +1024,7 @@ int doit(const prb_t *p, res_t *r) {
             DNN_SAFE(mkldnn_convolution_relu_desc_init(crd, &cd, 0), WARN);
             copd = crd;
         }
-        for (plain_prim_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
+        for (prim_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
             print(0," PIT stop #%u :",pit.n());
             auto pd_n = pit.get(); // a scoped mkldnn_primitive_desc_t
             if( !pd_n ){ print(2," pd_%u==nullptr!?\n",pit.n()); break; }
@@ -1019,7 +1036,7 @@ int doit(const prb_t *p, res_t *r) {
                 print(0, " %s\n", impl_str);
                 DNN_SAFE(mkldnn_primitive_create(&c, pd_n, inputs, outputs), WARN);
                 SAFE(execute(c), WARN);
-                if( do_perf(c, r) != OK ) return FAIL;
+                if( do_perf(c, r, p) != OK ) return FAIL;
                 if (bench_mode & CORR) {
                     dnn_mem_t wei(wei_dt, fp, mkldnn_goihw);
                     SAFE(wei.reorder(wei_dt), WARN);
@@ -1037,12 +1054,13 @@ int doit(const prb_t *p, res_t *r) {
                 break; // default is just to test "best avail" mkldnn impl
         }
         if (crd) delete crd;
+        if (bench_mode & TEST){} // TODO
     } else {
         SAFE(FAIL, CRIT);
     }
     DNN_SAFE(mkldnn_primitive_desc_destroy(cpd), WARN); // segfault!
 
-    return OK;
+    return PASSED;
 }
 
 } 

@@ -90,6 +90,7 @@ void perf_report(const prb_t *p, const res_t *r, const char *pstr) {
     };
 
     const char *pt = perf_template;
+    //print(0," perf_template %s\n", pt);
     char c;
 
     while ((c = *pt++) != '\0') {

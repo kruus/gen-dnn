@@ -71,9 +71,10 @@ void check_correctness(const desc_t *c) {
 
     bool want_perf_report = false;
 
-    auto &bs = benchdnn_stat;
     const char *state = state2str(res.state);
 
+    // XXX TODO output messages based on bs directly
+    auto &bs = benchdnn_stat;
     switch (res.state) {
     case UNTESTED:
         if (!(bench_mode & CORR)) {
@@ -114,8 +115,10 @@ void check_correctness(const desc_t *c) {
         { []() { SAFE(FAIL, CRIT); return 0; }(); }
     }
 
-    if (want_perf_report && bench_mode & PERF)
-        perf_report(&p, &res, pstr);
+    if(0){ // old report method, now we iterate inside doit...
+        if (want_perf_report && bench_mode & PERF)
+            perf_report(&p, &res, pstr);
+    }//old report method
 
     bs.tests++;
 }
