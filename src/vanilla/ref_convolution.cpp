@@ -18,9 +18,12 @@
 #include "mkldnn_traits.hpp"
 #include "math_utils.hpp"
 
+#if !defined(DBG_CONV)
+#if !defined(NDEBUG)
 #define DBG_CONV 1
-#if !defined(DBG_CONV) && !defined(NDEBUG)
-#define DBG_CONV 1
+#else
+#define DBG_CONV 0
+#endif
 #endif
 
 #if DBG_CONV

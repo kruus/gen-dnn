@@ -67,60 +67,64 @@ void check_correctness(const desc_t *c) {
 
     res_t res{ .state=UNTESTED };
     const int status = conv::doit(&p, &res);
-    (void)status;
+    RT_ASSERT( status == OK || status == FAIL );
 
+    auto &bs = benchdnn_stat;
+#if 0
+    print(0," (test %d, old output SKIPPED, bs.name=%s)", bs.tests,
+            (c->name?c->name:"NULL"));
+#else
     bool want_perf_report = false;
 
+    // XXX TODO output messages based on bs directly
     const char *state = state2str(res.state);
 
-    // XXX TODO output messages based on bs directly
-    auto &bs = benchdnn_stat;
     switch (res.state) {
     case UNTESTED:
-        if (!(bench_mode & CORR)) {
-            want_perf_report = true;
-            break;
-        }
+        //if (!(bench_mode & CORR)) {
+            //want_perf_report = true;
+            //break;
+        //}
     case FAILED:
         assert(status == FAIL);
-        bs.failed++;
+        //bs.failed++;
         print(0, "%d:%s (errors:%d total:%d) __REPRO: %s\n", bs.tests, state,
                 res.errors, res.total, pstr);
         break;
     case SKIPPED:
         assert(status == OK);
         print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
-        bs.skipped++;
+        //bs.skipped++;
         break;
     case UNIMPLEMENTED:
         assert(status == OK);
         print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
-        bs.unimplemented++;
-        bs.failed += !allow_unimpl;
+        //bs.unimplemented++;
+        //bs.failed += !allow_unimpl;
         break;
     case MISTRUSTED:
         assert(status == OK);
-        bs.mistrusted++;
+        //bs.mistrusted++;
         print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
         // bs.failed++; /* temporal workaround for some tests */
         break;
     case PASSED:
         assert(status == OK);
         print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
-        want_perf_report = true;
-        bs.passed++;
+        //want_perf_report = true;
+        //bs.passed++;
         break;
     default:
-        assert(!"unknown state");
-        { []() { SAFE(FAIL, CRIT); return 0; }(); }
+        RT_ASSERT(!"unknown state");
     }
 
-    if(0){ // old report method, now we iterate inside doit...
+    if(0){ // old report method, now we iterate inside doit
+        // o/w would need second impl-iter loop.
         if (want_perf_report && bench_mode & PERF)
             perf_report(&p, &res, pstr);
     }//old report method
-
-    bs.tests++;
+#endif
+    ++bs.tests;
 }
 
 int batch(const char *fname);
@@ -166,10 +170,9 @@ int bench(int argc, char **argv, bool main_bench) {
         }
     }
 
-    /* deprecated? */
     if (main_bench && benchdnn_stat.tests == 0) {
-        /* use default list of problems */
-        int N = sizeof(default_list) / sizeof(default_list[0]);
+        const int N = sizeof(default_list) / sizeof(default_list[0]);
+        print(0,"/* using default list of %d problems */", N);
         for (int n = 0; n < N; ++n)
             check_correctness(&default_list[n]);
     }

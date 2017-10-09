@@ -53,6 +53,16 @@ enum { CRIT = 1, WARN = 2 };
     } \
 } while(0)
 
+#define RT_ASSERT( COND ) do { \
+    bool const rt_assert_cond = (COND); \
+    if( ! rt_assert_cond ) { \
+        fflush(0), fprintf(stderr, "@@@ error [%s:%d]: '%s' -> false\n", \
+                __PRETTY_FUNCTION__, __LINE__, #COND), fflush(0); \
+        exit(1); \
+    } \
+}while(0)
+
+
 #define ABS(a) ((a)>0?(a):(-(a)))
 
 #define MIN2(a,b) ((a)<(b)?(a):(b))
@@ -115,7 +125,8 @@ extern bench_mode_t bench_mode;
 } while (0)
 
 struct stat_t {
-    int tests;
+    int tests;          ///< count convolution problem specs
+    int impls;          ///< count convolution impls (==tests if not iterating over impls)
     int passed;
     int failed;
     int skipped;

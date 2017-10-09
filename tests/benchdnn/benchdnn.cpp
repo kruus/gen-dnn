@@ -86,10 +86,10 @@ int main(int argc, char **argv) {
     perf_end(perf_data);
     finalize();
 
-    printf("tests:%d passed:%d "
+    printf("tests:%d impls:%d passed:%d "
             "skipped:%d mistrusted:%d unimplemented:%d "
             "failed:%d\n",
-            benchdnn_stat.tests, benchdnn_stat.passed,
+            benchdnn_stat.tests, benchdnn_stat.impls, benchdnn_stat.passed,
             benchdnn_stat.skipped, benchdnn_stat.mistrusted,
             benchdnn_stat.unimplemented, benchdnn_stat.failed);
 
