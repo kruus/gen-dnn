@@ -280,36 +280,6 @@ inline void* malloc(size_t size, int alignment) {
     return (rc == 0) ? ptr : 0;
 }
 #else
-#if 0
-// Adapted from FFTW aligned malloc/free.  Assumes that malloc is at least
-// sizeof(void*)-aligned. Allocated memory must be freed with free0.
-inline int posix_memalign0(void **memptr, size_t alignment, size_t size)
-{
-    //#if defined(_SX)
-    //    std::cout<<" align.h: posix_memalign0( (void**)memptr="<<(void*)memptr<<", alignment="<<alignment<<", size="<<size<<")"<<std::endl;
-    //#endif
-    if(alignment % sizeof (void *) != 0 || (alignment & (alignment - 1)) != 0)
-        return EINVAL;
-    void *p0=malloc(size+alignment);
-    if(!p0) return ENOMEM;
-    void *p=(void *)(((uintptr_t) p0+alignment)&~(alignment-1));
-    *((void **) p-1)=p0;
-    *memptr=p;
-    return 0;
-}
-
-inline void free0(void *p)
-{
-    if(p) ::free(*((void **) p-1));
-}
-/** For SX, mkldnn::impl::malloc/free **MUST** be called in matching pairs */
-inline void* malloc(size_t size, int alignment) {
-    void *ptr;
-    int rc = posix_memalign0(&ptr, alignment, size);
-    return (rc == 0) ? ptr : 0;
-}
-inline void free(void* p) { free0(p); }
-#else
 /** SX -> std malloc and free, instead of aligning pointers.
  * Until I am sure that we do not use these pointers in mkldnn.hpp
  * shared pointers, we had better err on side of compatibility.
@@ -319,7 +289,6 @@ inline void free(void* p) { free0(p); }
  * \p alignment arg ignored.
  */
 inline void* malloc(size_t size, int /*alignment*/) { return ::malloc(size); }
-#endif
 #endif
 
 #ifdef _WIN32

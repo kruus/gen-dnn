@@ -26,10 +26,6 @@
 #include "nstl.hpp"
 #include "utils.hpp"
 
-#ifndef NDEBUG
-#include <iostream>
-#endif
-
 namespace mkldnn {
 namespace impl {
 
@@ -62,9 +58,9 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
 #if MKLDNN_JIT_TYPES > 0
                 , nChw8c, nChw16c
 #endif
-                , oi, io, oihw, ihwo
+                , oi, io, oihw, ihwo, hwio
 #if MKLDNN_JIT_TYPES > 0
-                , hwio, oIhw8i, oIhw16i, OIhw8i8o, OIhw16i16o
+                , oIhw8i, oIhw16i, OIhw8i8o, OIhw16i16o
                 , OIhw8i16o2i, OIhw8o16i2o, OIhw8o8i, OIhw16o16i, Oihw8o
                 , Oihw16o, Ohwi8o, Ohwi16o, OhIw16o4i
 #endif
@@ -157,9 +153,6 @@ inline data_type_t default_accum_data_type(data_type_t src_dt,
             return s32;
     }
 
-#ifndef NDEBUG
-    std::cout<<"Oh? src_dt="<<src_dt<<" wei_dt="<<wei_dt<<" dst_dt="<<dst_dt<<std::endl;
-#endif
     assert(!"unimplemented use-case: no default parameters available");
     return dst_dt;
 }

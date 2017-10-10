@@ -37,11 +37,11 @@ template <typename T, typename A> inline T relu_bwd(T dd, T s, A alpha) {
 }
 
 template <typename T> T tanh_fwd(T s) {
-    const float e = ::expf(float(2*s)); /* maybe replace with -2*s? */
+    const float e = ::expf(float(2 * s)); /* maybe replace with -2*s? */
     return static_cast<T>((e - 1) / (e + 1));
 }
 template <typename T> T tanh_bwd(T dd, T s) {
-    const float e = ::expf(float(2*s)); /* maybe replace with -2*s? */
+    const float e = ::expf(float(2 * s)); /* maybe replace with -2*s? */
     const float th = (e - 1.f) / (e + 1.f);
     return static_cast<T>(dd * (1 - th * th));
 }
@@ -103,7 +103,7 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_dense() {
     dst += data_d.blocking_desc().offset_padding;
 
 #   pragma omp parallel for schedule(static)
-    for (ssize_t e = 0; e < (ssize_t)nelems; ++e) {
+    for (ptrdiff_t e = 0; e < (ptrdiff_t)nelems; ++e) {
         switch (alg_kind) {
         case eltwise_relu: dst[e] = relu_fwd(src[e], alpha); break;
         case eltwise_tanh: dst[e] = tanh_fwd(src[e]); break;
@@ -169,7 +169,7 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_dense() {
     diff_src += diff_data_d.blocking_desc().offset_padding;
 
 #   pragma omp parallel for schedule(static)
-    for (ssize_t e = 0; e < (ssize_t)nelems; ++e) {
+    for (ptrdiff_t e = 0; e < (ptrdiff_t)nelems; ++e) {
         diff_src[e] = static_cast<data_t>(diff_dst[e]
             * ((src[e] > 0) ? 1. : alpha));
         switch (alg_kind) {

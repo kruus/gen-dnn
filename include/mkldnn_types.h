@@ -773,12 +773,11 @@ typedef struct {
  *     the lifetime of queried primitive descriptor. Returned objects must not
  *     be destroyed by user. If there is a need to keep the object longer than
  *     a lifetime of queried primitive descriptor use
- *     mkldnn_primitive_desc_clone() to make a copy.
+ *     \c mkldnn_primitive_desc_clone() to make a copy.
  *
  * @sa mkldnn_status_t mkldnn_primitive_desc_query(
  *                        const_mkldnn_primitive_desc_t primitive_desc,
  *                        mkldnn_query_t what, int index, void *result)
- *     for 
  * @sa const mkldnn_memory_desc_t mkldnn_primitive_desc_query_memory_d(
  *                        const_mkldnn_primitive_desc_t primitive_desc)
  * @sa const_mkldnn_primitive_desc_t mkldnn_primitive_desc_query_pd(

@@ -53,9 +53,8 @@ struct memory_desc_wrapper: public c_compatible {
      * descriptor \param md */
     memory_desc_wrapper(const memory_desc_t &md) : _md(&md) {}
     memory_desc_wrapper(const memory_desc_t *md) : _md(md) {}
-    memory_desc_wrapper(const memory_pd_t *m_pd); // do not want memory_pd.hpp header here
-    //memory_desc_wrapper(const memory_pd_t *m_pd)
-    //    : _md(m_pd == nullptr ? nullptr : m_pd->desc()) {}
+    /** do not depend on \c memory_pd.hpp */
+    memory_desc_wrapper(const memory_pd_t *m_pd);
 
     /* implementing attributes */
     inline int ndims() const { return _md->ndims; }
@@ -202,7 +201,7 @@ struct memory_desc_wrapper: public c_compatible {
     }
 
     /** returns physical offset by logical one. logical offset is represented by
-     * a tuple of indeces (\c xn, ..., \c x1, \c x0) */
+     * a tuple of indices (\c xn, ..., \c x1, \c x0) */
     template<typename... Args> inline size_t off(Args... args) const {
         assert(sizeof...(args) == ndims());
         dims_t pos = { args... };
@@ -210,7 +209,7 @@ struct memory_desc_wrapper: public c_compatible {
     }
 
     /** returns physical offset by logical one. logical offset is represented by
-     * a tuple of indeces (\c xn, ..., \c x1, \c x0) in already padded area */
+     * a tuple of indices (\c xn, ..., \c x1, \c x0) in already padded area */
     template<typename... Args> inline size_t off_padding(Args... args) const {
         assert(sizeof...(args) == ndims());
         dims_t pos = { args... };
@@ -218,7 +217,7 @@ struct memory_desc_wrapper: public c_compatible {
     }
 
     /** returns physical offset by logical one. Logical offset is represented by
-     * a tuple of block indeces (\c bn, ..., \c b1, \c b0). It is a
+     * a tuple of block indices (\c bn, ..., \c b1, \c b0). It is a
      * user responsibility to adjust the result to get offset within blocks */
     template<typename ...Args> inline size_t blk_off(Args... args) const {
         return _blk_off<Args...>(args...);

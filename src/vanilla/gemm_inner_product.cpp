@@ -19,7 +19,7 @@
 #include "mkldnn_thread.hpp"
 
 #include "gemm_inner_product.hpp"
-#include "os-blas.hpp"
+#include "os_blas.hpp"
 
 /* TODO: check if jit gemm should be made available for inner_product
  *       Should this decision be consistent with gemm_convolution ?

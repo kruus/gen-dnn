@@ -273,6 +273,7 @@ struct _gemm_convolution_bwd_data_t: public cpu_primitive_t {
         : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
     {
         using namespace prop_kind;
+
 #ifndef TARGET_VANILLA
         if (run_jit)
             sgemm_ = new jit_uni_gemm_f32('N', 'T', 0.0, false);
