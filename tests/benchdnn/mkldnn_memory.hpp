@@ -23,7 +23,10 @@ struct dnn_mem_t {
     dnn_mem_t &operator=(const dnn_mem_t &rhs) = delete;
     dnn_mem_t(const dnn_mem_t &rhs) = delete;
 
-    dnn_mem_t(): active_(false) {}
+    /** md_ now explicitly initialized.
+     * Sometimes we want to check whether the md_ is valid,
+     * without having access to \c this->active_. */
+    dnn_mem_t(): md_(), active_(false) {}
 
     /** create a memory block "just like" \c md (same layout, dims and
      * data-type), owning a zero-initialized \c this->data region or
