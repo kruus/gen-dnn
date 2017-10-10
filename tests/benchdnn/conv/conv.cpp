@@ -1088,14 +1088,13 @@ int doit(const prb_t *p, res_t *r) {
             ITERATE_OVER_IMPLS_END;
         }
         if (bench_mode & TEST){
-#if 1
             print(0," %s\n", "Testing bwd_w ...");
             size_t const imp0 = 0U; // TBD: use 1U, warn if no 'other' impls
             size_t const nimp = get_nref_impls();
             for(size_t imp=imp0; imp<nimp; ++imp){
                 dnn_mem_t src_tt(src_fp, fp); /* copied (should reuse) */
                 dnn_mem_t wei_tt(wei_fp.md_); /* ZEROED */
-                //print(0," %s\n", "zero bia");
+                //print(0," %s\n", "zero bia"); cout<<" bia_fp.md_="<<bia_fp.md_<<endl;
                 // [ejk] dnn_mem_t was extended to handle bia_fp.md_ undef
                 dnn_mem_t bia_tt(bia_fp.md_); /* ZEROED (or inactive) */
                 dnn_mem_t dst_tt(dst_fp, fp); /* copied (should reuse) */
@@ -1109,7 +1108,6 @@ int doit(const prb_t *p, res_t *r) {
                 TEST_IMPL_COMPARE( bwd_w(p, src_tt, wei_tt, bia_tt, dst_tt),
                             compare_fn );
             }
-#endif
         }
     } else {
         SAFE(FAIL, CRIT);
