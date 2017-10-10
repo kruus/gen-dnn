@@ -145,6 +145,7 @@ The software was validated on RedHat\* Enterprise Linux 7 with
 * Clang\* 3.8.0
 * [Intel(R) C/C++ Compiler](https://software.intel.com/en-us/intel-parallel-studio-xe)
   17.0
+
 and on Windows Server\* 2012 R2 with
 * Visual Studio\* 2015
 * [Intel(R) C/C++ Compiler](https://software.intel.com/en-us/intel-parallel-studio-xe)
@@ -218,8 +219,8 @@ for standalone Intel MKL-DNN build.
 |:---                   |:---
 |lib/libmkldnn.so       | Intel MKL-DNN dynamic library
 |lib/libiomp5.so        | Intel OpenMP* runtime library
-|lib/libmkl_gnu.so      | Intel MKL small library for GNU* OpenMP runtime
-|lib/libmkl_intel.so    | Intel MKL small library for Intel(R) OpenMP runtime
+|lib/libmklml_gnu.so    | Intel MKL small library for GNU* OpenMP runtime
+|lib/libmklml_intel.so  | Intel MKL small library for Intel(R) OpenMP runtime
 |include/mkldnn.h       | C header
 |include/mkldnn.hpp     | C++ header
 |include/mkldnn_types.h | auxillary C header

@@ -185,14 +185,6 @@ struct benchdnn_timer_t {
     double ms(mode_t mode = benchdnn_timer_t::min) const
     { return ms_[mode] / (mode == avg ? times_ : 1); }
 
-#if USE_RDPMC || USE_RDTSC
-    long long ticks(mode_t mode = min) const
-    { return ticks_[mode] / (mode == avg ? times_ : 1); }
-#else
-    long long ticks(mode_t /*unused*/ ) const
-    { return 0U; }
-#endif
-
     benchdnn_timer_t &operator=(const benchdnn_timer_t &rhs);
 
     int times_;

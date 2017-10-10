@@ -50,7 +50,7 @@ where *harness-knobs* are:
  - `--alg={DIRECT, WINO}` convolution algorithm, default DIRECT
  - `--merge={NONE, RELU}` merged primitive, default NONE (nothing merged)
  - `--mb=N` override minibatch that is specified in convolution description, default `0` (use mb specified in conv desc)
- - `--match=regex` check only convolutions that match with regex, default is `".*"`
+ - `--match=regex` check only convolutions that match with regex, default is `".*"`. Notice: Windows may only interpret string arguments surrounded by double quotation marks.
  - `--skip-impl="str1[:str2]...` skip implementation (see mkldnn_query_impl_info_str), default `""`
  - `--allow-unimpl=true|false` do not treat unimplemented configuration as an error, default `false`
  - `--perf-template=template-str` set template for performance report (see section *Performance measurements*)
@@ -111,10 +111,8 @@ table of modifiers below.
 | \%D            | expanded problem descriptor (conv parameters in csv format)
 | \%n            | problem name
 | \%z            | direction
-| \%@F           | effective cpu frequency computed as clocks[@] / time[@]
 | \%O            | number of ops required (padding is not taken into account)
 | \%@t           | time in ms
-| \%@c           | time in clocks
 | \%@p           | ops per second
 
 | modifier  | description
@@ -132,14 +130,13 @@ The definition of expanded problem descriptor is:
 `g,mb,ic,ih,iw,oc,oh,ow,kh,kw,sh,sw,ph,pw`.
 
 The default template can be found in conv/bench_conv.cpp that is defined as
-`perf,\%n,\%d,\%GO,\%GF,\%-t,\%-Gp,\%0t,\%0Gp`. That will produce the following output
+`perf,\%n,\%d,\%GO,\%-t,\%-Gp,\%0t,\%0Gp`. That will produce the following output
 in CSV format:
 ```
 string: perf
 convolution name
 full conv-desc
 number of giga ops calculated
-effective cpu frequency in GHz (amb clocks[min] / time[min])
 minimum time spent in ms
 best gigaops (since it corresponds to mimimum time)
 average time spent in ms

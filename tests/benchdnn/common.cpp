@@ -16,19 +16,16 @@
 
 #include "common.hpp"
 
-#if defined(_WIN32) || defined(_SX)
-#include <chrono> // new: SX timer now follow the WIN32 approach
-#if defined(_SX)
-//#include <second.h> // old ?
-#endif
-
-#else
+#include <chrono>
 #define HAVE_REGEX
 #if defined(HAVE_REGEX)
+#ifdef _WIN32
+#include <regex>
+#else
 #include <sys/types.h>
 #include <regex.h>
-#endif /* HAVE_REGEX */
 #endif /* _WIN32 */
+#endif /* HAVE_REGEX */
 
 #include <iostream> // tmp XXX
 using std::cout; using std::endl;
@@ -125,10 +122,17 @@ const char *bool2str(bool value) {
 }
 
 #if defined(HAVE_REGEX)
+#ifdef _WIN32
+/* NOTE: this should be supported on linux as well, but currently
+ * having issues for ICC170 and Clang*/
+bool match_regex(const char *str, const char *pattern) {
+    std::regex re(pattern);
+    return std::regex_search(str, re);
+}
+#else
 bool match_regex(const char *str, const char *pattern) {
     static regex_t regex;
     static const char *prev_pattern = NULL;
-
     if (pattern != prev_pattern) {
         if (prev_pattern)
             regfree(&regex);
@@ -143,81 +147,21 @@ bool match_regex(const char *str, const char *pattern) {
 
     return !regexec(&regex, str, 0, NULL, 0);
 }
+#endif /* _WIN32 */
 #else
 bool match_regex(const char *str, const char *pattern) { return true; }
 #endif
 
 /* perf */
 
-#include <sys/types.h>
-#include <time.h>
-
-// NEW: _SX timer treatment can follow _WIND32 approach ...
-#if defined(_WIN32) || defined(_SX)
-
-#if USE_RDPMC || USE_RDTSC
-unsigned long long ticks_now() {
-    /* Not allowed on user-mode, privileged instruction */
-    return (unsigned long long)0;
-}
-#endif
-
-#if 0 && defined(_SX)
-#include <second.h>
-//unsigned long long ticks_now() { // remove, since equiv to ms_now
-//    return static_cast<unsigned long long>( second()*1000000.0/*double, microseconds*/ );
-//}
-static inline double ms_now() {
-    return second() * 1000.0 /* ms / second */;
-}
-#else
 static inline double ms_now() {
     auto timePointTmp
         = std::chrono::high_resolution_clock::now().time_since_epoch();
     return std::chrono::duration<double, std::milli>(timePointTmp).count();
-    // Fix: conv/perf_report.cpp 'F' and 'p' outputs make it clear that
-    //      ms_now returns ms *milli* seconds (not us or microseconds)
-    // This also agrees with existing linux code.
 }
-#endif
-
-#else // linux ...
-
-#include <unistd.h>
-
-#if USE_RDPMC
-// [ejk] this segfaulted for me until I added perf_begin and perf_end
-//       that actually open a perf_event fd and mmap it.
-// Note: if perf_event "can_user_time", you could also get the conversion to nanoseconds
-//       in a single call!
-// rdbutso REMOVED the function entirely!
-unsigned long long ticks_now() {
-    unsigned eax, edx, ecx;
-
-    ecx = (1 << 30) + 1;
-    __asm__ volatile("rdpmc" : "=a" (eax), "=d" (edx) : "c" (ecx));
-
-    return (unsigned long long)eax | (unsigned long long)edx << 32;
-}
-#endif
-
-static inline double ms_now() {
-//#if ! defined(_SX)
-    struct timespec tv;
-    clock_gettime(CLOCK_MONOTONIC, &tv);
-    return (1000000000ll * tv.tv_sec + tv.tv_nsec) / 1e6;
-//#else
-//    return second() * 1000.0/* ms / second */; // SX has microsecond resolutions
-//#endif
-}
-#endif /* _WIN32 */
 
 void benchdnn_timer_t::reset() {
     times_ = 0;
-#if USE_RDPMC || USE_RDTSC
-    for (int i = 0; i < n_modes; ++i) ticks_[i] = 0;
-    ticks_start_ = 0;
-#endif
     for (int i = 0; i < n_modes; ++i) ms_[i] = 0;
     ms_start_ = 0;
 
@@ -225,9 +169,6 @@ void benchdnn_timer_t::reset() {
 }
 
 void benchdnn_timer_t::start() {
-#if USE_RDPMC || USE_RDTSC
-    ticks_start_ = ticks_now();
-#endif
     ms_start_ = ms_now();
 }
 
@@ -241,27 +182,12 @@ void benchdnn_timer_t::stop() {
     ms_[benchdnn_timer_t::avg] += d_ms;
     ms_[benchdnn_timer_t::max] = times_
         ? MAX2(ms_[benchdnn_timer_t::min], d_ms) : d_ms;
-
-#if USE_RDPMC || USE_RDTSC
-    long long d_ticks = ticks_now() - ticks_start_; /* FIXME: overflow? */
-    ticks_start_ += d_ticks;
-    ticks_[benchdnn_timer_t::min] = times_
-        ? MIN2(ticks_[benchdnn_timer_t::min], d_ticks) : d_ticks;
-    ticks_[benchdnn_timer_t::avg] += d_ticks;
-    ticks_[benchdnn_timer_t::max] = times_
-        ? MAX2(ticks_[benchdnn_timer_t::min], d_ticks) : d_ticks;
-#endif
-
-    ++times_;
+    times_++;
 }
 
 benchdnn_timer_t &benchdnn_timer_t::operator=(const benchdnn_timer_t &rhs) {
     if (this == &rhs) return *this;
     times_ = rhs.times_;
-#if USE_RDPMC || USE_RDTSC
-    for (int i = 0; i < n_modes; ++i) ticks_[i] = rhs.ticks_[i];
-    ticks_start_ = rhs.ticks_start_;
-#endif
     for (int i = 0; i < n_modes; ++i) ms_[i] = rhs.ms_[i];
     ms_start_ = rhs.ms_start_;
     return *this;

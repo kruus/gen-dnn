@@ -666,9 +666,11 @@ status_t jit_avx512_common_1x1_conv_kernel::init_conf(
             jcp.fma_step = 4;
         } else if (jcp.prop_kind == backward_weights && mayiuse(avx512_mic_4ops)
                 && !reduce_src
-                /* 4fma bwd_w for some cases of small spatial only */
-                && ((jcp.ih <= 7 && jcp.ic / jcp.oc <= 24)
-                           || (jcp.ih == 14 && jcp.ic / jcp.oc <= 4)))
+                /* Heuristic condition for relation of src size to oc. Otherwise
+                   the src transposition overhead exceed the benefit from 4fma
+                */
+                && ((jcp.is * jcp.ic) / jcp.oc <= 2048)
+                )
         {
             jcp.transpose_src = true;
             jcp.ver = ver_4fma;
@@ -880,6 +882,8 @@ status_t jit_avx512_common_1x1_conv_kernel::init_conf(
     } else if (jcp.prop_kind == backward_weights) {
 
         jcp.use_vmovntps = false;
+        if(jcp.is > SMALL_SPATIAL && jcp.ver == ver_4fma)
+            jcp.use_vmovntps = true;
 
         if (jcp.transpose_src)
             jcp.reduce_dim = jcp.tr_is;
@@ -918,6 +922,7 @@ status_t jit_avx512_common_1x1_conv_kernel::init_conf(
         jcp.load_loop_iter_step = jcp.oc_block;
 
         /* --- */
+        balance(jcp, nthreads);
 
         load_blocking = div_up(jcp.load_dim, jcp.load_block);
         load_blocking = best_divider(load_blocking, 16, load_blocking, false);
@@ -990,6 +995,80 @@ status_t jit_avx512_common_1x1_conv_kernel::init_conf(
 
     return status::success;
 }
+
+void jit_avx512_common_1x1_conv_kernel::balance(jit_1x1_conv_conf_t &jcp,
+        int nthreads)
+{
+    if (nthreads < jcp.ngroups) {
+        /* simplification... fortunately it doesn't hurt much */
+        jcp.nthr_ = jcp.nthr_mb_ = jcp.nthr_g_ =
+            jcp.nthr_oc_b_ = jcp.nthr_ic_b_ = 1;
+        return;
+    }
+    const int nb_bcast = div_up(jcp.bcast_dim, jcp.bcast_block);
+    const int nb_load = div_up(jcp.load_dim, jcp.load_block);
+    const int nb_reduce = div_up(jcp.reduce_dim, jcp.reduce_block);
+
+    jcp.nthr_g_ = jcp.ngroups;
+    const int nthr = nthreads / jcp.nthr_g_;
+
+    auto calc_mem_cost = [=](int nthr_mb, int nthr_oc_b, int nthr_ic_b) {
+        /* calculate per thread memory cost (read/write). high level
+        * optimizer tries to minimize memory consumption. few notes: (n1)
+        * unclear why, but that essentially helps first convolution...
+        *  (n2) assuming the reduction over minibatch is always there:
+        *    - instead of 8 it should be 5 here (write ~= 2 read):
+        *      kernel: temporal workspace 1 write
+        *      reduction: 1 read from workspace and 1 write to the diff_wei
+        *    - but experiments showed 8 works better than 5 or 6... */
+        int bcast_koeff = 1;
+        int load_koeff = 1;
+        int output_koeff = 12;
+        if (jcp.transpose_src) {
+            bcast_koeff = 5;
+            load_koeff = 1;
+            output_koeff = 8;
+        }
+        return 0
+            + bcast_koeff * div_up(jcp.mb * nb_reduce, nthr_mb)
+            * div_up(jcp.ngroups, jcp.nthr_g_)
+            * div_up(nb_bcast, nthr_ic_b) * jcp.ic_block * jcp.reduce_block
+            / jcp.stride_h / jcp.stride_w /* (n1) */
+            + load_koeff * div_up(jcp.mb * nb_reduce, nthr_mb)
+            * div_up(jcp.ngroups, jcp.nthr_g_)
+            * div_up(nb_load, nthr_oc_b) * jcp.oc_block * jcp.reduce_block
+            + output_koeff /* (n2) */
+            * div_up(jcp.ngroups, jcp.nthr_g_) * div_up(nb_load, nthr_oc_b)
+            * div_up(nb_bcast, nthr_ic_b) * jcp.ic_block
+            * jcp.oc_block;
+    };
+
+    int nthr_mb = 1, nthr_oc_b = 1, nthr_ic_b = 1;
+    int best_mem_cost = calc_mem_cost(nthr_mb, nthr_oc_b, nthr_ic_b);
+
+    /* step 1: find the best thread distribution with lowest memory cost */
+    const int nthr_mb_max = nstl::min(nthr, jcp.mb * nb_reduce);
+    for (nthr_mb = 1; nthr_mb <= nthr_mb_max; ++nthr_mb) {
+        const int nthr_par = nthr / nthr_mb;
+        const int nthr_oc_b_max = nstl::min(nthr_par, nb_load);
+        for (nthr_oc_b = 1; nthr_oc_b <= nthr_oc_b_max; ++nthr_oc_b) {
+            nthr_ic_b = nstl::min(nthr_par / nthr_oc_b, nb_bcast);
+            int mem_cost = calc_mem_cost(nthr_mb, nthr_oc_b, nthr_ic_b);
+            if (mem_cost <= best_mem_cost) {
+                best_mem_cost = mem_cost;
+                jcp.nthr_mb_ = nthr_mb;
+                jcp.nthr_oc_b_ = nthr_oc_b;
+                jcp.nthr_ic_b_ = nthr_ic_b;
+            }
+        }
+    }
+    if (jcp.nthr_mb_ > nthreads / 2 && jcp.nthr_mb_ < nthreads)
+        jcp.nthr_mb_ = nstl::min(jcp.mb, nthreads);
+
+    jcp.nthr_ = jcp.nthr_mb_ * jcp.nthr_g_ * jcp.nthr_oc_b_ * jcp.nthr_ic_b_;
+    assert(jcp.nthr_ <= nthreads);
+}
+
 }
 }
 }
