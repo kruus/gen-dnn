@@ -73,7 +73,7 @@
 
 #if VERBOSE_PRIMITIVE_CREATE
 #include <iostream>
-#include <typeinfo>
+//#include <typeinfo>
 #include "mkldnn_io.hpp"
 #endif
 
@@ -136,7 +136,8 @@ static mkldnn::impl::status_t verbose_primitive_desc_create(
     mkldnn::impl::status_t ret = primitive_desc_t::create<pd_t>( pd, adesc, engine, hint_fwd );
     // printing the full failuer chain can be quite lengthy ...
     if( ret == success )
-        cout<<" create<"<<typeid(prim).name()
+        cout<<" create<"<<(*pd)->name()
+            //<<typeid(prim).name()
             <<">::pd_t(pd,adesc,engine,hint_fwd) --> "<<ret<<endl;
     return ret;
 }

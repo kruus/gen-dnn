@@ -29,7 +29,7 @@ struct dnn_mem_t {
      * data-type), owning a zero-initialized \c this->data region or
      * optionally referring to unowned pre-initialized \c data. */
     dnn_mem_t(const mkldnn_memory_desc_t &md, void *data = NULL): active_(true)
-    { initialize(md, data); }
+    { if (initialize(md, data) != OK) active_ = false; }
 
     dnn_mem_t(int ndims, mkldnn_dims_t dims, mkldnn_data_type_t dt,
             mkldnn_memory_format_t fmt, void *data = NULL): active_(true) {
@@ -139,6 +139,7 @@ struct dnn_mem_t {
 
 private:
     int initialize(const mkldnn_memory_desc_t &md, void *data) {
+        if (md.format == mkldnn_format_undef) return FAIL;
         md_ = md;
         DNN_SAFE(mkldnn_memory_primitive_desc_create(&mpd_, &md_, engine),
                 CRIT);

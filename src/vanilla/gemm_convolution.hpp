@@ -34,6 +34,7 @@
 
 #if VERBOSE_PRIMITIVE_CREATE
 #include <iostream>
+//#include <typeinfo>
 #endif
 
 namespace mkldnn {
@@ -126,9 +127,11 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
             //std::cout<<" VERBOSE_PRIMITIVE_CREATE = "<<VERBOSE_PRIMITIVE_CREATE<<std::endl;
 #if VERBOSE_PRIMITIVE_CREATE
             if( !ok && last_tested != nullptr ){
-                std::cout
+                std::cout<<" "
                     //<<"_gemm_convolution_fwd_t failed precondition:\n\t"
-                    <<" "<<typeid(*this).name()<<" failed precondition:\n\t"
+                    //" "<<typeid(*this).name()
+                    <<this->name()
+                    <<" failed precondition:\n\t"
                     <<last_tested<<std::endl;
             }
 #endif
