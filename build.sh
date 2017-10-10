@@ -249,7 +249,7 @@ fi
     #    TODO: cblas / mathkeisan alternatives?
     if [ "$BUILDOK" == "y" ]; then
         BUILDOK="n"
-        rm -f ${BUILDDIR}/stamp-BUILDOK ./CMakeCache.txt
+        rm -f ./stamp-BUILDOK ./CMakeCache.txt
         echo "${CMAKEENV}; cmake ${CMAKEOPT} ${CMAKETRACE} .."
         set -x
         { if [ x"${CMAKEENV}" == x"" ]; then ${CMAKEENV}; fi; \
@@ -289,7 +289,7 @@ fi
         { cd ..; find "${BUILDDIR}" -type d -exec chmod o+w {} \; ; }
     fi
     if [ "$BUILDOK" == "y" ]; then
-        touch ${BUILDDIR}/stamp-BUILDOK
+        touch ./stamp-BUILDOK
         if [ "$DODOC" == "y" ]; then
             echo "Build OK... Doxygen (please be patient)"
             make VERBOSE=1 doc >& ../doxygen.log
@@ -299,6 +299,11 @@ fi
 ) 2>&1 | tee "${BUILDDIR}".log
 ls -l "${BUILDDIR}"
 BUILDOK="n"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="y"; fi
+
+echo "BUILDDIR   ${BUILDDIR}"
+echo "INSTALLDIR ${INSTALLDIR}"
+echo "DOTARGET=${DOTARGET}, DOJIT=${DOJIT}, DODEBUG=${DODEBUG}, DOTEST=${DOTEST}, DODOC=${DODOC}, DONEEDMKL=${DONEEDMKL}"
+LOGDIR="log-${DOTARGET}${DOJIT}${DODEBUG}${DOTEST}${DODOC}${DONEEDMKL}"
 if [ "$BUILDOK" == "y" ]; then
     echo "BUILDOK !"
     cd "${BUILDDIR}"
@@ -313,16 +318,16 @@ if [ "$BUILDOK" == "y" ]; then
         rm -f test1.log test2.log test3.log
         echo "Testing ... test1"
         if [ true ]; then
-            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test1.log || true
+            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee "${BUILDDIR}/test1.log" || true
         fi
         if [ $DOTEST -ge 2 ]; then
             echo "Testing ... test2"
             (cd "${BUILDDIR}" && ARGS='-VV -N' make test \
-            && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee test2.log || true
+            && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee "${BUILDDIR}/test2.log" || true
         fi
         if [ $DOTEST -ge 3 ]; then
             if [ -x ./bench.sh ]; then
-                /usr/bin/time -v ./bench.sh 2>&1 | tee test3.log || true
+                /usr/bin/time -v ./bench.sh 2>&1 | tee "${BUILDDIR}/test3.log" || true
             fi
         fi
         echo "Tests done"
@@ -337,14 +342,13 @@ echo "BUILDDIR   ${BUILDDIR}"
 echo "INSTALLDIR ${INSTALLDIR}"
 echo "DOTARGET=${DOTARGET}, DOJIT=${DOJIT}, DODEBUG=${DODEBUG}, DOTEST=${DOTEST}, DODOC=${DODOC}, DONEEDMKL=${DONEEDMKL}"
 if [ "${BUILDOK}" == "y" ]; then
-    LOGDIR="log-${DOTARGET}${DOJIT}${DODEBUG}${DOTEST}${DODOC}${DONEEDMKL}"
     if [ $DOTEST -gt 0 ]; then
         echo "LOGDIR:       ${LOGDIR}" 2>&1 >> "${BUILDDIR}".log
     fi
     if [ $DOTEST -gt 0 ]; then
         if [ -d "${LOGDIR}" ]; then rm -f "${LOGIDR}.bak"; mv -v "${LOGDIR}" "${LOGDIR}.bak"; fi
         mkdir ${LOGDIR}
-        for f in "${BUILDDIR}.log" test1.log test2.log test3.log doxygen.log; do
+        for f in "${BUILDDIR}/*log" doxygen.log; do
             cp -av "${f}" "${LOGDIR}/" || true
         done
     fi
