@@ -682,7 +682,7 @@ struct conv_iter_t {
      * \note For convolutions, we can <B>probably</B> get away with
      * nullptr hint, but this may not always work, esp. if iterating
      * over layers like batch-normalization, lrn, and pooling.
-     * \sa [[mkl-dnn issue \#132][https://github.com/01org/mkl-dnn/issues/132]]
+     * \sa [mkl-dnn issue \#132](https://github.com/01org/mkl-dnn/issues/132)
      */
     conv_iter_t( const_mkldnn_op_desc_t op_desc,
         mkldnn_engine_t engine,
