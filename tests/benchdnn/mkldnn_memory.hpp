@@ -115,7 +115,7 @@ struct dnn_mem_t {
     template <typename T>
     explicit operator T*() const { return static_cast<T*>(data_); }
 
-    /** Construct an optionally \active dnn_mem_t.
+    /** Construct an optionally active dnn_mem_t.
      * - if ! \c active,  use \c dnn_mem_t()
      * - else construct using \c args ; i.e. \c dnn_mem_t(args...)
      * \return rvalue that you can assign to an object.  */

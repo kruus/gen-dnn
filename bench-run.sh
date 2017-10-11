@@ -1,5 +1,8 @@
 #!/bin/bash
 # vim: et ts=4 sw=4
+#
+# This is a version of bench.sh I use for debugging [ejk]
+#
 ORIGINAL_CMD="$0 $*"
 if [ -d src/vanilla ]; then
     DOTARGET="v" # v for vanilla (C/C++ code)
@@ -70,7 +73,7 @@ while getopts ":hv:jdqbPTGVs:m:M:D:" arg; do
             RUN_UNDER=(valgrind --leak-check=full)
             skip="gemm" # my valgrind did not handle some mkl VEX instrns
             ;;
-        s) # skip-impl string TBD
+        s) # skip-impl string [""]
             skip="${OPTARG}"
             ;;
     h | *) # help

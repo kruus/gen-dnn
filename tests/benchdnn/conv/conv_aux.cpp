@@ -44,7 +44,7 @@ alg_t str2alg(const char *str) {
     CASE(DIRECT);
     CASE(WINO);
 #undef CASE
-    assert(!"unknown algorithm");
+    printf("--alg=%s unknown, assuming DIRECT\n", str);
     return DIRECT;
 }
 

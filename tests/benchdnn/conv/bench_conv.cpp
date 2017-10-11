@@ -43,7 +43,7 @@ alg_t alg = DIRECT;
 merge_t merge = NONE;
 const char *skip_impl = "";
 bool allow_unimpl = false;
-const char *perf_template = "perf,%n,%d,%GO,%-t,%-Gp,%0t,%0Gp";
+const char *perf_template = "perf,%n,%d,%GO,%-t,%-Gp,%0t,%0Gp,%i";
 
 void reset_parameters() {
     cfg = conf_f32;
@@ -63,7 +63,7 @@ void check_correctness(const desc_t *c) {
 
     if (pattern && !match_regex(pstr, pattern))
         return;
-    print(1, "run: %s\n", pstr);
+    print(1, "run: %s", pstr);
 
     res_t res{ .state=UNTESTED };
     const int status = conv::doit(&p, &res);
@@ -97,7 +97,7 @@ void check_correctness(const desc_t *c) {
         //bs.skipped++;
         break;
     case UNIMPLEMENTED:
-        assert(status == OK);
+        assert(status == FAIL);
         print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
         //bs.unimplemented++;
         //bs.failed += !allow_unimpl;

@@ -42,6 +42,7 @@ table of modifiers below.
 | %d            | problem descriptor
 | %D            | expanded problem descriptor (conv parameters in csv format)
 | %n            | problem name
+| %i            | implementation string
 | %z            | direction
 | %O            | number of ops required (padding is not taken into account)
 | %@t           | time in ms
@@ -62,7 +63,7 @@ The definition of expanded problem descriptor is:
 `g,mb,ic,ih,iw,oc,oh,ow,kh,kw,sh,sw,ph,pw`.
 #endif
 
-void perf_report(const prb_t *p, const res_t *r, const char *pstr) {
+void perf_report(const prb_t *p, const res_t *r, const char *pstr, const char *impl) {
     const auto &t = r->timer;
     const int max_len = 400;
     int rem_len = max_len - 1;
@@ -109,7 +110,7 @@ void perf_report(const prb_t *p, const res_t *r, const char *pstr) {
             c = *pt++;
         }
 
-        if (c == 'd') DPRINT("%s", pstr);
+        if (c == 'd') DPRINT("\"%s\"", pstr);
         else if (c == 'D')
             DPRINT("%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", p->g, p->mb,
                     p->ic, p->ih, p->iw, p->oc, p->oh, p->ow, p->kh, p->kw,
@@ -124,6 +125,8 @@ void perf_report(const prb_t *p, const res_t *r, const char *pstr) {
             DPRINT("%g", t.ms(mode) / unit);
         else if (c == 'p')
             DPRINT("%g", p->ops / t.ms(mode) / unit * 1e3);
+        else if (c == 'i')
+            DPRINT("\"%s\"", (impl? impl: "conv"));
         else
             []() { SAFE(FAIL, CRIT); return 0; }();
     }

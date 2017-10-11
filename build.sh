@@ -16,8 +16,8 @@ DOJUSTDOC="n"
 DOWARN="y"
 BUILDOK="y"
 SIZE_T=32 # or 64, for -s or -S SX compile
-#JOBS="-j8"
-JOBS="-j1"
+JOBS="-j8"
+#JOBS="-j1"
 CMAKETRACE=""
 USE_CBLAS=1
 usage() {
@@ -306,13 +306,12 @@ echo "DOTARGET=${DOTARGET}, DOJIT=${DOJIT}, DODEBUG=${DODEBUG}, DOTEST=${DOTEST}
 LOGDIR="log-${DOTARGET}${DOJIT}${DODEBUG}${DOTEST}${DODOC}${DONEEDMKL}"
 if [ "$BUILDOK" == "y" ]; then
     echo "BUILDOK !"
-    cd "${BUILDDIR}"
-    {
+    (
+        cd "${BUILDDIR}"
         # trouble with cmake COMPONENTs ...
         echo "Installing :"; make install;
         #if [ "$DODOC" == "y" ]; then { echo "Installing docs ..."; make install-doc; } fi
-    } 2>&1 >> "${BUILDDIR}".log
-    cd ..
+    ) 2>&1 >> "${BUILDDIR}".log || { echo "'make install' in ${BUILDDIR} had issues"; }
     echo "Testing ?"
     if [ ! $DOTEST -eq 0 -a ! "$DOTARGET" == "s" ]; then
         rm -f test1.log test2.log test3.log
@@ -327,7 +326,7 @@ if [ "$BUILDOK" == "y" ]; then
         fi
         if [ $DOTEST -ge 3 ]; then
             if [ -x ./bench.sh ]; then
-                /usr/bin/time -v ./bench.sh 2>&1 | tee "${BUILDDIR}/test3.log" || true
+                /usr/bin/time -v ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
             fi
         fi
         echo "Tests done"
@@ -346,9 +345,11 @@ if [ "${BUILDOK}" == "y" ]; then
         echo "LOGDIR:       ${LOGDIR}" 2>&1 >> "${BUILDDIR}".log
     fi
     if [ $DOTEST -gt 0 ]; then
-        if [ -d "${LOGDIR}" ]; then rm -f "${LOGIDR}.bak"; mv -v "${LOGDIR}" "${LOGDIR}.bak"; fi
+        if [ -d "${LOGDIR}" ]; then rm -rf "${LOGIDR}.bak"; mv -v "${LOGDIR}" "${LOGDIR}.bak"; fi
         mkdir ${LOGDIR}
-        for f in "${BUILDDIR}/*log" doxygen.log; do
+        pwd -P
+        ls "${BUILDDIR}/*log"
+        for f in "${BUILDDIR}/"*log doxygen.log; do
             cp -av "${f}" "${LOGDIR}/" || true
         done
     fi

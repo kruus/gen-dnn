@@ -1,8 +1,7 @@
 # benchdnn
 
 **benchdnn** is a standalone correctness and performance benchmark for
-[Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)](
-https://raw.githubusercontent.com/01org/mkl-dnn) library.
+[Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)](https://raw.githubusercontent.com/01org/mkl-dnn) library.
 The purpose of the benchmark is extended and robust correctness verification of
 the primitives provided by MKL-DNN. So far **benchdnn** supports convolutions
 and inner products of different data types. It also implicitly tests reorders.
@@ -26,7 +25,10 @@ where:
 
  - `HARNESS` is either `conv` [default] or `ip`
 
- - `MODE` -- string that contains flags for benchmark mode. Use `C` or `c` for correctness (used by default), and `P` or `p` for performance
+ - `MODE` -- string that contains flags for benchmark mode.
+   - Use `C` or `c` for correctness (used by default), and `P` or `p` for performance.
+   - For `--conv`, an 'A' in `--mode` will loop over all available mkl-dnn implementations
+   - For `--conv`, a 'T' in `--mode` will loop over alt benchdnn reference impls [if any].
 
  - `N` -- verbose level (integer from 0 [default] to ...)
 
@@ -107,13 +109,14 @@ table of modifiers below.
 
 | abbreviation  | description
 |:------------  |:-----------
-| \%d            | problem descriptor
-| \%D            | expanded problem descriptor (conv parameters in csv format)
-| \%n            | problem name
-| \%z            | direction
-| \%O            | number of ops required (padding is not taken into account)
-| \%@t           | time in ms
-| \%@p           | ops per second
+| \%d           | problem descriptor
+| \%D           | expanded problem descriptor (conv parameters in csv format)
+| \%n           | problem name
+| \%z           | direction
+| \%O           | number of ops required (padding is not taken into account)
+| \%@t          | time in ms
+| \%@p          | ops per second
+| \%i           | convolution implementation string
 
 | modifier  | description
 |:--------  |:-----------
@@ -130,7 +133,7 @@ The definition of expanded problem descriptor is:
 `g,mb,ic,ih,iw,oc,oh,ow,kh,kw,sh,sw,ph,pw`.
 
 The default template can be found in conv/bench_conv.cpp that is defined as
-`perf,\%n,\%d,\%GO,\%-t,\%-Gp,\%0t,\%0Gp`. That will produce the following output
+`perf,\%n,\%d,\%GO,\%-t,\%-Gp,\%0t,\%0Gp,\%i`. That will produce the following output
 in CSV format:
 ```
 string: perf
@@ -141,6 +144,7 @@ minimum time spent in ms
 best gigaops (since it corresponds to mimimum time)
 average time spent in ms
 average gigaops (since it corresponds to average time)
+convolution implementation name
 ```
 
 ## Examples
@@ -188,6 +192,21 @@ configurations (`u8s8u8s32` and `f32`):
         --cfg=u8s8u8s32 ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_n"alexnet:conv1" \
         --cfg=f32 ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_n"alexnet:conv1"
 ```
+
+Run the 1st Alexnet convolution comparing all convolution implementations except
+for the reference one
+```ShellSession
+    $ ./benchdnn --conv --mode=AP --dir=FWD_D --skip-impl=sref" \
+        ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_n"alexnet:conv1"
+```
+(On my desktop, the above yielded
+
+    perf,alexnet:conv1,"--dir=FWD_D ic3ih227oc96oh55kh11sh4nalexnet:conv1",0.421661,0.814615,517.62,0.890699,473.404,"_jit_avx2_convolution_fwd_t"
+    perf,alexnet:conv1,"--dir=FWD_D ic3ih227oc96oh55kh11sh4nalexnet:conv1",0.421661,2.61064,161.516,2.85301,147.795,"_jit_sse42_convolution_fwd_t"
+    0:PASSED __REPRO: --dir=FWD_D ic3ih227oc96oh55kh11sh4nalexnet:conv1
+    tests:1 impls:3 passed:2 skipped:1 mistrusted:0 unimplemented:0 failed:0
+
+Yahoo. For this convolution, avx2 was over 3x faster than the sse2.
 
 Run batch file for different algorithms (assuming the file only specifies
 convolutions and does not include harness options that would override ones

@@ -218,7 +218,7 @@ typedef struct {
  */
 conv_impls_t * get_ref_impls();
 
-void perf_report(const prb_t *p, const res_t *r, const char *pstr);
+void perf_report(const prb_t *p, const res_t *r, const char *pstr, const char *impl=nullptr);
 
 bool maybe_skip(const char *impl_str);
 int doit(const prb_t *p, res_t *res);

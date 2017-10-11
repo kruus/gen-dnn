@@ -19,7 +19,14 @@
 #include <float.h>
 #include <math.h>
 
-#include "mkldnn_io.hpp"
+#if defined(JITFUNCS)    // only for necla-ml fork...
+#include "mkldnn_io.hpp" // set MKLDNN_IO and provide mkldnn_name_XXX funcs
+//   for additional quick debug...
+#include <iomanip>
+using mkldnn::operator <<;
+using std::cout; using std::endl; using std::setw;
+#endif
+
 #include "mkldnn.h"
 
 #include "mkldnn_common.hpp"
@@ -29,20 +36,13 @@
 
 #include "conv/conv.hpp"
 
-#if 1 // from c_types_map.h
-//#include "../../../src/common/c_types_map.hpp"
-//#include "../../../src/common/primitive_desc.hpp"
-#endif
-
-#include <iomanip>
-using mkldnn::operator <<;
-using std::cout; using std::endl; using std::setw;
 
 namespace conv {
 
 static conv_impls_t conv_impls[] = {
     {compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
-    {compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w}, // don't have a different set yet
+    // just for show (don't have a different set yet)
+    {compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
 };
 
 conv_impls_t * get_ref_impls() {
@@ -493,12 +493,11 @@ int init_conv_desc(mkldnn_convolution_desc_t &cd, const prb_t *p )
                     strides, padding, padding_r, mkldnn_padding_zero), WARN);
         break;
     default: DNN_SAFE(mkldnn_invalid_arguments, CRIT);
-             cout<<"bad init_conv_desc call : unsupported p->dir"<<endl;
+             print(0,"%s\n", "bad init_conv_desc call : unsupported p->dir");
     }
     DNN_SAFE(cd.accum_data_type == p->cfg[ACC].dt
              ? mkldnn_success : mkldnn_unimplemented, CRIT);
 
-    //cout<<"init_conv_desc OK"<<endl;
     return OK;
 }
 #if 0 // memory valid checks... musings :
@@ -526,20 +525,15 @@ int init_conv_prim_any( mkldnn_primitive_desc_t &cpd, const prb_t *p,
     mkldnn_status_t init_status = mkldnn_success;
     if (p->merge == RELU) {
         mkldnn_convolution_relu_desc_t crd;
-        //cout<<" 10";cout.flush();
         DNN_SAFE(mkldnn_convolution_relu_desc_init(&crd, &cd, 0), WARN);
-        //cout<<" 11";cout.flush();
         init_status = mkldnn_primitive_desc_create(&cpd, &crd, engine, NULL);
-        //cout<<" 12";cout.flush();
     } else {
         init_status = mkldnn_primitive_desc_create(&cpd, &cd, engine, NULL);
     }
 
     if (init_status == mkldnn_unimplemented){
-        //cout<<" init_conv_prim_any UNIMPLEMENTED"<<endl;
         return r->state = UNIMPLEMENTED, OK;
     } else {
-        //cout<<" init_conv_prim_any status="<<r->state<<endl;
         SAFE(init_status, WARN);
     }
 
@@ -603,7 +597,7 @@ static int finalize_conv_desc( mkldnn_primitive_desc_t it_cpd,
         mkldnn_convolution_desc_t it_cd;
         if(p->merge == NONE){
             DNN_SAFE(mkldnn_primitive_desc_query( it_cpd,
-                                                  mkldnn_query_convolution_d, 0, &it_cd), CRIT);
+                    mkldnn_query_convolution_d, 0, &it_cd), CRIT);
             return update_conv_desc( it_cd, p, it_cpd );
         } else {
             // RELU is more complicated, conv desc is a subfield.
@@ -613,20 +607,48 @@ static int finalize_conv_desc( mkldnn_primitive_desc_t it_cpd,
 }
 #endif
 
-static void print_mem_desc(dnn_mem_t const &src_fp, dnn_mem_t const &wei_fp,
+#if MKLDNN_IO
+static char const* tostr(dnn_mem_t const &src_fp, dnn_mem_t const &wei_fp,
             dnn_mem_t const &bia_fp, dnn_mem_t const &dst_fp) {
-    if( src_fp.active_ ) cout<<"src.md_ : "<<src_fp.md_<<endl;
-    else                 cout<<"src inactive"<<endl;
-    if( wei_fp.active_ ) cout<<"wei.md_ : "<<wei_fp.md_<<endl;
-    else                 cout<<"wei inactive"<<endl;
-    if( bia_fp.active_ ) cout<<"bia.md_ : "<<bia_fp.md_<<endl;
-    else                 cout<<"bia inactive"<<endl;
-    if( dst_fp.active_ ) cout<<"dst.md_ : "<<dst_fp.md_<<endl;
-    else                 cout<<"dst inactive"<<endl;
+    const int buflen = 1024;
+    static char buf[buflen];
+    char *o = &buf[0];
+    int r = buflen;
+#define CHKBUF do \
+    { \
+        assert( n > 0 ); \
+        if( n > r ){ r=0; } \
+        else { o += n; r -= n; } \
+    }while(0)
+    int n;
+#define PRT1( XXX ) do \
+    { \
+        if( XXX##_fp.active_ ) { \
+            n = snprintf(o,r, #XXX ".md_ : "); CHKBUF; \
+            n = mkldnn_name_memory_desc(& XXX##_fp.md_, o, r); CHKBUF; \
+            n = snprintf(o,r, "\n"); CHKBUF; \
+        } else { \
+            n = snprintf(o,r, #XXX "     : inactive\n"); CHKBUF; \
+        } \
+    }while(0)
+    PRT1(src);
+    PRT1(wei);
+    PRT1(bia);
+    PRT1(dst);
+    buf[buflen-1] = '\0'; // just in case
+    return buf;
+#undef PRT1
+#undef CHKBUF
 }
+#else
+static char const* tostr(dnn_mem_t const &src_fp, dnn_mem_t const &wei_fp,
+            dnn_mem_t const &bia_fp, dnn_mem_t const &dst_fp) {
+    return "";
+}
+#endif
 
-static void cmp_fp_data(const char* msg, const dnn_mem_t &f32a,
-                        const dnn_mem_t &f32b ) {
+static const char* cmp_fp_data(const char* msg, const dnn_mem_t &f32a,
+                const dnn_mem_t &f32b ) {
     if( f32a.active_ && f32b.active_ ){
         RT_ASSERT( (f32a.dt() == mkldnn_f32 ));
         RT_ASSERT( (f32b.dt() == mkldnn_f32 ));
@@ -635,17 +657,36 @@ static void cmp_fp_data(const char* msg, const dnn_mem_t &f32a,
             if( (m=f32b.nelems()) < n ) n = m;
             return n;
         }();
+        const int buflen = 1024;
+        static char buf[buflen];
+        char *o = &buf[0];
+        int r = buflen;
+#define CHKBUF do \
+        { \
+            assert( n > 0 ); \
+            if( n > r ){ r=0; } \
+            else { o += n; r -= n; } \
+        }while(0)
+        int n;
         for(unsigned i=0U; i<nPrt; ++i){
-            cout<<" "<<msg<<"["<<setw(3)<<i<<"] = "
-                <<setw(8)<<((float*)f32a) [i]<<", "
-                <<setw(8)<<((float*)f32b) [i]<<(i%5U==4U? '\n': ' ');
+            n = snprintf(o,r," %s[%3u] = %8.2f, %8.2f%c",
+                         msg, i, ((float*)f32a)[i], ((float*)f32b)[i],
+                         (i%5U==4U? '\n': ' '));
+            CHKBUF;
         }
-        cout<<endl;
+        n = snprintf(o,r,"\n"); CHKBUF;
+        buf[buflen-1] = '\0'; // just in case
+        return &buf[0];
+    } else {
+        return "";
     }
+#undef CHKBUF
 }
+
 /** run performance loops if bench_mode \& PERF.
  * \ret 0/1 OK/FAIL */
-static int do_perf( mkldnn_primitive_t prim, res_t *r, const prb_t *p ) {
+static int do_perf( mkldnn_primitive_t prim, res_t *r, const prb_t *p,
+                const char *impl=nullptr ) {
     bool want_perf_report = (bench_mode & PERF) || (bench_mode & TEST);
     if (!want_perf_report) // iterating, can skip perf test without failure
         return OK;
@@ -666,7 +707,7 @@ static int do_perf( mkldnn_primitive_t prim, res_t *r, const prb_t *p ) {
     //cout<<": r->state="<<state2str(r->state);
     char pstr[max_prb_len];
     prb2str(p, pstr);
-    perf_report(p, r, pstr);
+    perf_report(p, r, pstr, impl);
     //cout<<": r->state="<<state2str(r->state);
     //cout<<" -do_perf OK"<<endl;
     //r->state = PASSED;
@@ -851,6 +892,57 @@ static void benchdnn_stat_update( res_state_t st, res_t *r )
     ++bs.impls;
 }
 
+/** return a short substring of the possibly long convolution function name */        
+static char const* shorten(char const* impl_str)
+{
+    int const lenmax=64;
+    static char buffer[lenmax];
+    char *buf = &buffer[0];
+    int rem_len = lenmax;
+#define DPRINT(...) do \
+    { \
+        int n = snprintf(buf, rem_len, __VA_ARGS__); \
+        if( n > rem_len ){ rem_len = 0; } \
+        else { buf+=n; rem_len-=n; } \
+    } while(0)
+    if (impl_str == nullptr){
+        DPRINT("noimpl");
+        return &buffer[0];
+    }
+    /* search for a reasonable 'end' character */
+    char const* q = strstr(impl_str, "(");     /* until __FUNCTION__ ( */
+    char const* q2 = strstr(impl_str, "::pd_t::name");       /* common */
+    if (q==nullptr || (q2 && q2 < q)) q = q2;
+    q2 = strstr(impl_str, "<");         /* ignore template-spec if any */
+    if (q==nullptr || (q2 && q2 < q)) q = q2;
+
+    if( q==nullptr ){ /* give up */
+        DPRINT("%s", impl_str);
+        return &buffer[0];
+    }
+
+    /* search for a nice 'start' character */
+    char const *p = impl_str;
+    char const * p2;
+    for( p2=q; p2>p; --p2) if(*p2==' ') break; /* ignore return type */
+    if (*p2==' ') p = p2 + 1;
+    for( p2=q; p2>p; --p2) if(*p2==':') break; /* ignore namespace */
+    if (*p2==':') p = p2 + 1;
+
+    /* copy range [p,q), and null-terminate */
+    for(int i=0; i<lenmax; ++i){
+        if( p+i < q ){
+            buffer[i] = p[i];
+        } else {
+            buffer[i] = '\0';
+            break;
+        }
+    }
+    buffer[lenmax-1] = '\0';
+    return &buffer[0];
+#undef DPRINT
+}
+
 int doit(const prb_t *p, res_t *r) {
     //auto &bs = benchdnn_stat;
     char pstr[max_prb_len];
@@ -874,7 +966,8 @@ int doit(const prb_t *p, res_t *r) {
                 SAFE(finalize_conv_desc( cd, p, cpd ), CRIT);     // finish up
                 DNN_SAFE(mkldnn_primitive_desc_destroy(cpd), WARN);
             } else {
-                RT_ASSERT( r->state == SKIPPED  && r->state == UNIMPLEMENTED );
+                RT_ASSERT( r->state == SKIPPED  || r->state == UNIMPLEMENTED );
+                return FAILED;
             }
 #endif
             return OK;
@@ -882,11 +975,12 @@ int doit(const prb_t *p, res_t *r) {
         if (cd_init() != OK){
             if( r->state == UNTESTED ) r->state = UNIMPLEMENTED;
             benchdnn_stat_update( r->state, r );
-            print(10, " Oops: primitive descriptor: %s\n", state2str(r->state));
+            print(0, " Oops: primitive descriptor %s\n", state2str(r->state));
             return FAIL;
         }
     }
-    RT_ASSERT( r->state == UNTESTED );
+    print(0, "%s", "\n");
+    RT_ASSERT( r->state == UNTESTED || r->state == UNIMPLEMENTED );
 
     auto &src_dt_d = p->dir == BWD_D ? cd.diff_src_desc : cd.src_desc;
     auto &wei_dt_d = p->dir & FLAG_WEI ? cd.diff_weights_desc : cd.weights_desc;
@@ -919,6 +1013,9 @@ int doit(const prb_t *p, res_t *r) {
 
     mkldnn_primitive_t c{};
     int const v = verbose;
+    char const* impl = nullptr;
+    size_t const imp0 = 1U; // use 1U, warn if no 'other' impls
+    size_t const nimp = get_nref_impls();
     if (p->dir & FLAG_FWD) {
         mkldnn_primitive_at_t inputs[3] = { {src_dt.p_, 0}, {wei_dt.p_, 0},
             {p->dir & FLAG_BIA ? bia_dt.p_ : NULL, 0}
@@ -926,9 +1023,10 @@ int doit(const prb_t *p, res_t *r) {
         const_mkldnn_primitive_t outputs[] = { dst_dt.p_ };
         if (bench_mode & CORR || bench_mode & TEST )
             compute_ref_fwd(p, src_fp, wei_fp, bia_fp, dst_fp);
-        auto fwd_test = [&c,&r,&p,&dst_fp,&dst_dt]()->int{
+        auto fwd_test = [&c,&r,&p,&dst_fp,&dst_dt,&impl]()
+                        ->int{
             SAFE(execute(c), WARN);
-            if( do_perf(c, r, p) != OK ) return FAIL;
+            if( do_perf(c, r, p, impl) != OK ) return FAIL;
             if (bench_mode & CORR) {
                 dnn_mem_t dst(dst_dt, fp, mkldnn_nchw);
                 SAFE(dst.reorder(dst_dt), WARN);
@@ -944,19 +1042,22 @@ int doit(const prb_t *p, res_t *r) {
         // and assume that hint compatibility is properly checked by mkldnn
         for ( conv_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
 #define ITERATE_OVER_IMPLS_BEGIN \
-            print(0,"impl#%u,", pit.n()); \
+            print((bench_mode&PERF?1:0),"impl#%u,", pit.n()); \
             auto pd_n = pit.get(); /* a scoped mkldnn_primitive_desc_t */ \
             if( !pd_n ){ print(2," pd_%u==nullptr!?\n",pit.n()); break; } \
             /* Not needed: update_conv_desc( pd_n, p ); */ \
-            res_state_t pitst = UNTESTED; \
             const char *impl_str = query_impl_info(pd_n); \
+            impl = shorten(impl_str); \
+            res_state_t pitst = UNTESTED; \
             if (maybe_skip(impl_str)) { \
                 pitst = SKIPPED; \
+                print(5, "SKIPPED %s,%s\n", dir2str(p->dir), impl); \
             }
             ITERATE_OVER_IMPLS_BEGIN;
 #define ITERATE_OVER_IMPLS_TEST( test_ok_fail ) \
             if (pitst == UNTESTED) { \
-                print(1, " %s, %s\n", impl_str, #test_ok_fail); \
+                /*print(1, " %s, %s\n", impl_str, #test_ok_fail);*/ \
+                print(5, "%s,%s\n", dir2str(p->dir), impl); \
                 scoped_prim prim_create(c, pd_n, inputs, outputs); \
                 SAFE((bool)prim_create? OK: FAIL, WARN); \
                 pitst = (test_ok_fail() != OK? FAILED: PASSED); \
@@ -964,7 +1065,8 @@ int doit(const prb_t *p, res_t *r) {
             ITERATE_OVER_IMPLS_TEST( fwd_test );
 #define ITERATE_OVER_IMPLS_END \
             benchdnn_stat_update(pitst, r); \
-            if (pitst != PASSED) print(0,"%s\n",state2str(pitst)); \
+            if (pitst != PASSED) print(1,"%s,%s,%s\n",state2str(pitst), \
+                        dir2str(p->dir), impl); \
             if (pitst == SKIPPED) \
                 continue; \
             if(! (bench_mode & ALL)) \
@@ -975,12 +1077,11 @@ int doit(const prb_t *p, res_t *r) {
             r->state = UNIMPLEMENTED;
             benchdnn_stat_update(r->state, r);
         }
-        if (bench_mode & TEST){ // any optional floating point reference loops?
-            size_t const imp0 = 0U; // TBD: use 1U, warn if no 'other' impls
-            size_t const nimp = get_nref_impls();
+        if ((bench_mode & TEST) && nimp > imp0){
+            // any optional floating point reference loops?
             for(size_t imp=imp0; imp<nimp; ++imp){
                 /* get new zeroed data "just like" the ref fp32 calc */
-                if(v>1) print(0," %s ...\n", "dnn_mem_t src_tt(src_fp)");
+                print(3," %s ...\n", "dnn_mem_t src_tt(src_fp)");
                 /* inputs (for FWD calc) acquire content from ref fp32 calc */
                 /*dnn_mem_t src_tt(src_fp); // separate, zeroed data */
                 /*src_tt.reorder(src_fp);   // + acquire data explicitly */
@@ -989,13 +1090,12 @@ int doit(const prb_t *p, res_t *r) {
                 dnn_mem_t wei_tt(wei_fp, fp); /* same layout, copied data */
                 dnn_mem_t bia_tt(bia_fp, fp); /* now OK for !active_ */
                 dnn_mem_t dst_tt(dst_fp.md_); /* separate, ZEROED data */
-                if(v){
-                    print_mem_desc(src_fp, wei_fp, bia_fp, dst_fp);
-                    if(v>1) cmp_fp_data("src", src_fp, src_tt);
-                    if(v>1) cmp_fp_data("wei", wei_fp, wei_tt);
-                    if(v>1) cmp_fp_data("bia", bia_fp, bia_tt);
-                    if(v>1) cout<<"convolution forward test imp "<<imp<<endl;
-                }
+                if (imp == imp0)
+                    print(2, "%s", tostr(src_fp, wei_fp, bia_fp, dst_fp));
+                print(3, "%s", cmp_fp_data("src", src_fp, src_tt));
+                print(3, "%s", cmp_fp_data("wei", wei_fp, wei_tt));
+                print(3, "%s", cmp_fp_data("bia", bia_fp, bia_tt));
+                print(1, "conv fwd test imp %lu ", (long unsigned)imp);
                 auto compare_fn = [&]()->int{
                     // similar to above 'fwd_test', but always floating point
                     SAFE(compare_dst(p, dst_tt, dst_fp, r, true), WARN);
@@ -1010,8 +1110,8 @@ int doit(const prb_t *p, res_t *r) {
     print(5, "compare_dst, impl[%lu] vs impl[0]", (unsigned long)imp); \
     if(v>1) cmp_fp_data("dst", dst_fp, dst_tt); \
     int status = COMPARE_FUNCTION(); /* returns OK or FAIL */ \
-    print(0, " convolution forward test imp #%lu time %f ms %s\n", \
-          (unsigned long)imp, 1e-3*(long)(1e3*tt.total_ms()+0.5), \
+    print(0, "TEST #%lu %s time %f ms %s\n", \
+          (unsigned long)imp, #RUN_IMPL, 1e-3*(long)(1e3*tt.total_ms()+0.5), \
           (status==OK? "CORRECT": "INCORRECT")); \
 }while(0)
                 TEST_IMPL_COMPARE( fwd(p, src_tt, wei_tt, bia_tt, dst_tt),
@@ -1023,9 +1123,10 @@ int doit(const prb_t *p, res_t *r) {
         const_mkldnn_primitive_t outputs[] = { src_dt.p_ };
         if (bench_mode & CORR || bench_mode & TEST )
             compute_ref_bwd_d(p, src_fp, wei_fp, dst_fp);
-        auto bwd_d_test = [&c,&r,&p,&src_dt,&src_fp]()->int{
+        auto bwd_d_test = [&c,&r,&p,&src_dt,&src_fp,&impl]()
+                        ->int{
             SAFE(execute(c), WARN);
-            if( do_perf(c, r, p) != OK ) return FAIL;
+            if( do_perf(c, r, p, impl) != OK ) return FAIL;
             if (bench_mode & CORR) {
                 dnn_mem_t src(src_dt, fp, mkldnn_nchw);
                 SAFE(src.reorder(src_dt), WARN);
@@ -1041,9 +1142,8 @@ int doit(const prb_t *p, res_t *r) {
             ITERATE_OVER_IMPLS_TEST( bwd_d_test );
             ITERATE_OVER_IMPLS_END;
         }
-        if (bench_mode & TEST){
-            size_t const imp0 = 0U; // TBD: use 1U, warn if no 'other' impls
-            size_t const nimp = get_nref_impls();
+        if ((bench_mode & TEST) && nimp > imp0){
+            //print(0," %s\n", "Testing bwd_d ...");
             for(size_t imp=imp0; imp<nimp; ++imp){
                 dnn_mem_t src_tt(src_fp.md_); /* ZEROED */
                 dnn_mem_t wei_tt(wei_fp, fp); /* copied (should reuse) */
@@ -1064,9 +1164,10 @@ int doit(const prb_t *p, res_t *r) {
         };
         if (bench_mode & CORR || bench_mode & TEST )
             compute_ref_bwd_w(p, src_fp, wei_fp, bia_fp, dst_fp);
-        auto bwd_w_test = [&c,&r,&p,&wei_dt,&wei_fp, &bia_dt, &bia_fp]()->int{
+        auto bwd_w_test = [&c,&r,&p,&wei_dt,&wei_fp,&bia_dt,&bia_fp,&impl]()
+                        ->int{
             SAFE(execute(c), WARN);
-            if( do_perf(c, r, p) != OK ) return FAIL;
+            if( do_perf(c, r, p, impl) != OK ) return FAIL;
             if (bench_mode & CORR) {
                 dnn_mem_t wei(wei_dt, fp, mkldnn_goihw);
                 SAFE(wei.reorder(wei_dt), WARN);
@@ -1087,10 +1188,8 @@ int doit(const prb_t *p, res_t *r) {
             ITERATE_OVER_IMPLS_TEST( bwd_w_test );
             ITERATE_OVER_IMPLS_END;
         }
-        if (bench_mode & TEST){
-            print(0," %s\n", "Testing bwd_w ...");
-            size_t const imp0 = 0U; // TBD: use 1U, warn if no 'other' impls
-            size_t const nimp = get_nref_impls();
+        if ((bench_mode & TEST) && nimp > imp0){
+            //print(0," %s\n", "Testing bwd_w ...");
             for(size_t imp=imp0; imp<nimp; ++imp){
                 dnn_mem_t src_tt(src_fp, fp); /* copied (should reuse) */
                 dnn_mem_t wei_tt(wei_fp.md_); /* ZEROED */
@@ -1111,6 +1210,9 @@ int doit(const prb_t *p, res_t *r) {
         }
     } else {
         SAFE(FAIL, CRIT);
+    }
+    if ((bench_mode & TEST) && !(nimp > imp0)){
+        print(0, "%s\n", "TEST mode: no alternate test convolutions");
     }
 
     return OK;
