@@ -194,10 +194,13 @@ configurations (`u8s8u8s32` and `f32`):
 ```
 
 Run the 1st Alexnet convolution **comparing** all convolution
-**implementations** except for the reference one
+**implementations** except for the reference one. `--mode`
+setting is for <b>A</b>ll <b>P</b>erformance. The spec was shortened
+because when height and width of things are equal, you only need to specify
+one of them.
 ```ShellSession
-    $ ./benchdnn --conv --mode=AP --dir=FWD_D --skip-impl=sref" \
-        ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_n"alexnet:conv1"
+    $ ./benchdnn --conv --mode=AP \
+        --dir=FWD_D --skip-impl=ref ic3ih227_oc96oh55_kh11_sh4ph0_n"alexnet:conv1"
 ```
 (On my desktop, the above yielded
 ```Text linenos:false
@@ -215,7 +218,7 @@ Run batch file for different algorithms (assuming the file only specifies
 convolutions and does not include harness options that would override ones
 passed in the command line). Also ignore mkldnn_unimplemented errors in case of
 Winograd:
-```
+```ShellSession
     $ ./benchdnn --conv \
         --alg=DIRECT --batch=convs.in \
         --allow-unimpl=true \
