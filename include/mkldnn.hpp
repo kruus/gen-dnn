@@ -25,9 +25,6 @@
 #include <algorithm>
 #include <iterator>
 #include "mkldnn.h"
-//#ifndef NDEBUG
-//#include "mkldnn_io.hpp" // tracing an initialization error [turned out it was sxcc compiler bug]
-//#endif
 #endif
 
 namespace mkldnn {
@@ -38,7 +35,10 @@ namespace mkldnn {
 /// @addtogroup cpp_api_utils Utils
 /// @{
 
-/// signed size_t type (promotion of some 'int' calcs)    
+/// signed size_t type (promotion of some 'int' calcs).
+/// - Is this OK for all compilers? for all #pragma omp for-loops?
+/// - wip: mkldnn.h has 64-bit dimensioning info, but loops often use int!
+/// - Are large (>2G/4G) memory regions to be supported eventually? 
 typedef intptr_t ssize_t;
 static_assert(sizeof(intptr_t) == sizeof(size_t)," ssize_t must be set by hand for this system");
 
@@ -115,19 +115,8 @@ public:
         /// @param aprimitive The target primitive.
         /// @param at The output index.
 
-#if 0 // for SX debug of primitives gettinc constructed with nonzero "output_index"
-        // Note: this is not necessarily even used.  The error may be comming
-        //       from POD initialization that varies between compilers!
-        // Verified: this seems to be and sxcc compiler bug
-        at(const primitive &aprimitive, size_t at = 0)
-            : data(c_api::mkldnn_primitive_at(aprimitive.get(), at)) {
-                using namespace std;
-                if(at != 0U){ cout<<" primitive.at("<<aprimitive<<"\n\t, at="<<at<<")"<<endl; }
-            }
-#else
         at(const primitive &aprimitive, size_t at = 0)
             : data(mkldnn_primitive_at(aprimitive.get(), at)) {}
-#endif
         /// Returns the specified output.
         inline operator primitive() const;
     };
@@ -475,15 +464,8 @@ struct memory: public primitive  {
                 mkldnn_primitive_create(&result, adesc.get(), nullptr, nullptr),
                 "could not create a memory primitive");
         reset(result);
-#if defined(_SX) // changed my mind. let's just ignore all alignment for SX
-        // XXX check other posix_memalign and do this too!
-        //     (Alt: posix_memalign0 and free0 as in simd/sx/ code)
-        // SX: During _free,
-        // /SX/usr/include/c++/memory warns about void* --> char* conversion
-        // why? "argument of type "void *"
-        //          is incompatible with parameter of type "char *"
-        //_handle.reset(static_cast<char*>(_malloc(adesc.get_size(), 64)), _free);
-        //  ... modified _malloc lambda instead !!!
+#if defined(_SX)
+        //  let's just ignore all alignment for SX (advanced memory bus)
         auto _malloc = [](size_t size, int /*alignment*/) -> char* {
             void *ptr = ::malloc(size);
             return static_cast<char*>(ptr);

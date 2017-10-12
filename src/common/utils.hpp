@@ -24,49 +24,6 @@
 #include <malloc.h>
 #endif
 
-#ifndef HAVE_POSIX_MEMALIGN
-# if defined(_SX)
-//  SX ** does not ** have memalign
-# else
-#  ifdef __GLIBC_PREREQ
-#  if __GLIBC_PREREQ(2,3)
-#  define HAVE_POSIX_MEMALIGN
-#  endif
-#  else
-#  ifdef _POSIX_SOURCE
-#  define HAVE_POSIX_MEMALIGN
-#  endif
-#  endif
-# endif
-#endif
-
-#if 0 && defined(_SX) // posix_memalign compat...
-#include <malloc.h>
-#include <errno.h>
-/* OHOH -- _SX does not even give us memalign
-inline int posix_memalign(void **ptr, size_t align, size_t size) {
-    bool ok=false;
-    for(size_t i=sizeof(void*); i!=0; i*=2){
-        if(align==i){
-            ok=true;
-            break;
-        }
-    }
-    if(ok){
-        int saved_errno=errno;
-        void *p = memalign(align,size);
-        if(p == nullptr){
-            errno = saved_errno;
-            return ENOMEM;
-        }
-        *ptr = p;
-        return 0;
-    }
-    return EINVAL;
-}
-*/
-#endif
-
 namespace mkldnn {
 namespace impl {
 
@@ -221,10 +178,11 @@ inline T nd_iterator_init(T start) { return start; }
 template<typename T, typename U, typename W, typename... Args>
 inline T nd_iterator_init(T start, U &x, const W &X, Args &&... tuple) {
     start = nd_iterator_init(start, utils::forward<Args>(tuple)...);
-    x = static_cast<U>(start % static_cast<T>(X));  // ? do in "larger-of" type ?
+    x = static_cast<U>(start % static_cast<T>(X));
     return start / static_cast<T>(X);
+    // .. or maybe do in "larger-of" type ?
     //typedef decltype(start + x) TU_t;
-    //x = static_cast<U>( TU_t(start) % TU_t(X));
+    //x = static_cast<U>( (TU_t)(start) % (TU_t)(X));
     //return static_cast<T>(start / X);
 }
 
