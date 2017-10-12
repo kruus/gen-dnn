@@ -211,8 +211,13 @@ one of them.
     0:PASSED __REPRO: --dir=FWD_D ic3ih227oc96oh55kh11sh4nalexnet:conv1
     tests:1 impls:3 passed:2 skipped:1 mistrusted:0 unimplemented:0 failed:0
 ```
-Yahoo. For this convolution, `avx2` was over 3x faster than the `sse2` (473 vs 148
-Mops).  Prefacing the command with `OMP_NUM_THREADS=1`, I got 81 vs 27 Mops.
+- Yahoo. For this convolution, `avx2` was over 3x faster than the `sse2` (473 vs 148
+  Mops).  Prefacing the command with `OMP_NUM_THREADS=1`, I got 81 vs 27 Mops.
+- If you were to runn with `--mode=CAP`, the final output line should read
+  `correct:2` instead of `passed:2`.
+- If you were to runn with `--mode=CAPT`, and you have defined reference loops other
+  than the normal ones in `benchdnn/conv/ref_conv.cpp`, then you *may* see lines like:
+  `TEST #1 ... time 471.092000 ms CORRECT`
 
 Run batch file for different algorithms (assuming the file only specifies
 convolutions and does not include harness options that would override ones

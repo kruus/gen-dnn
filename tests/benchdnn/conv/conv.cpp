@@ -42,7 +42,7 @@ namespace conv {
 static conv_impls_t conv_impls[] = {
     {compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
     // just for show (don't have a different set yet)
-    {compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
+    //{compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
 };
 
 conv_impls_t * get_ref_impls() {
@@ -1042,22 +1042,18 @@ int doit(const prb_t *p, res_t *r) {
         // and assume that hint compatibility is properly checked by mkldnn
         for ( conv_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
 #define ITERATE_OVER_IMPLS_BEGIN \
-            print((bench_mode&PERF?1:0),"impl#%u,", pit.n()); \
+            print((bench_mode&PERF?10:0),"impl#%u,", pit.n()); \
             auto pd_n = pit.get(); /* a scoped mkldnn_primitive_desc_t */ \
             if( !pd_n ){ print(2," pd_%u==nullptr!?\n",pit.n()); break; } \
             /* Not needed: update_conv_desc( pd_n, p ); */ \
             const char *impl_str = query_impl_info(pd_n); \
             impl = shorten(impl_str); \
-            res_state_t pitst = UNTESTED; \
-            if (maybe_skip(impl_str)) { \
-                pitst = SKIPPED; \
-                print(5, "SKIPPED %s,%s\n", dir2str(p->dir), impl); \
-            }
+            res_state_t pitst = UNTESTED;
             ITERATE_OVER_IMPLS_BEGIN;
 #define ITERATE_OVER_IMPLS_TEST( test_ok_fail ) \
-            if (pitst == UNTESTED) { \
-                /*print(1, " %s, %s\n", impl_str, #test_ok_fail);*/ \
-                print(5, "%s,%s\n", dir2str(p->dir), impl); \
+            if (maybe_skip(impl_str)) pitst = SKIPPED; \
+            else { \
+                print(20, " %s,%s\n", impl, dir2str(p->dir)); \
                 scoped_prim prim_create(c, pd_n, inputs, outputs); \
                 SAFE((bool)prim_create? OK: FAIL, WARN); \
                 pitst = (test_ok_fail() != OK? FAILED: PASSED); \
@@ -1065,12 +1061,11 @@ int doit(const prb_t *p, res_t *r) {
             ITERATE_OVER_IMPLS_TEST( fwd_test );
 #define ITERATE_OVER_IMPLS_END \
             benchdnn_stat_update(pitst, r); \
-            if (pitst != PASSED) print(1,"%s,%s,%s\n",state2str(pitst), \
-                        dir2str(p->dir), impl); \
-            if (pitst == SKIPPED) \
-                continue; \
-            if(! (bench_mode & ALL)) \
-                break; /* default is just to test "best avail" mkldnn impl */
+            print((pitst==PASSED? 10: pitst==SKIPPED? 1: 0), \
+                        "%s#%u,%s,%s\n", state2str(pitst), pit.n(), \
+                        impl, dir2str(p->dir)); \
+            if (pitst == SKIPPED) continue; \
+            if(! (bench_mode & ALL)) break;
             ITERATE_OVER_IMPLS_END;
         }
         if (r->state == UNTESTED){ // paranoia
@@ -1081,7 +1076,8 @@ int doit(const prb_t *p, res_t *r) {
             // any optional floating point reference loops?
             for(size_t imp=imp0; imp<nimp; ++imp){
                 /* get new zeroed data "just like" the ref fp32 calc */
-                print(3," %s ...\n", "dnn_mem_t src_tt(src_fp)");
+                print(2," imp=%lu/%lu : %s ...\n", (unsigned long)imp,
+                            (unsigned long)nimp, "test loop mem descriptors");
                 /* inputs (for FWD calc) acquire content from ref fp32 calc */
                 /*dnn_mem_t src_tt(src_fp); // separate, zeroed data */
                 /*src_tt.reorder(src_fp);   // + acquire data explicitly */
@@ -1212,7 +1208,7 @@ int doit(const prb_t *p, res_t *r) {
         SAFE(FAIL, CRIT);
     }
     if ((bench_mode & TEST) && !(nimp > imp0)){
-        print(0, "%s\n", "TEST mode: no alternate test convolutions");
+        print(1, "%s\n", "TEST mode: no alternate test convolutions");
     }
 
     return OK;
