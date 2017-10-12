@@ -18,8 +18,14 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>     /* strstr */
 
 #include "mkldnn.h"
+
+/** Set nonzero if you want to run valgrind.
+ * Some things valgrind will not handle -- attempt to skip them
+ * so you can still run under valgrind --lead-check=full ... */
+static int const want_valgrind = 1;
 
 #define CHECK(f) do { \
     mkldnn_status_t s = f; \
@@ -374,7 +380,7 @@ void test3() {
     mkldnn_primitive_t net[] = {l2, r};
     mkldnn_stream_t stream;
     CHECK(mkldnn_stream_create(&stream, mkldnn_eager));
-    CHECK(mkldnn_stream_submit(stream, 2, net, NULL));
+    CHECK(mkldnn_stream_submit(stream, 2, net, NULL)); /* -->leak? */
     CHECK(mkldnn_stream_wait(stream, 1, NULL));
 
     TRACE("3:clean");
@@ -420,12 +426,16 @@ void test4() {
     const int mb = 2;
     //const int groups = 2;
     const int groups = 1;
-    int c3_src_sizes[4] = {mb, 256, 13, 13};
-    int c3_weights_sizes[] = {groups, 384/groups, 256/groups, 3, 3};
-    int c3_bias_sizes[1] = {384};
+    const int csize = 13;
+    const int splanes = (want_valgrind? 16: 256);
+    const int dplanes = (want_valgrind? 64: 384);
+
+    int c3_src_sizes[4] = {mb, splanes, csize, csize};
+    int c3_weights_sizes[] = {groups, dplanes/groups, splanes/groups, 3, 3};
+    int c3_bias_sizes[1] = {dplanes};
     int strides[] = {1, 1};
     int32_t  padding[] = {0, 0}; // set proper values
-    int c3_dst_sizes[4] = {mb, 384,
+    int c3_dst_sizes[4] = {mb, dplanes,
         (c3_src_sizes[2] + 2*padding[0] - c3_weights_sizes[3])/strides[0] + 1,
         (c3_src_sizes[3] + 2*padding[1] - c3_weights_sizes[4])/strides[1] + 1
     };
@@ -449,7 +459,7 @@ void test4() {
     mkldnn_primitive_desc_t c3_src_pd, c3_weights_pd, c3_bias_pd, c3_dst_pd, out_pd;
     mkldnn_primitive_t c3_src, c3_weights, c3_bias, c3_dst, out;
 
-#if 0 && MKLDNN_JIT_TYPES > 0
+#if MKLDNN_JIT_TYPES > 0
     mkldnn_memory_format_t lay_src     = mkldnn_nChw8c;
     mkldnn_memory_format_t lay_weights = (groups == 1 ? mkldnn_OIhw8i8o : mkldnn_gOIhw8i8o);
     mkldnn_memory_format_t lay_bias    = mkldnn_x;
@@ -555,7 +565,7 @@ void test4() {
             mkldnn_primitive_desc_t c3_pd;
 
 #if CONV_ITER
-            c3_pd = mkldnn_primitive_desc_iterator_fetch( c3_iter );
+            c3_pd = mkldnn_primitive_desc_iterator_fetch( c3_iter ); /* --> STILL leaks? */
             CHECK_TRUE( c3_pd != NULL );
 #else
             CHECK(mkldnn_primitive_desc_create(&c3_pd, &c3_desc, engine, NULL));
@@ -566,6 +576,14 @@ void test4() {
                             mkldnn_query_impl_info_str, 0,
                             (void*)&impl_info_str ));
                 printf("\n\n4:conv impl : %s\n", impl_info_str);
+                fflush(stdout);
+                /* Note: valgrind will likely choke if you run gemm or jit */
+                if( want_valgrind ){
+                    if (strstr(impl_info_str,"ref_convolution")==NULL)
+                        continue;
+                    else
+                        TRACE("4:want_valgrind=be patient");
+                }
             }
 
             /* create convolution primitive */
@@ -584,7 +602,8 @@ void test4() {
             CHECK_TRUE(mkldnn_memory_primitive_desc_equal(
                         mkldnn_primitive_desc_query_pd(
                             c3_pd, mkldnn_query_dst_pd, 0), c3_dst_pd));
-            //CHECK(mkldnn_primitive_desc_destroy(c3_pd));
+
+            CHECK(mkldnn_primitive_desc_destroy(c3_pd));
         }
 
         /* let us build a net and run it */
@@ -616,6 +635,7 @@ void test4() {
     }
 #if CONV_ITER
     CHECK_TRUE( c3st == mkldnn_iterator_ends );
+    CHECK(mkldnn_primitive_desc_iterator_destroy(c3_iter));
 #endif
 
     /* clean-up */
@@ -644,7 +664,7 @@ void test4() {
 
 int main() {
     test1();
-    test2();
+    if (!want_valgrind) test2();
     test3();
     test4();
     return 0;

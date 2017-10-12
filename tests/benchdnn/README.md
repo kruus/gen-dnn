@@ -27,8 +27,8 @@ where:
 
  - `MODE` -- string that contains flags for benchmark mode.
    - Use `C` or `c` for correctness (used by default), and `P` or `p` for performance.
-   - For `--conv`, an 'A' in `--mode` will loop over all available mkl-dnn implementations
-   - For `--conv`, a 'T' in `--mode` will loop over alt benchdnn reference impls [if any].
+   - For `--conv`, an `A` in `--mode` will loop over all available mkl-dnn implementations
+   - For `--conv`, a `T` in `--mode` will loop over alt benchdnn reference impls [if any].
 
  - `N` -- verbose level (integer from 0 [default] to ...)
 
