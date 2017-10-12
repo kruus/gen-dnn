@@ -71,12 +71,6 @@
 #include "cpu/jit_uni_inner_product.hpp"
 #endif
 
-#if VERBOSE_PRIMITIVE_CREATE
-#include <iostream>
-//#include <typeinfo>
-#include "mkldnn_io.hpp"
-#endif
-
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -134,11 +128,9 @@ static mkldnn::impl::status_t verbose_primitive_desc_create(
     using namespace std;
     typedef typename prim::pd_t pd_t;
     mkldnn::impl::status_t ret = primitive_desc_t::create<pd_t>( pd, adesc, engine, hint_fwd );
-    // printing the full failuer chain can be quite lengthy ...
     if( ret == success )
-        cout<<" create<"<<(*pd)->name()
-            //<<typeid(prim).name()
-            <<">::pd_t(pd,adesc,engine,hint_fwd) --> "<<ret<<endl;
+        printf(" create<%s>::pd_t(pd,adesc,engine,hint_fwd) --> %d\n",
+                    (*pd)->name(), ret );
     return ret;
 }
 #define INSTANCE(...) &verbose_primitive_desc_create<__VA_ARGS__>

@@ -22,14 +22,14 @@
 #if !defined(NDEBUG)
 #define DBG_CONV 1
 #else
-#define DBG_CONV 0
+#define DBG_CONV 1
 #endif
 #endif
 
 #if DBG_CONV
 #include "mkldnn_io.h"
+#include "string.h"
 #include <unordered_set> // to track new ref_convolutions (potential to optimize?)
-#include <iostream>
 #endif
 
 namespace mkldnn {
@@ -51,8 +51,64 @@ inline int mem_fmt_tag(mkldnn_memory_format_t s, mkldnn_memory_format_t wb, mkld
     mkldnn_memory_format_t const m=mkldnn_memory_format_max;
     return ((s)*m + wb)*m + d;
 }
-// maintain a registry, and avoid outputting duplicates ?
+// maintain a registry, and avoid outputting duplicates
 static std::unordered_set<int> seen;
+
+/** return a short substring of the possibly long convolution function name */        
+static char const* short_impl(char const* impl_str)
+{
+    int const lenmax=64;
+    static char buffer[lenmax];
+    char *buf = &buffer[0];
+    int rem_len = lenmax;
+#define DPRINT(...) do \
+    { \
+        int n = snprintf(buf, rem_len, __VA_ARGS__); \
+        if( n > rem_len ){ rem_len = 0; } \
+        else { buf+=n; rem_len-=n; } \
+    } while(0)
+    if (impl_str == nullptr){
+        DPRINT("noimpl");
+        return &buffer[0];
+    }
+    /* search for a reasonable 'end' character */
+    char const* q = strstr(impl_str, "(");     /* until __FUNCTION__ ( */
+    char const* q2 = strstr(impl_str, "::pd_t::name");       /* common */
+    if (q==nullptr || (q2 && q2 < q)) q = q2;
+    q2 = strstr(impl_str, "<");         /* ignore template-spec if any */
+    if (q==nullptr || (q2 && q2 < q)) q = q2;
+
+    if( q==nullptr ){ /* give up */
+        DPRINT("%s", impl_str);
+        return &buffer[0];
+    }
+
+    /* search for a nice 'start' character */
+    char const *p = impl_str;
+    char const * p2;
+    for( p2=q; p2>p; --p2) if(*p2==' ') break; /* ignore return type */
+    if (*p2==' ') p = p2 + 1;
+    for( p2=q; p2>p; --p2) if(*p2==':') break; /* ignore namespace */
+    if (*p2==':') p = p2 + 1;
+
+    /* copy range [p,q), and null-terminate */
+    for(int i=0; i<lenmax; ++i){
+        if( p+i < q ){
+            buffer[i] = p[i];
+        } else {
+            buffer[i] = '\0';
+            break;
+        }
+    }
+    buffer[lenmax-1] = '\0';
+    return &buffer[0];
+#undef DPRINT
+}
+/** substring after the last ':' */
+static char const* after_last_colon(const char* msg) {
+    const char * last_colon = strrchr(msg, ':');
+    return last_colon? last_colon+1: msg;
+}
 
 #endif
 
@@ -63,36 +119,31 @@ _ref_convolution_fwd_t<with_relu, src_type, wei_type, acc_type, dst_type>
                           const output_vector &outputs)
 : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {
 #if DBG_CONV
-    using namespace std;
-    // debug data_type info for deciding which cases to optimize...
-    // Eventually, common cases can be "switched" into memory-format-optimized
-    // implementations for the inner-loop off() offset calculations.
-    //
-    //const memory_desc_wrapper src_d(conf_.src_pd());
-    //const memory_desc_wrapper dst_d(conf_.dst_pd());
-    //const memory_desc_wrapper weights_d(conf_.weights_pd(0));
-    //const memory_desc_wrapper bias_d(conf_.weights_pd(1));
-    //
     mkldnn_memory_format_t const sfmt = conf_.src_pd()->desc()->format;
     mkldnn_memory_format_t const wbfmt = conf_.weights_pd()->desc()->format;
     mkldnn_memory_format_t const dfmt = conf_.dst_pd()->desc()->format;
     int tag = mem_fmt_tag(sfmt,wbfmt,dfmt);
     auto ins = seen.insert( tag );
-    if(ins.second){
-        cout<<"\n ***** NEW CONVOLUTION TYPES *****\n";
-    }
-    if(1 || ins.second){
 #define LEN 500
-        char sbuf[LEN], wbuf[LEN], dbuf[LEN]; // biases *same* layout as weights
-        mkldnn_name_memory_desc( conf_.src_pd()->desc(), sbuf, LEN );
-        mkldnn_name_memory_desc( conf_.weights_pd()->desc(), wbuf, LEN );
-        mkldnn_name_memory_desc( conf_.dst_pd()->desc(), dbuf, LEN );
-#undef LEN
-        cout<<" _ref_conv( src        :fmt="<<sfmt<<" : "<<sbuf
-            <<"\n          , weight/bias:fmt="<<wbfmt<<" : "<<wbuf
-            <<"\n          , dst        :fmt="<<dfmt<<" : "<<dbuf<<" )"<<endl;
+    if(ins.second){ // a one-line message
+        printf("\n *** NEW FMTS for %s *** src %s,  wei|bia %s,  dst %s\n",
+                    short_impl(conf_.name()),
+                    after_last_colon(mkldnn_name_memory_format( sfmt )),
+                    after_last_colon(mkldnn_name_memory_format( wbfmt )),
+                    after_last_colon(mkldnn_name_memory_format( dfmt )));
     }
-#endif
+    if(ins.second){ // extra detail
+        char sbuf[LEN], wbuf[LEN], dbuf[LEN]; // bias layout same as weights
+        mkldnn_name_memory_desc( conf_.src_pd()->desc(),     sbuf, LEN );
+        mkldnn_name_memory_desc( conf_.weights_pd()->desc(), wbuf, LEN );
+        mkldnn_name_memory_desc( conf_.dst_pd()->desc(),     dbuf, LEN );
+        printf(" _ref_conv( src        :fmt=%s\n"
+               "          , weight/bias:fmt=%s\n"
+               "          , dst        :fmt=%s\n",
+               &sbuf[0], &wbuf[0], &dbuf[0]);
+    }
+#undef LEN
+#endif /* DBG_CONV */
 }
 
 template <bool with_relu, data_type_t src_type, data_type_t wei_type,

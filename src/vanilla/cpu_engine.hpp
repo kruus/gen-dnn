@@ -26,6 +26,12 @@
 
 #ifndef VERBOSE_PRIMITIVE_CREATE
 #if defined(NDEBUG)
+/** Debug --- see every impl that was skipped as we iterate to find
+ * an acceptable impl. This can be quite verbose.
+ *
+ * In particularly, with mods to various init() functions, you can use
+ * this flag to also print out precisely why an impl was skipped.
+ */
 #define VERBOSE_PRIMITIVE_CREATE 0
 #else
 #define VERBOSE_PRIMITIVE_CREATE 0
@@ -33,10 +39,22 @@
 #endif
 
 #ifdef TARGET_VANILLA
+/** In principle could have multiple TARGETS.
+ * For example: VANILLA, and later perhaps SSE42, AVX2, AVX512.
+ * Default is "compile everything".
+ * These TARGETS can be set in cmake to generate reduced-functionality libmkldnn.
+ * Which jit impls get included in the engine is capped by a single value.
+ *
+ *
+ * For example, TARGET_VANILLA includes NO Intel JIT code at all, and is suitable
+ * for [cross-]compiling for other platforms.
+ *
+ * \note TARGET_VANILLA impls are not *yet* optimized for speed! */
 #define JITFUNCS 0
 #endif
 
 #ifndef JITFUNCS
+/* default mkl-dnn compile works as usual, 100 means include all impls */
 #define JITFUNCS 0
 #endif
 
