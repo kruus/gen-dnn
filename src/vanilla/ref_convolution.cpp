@@ -54,8 +54,11 @@ inline int mem_fmt_tag(mkldnn_memory_format_t s, mkldnn_memory_format_t wb, mkld
 // maintain a registry, and avoid outputting duplicates
 static std::unordered_set<int> seen;
 
-/** return a short substring of the possibly long convolution function name */        
-static char const* short_impl(char const* impl_str)
+/** return a short substring of the possibly long convolution function name.
+ * Layer conf_`->name()` can return a very long function name, like
+ * `<retval> <namespaces>::LAYER_t<template args>::pd_t::name() [with ...]`.
+ * So try to pick out just the **LAYER_t** portion. */
+static inline char const* short_impl(char const* impl_str)
 {
     int const lenmax=64;
     static char buffer[lenmax];
@@ -105,7 +108,7 @@ static char const* short_impl(char const* impl_str)
 #undef DPRINT
 }
 /** substring after the last ':' */
-static char const* after_last_colon(const char* msg) {
+static inline char const* after_last_colon(const char* msg) {
     const char * last_colon = strrchr(msg, ':');
     return last_colon? last_colon+1: msg;
 }

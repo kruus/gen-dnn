@@ -33,7 +33,8 @@
 
 #if CPU_MEMORY_HPP_DBG && defined(_SX)
 inline void cpu_memory_brk(size_t output_index){
-    std::cout<<" cpu_memory_t::const_memory("<<output_index<<")!!!"<<std::endl;
+    printf(" cpu_memory_t::const_memory(%lu)!!!\n",
+           (unsigned long)output_index);
 }
 #endif
 
@@ -82,29 +83,30 @@ struct cpu_memory_t: public cpu_primitive_t {
     virtual const char* const_memory(size_t output_index = 0) const
     //{ assert(output_index == 0); return data_; }
     {
-#if ! CPU_MEMORY_HPP_DBG
+#if CPU_MEMORY_HPP_DBG
+        // sxc++ triggered assert(output_index == 0). This was a compiler bug.
+        // Garbage values fixed by always using full init:
+        //       e.g.     mem_at_t x={a}   -->    mem_at_t x={a,0}
+        if(0 || output_index!=0) { // basic error msg
+            printf(" ERROR: const_memory(output_index %lu != 0)\n\t%s",
+                   (unsigned long)output_index, __PRETTY_FUNCTION__);
+#if defined(_SX)
+            ::cpu_memory_brk(output_index); // a debugger breakpoint
+#endif
+        }
+        if(0 || output_index!=0) { // details
+            printf("cpu_memory_t::const_memory(%lu) :\n"
+                   "                   conf_.kind() = %s\n",
+                   (unsigned long)output_index,
+                   mkldnn_name_primitive_kind(conf_.kind()));
+            //cout<<"              *conf_.desc() = "<<*conf_.desc()<<endl
+        }
+        assert(conf_.kind() == mkldnn_memory);
+        assert(output_index==0);
+#endif // CPU_MEMORY_HPP_DBG
+        assert(conf_.kind() == mkldnn_memory);
         assert(output_index == 0);
         return data_;
-#else // sxc++ triggered above assertion
-        // debugging uncovered an sxcc compiler bug in C struct initializers
-        // that left uninitialized garbage values.
-        // fix was to fully specify struct initializers
-        // Example:    mem_at_t x={a}   -->      mem_at_t x={a,0}
-        using namespace std;
-        cout<<" cpu_memory_t::const_memory("<<output_index<<") :\n"
-            <<"               conf_.kind() = "<<conf_.kind()<<"\n"
-            <<"              *conf_.desc() = "<<*conf_.desc()<<endl;
-        if(output_index!=0) {
-            std::cout<<" ERROR: cpu_memory_t::const_memory(output_index="<<output_index
-                <<") called with non-zero output_index"<<std::endl;
-#if defined(_SX)
-            ::cpu_memory_brk(output_index); // provide a convenient debugger breakpoint
-#endif
-            assert(conf_.kind() == mkldnn_memory);
-            assert(output_index==0);
-        }
-        return data_;
-#endif // CPU_MEMORY_HPP_DBG
     }
 
 private:
