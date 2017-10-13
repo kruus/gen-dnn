@@ -1,3 +1,5 @@
+PS1='[\h \W]\$ '
+if [ "`uname`" = "SUPER-UX" ]; then PS1='[SX \W]\$ '; fi
 ##################### utilities ###############################
 #  Ex. FOO=a:bb:c:d; ColonVarDel FOO bb; echo $FOO --> a:c:d
 function ColonVarDel() {
@@ -59,4 +61,5 @@ export LD_LIBRARY_PATH
 export MANPATH
 
 ######################  local cmake-3.0 ################################
-pathbefore /gfs/nlabhpg/local/cmake3.0/bin
+pathrm "${HOME}"/local/cmake3.8/bin
+pathbefore "${HOME}"/local/cmake3.8/bin
