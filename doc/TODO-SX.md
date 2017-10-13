@@ -16,6 +16,12 @@ General Goal:
     performance of all impls in an mkl-dnn engine.
 - [w] port existing loop transforms into benchdnn first
 
+- [ ] SX bench.sh should never compile, but just check for build stamp
+      file, and if OK go through the standard -t (or -tt or -ttt) tests,
+      so the "same thing" runs on intel/sx platform.  This will take a
+      *long, long time* until I add dense specializations in for several
+      ref implementations.  These addons will be only in `vanilla/`, since
+      they are low on Intel's radar for the moment.
 - [ ] *add* fast loops/gemms/eltwise into mkldnn see B.2 Option below
 - [ ] Try SX Windograd (study: what is mkl-dnn overlapped tiles layout?)
 - [ ] Try direct convolution w/ nChw128c layout
