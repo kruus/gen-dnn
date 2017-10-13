@@ -1,0 +1,8 @@
+*.cpp
+a.out
+*.o
+*.c
+*.h
+*.hpp
+*.c
+*.cxx
