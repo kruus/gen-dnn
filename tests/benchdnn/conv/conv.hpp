@@ -183,33 +183,24 @@ typedef void (*conv_bwd_d_fn) (const prb_t *p, dnn_mem_t &diff_src_m,
 typedef void (*conv_bwd_w_fn )(const prb_t *p, dnn_mem_t &src_m,
         dnn_mem_t &diff_wei_m, dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m);
 
-#if 1
-void compute_ref_fwd(const prb_t *p, dnn_mem_t &src_m,
-        dnn_mem_t &wei_m, dnn_mem_t &bia_m, dnn_mem_t &dst_m);
-void compute_ref_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
-        dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m);
-void compute_ref_bwd_w (const prb_t *p, dnn_mem_t &src_m,
-        dnn_mem_t &diff_wei_m, dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m);
-#else
-conv_fwd_fn compute_ref_fwd;
-conv_bwd_d_fn compute_ref_bwd_d;
-conv_bwd_w_fn  compute_ref_bwd_w;
-#endif
+#define COMPUTE_REF_DECL( PFX ) \
+void PFX##_fwd(const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &wei_m, \
+               dnn_mem_t &bia_m, dnn_mem_t &dst_m); \
+void PFX##_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m, dnn_mem_t &wei_m, \
+                 dnn_mem_t &diff_dst_m); \
+void PFX##_bwd_w (const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &diff_wei_m, \
+                  dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m);
+COMPUTE_REF_DECL( compute_ref ) /* ref_conv.cpp */
+COMPUTE_REF_DECL( refconv_2 )   /* ref_conv2.cpp */
+COMPUTE_REF_DECL( refconv_3 )   /* ref_conv3.cpp */
 
 typedef struct {
     conv_fwd_fn   fwd;
     conv_bwd_d_fn bwd_d;
     conv_bwd_w_fn bwd_w;
 } conv_impls_t;
-
-/** guarantees returning a null-terminating list of convolution impls.
- * The first one is (*always*) {compute_ref_fwd, compute_ref_bwd_d, compute_ref_bwd_w},
- * and this impl is always used for correctness testing (bench_mode 'C')
- *
- * Other impl triplets (if any) are *test** impls (bench_mode 'T').
- * These *test* codes are local to benchdnn
- *
- * This is distinct from (TBD) bench_mode 'A', which runs **all** mkl-dnn impls.
+/** list of TEST mode convolution impls.
+ * TEST mode is distinct from bench_mode 'A', which runs **all** mkl-dnn impls.
  *
  * We expect to investigate convolutions in 'T'est mode, and if they are fast and
  * correct move them to mkl-dnn (and comment them out of general use in benchdnn).
@@ -217,6 +208,7 @@ typedef struct {
  * \sa bench_mode.
  */
 conv_impls_t * get_ref_impls();
+size_t constexpr get_nref_impls() { return 3U; }
 
 void perf_report(const prb_t *p, const res_t *r, const char *pstr, const char *impl=nullptr);
 

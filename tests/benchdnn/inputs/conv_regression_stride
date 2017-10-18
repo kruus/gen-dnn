@@ -1,0 +1,42 @@
+# 5x5
+mb1ic16oc16_ih10kh5_kh5ph7sh2
+mb1ic16oc16_ih10kh5_kh5ph6sh2
+mb1ic16oc16_ih10kh5_kh5ph5sh2
+mb1ic16oc16_ih10kh5_kh5ph4sh2
+mb1ic16oc16_ih10kh5_kh5ph3sh2
+mb1ic16oc16_ih10kh5_kh5ph2sh2
+mb1ic16oc16_ih10kh5_kh5ph1sh2
+
+# 3x3
+mb1ic16oc16_ih10kh3_kh3ph5sh2
+mb1ic16oc16_ih10kh3_kh3ph4sh2
+mb1ic16oc16_ih10kh3_kh3ph3sh2
+mb1ic16oc16_ih10kh3_kh3ph2sh2
+mb1ic16oc16_ih10kh3_kh3ph1sh2
+
+# 1x1
+mb1ic16oc16_ih10kh1_kh1ph3sh2
+mb1ic16oc16_ih10kh1_kh1ph2sh2
+mb1ic16oc16_ih10kh1_kh1ph1sh2
+
+# 5x5
+mb1ic16oc16_ih10kh5_kh5ph7sh3
+mb1ic16oc16_ih10kh5_kh5ph6sh3
+mb1ic16oc16_ih10kh5_kh5ph5sh3
+mb1ic16oc16_ih10kh5_kh5ph4sh3
+mb1ic16oc16_ih10kh5_kh5ph3sh3
+mb1ic16oc16_ih10kh5_kh5ph2sh3
+mb1ic16oc16_ih10kh5_kh5ph1sh3
+
+# 3x3
+mb1ic16oc16_ih10kh3_kh3ph5sh3
+mb1ic16oc16_ih10kh3_kh3ph4sh3
+mb1ic16oc16_ih10kh3_kh3ph3sh3
+mb1ic16oc16_ih10kh3_kh3ph2sh3
+mb1ic16oc16_ih10kh3_kh3ph1sh3
+
+# 1x1
+mb1ic16oc16_ih10kh1_kh1ph3sh3
+mb1ic16oc16_ih10kh1_kh1ph2sh3
+mb1ic16oc16_ih10kh1_kh1ph1sh3
+

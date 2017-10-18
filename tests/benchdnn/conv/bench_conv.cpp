@@ -29,6 +29,7 @@
 #include "mkldnn_memory.hpp"
 
 #include "conv/conv.hpp"
+#include "conv/conv_test_data.hpp"
 
 #include "conv/input_conv.hpp"
 
@@ -125,11 +126,26 @@ void check_correctness(const desc_t *c) {
     }//old report method
 #endif
     ++bs.tests;
+
 }
 
 int batch(const char *fname);
 
 int bench(int argc, char **argv, bool main_bench) {
+    static bool own_ts = false;
+    static unsigned recurse = 0U;
+
+    int const dbg_alloc = 20;
+    print(dbg_alloc, "%s recurse=%u\n", "***** conv/bench_conv.cpp *****", recurse);
+    if (recurse == 0U){
+        if ((benchdnn_stat.ts == nullptr)){
+            print(dbg_alloc, "%s", "***** new test_stats\n");
+            benchdnn_stat.ts = new test_stats();
+            own_ts = true;
+        }
+    }
+    ++recurse;
+
     for (int arg = 0; arg < argc; ++arg) {
         if (!strncmp("--batch=", argv[arg], 8))
             SAFE(batch(argv[arg] + 8), CRIT);
@@ -167,6 +183,8 @@ int bench(int argc, char **argv, bool main_bench) {
                 exit(2);
             }
             check_correctness(&c);
+            if((bench_mode & TEST))
+                benchdnn_stat.ts->prt();
         }
     }
 
@@ -175,6 +193,17 @@ int bench(int argc, char **argv, bool main_bench) {
         print(0,"/* using default list of %d problems */", N);
         for (int n = 0; n < N; ++n)
             check_correctness(&default_list[n]);
+        if((bench_mode & TEST))
+            benchdnn_stat.ts->prt();
+    }
+
+    --recurse;
+    print(dbg_alloc, "%s recurse=%u\n", "*END* conv/bench_conv.cpp *****", recurse);
+    if (recurse == 0 && own_ts){
+        RT_ASSERT(benchdnn_stat.ts != nullptr);
+        print(dbg_alloc, "%s", "***** delete test_stats\n");
+        delete benchdnn_stat.ts;
+        benchdnn_stat.ts = nullptr;
     }
 
     return OK;
@@ -235,7 +264,9 @@ FILE *open_batch_file(const char *fname) {
 
 int batch(const char *fname) {
     FILE *fp = open_batch_file(fname);
+    print(0, "batch: %s ???", fname);
     SAFE(fp ? OK : FAIL, CRIT);
+    print(0, "batch: %s OK\n", fname);
 
     const size_t maxlen = 1024;
     char *opts[8*1024] = {0}, buf[maxlen + 1];

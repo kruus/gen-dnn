@@ -124,6 +124,7 @@ extern bench_mode_t bench_mode;
     } \
 } while (0)
 
+struct test_stats;      ///< optional, opaque
 struct stat_t {
     int tests;          ///< count convolution problem specs
     int impls;          ///< count convolution impls (==tests if not iterating over impls)
@@ -132,6 +133,8 @@ struct stat_t {
     int skipped;
     int mistrusted;
     int unimplemented;
+    int test_fail;      ///< --mode=TEST failure count
+    test_stats *ts;     ///< optional --mode=TEST stats
 };
 extern stat_t benchdnn_stat;
 

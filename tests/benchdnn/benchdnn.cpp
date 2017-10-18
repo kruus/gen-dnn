@@ -29,6 +29,7 @@
 #include "mkldnn_memory.hpp"
 
 #include "conv/conv.hpp"
+#
 #include "ip/ip.hpp"
 
 #if defined(_OPENMP)
@@ -68,7 +69,11 @@ int main(int argc, char **argv) {
     }
 
     int omp_max_thr = omp_get_max_threads();
-    printf("benchdnn init ... omp_max_thr=%d",omp_max_thr); fflush(stdout);
+    printf("benchdnn --%s --mode=%s -v%d ... init omp_max_thr=%d ",
+                (prim==CONV? "conv": prim==IP? "ip" : "huh?"),
+                bench_mode2str(bench_mode), verbose, omp_max_thr);
+    fflush(stdout);
+
     init();
     printf(" OK\n"); fflush(stdout);
     perf_t const * perf_data = perf_begin();
@@ -88,11 +93,14 @@ int main(int argc, char **argv) {
 
     printf("tests:%d impls:%d %s:%d "
             "skipped:%d mistrusted:%d unimplemented:%d "
-            "failed:%d\n",
+            "failed:%d",
             benchdnn_stat.tests, benchdnn_stat.impls,
             (bench_mode&CORR? "correct": "passed"), benchdnn_stat.passed,
             benchdnn_stat.skipped, benchdnn_stat.mistrusted,
             benchdnn_stat.unimplemented, benchdnn_stat.failed);
+    if ((bench_mode & TEST))
+        printf(" test_fail: %d", benchdnn_stat.test_fail);
+    printf("\n");
 
     return !!benchdnn_stat.failed;
 }

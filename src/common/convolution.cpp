@@ -36,11 +36,18 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
         const dims_t strides, const dims_t dilates,
         const dims_t padding_l, const dims_t padding_r,
         padding_kind_t padding_kind) {
+#ifndef NDEBUG
+    //printf("+conv_desc_init\n");
+#endif
     bool args_ok = true
         && !any_null(conv_desc, src_desc, weights_desc, dst_desc, strides,
                 padding_l)
         && one_of(alg_kind, convolution_direct, convolution_winograd)
         && one_of(padding_kind, padding_kind::padding_zero);
+#ifndef NDEBUG
+    if (!args_ok) {printf("Oops [%s:%d] !args_ok\n", __FILE__, __LINE__); fflush(stdout);}
+    //else          {printf(" OK  [%s:%d]  args_ok\n", __FILE__, __LINE__); fflush(stdout);}
+#endif
     if (!args_ok) return invalid_arguments;
 
     if (padding_r == nullptr) padding_r = padding_l;
@@ -82,6 +89,7 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
 
     const int g = with_groups ? weights_desc->dims[0] : 1;
 
+#ifdef NDEBUG
     bool consistency = true
         && src_desc->ndims == 4
         && dst_desc->ndims == 4
@@ -91,6 +99,34 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
         && src_desc->dims[0] == dst_desc->dims[0]
         && src_desc->dims[1] == g * weights_desc->dims[with_groups + 1]
         && dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0];
+#else
+    int const lenmax = 1024;
+    static char buffer[lenmax];
+    char *buf = &buffer[0];
+    int rem_len = lenmax;
+#define DPRINT(...) do \
+    { \
+        int n = snprintf(buf, rem_len, __VA_ARGS__); \
+        if( n > rem_len ){ rem_len = 0; } \
+        else { buf+=n; rem_len-=n; } \
+    } while(0)
+#define AND_WANT( COND ) do { \
+    bool cond; \
+    if (!(cond=(COND))){ \
+        DPRINT("Oops [%s:%d] %s\n", __FILE__, __LINE__, #COND); \
+        consistency = false; \
+    } \
+}while(0)
+    bool consistency = true;
+    AND_WANT((src_desc->ndims == 4));
+    AND_WANT((dst_desc->ndims == 4));
+    AND_WANT((utils::one_of(weights_desc->ndims, 4, 5)));
+    AND_WANT(((with_bias ? bias_desc->ndims == 1 : true)));
+    AND_WANT(((with_bias ? bias_desc->dims[0] == dst_desc->dims[1] : true)));
+    AND_WANT((src_desc->dims[0] == dst_desc->dims[0]));
+    AND_WANT((src_desc->dims[1] == g * weights_desc->dims[with_groups + 1]));
+    AND_WANT((dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0]));
+#endif
     for (int i = 2; i <= 3; ++i)
     {
         int src = src_desc->dims[i];
@@ -100,9 +136,22 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
         int str = strides[i - 2];
         int dst = dst_desc->dims[i];
 
+#ifdef NDEBUG
         consistency = consistency &&
             (src - ((ker - 1) * (dil + 1) + 1) + pad) / str + 1 == dst;
+#else
+        AND_WANT((src - ((ker - 1) * (dil + 1) + 1) + pad) / str + 1 == dst);
+#endif
     }
+#ifndef NDEBUG
+    //printf("consistency = %s\n", (consistency?"true":"false"));
+    if (!consistency){
+        printf("Msg %s\n", &buffer[0]);
+        fflush(stdout);
+    }
+#undef AND_WANT
+#undef DPRINT
+#endif
     if (!consistency) return invalid_arguments;
 
     *conv_desc = cd;
@@ -144,8 +193,8 @@ status_t mkldnn_convolution_backward_data_desc_init(
         const dims_t padding_l, const dims_t padding_r,
         padding_kind_t padding_kind) {
     return conv_desc_init(conv_desc, backward_data, alg_kind, diff_src_desc,
-            weights_desc, nullptr, diff_dst_desc, strides, nullptr,
-            padding_l, padding_r, padding_kind);
+            weights_desc, nullptr, diff_dst_desc, strides,      /*no bias  */
+            nullptr, padding_l, padding_r, padding_kind);       /*no dilate*/
 }
 
 status_t mkldnn_convolution_backward_weights_desc_init(
@@ -160,4 +209,4 @@ status_t mkldnn_convolution_backward_weights_desc_init(
             nullptr, padding_l, padding_r, padding_kind);
 }
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

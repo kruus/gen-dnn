@@ -35,22 +35,24 @@ using std::cout; using std::endl; using std::setw;
 #include "norm.hpp"
 
 #include "conv/conv.hpp"
-
+#include "conv/conv_test.hpp"
+#include "conv/conv_test_data.hpp"
 
 namespace conv {
 
-static conv_impls_t conv_impls[] = {
+static conv_impls_t conv_impls_[] = {
     {compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
-    // just for show (don't have a different set yet)
-    //{compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
+    {refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
+    {refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
 };
 
-conv_impls_t * get_ref_impls() {
-    return conv_impls;
-}
-size_t constexpr get_nref_impls() {
-    return sizeof(conv_impls) / sizeof(conv_impls_t);
-}
+#define TESTN (sizeof(conv_impls_) / sizeof(conv_impls_t))
+
+static_assert( TESTN == get_nref_impls(),
+        "Please reconcile conv_impls (conv.cpp) with get_nref_impls() (test.hpp");
+conv_impls_t *conv_impls = &conv_impls_[0];
+
+conv_impls_t *get_ref_impls() { return conv_impls; }
 
 double get_trust_nz_level(const prb_t *p, int what, bool final_compare) {
     if (!final_compare)
@@ -429,25 +431,10 @@ inline int fill_dst(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
 
 /** Initialize conv desc as per \c prb_t command-line args */
 static int init_conv_desc(mkldnn_convolution_desc_t &cd, const prb_t *p );
-/** From initial conv desc \c cd, form the conv primitive \c cpd */
-static int init_conv_prim( mkldnn_primitive_desc_t &cpd, const prb_t *p,
-            mkldnn_convolution_desc_t const& cd, res_t *r);
 /** Finalize conv desc \c cd by querying the convolution primitive \c cpd */
 static int finalize_conv_desc(mkldnn_convolution_desc_t &cd, const prb_t *p,
             const mkldnn_primitive_desc_t &cpd );
 
-/** Original initialization scheme.  Likely I need to use the
- * split-up pieces to support iterating over available primitives.
- */
-inline int init_pd(const prb_t *p, mkldnn_convolution_desc_t &cd,
-        mkldnn_primitive_desc_t &cpd, res_t *r) {
-    //r->state = UNTESTED; // (just to be sure)
-    SAFE(init_conv_desc(cd, p), WARN);
-    SAFE(init_conv_prim( cpd, p, cd, r ), WARN);
-    if( r->state != SKIPPED  && r->state != UNIMPLEMENTED )
-        SAFE(finalize_conv_desc( cd, p, cpd ), CRIT);
-    return OK;
-}
 int init_conv_desc(mkldnn_convolution_desc_t &cd, const prb_t *p )
 {
     mkldnn_memory_desc_t src_d, wei_d, bia_d, dst_d;
@@ -492,7 +479,7 @@ int init_conv_desc(mkldnn_convolution_desc_t &cd, const prb_t *p )
                     &src_d, &wei_d, p->dir == BWD_W ? NULL : &bia_d, &dst_d,
                     strides, padding, padding_r, mkldnn_padding_zero), WARN);
         break;
-    default: DNN_SAFE(mkldnn_invalid_arguments, CRIT);
+    default: DNN_SAFE(mkldnn_invalid_arguments, WARN);
              print(0,"%s\n", "bad init_conv_desc call : unsupported p->dir");
     }
     DNN_SAFE(cd.accum_data_type == p->cfg[ACC].dt
@@ -517,7 +504,7 @@ bool memory_sz( const primitive_desc_t *memory_pd ){
 
 /** We need a "first" convolution to succeed (not skipped).
  * Then we are able to get right-sized memory and initialize it
- * with test data. */
+ * with test data.  This does *not* check for --skip-impl. */
 int init_conv_prim_any( mkldnn_primitive_desc_t &cpd, const prb_t *p,
             mkldnn_convolution_desc_t const& cd, res_t *r)
 {
@@ -539,23 +526,6 @@ int init_conv_prim_any( mkldnn_primitive_desc_t &cpd, const prb_t *p,
 
     return OK;
 }
-/** skip this impl (return FAIL) if the impl matches any -skip-impl string. */
-int init_conv_prim( mkldnn_primitive_desc_t &cpd, const prb_t *p,
-            mkldnn_convolution_desc_t const& cd, res_t *r)
-{
-    SAFE(init_conv_prim_any( cpd, p, cd, r), WARN);
-
-    const char *impl_str = query_impl_info(cpd);
-    if (maybe_skip(impl_str)) {
-        print(2, "SKIPPED: mkldnn implementation: %s\n", impl_str);
-        DNN_SAFE(mkldnn_primitive_desc_destroy(cpd), WARN);
-        return r->state = SKIPPED, OK;
-    } else {
-        print(5, "mkldnn implementation: %s\n", impl_str);
-    }
-    return OK;
-}
-
 int finalize_conv_desc(mkldnn_convolution_desc_t &cd, const prb_t *p,
             const mkldnn_primitive_desc_t &cpd )
 {
@@ -687,7 +657,7 @@ static const char* cmp_fp_data(const char* msg, const dnn_mem_t &f32a,
  * \ret 0/1 OK/FAIL */
 static int do_perf( mkldnn_primitive_t prim, res_t *r, const prb_t *p,
                 const char *impl=nullptr ) {
-    bool want_perf_report = (bench_mode & PERF) || (bench_mode & TEST);
+    bool want_perf_report = (bench_mode & PERF);
     if (!want_perf_report) // iterating, can skip perf test without failure
         return OK;
     //cout<<" +do_perf"<<bench_mode2str(bench_mode);
@@ -943,8 +913,10 @@ static char const* shorten(char const* impl_str)
 #undef DPRINT
 }
 
+
 int doit(const prb_t *p, res_t *r) {
-    //auto &bs = benchdnn_stat;
+    auto &bs = benchdnn_stat;
+    if ((bench_mode & TEST)) RT_ASSERT( bs.ts != nullptr );
     char pstr[max_prb_len];
     prb2str(p, pstr);
     res_t res_zero{};
@@ -955,9 +927,8 @@ int doit(const prb_t *p, res_t *r) {
     {
         auto cd_init = [&]()->int{
             mkldnn_primitive_desc_t cpd;
-#if 0 // original way
-            SAFE(init_pd(p, cd, cpd, r), WARN); // oops if best-impl is a skip-impl
-#else
+            //SAFE(init_pd(p, cd, cpd, r), WARN);
+            // --> oops if best-impl is a skip-impl, so test for skip-impl later.
             // Intialize convolution in "must-succeed" mode, so that we
             // can set memory descriptors for convolution primitives
             SAFE(init_conv_desc(cd, p), WARN);              // test data
@@ -969,7 +940,6 @@ int doit(const prb_t *p, res_t *r) {
                 RT_ASSERT( r->state == SKIPPED  || r->state == UNIMPLEMENTED );
                 return FAILED;
             }
-#endif
             return OK;
         };
         if (cd_init() != OK){
@@ -979,6 +949,8 @@ int doit(const prb_t *p, res_t *r) {
             return FAIL;
         }
     }
+    // improvement: TEST with dilates should not return UNIMPLEMENTED just
+    // because mkl-dnn does not support BWD dirn with dilates.
     print(0, "%s", "\n");
     RT_ASSERT( r->state == UNTESTED || r->state == UNIMPLEMENTED );
 
@@ -1012,9 +984,8 @@ int doit(const prb_t *p, res_t *r) {
     }
 
     mkldnn_primitive_t c{};
-    int const v = verbose;
+    //int const v = verbose;
     char const* impl = nullptr;
-    size_t const imp0 = 1U; // use 1U, warn if no 'other' impls
     size_t const nimp = get_nref_impls();
     if (p->dir & FLAG_FWD) {
         mkldnn_primitive_at_t inputs[3] = { {src_dt.p_, 0}, {wei_dt.p_, 0},
@@ -1023,95 +994,104 @@ int doit(const prb_t *p, res_t *r) {
         const_mkldnn_primitive_t outputs[] = { dst_dt.p_ };
         if (bench_mode & CORR || bench_mode & TEST )
             compute_ref_fwd(p, src_fp, wei_fp, bia_fp, dst_fp);
-        auto fwd_test = [&c,&r,&p,&dst_fp,&dst_dt,&impl]()
-                        ->int{
-            SAFE(execute(c), WARN);
-            if( do_perf(c, r, p, impl) != OK ) return FAIL;
-            if (bench_mode & CORR) {
-                dnn_mem_t dst(dst_dt, fp, mkldnn_nchw);
-                SAFE(dst.reorder(dst_dt), WARN);
-                SAFE(compare_dst(p, dst, dst_fp, r, true), WARN);
-            }
-            return OK;
-        };
-        // iterate over impls
-        scoped_op_desc copd( cd, p->merge ); // basic or merged conv layer?
-        DNN_SAFE(copd.status(), CRIT);
-        // NOTE: For now, we **depend** on convolutions NOT requiring a fwd hint.
-        // Alternatively, we could grab a "default" fwd hint from above,
-        // and assume that hint compatibility is properly checked by mkldnn
-        for ( conv_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
-#define ITERATE_OVER_IMPLS_BEGIN \
-            print((bench_mode&PERF?10:0),"impl#%u,", pit.n()); \
-            auto pd_n = pit.get(); /* a scoped mkldnn_primitive_desc_t */ \
-            if( !pd_n ){ print(2," pd_%u==nullptr!?\n",pit.n()); break; } \
-            /* Not needed: update_conv_desc( pd_n, p ); */ \
-            const char *impl_str = query_impl_info(pd_n); \
-            impl = shorten(impl_str); \
-            res_state_t pitst = UNTESTED;
-            ITERATE_OVER_IMPLS_BEGIN;
-#define ITERATE_OVER_IMPLS_TEST( test_ok_fail ) \
-            if (maybe_skip(impl_str)) pitst = SKIPPED; \
-            else { \
-                print(20, " %s,%s\n", impl, dir2str(p->dir)); \
-                scoped_prim prim_create(c, pd_n, inputs, outputs); \
-                SAFE((bool)prim_create? OK: FAIL, WARN); \
-                pitst = (test_ok_fail() != OK? FAILED: PASSED); \
-            }
-            ITERATE_OVER_IMPLS_TEST( fwd_test );
-#define ITERATE_OVER_IMPLS_END \
-            benchdnn_stat_update(pitst, r); \
-            print((pitst==PASSED? 10: pitst==SKIPPED? 1: 0), \
-                        "%s#%u,%s,%s\n", state2str(pitst), pit.n(), \
-                        impl, dir2str(p->dir)); \
-            if (pitst == SKIPPED) continue; \
-            if(! (bench_mode & ALL)) break;
-            ITERATE_OVER_IMPLS_END;
-        }
-        if (r->state == UNTESTED){ // paranoia
-            r->state = UNIMPLEMENTED;
-            benchdnn_stat_update(r->state, r);
-        }
         if ((bench_mode & TEST) && nimp > imp0){
-            // any optional floating point reference loops?
+            /* any optional floating point reference loops?          */
+            /* similar to CORR/PERF tests, but always floating point */
+            bs.ts->begin_impls();
             for(size_t imp=imp0; imp<nimp; ++imp){
+                auto impl_fn = get_ref_impls()[imp].fwd;
+                if (impl_fn == nullptr) continue;
                 /* get new zeroed data "just like" the ref fp32 calc */
                 print(2," imp=%lu/%lu : %s ...\n", (unsigned long)imp,
-                            (unsigned long)nimp, "test loop mem descriptors");
+                        (unsigned long)nimp, "test loop mem descriptors");
                 /* inputs (for FWD calc) acquire content from ref fp32 calc */
                 /*dnn_mem_t src_tt(src_fp); // separate, zeroed data */
                 /*src_tt.reorder(src_fp);   // + acquire data explicitly */
-                /* perhaps not most elegant --- no reuse? */
+                /* not most elegant, in principle could reuse const input mem */
                 dnn_mem_t src_tt(src_fp, fp); /* same layout, copied data */
                 dnn_mem_t wei_tt(wei_fp, fp); /* same layout, copied data */
                 dnn_mem_t bia_tt(bia_fp, fp); /* now OK for !active_ */
                 dnn_mem_t dst_tt(dst_fp.md_); /* separate, ZEROED data */
-                if (imp == imp0)
-                    print(2, "%s", tostr(src_fp, wei_fp, bia_fp, dst_fp));
-                print(3, "%s", cmp_fp_data("src", src_fp, src_tt));
-                print(3, "%s", cmp_fp_data("wei", wei_fp, wei_tt));
-                print(3, "%s", cmp_fp_data("bia", bia_fp, bia_tt));
-                print(1, "conv fwd test imp %lu ", (long unsigned)imp);
-                auto compare_fn = [&]()->int{
-                    // similar to above 'fwd_test', but always floating point
-                    SAFE(compare_dst(p, dst_tt, dst_fp, r, true), WARN);
+                if(verbose){
+                    if (imp == imp0)
+                        print(2, "%s", tostr(src_fp, wei_fp, bia_fp, dst_fp));
+                    print(3, "%s", cmp_fp_data("src", src_fp, src_tt));
+                    print(3, "%s", cmp_fp_data("wei", wei_fp, wei_tt));
+                    print(3, "%s", cmp_fp_data("bia", bia_fp, bia_tt));
+                    print(1, "conv fwd test imp %lu ", (long unsigned)imp);
+                }
+                auto run_fn = [&]()->void{
+                    (*impl_fn)(p, src_tt, wei_tt, bia_tt, dst_tt);
+                };
+                auto compare_fn = [&]()->int{ /* return OK / FAIL */
+                    if(verbose>1) cmp_fp_data("dst", dst_fp, dst_tt);
+                    SAFE(compare_dst(p, dst_tt, dst_fp, r), WARN);
                     return OK;
                 };
-#define TEST_IMPL_COMPARE( RUN_IMPL, COMPARE_FUNCTION ) do { \
+#define TEST_IMPL_COMPARE do { \
     benchdnn_timer_t tt; \
     tt.start(); \
-    /*..was..compute_ref_fwd(p, src_tt, wei_tt, bia_tt, dst_tt);*/ \
-    get_ref_impls()[imp].RUN_IMPL; \
+    run_fn(); \
     tt.stop(); \
-    print(5, "compare_dst, impl[%lu] vs impl[0]", (unsigned long)imp); \
-    if(v>1) cmp_fp_data("dst", dst_fp, dst_tt); \
-    int status = COMPARE_FUNCTION(); /* returns OK or FAIL */ \
-    print(0, "TEST #%lu %s time %f ms %s\n", \
-          (unsigned long)imp, #RUN_IMPL, 1e-3*(long)(1e3*tt.total_ms()+0.5), \
-          (status==OK? "CORRECT": "INCORRECT")); \
+    print(5, "compare impl[%lu] vs impl[0]", (unsigned long)imp); \
+    int status = compare_fn(); \
+    bs.ts->update_impl(p, r, status, tt, imp); \
 }while(0)
-                TEST_IMPL_COMPARE( fwd(p, src_tt, wei_tt, bia_tt, dst_tt),
-                            compare_fn );
+            TEST_IMPL_COMPARE;
+            }
+            bs.ts->end_impls();
+        }
+        if( bench_mode & PERF || bench_mode & CORR ) {
+            r->state = UNTESTED; // ignore errors in test loops (just report)
+            //
+            auto fwd_test = [&c,&r,&p,&dst_fp,&dst_dt,&impl]()
+                ->int{
+                    SAFE(execute(c), WARN);
+                    if( do_perf(c, r, p, impl) != OK ) return FAIL;
+                    if (bench_mode & CORR) {
+                        dnn_mem_t dst(dst_dt, fp, mkldnn_nchw);
+                        SAFE(dst.reorder(dst_dt), WARN);
+                        SAFE(compare_dst(p, dst, dst_fp, r, true), WARN);
+                    }
+                    return OK;
+                };
+            // iterate over impls
+            scoped_op_desc copd( cd, p->merge ); // basic or merged conv layer?
+            DNN_SAFE(copd.status(), CRIT);
+            // NOTE: For now, we **depend** on convolutions NOT requiring a fwd hint.
+            // Alternatively, we could grab a "default" fwd hint from above,
+            // and assume that hint compatibility is properly checked by mkldnn
+            for ( conv_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
+#define ITERATE_OVER_IMPLS_BEGIN \
+                print((bench_mode&PERF?10:0),"impl#%u,", pit.n()); \
+                auto pd_n = pit.get(); /* a scoped mkldnn_primitive_desc_t */ \
+                if( !pd_n ){ print(2," pd_%u==nullptr!?\n",pit.n()); break; } \
+                /* Not needed: update_conv_desc( pd_n, p ); */ \
+                const char *impl_str = query_impl_info(pd_n); \
+                impl = shorten(impl_str); \
+                res_state_t pitst = UNTESTED;
+                ITERATE_OVER_IMPLS_BEGIN;
+#define ITERATE_OVER_IMPLS_TEST( test_ok_fail ) \
+                if (maybe_skip(impl_str)) pitst = SKIPPED; \
+                else { \
+                    print(20, " %s,%s\n", impl, dir2str(p->dir)); \
+                    scoped_prim prim_create(c, pd_n, inputs, outputs); \
+                    SAFE((bool)prim_create? OK: FAIL, WARN); \
+                    pitst = (test_ok_fail() != OK? FAILED: PASSED); \
+                }
+                ITERATE_OVER_IMPLS_TEST( fwd_test );
+#define ITERATE_OVER_IMPLS_END \
+                benchdnn_stat_update(pitst, r); \
+                print((pitst==PASSED? 10: pitst==SKIPPED? 1: 0), \
+                      "%s#%u,%s,%s\n", state2str(pitst), pit.n(), \
+                      impl, dir2str(p->dir)); \
+                if (pitst == SKIPPED) continue; \
+                if(! (bench_mode & ALL)) break;
+                ITERATE_OVER_IMPLS_END;
+            }
+            if (r->state == UNTESTED){ // paranoia
+                r->state = UNIMPLEMENTED;
+                benchdnn_stat_update(r->state, r);
             }
         }
     } else if (p->dir == BWD_D) {
@@ -1119,38 +1099,48 @@ int doit(const prb_t *p, res_t *r) {
         const_mkldnn_primitive_t outputs[] = { src_dt.p_ };
         if (bench_mode & CORR || bench_mode & TEST )
             compute_ref_bwd_d(p, src_fp, wei_fp, dst_fp);
-        auto bwd_d_test = [&c,&r,&p,&src_dt,&src_fp,&impl]()
-                        ->int{
-            SAFE(execute(c), WARN);
-            if( do_perf(c, r, p, impl) != OK ) return FAIL;
-            if (bench_mode & CORR) {
-                dnn_mem_t src(src_dt, fp, mkldnn_nchw);
-                SAFE(src.reorder(src_dt), WARN);
-                SAFE(compare_src(p, src, src_fp, r, true), WARN);
-            }
-            return OK;
-        };
-        // iterate over impls
-        scoped_op_desc copd( cd, p->merge ); // basic or merged conv layer?
-        DNN_SAFE(copd.status(), CRIT);
-        for (conv_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
-            ITERATE_OVER_IMPLS_BEGIN;
-            ITERATE_OVER_IMPLS_TEST( bwd_d_test );
-            ITERATE_OVER_IMPLS_END;
-        }
         if ((bench_mode & TEST) && nimp > imp0){
-            //print(0," %s\n", "Testing bwd_d ...");
             for(size_t imp=imp0; imp<nimp; ++imp){
+                auto impl_fn = get_ref_impls()[imp].bwd_d;
+                if (impl_fn == nullptr) continue;
                 dnn_mem_t src_tt(src_fp.md_); /* ZEROED */
                 dnn_mem_t wei_tt(wei_fp, fp); /* copied (should reuse) */
-                dnn_mem_t bia_tt(bia_fp, fp); /* copied (should reuse) */
+                //dnn_mem_t bia_tt(bia_fp, fp); /* not needed */
                 dnn_mem_t dst_tt(dst_fp, fp); /* copied (should reuse) */
+                auto run_fn = [&]()->void{
+                    (*impl_fn)(p, src_tt, wei_tt, dst_tt);
+                };
                 auto compare_fn = [&]()->int{ // like bwd_d_test, but float
-                    SAFE(compare_src(p, src_tt, src_fp, r, true), WARN);
+                    SAFE(compare_src(p, src_tt, src_fp, r), WARN);
                     return OK;
                 };
-                TEST_IMPL_COMPARE( bwd_d(p, src_tt, wei_tt, dst_tt),
-                            compare_fn );
+                TEST_IMPL_COMPARE;
+            }
+        }
+        if( bench_mode & PERF || bench_mode & CORR ) {
+            r->state = UNTESTED; // ignore errors in test loops (just report)
+            // iterate over impls
+            auto bwd_d_test = [&c,&r,&p,&src_dt,&src_fp,&impl]()
+                ->int{
+                    SAFE(execute(c), WARN);
+                    if( do_perf(c, r, p, impl) != OK ) return FAIL;
+                    if (bench_mode & CORR) {
+                        dnn_mem_t src(src_dt, fp, mkldnn_nchw);
+                        SAFE(src.reorder(src_dt), WARN);
+                        SAFE(compare_src(p, src, src_fp, r, true), WARN);
+                    }
+                    return OK;
+                };
+            scoped_op_desc copd( cd, p->merge ); // basic or merged conv layer?
+            DNN_SAFE(copd.status(), CRIT);
+            for (conv_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
+                ITERATE_OVER_IMPLS_BEGIN;
+                ITERATE_OVER_IMPLS_TEST( bwd_d_test );
+                ITERATE_OVER_IMPLS_END;
+            }
+            if (r->state == UNTESTED){ // paranoia
+                r->state = UNIMPLEMENTED;
+                benchdnn_stat_update(r->state, r);
             }
         }
     } else if (p->dir & FLAG_BWD && p->dir & FLAG_WEI) {
@@ -1160,52 +1150,65 @@ int doit(const prb_t *p, res_t *r) {
         };
         if (bench_mode & CORR || bench_mode & TEST )
             compute_ref_bwd_w(p, src_fp, wei_fp, bia_fp, dst_fp);
-        auto bwd_w_test = [&c,&r,&p,&wei_dt,&wei_fp,&bia_dt,&bia_fp,&impl]()
-                        ->int{
-            SAFE(execute(c), WARN);
-            if( do_perf(c, r, p, impl) != OK ) return FAIL;
-            if (bench_mode & CORR) {
-                dnn_mem_t wei(wei_dt, fp, mkldnn_goihw);
-                SAFE(wei.reorder(wei_dt), WARN);
-                SAFE(compare_wei(p, wei, wei_fp, r, true), WARN);
-                if (p->dir & FLAG_BIA) {
-                    dnn_mem_t bia(bia_dt, fp, mkldnn_x);
-                    SAFE(bia.reorder(bia_dt), WARN);
-                    SAFE(compare_bia(p, bia, bia_fp, r, true), WARN);
-                }
-            }
-            return OK;
-        };
-        // iterate over impls
-        scoped_op_desc copd( cd, p->merge ); // basic or merged conv layer?
-        DNN_SAFE(copd.status(), CRIT);
-        for (conv_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
-            ITERATE_OVER_IMPLS_BEGIN;
-            ITERATE_OVER_IMPLS_TEST( bwd_w_test );
-            ITERATE_OVER_IMPLS_END;
-        }
         if ((bench_mode & TEST) && nimp > imp0){
-            //print(0," %s\n", "Testing bwd_w ...");
             for(size_t imp=imp0; imp<nimp; ++imp){
+                auto impl_fn = get_ref_impls()[imp].bwd_w;
+                if (impl_fn == nullptr) continue;
                 dnn_mem_t src_tt(src_fp, fp); /* copied (should reuse) */
                 dnn_mem_t wei_tt(wei_fp.md_); /* ZEROED */
-                //print(0," %s\n", "zero bia"); cout<<" bia_fp.md_="<<bia_fp.md_<<endl;
-                // [ejk] dnn_mem_t was extended to handle bia_fp.md_ undef
+                /* [ejk] dnn_mem_t now handles bia_fp.md_ inactive */
                 dnn_mem_t bia_tt(bia_fp.md_); /* ZEROED (or inactive) */
                 dnn_mem_t dst_tt(dst_fp, fp); /* copied (should reuse) */
+                auto run_fn = [&]()->void{
+                    (*impl_fn)(p, src_tt, wei_tt, bia_tt, dst_tt);
+                };
                 auto compare_fn = [&]()->int{ // like bwd_w_test, but both float
-                    SAFE(compare_wei(p, wei_tt, wei_fp, r, true), WARN);
+                    SAFE(compare_wei(p, wei_tt, wei_fp, r), WARN);
                     if (p->dir & FLAG_BIA) {
-                        SAFE(compare_bia(p, bia_tt, bia_fp, r, true), WARN);
+                        SAFE(compare_bia(p, bia_tt, bia_fp, r), WARN);
                     }
                     return OK;
                 };
-                TEST_IMPL_COMPARE( bwd_w(p, src_tt, wei_tt, bia_tt, dst_tt),
-                            compare_fn );
+                TEST_IMPL_COMPARE;
+            }
+        }
+        if( bench_mode & PERF || bench_mode & CORR ) {
+            r->state = UNTESTED; // ignore errors in test loops (just report)
+            auto bwd_w_test = [&c,&r,&p,&wei_dt,&wei_fp,&bia_dt,&bia_fp,&impl]()
+                            ->int{
+                SAFE(execute(c), WARN);
+                if( do_perf(c, r, p, impl) != OK ) return FAIL;
+                if (bench_mode & CORR) {
+                    dnn_mem_t wei(wei_dt, fp, mkldnn_goihw);
+                    SAFE(wei.reorder(wei_dt), WARN);
+                    SAFE(compare_wei(p, wei, wei_fp, r, true), WARN);
+                    if (p->dir & FLAG_BIA) {
+                        dnn_mem_t bia(bia_dt, fp, mkldnn_x);
+                        SAFE(bia.reorder(bia_dt), WARN);
+                        SAFE(compare_bia(p, bia, bia_fp, r, true), WARN);
+                    }
+                }
+                return OK;
+            };
+            // iterate over impls
+            scoped_op_desc copd( cd, p->merge ); // basic or merged conv layer?
+            DNN_SAFE(copd.status(), CRIT);
+            for (conv_iter_t pit(copd, engine, NULL); (bool)pit; ++pit) {
+                ITERATE_OVER_IMPLS_BEGIN;
+                ITERATE_OVER_IMPLS_TEST( bwd_w_test );
+                ITERATE_OVER_IMPLS_END;
+            }
+            if (r->state == UNTESTED){ // paranoia
+                r->state = UNIMPLEMENTED;
+                benchdnn_stat_update(r->state, r);
             }
         }
     } else {
-        SAFE(FAIL, CRIT);
+        print(0," p->dir = %s\n", dir2str(p->dir));
+        RT_ASSERT(!"unhandled problem direction p->dir");
+    }
+    if ((bench_mode & TEST) && !(nimp > imp0)){
+        print(1, "%s\n", "TEST mode: no alternate test convolutions");
     }
     if ((bench_mode & TEST) && !(nimp > imp0)){
         print(1, "%s\n", "TEST mode: no alternate test convolutions");
@@ -1218,4 +1221,4 @@ int doit(const prb_t *p, res_t *r) {
 }
 
 } 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent ai cino=l0,\:0,N-s
