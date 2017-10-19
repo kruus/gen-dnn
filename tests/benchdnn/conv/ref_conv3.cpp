@@ -17,6 +17,7 @@
 /** \file
  * precalc inner kernel loop limits to avoid conditionals */
 #include "conv/conv.hpp"
+#include "idiv.hpp"
 
 namespace conv {
 
@@ -49,7 +50,10 @@ static bool trivial( int const verb, bool const cond, char const* msg,
 #define DMUST(...)   MUST(__VA_ARGS__)
 #endif
 
-/** hoist `A+iB in range [C,D)` condition out of a loop.
+//----------------------------
+
+/** hoist `A+iB in range [C,D)` condition out of a loop for i in [imin,imax].
+ * When 
  * Original:
  * \code
  * for(i=imin; i<imax; ++i){       // original loop
@@ -78,6 +82,9 @@ static inline void hoist_ApiB_in( int& beg, int& end,
     // int i*B < A    iff    i < (A    )/B
     // int i*B > A    iff    i > (A+B-1)/A
     // A+iB >= c ... iB >= c-A  ... i >= (c-A + B-1 )/B
+#if 1
+    beg = div_floor( c-a+b-1, b );
+#else
     beg = c-a + b-1;
     if( beg >= 0 ){
         beg /= b;
@@ -86,6 +93,7 @@ static inline void hoist_ApiB_in( int& beg, int& end,
         RT_ASSERT( beg + fmul*b >= 0 );
         beg = (beg + fmul*b) / b - fmul;
     }
+#endif
     //print(0, "i in [%d,%d), lin(a,b)=%d+i*%d in [c,d]=[%d,%d), beg=%d? f+c-a+b-1=%d\n",
     //        imin,imax, a,b, c,d, beg, f+c-a+b-1);
     DMUST( a + (beg-1)*b < c );
@@ -93,6 +101,9 @@ static inline void hoist_ApiB_in( int& beg, int& end,
     if( beg < imin ) beg = imin;
 
     // A+iB < d ... iB < d-A    ... i < (d-A) / B
+#if 1
+    end = div_floor( d-a+b-1, b );
+#else
     end = d-a +b-1;
     if( end >= 0 ){
         end /= b;
@@ -101,18 +112,12 @@ static inline void hoist_ApiB_in( int& beg, int& end,
         RT_ASSERT( end + fmul*b >= 0 );
         end = (end + fmul*b) / b - fmul;
     }
+#endif
     //print(0, "i in [%d,%d), lin(a,b)=%d+i*%d in [c,d]=[%d,%d), end=%d? f+d-a=%d\n",
     //        imin,imax, a,b, c,d, end, f+d-a);
     DMUST( a + (end-1)*b < d );
     DMUST( a + (end  )*b >= d );
     if( end > imax ) end = imax;
-}
-/** if \c a<0 add some \c mult to make result non-negative.
- * oops, does not return the fudge, \c 0 or \c (-a/mult).
- * But maybe useful for modulo arithmetic with negatives. */
-static inline int constexpr mk_nonneg( const int a, const int mult )
-{
-    return a >= 0? a: a + (-a / mult + 1) * mult;
 }
 
 /** Integer \c i so A-iB is <em>just below</em> \c target.
@@ -120,6 +125,7 @@ static inline int constexpr mk_nonneg( const int a, const int mult )
 static inline int AmiB_lt_target( const int a, const int b, const int target)
 {
     int ibelow = a-target + b;
+    // XXX use idiv.hpp here too
     if( ibelow >= 0 ){
         ibelow /= b;
     } else {
@@ -402,4 +408,4 @@ void refconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 }
 
 }
-// vim: et ts=4 sw=4 cindent nopaste ai cino=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s
