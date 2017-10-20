@@ -183,8 +183,10 @@ int bench(int argc, char **argv, bool main_bench) {
                 exit(2);
             }
             check_correctness(&c);
-            if((bench_mode & TEST))
+            if((bench_mode & TEST)){
+                print(0,"%s","??? 000 ts->prt\n");
                 benchdnn_stat.ts->prt();
+            }
         }
     }
 
@@ -193,8 +195,10 @@ int bench(int argc, char **argv, bool main_bench) {
         print(0,"/* using default list of %d problems */", N);
         for (int n = 0; n < N; ++n)
             check_correctness(&default_list[n]);
-        if((bench_mode & TEST))
+        if((bench_mode & TEST)){
+            print(0,"%s","??? 111 ts->prt\n");
             benchdnn_stat.ts->prt();
+        }
     }
 
     --recurse;

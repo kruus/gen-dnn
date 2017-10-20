@@ -55,7 +55,7 @@ static_assert( -1/-3 == 0, "oops"); // mod:-1 want: 0 (OK)
 static_assert( -2/-3 == 0, "oops"); // mod:-2 want: 0 (OK)
 static_assert( -3/-3 == 1, "oops"); // mod:0  want: 1 (OK)
 static_assert( -4/-3 == 1, "oops"); // mod:-1 want: 1 (OK)
-// and modulus...
+// and modulus... (for C++11 / C99 at least)
 static_assert(  5%3 == 2, "oops");
 static_assert(  4%3 == 1, "oops");
 static_assert(  3%3 == 0, "oops");

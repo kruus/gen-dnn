@@ -20,13 +20,15 @@
 
 using namespace conv;
 
+static int const vdbg=99; // threshold verbose level for this file
+
 test_stats::~test_stats() {
-    print(0,"%s","~test_stats()");
+    print(vdbg,"%s","~test_stats()");
     if(td!=nullptr) delete td;
 }
 
 void test_stats::reset_all(){
-    print(0,"%s","+test_stats::reset_all");
+    print(vdbg,"%s","+test_stats::reset_all");
     if( td == nullptr ){
         td = new test_data_t;
     }
@@ -38,7 +40,7 @@ void test_stats::reset_all(){
             td->wins[i*TESTN+j] = 0U;
         }
     }
-    this->prt();
+    // check... this->prt();
 }
 void test_stats::begin_impls(){
     for(unsigned i=0; i<TESTN; ++i){
@@ -75,9 +77,9 @@ void test_stats::end_impls(){
 }
 void test_stats::prt(){
     RT_ASSERT( td != nullptr );
-    //print(0, "TESTN=%d get_nref_impls=%lu sizeof(wins)=%lu",
-    //      (int)TESTN, (long unsigned)get_nref_impls(), (long unsigned)sizeof(td->wins));
-    //printf("\n");
+    print(vdbg, "TESTN=%d get_nref_impls=%lu sizeof(wins)=%lu",
+          (int)TESTN, (long unsigned)get_nref_impls(), (long unsigned)sizeof(td->wins));
+    print(vdbg, "%c", '\n');
     for(unsigned i=imp0; i<TESTN; ++i){
         int wins=0;
         for(unsigned j=0; j<i; ++j){
