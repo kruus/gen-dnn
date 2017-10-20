@@ -1068,7 +1068,7 @@ int doit(const prb_t *p, res_t *r) {
                 if( !pd_n ){ print(2," pd_%u==nullptr!?\n",pit.n()); break; } \
                 /* Not needed: update_conv_desc( pd_n, p ); */ \
                 const char *impl_str = query_impl_info(pd_n); \
-                impl = shorten(impl_str); \
+                impl = (verbose>0? impl_str: shorten(impl_str)); \
                 res_state_t pitst = UNTESTED;
                 ITERATE_OVER_IMPLS_BEGIN;
 #define ITERATE_OVER_IMPLS_TEST( test_ok_fail ) \
