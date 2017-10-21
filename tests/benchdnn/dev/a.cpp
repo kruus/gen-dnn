@@ -26,13 +26,25 @@ int test_div_floor( int n, int d){
     ASM_COMMENT( "divfp" );
     return div_floor(n,d);
 }
+int test_rem_floor( int n, int d){
+    ASM_COMMENT( "remfp" );
+    return rem_floor(n,d);
+}
 int test_div_floorn( int n, int d){
     ASM_COMMENT( "divfn" );
     return div_floorn(n,d);
 }
+int test_rem_floorn( int n, int d){
+    ASM_COMMENT( "remfp" );
+    return rem_floorn(n,d);
+}
 int test_div_floorx( int n, int d){
     ASM_COMMENT( "divfx" );
     return div_floorx(n,d);
+}
+int test_rem_floorx( int n, int d){
+    ASM_COMMENT( "remfp" );
+    return rem_floorx(n,d);
 }
 int main(int argc, char** argv){
     int s=0;

@@ -15,7 +15,7 @@ HDRS := ../idiv.hpp
 	objdump -C -S -dt $< > $@ 2>&1
 	
 .PHONY: run
-run: a
+run: all
 	./a 2 8 -4
 
 clean:
