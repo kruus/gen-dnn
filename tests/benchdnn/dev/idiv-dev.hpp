@@ -518,6 +518,16 @@ inline constexpr int rem_floorn( int const n, int const d )
 
 #endif
 }
+inline constexpr int div_floorx_diffsign0( int const a, int const b ){
+    return a & ((a^b)<0? ~0: 0); 
+}
+inline constexpr int div_floorx_diffsign1( int const a, int const b ){
+    return ( ((a^b)>>31) & a );
+}
+inline constexpr int div_floorx_diffsign2( int const a, int const b ){
+    //return ( ((a^b)>>31) & (a!=0) );    // ret is 0/1
+    return (a!=0) & ((a^b)>>31);    // ret is 0/1
+}
 /** Truncate integer \c n / \c d (any signs) \f$\forall n, d!=0\f$
  * toward \f$-\infty\f$.
  * \pre d != 0 (unchecked)
@@ -572,8 +582,115 @@ inline constexpr int div_floorx( int const n, int const d )
     // NOPE return ((n/d) - ( n%d<0 == d>0? 1 : 0));
     //return ((n/d) - ( (n%d==0) ? 0 : n%d<0 == d>0? !(n%d==0) : 0));
     //return ((n/d) - (                  n%d<0 == d>0? !(n%d==0) : 0)); // branchless
-    return ((n/d) - (n%d<0 == d>0? !(n%d==0) : 0)); // branchless and no cmov
+    //return ((n/d) - (n%d<0 == d>0? !(n%d==0) : 0)); // branchless and no cmov
 
+    // diffsign versions still have extra instrns ... so
+    //return n/d - ( ((n%d^d)>>31)? n%d!=0: 0);
+    return n/d - ( ((n%d^d)<0)? n%d!=0: 0); // same
+    /* 0000000000000060 <test_div_floorx(int, int)>:
+60:	89 f8                	mov    %edi,%eax
+62:	99                   	cltd   
+63:	f7 fe                	idiv   %esi
+65:	31 d6                	xor    %edx,%esi
+67:	c1 ee 1f             	shr    $0x1f,%esi
+6a:	85 d2                	test   %edx,%edx
+6c:	0f 95 c2             	setne  %dl
+6f:	21 d6                	and    %edx,%esi
+71:	29 f0                	sub    %esi,%eax
+73:	c3                   	retq   
+     */
+    //return n/d - ( ((n%d^d)>>31) & (n%d!=0));
+    //return n/d - ( ((((n%d^d)<0)?~0:0) & (n%d!=0)) ); //same
+    /* 0000000000000060 <test_div_floorx(int, int)>:
+60:	89 f8                	mov    %edi,%eax
+62:	99                   	cltd   
+63:	f7 fe                	idiv   %esi
+65:	31 d6                	xor    %edx,%esi
+67:	c1 fe 1f             	sar    $0x1f,%esi
+6a:	85 d2                	test   %edx,%edx
+6c:	0f 95 c2             	setne  %dl
+6f:	0f b6 d2             	movzbl %dl,%edx
+72:	21 d6                	and    %edx,%esi
+74:	29 f0                	sub    %esi,%eax
+76:	c3                   	retq   
+     */
+    //return n/d + ( ((n%d^d)>>31) & -(n%d!=0));
+    //return n/d - ( ( ((n%d^d)>>31) & (n%d) )!=0);
+    //return n/d - ( (((n%d^d)>>31) & n%d) != 0 );
+    /* 0000000000000060 <test_div_floorx(int, int)>:
+60:	89 f8                	mov    %edi,%eax
+62:	99                   	cltd   
+63:	f7 fe                	idiv   %esi
+65:	31 d6                	xor    %edx,%esi
+67:	c1 fe 1f             	sar    $0x1f,%esi
+6a:	85 d6                	test   %edx,%esi
+6c:	0f 95 c2             	setne  %dl
+6f:	0f b6 d2             	movzbl %dl,%edx
+72:	29 d0                	sub    %edx,%eax
+74:	c3                   	retq   
+     */
+    //return n/d + ( ((n%d^d)<0)? -(n%d!=0): 0); // ok
+    //return n/d - ( n%d!=0? ((n%d)^d)<0: 0);  // better
+    //return n/d - ( n%d==0? 0: ((n%d)^d)<0 );
+    /* 0000000000000060 <test_div_floorx(int, int)>:
+60:	89 f8                	mov    %edi,%eax
+62:	99                   	cltd   
+63:	f7 fe                	idiv   %esi
+65:	85 d2                	test   %edx,%edx
+67:	74 05                	je     6e <test_div_floorx(int, int)+0xe>
+69:	31 f2                	xor    %esi,%edx
+6b:	c1 ea 1f             	shr    $0x1f,%edx
+6e:	29 d0                	sub    %edx,%eax
+70:	c3                   	retq   
+     */
+    //return n/d - (n%d<0 == d>0? !(n%d==0) : 0); // branchless and no cmov
+    /* 0000000000000020 <test_div_floorx(int, int)>:
+20:	89 f8                	mov    %edi,%eax
+22:	99                   	cltd   
+23:	f7 fe                	idiv   %esi
+25:	89 d1                	mov    %edx,%ecx
+27:	f7 d1                	not    %ecx
+29:	c1 e9 1f             	shr    $0x1f,%ecx
+2c:	85 f6                	test   %esi,%esi
+2e:	40 0f 9f c6          	setg   %sil
+32:	31 f1                	xor    %esi,%ecx
+34:	85 d2                	test   %edx,%edx
+36:	0f 95 c2             	setne  %dl
+39:	0f b6 d2             	movzbl %dl,%edx
+3c:	21 d1                	and    %edx,%ecx
+3e:	29 c8                	sub    %ecx,%eax
+40:	c3                   	retq   
+     */
+    //return n/d - (div_floorx_diffsign0(n%d,d/*!=0*/)? !(n%d==0) : 0);
+    /* 0000000000000060 <test_div_floorx(int, int)>:
+60:	89 f8                	mov    %edi,%eax
+62:	99                   	cltd   
+63:	f7 fe                	idiv   %esi
+65:	31 d6                	xor    %edx,%esi
+67:	c1 fe 1f             	sar    $0x1f,%esi
+6a:	85 d6                	test   %edx,%esi
+6c:	0f 95 c2             	setne  %dl
+6f:	0f b6 d2             	movzbl %dl,%edx
+72:	29 d0                	sub    %edx,%eax
+74:	c3                   	retq   
+     */
+    //return n/d - (nzdiffsign_bnz(n%d,d/*!=0*/)? 1 : 0); // changed nzdiffsign... (again)
+    /* 0000000000000060 <test_div_floorx(int, int)>:
+60:	89 f8                	mov    %edi,%eax
+62:	31 c9                	xor    %ecx,%ecx
+64:	99                   	cltd   
+65:	f7 fe                	idiv   %esi
+67:	31 d6                	xor    %edx,%esi
+69:	78 05                	js     70 <test_div_floorx(int, int)+0x10>
+6b:	29 c8                	sub    %ecx,%eax
+6d:	c3                   	retq   
+6e:	66 90                	xchg   %ax,%ax
+70:	31 c9                	xor    %ecx,%ecx
+72:	85 d2                	test   %edx,%edx
+74:	0f 95 c1             	setne  %cl
+77:	29 c8                	sub    %ecx,%eax
+79:	c3                   	retq   
+     */
 #elif 0
     return (n - 1 + (d>0) + (n<0) - ((d>0)==(n<0)? d: 0)) / d;
     // 15 instrns

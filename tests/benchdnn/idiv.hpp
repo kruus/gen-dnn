@@ -106,9 +106,37 @@ static_assert( -4%-3 ==-1, "oops");
  */
 static inline constexpr int nzdiffsign_bnz( int const a, int const b )
 {
-#if (-1 >> 1 == -1)
+#if 1
+    return a & ((a^b)<0? ~0: 0); // return a or 0
+    /* 0000000000000000 <test_nzdiffsign_bnz(int, int)>:
+0:	31 fe                	xor    %edi,%esi
+2:	c1 fe 1f             	sar    $0x1f,%esi
+5:	89 f0                	mov    %esi,%eax
+7:	21 f8                	and    %edi,%eax
+9:	c3                   	retq   
+     */
+    //return ((a^b)<0? a: 0);                // return a/0 
+    /*
+       0000000000000000 <test_nzdiffsign_bnz(int, int)>:
+0:	31 fe                	xor    %edi,%esi
+2:	b8 00 00 00 00       	mov    $0x0,%eax
+7:	0f 48 c7             	cmovs  %edi,%eax
+a:	c3                   	retq   
+     */
+    //return ((a^b)<0? (a!=0): 0);                // return 1/0
+    //return ((a^b) & ((a!=0)? ~0: 0)) < 0; // ouch
+    /*
+       0000000000000000 <test_nzdiffsign_bnz(int, int)>:
+0:	31 fe                	xor    %edi,%esi
+2:	c1 ee 1f             	shr    $0x1f,%esi
+5:	85 ff                	test   %edi,%edi
+7:	0f 95 c0             	setne  %al
+a:	21 f0                	and    %esi,%eax
+c:	c3                   	retq   
+     */
+#elif (-1 >> 1 == -1)
     //return a!=0 && b!=0 && (a^b)<0; // ok, but long
-    //return ( ((a^b)>>31) & (a!=0) );
+    //return ( ((a^b)>>31) & (a!=0) );          // return 1/0
     /* 
 0:	31 fe                	xor    %edi,%esi
 2:	31 c0                	xor    %eax,%eax
@@ -118,7 +146,6 @@ static inline constexpr int nzdiffsign_bnz( int const a, int const b )
 c:	21 f0                	and    %esi,%eax
 e:	c3                   	retq   
      */
-    //return ( ((a^b)<0) & (a!=0) );
     return ( ((a^b)>>31) & a );
 #else
 #error "bit-twiddling hacks insufficient"
@@ -177,7 +204,7 @@ a:	c3                   	retq
 inline constexpr int rem_floor( int const n, int const d )
 {
 #if 1 // I think this one is totally portable, and code is identical to next
-    return (n%d + (d & (n%d<0? ~0: 0) ));
+    return n%d + (d & (n%d<0? ~0: 0));
 #elif ~(-1) == 0 /* best code, without numeric_limits */
     // only assumes 2-s complement
     //return (n%d +   (d & (-(n%d<0)        ) ));
@@ -250,7 +277,8 @@ DIVREM(-2000444000,1);
  */
 inline constexpr int div_floorn( int const n, int const d )
 {
-    return (n/d) - (n%d>0? 1: 0); 
+    //return (n/d) - (n%d>0? 1: 0); 
+    return (n/d) - (n%d>0); 
     /* 0000000000000010 <test_div_floorn(int, int)>:
 10:	89 f8                	mov    %edi,%eax
 12:	99                   	cltd   
@@ -267,8 +295,20 @@ inline constexpr int div_floorn( int const n, int const d )
 inline constexpr int rem_floorn( int const n, int const d )
 {
     //return n - d*div_floorn(n,d);
+    return n%d +   (d & (-(n%d)<0? ~0: 0));
+    /* 0000000000000040 <test_rem_floorn(int, int)>:
+40:	89 f8                	mov    %edi,%eax
+42:	99                   	cltd   
+43:	f7 fe                	idiv   %esi
+45:	89 d0                	mov    %edx,%eax
+47:	f7 d8                	neg    %eax
+49:	c1 f8 1f             	sar    $0x1f,%eax
+4c:	21 c6                	and    %eax,%esi
+4e:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
+51:	c3                   	retq   
+     */
     //return n%d + (n%d > 0? d: 0);  // correct
-    return n%d + (n%d <= 0? 0: d); // same
+    //return n%d + (n%d <= 0? 0: d); // same
     /* 0000000000000030 <test_rem_floorn(int, int)>:
 30:	89 f8                	mov    %edi,%eax
 32:	99                   	cltd   
@@ -346,25 +386,9 @@ DIVREMn(-2000444000,-1);
  */
 inline constexpr int div_floorx( int const n, int const d )
 {
-    //return n/d - (n%d<0 == d>0? !(n%d==0) : 0); // branchless and no cmov
-    /* 0000000000000020 <test_div_floorx(int, int)>:
-20:	89 f8                	mov    %edi,%eax
-22:	99                   	cltd   
-23:	f7 fe                	idiv   %esi
-25:	89 d1                	mov    %edx,%ecx
-27:	f7 d1                	not    %ecx
-29:	c1 e9 1f             	shr    $0x1f,%ecx
-2c:	85 f6                	test   %esi,%esi
-2e:	40 0f 9f c6          	setg   %sil
-32:	31 f1                	xor    %esi,%ecx
-34:	85 d2                	test   %edx,%edx
-36:	0f 95 c2             	setne  %dl
-39:	0f b6 d2             	movzbl %dl,%edx
-3c:	21 d1                	and    %edx,%ecx
-3e:	29 c8                	sub    %ecx,%eax
-40:	c3                   	retq   
-     */
-    //return n/d - (nzdiffsign_bnz(n%d,d/*!=0*/)? !(n%d==0) : 0);
+    // diffsign versions still have extra instrns ... so
+    //return n/d - (nzdiffsign_bnz(n%d,d/*!=0*/)? 1 : 0);
+    //return n/d - (nzdiffsign_bnz(n%d,d/*!=0*/)!=0);
     /* 0000000000000060 <test_div_floorx(int, int)>:
 60:	89 f8                	mov    %edi,%eax
 62:	99                   	cltd   
@@ -377,7 +401,34 @@ inline constexpr int div_floorx( int const n, int const d )
 72:	29 d0                	sub    %edx,%eax
 74:	c3                   	retq   
      */
-    return n/d - (nzdiffsign_bnz(n%d,d/*!=0*/)? 1 : 0); //same
+    //return n/d - ( ((n%d^d)>>31)? n%d!=0: 0);
+    return n/d - ( ((n%d^d)<0)? n%d!=0: 0); // same
+    /* 0000000000000060 <test_div_floorx(int, int)>:
+60:	89 f8                	mov    %edi,%eax
+62:	99                   	cltd   
+63:	f7 fe                	idiv   %esi
+65:	31 d6                	xor    %edx,%esi
+67:	c1 ee 1f             	shr    $0x1f,%esi
+6a:	85 d2                	test   %edx,%edx
+6c:	0f 95 c2             	setne  %dl
+6f:	21 d6                	and    %edx,%esi
+71:	29 f0                	sub    %esi,%eax
+73:	c3                   	retq   
+     */
+    //return n/d + ( ((n%d^d)<0)? -(n%d!=0): 0); // ok
+    //return n/d - ( n%d!=0? ((n%d)^d)<0: 0);  // better
+    // shorter, but branch, and branch is regularly wrong
+    /* 0000000000000060 <test_div_floorx(int, int)>:
+60:	89 f8                	mov    %edi,%eax
+62:	99                   	cltd   
+63:	f7 fe                	idiv   %esi
+65:	85 d2                	test   %edx,%edx
+67:	74 05                	je     6e <test_div_floorx(int, int)+0xe>
+69:	31 f2                	xor    %esi,%edx
+6b:	c1 ea 1f             	shr    $0x1f,%edx
+6e:	29 d0                	sub    %edx,%eax
+70:	c3                   	retq   
+     */
 }
 #define TEST_nzdiffsign_bnz(a,b) /* a,b > 0 */ \
 static_assert( !nzdiffsign_bnz(a,b), "oops sign" " +" #a " +" #b); \
@@ -401,15 +452,10 @@ int test_nzdiffsign_bnz( int const a, int const b )
 inline constexpr int rem_floorx( int const n, int const d )
 {
     //return n - d*div_floor(n,d); // correct, but not so good (has Multiply)
-    //return d>0? rem_floor(n,d): rem_floorn(n,d);
     //return d<0? rem_floorn(n,d): rem_floor(n,d);
-    //return n%d + (d & (d<0? (n%d>0? ~0: 0): (n%d<0? ~0: 0)));
-    // same return n%d + (d & (d<0? (n%d>0? ~(1-(d<0)): 1-(d<0)): (n%d<0? ~(d<0): (d<0))));
-    //return n%d + (d & ( ((d>>31)&&(n%d>0) || ((d>0)&&(n%d>>31)) ? ~0 : 0))); // longer
-    // ?? return n%d + (d & ( ((d^(n%d)>>31)!=0) || ((d>0)&&(n%d>>31)) ? ~0 : 0));
-    //
     // pretty good, no cmov ...
     //return n%d + (d & ( nzdiffsign_bnz(n%d,d/*!=0*/) ? ~0 : 0));
+    //return n%d + (d & ( (((n%d^d)>>31) & (n%d) ? ~0: 0)));
     /* 0000000000000090 <test_rem_floorx(int, int)>:
 90:	89 f8                	mov    %edi,%eax
 92:	99                   	cltd   
@@ -425,7 +471,8 @@ a6:	21 c6                	and    %eax,%esi
 a8:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
 ab:	c3                   	retq   
      */
-    return n%d + ( nzdiffsign_bnz(n%d, d/*!=0*/)? d: 0);
+    //return n%d + ( nzdiffsign_bnz(n%d, d/*!=0*/)? d: 0);
+    return n%d + ( (n%d) & ((n%d^d)>>31)? d: 0);
     /* shorter, but with cmov 0000000000000090 <test_rem_floorx(int, int)>:
 90:	89 f8                	mov    %edi,%eax
 92:	89 f1                	mov    %esi,%ecx
@@ -438,6 +485,8 @@ ab:	c3                   	retq
 a1:	8d 04 0a             	lea    (%rdx,%rcx,1),%eax
 a4:	c3                   	retq   
      */
+    //return n%d + ( ((n%d^d)>>31) & n%d? d: 0); // ouch
+    //return n%d + ( (n%d? d: 0) & ((n%d^d)>>31) );
 }
 static_assert( div_floorx( 5,3) ==  1, "oops");
 static_assert( div_floorx( 4,3) ==  1, "oops");
