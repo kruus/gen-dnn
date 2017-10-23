@@ -27,7 +27,7 @@
 
 namespace conv {
 
-#if 0
+#if 0 // from benchdnn README.md:
 **benchdnn** supports custom performance report. Template is passed via
 command line and consists of terminal and nonterminal symbols. Nonterminal
 symbols are printed as is. Description of terminal symbols is given below.
@@ -39,22 +39,22 @@ table of modifiers below.
 
 | abbreviation  | description
 |:------------  |:-----------
-| %d            | problem descriptor
-| %D            | expanded problem descriptor (conv parameters in csv format)
-| %n            | problem name
-| %i            | implementation string
-| %z            | direction
-| %O            | number of ops required (padding is not taken into account)
-| %@t           | time in ms
-| %@p           | ops per second
+| \%d           | problem descriptor
+| \%D           | expanded problem descriptor (conv parameters in csv format)
+| \%n           | problem name
+| \%z           | direction
+| \%O           | number of ops required (padding is not taken into account)
+| \%@t          | time in ms
+| \%@p          | ops per second
+| \%i           | convolution implementation string
 
 | modifier  | description
 |:--------  |:-----------
 |           | default
-| -         | min (time) -- default
+| -         | min (time) = default
 | 0         | avg (time)
 | +         | max (time)
-|           |
+| --------- | ----------
 | K         | Kilo (1e3)
 | M         | Mega (1e6)
 | G         | Giga (1e9)

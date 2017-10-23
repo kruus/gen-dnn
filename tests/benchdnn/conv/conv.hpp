@@ -193,6 +193,7 @@ void PFX##_bwd_w (const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &diff_wei_m, \
 COMPUTE_REF_DECL( compute_ref ) /* ref_conv.cpp */
 COMPUTE_REF_DECL( refconv_2 )   /* ref_conv2.cpp */
 COMPUTE_REF_DECL( refconv_3 )   /* ref_conv3.cpp */
+COMPUTE_REF_DECL( refconv_4 )   /* ref_conv4.cpp */
 
 typedef struct {
     conv_fwd_fn   fwd;
@@ -208,7 +209,7 @@ typedef struct {
  * \sa bench_mode.
  */
 conv_impls_t * get_ref_impls();
-size_t constexpr get_nref_impls() { return 3U; }
+size_t constexpr get_nref_impls() { return 4U; }
 
 void perf_report(const prb_t *p, const res_t *r, const char *pstr, const char *impl=nullptr);
 

@@ -44,12 +44,13 @@ static conv_impls_t conv_impls_[] = {
     {compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
     {refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
     {refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
+    {refconv_4_fwd,         refconv_4_bwd_d,            refconv_4_bwd_w}
 };
 
 #define TESTN (sizeof(conv_impls_) / sizeof(conv_impls_t))
 
 static_assert( TESTN == get_nref_impls(),
-        "Please reconcile conv_impls (conv.cpp) with get_nref_impls() (test.hpp");
+        "Please reconcile conv_impls (conv.cpp) with get_nref_impls() (conv/conv.hpp");
 conv_impls_t *conv_impls = &conv_impls_[0];
 
 conv_impls_t *get_ref_impls() { return conv_impls; }
@@ -654,7 +655,7 @@ static const char* cmp_fp_data(const char* msg, const dnn_mem_t &f32a,
 }
 
 /** run performance loops if bench_mode \& PERF.
- * \ret 0/1 OK/FAIL */
+ * \return 0/1 OK/FAIL */
 static int do_perf( mkldnn_primitive_t prim, res_t *r, const prb_t *p,
                 const char *impl=nullptr ) {
     bool want_perf_report = (bench_mode & PERF);

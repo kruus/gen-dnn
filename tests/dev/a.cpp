@@ -22,6 +22,11 @@
 using namespace std;
 
 // The following seems sufficient for seeing the actual assembly code.
+int test_nzdiffsign_bnz( int const a, int const b )
+{
+    ASM_COMMENT( "nzdiffsign" );
+    return nzdiffsign_bnz(a,b);
+}
 int test_div_floor( int n, int d){
     ASM_COMMENT( "divfp" );
     return div_floor(n,d);

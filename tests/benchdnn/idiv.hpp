@@ -11,29 +11,30 @@
 
 // fwd decl
 
-/** Truncate integer \c n / \c d \f$\forall n, d>0\f$ toward \f$-\infty\f$,
+/** Truncate integer \c n / \c d \f$\forall d>0, \mathrm{any }n\f$ toward \f$-\infty\f$,
  * unchecked.  These are fast, inlinable constexpr 1-line functions.
  * Use prior knowledge of signed-ness to choose the correct [fastest!]
  * function call.
  *
- * Intel+gcc
- * | Routine   | \~instrns | \~bytes (hex) | trunc \f$\rightarrow -infty\f$
- * | :------------ | :-------- | :------------ | :-------------------------
- * | n/d in C++11 or C99 | 1   | ??            | n>0, d>0
- * | **div_floor** | 5         | 0a            | any n, d>0
- * | div_floorn    | 7         | 1f            | any n, d<0
- * | div_floorx    | 15        | 40            | any n, any d!=0
+ * Intel+gcc (old versions!)
+ *
+ * | Routine   | \~instrns | \~bytes (hex) | trunc \f$\rightarrow -infty\f$ |
+ * |:------------- |:-------- |:------------ |:------------------------- |
+ * | n/d in C++11 or C99 | 1   | ??            | n>0, d>0 |
+ * | **div_floor** | 5         | 0a            | any n, d>0 |
+ * | div_floorn    | 7         | 1f            | any n, d<0 |
+ * | div_floorx    | 15        | 40            | any n, any d!=0 |
  */
 constexpr int div_floor( int const n, int const d );
 /** Euclidean remainder for \c d> 0 returns \b\c r in [0,k)
  * st \c n \c =d*k+r for some int \c k. [\c k is div_floor(n,d)]. */
 constexpr int rem_floor( int const n, int const d );
 
-/** Truncate integer \c n / \c d \f$\forall n, d<0\f$ toward \f$-\infty\f$,
- * unchecked. About 8 branchless instrns on Intel w/ cmov. */
+/** Truncate integer \c n / \c d \f$\forall d<0, \mathrm{any }n\f$ toward \f$-\infty\f$,
+ * unchecked. */
 constexpr int div_floorn( int const n, int const d );
 /** For \c d<0, returns \c r in (d,0] st \c n \c =d*k+r. This is so
- * \f$n=d*\textrm{div_{floor*}}(n,d) + \textrm{rem_{floor*}}\f$ holds. */
+ * \f$n=d*\mathrm{div_{floor*}}(n,d) + \mathrm{rem_{floor*}}\f$ holds. */
 inline constexpr int rem_floorn( int const n, int const d );
 
 /** Truncate integer \c n / \c d (any signs) \f$\forall n, d!=0\f$
@@ -104,7 +105,7 @@ static_assert( -4%-3 ==-1, "oops");
 9:	c3                   	retq   
  * \endcode
  */
-static inline constexpr int nzdiffsign_bnz( int const a, int const b )
+inline constexpr int nzdiffsign_bnz( int const a, int const b )
 {
 #if 1
     return a & ((a^b)<0? ~0: 0); // return a or 0
@@ -115,7 +116,8 @@ static inline constexpr int nzdiffsign_bnz( int const a, int const b )
 7:	21 f8                	and    %edi,%eax
 9:	c3                   	retq   
      */
-    //return ((a^b)<0? a: 0);                // return a/0 
+#elif 0 && !defined(DOXYGEN_SHOULD_SKIP_THIS)
+    //return ((a^b)<0? a: 0);                   // return a or 0 
     /*
        0000000000000000 <test_nzdiffsign_bnz(int, int)>:
 0:	31 fe                	xor    %edi,%esi
@@ -123,8 +125,8 @@ static inline constexpr int nzdiffsign_bnz( int const a, int const b )
 7:	0f 48 c7             	cmovs  %edi,%eax
 a:	c3                   	retq   
      */
-    //return ((a^b)<0? (a!=0): 0);                // return 1/0
-    //return ((a^b) & ((a!=0)? ~0: 0)) < 0; // ouch
+    //return ((a^b)<0? (a!=0): 0);              // return 1 or 0
+    //return (a!=0) & ((a^b)<0);                // return 1 or 0
     /*
        0000000000000000 <test_nzdiffsign_bnz(int, int)>:
 0:	31 fe                	xor    %edi,%esi
@@ -135,8 +137,10 @@ a:	21 f0                	and    %esi,%eax
 c:	c3                   	retq   
      */
 #elif (-1 >> 1 == -1)
+    return ( ((a^b)>>31) & a ); // good, equiv  a & ((a^b)<0? ~0: 0)
     //return a!=0 && b!=0 && (a^b)<0; // ok, but long
-    //return ( ((a^b)>>31) & (a!=0) );          // return 1/0
+    //return ( ((a^b)>>31) & (a!=0) );          // return 1 or 0
+    //return (a & ((a^b)<0? ~0: 0)) != 0;       // return 1 or 0
     /* 
 0:	31 fe                	xor    %edi,%esi
 2:	31 c0                	xor    %eax,%eax
@@ -146,23 +150,24 @@ c:	c3                   	retq
 c:	21 f0                	and    %esi,%eax
 e:	c3                   	retq   
      */
-    return ( ((a^b)>>31) & a );
 #else
 #error "bit-twiddling hacks insufficient"
 #endif
 }
-/** Truncate integer \c n / \c d \f$\forall n, d>0\f$ toward \f$-\infty\f$.
+/** 
  * In C99 and C++11 integer division always truncates -ves toward 0.
  * so:
+ * \verbatim
  *         5/3=1,     4/3=1,   3/3=1
  *         2/3=0,     1/3=0,   0/3=0
  * , but **-1/3=0**, -2/3=0,  -3/3=-1
+ * \endverbatim
  *
  * When dealing with integer inequalities, we often need to
- * always truncate the division downward,
- * towards \f$-\infty\f$.  This happens when we deal with
- * integer.
+ * always truncate the division downward, towards \f$-\infty\f$.
+ *
  * \pre d > 0 (unchecked)
+ * \return n/d rounded downward toward \f$-\infty\f$
  * \note This fast case often applies to strided "forward"
  *       index calculations.  Any-valued strides should use
  *       \c div_floorx. Negative strides can use \c div_floorn.
@@ -179,7 +184,7 @@ inline constexpr int div_floor( int const n, int const d )
 8:	29 d0                	sub    %edx,%eax
 a:	c3                   	retq   
      */
-#else
+#elif !defined(DOXYGEN_SHOULD_SKIP_THIS)
     return (n + ((n>=0)? 0: 1-d)) / d; // 2-insn branch
     // bit-twiddling of "add-to-n" fixups ...
     //return (n-rem_floor(n,d)) / d; // not so nice
@@ -205,10 +210,6 @@ inline constexpr int rem_floor( int const n, int const d )
 {
 #if 1 // I think this one is totally portable, and code is identical to next
     return n%d + (d & (n%d<0? ~0: 0));
-#elif ~(-1) == 0 /* best code, without numeric_limits */
-    // only assumes 2-s complement
-    //return (n%d +   (d & (-(n%d<0)        ) ));
-    //return (n%d + (d & (n%d<0? 0xFFffFFff: 0) )); // test!
     /* 0000000000000010 <test_rem_floor(int, int)>:
 10:	89 f8                	mov    %edi,%eax
 12:	99                   	cltd   
@@ -219,6 +220,10 @@ inline constexpr int rem_floor( int const n, int const d )
 1c:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
 1f:	c3                   	retq   
      */
+#elif ~(-1) == 0 /* best code, without numeric_limits */
+    // only assumes 2-s complement
+    //return (n%d +   (d & (-(n%d<0)        ) ));       // equiv
+    //return (n%d + (d & (n%d<0? 0xFFffFFff: 0) ));     // equiv
 #elif -1 >> 1 == -1 /* have signed arithmetic shift? */
     // same code as above
     return n%d + ((n%d>>(std::numeric_limits<int>::digits)) & d);
@@ -271,10 +276,7 @@ DIVREM(-5,3); // 1
 DIVREM( 2000444000,1);
 DIVREM(-2000444000,1);
 
-/** Truncate integer \c n / \c d \f$\forall n, d<0\f$
- * toward \f$-\infty\f$.
- * \pre d != 0 (unchecked)
- */
+/** \pre d < 0 (unchecked) */
 inline constexpr int div_floorn( int const n, int const d )
 {
     //return (n/d) - (n%d>0? 1: 0); 
@@ -444,10 +446,6 @@ static_assert( !nzdiffsign_bnz(0,-1), "oops");
 static_assert( !nzdiffsign_bnz(0,2000111000), "oops");
 static_assert( !nzdiffsign_bnz(0,-2000111000), "oops");
 //static_assert( !nzdiffsign_bnz(0,0), "oops");
-int test_nzdiffsign_bnz( int const a, int const b )
-{
-    return nzdiffsign_bnz(a,b);
-}
 /** \pre d!=0 (unchecked) */
 inline constexpr int rem_floorx( int const n, int const d )
 {

@@ -176,34 +176,34 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
         }
     };
 
-#   pragma omp parallel for collapse(4)
+#   pragma omp parallel for collapse(5)
     for (int g = 0; g < p->g; ++g) {
     for (int mb = 0; mb < p->mb; ++mb) {
         for (int oc = 0; oc < p->oc/p->g; ++oc) {
         for (int oh = 0; oh < p->oh; ++oh) {
-        int kh_beg, kh_end;
-        hoist_ApiB_in( kh_beg, kh_end,
-                /*i  in   */ 0, p->kh,
-                /*ih=A+iB */ (oh * p->sh - p->ph), (p->dh + 1),
-                /*ih in   */ 0, p->ih);
         for (int ow = 0; ow < p->ow; ++ow) {
+            size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+            size_t bia_off = bia_off_f(p, g, oc);
+            float &d = ((float*)dst_m)[dst_off];
+            d = (p->dir & FLAG_BIA)? ((float*)bia_m)[bia_off] : 0;
+            int kh_beg, kh_end;
+            hoist_ApiB_in( kh_beg, kh_end,
+                    /*i  in   */ 0, p->kh,
+                    /*ih=A+iB */ (oh * p->sh - p->ph), (p->dh + 1),
+                    /*ih in   */ 0, p->ih);
+            if (kh_beg < kh_end){
             int kw_beg, kw_end;
             hoist_ApiB_in( kw_beg, kw_end,
                     /*i  in   */ 0, p->kw,
                     /*iw=A+iB */ (ow * p->sw - p->pw), (p->dw + 1),
                     /*iw in   */ 0, p->iw);
-            size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
-            size_t bia_off = bia_off_f(p, g, oc);
-            float &d = ((float*)dst_m)[dst_off];
-            d = (p->dir & FLAG_BIA)? ((float*)bia_m)[bia_off] : 0;
-            if( TRIVIAL(kh_beg >= kh_end || kw_beg >= kw_end) ){
-                DPRINTF("t");
-            } else {
+            if (kw_beg < kw_end){
                 DPRINTF(".");
                 ker( p, src_m, wei_m,
                         d, g, mb, oc, oh, ow
                         , kh_beg, kh_end, kw_beg, kw_end
                    );
+            }
             }
             if (p->merge == RELU && d < 0)
                 d = 0;
