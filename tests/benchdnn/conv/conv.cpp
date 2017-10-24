@@ -1045,10 +1045,10 @@ int doit(const prb_t *p, res_t *r) {
 #define TEST_IMPL_END do \
             { \
                 bool all_passed = bs.ts->end_impls(); \
-                printf(" TEST all_passed=%d ",(int)all_passed); \
-                if (all_passed && !(bench_mode&PERF || bench_mode&CORR)) { \
-                    ++bs.mistrusted; \
-                    printf(" mistrusted "); \
+                /*printf(" TEST all_passed=%d ",(int)all_passed);*/ \
+                if (!(bench_mode&PERF || bench_mode&CORR)) { \
+                    if(all_passed) ++bs.mistrusted; else ++bs.failed; \
+                    /*printf(" mistrusted ");*/ \
                 } \
             }while(0)
             TEST_IMPL_END;

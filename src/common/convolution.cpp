@@ -141,9 +141,9 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
             (src - ((ker - 1) * (dil + 1) + 1) + pad) / str + 1 == dst;
 #else
         AND_WANT((src - ((ker - 1) * (dil + 1) + 1) + pad) / str + 1 == dst);
-#endif
         if( !consistency ){ DPRINT("(src-((ker-1)+(dil+1)+1) + pad)/str+1 = (%d-(%d*%d+1)+%d)/%d+1 = %d/%d+1 = %d, but dst = %d\n",
                 src,ker-1,dil+1,pad,str, (src - ((ker - 1) * (dil + 1) + 1) + pad), str,  (src - ((ker - 1) * (dil + 1) + 1) + pad) / str + 1, dst);}
+#endif
     }
 #ifndef NDEBUG
     //printf("consistency = %s\n", (consistency?"true":"false"));

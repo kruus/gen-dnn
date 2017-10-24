@@ -24,7 +24,14 @@ static int const vdbg=99; // threshold verbose level for this file
 
 test_stats::~test_stats() {
     print(vdbg,"%s","~test_stats()");
-    if(td!=nullptr) delete td;
+    if(td!=nullptr) {
+        if( td->loops > 0 ){
+            printf("TEST final stats:\n");
+            this->prt();
+        }
+        delete td;
+        td = nullptr;
+    }
 }
 
 void test_stats::reset_all(){
@@ -48,7 +55,7 @@ void test_stats::begin_impls(){
         td->ms[i] = 0.0;
     }
     td->impls_ok = true;  // remains true iff all test comparisons pass
-    printf(" +impls_ok=%d ",td->impls_ok);
+    //printf(" +impls_ok=%d ",td->impls_ok);
 }
 void test_stats::update_impl(const prb_t *p, res_t *r, int status,
         benchdnn_timer_t const& tt, int imp)
@@ -63,8 +70,8 @@ void test_stats::update_impl(const prb_t *p, res_t *r, int status,
           pstr);
     td->ms[imp] = tt.total_ms();
     if (r->state==UNTESTED) r->state = PASSED;
-    if (r->state!=PASSED) { td->impls_ok = false; printf(" !impls_ok "); }
-    else printf(" ??impls_ok=%d ",(int)(td->impls_ok));
+    if (r->state!=PASSED) { td->impls_ok = false; /*printf(" !impls_ok ");*/ }
+    //else printf(" ??impls_ok=%d ",(int)(td->impls_ok));
 }
 bool test_stats::end_impls(){
     ++td->loops;

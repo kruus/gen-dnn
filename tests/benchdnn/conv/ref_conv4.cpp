@@ -574,6 +574,9 @@ void refconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
 void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
                      dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m)
 {
+  const int a = div_floor( p->ph - (p->kh-1)*(p->dh+1), p->sh );
+  const int b = a*p->sh - p->ph + (p->kh-1) * (p->dh+1);
+  const int oh_lowest = (b>0? b: 0); /// oh wow, oh0 is INDEPENDENT of all loop vars
 #   pragma omp parallel for collapse(2)
   for (int g = 0; g < p->g; ++g) {
     for (int mb = 0; mb < p->mb; ++mb) {
@@ -636,7 +639,7 @@ void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
             }
           }
         }
-#elif 1 // 2.4x loop order
+#elif 0 // 2.4x loop order
         // bounds, then branch (easy case: p-dh == 0)
         for (int ih = 0; ih < p->ih; ++ih) {
           for (int iw = 0; iw < p->iw; ++iw) {
@@ -680,22 +683,25 @@ void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
             }
           }
         }
-#elif 1 // dbg
-        // bounds, then branch (easy case: p-dh == 0)
-        printf("\n"); int ocount = 0;
-        for (int kh = 0; kh < p->kh; ++kh) {
-          for (int ih = 0; ih < p->ih; ++ih) {
+#elif 0 // separate ih,iw,kw loops and print
+        for (int ih = 0; ih < p->ih; ++ih) {
+          for (int iw = 0; iw < p->iw; ++iw) {
+            const size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+            float &ds = ((float*)diff_src_m)[src_off];
+            ds = 0; ///printf(" Z "); /// cannot move into kh-loop
+          }
+        }
+        printf("\nk,i,oh= "); int ocount = 0; ///ooo
+        for (int ih = 0; ih < p->ih; ++ih) {
+          for (int kh = 0; kh < p->kh; ++kh) {
             int oh0 = ih - kh * (p->dh + 1) + p->ph;
-            //if (oh0 % p->sh) continue;
             int oh = oh0 / p->sh;
             if (oh < 0 || oh >= p->oh) continue;
             if (oh * p->sh != oh0) continue;
+            printf( "%d,%d,%d%s", kh,ih,oh, (++ocount%10==0?"\n        ":"  ")); ///ooo
             RT_ASSERT( ih == oh*p->sh + kh * (p->dh + 1) - p->ph );
-            printf( "%ck,i,oh=%d,%d,%d", (++ocount%10==1?'\n':' '), kh,ih,oh );
+
             for (int iw = 0; iw < p->iw; ++iw) {
-              const size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
-              float &ds = ((float*)diff_src_m)[src_off];
-              ds = 0;
               for (int kw = 0; kw < p->kw; ++kw) {
                 int ow = iw - kw * (p->dw + 1) + p->pw;
                 if (ow < 0 || ow % p->sw) continue;
@@ -704,6 +710,8 @@ void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
                 for (int oc = 0; oc < p->oc/p->g; ++oc) {
                   size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
                   size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+                  const size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+                  float &ds = ((float*)diff_src_m)[src_off];
                   ds += ((float*)diff_dst_m)[dst_off]
                     * ((float*)wei_m)[wei_off];
                 }
@@ -711,51 +719,84 @@ void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
             }
           }
         }
-#elif 1 // 2.4x loop order
-        // bounds, then branch (easy case: p-dh == 0)
+#elif 0 // loop order change -- tricky
+        printf("\nk,i,oh= "); int ocount = 0; ///ooo
 #if 0
         for (int ih = 0; ih < p->ih; ++ih) {
           for (int kh = 0; kh < p->kh; ++kh) {
             int oh0 = ih - kh * (p->dh + 1) + p->ph;
-            //if (oh0 % p->sh) continue;
             int oh = oh0 / p->sh;
             if (oh < 0 || oh >= p->oh) continue;
             if (oh * p->sh != oh0) continue;
+            printf( "%s%d,%d,%d", (++ocount%10==1?"\n       ":"  "), kh,ih,oh ); ///ooo
+            RT_ASSERT( ih == oh*p->sh + kh * (p->dh + 1) - p->ph );
 #else
         //        const int iw0 = rem_floor( - p->pw + kw * (p->dw + 1), p->sw);  ///<--
         //        for (int iw = iw0; iw < p->iw; iw += p->sw) {                   ///<--
         //          const int ow = (iw + p->pw - kw * (p->dw + 1)) / p->sw;       ///<--
         //          if (ow < 0 || ow >= p->ow) continue;                          ///<--
+        for (int ih = 0; ih < p->ih; ++ih) {
+          for (int iw = 0; iw < p->iw; ++iw) {
+            const size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+            float &ds = ((float*)diff_src_m)[src_off];
+            ds = 0;
+          }
+        }
         for (int kh = 0; kh < p->kh; ++kh) {
-          ///int oh0 = ih - p->ph - kh * (p->dh + 1);
-          ///int oh = oh0 / p->sh
-          const int oh0 = rem_floor( - p->ph + kh * (p->dh+1), p->sh );
+          ///int oh00 = ih + p->ph - kh * (p->dh + 1);
+          ///int oh = oh00 / p->sh
+          // lowest oh is for ih="near zero" kh=p->kh-1:
+          //     oh = (ih + p->ph - (p->kh-1)*(p->dh+1)) / p->sh; // almost OK
+          //     oh = (ih + p->ph - (p->kh-1)*(p->dh+1)) / p->sh; // almost OK
+          //const int a = div_floor( p->ph - (p->kh-1)*(p->dh+1), p->sh );
+          //const int b = a*p->sh - p->ph + (p->kh-1) * (p->dh+1);
+          //const int oh0 = (b>0? b: 0); /// oh wow, oh0 is INDEPENDENT of all loop vars
+          const int oh0 = oh_lowest; // moved above!
+          printf(" kh=%d,oh0=%d:   ",kh,oh0);
           RT_ASSERT( oh0 >= 0 );
-          for (int oh = oh0/p->sh; oh < p->oh; oh+=p->sh) {
-            ///const int ih = oh*p->sh - p->ph + kh * (p->dh+1);
+          for (int oh = oh0; oh < p->oh; ++oh) {
             const int ih = oh*p->sh - p->ph + kh * (p->dh+1);
             if( ih < 0 || ih >= p->ih ) continue;
-#endif
-            RT_ASSERT( ih == oh*p->sh + kh * (p->dh + 1) - p->ph );
-            //const int iih = oh + kh * (p->dh + 1) - p->ph;
-            //RT_ASSERT( iih == ih );
-            //if (oh < 0 ) continue;
-            //RT_ASSERT( p->sh > 0 );
-            ////if (oh % p->sh) continue;             ///<---
-            //RT_ASSERT( oh/p->sh*p->sh == oh );
-            //oh /= p->sh;
-            //RT_ASSERT( oh*p->sh == oh*p->sh );
-            ////if (oh * p->sh != oh) continue;
-            //RT_ASSERT( ih == oh*p->sh + kh * (p->dh + 1) - p->ph );
-            //if (oh >= p->oh) continue;
-
             RT_ASSERT( ih >= 0 && ih < p->ih );
             RT_ASSERT( oh >= 0 && oh < p->oh );
             RT_ASSERT( kh >= 0 && kh < p->kh );
+            printf( "%d,%d,%d%s", kh,ih,oh, (++ocount%10==0?"\n        ":"  ")); ///ooo
+            RT_ASSERT( ih == oh*p->sh + kh * (p->dh + 1) - p->ph );
+#endif
+            for (int iw = 0; iw < p->iw; ++iw) {
+              for (int kw = 0; kw < p->kw; ++kw) {
+                int ow = iw - kw * (p->dw + 1) + p->pw;
+                if (ow < 0 || ow % p->sw) continue;
+                ow /= p->sw;
+                if (ow >= p->ow) continue;
+                for (int oc = 0; oc < p->oc/p->g; ++oc) {
+                  size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+                  size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+            const size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+            float &ds = ((float*)diff_src_m)[src_off];
+                  ds += ((float*)diff_dst_m)[dst_off]
+                    * ((float*)wei_m)[wei_off];
+                }
+              }
+            }
+          }
+        }
+#elif 1 // cleanup debug and do "same" for ih,iw,kw loops XXX
+        for (int ih = 0; ih < p->ih; ++ih) {
+          for (int iw = 0; iw < p->iw; ++iw) {
+            const size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+            float &ds = ((float*)diff_src_m)[src_off];
+            ds = 0;
+          }
+        }
+        for (int kh = 0; kh < p->kh; ++kh) {
+          for (int oh = oh_lowest; oh < p->oh; ++oh) {
+            const int ih = oh*p->sh - p->ph + kh * (p->dh+1);
+            if( ih < 0 || ih >= p->ih ) continue;
+
             for (int iw = 0; iw < p->iw; ++iw) {
               const size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
               float &ds = ((float*)diff_src_m)[src_off];
-              ds = 0;
               for (int kw = 0; kw < p->kw; ++kw) {
                 int ow = iw - kw * (p->dw + 1) + p->pw;
                 if (ow < 0 || ow % p->sw) continue;

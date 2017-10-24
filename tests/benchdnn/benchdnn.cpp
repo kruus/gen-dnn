@@ -29,7 +29,6 @@
 #include "mkldnn_memory.hpp"
 
 #include "conv/conv.hpp"
-#
 #include "ip/ip.hpp"
 
 #if defined(_OPENMP)
