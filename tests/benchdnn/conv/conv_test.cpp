@@ -40,12 +40,15 @@ void test_stats::reset_all(){
             td->wins[i*TESTN+j] = 0U;
         }
     }
+    td->impls_ok = true;
     // check... this->prt();
 }
 void test_stats::begin_impls(){
     for(unsigned i=0; i<TESTN; ++i){
         td->ms[i] = 0.0;
     }
+    td->impls_ok = true;  // remains true iff all test comparisons pass
+    printf(" +impls_ok=%d ",td->impls_ok);
 }
 void test_stats::update_impl(const prb_t *p, res_t *r, int status,
         benchdnn_timer_t const& tt, int imp)
@@ -60,9 +63,10 @@ void test_stats::update_impl(const prb_t *p, res_t *r, int status,
           pstr);
     td->ms[imp] = tt.total_ms();
     if (r->state==UNTESTED) r->state = PASSED;
-    if (status != OK) { ++benchdnn_stat.test_fail; r->state = FAILED; }
+    if (r->state!=PASSED) { td->impls_ok = false; printf(" !impls_ok "); }
+    else printf(" ??impls_ok=%d ",(int)(td->impls_ok));
 }
-void test_stats::end_impls(){
+bool test_stats::end_impls(){
     ++td->loops;
     for(unsigned i=imp0; i<TESTN; ++i){
         td->ms_tot[i] += td->ms[i];             // total ms per impl
@@ -74,6 +78,7 @@ void test_stats::end_impls(){
             }
         }
     }
+    return td->impls_ok;
 }
 void test_stats::prt(){
     RT_ASSERT( td != nullptr );

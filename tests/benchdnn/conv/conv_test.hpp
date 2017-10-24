@@ -27,7 +27,7 @@ struct test_stats {
     void begin_impls();
     void update_impl(const conv::prb_t *p, res_t *r, int status,
                      benchdnn_timer_t const& tt, int imp);
-    void end_impls();
+    bool end_impls();           ///< return false if any impls were not PASSED.
     void prt();
     ~test_stats();
 private:

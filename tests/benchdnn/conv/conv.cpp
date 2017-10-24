@@ -831,6 +831,7 @@ private:
 static void benchdnn_stat_update( res_state_t st, res_t *r )
 {
     auto &bs = benchdnn_stat;
+    print(0," benchdnn_stat_update!!!%c", ' ');
     //char const *state = state2str(r->state);
     switch (st) {
     case UNTESTED:
@@ -952,7 +953,7 @@ int doit(const prb_t *p, res_t *r) {
     }
     // improvement: TEST with dilates should not return UNIMPLEMENTED just
     // because mkl-dnn does not support BWD dirn with dilates.
-    print(0, "%s", "\n");
+    print(0, "%s", " (setting up test data)\n");
     RT_ASSERT( r->state == UNTESTED || r->state == UNIMPLEMENTED );
 
     auto &src_dt_d = p->dir == BWD_D ? cd.diff_src_desc : cd.src_desc;
@@ -1029,18 +1030,28 @@ int doit(const prb_t *p, res_t *r) {
                     SAFE(compare_dst(p, dst_tt, dst_fp, r), WARN);
                     return OK;
                 };
-#define TEST_IMPL_COMPARE do { \
-    benchdnn_timer_t tt; \
-    tt.start(); \
-    run_fn(); \
-    tt.stop(); \
-    print(5, "compare impl[%lu] vs impl[0]", (unsigned long)imp); \
-    int status = compare_fn(); \
-    bs.ts->update_impl(p, r, status, tt, imp); \
-}while(0)
-            TEST_IMPL_COMPARE;
+#define TEST_IMPL_COMPARE do \
+                { \
+                    benchdnn_timer_t tt; \
+                    tt.start(); \
+                    run_fn(); \
+                    tt.stop(); \
+                    print(5, "compare impl[%lu] vs impl[0]", (unsigned long)imp); \
+                    int status = compare_fn(); \
+                    bs.ts->update_impl(p, r, status, tt, imp); \
+                }while(0)
+                TEST_IMPL_COMPARE;
             }
-            bs.ts->end_impls();
+#define TEST_IMPL_END do \
+            { \
+                bool all_passed = bs.ts->end_impls(); \
+                printf(" TEST all_passed=%d ",(int)all_passed); \
+                if (all_passed && !(bench_mode&PERF || bench_mode&CORR)) { \
+                    ++bs.mistrusted; \
+                    printf(" mistrusted "); \
+                } \
+            }while(0)
+            TEST_IMPL_END;
         }
         if( bench_mode & PERF || bench_mode & CORR ) {
             r->state = UNTESTED; // ignore errors in test loops (just report)
@@ -1117,6 +1128,7 @@ int doit(const prb_t *p, res_t *r) {
                 };
                 TEST_IMPL_COMPARE;
             }
+            TEST_IMPL_END;
         }
         if( bench_mode & PERF || bench_mode & CORR ) {
             r->state = UNTESTED; // ignore errors in test loops (just report)
@@ -1172,6 +1184,7 @@ int doit(const prb_t *p, res_t *r) {
                 };
                 TEST_IMPL_COMPARE;
             }
+            TEST_IMPL_END;
         }
         if( bench_mode & PERF || bench_mode & CORR ) {
             r->state = UNTESTED; // ignore errors in test loops (just report)

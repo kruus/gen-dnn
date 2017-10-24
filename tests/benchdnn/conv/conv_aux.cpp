@@ -122,7 +122,8 @@ int str2desc(desc_t *desc, const char *str) {
     if (d.sh < 1  || d.sw <  1) return FAIL;
 
     auto compute_out = [](int i, int k, int s, int p, int d) {
-        return (i - ((k - 1) * (d + 1) + 1) + 2 * p) / s + 1;
+        return (i - ((k-1) * (d+1) + 1) + 2 * p) / s + 1;
+        // padding left + right           ^^^^^
     };
     auto compute_pad = [](int o, int i, int k, int s, int d) {
         /* XXX: is it oK? */
@@ -165,6 +166,35 @@ int str2desc(desc_t *desc, const char *str) {
     }
 
     *desc = d;
+
+    // patch things to consistency a bit more
+    int ddow = compute_out(d.iw, d.kw, d.sw, d.pw, d.dw);
+    int ddoh = compute_out(d.ih, d.kh, d.sh, d.ph, d.dh);
+    if( d.ow < ddow ) d.ow = ddow; // allow making output bigger
+    if( d.oh < ddoh ) d.oh = ddoh;
+    if( d.ow < 1 ) d.ow = 1;
+    if( d.oh < 1 ) d.oh = 1;
+    bool strange = ddow > d.ow || ddoh > d.oh || d.ow <= 0 || d.oh <= 0;
+    if (strange){
+        print(0, "       i,k,s,p,d %d,%d,%d,%d,%d -> ow=%d, but have d.ow=%d\n",
+              d.iw, d.kw, d.sw, d.pw, d.dw, ddow, d.ow );
+        print(0, " ow = ([ih=%d] - [k-1,d+1](%d*%d+1) + (2p=%d) / %d + 1\n"
+              "    = %d / %d + 1\n",
+              d.iw, d.kw-1, d.dw+1, 2*d.pw, d.sw,
+              d.iw - ((d.kw-1)*(d.dw+1)+1), d.sw );
+        print(0, "       i,k,s,p,d %d,%d,%d,%d,%d -> oh=%d\n",
+              d.ih, d.kh, d.sh, d.ph, d.dh, d.oh );
+    }
+
+    if( strange ){
+        printf("Error: Tried to make things consistend,"
+               " but still bad output width/height\n");
+        printf("       i,k,s,p,d %d,%d,%d,%d,%d -> ow=%d\n",
+               d.iw, d.kw, d.sw, d.pw, d.dw, d.ow );
+        printf("       i,k,s,p,d %d,%d,%d,%d,%d -> oh=%d\n",
+               d.ih, d.kh, d.sh, d.ph, d.dh, d.oh );
+        return FAIL;
+    }
 
     return OK;
 }

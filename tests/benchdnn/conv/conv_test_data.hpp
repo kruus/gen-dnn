@@ -23,6 +23,9 @@ struct test_data_t {
     /** how many TEST (loops-over-impls)? */
     unsigned loops;
 
+    /** was the last (loop-over-impls) all-PASSED? */
+    bool impls_ok;
+
     /** for each loop-over-impls, record time taken */
     double ms[get_nref_impls()];
 

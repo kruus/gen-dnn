@@ -57,6 +57,23 @@ void reset_parameters() {
     allow_unimpl = false;
 }
 
+/** return true if we think mkldnn ought to support this problem. */
+bool check_mkldnn_support( const prb_t *p, res_t *res ) {
+    char const *errmsg = nullptr;
+    if (p->dir == BWD_D && (p->dh>0 || p->dw>0)){
+        printf(" p->dh=%d, p->dw=%d\n", p->dh, p->dw);
+        errmsg="mkl-dnn BWD_D + dilation not possible (yet?)";
+    }
+    // others? ...
+    if (errmsg != nullptr){
+        printf("\nUNTESTABLE: mkl-dnn probably doesn't handle this case yet\n"
+               "          %s\n", errmsg);
+        auto &bs = benchdnn_stat;
+        res->state = SKIPPED;
+        ++bs.skipped;
+    }
+    return errmsg == nullptr;
+}
 void check_correctness(const desc_t *c) {
     const prb_t p(*c, dir, cfg, alg, merge, mb);
     char pstr[max_prb_len];
@@ -67,65 +84,53 @@ void check_correctness(const desc_t *c) {
     print(1, "run: %s", pstr);
 
     res_t res{ .state=UNTESTED };
-    const int status = conv::doit(&p, &res);
-    RT_ASSERT( status == OK || status == FAIL );
-
     auto &bs = benchdnn_stat;
-#if 0
-    print(0," (test %d, old output SKIPPED, bs.name=%s)", bs.tests,
-            (c->name?c->name:"NULL"));
+
+#if 1
+    // Nicely avoid unsupported things:
+    const bool mkldnn_ok = check_mkldnn_support(&p, &res);
+    int status = (mkldnn_ok? conv::doit(&p, &res): OK);
 #else
-    bool want_perf_report = false;
+    const bool mkldnn_ok = true;
+    int status = conv::doit(&p, &res);
+#endif
+    RT_ASSERT( status == OK || status == FAIL );
 
     // XXX TODO output messages based on bs directly
     const char *state = state2str(res.state);
 
     switch (res.state) {
     case UNTESTED:
-        //if (!(bench_mode & CORR)) {
-            //want_perf_report = true;
-            //break;
-        //}
-    case FAILED:
-        assert(status == FAIL);
-        //bs.failed++;
-        print(0, "%d:%s (errors:%d total:%d) __REPRO: %s\n", bs.tests, state,
-                res.errors, res.total, pstr);
-        break;
+        ++bs.skipped; // ???
     case SKIPPED:
         assert(status == OK);
         print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
-        //bs.skipped++;
+        break;
+    case FAILED:
+        // XXX assert(status == FAIL);
+        print(0, "%d:%s (errors:%d total:%d) __REPRO: %s\n", bs.tests, state,
+                res.errors, res.total, pstr);
         break;
     case UNIMPLEMENTED:
         assert(status == FAIL);
         print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
-        //bs.unimplemented++;
-        //bs.failed += !allow_unimpl;
         break;
     case MISTRUSTED:
         assert(status == OK);
-        //bs.mistrusted++;
         print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
-        // bs.failed++; /* temporal workaround for some tests */
         break;
     case PASSED:
         assert(status == OK);
         print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
-        //want_perf_report = true;
-        //bs.passed++;
         break;
     default:
         RT_ASSERT(!"unknown state");
     }
 
-    if(0){ // old report method, now we iterate inside doit
-        // o/w would need second impl-iter loop.
-        if (want_perf_report && bench_mode & PERF)
-            perf_report(&p, &res, pstr);
-    }//old report method
-#endif
     ++bs.tests;
+    if(mkldnn_ok && (bench_mode & TEST)){
+        bs.ts->prt();
+    }
 
 }
 
@@ -183,10 +188,6 @@ int bench(int argc, char **argv, bool main_bench) {
                 exit(2);
             }
             check_correctness(&c);
-            if((bench_mode & TEST)){
-                print(0,"%s","??? 000 ts->prt\n");
-                benchdnn_stat.ts->prt();
-            }
         }
     }
 
@@ -195,10 +196,6 @@ int bench(int argc, char **argv, bool main_bench) {
         print(0,"/* using default list of %d problems */", N);
         for (int n = 0; n < N; ++n)
             check_correctness(&default_list[n]);
-        if((bench_mode & TEST)){
-            print(0,"%s","??? 111 ts->prt\n");
-            benchdnn_stat.ts->prt();
-        }
     }
 
     --recurse;
