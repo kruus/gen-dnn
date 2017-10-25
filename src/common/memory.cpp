@@ -44,6 +44,9 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     bool args_ok = !any_null(memory_desc)
         && 0 < ndims && ndims <= TENSOR_MAX_DIMS
         && one_of(data_type, f32, s32, s16, s8, u8);
+#ifndef NDEBUG
+    if (!args_ok){ printf("Oops [%s:%d] !args_ok\n", __FILE__, __LINE__); fflush(stdout);}
+#endif
     if (!args_ok) return invalid_arguments;
 
     /* for now, mkl-dnn is written NOT to support large tensors (>2G) */
@@ -119,6 +122,7 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     case memory_format::undef:
     case blocked:
     default:
+        printf(" ??? memory_desc_init not enough information\n");
         return invalid_arguments;
     }
 

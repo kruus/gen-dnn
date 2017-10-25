@@ -320,7 +320,8 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
   }
 }
 
-/** This one just reuses the hoisting function from FWD */
+/** This one just reuses the hoisting function from FWD.
+ * g,oc,ic,kh,kw,mb,oh,ow,[iw],[ih] */
 void refconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     dnn_mem_t &diff_wei_m, dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m) {
 #define NEW 1

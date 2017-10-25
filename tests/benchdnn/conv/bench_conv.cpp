@@ -60,9 +60,10 @@ void reset_parameters() {
 /** return true if we think mkldnn ought to support this problem. */
 bool check_mkldnn_support( const prb_t *p, res_t *res ) {
     char const *errmsg = nullptr;
-    if (p->dir == BWD_D && (p->dh>0 || p->dw>0)){
+    if ((p->dir == BWD_D) || (p->dir == BWD_W) || (p->dir == BWD_WB)
+            && (p->dh>0 || p->dw>0)){
         printf(" p->dh=%d, p->dw=%d\n", p->dh, p->dw);
-        errmsg="mkl-dnn BWD_D + dilation not possible (yet?)";
+        errmsg="mkl-dnn BWD + dilation not possible (yet?)";
     }
     // others? ...
     if (errmsg != nullptr){

@@ -24,6 +24,7 @@
 
 #include "mkldnn_common.hpp"
 #include "conv/conv.hpp"
+#include "../idiv.hpp"
 
 namespace conv {
 
@@ -69,6 +70,39 @@ const char *merge2str(merge_t merge) {
     if (merge == RELU) return "relu";
     assert(!"unknown merge");
     return "unknown merge";
+}
+
+static inline int compute_out(int i, int k, int s, int p, int d) {
+    const int A = i - ((k-1) * (d+1) + 1);
+    return (A + 2 * p) / s + 1;
+    // padding left + right, so 2*p
+};
+// (i - ((k-1)*(d+1)+1) + 2*p) /s +1 >= o   (equality may not be possible)
+//  i - ((k-1)*(d+1)+1) + 2*p  >= (o-1)*s
+//                        2*p  >= (o-1)*s - i + ((k-1)*(d+1)+1)
+//                          p  >= ((o-1)*s - i + ((k-1)*(d+1)+1)   +1   ) / 2
+static int compute_pad(int o, int i, int k, int s, int d) {
+//    if 2A >= B, if B is even, all is fine.
+//                if B is odd, want A = (B+1)/2
+//    so we correct the old formula ...
+    const int A = i - ((k-1) * (d+1) + 1);
+    int top = (o-1)*s - A; 
+    int ret = (top+1)/2; // simpler
+#if 1
+    int ret0 = div_floorx(top+1, 2); 
+    if ( (A+2*ret)/s+1 < o ) ++ret0;  // explicit verification that consistent o is >=
+    RT_ASSERT( ret == ret0 );
+#endif
+    return ret;
+};
+void dbg_out(int i, int k, int s, int p, int d, int o){
+    print(0, " o = ([i=%d] - [k-1,d+1](%d*%d+1) + (2p=%d) / %d + 1\n"
+          "    = (%d+ (2p=%d)) / %d + 1\n"
+          "    = %d, with pad of %d\n",
+          i, k-1, d+1, 2*p, s,
+          i - ((k-1)*(d+1)+1), 2*p, s,
+          (i - ((k-1)*(d+1)+1) + 2*p) / s + 1, p
+         );
 }
 
 int str2desc(desc_t *desc, const char *str) {
@@ -121,32 +155,59 @@ int str2desc(desc_t *desc, const char *str) {
     if (d.ic == 0 || d.oc == 0) return FAIL;
     if (d.sh < 1  || d.sw <  1) return FAIL;
 
-    auto compute_out = [](int i, int k, int s, int p, int d) {
-        return (i - ((k-1) * (d+1) + 1) + 2 * p) / s + 1;
-        // padding left + right           ^^^^^
-    };
-    auto compute_pad = [](int o, int i, int k, int s, int d) {
-        /* XXX: is it oK? */
-        return ((o - 1) * s - i + ((k - 1) * (d + 1) + 1)) / 2;
-    };
-
     const bool no_h = (d.ih | d.kh | d.oh | d.ph | d.dh) == 0 && d.sh == 1;
     const bool no_w = (d.iw | d.kw | d.ow | d.pw | d.dw) == 0 && d.sw == 1;
 
+    bool strange = false;
+
+    //print(0, "INIT:  i,k,s,p,d %d,%d,%d,%d,%d, oh=%d\n", d.ih, d.kh, d.sh, d.ph, d.dh, d.oh );
     if (!no_h) {
         if (!d.ih || !d.kh) return FAIL;
 
-        if (!d.oh) d.oh = compute_out(d.ih, d.kh, d.sh, d.ph, d.dh);
-        else if (!d.ph && d.oh != compute_out(d.ih, d.kh, d.sh, d.ph, d.dh))
-            d.ph = compute_pad(d.oh, d.ih, d.kh, d.ph, d.dh);
+        if (d.oh<=0) // illegal/unset
+            d.oh = compute_out(d.ih, d.kh, d.sh, d.ph, d.dh);
+
+        if (d.oh<=0){ // illegal/unset
+            //print(0, "OH !   i,k,s,p,d %d,%d,%d,%d,%d, oh=%d\n", d.ih, d.kh, d.sh, d.ph, d.dh, d.oh );
+            //print(0, "mod d.oh     : d.ph=%d and d.oh=%d\n",d.ph,d.oh);
+            if (d.oh <= 0){ // adjust padding to make it +ve
+                // NO strange = !d.ph;
+                d.oh = 1;
+                //print(0, "d.oh---> 1    : d.ph=%d and d.oh=%d\n",d.ph,d.oh);
+                d.ph = compute_pad(d.oh, d.ih, d.kh, d.sh, d.dh);
+                //print(0, "d.ph mod ...  : d.ph=%d and d.oh=%d\n",d.ph,d.oh);
+                //print(0, "REPAD  i,k,s,p,d %d,%d,%d,%d,%d, oh=%d\n", d.ih, d.kh, d.sh, d.ph, d.dh, d.oh);
+                d.oh = compute_out(d.ih, d.kh, d.sh, d.ph, d.dh);
+                //dbg_out(d.ih, d.kh, d.sh, d.ph, d.dh,   d.oh);
+                //print(0, "ph & oh adjust: d.ph=%d and d.oh=%d\n",d.ph,d.oh);
+                //print(0, "DAMN:  i,k,s,p,d %d,%d,%d,%d,%d, oh=%d\n", d.ih, d.kh, d.sh, d.ph, d.dh, d.oh);
+                RT_ASSERT( d.oh == 1 || d.oh == 2 );
+            }
+            RT_ASSERT( d.oh > 0 );
+        }
+        if (!d.ph && d.oh != compute_out(d.ih, d.kh, d.sh, d.ph, d.dh)){
+            d.ph = compute_pad(d.oh, d.ih, d.kh, d.sh, d.dh);
+        }
     }
 
     if (!no_w) {
         if (!d.iw || !d.kw) return FAIL;
 
-        if (!d.ow) d.ow = compute_out(d.iw, d.kw, d.sw, d.pw, d.dw);
-        else if (!d.pw && d.ow != compute_out(d.iw, d.kw, d.sw, d.pw, d.dw))
-            d.pw = compute_pad(d.ow, d.iw, d.kw, d.pw, d.dw);
+        if (d.ow<=0) // illegal/unset
+            d.ow = compute_out(d.iw, d.kw, d.sw, d.pw, d.dw);
+
+        if (d.ow<=0){ // illegal/unset
+            print(0, "mod d.ow     : d.pw=%d and d.ow=%d\n",d.pw,d.ow);
+            if (d.ow <= 0){ // adjust padding to make it +ve
+                //strange = !d.pw; // problem spec way out of kilter AND padding was given
+                d.pw = compute_pad( 1  , d.iw, d.kw, d.sw, d.dw);
+                d.ow = compute_out(d.iw, d.kw, d.sw, d.pw, d.dw);
+                print(0, "pw & ow adjust: d.pw=%d and d.ow=%d\n",d.pw,d.ow);
+            }
+            RT_ASSERT( d.ow > 0 );
+        }
+        if (!d.pw && d.ow != compute_out(d.iw, d.kw, d.sw, d.pw, d.dw))
+            d.pw = compute_pad(d.ow, d.iw, d.kw, d.sw, d.dw);
     }
 
     if (no_w) {
@@ -174,8 +235,11 @@ int str2desc(desc_t *desc, const char *str) {
     if( d.oh < ddoh ) d.oh = ddoh;
     if( d.ow < 1 ) d.ow = 1;
     if( d.oh < 1 ) d.oh = 1;
-    bool strange = ddow > d.ow || ddoh > d.oh || d.ow <= 0 || d.oh <= 0;
-    if (strange){
+    strange = strange || (ddow > d.ow || ddoh > d.oh || d.ow <= 0 || d.oh <= 0);
+    if (1){
+        if (strange) print(0," %s\n", "STRANGE");
+        print(0, "       i,k,s,p,d %d,%d,%d,%d,%d -> oh=%d, but have d.oh=%d\n",
+              d.ih, d.kh, d.sh, d.ph, d.dh, ddoh, d.oh );
         print(0, "       i,k,s,p,d %d,%d,%d,%d,%d -> ow=%d, but have d.ow=%d\n",
               d.iw, d.kw, d.sw, d.pw, d.dw, ddow, d.ow );
         print(0, " ow = ([ih=%d] - [k-1,d+1](%d*%d+1) + (2p=%d) / %d + 1\n"
