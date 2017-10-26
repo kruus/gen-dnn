@@ -953,7 +953,7 @@ int doit(const prb_t *p, res_t *r) {
     }
     // improvement: TEST with dilates should not return UNIMPLEMENTED just
     // because mkl-dnn does not support BWD dirn with dilates.
-    print(0, "%s", " (setting up test data)\n");
+    print(0, "%s\n", ""); //"(setting up test data)");
     RT_ASSERT( r->state == UNTESTED || r->state == UNIMPLEMENTED );
 
     auto &src_dt_d = p->dir == BWD_D ? cd.diff_src_desc : cd.src_desc;
@@ -1074,15 +1074,16 @@ static int do_perf( mkldnn_primitive_t prim, res_t *r, const prb_t *p,
                     if ((bench_mode & PERF)) { \
                         auto &t = r->timer; \
                         t.reset(); \
+                        const int msmax = 50; const int repmax = 10; \
                         while (true) { \
                             t.start(); \
                             run_fn(); \
                             t.stop(); \
                             const bool stop = false \
-                                || (fix_times_per_prb \
-                                        && t.times() >= 100/*fix_times_per_prb*/ ) \
-                                || (!fix_times_per_prb \
-                                        && t.total_ms() >= 100/*max_ms_per_prb*/ \
+                                || (0 /* fix_times_per_prb */ \
+                                        && t.times() >= repmax/*fix_times_per_prb*/ ) \
+                                || (1 /* !fix_times_per_prb */ \
+                                        && t.total_ms() >= msmax/*max_ms_per_prb*/ \
                                         && t.times() >= 1/*min_times_per_prb*/ ); \
                             if (stop) break; \
                         } \
@@ -1188,7 +1189,8 @@ static int do_perf( mkldnn_primitive_t prim, res_t *r, const prb_t *p,
             }
             TEST_IMPL_END;
         }
-        if( bench_mode & PERF || bench_mode & CORR ) {
+        if( ((bench_mode & PERF) && !(bench_mode & TEST))
+                || bench_mode & CORR ) {
             r->state = UNTESTED; // ignore errors in test loops (just report)
             // iterate over impls
             auto bwd_d_test = [&c,&r,&p,&src_dt,&src_fp,&impl]()
@@ -1244,7 +1246,8 @@ static int do_perf( mkldnn_primitive_t prim, res_t *r, const prb_t *p,
             }
             TEST_IMPL_END;
         }
-        if( bench_mode & PERF || bench_mode & CORR ) {
+        if( ((bench_mode & PERF) && !(bench_mode & TEST))
+                || bench_mode & CORR ) {
             r->state = UNTESTED; // ignore errors in test loops (just report)
             auto bwd_w_test = [&c,&r,&p,&wei_dt,&wei_fp,&bia_dt,&bia_fp,&impl]()
                             ->int{

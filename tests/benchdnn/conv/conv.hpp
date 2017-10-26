@@ -178,6 +178,10 @@ inline void inv_wei_off_f(const prb_t *p, int off, int &g, int &oc, int &ic,
     assert(off == 0);
 }
 
+inline size_t bia_off_f_nog(const prb_t *p, /*int g,*/ int oc) {
+    return (size_t)oc;
+}
+
 inline size_t bia_off_f(const prb_t *p, int g, int oc) {
     return (size_t)g * p->oc / p->g + oc;
 }
