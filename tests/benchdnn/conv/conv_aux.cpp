@@ -86,12 +86,14 @@ static int compute_pad(int o, int i, int k, int s, int d) {
 //                if B is odd, want A = (B+1)/2
 //    so we correct the old formula ...
     const int A = i - ((k-1) * (d+1) + 1);
-    int top = (o-1)*s - A; 
-    int ret = (top+1)/2; // simpler
-#if 1
+    const int top = (o-1)*s - A; 
+#if 0 // recommended
+    int ret = (top+1)/2; // round UP
     int ret0 = div_floorx(top+1, 2); 
     if ( (A+2*ret)/s+1 < o ) ++ret0;  // explicit verification that consistent o is >=
     RT_ASSERT( ret == ret0 );
+#else // should still work, depending on how careful str2desc fixups are
+    int ret = (top)/2;   // rounded-down padding
 #endif
     return ret;
 };
@@ -162,12 +164,15 @@ int str2desc(desc_t *desc, const char *str) {
 
     //print(0, "INIT:  i,k,s,p,d %d,%d,%d,%d,%d, oh=%d\n", d.ih, d.kh, d.sh, d.ph, d.dh, d.oh );
     if (!no_h) {
-        if (!d.ih || !d.kh) return FAIL;
+        // Force user to fix nonsense spec strings
+        if (!d.ih || !d.kh ) return FAIL;                      // required!
+        if ( d.sh<1 || d.ih<0 || d.oh<0 || d.ph<0 ) return FAIL;  // range!
 
         if (d.oh<=0) // illegal/unset
             d.oh = compute_out(d.ih, d.kh, d.sh, d.ph, d.dh);
 
-        if (d.oh<=0){ // illegal/unset
+        if (d.oh<=0){ // illegal/unset (may be -ve because of too-low pad?)
+#if 0 // version 0
             //print(0, "OH !   i,k,s,p,d %d,%d,%d,%d,%d, oh=%d\n", d.ih, d.kh, d.sh, d.ph, d.dh, d.oh );
             //print(0, "mod d.oh     : d.ph=%d and d.oh=%d\n",d.ph,d.oh);
             if (d.oh <= 0){ // adjust padding to make it +ve
@@ -184,18 +189,36 @@ int str2desc(desc_t *desc, const char *str) {
                 RT_ASSERT( d.oh == 1 || d.oh == 2 );
             }
             RT_ASSERT( d.oh > 0 );
+#else
+            int tgt_out = (d.oh > 0? d.oh: 1);
+            int tgt_pad = compute_pad(tgt_out, d.ih, d.kh, d.sh, d.dh);
+            if (d.ph < tgt_pad) { // oh-oh.  ++padding to get to tgt_oh
+                d.oh = tgt_out;
+                d.ph = tgt_pad;
+            }
+            // ? RT_ASSERT( d.oh > 0 ); depends on rounding choice in compute_pad
+            // RT_ASSERT( d.oh >= tgt_out ); // -- " --
+            // paranoia? double-check consistency
+            //tgt_out = compute_out(d.ih, d.kh, d.sh, d.ph, d.dh);
+            // depends on compute_pad rounding: RT_ASSERT( tgt_out > 0 );
+            //
+            // BUT ... have second chance to make d.oh consistent with padding
+            //         (however, seems easier to just round padding up)
+#endif
         }
-        if (!d.ph && d.oh != compute_out(d.ih, d.kh, d.sh, d.ph, d.dh)){
+        if (!d.ph && d.oh < compute_out(d.ih, d.kh, d.sh, d.ph, d.dh)){
             d.ph = compute_pad(d.oh, d.ih, d.kh, d.sh, d.dh);
         }
     }
 
     if (!no_w) {
         if (!d.iw || !d.kw) return FAIL;
+        if ( d.sh<1 || d.ih<0 || d.oh<0 || d.ph<0 ) return FAIL;  // range!
 
         if (d.ow<=0) // illegal/unset
             d.ow = compute_out(d.iw, d.kw, d.sw, d.pw, d.dw);
 
+#if 0
         if (d.ow<=0){ // illegal/unset
             print(0, "mod d.ow     : d.pw=%d and d.ow=%d\n",d.pw,d.ow);
             if (d.ow <= 0){ // adjust padding to make it +ve
@@ -206,6 +229,14 @@ int str2desc(desc_t *desc, const char *str) {
             }
             RT_ASSERT( d.ow > 0 );
         }
+#else
+            int tgt_out = (d.ow > 0? d.ow: 1);
+            int tgt_pad = compute_pad(tgt_out, d.iw, d.kw, d.sw, d.dw);
+            if (d.pw < tgt_pad) { // oh-oh.  ++padding to get to tgt_ow
+                d.ow = tgt_out;
+                d.pw = tgt_pad;
+            }
+#endif
         if (!d.pw && d.ow != compute_out(d.iw, d.kw, d.sw, d.pw, d.dw))
             d.pw = compute_pad(d.ow, d.iw, d.kw, d.sw, d.dw);
     }
@@ -236,7 +267,7 @@ int str2desc(desc_t *desc, const char *str) {
     if( d.ow < 1 ) d.ow = 1;
     if( d.oh < 1 ) d.oh = 1;
     strange = strange || (ddow > d.ow || ddoh > d.oh || d.ow <= 0 || d.oh <= 0);
-    if (1){
+    if (strange){
         if (strange) print(0," %s\n", "STRANGE");
         print(0, "       i,k,s,p,d %d,%d,%d,%d,%d -> oh=%d, but have d.oh=%d\n",
               d.ih, d.kh, d.sh, d.ph, d.dh, ddoh, d.oh );

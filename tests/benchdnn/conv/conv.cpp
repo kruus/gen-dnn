@@ -1030,15 +1030,72 @@ int doit(const prb_t *p, res_t *r) {
                     SAFE(compare_dst(p, dst_tt, dst_fp, r), WARN);
                     return OK;
                 };
+#if 0
+static int do_perf( mkldnn_primitive_t prim, res_t *r, const prb_t *p,
+                const char *impl=nullptr ) {
+    bool want_perf_report = (bench_mode & PERF);
+    if (!want_perf_report) // iterating, can skip perf test without failure
+        return OK;
+    //cout<<" +do_perf"<<bench_mode2str(bench_mode);
+    //cout<<": r->state="<<state2str(r->state);
+    auto &t = r->timer; // <--- ahaa
+    t.reset();
+    while (true) {
+        SAFE(execute(prim), WARN);
+        t.stamp();
+        const bool stop = false
+            || (fix_times_per_prb && t.times() >= fix_times_per_prb)
+            || (!fix_times_per_prb
+                && t.total_ms() >= max_ms_per_prb
+                && t.times() >= min_times_per_prb);
+        if (stop) break;
+    }
+    //cout<<": r->state="<<state2str(r->state);
+    char pstr[max_prb_len];
+    prb2str(p, pstr);
+    perf_report(p, r, pstr, impl);
+    //cout<<": r->state="<<state2str(r->state);
+    //cout<<" -do_perf OK"<<endl;
+    //r->state = PASSED;
+    return OK;
+}
+#endif
 #define TEST_IMPL_COMPARE do \
-                { \
+                { /* always do a single test run, for pass/error status */ \
                     benchdnn_timer_t tt; \
                     tt.start(); \
                     run_fn(); \
                     tt.stop(); \
                     print(5, "compare impl[%lu] vs impl[0]", (unsigned long)imp); \
                     int status = compare_fn(); \
-                    bs.ts->update_impl(p, r, status, tt, imp); \
+                    if (!(bench_mode & PERF)) { \
+                        bs.ts->update_impl(p, r, status, tt, imp); \
+                    } \
+                    if ((bench_mode & PERF)) { \
+                        auto &t = r->timer; \
+                        t.reset(); \
+                        while (true) { \
+                            t.start(); \
+                            run_fn(); \
+                            t.stop(); \
+                            const bool stop = false \
+                                || (fix_times_per_prb \
+                                        && t.times() >= 100/*fix_times_per_prb*/ ) \
+                                || (!fix_times_per_prb \
+                                        && t.total_ms() >= 100/*max_ms_per_prb*/ \
+                                        && t.times() >= 1/*min_times_per_prb*/ ); \
+                            if (stop) break; \
+                        } \
+                        if(0) { \
+                            char impl_str[16]; \
+                            snprintf(&impl_str[0], 16, "TEST:%lu", imp); \
+                            char pstr[max_prb_len]; \
+                            prb2str(p, pstr); \
+                            perf_report(p, r, pstr, &impl_str[0]); \
+                        } else { \
+                            bs.ts->update_impl(p, r, status, tt, imp); \
+                        } \
+                    } \
                 }while(0)
                 TEST_IMPL_COMPARE;
             }
@@ -1053,7 +1110,8 @@ int doit(const prb_t *p, res_t *r) {
             }while(0)
             TEST_IMPL_END;
         }
-        if( bench_mode & PERF || bench_mode & CORR ) {
+        if( ((bench_mode & PERF) && !(bench_mode & TEST))
+                || bench_mode & CORR ) {
             r->state = UNTESTED; // ignore errors in test loops (just report)
             //
             auto fwd_test = [&c,&r,&p,&dst_fp,&dst_dt,&impl]()

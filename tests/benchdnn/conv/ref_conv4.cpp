@@ -1037,7 +1037,7 @@ void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
 void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
                      dnn_mem_t &diff_wei_m, dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m)
 {
-#if 0 // no loop-combine ...
+#if 1 // no loop-combine ...
 #if 0 // 1.15 x
 #   pragma omp parallel for collapse(5)
   for (int g = 0; g < p->g; ++g) {
@@ -1068,22 +1068,23 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
-#elif 1 // 4.5x(6t), 6.4x(1t) chg loop order, collapse. Hoist as in ref_conv3, move code 'up', early-continue
+#elif 1
+  // 4.5x(6t), 6.4x(1t) chg loop order, collapse. Hoist as in ref_conv3, move code 'up', early-continue
   // zero the entire wei_off memory as a first step (NO minibatch loop)
-#if 0 // 4.1x
-# pragma omp parallel for collapse(5)
-  for (int g = 0; g < p->g; ++g) {
-    for (int oc = 0; oc < p->oc/p->g; ++oc) {
-      for (int ic = 0; ic < p->ic/p->g; ++ic) {
-        for (int kh = 0; kh < p->kh; ++kh) {
-          for (int kw = 0; kw < p->kw; ++kw) {
-            size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
-            float &dw = ((float*)diff_wei_m)[wei_off];
-            dw = 0;
-          }
+#if 1 // 5.1x
+# pragma omp parallel for collapse(4)
+  //for (int g = 0; g < p->g; ++g)
+  //  for (int oc = 0; oc < p->oc/p->g; ++oc)
+  for (int oc=0; oc < p->oc; ++oc) {
+    //for (int ic = 0; ic < p->ic/p->g; ++ic)
+    for (int ic = 0; ic < p->ic; ++ic)
+      for (int kh = 0; kh < p->kh; ++kh) {
+        for (int kw = 0; kw < p->kw; ++kw) {
+          size_t wei_off = wei_off_f_nog(p, /*g,*/ oc, ic, kh, kw);
+          float &dw = ((float*)diff_wei_m)[wei_off];
+          dw = 0;
         }
       }
-    }
   }
 #else //6.4x
   memset( (float*)diff_wei_m, 0, diff_wei_m.size() ); // now can move mb loop freely
@@ -1171,6 +1172,7 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   // BUT might not scale to large # threads as well for small mb, g
   // zero the entire wei_off memory as a first step (NO minibatch loop)
   memset( (float*)diff_wei_m, 0, diff_wei_m.size() ); // now can move mb loop freely
+
   if ((p->dir & FLAG_BIA)) memset( (float*)diff_bia_m, 0, diff_bia_m.size() );
 # pragma omp parallel for collapse(3)
   for (int mb = 0; mb < p->mb; ++mb) {

@@ -140,6 +140,34 @@ inline size_t wei_off_f(const prb_t *p, int g, int oc, int ic, int kh, int kw)
         * p->kw + kw;
 }
 
+/** occasionally it is useful [ex memset loops] to get largest possible
+ * loop ranges by ignoring the loop over groups.
+ *
+ * When \c p->g groups is one, these are called "full" convolutions.
+ * Groups segregate channels and saves parameters by *reuse* weights.
+ * mkl-dnn (and most other implementations) assume the number of channels
+ * is perfectly divisible by the groups.
+ *
+ * \code
+ * 1. for (int g = 0; g < p->g; ++g)
+ *   2. for (int oc = 0; oc < p->oc/p->g; ++oc)
+ *     3. for (int ic = 0; ic < p->ic/p->g; ++ic)
+ *       ... kh, kw, mb, oh, ow ...
+ *       foo(   dst/src/wei_off_f(... g, ...)   );
+ * \endcode
+ * get transformed into possibly larger ranges as:
+ * \code
+ *   1. for (int oc = 0; oc < p->oc; ++oc)
+ *     2. for (int ic = 0; ic < p->ic; ++ic)
+ *       ... kh, kw, mb, oh, ow ...
+ *       memset( dst/src/wei_off_f_nog( ... ); // *no* g
+ * \endcode
+ */
+inline constexpr size_t wei_off_f_nog(const prb_t *p, /*int g,*/ int oc, int ic, int kh, int kw)
+{
+    return ((((size_t)oc) * p->ic + ic) * p->kh + kh) * p->kw + kw;
+}
+
 inline void inv_wei_off_f(const prb_t *p, int off, int &g, int &oc, int &ic,
         int &kh, int &kw) {
     kw = off % p->kw; off /= p->kw;
