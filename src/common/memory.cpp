@@ -61,7 +61,12 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     }
     // perhaps also limited to total memory size?
     // i.e. elements * types::data_type_size(data_type) < 2G or 4G?
-    if (!args_ok) return invalid_arguments;
+    if (!args_ok){
+#ifndef NDEBUG
+        printf("OOPS too large a tensor? elements=%lu ??\n",(long unsigned)elements);
+#endif
+        return invalid_arguments;
+    }
 
     memory_desc_t md;
     md.ndims = ndims;

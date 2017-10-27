@@ -38,12 +38,18 @@ using std::cout; using std::endl; using std::setw;
 #include "conv/conv_test.hpp"
 #include "conv/conv_test_data.hpp"
 
+#include <functional> // ??? lambda passing?
+
 namespace conv {
 
 static conv_impls_t conv_impls_[] = {
     {compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
     {refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
+
+    //{refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
     {refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
+
+    //{refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
     {refconv_4_fwd,         refconv_4_bwd_d,            refconv_4_bwd_w}
 };
 
@@ -448,6 +454,7 @@ int init_conv_desc(mkldnn_convolution_desc_t &cd, const prb_t *p )
     DNN_SAFE(mkldnn_memory_desc_init(&src_d, 4, src_dims, p->cfg[SRC].dt, mkldnn_any), WARN);
     DNN_SAFE(mkldnn_memory_desc_init(&wei_d, 5, wei_dims, p->cfg[WEI].dt, mkldnn_any), WARN);
     DNN_SAFE(mkldnn_memory_desc_init(&bia_d, 1, bia_dims, p->cfg[BIA].dt, mkldnn_any), WARN);
+    //printf(" dst_dims = %d,%d,%d,%d\n",p->mb, p->oc, p->oh, p->ow);
     DNN_SAFE(mkldnn_memory_desc_init(&dst_d, 4, dst_dims, p->cfg[DST].dt, mkldnn_any), WARN);
 
     int strides[] = {p->sh, p->sw};
@@ -915,6 +922,57 @@ static char const* shorten(char const* impl_str)
 #undef DPRINT
 }
 
+/** \c run_fn a benchdnn test loop and return status of \c compare_fn.
+ * Accumulate stats and report as per \c bench_mode TEST/PERF. */
+static void test_impl_compare( const prb_t* p, res_t* r, const size_t imp,
+        std::function<void(void)> run_fn, std::function<int(void)> compare_fn  )
+{ /* always do a single test run, for pass/error status */
+    auto &bs = benchdnn_stat;
+    benchdnn_timer_t tt;
+    tt.start();
+    run_fn();
+    tt.stop();
+    print(5, "compare impl[%lu] vs impl[0]", (unsigned long)imp);
+    int status = compare_fn();
+    if (!(bench_mode & PERF)) {
+        bs.ts->update_impl(p, r, status, tt, imp);
+    }
+    if ((bench_mode & PERF)) {
+        auto &t = r->timer;
+        t.reset();
+        const int msmax = 50; const int repmax = 10;
+        while (true) {
+            t.start();
+            run_fn();
+            t.stop();
+            const bool stop = false
+                || (0 /* fix_times_per_prb */
+                        && t.times() >= repmax/*fix_times_per_prb*/ )
+                || (1 /* !fix_times_per_prb */
+                        && t.total_ms() >= msmax/*max_ms_per_prb*/
+                        && t.times() >= 1/*min_times_per_prb*/ );
+            if (stop) break;
+        }
+        if(0) {
+            char impl_str[16];
+            snprintf(&impl_str[0], 16, "TEST:%lu", imp);
+            char pstr[max_prb_len];
+            prb2str(p, pstr);
+            perf_report(p, r, pstr, &impl_str[0]);
+        } else {
+            bs.ts->update_impl(p, r, status, tt, imp);
+        }
+    }
+}
+static void test_impl_end(){
+    auto &bs = benchdnn_stat;
+    bool all_passed = bs.ts->end_impls();
+    /*printf(" TEST all_passed=%d ",(int)all_passed);*/
+    if (!(bench_mode&PERF || bench_mode&CORR)) {
+        if(all_passed) ++bs.mistrusted; else ++bs.failed;
+        /*printf(" mistrusted ");*/
+    }
+}
 
 int doit(const prb_t *p, res_t *r) {
     auto &bs = benchdnn_stat;
@@ -924,6 +982,7 @@ int doit(const prb_t *p, res_t *r) {
     res_t res_zero{};
     *r = res_zero;
     RT_ASSERT(r->state == UNTESTED);
+    //printf(" doit: dst_dims = %d,%d,%d,%d\n",p->mb, p->oc, p->oh, p->ow);
 
     mkldnn_convolution_desc_t cd;
     {
@@ -1030,86 +1089,9 @@ int doit(const prb_t *p, res_t *r) {
                     SAFE(compare_dst(p, dst_tt, dst_fp, r), WARN);
                     return OK;
                 };
-#if 0
-static int do_perf( mkldnn_primitive_t prim, res_t *r, const prb_t *p,
-                const char *impl=nullptr ) {
-    bool want_perf_report = (bench_mode & PERF);
-    if (!want_perf_report) // iterating, can skip perf test without failure
-        return OK;
-    //cout<<" +do_perf"<<bench_mode2str(bench_mode);
-    //cout<<": r->state="<<state2str(r->state);
-    auto &t = r->timer; // <--- ahaa
-    t.reset();
-    while (true) {
-        SAFE(execute(prim), WARN);
-        t.stamp();
-        const bool stop = false
-            || (fix_times_per_prb && t.times() >= fix_times_per_prb)
-            || (!fix_times_per_prb
-                && t.total_ms() >= max_ms_per_prb
-                && t.times() >= min_times_per_prb);
-        if (stop) break;
-    }
-    //cout<<": r->state="<<state2str(r->state);
-    char pstr[max_prb_len];
-    prb2str(p, pstr);
-    perf_report(p, r, pstr, impl);
-    //cout<<": r->state="<<state2str(r->state);
-    //cout<<" -do_perf OK"<<endl;
-    //r->state = PASSED;
-    return OK;
-}
-#endif
-#define TEST_IMPL_COMPARE do \
-                { /* always do a single test run, for pass/error status */ \
-                    benchdnn_timer_t tt; \
-                    tt.start(); \
-                    run_fn(); \
-                    tt.stop(); \
-                    print(5, "compare impl[%lu] vs impl[0]", (unsigned long)imp); \
-                    int status = compare_fn(); \
-                    if (!(bench_mode & PERF)) { \
-                        bs.ts->update_impl(p, r, status, tt, imp); \
-                    } \
-                    if ((bench_mode & PERF)) { \
-                        auto &t = r->timer; \
-                        t.reset(); \
-                        const int msmax = 50; const int repmax = 10; \
-                        while (true) { \
-                            t.start(); \
-                            run_fn(); \
-                            t.stop(); \
-                            const bool stop = false \
-                                || (0 /* fix_times_per_prb */ \
-                                        && t.times() >= repmax/*fix_times_per_prb*/ ) \
-                                || (1 /* !fix_times_per_prb */ \
-                                        && t.total_ms() >= msmax/*max_ms_per_prb*/ \
-                                        && t.times() >= 1/*min_times_per_prb*/ ); \
-                            if (stop) break; \
-                        } \
-                        if(0) { \
-                            char impl_str[16]; \
-                            snprintf(&impl_str[0], 16, "TEST:%lu", imp); \
-                            char pstr[max_prb_len]; \
-                            prb2str(p, pstr); \
-                            perf_report(p, r, pstr, &impl_str[0]); \
-                        } else { \
-                            bs.ts->update_impl(p, r, status, tt, imp); \
-                        } \
-                    } \
-                }while(0)
-                TEST_IMPL_COMPARE;
+                test_impl_compare(p, r, imp, run_fn, compare_fn);
             }
-#define TEST_IMPL_END do \
-            { \
-                bool all_passed = bs.ts->end_impls(); \
-                /*printf(" TEST all_passed=%d ",(int)all_passed);*/ \
-                if (!(bench_mode&PERF || bench_mode&CORR)) { \
-                    if(all_passed) ++bs.mistrusted; else ++bs.failed; \
-                    /*printf(" mistrusted ");*/ \
-                } \
-            }while(0)
-            TEST_IMPL_END;
+            test_impl_end();
         }
         if( ((bench_mode & PERF) && !(bench_mode & TEST))
                 || bench_mode & CORR ) {
@@ -1185,9 +1167,9 @@ static int do_perf( mkldnn_primitive_t prim, res_t *r, const prb_t *p,
                     SAFE(compare_src(p, src_tt, src_fp, r), WARN);
                     return OK;
                 };
-                TEST_IMPL_COMPARE;
+                test_impl_compare(p, r, imp, run_fn, compare_fn);
             }
-            TEST_IMPL_END;
+            test_impl_end();
         }
         if( ((bench_mode & PERF) && !(bench_mode & TEST))
                 || bench_mode & CORR ) {
@@ -1242,9 +1224,9 @@ static int do_perf( mkldnn_primitive_t prim, res_t *r, const prb_t *p,
                     }
                     return OK;
                 };
-                TEST_IMPL_COMPARE;
+                test_impl_compare(p, r, imp, run_fn, compare_fn);
             }
-            TEST_IMPL_END;
+            test_impl_end();
         }
         if( ((bench_mode & PERF) && !(bench_mode & TEST))
                 || bench_mode & CORR ) {

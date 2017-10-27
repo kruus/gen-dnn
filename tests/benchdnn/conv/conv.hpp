@@ -124,6 +124,15 @@ inline size_t src_off_f(const prb_t *p, int mb, int g, int ic, int ih, int iw)
         + iw;
 }
 
+inline size_t src_off_f_nog(const prb_t *p, int mb, /*int g,*/ int ic, int ih, int iw)
+{
+    // ic now ranges over full range [0,p->ic)
+    //                              vvvvvvvvvvvvvvvvvvv
+    //return (((size_t)mb * p->ic + g * p->ic/p->g + ic) * p->ih + ih) * p->iw
+    //    + iw;
+    return (((size_t)mb * p->ic +   ic  ) * p->ih + ih) * p->iw + iw;
+}
+
 inline void inv_src_off_f(const prb_t *p, int off, int &mb, int &g, int &ic,
         int &ih, int &iw) {
     iw = off % p->iw; off /= p->iw;
@@ -168,6 +177,25 @@ inline constexpr size_t wei_off_f_nog(const prb_t *p, /*int g,*/ int oc, int ic,
     return ((((size_t)oc) * p->ic + ic) * p->kh + kh) * p->kw + kw;
 }
 
+inline void zero_wei( const prb_t *p, dnn_mem_t const& wei_m ){
+#if 1
+    // weight_off_f_nog is dense in oc,ic,kh,kw so all loops collapse into one!
+    memset( (float*)wei_m, 0, wei_m.size() );
+#else
+# pragma omp parallel for collapse(4)
+    for (int ic = 0; ic < p->ic; ++ic) { // dw = 0
+        for (int oc=0; oc < p->oc; ++oc) {
+            for (int kh = 0; kh < p->kh; ++kh) {
+                for (int kw = 0; kw < p->kw; ++kw) {
+                    size_t wei_off = wei_off_f_nog(p, /*g,*/ oc, ic, kh, kw);
+                    *((float*)wei_m)[wei_off] = 0;
+                }
+            }
+        }
+    }
+#endif
+} 
+
 inline void inv_wei_off_f(const prb_t *p, int off, int &g, int &oc, int &ic,
         int &kh, int &kw) {
     kw = off % p->kw; off /= p->kw;
@@ -178,13 +206,27 @@ inline void inv_wei_off_f(const prb_t *p, int off, int &g, int &oc, int &ic,
     assert(off == 0);
 }
 
+inline size_t bia_off_f(const prb_t *p, int g, int oc) {
+    return (size_t)g * p->oc / p->g + oc;
+}
+
 inline size_t bia_off_f_nog(const prb_t *p, /*int g,*/ int oc) {
     return (size_t)oc;
 }
 
-inline size_t bia_off_f(const prb_t *p, int g, int oc) {
-    return (size_t)g * p->oc / p->g + oc;
-}
+inline void zero_bia( const prb_t *p, dnn_mem_t const& bia_m ){
+#if 1
+    // bia_off_f_nog is just a single for-loop, so assume bia is dense
+    // (I suppose it might be longer, but this is still likely fastest way)
+    memset( (float*)bia_m, 0, bia_m.size() );
+#else
+    for (int oc=0; oc < p->oc; ++oc) {
+        size_t bia_off = bia_off_f_nog(p, oc);
+        float &db = ((float*)diff_bia_m)[bia_off];
+        db = 0;
+    }
+#endif
+} 
 
 inline void inv_bia_off_f(const prb_t *p, int off, int &g, int &oc) {
     oc = off % (p->oc / p->g); off /= (p->oc / p->g);
@@ -198,6 +240,21 @@ inline size_t dst_off_f(const prb_t *p, int mb, int g, int oc, int oh, int ow)
         + ow;
 }
 
+inline size_t dst_off_f_nog(const prb_t *p, int mb, /*int g,*/ int oc, int oh, int ow)
+{
+    // with no group, oc itself has full range of 0..p->oc
+    //                            vvvvvvvvvvvvvvv
+    //return (((size_t)mb * p->oc + g*p->oc/p->g+oc) * p->oh + oh) * p->ow + ow;
+    return (((size_t)mb * p->oc + oc) * p->oh + oh) * p->ow + ow;
+}
+/** no group-loop + merge oh- and ow-loops into ohw in p->oh*p->ow */
+inline size_t dst_off_f_nog_ohw(const prb_t *p, int mb, /*int g,*/ int oc, int ohw)
+{
+    //return (((size_t)mb * p->oc + oc) * p->oh + oh) * p->ow + ow;
+    //  ohw runs through all values oh*p->ow + ow
+    //return ((size_t)mb * p->oc + oc) * p->oh * p->ow   +   oh * p->ow + ow;
+    return ((size_t)mb * p->oc + oc) * p->oh * p->ow   +   ohw;
+}
 inline void inv_dst_off_f(const prb_t *p, int off, int &mb, int &g, int &oc,
         int &oh, int &ow) {
     ow = off % p->ow; off /= p->ow;

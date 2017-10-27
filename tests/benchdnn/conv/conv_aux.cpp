@@ -257,8 +257,6 @@ int str2desc(desc_t *desc, const char *str) {
         d.dh = d.dw;
     }
 
-    *desc = d;
-
     // patch things to consistency a bit more
     int ddow = compute_out(d.iw, d.kw, d.sw, d.pw, d.dw);
     int ddoh = compute_out(d.ih, d.kh, d.sh, d.ph, d.dh);
@@ -267,7 +265,7 @@ int str2desc(desc_t *desc, const char *str) {
     if( d.ow < 1 ) d.ow = 1;
     if( d.oh < 1 ) d.oh = 1;
     strange = strange || (ddow > d.ow || ddoh > d.oh || d.ow <= 0 || d.oh <= 0);
-    if (strange){
+    if (0 || strange){
         if (strange) print(0," %s\n", "STRANGE");
         print(0, "       i,k,s,p,d %d,%d,%d,%d,%d -> oh=%d, but have d.oh=%d\n",
               d.ih, d.kh, d.sh, d.ph, d.dh, ddoh, d.oh );
@@ -291,6 +289,7 @@ int str2desc(desc_t *desc, const char *str) {
         return FAIL;
     }
 
+    *desc = d;
     return OK;
 }
 

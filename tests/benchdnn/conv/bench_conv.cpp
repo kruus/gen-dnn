@@ -79,6 +79,7 @@ void check_correctness(const desc_t *c) {
     const prb_t p(*c, dir, cfg, alg, merge, mb);
     char pstr[max_prb_len];
     prb2str(&p, pstr);
+    //RT_ASSERT( p.oh > 0 && p.ow > 0 );
 
     if (pattern && !match_regex(pstr, pattern))
         return;

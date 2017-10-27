@@ -176,6 +176,7 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
         }
     };
 
+    // writes go to  dst_off_f(p, mb, g, oc, oh, ow);
 #   pragma omp parallel for collapse(5)
     for (int g = 0; g < p->g; ++g) {
     for (int mb = 0; mb < p->mb; ++mb) {
@@ -191,20 +192,20 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
                     /*i  in   */ 0, p->kh,
                     /*ih=A+iB */ (oh * p->sh - p->ph), (p->dh + 1),
                     /*ih in   */ 0, p->ih);
-            if (kh_beg < kh_end){
+            //if (kh_beg < kh_end){
             int kw_beg, kw_end;
             hoist_ApiB_in( kw_beg, kw_end,
                     /*i  in   */ 0, p->kw,
                     /*iw=A+iB */ (ow * p->sw - p->pw), (p->dw + 1),
                     /*iw in   */ 0, p->iw);
-            if (kw_beg < kw_end){
+            //if (kw_beg < kw_end){
                 DPRINTF(".");
                 ker( p, src_m, wei_m,
                         d, g, mb, oc, oh, ow
                         , kh_beg, kh_end, kw_beg, kw_end
                    );
-            }
-            }
+            //}
+            //}
             if (p->merge == RELU && d < 0)
                 d = 0;
         }
@@ -410,4 +411,4 @@ void refconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     }
 
 }
-// vim: et ts=2 sw=2 cindent nopaste ai cino=^=l0,\:0,N-s
+// vim: et ts=2 sw=2 cindent nopaste ai cino=^=l0,\:0,N-s foldmethod=indent foldlevel=3
