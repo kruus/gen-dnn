@@ -231,7 +231,7 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
       , const int kw_beg, const int kw_end
       ) {
     RT_ASSERT(p->sh > 0);
-    bool const s0 = kh_beg >= kh_end || p->sh <= 1; // this IMPLIES skips remains 0
+    //bool const s0 = kh_beg >= kh_end || p->sh <= 1; // this IMPLIES skips remains 0
     for (int oc = 0; oc < p->oc/p->g; ++oc) {
       // next: loop over allowed oh values, THEN over kh
       //int const khh = p->sh; // only for p->dh==0 !!!
