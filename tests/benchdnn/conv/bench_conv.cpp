@@ -61,7 +61,7 @@ void reset_parameters() {
 bool check_mkldnn_support( const prb_t *p, res_t *res ) {
     char const *errmsg = nullptr;
     if ((p->dir == BWD_D || p->dir == BWD_W || p->dir == BWD_WB)
-            && p->dh>0 || p->dw>0) {
+            && (p->dh>0 || p->dw>0)) {
         printf(" dilation: p->dh=%d, p->dw=%d", p->dh, p->dw);
         errmsg="mkl-dnn BWD + dilation not possible (yet?)";
     }
