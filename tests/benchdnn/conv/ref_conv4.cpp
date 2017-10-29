@@ -858,7 +858,7 @@ void refconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
-#pragma parallel for collapse(4)
+#pragma omp parallel for collapse(4)
   for (int g = 0; g < p->g; ++g) {
     for (int oc = 0; oc < p->oc/p->g; ++oc) {
       for (int mb = 0; mb < p->mb; ++mb) {
@@ -1922,7 +1922,7 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   // BUT might not scale to large # threads as well for small mb, g
   zero_wei(p, diff_wei_m);
   zero_bia(p, diff_bia_m);
-//#pragma parallel for collapse(4) // 0.76
+//#pragma omp parallel for collapse(4) // 0.76
     //for (int mb = 0; mb < p->mb; ++mb)
   for (int g = 0; g < p->g; ++g) {
     for (int oc = 0; oc < p->oc/p->g; ++oc) {
@@ -1960,7 +1960,7 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
                 //#pragma omp for collapse(2)
                 size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
                 float &dw = ((float*)diff_wei_m)[wei_off];
-                //#pragma parallel for collapse(2) // 0.75x
+                //#pragma omp parallel for collapse(2) // 0.75x
                 for (int oh = oh_beg; oh < oh_end; ++oh) {
                   for (int ow = ow_beg; ow < ow_end; ++ow) {
                     const int ih = oh * p->sh - p->ph + kh * (p->dh + 1);
