@@ -1779,7 +1779,7 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   //# pragma omp parallel for collapse(4) // PT 4.0x (loop reorder
   //# pragma omp parallel for collapse(4) // PT 4.0x
   //# pragma omp parallel for collapse(3) // PT 2.3x (loop reorder
-  for (int mb = 0; mb < p->mb; ++mb) {// 2.5x
+  //for (int mb = 0; mb < p->mb; ++mb) {// 2.5x , but WRONG if here regr.sh BWD_W 8 (avx)--> 5.6x
 # pragma omp parallel for collapse(4) // PT 4.0x
     for (int g = 0; g < p->g; ++g) {
       for (int oc = 0; oc < p->oc/p->g; ++oc) {
@@ -1797,6 +1797,7 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
                              /*iw=A+iB */ (kw * (p->dw+1) - p->pw), p->sw,
                              /*iw in   */ 0, p->iw);
               if( oh_beg >= oh_end || ow_beg >= ow_end ) continue;
+  for (int mb = 0; mb < p->mb; ++mb) {// CORRECT here. regr.sh BWD_W 8 (avx) --> 5.3x (still good)
               for (int ic = 0; ic < p->ic/p->g; ++ic) {       //--- 4.9x // ********
                 size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
                 float &dw = ((float*)diff_wei_m)[wei_off];
