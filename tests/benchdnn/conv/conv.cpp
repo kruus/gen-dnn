@@ -964,13 +964,15 @@ static void test_impl_compare( const prb_t* p, res_t* r, const size_t imp,
         }
     }
 }
-static void test_impl_end(){
+static void test_impl_end(res_t *r){
     auto &bs = benchdnn_stat;
     bool all_passed = bs.ts->end_impls();
-    /*printf(" TEST all_passed=%d ",(int)all_passed);*/
-    if (!(bench_mode&PERF || bench_mode&CORR)) {
-        if(all_passed) ++bs.mistrusted; else ++bs.failed;
-        /*printf(" mistrusted ");*/
+    r->state = (all_passed? PASSED: MISTRUSTED);
+    printf(" TEST all_passed=%d ",(int)all_passed);
+    RT_ASSERT( (bench_mode & PERF) );
+    if (!(bench_mode&CORR)) {
+        if(all_passed) ++bs.mistrusted; else ++bs.test_fail;
+        ++bs.impls;
     }
 }
 
@@ -1056,6 +1058,7 @@ int doit(const prb_t *p, res_t *r) {
         if (bench_mode & CORR || bench_mode & TEST )
             compute_ref_fwd(p, src_fp, wei_fp, bia_fp, dst_fp);
         if ((bench_mode & TEST) && nimp > imp0){
+            //printf(" FWD TESTS... ");
             /* any optional floating point reference loops?          */
             /* similar to CORR/PERF tests, but always floating point */
             bs.ts->begin_impls();
@@ -1091,7 +1094,8 @@ int doit(const prb_t *p, res_t *r) {
                 };
                 test_impl_compare(p, r, imp, run_fn, compare_fn);
             }
-            test_impl_end();
+            //printf(" FWD TESTS END... ");
+            test_impl_end(r);
         }
         if( ((bench_mode & PERF) && !(bench_mode & TEST))
                 || bench_mode & CORR ) {
@@ -1169,7 +1173,7 @@ int doit(const prb_t *p, res_t *r) {
                 };
                 test_impl_compare(p, r, imp, run_fn, compare_fn);
             }
-            test_impl_end();
+            test_impl_end(r);
         }
         if( ((bench_mode & PERF) && !(bench_mode & TEST))
                 || bench_mode & CORR ) {
@@ -1226,7 +1230,7 @@ int doit(const prb_t *p, res_t *r) {
                 };
                 test_impl_compare(p, r, imp, run_fn, compare_fn);
             }
-            test_impl_end();
+            test_impl_end(r);
         }
         if( ((bench_mode & PERF) && !(bench_mode & TEST))
                 || bench_mode & CORR ) {

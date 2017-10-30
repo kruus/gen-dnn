@@ -24,6 +24,8 @@ namespace conv {
 // BWD + dilate is not fast for these loops (and mkl-dnn doesn't allow it yet)
 extern void refconv_2_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
         dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m);
+extern void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
+        dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m);
 
 static void chk( bool cond, char const* msg, char const* file, int const lineno ){
     if (!cond){ printf("@@@ error: %s : [%s:%d]\n", msg, file, lineno); exit(1); }
@@ -222,7 +224,7 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
   if (p->dh != 0) { // A fast version here does not support dilation
     // This is no big deal, since mkl-dnn does not even allow you to
     // create the descriptors for it.
-    refconv_2_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
+    refconv_4_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
   }
 
   auto ker = [](
