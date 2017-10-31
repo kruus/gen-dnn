@@ -50,7 +50,9 @@ static conv_impls_t conv_impls_[] = {
     {refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
 
     //{refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
-    {refconv_4_fwd,         refconv_4_bwd_d,            refconv_4_bwd_w}
+    {refconv_4_fwd,         refconv_4_bwd_d,            refconv_4_bwd_w},
+
+    {refconv_99_fwd,         refconv_99_bwd_d,            refconv_99_bwd_w}
 };
 
 #define TESTN (sizeof(conv_impls_) / sizeof(conv_impls_t))

@@ -64,6 +64,7 @@ void refconv_2_fwd(const prb_t *p, dnn_mem_t &src_m,
 
 void refconv_2_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
                      dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m) {
+#if 0 // regr 1.0x
   auto ker = [](
                 const prb_t *p, const dnn_mem_t &diff_dst_m, const dnn_mem_t &wei_m,
                 float &ds, int g, int mb, int ic, int ih, int iw) {
@@ -105,6 +106,46 @@ void refconv_2_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
       }
     }
   }
+#elif 1
+  //RT_ASSERT( p->dh == 0 && p->dw == 0 );
+# pragma omp parallel for collapse(5)
+  for (int g = 0; g < p->g; ++g) {
+    for (int mb = 0; mb < p->mb; ++mb) {
+      for (int ic = 0; ic < p->ic/p->g; ++ic) {
+        for (int ih = 0; ih < p->ih; ++ih) {
+          for (int iw = 0; iw < p->iw; ++iw) {
+            size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+            float &ds = ((float*)diff_src_m)[src_off];
+            ds = 0;
+            for (int kh = 0; kh < p->kh; ++kh) {
+              int oh = ih - kh * (p->dh + 1) + p->ph;
+              bool const ohok = oh >= 0 && oh % p->sh == 0;
+              oh = oh / p->sh;
+
+              for (int kw = 0; kw < p->kw; ++kw) {
+                int ow = iw - kw * (p->dw + 1) + p->pw;
+                bool const owok = ow >= 0 && ow % p->sw == 0;
+                ow = ow / p->sw;
+                if (!(ohok && owok && oh < p->oh && ow < p->ow)) continue;
+                // test fail 40 ??? why ...
+                //if (!(ohok && owok && (oh=oh/p->sh)<p->oh && (ow=ow/p->sw)<p->ow)) continue;
+
+                for (int oc = 0; oc < p->oc/p->g; ++oc) { // <---- moved
+                  size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+                  size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+                  ds += ((float*)diff_dst_m)[dst_off]
+                    * ((float*)wei_m)[wei_off];
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+#else
+#error "select one"
+#endif
 }
 
 void refconv_2_bwd_w(const prb_t *p, dnn_mem_t &src_m,
