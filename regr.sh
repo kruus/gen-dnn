@@ -40,9 +40,11 @@ if [ "$BATCH" = "" ]; then
     usage
     exit
 fi
-if [ ! "$THREADS" -ge 0 ]; then
-    usage
-    exit
+if [ "$THREADS" ]; then
+    if [ ! "$THREADS" -ge 0 ]; then
+        usage
+        exit
+    fi
 fi
 BUILDDIR=build
 #(cd build && make && cd tests/benchdnn && /usr/bin/time -v ./benchdnn --mode=PT --batch=inputs/test_fwd_regression) 2>&1 | tee PT.log

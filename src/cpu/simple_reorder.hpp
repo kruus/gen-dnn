@@ -177,7 +177,8 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o) {
             if (alpha == 1.0 && beta == 0.0) {
-#               pragma omp simd collapse(2)
+#               pragma omp for collapse(2) // really?
+#               pragma omp simd
                 for (int C = 0; C < dims[1] / blksize; ++C) {
                     for (int c = 0; c < blksize; ++c) {
                         if (order_keep) {
@@ -188,7 +189,8 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                     }
                 }
             } else {
-#               pragma omp simd collapse(2)
+#               pragma omp for collapse(2)
+#               pragma omp simd
                 for (int C = 0; C < dims[1] / blksize; ++C) {
                     for (int c = 0; c < blksize; ++c) {
                         const auto dst_off = order_keep ? C * os[1] + c :
@@ -1407,22 +1409,19 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         const float alpha = alpha_, beta = beta_;
         if (alpha == 1.0 && beta == 0.0) {
-#           pragma omp parallel for schedule(static)
-#           pragma simd
+#               pragma omp parallel for simd
             for (size_t e = 0; e < nelems; ++e) {
                 output[output_d.off_l(e)] =
                     data_t<type_o>(input[input_d.off_l(e)]);
             }
         } else {
-#           pragma omp parallel for schedule(static)
-#           pragma simd
+#               pragma omp parallel for simd
             for (size_t e = 0; e < nelems; ++e) {
                 output[output_d.off_l(e)] = data_t<type_o>(
-                    alpha * input[input_d.off_l(e)]
-                    + (beta ? beta * output[output_d.off_l(e)] : 0));
+                        alpha * input[input_d.off_l(e)]
+                        + (beta ? beta * output[output_d.off_l(e)] : 0));
             }
         }
-
         return success;
     }
 };
