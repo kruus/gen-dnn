@@ -14,6 +14,7 @@ usage() {
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
     awk '/getopts/{flag=1;next} /done/{flag=0} flag&&/^[^#]+\) #/; flag&&/^ *# /' $0
     echo " Example:   ./regr.sh FWD 6    # FWD 6 threads"
+    echo "            # output to FWD-t6-<hostname>.log"
     echo ""
     #./bench.sh -h
     #exit 0
@@ -21,12 +22,16 @@ usage() {
 case $DIRN in
     FWD*) # mostly FWD_B and some with --merge=RELU
         BATCH="inputs/test_fwd_regression"
+        DIRN='FWD'
         ;;
     BWD_D) # backward data
         BATCH="inputs/test_bwd_d_regression"
         ;;
     BWD_W*) # backward weights (runs BWD_WB tests)
         BATCH="inputs/test_bwd_w_regression"
+        ;;
+    ALL) # test_conv_regression mix
+        BATCH="inputs/test_conv_regression"
         ;;
     #ALEX*) # alexnet (mix)
     #    BATCH="inputs/conv_alexnet"
@@ -68,5 +73,5 @@ echo "LOGFILE : $LOGFILE"
     ) >& "$LOGFILE" && {
 	echo YAY;
 	tail -n40 "$LOGFILE";
-} || { echo "ohoh"; tail -n80 $LOGFILE; echo "See LOGFILE = $LOGFILE"; }
+} || { echo "ohoh"; tail -n80 $LOGFILE | grep '^[Tt@]'; echo "See LOGFILE = $LOGFILE"; }
 # vim: set ts=4 sw=4 et :

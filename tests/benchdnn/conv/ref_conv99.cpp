@@ -38,18 +38,21 @@ extern void refconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 void refconv_99_fwd(const prb_t *p, dnn_mem_t &src_m,
         dnn_mem_t &wei_m, dnn_mem_t &bia_m, dnn_mem_t &dst_m) {
   // musek(avx)-->3
+  // snake10(avx2)-->3
     refconv_3_fwd(p, src_m, wei_m, bia_m, dst_m);
 }
 
 void refconv_99_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
         dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m) {
   // musek(avx)-->3
+  // snake10(avx2)-->3
     refconv_3_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
 }
 
 void refconv_99_bwd_w(const prb_t *p, dnn_mem_t &src_m,
         dnn_mem_t &diff_wei_m, dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m) {
   // musek(avx)-->4 (by large margin)
+  // snake10(avx2)-->4
     refconv_4_bwd_w(p, src_m, diff_wei_m, diff_bia_m, diff_dst_m);
 }
 

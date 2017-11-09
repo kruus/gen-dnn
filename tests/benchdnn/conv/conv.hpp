@@ -215,14 +215,14 @@ inline size_t bia_off_f_nog(const prb_t *p, /*int g,*/ int oc) {
 }
 
 inline void zero_bia( const prb_t *p, dnn_mem_t const& bia_m ){
-#if 1
+#if 0
     // bia_off_f_nog is just a single for-loop, so assume bia is dense
     // (I suppose it might be longer, but this is still likely fastest way)
     memset( (float*)bia_m, 0, bia_m.size() );
 #else
     for (int oc=0; oc < p->oc; ++oc) {
         size_t bia_off = bia_off_f_nog(p, oc);
-        float &db = ((float*)diff_bia_m)[bia_off];
+        float &db = ((float*)bia_m)[bia_off];
         db = 0;
     }
 #endif
