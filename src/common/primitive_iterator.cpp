@@ -36,6 +36,7 @@ struct mkldnn_primitive_desc_iterator: public c_compatible {
         , impl_list_(engine_->get_implementation_list()), last_idx_(0)
     {
         while (impl_list_[last_idx_] != nullptr) ++last_idx_;
+        assert( this->attr_ != nullptr );
     }
     ~mkldnn_primitive_desc_iterator() { if (pd_) delete pd_; }
 
@@ -82,13 +83,14 @@ private:
         , impl_list_(nullptr), last_idx_(last_idx) {}
 };
 
+static const primitive_attr_t dummy_attr;
+
 status_t mkldnn_primitive_desc_iterator_create_v2(
         primitive_desc_iterator_t **iterator, const_c_op_desc_t c_op_desc,
         const primitive_attr_t *attr, engine_t *engine,
         const primitive_desc_t *hint_fwd_pd) {
     const op_desc_t *op_desc = (const op_desc_t *)c_op_desc;
 
-    const primitive_attr_t dummy_attr;
     if (attr == nullptr)
         attr = &dummy_attr;
 

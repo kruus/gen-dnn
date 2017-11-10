@@ -30,7 +30,10 @@ struct mkldnn_primitive_desc: public mkldnn::impl::c_compatible {
     mkldnn_primitive_desc(mkldnn::impl::engine_t *engine,
             const mkldnn::impl::primitive_attr_t *attr,
             mkldnn::impl::primitive_kind_t kind)
-        : engine_(engine), attr_(*attr), kind_(kind) {}
+        : engine_(engine), attr_(*attr), kind_(kind) {
+            assert( engine != nullptr );
+            assert( attr != nullptr );
+        }
 
     mkldnn_primitive_desc(mkldnn::impl::engine_t *engine,
             mkldnn::impl::primitive_kind_t kind)
