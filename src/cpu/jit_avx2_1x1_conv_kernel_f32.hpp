@@ -37,7 +37,7 @@ struct jit_avx2_1x1_conv_kernel_f32: public jit_generator {
             const memory_desc_wrapper &src_d,
             const memory_desc_wrapper &weights_d,
             const memory_desc_wrapper &dst_d,
-            bool with_relu, double relu_negative_slope);
+            bool with_relu, float relu_negative_slope);
 
     static status_t init_conf(jit_1x1_conv_conf_t &jcp,
             const convolution_desc_t &cd,
@@ -59,8 +59,8 @@ private:
     reg64_t reg_load_data = rsi;
     reg64_t reg_output_data = rbx;
     reg64_t aux_reg_bcast_data = rdx;
-    reg64_t aux1_reg_bcast_data = rcx;
-    reg64_t aux_reg_load_data = rdi;
+    reg64_t aux1_reg_bcast_data = abi_not_param1;
+    reg64_t aux_reg_load_data = abi_param1;
     reg64_t aux_reg_output_data = rbp;
     reg64_t reg_load_loop_work = r9;
     reg64_t reg_bcast_loop_work = r10;

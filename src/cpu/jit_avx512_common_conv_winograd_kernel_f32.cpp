@@ -74,8 +74,8 @@ struct prefetcher_t {
             int nb_instructions_in_block, int fma_ipc)
         : cg_(generator)
         , reg_base_addr_(reg_base_addr)
-        , cache_block_size_(block_size)
         , cache_type_(cache_type)
+        , cache_block_size_(block_size)
     {
         nb_cache_lines_to_prefetch_ = cache_block_size_ / (64 / sizeof(data_t));
         prefetch_spread_
@@ -123,8 +123,8 @@ private:
     jit_generator *cg_;
     Xbyak::Reg64 reg_base_addr_;
     cache_t cache_type_;
-    size_t cache_block_size_ = 0;
-    size_t nb_cache_lines_to_prefetch_ = 0;
+    int cache_block_size_ = 0;
+    int nb_cache_lines_to_prefetch_ = 0;
     int prefetches_issued_ = 0;
     int prefetch_spread_ = 0;
     int prefetch_blk_ = 0;
@@ -337,7 +337,7 @@ bool check_cond1(int dimN_reg_block, int dimK_block, int dimK_reg_block,
                         + dimM_block * dimK_block * dimK_reg_block
                                 * dimM_simd_block
                         + dimK_block * dimN_reg_block * dimK_reg_block)
-            * sizeof(float);
+            * (float)sizeof(float);
     float rhs = C * L1_cache_size;
     return (lhs < rhs);
 }
@@ -347,7 +347,7 @@ bool check_cond1_bis(int dimN_reg_block, int dimK_block, int dimK_reg_block,
 {
     float lhs = (dimM_block * dimK_block * dimK_reg_block * dimM_simd_block
                         + dimK_block * dimN_reg_block * dimK_reg_block)
-            * sizeof(float);
+            * (float)sizeof(float);
     float rhs = C * L1_cache_size;
     return (lhs < rhs);
 }
@@ -356,12 +356,12 @@ bool check_cond2(int nb_dimN_reg_block, int dimN_reg_block, int dimK_nb_block,
         int dimK_block, int dimK_reg_block, int dimM_block, int dimM_simd_block,
         float C)
 {
-    int lhs = (nb_dimN_reg_block * dimM_block * dimN_reg_block * dimM_simd_block
+    float lhs = (nb_dimN_reg_block * dimM_block * dimN_reg_block * dimM_simd_block
                       + dimK_nb_block * dimM_block * dimK_block * dimK_reg_block
                               * dimM_simd_block
                       + nb_dimN_reg_block * dimK_nb_block * dimK_block
                               * dimN_reg_block * dimK_reg_block)
-            * sizeof(float);
+            * (float)sizeof(float);
     float rhs = C * L2_cache_size;
     return (lhs < rhs);
 }
@@ -443,12 +443,12 @@ status_t _jit_avx512_common_conv_winograd_data_kernel_f32::init_conf_kernel(
             int dimN_reg_block, int current_best) {
         return (dimN_reg_block >= MIN_REQUIRED_DIMN_REG_BLOCK)
                 && (dimN_reg_block < jcp.nb_reg)
-                && (dimN_reg_block > current_best);
+                && (dimN_reg_block < current_best);
     };
     jcp.dimN_reg_block = get_divisor_satisfying_cond(
-            jcp, jcp.dimN, 1, test_cond_dimN_reg_block);
+            jcp, jcp.dimN, jcp.dimN, test_cond_dimN_reg_block);
 
-    if (jcp.dimN_reg_block == 1) {
+    if (jcp.dimN_reg_block >= jcp.nb_reg) {
         auto test_cond_dimN_reg_block = [](jit_conv_winograd_conf_t &jcp,
                 int dimN_reg_block, int current_best) {
             return (dimN_reg_block < jcp.nb_reg)
@@ -528,7 +528,7 @@ status_t jit_avx512_common_conv_winograd_fwd_kernel_f32::init_conf(
         jit_conv_winograd_conf_t &jcp, const convolution_desc_t &cd,
         const memory_desc_wrapper &src_d, const memory_desc_wrapper &weights_d,
         const memory_desc_wrapper &dst_d, bool with_relu,
-        double relu_negative_slope)
+        float relu_negative_slope)
 {
     status_t st = init_conf_common(jcp, cd, src_d, weights_d, dst_d);
 
@@ -815,7 +815,7 @@ void jit_avx512_common_conv_winograd_bwd_weights_kernel_f32::gemm_loop_generate(
 bool check_cond1_wu(int dimM_block, int dimM_simdw, int dimK_block,
         int dimK_reg_block, int dimK_4fma, int dimN_reg_block, float C)
 {
-    float lhs = dimM_block * dimN_reg_block * dimM_simdw;
+    float lhs = 1.0f * dimM_block * dimN_reg_block * dimM_simdw;
     lhs += dimM_block * dimK_block * dimK_reg_block * dimK_4fma * dimM_simdw;
     lhs += dimK_block * dimN_reg_block * dimK_reg_block * dimK_4fma;
     lhs *= sizeof(float);
@@ -827,7 +827,7 @@ bool check_cond1bis_wu(int dimM_block, int dimM_simdw, int dimK_block,
         int dimK_reg_block, int dimK_4fma, int dimN_reg_block, float C)
 {
     float lhs
-            = dimM_block * dimK_block * dimK_reg_block * dimK_4fma * dimM_simdw;
+        = 1.0f * dimM_block * dimK_block * dimK_reg_block * dimK_4fma * dimM_simdw;
     lhs += dimK_block * dimN_reg_block * dimK_reg_block * dimK_4fma;
     lhs *= sizeof(float);
     float rhs = C * L1_cache_size;
@@ -839,7 +839,7 @@ bool check_cond2bis_wu(int dimM_block, int dimM_simdw, int dimK_block,
         float C)
 {
     float lhs
-            = dimM_block * dimM_simdw * dimK_block * dimK_reg_block * dimK_4fma;
+        = 1.0f * dimM_block * dimM_simdw * dimK_block * dimK_reg_block * dimK_4fma;
     lhs += dimK_block * dimK_reg_block * dimK_4fma * dimN_block
             * dimN_reg_block;
     lhs *= sizeof(float);
@@ -850,7 +850,7 @@ bool check_cond2_wu(int dimM_block, int dimM_simdw, int dimK_block,
         int dimK_reg_block, int dimK_4fma, int dimN_block, int dimN_reg_block,
         float C)
 {
-    float lhs = dimM_block * dimM_simdw * dimN_block * dimN_reg_block;
+    float lhs = 1.0f * dimM_block * dimM_simdw * dimN_block * dimN_reg_block;
     lhs += dimM_block * dimM_simdw * dimK_block * dimK_reg_block * dimK_4fma;
     lhs += dimK_block * dimK_reg_block * dimK_4fma * dimN_block
             * dimN_reg_block;

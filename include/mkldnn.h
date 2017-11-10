@@ -76,6 +76,17 @@ mkldnn_status_t MKLDNN_API mkldnn_primitive_desc_iterator_create(
         const_mkldnn_op_desc_t op_desc, mkldnn_engine_t engine,
         const_mkldnn_primitive_desc_t hint_forward_primitive_desc);
 
+/** Creates a primitive descriptor @p iterator for given @p op_desc, @p attr,
+ * @p engine, and optionally a hint primitive descriptor from forward
+ * propagation (required for backward propagation). Pass @c NULL for forward
+ * propagation.
+ */
+mkldnn_status_t MKLDNN_API mkldnn_primitive_desc_iterator_create_v2(
+        mkldnn_primitive_desc_iterator_t *iterator,
+        const_mkldnn_op_desc_t op_desc, const_mkldnn_primitive_attr_t attr,
+        mkldnn_engine_t engine,
+        const_mkldnn_primitive_desc_t hint_forward_primitive_desc);
+
 /** Iterates over primitive descriptors. Returns #mkldnn_iterator_ends if no
  * more primitive descriptors are available */
 mkldnn_status_t MKLDNN_API mkldnn_primitive_desc_iterator_next(
@@ -102,10 +113,32 @@ mkldnn_status_t MKLDNN_API mkldnn_primitive_desc_create(
         const_mkldnn_op_desc_t op_desc, mkldnn_engine_t engine,
         const_mkldnn_primitive_desc_t hint_forward_primitive_desc);
 
+/** Creates a @p primitive_desc using @p op_desc, @p attr, @p engine, and
+ * optionally a hint primitive descriptor from forward propagation. The call is
+ * equivalent to create a primitive descriptor iterator, instantly fetch a @p
+ * primitive_desc and destroy the iterator. */
+mkldnn_status_t MKLDNN_API mkldnn_primitive_desc_create_v2(
+        mkldnn_primitive_desc_t *primitive_desc,
+        const_mkldnn_op_desc_t op_desc, const_mkldnn_primitive_attr_t attr,
+        mkldnn_engine_t engine,
+        const_mkldnn_primitive_desc_t hint_forward_primitive_desc);
+
 /** Makes a copy of a @p primitive_desc. */
 mkldnn_status_t MKLDNN_API mkldnn_primitive_desc_clone(
         mkldnn_primitive_desc_t *primitive_desc,
         const_mkldnn_primitive_desc_t existing_primitive_desc);
+
+/** Returns a constant reference to the attribute of a @p primitive_desc.
+ *
+ * @warning
+ *      User should not destroy obtained @p attr
+ *
+ * @warning
+ *      The lifetime of an @p attr is same as @p primitive_desc, so it is
+ *      illegal to use the @p attr once @p primitive_desc is destroyed */
+mkldnn_status_t MKLDNN_API mkldnn_primitive_desc_get_attr(
+        const_mkldnn_primitive_desc_t primitive_desc,
+        const_mkldnn_primitive_attr_t *attr);
 
 /** Deletes a @p primitive_desc. */
 mkldnn_status_t MKLDNN_API mkldnn_primitive_desc_destroy(
@@ -180,6 +213,101 @@ mkldnn_primitive_at_t MKLDNN_API mkldnn_primitive_at(
 
 /** @} */
 
+/** @addtogroup c_api_attributes Attributes
+ * An extension for controlling primitive behavior.
+ * @{ */
+
+/** Creates an empty (default) @p attr attribute. All the parameters set to
+ * default values.
+ *
+ * An empty attribute is used in primitive descriptor creating whenever it is
+ * not passed explicitly, e.g. in mkldnn_primitive_desc_create.
+ */
+mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_create(
+        mkldnn_primitive_attr_t *attr);
+
+/** Makes a copy of an @p existing_attr. */
+mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_clone(
+        mkldnn_primitive_attr_t *attr,
+        const_mkldnn_primitive_attr_t existing_attr);
+
+/** Deletes an @p attr. */
+mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_destroy(
+        mkldnn_primitive_attr_t attr);
+
+/* Returns integer output rounding mode @p round_mode for a given @p attr,
+ * previously set by mkldnn_primitive_attr_set_int_output_round_mode. */
+mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_get_int_output_round_mode(
+        const_mkldnn_primitive_attr_t attr, mkldnn_round_mode_t *round_mode);
+
+/* Sets output rounding mode @p round_mode for integer operations for a given
+ * @p attr.
+ *
+ * The default value is #mkldnn_round_nearest.
+ */
+mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_set_int_output_round_mode(
+        mkldnn_primitive_attr_t attr, mkldnn_round_mode_t round_mode);
+
+/* Returns @p count, correspondence scale @p mask, and pointer to a constant
+ * floating point array of output @p scales for given @p attr, previously set
+ * by mkldnn_primitive_attr_set_output_scales.
+ *
+ * @warning
+ *      @scales array points to the internal @p attr field, so user should not
+ *      modify/destroy @p scales.
+ *
+ * @warning
+ *      The lifetime of @p scales is same as @p attr it belongs to, so it is
+ *      illegal to use the @p scales after @p attr is destroyed
+ */
+mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_get_output_scales(
+        const_mkldnn_primitive_attr_t attr, int *count, int *mask,
+        const float **scales);
+
+/* Sets output @p scales for primitive operations. The number of elements @p
+ * count and correspondence scale @p mask are stored for future use.
+ *
+ * The @p mask argument defines correspondence between output tensor dimensions
+ * and the @p scales array. Set i-th bit of @p mask to 1 to use dedicated
+ * scaling factor for each slice of the output tensor over i-th dimension. Set
+ * @p mask to 0 to use common scaling factor for the whole output tensor.
+ *
+ * @note
+ *      The dimension order is always native and does not depend on the actual
+ *      layout used. Examples:
+ *       - 2D dimensional data the order of dimensions is always: (n, c)
+ *       - 4D dimensional data the order is always: (n, c, h, w)
+ *       - 5D dimensional weights the order is always: (g, oc, ic, kh, kw)
+ *
+ * Example usage:
+ * @code
+ *      int mb = 32, oc = 32, oh = 14, ow = 14; // convolution output params
+ *      float scales[oc] = { ... }; // unique output scales per output channel
+ *      int oc_dim = 1; // mb_dim = 0, channel_dim = 1, height_dim = 2, ...
+ *
+ *      mkldnn_convolution_desc_t cd; // create & configure convolution op_desc
+ *
+ *      mkldnn_primitive_attr_t attr;
+ *      mkldnn_primitive_attr_create(&attr);  // create default attributes
+ *      mkldnn_primitive_attr_set_output_scales(attr, oc, 1 << oc_dim, scales);
+ *
+ *      mkldnn_primitive_desc_t cpd;
+ *      mkldnn_primitive_desc_create_v2(&cpd, &cd, attr, NULL);
+ * @endcode
+ *
+ * @note
+ *      There is no way to check that @p count corresponds to @p mask until an
+ *      actual primitive descriptor is created, so it is user's responsibility
+ *      to set proper values. The following formula must be hold:
+ *
+ *      count == \prod_{d \in mask} output.dims[d]
+ */
+mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_set_output_scales(
+        mkldnn_primitive_attr_t attr, int count, int mask,
+        const float *scales);
+
+/** @} */
+
 /** @addtogroup c_api_memory Memory
  * A primitive to describe data.
  * @{ */
@@ -246,6 +374,14 @@ mkldnn_status_t MKLDNN_API mkldnn_reorder_primitive_desc_create(
         const_mkldnn_primitive_desc_t input,
         const_mkldnn_primitive_desc_t output);
 
+/** Initializes a @p reorder_primitive_desc using an @p attr attribute and
+ * descriptors of @p input and @p output memory primitives. */
+mkldnn_status_t MKLDNN_API mkldnn_reorder_primitive_desc_create_v2(
+        mkldnn_primitive_desc_t *reorder_primitive_desc,
+        const_mkldnn_primitive_desc_t input,
+        const_mkldnn_primitive_desc_t output,
+        const_mkldnn_primitive_attr_t attr);
+
 /** @} */
 
 /** @addtogroup c_api_concat Concat
@@ -304,9 +440,8 @@ mkldnn_status_t MKLDNN_API mkldnn_concat_inplace_by_output_primitive_desc_create
  * automatically. */
 mkldnn_status_t MKLDNN_API mkldnn_sum_primitive_desc_create(
         mkldnn_primitive_desc_t *sum_primitive_desc,
-        const mkldnn_memory_desc_t *output_desc, int n, double* scale,
+        const mkldnn_memory_desc_t *output_desc, int n, const float *scales,
         const_mkldnn_primitive_desc_t *input_pds);
-
 
 /** @} */
 
@@ -385,6 +520,20 @@ mkldnn_status_t MKLDNN_API mkldnn_convolution_backward_data_desc_init(
         const mkldnn_dims_t padding_l, const mkldnn_dims_t padding_r,
         mkldnn_padding_kind_t padding_kind);
 
+/** Initializes a dilated convolution descriptor @p conv_desc for backward
+ * propagation with respect to data using @p alg_kind, memory descriptors, @p
+ * strides, @p dilates @p padding_l, @p padding_r, and @p padding_kind.
+ *
+ * @note memory descriptors are allowed to be initialized with #mkldnn_any
+ * value of @p format_kind. */
+mkldnn_status_t MKLDNN_API mkldnn_dilated_convolution_backward_data_desc_init(
+        mkldnn_convolution_desc_t *conv_desc, mkldnn_alg_kind_t alg_kind,
+        const mkldnn_memory_desc_t *diff_src_desc,
+        const mkldnn_memory_desc_t *weights_desc,
+        const mkldnn_memory_desc_t *diff_dst_desc, const mkldnn_dims_t strides,
+        const mkldnn_dims_t dilates, const mkldnn_dims_t padding_l,
+        const mkldnn_dims_t padding_r, mkldnn_padding_kind_t padding_kind);
+
 /** Initializes a convolution descriptor @p conv_desc for backward propagation
  * with respect to weights using @p alg_kind, memory descriptors, @p strides,
  * @p padding_l, @p padding_r, and @p padding_kind.
@@ -399,6 +548,22 @@ mkldnn_status_t MKLDNN_API mkldnn_convolution_backward_weights_desc_init(
         const mkldnn_memory_desc_t *diff_dst_desc, const mkldnn_dims_t strides,
         const mkldnn_dims_t padding_l, const mkldnn_dims_t padding_r,
         mkldnn_padding_kind_t padding_kind);
+
+/** Initializes a convolution descriptor @p conv_desc for backward propagation
+ * with respect to weights using @p alg_kind, memory descriptors, @p strides,
+ * @p dilates @p padding_l, @p padding_r, and @p padding_kind.
+ *
+ * @note memory descriptors are allowed to be initialized with #mkldnn_any
+ * value of @p format_kind. */
+mkldnn_status_t MKLDNN_API
+mkldnn_dilated_convolution_backward_weights_desc_init(
+        mkldnn_convolution_desc_t *conv_desc, mkldnn_alg_kind_t alg_kind,
+        const mkldnn_memory_desc_t *src_desc,
+        const mkldnn_memory_desc_t *diff_weights_desc,
+        const mkldnn_memory_desc_t *diff_bias_desc,
+        const mkldnn_memory_desc_t *diff_dst_desc, const mkldnn_dims_t strides,
+        const mkldnn_dims_t dilates, const mkldnn_dims_t padding_l,
+        const mkldnn_dims_t padding_r, mkldnn_padding_kind_t padding_kind);
 
 /** @} */
 
@@ -415,7 +580,7 @@ mkldnn_status_t MKLDNN_API mkldnn_convolution_backward_weights_desc_init(
 mkldnn_status_t MKLDNN_API mkldnn_eltwise_forward_desc_init(
         mkldnn_eltwise_desc_t *eltwise_desc, mkldnn_prop_kind_t prop_kind,
         mkldnn_alg_kind_t alg_kind, const mkldnn_memory_desc_t *data_desc,
-        double alpha, double beta);
+        float alpha, float beta);
 
 /** Initializes a @p eltwise_desc for backward propagation using @p alg_kind
  * algorithm memory descriptors @p diff_data_desc and @p data_desc, and
@@ -424,7 +589,7 @@ mkldnn_status_t MKLDNN_API mkldnn_eltwise_forward_desc_init(
 mkldnn_status_t MKLDNN_API mkldnn_eltwise_backward_desc_init(
         mkldnn_eltwise_desc_t *eltwise_desc, mkldnn_alg_kind_t alg_kind,
         const mkldnn_memory_desc_t *diff_data_desc,
-        const mkldnn_memory_desc_t *data_desc, double alpha, double beta);
+        const mkldnn_memory_desc_t *data_desc, float alpha, float beta);
 
 /** @} */
 
@@ -444,7 +609,7 @@ mkldnn_status_t MKLDNN_API mkldnn_eltwise_backward_desc_init(
 MKLDNN_DEPRECATED
 mkldnn_status_t MKLDNN_API mkldnn_relu_forward_desc_init(
         mkldnn_relu_desc_t *relu_desc, mkldnn_prop_kind_t prop_kind,
-        const mkldnn_memory_desc_t *data_desc, double negative_slope);
+        const mkldnn_memory_desc_t *data_desc, float negative_slope);
 
 /** Initializes a @p relu_desc for backward propagation using @p negative_slope
  * and memory descriptors @p diff_data_desc and @p data_desc.
@@ -455,7 +620,7 @@ MKLDNN_DEPRECATED
 mkldnn_status_t MKLDNN_API mkldnn_relu_backward_desc_init(
         mkldnn_relu_desc_t *relu_desc,
         const mkldnn_memory_desc_t *diff_data_desc,
-        const mkldnn_memory_desc_t *data_desc, double negative_slope);
+        const mkldnn_memory_desc_t *data_desc, float negative_slope);
 
 /** @} */
 
@@ -555,7 +720,7 @@ mkldnn_status_t MKLDNN_API mkldnn_pooling_backward_desc_init(
 mkldnn_status_t MKLDNN_API mkldnn_lrn_forward_desc_init(
         mkldnn_lrn_desc_t *lrn_desc, mkldnn_prop_kind_t prop_kind,
         mkldnn_alg_kind_t alg_kind, const mkldnn_memory_desc_t *data_desc,
-        int local_size, double alpha, double beta, double k);
+        int local_size, float alpha, float beta, float k);
 
 /** Initializes an @p lrn_desc for backward propagation using @p alg_kind,
  * memory descriptors @p data_desc, and @p diff_data_desc, and regularization
@@ -563,8 +728,8 @@ mkldnn_status_t MKLDNN_API mkldnn_lrn_forward_desc_init(
 mkldnn_status_t MKLDNN_API mkldnn_lrn_backward_desc_init(
         mkldnn_lrn_desc_t *lrn_desc, mkldnn_alg_kind_t alg_kind,
         const mkldnn_memory_desc_t *diff_data_desc,
-        const mkldnn_memory_desc_t *data_desc, int local_size, double alpha,
-        double beta, double k);
+        const mkldnn_memory_desc_t *data_desc, int local_size, float alpha,
+        float beta, float k);
 
 /** @} */
 
@@ -592,7 +757,7 @@ mkldnn_status_t MKLDNN_API mkldnn_lrn_backward_desc_init(
 mkldnn_status_t MKLDNN_API mkldnn_batch_normalization_forward_desc_init(
         mkldnn_batch_normalization_desc_t *bnrm_desc,
         mkldnn_prop_kind_t prop_kind, const mkldnn_memory_desc_t *data_desc,
-        double epsilon, unsigned flags);
+        float epsilon, unsigned flags);
 
 /** Initializes a batch normalization descriptor @p bnrm_desc for backward
  * propagation with respect to data and scale-shift parameters using memory
@@ -606,7 +771,7 @@ mkldnn_status_t MKLDNN_API mkldnn_batch_normalization_backward_desc_init(
         mkldnn_prop_kind_t prop_kind,
         const mkldnn_memory_desc_t *diff_data_desc,
         const mkldnn_memory_desc_t *data_desc,
-        double epsilon, unsigned flags);
+        float epsilon, unsigned flags);
 
 /** @} */
 
@@ -672,7 +837,7 @@ mkldnn_status_t MKLDNN_API mkldnn_inner_product_backward_weights_desc_init(
  * descriptor @p conv_desc and ReLU parameter @p negative slope. */
 mkldnn_status_t MKLDNN_API mkldnn_convolution_relu_desc_init(
         mkldnn_convolution_relu_desc_t *conv_relu_desc,
-        const mkldnn_convolution_desc_t *conv_desc, double negative_slope);
+        const mkldnn_convolution_desc_t *conv_desc, float negative_slope);
 
 /** @} */
 

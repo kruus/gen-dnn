@@ -69,42 +69,89 @@ void jit_avx512_common_1x1_conv_kernel::bcast_loop(int load_loop_blk)
     mov(aux_reg_output_data, reg_output_data);
     mov(bcast_loop_iter, EVEX_compress_addr(rsp, bcast_loop_work_offt));
 
-    Label bcast_loop;
-    Label bcast_loop_tail;
+    if (jcp.ver == ver_4fma)
+    {
+        Label bcast_loop;
+        Label bcast_loop_wraparound;
+        Label bcast_loop_out;
+        Label bcast_loop_ur_full;
 
-    cmp(bcast_loop_iter, jcp.ur);
-    jl(bcast_loop_tail, T_NEAR);
+        cmp(bcast_loop_iter, jcp.ur);
+        jle(bcast_loop_wraparound, T_NEAR);
 
-    L(bcast_loop); {
-        assert(jcp.bcast_block % jcp.ur == 0);
-        int num_substeps = jcp.bcast_block / jcp.ur;
-        assert(num_substeps > 0 && num_substeps < 10);
-        for (int i = 0; i < num_substeps; i++) {
-            reduce_loop(load_loop_blk, jcp.ur, i, false);
-            if (i < num_substeps - 1) {
-                add(aux1_reg_bcast_data, jcp.bcast_loop_bcast_substep);
-                add(aux_reg_output_data, jcp.bcast_loop_output_substep);
-            } else {
-                add(aux1_reg_bcast_data, jcp.bcast_loop_bcast_step
+        L(bcast_loop); {
+            assert(jcp.bcast_block % jcp.ur == 0);
+            int num_substeps = jcp.bcast_block / jcp.ur;
+            assert(num_substeps > 0 && num_substeps < 10);
+            for (int i = 0; i < num_substeps; i++) {
+                reduce_loop(load_loop_blk, jcp.ur, i, false);
+                if (i < num_substeps - 1) {
+                    add(aux1_reg_bcast_data, jcp.bcast_loop_bcast_substep);
+                    add(aux_reg_output_data, jcp.bcast_loop_output_substep);
+                }
+                else {
+                    add(aux1_reg_bcast_data, jcp.bcast_loop_bcast_step
                         - (num_substeps - 1) * jcp.bcast_loop_bcast_substep);
-                add(aux_reg_output_data, jcp.bcast_loop_output_step
+                    add(aux_reg_output_data, jcp.bcast_loop_output_step
                         - (num_substeps - 1) * jcp.bcast_loop_output_substep);
+                }
             }
+            sub(bcast_loop_iter, jcp.bcast_block);
+            cmp(bcast_loop_iter, jcp.bcast_block);
+            jg(bcast_loop, T_NEAR);
         }
-        sub(bcast_loop_iter, jcp.bcast_block);
-        cmp(bcast_loop_iter, jcp.bcast_block);
-        jge(bcast_loop, T_NEAR);
-    }
 
-    L(bcast_loop_tail);
-    if (jcp.ur_tail) {
-        Label bcast_loop_tail_out;
-        cmp(bcast_loop_iter, 0);
-        jz(bcast_loop_tail_out, T_NEAR);
-        reduce_loop(load_loop_blk, jcp.ur_tail, 0, true);
-        L(bcast_loop_tail_out);
+        L(bcast_loop_wraparound);
+        if (jcp.ur_tail) {
+            je(bcast_loop_ur_full, T_NEAR);
+            reduce_loop(load_loop_blk, jcp.ur_tail, 0, true);
+            jmp(bcast_loop_out, T_NEAR);
+        }
+        L(bcast_loop_ur_full);
+        reduce_loop(load_loop_blk, jcp.ur, 0, true);
+        L(bcast_loop_out);
+    }
+    else
+    {
+        Label bcast_loop;
+        Label bcast_loop_tail;
+
+        cmp(bcast_loop_iter, jcp.ur);
+        jl(bcast_loop_tail, T_NEAR);
+
+        L(bcast_loop); {
+            assert(jcp.bcast_block % jcp.ur == 0);
+            int num_substeps = jcp.bcast_block / jcp.ur;
+            assert(num_substeps > 0 && num_substeps < 10);
+            for (int i = 0; i < num_substeps; i++) {
+                reduce_loop(load_loop_blk, jcp.ur, i, false);
+                if (i < num_substeps - 1) {
+                    add(aux1_reg_bcast_data, jcp.bcast_loop_bcast_substep);
+                    add(aux_reg_output_data, jcp.bcast_loop_output_substep);
+                }
+                else {
+                    add(aux1_reg_bcast_data, jcp.bcast_loop_bcast_step
+                        - (num_substeps - 1) * jcp.bcast_loop_bcast_substep);
+                    add(aux_reg_output_data, jcp.bcast_loop_output_step
+                        - (num_substeps - 1) * jcp.bcast_loop_output_substep);
+                }
+            }
+            sub(bcast_loop_iter, jcp.bcast_block);
+            cmp(bcast_loop_iter, jcp.bcast_block);
+            jge(bcast_loop, T_NEAR);
+        }
+
+        L(bcast_loop_tail);
+        if (jcp.ur_tail) {
+            Label bcast_loop_tail_out;
+            cmp(bcast_loop_iter, 0);
+            jz(bcast_loop_tail_out, T_NEAR);
+            reduce_loop(load_loop_blk, jcp.ur_tail, 0, true);
+            L(bcast_loop_tail_out);
+        }
     }
 }
+
 
 void jit_avx512_common_1x1_conv_kernel::reduce_loop(int load_loop_blk,
          int ur, int substep, bool wraparound)
@@ -126,7 +173,7 @@ void jit_avx512_common_1x1_conv_kernel::reduce_loop(int load_loop_blk,
     auto bcast_ptr = [=](int i_reduce, int i_ur, bool bcast) {
         assert(i_ur < jcp.ur);
         assert(i_reduce <= jcp.reduce_loop_unroll);
-        size_t offt;
+        int offt;
         if (one_of(jcp.prop_kind, forward_training, forward_inference,
                    backward_data)) {
             assert(jcp.reduce_loop_unroll == jcp.reduce_block);
@@ -147,10 +194,10 @@ void jit_avx512_common_1x1_conv_kernel::reduce_loop(int load_loop_blk,
     };
 
     auto load_ptr = [=](int i_reduce, int i_load) {
-        size_t offt;
-        size_t u0 = i_reduce % jcp.reduce_loop_unroll;
-        size_t u1 = i_reduce / jcp.reduce_loop_unroll;
-        if (jcp.prop_kind == backward_data)
+        int offt;
+        int u0 = i_reduce % jcp.reduce_loop_unroll;
+        int u1 = i_reduce / jcp.reduce_loop_unroll;
+        if (jcp.prop_kind == backward_data && jcp.ver == ver_4vnni)
             offt = (i_load * jcp.reduce_block + u0) * jcp.load_block;
         else
             offt = (i_load * jcp.reduce_dim + u0) * jcp.load_block;
@@ -247,7 +294,7 @@ void jit_avx512_common_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             if (jcp.relu_negative_slope == 0) {
                 zmm_relu_ns = zmm_zero;
             } else {
-                mov(imm_addr64, float2int(jcp.relu_negative_slope));
+                mov(imm_addr64, float2int((float)jcp.relu_negative_slope));
                 vmovq(xmm_relu_ns, imm_addr64);
                 vbroadcastss(zmm_relu_ns, xmm_relu_ns);
             }
@@ -329,10 +376,11 @@ void jit_avx512_common_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                 int i_pf = i_op / (load_loop_blk * other_pf_trigger);
                 if (i_pf < n_pf_ker_l2) {
                     int offt = (i_pf + (i_load + 1) * jcp.reduce_dim)
-                                    * jcp.load_block;
-                    if (jcp.prop_kind == backward_data)
+                        * jcp.load_block;
+                    if (jcp.prop_kind == backward_data && jcp.ver == ver_4vnni)
                         offt = (i_pf + (i_load + 1) * jcp.reduce_block)
                                 * jcp.load_block;
+
                     mic_prefetcht1(ptr[aux_reg_load_data
                                     + offt * jcp.typesize_in]);
                 } else if (i_pf < n_pf_ker_l2 + n_pf_ker_l1) {
@@ -340,15 +388,10 @@ void jit_avx512_common_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                     auto pf_reg = last_block ? reg_load_data
                                              : aux_reg_load_data;
                     int offt = (i_pf + i_load * jcp.reduce_dim
-                                    + (last_block
-                                        ? (wraparound ? jcp.reduce_dim : 0)
-                                        : jcp.reduce_block))
-                                * jcp.load_block;
-                    if (jcp.prop_kind == backward_data) {
-                        offt = (i_pf + i_load * jcp.reduce_block + (last_block
-                                ? (wraparound ? jcp.load_block : 0)
-                                : jcp.load_dim)) * jcp.reduce_block;
-                    }
+                        + (last_block
+                            ? (wraparound ? jcp.reduce_dim : 0)
+                            : jcp.reduce_block))
+                        * jcp.load_block;
                     mic_prefetcht0(ptr[pf_reg + offt * jcp.typesize_in]);
                 } else if (i_pf < n_pf_ker_l1 + n_pf_ker_l2 + n_pf_out_l1) {
                     i_pf -= n_pf_ker_l1 + n_pf_ker_l2;
@@ -566,7 +609,7 @@ status_t jit_avx512_common_1x1_conv_kernel::init_conf(
         jit_1x1_conv_conf_t &jcp, const convolution_desc_t &cd,
         const memory_desc_wrapper &src_d, const memory_desc_wrapper &weights_d,
         const memory_desc_wrapper &dst_d, bool with_relu,
-        double relu_negative_slope, int nthreads, bool reduce_src)
+        float relu_negative_slope, int nthreads, bool reduce_src)
 {
     if (!mayiuse(avx512_common)) return status::unimplemented;
 
@@ -651,8 +694,8 @@ status_t jit_avx512_common_1x1_conv_kernel::init_conf(
                             weights_d.data_type(), dst_d.data_type()))
     {
         constexpr memory_format_t weights_formats[2][2] = {
-            { OIhw16i16o, OIhw16o16i },
-            { gOIhw16i16o, gOIhw16o16i }
+            { OIhw16i16o, IOhw16o16i },
+            { gOIhw16i16o, gIOhw16o16i }
         };
         memory_format_t weights_format
             = weights_formats[with_groups][jcp.prop_kind == backward_data];
@@ -696,7 +739,10 @@ status_t jit_avx512_common_1x1_conv_kernel::init_conf(
     else
         size_treshold = 14;
 
-    for (int ur_w = max_regs; ur_w >= min_regs; ur_w--) {
+    int ur_step = 1;
+    if (jcp.ver == ver_4fma || jcp.ver == ver_4vnni)
+        ur_step = 4;
+    for (int ur_w = max_regs; ur_w >= min_regs; ur_w -= ur_step) {
         if ((jcp.ih >= size_treshold && jcp.ih % ur_w == 0)
             || (jcp.ih < size_treshold && jcp.os % ur_w == 0)) {
             jcp.ur = ur_w;
@@ -709,7 +755,7 @@ status_t jit_avx512_common_1x1_conv_kernel::init_conf(
     if (jcp.ur == 1) {
         jcp.ur = nstl::min(max_regs, jcp.os);
         int os_tail = jcp.os % max_regs;
-        for (int i = max_regs; i >= min_regs; i--) {
+        for (int i = max_regs; i >= min_regs; i -= ur_step) {
             int i_tail = jcp.os % i;
             if (i_tail > os_tail || i_tail == 0) {
                 jcp.ur = i;
@@ -719,6 +765,7 @@ status_t jit_avx512_common_1x1_conv_kernel::init_conf(
             }
         }
     }
+
     int load_blocking{ 0 };
     int load_blocking_max{ 0 };
     int bcast_blocking{ 0 };
@@ -729,160 +776,118 @@ status_t jit_avx512_common_1x1_conv_kernel::init_conf(
     jcp.load_grp_count = 1;
     jcp.use_vmovntps = true;
 
-    const int L2_capacity = (512 * 1024) / sizeof(float);
+    const int L2_capacity = (512 * 1024 * 3) / (4 * sizeof(float));
     const int L1_capacity = (32 * 1024) / sizeof(float);
 
-    if (one_of(jcp.prop_kind, forward_training, forward_inference)) {
-        jcp.reduce_dim = jcp.ic;
-        jcp.reduce_block = jcp.ic_block;
+    if (one_of(jcp.prop_kind, forward_training, forward_inference,
+                backward_data)) {
+        if (one_of(jcp.prop_kind, forward_training, forward_inference)) {
+            jcp.reduce_dim = jcp.ic;
+            jcp.reduce_block = jcp.ic_block;
 
-        jcp.load_dim = jcp.oc;
-        jcp.load_block = jcp.oc_block;
+            jcp.load_dim = jcp.oc;
+            jcp.load_block = jcp.oc_block;
 
-        jcp.bcast_dim = jcp.is;
+            jcp.bcast_dim = jcp.is;
+        } else {
+            jcp.reduce_dim = jcp.oc;
+            jcp.reduce_block = jcp.oc_block;
+
+            jcp.load_dim = jcp.ic;
+            jcp.load_block = jcp.ic_block;
+
+            jcp.bcast_dim = jcp.os;
+        }
         jcp.bcast_block = jcp.ur;
 
         jcp.reduce_loop_unroll = jcp.reduce_block;
         jcp.reduce_loop_bcast_step
-            = jcp.reduce_loop_unroll * jcp.is * jcp.typesize_in;
-        jcp.reduce_loop_load_step
-            = jcp.reduce_loop_unroll * jcp.oc_block * jcp.typesize_in;
+                = jcp.reduce_loop_unroll * jcp.bcast_dim * jcp.typesize_in;
 
-        jcp.bcast_loop_output_step = jcp.ur * jcp.oc_block * jcp.typesize_out;
+        if (jcp.prop_kind == backward_data && jcp.ver == ver_4vnni)
+            jcp.reduce_loop_load_step
+                    = jcp.reduce_loop_unroll * jcp.ic * jcp.typesize_in;
+        else
+            jcp.reduce_loop_load_step
+                    = jcp.reduce_loop_unroll * jcp.load_block * jcp.typesize_in;
+
+        jcp.bcast_loop_output_step = jcp.ur * jcp.load_block * jcp.typesize_out;
         jcp.bcast_loop_output_substep = -1; // unused
-        jcp.bcast_loop_bcast_step = jcp.ur * jcp.ic_block * jcp.typesize_in;
+        jcp.bcast_loop_bcast_step = jcp.ur * jcp.reduce_block * jcp.typesize_in;
         jcp.bcast_loop_bcast_substep = -1; // unused
 
-        jcp.load_loop_load_step = jcp.ic * jcp.oc_block * jcp.typesize_in;
-        jcp.load_loop_iter_step = jcp.oc_block;
+        if (jcp.prop_kind == backward_data && jcp.ver == ver_4vnni)
+            jcp.load_loop_load_step
+                    = jcp.oc_block * jcp.ic_block * jcp.typesize_in;
+        else
+            jcp.load_loop_load_step
+                    = jcp.reduce_dim * jcp.load_block * jcp.typesize_in;
 
-        jcp.loop_order = reduce_src ? loop_blr : loop_lbr;
+        jcp.load_loop_iter_step = jcp.load_block;
 
-        load_blocking = jcp.load_dim;
+        if (jcp.prop_kind == backward_data)
+            jcp.loop_order = loop_lbr;
+        else
+            jcp.loop_order = reduce_src ? loop_blr : loop_lbr;
 
         int nb_bcast = div_up(jcp.bcast_dim, jcp.bcast_block);
-        int nb_load = div_up(jcp.load_dim, jcp.load_block);
         int nb_reduce = div_up(jcp.reduce_dim, jcp.reduce_block);
 
-        int reduce_divider = 1;
-        if (jcp.bcast_dim <= SMALL_SPATIAL && jcp.reduce_dim > BIG_REDUCE_DIM)
-            reduce_divider = 4;
-        else if (jcp.bcast_dim > SMALL_SPATIAL
-            && jcp.reduce_dim >= BIG_REDUCE_DIM)
-            reduce_divider = 2;
-
-        if (reduce_divider > 1) {
-            jcp.loop_order = reduce_src ? loop_rbl : loop_rlb;
-            jcp.use_vmovntps = false;
-        }
-        reduce_blocking = nstl::max(1, nb_reduce / reduce_divider);
+        reduce_blocking = nb_reduce;
+        if (jcp.bcast_dim <= SMALL_SPATIAL && jcp.reduce_dim >= BIG_REDUCE_DIM)
+            reduce_blocking = 16;
+        else if (jcp.bcast_dim > SMALL_SPATIAL &&
+                    jcp.reduce_dim >= BIG_REDUCE_DIM)
+            reduce_blocking = 8;
         reduce_blocking = best_divider(nb_reduce, 1, reduce_blocking, true);
         reduce_blocking *= jcp.reduce_block;
 
-        int kernel_size = reduce_blocking * jcp.load_dim;
-        int bcast_block_size = reduce_blocking * jcp.bcast_block;
-        int L2_for_kernel = rnd_dn(L2_capacity - bcast_block_size,
-                reduce_blocking * jcp.load_block);
-        int load_divider =
-                reduce_src ? 1 : div_up(kernel_size, L2_for_kernel);
-        load_divider = nstl::max(load_divider,
-            div_up(nthreads, jcp.mb * jcp.ngroups * nb_bcast));
-        load_divider = best_divider(
-                nthreads, load_divider, 2 * load_divider, false);
+        if (reduce_blocking < jcp.reduce_dim) {
+            if (jcp.prop_kind == backward_data)
+                jcp.loop_order = reduce_src ? loop_lbr : loop_rlb;
+            else
+                jcp.loop_order = reduce_src ? loop_rbl : loop_rlb;
+            jcp.use_vmovntps = false;
+        }
 
-        load_blocking = div_up(nb_load, load_divider) * jcp.load_block;
-        kernel_size = div_up(kernel_size, load_divider);
-        bool need_extra_parallelization = true
-            && jcp.mb * jcp.ngroups * nb_bcast < nthreads;
-        // Heuristic condition for certain convolutions...
-        bool need_divided_kernel = true
-                && jcp.oh <= 7 && jcp.mb <= nthreads
-                && jcp.reduce_dim * jcp.load_dim >= 1024 * 1024
-                && reduce_blocking == jcp.reduce_dim;
-        if (need_divided_kernel || need_extra_parallelization)
-            jcp.load_grp_count = load_divider;
+        load_blocking = jcp.load_dim;
+
+        jcp.load_grp_count = div_up(nthreads, jcp.mb * jcp.ngroups * nb_bcast);
+        jcp.load_grp_count = best_divider(
+                nthreads, jcp.load_grp_count, 2 * jcp.load_grp_count, false);
+        if (jcp.bcast_dim <= 49 && jcp.mb <= nthreads
+            && jcp.load_dim > 512
+            && jcp.load_dim / jcp.reduce_dim >= 4) {
+            jcp.load_grp_count = nstl::max(jcp.load_grp_count, 2);
+            load_blocking = jcp.load_block;
+        }
 
         bcast_blocking = div_up(jcp.mb * jcp.ngroups * nb_bcast,
-            div_up(nthreads, jcp.load_grp_count)) * jcp.bcast_block;
+                                 div_up(nthreads, jcp.load_grp_count))
+                * jcp.bcast_block;
         bcast_blocking = nstl::min(jcp.bcast_dim, bcast_blocking);
-        int space_for_bcast = nstl::min(L1_capacity - 4 * jcp.load_block,
-            L2_capacity - kernel_size);
-        int bcast_in_cache =
-            nstl::max(jcp.bcast_block, space_for_bcast / reduce_blocking);
-        bcast_blocking = nstl::min(bcast_blocking,
-            rnd_dn(bcast_in_cache, jcp.bcast_block));
+        bcast_blocking = rnd_up(bcast_blocking, jcp.bcast_block);
+
+        int space_for_bcast
+                = (L2_capacity - /* kernel_size - */
+                    2 * jcp.load_block * reduce_blocking
+                        - jcp.ur * reduce_blocking - 3 * 1024);
+        if (jcp.reduce_dim * jcp.bcast_dim > L2_capacity)
+            space_for_bcast /= 2;
+
+        int bcast_in_cache
+                = nstl::max(jcp.bcast_block, space_for_bcast / reduce_blocking);
+        bcast_blocking = nstl::min(
+                bcast_blocking, rnd_dn(bcast_in_cache, jcp.bcast_block));
 
         load_blocking_max = load_blocking;
         bcast_blocking_max = bcast_blocking * 3 / 2;
         reduce_blocking_max = reduce_blocking;
 
-    } else if (jcp.prop_kind == backward_data) {
-        // TODO: update heuristic blocking
-
-        int kernel_treshold = 192 * 1024;
-        jcp.ur = nstl::min(28, jcp.os);
-        if (jcp.iw <= 14 && jcp.ic * jcp.oc < kernel_treshold)
-            jcp.ur = nstl::min(14, jcp.os);
-
-        jcp.reduce_dim = jcp.oc;
-        jcp.reduce_block = jcp.oc_block;
-
-        jcp.load_dim = jcp.ic;
-        jcp.load_block = jcp.oc_block;
-
-        jcp.bcast_dim = jcp.os;
-        jcp.bcast_block = jcp.ur;
-
-        jcp.reduce_loop_unroll = jcp.reduce_block;
-        jcp.reduce_loop_bcast_step
-            = jcp.reduce_loop_unroll * jcp.os * jcp.typesize_in;
-        jcp.reduce_loop_load_step
-            = jcp.reduce_loop_unroll * jcp.ic * jcp.typesize_in;
-
-        jcp.bcast_loop_output_step = jcp.ur * jcp.ic_block * jcp.typesize_out;
-        jcp.bcast_loop_output_substep = -1; // unused
-        jcp.bcast_loop_bcast_step = jcp.ur * jcp.oc_block * jcp.typesize_in;
-        jcp.bcast_loop_bcast_substep = -1; // unused
-
-        jcp.load_loop_load_step = jcp.oc_block * jcp.ic_block * jcp.typesize_in;
-        jcp.load_loop_iter_step = jcp.ic_block;
-
-        jcp.loop_order = loop_lbr;
-
-        load_blocking = jcp.load_dim;
-
-        reduce_blocking = nstl::min(256, jcp.reduce_dim);
-
-        const int USABLE_L2 = 400ULL * 1024;
-        int os_block_size = jcp.typesize_in * reduce_blocking * jcp.ur;
-        bcast_blocking = nstl::min(jcp.os,
-            jcp.ur * nstl::max(1, USABLE_L2 / os_block_size));
-        bcast_blocking = nstl::min(196, bcast_blocking);
-        bcast_blocking = rnd_dn(bcast_blocking, jcp.bcast_block);
-
-        bcast_blocking_max = bcast_blocking * 3 / 2;
-        load_blocking_max = rnd_dn(load_blocking * 3 / 2, jcp.load_block);
-        reduce_blocking_max = reduce_blocking;
-
-        if (jcp.oh < 8 && jcp.mb < nthreads) {
-            // XXX: there must be a function that does this...
-            // Something similar to balance211 should work best
-            // XXX probably not the best choice...
-            const int nb_ic_div =
-                nstl::min(div_up(jcp.load_dim, jcp.load_block),
-                utils::div_up(nthreads, jcp.mb));
-            int load_grp_size = utils::div_up(nthreads, nb_ic_div);
-            jcp.load_grp_count = utils::div_up(nthreads, load_grp_size);
-        }
-
-        if (one_of(jcp.ver, ver_4fma, ver_4vnni)
-                && jcp.is < 15 * 15 && !reduce_src)
-            jcp.loop_order = loop_rlb;
-
     } else if (jcp.prop_kind == backward_weights) {
 
         jcp.use_vmovntps = false;
-        if(jcp.is > SMALL_SPATIAL && jcp.ver == ver_4fma)
+        if (jcp.is > SMALL_SPATIAL && jcp.ver == ver_4fma)
             jcp.use_vmovntps = true;
 
         if (jcp.transpose_src)

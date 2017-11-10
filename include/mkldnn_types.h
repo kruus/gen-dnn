@@ -84,6 +84,14 @@ typedef enum {
 #define MKLDNN_JIT_TYPES 1
 #endif
 
+/** Rounding mode */
+typedef enum {
+    /** Round nearest */
+    mkldnn_round_nearest = 1,
+    /** Round down */
+    mkldnn_round_down = 2,
+} mkldnn_round_mode_t;
+
 /** Memory format specification.
  *
  * Intel(R) MKL-DNN uses the following notation for memory format names:
@@ -168,6 +176,9 @@ typedef enum {
     /** 4D weights tensor in the @c oihw format with both input and output
      * channels data laid out in memory in 16-element blocks. */
     mkldnn_OIhw16o16i,
+    /** 4D weights tensor in the @c oihw format with both input and output
+     * channels data laid out in memory in 16-element blocks. */
+    mkldnn_IOhw16o16i,
     /** 4D weights tensor in the format (output channels, input channels,
      * height, width) with output channels data laid out in memory in 8-element
      * blocks. */
@@ -216,6 +227,10 @@ typedef enum {
      * input and output channels data laid out in memory in 16-element blocks.
      */
     mkldnn_gOIhw16o16i,
+    /** 5D weights tensor in the blocked version of @c goihw format with both
+     * input and output channels data laid out in memory in 16-element blocks.
+     */
+    mkldnn_gIOhw16o16i,
     /** 5D weights tensor in the blocked version of @c goihw format with output
      * channels data laid out in memory in 8-element blocks. */
     mkldnn_gOihw8o,
@@ -324,6 +339,20 @@ typedef enum {
     mkldnn_eltwise_tanh = 9,
     /** Eltwise: parametric exponential linear unit (elu) */
     mkldnn_eltwise_elu = 10,
+    /** Eltwise: square */
+    mkldnn_eltwise_square = 11,
+    /** Eltwise: abs */
+    mkldnn_eltwise_abs = 12,
+    /** Eltwise: square root */
+    mkldnn_eltwise_sqrt = 13,
+    /** Eltwise: linear */
+    mkldnn_eltwise_linear = 14,
+    /** Eltwise: bounded_relu */
+    mkldnn_eltwise_bounded_relu = 15,
+    /** Eltwise: soft_relu */
+    mkldnn_eltwise_soft_relu = 16,
+    /** Eltwise: logistic */
+    mkldnn_eltwise_logistic = 17,
     /** Max pooling */
     mkldnn_pooling_max = 34,
     /** Average pooling include padding */
@@ -488,14 +517,17 @@ typedef struct {
 /** A descriptor of a element-wise operation. */
 typedef struct {
     /** The kind of primitive. Used for self identifying the primitive
-     * descriptor. Must be #mkldnn_relu. */
+     * descriptor. Must be #mkldnn_eltwise. */
     mkldnn_primitive_kind_t primitive_kind;
     /** The kind of propagation. Possible values: #mkldnn_forward_training,
      * #mkldnn_forward_inference, #mkldnn_backward, and #mkldnn_backward_data.
      */
     mkldnn_prop_kind_t prop_kind;
     /** The kind of eltwise algorithm. Possible values: #mkldnn_eltwise_relu,
-     * #mkldnn_eltwise_tanh, #mkldnn_eltwise_elu */
+     * #mkldnn_eltwise_tanh, #mkldnn_eltwise_elu, #mkldnn_eltwise_square,
+     * #mkldnn_eltwise_abs, #mkldnn_eltwise_sqrt, #mkldnn_eltwise_linear,
+     * #mkldnn_eltwise_bounded_relu, #mkldnn_eltwise_soft_relu,
+     * #mkldnn_eltwise_logistic. */
     mkldnn_alg_kind_t alg_kind;
     /** Source and destination memory descriptor. */
     mkldnn_memory_desc_t data_desc;
@@ -506,16 +538,22 @@ typedef struct {
      *  - #mkldnn_eltwise_relu: @p alpha -- negative slope, @p beta ignored
      *  - #mkldnn_eltwise_tanh: @p alpha and @p beta ignored
      *  - #mkldnn_eltwise_elu: @p alpha -- negative slope, @p beta ignored
+     *  - #mkldnn_eltwise_square: @p alpha and @p beta ignored
+     *  - #mkldnn_eltwise_abs: @p alpha and @p beta ignored
+     *  - #mkldnn_eltwise_sqrt: @p alpha and @p beta ignored
+     *  - #mkldnn_eltwise_linear: @p alpha -- scale, @p beta -- shift
+     *  - #mkldnn_eltwise_bounded_relu: @p alpha -- upper bound, @p beta ignored
+     *  - #mkldnn_eltwise_soft_relu: @p alpha and @p beta ignored
+     *  - #mkldnn_eltwise_logistic: @p alpha and @p beta ignored
      */
-    double alpha, beta;
-    /** Scaling factor for negative values. Stored as double-precision, but
-     * interpreted in a way specific to the data type in each implementation.
-     * @deprecated: for ReLU use alpha instead
+    float alpha, beta;
+    /** ReLU scaling factor for negative values.
+     * @deprecated: use alpha instead
      * @warning: read-only value */
-    double negative_slope;
+    float negative_slope;
 } mkldnn_eltwise_desc_t;
 
-/* @depracated: use mkldnn_eltwise_desc_t */
+/* @deprecated: use mkldnn_eltwise_desc_t */
 typedef mkldnn_eltwise_desc_t mkldnn_relu_desc_t;
 
 /** A descriptor of a Softmax operation. */
@@ -586,11 +624,11 @@ typedef struct {
      * length of the square region to sum over (for within-channel LRN). */
     int local_size;
     /** LRN alpha parameter. */
-    double lrn_alpha;
+    float lrn_alpha;
     /** LRN beta parameter. */
-    double lrn_beta;
+    float lrn_beta;
     /** LRN k parameter. */
-    double lrn_k;
+    float lrn_k;
 } mkldnn_lrn_desc_t;
 
 /** A descriptor of a Batch Normalization operation. */
@@ -620,7 +658,7 @@ typedef struct {
     mkldnn_memory_desc_t mean_desc;
     mkldnn_memory_desc_t variance_desc;
     /** Batch normalization epsilon parameter. */
-    double batch_norm_epsilon;
+    float batch_norm_epsilon;
     unsigned flags;
 } mkldnn_batch_normalization_desc_t;
 
@@ -660,9 +698,9 @@ typedef struct {
     mkldnn_primitive_kind_t primitive_kind;
     /** A descriptor of a convolution operation. */
     mkldnn_convolution_desc_t convolution_desc;
-    /** Scaling factor for negative values, stored as double-precision but
+    /** Scaling factor for negative values, stored as float-precision but
      * interpreted in a way specific to the data type in each implementation */
-    double negative_slope;
+    float negative_slope;
 } mkldnn_convolution_relu_desc_t;
 
 /** @} */
@@ -720,6 +758,27 @@ typedef struct mkldnn_primitive_desc *mkldnn_primitive_desc_t;
 
 /** @brief A constant primitive descriptor handle. */
 typedef const struct mkldnn_primitive_desc *const_mkldnn_primitive_desc_t;
+
+/** @} */
+
+/** @addtogroup c_api_primitive_attr Primitive descriptor attributes
+ * @{ */
+
+/** @struct mkldnn_primitive_attr
+ * @brief An opaque structure for primitive descriptor attributes.
+ *
+ * Attributes may contain:
+ *  - rounding mode for integer based primitives (like convolution, reorders)
+ *  - output scales (to scale the result prior to storing it to the memory)
+ */
+struct mkldnn_primitive_attr;
+
+/** @brief A primitive descriptor attributes handle that controls primitive
+ * behavior. */
+typedef struct mkldnn_primitive_attr *mkldnn_primitive_attr_t;
+
+/** @brief A constant primitive descriptor attributes handle. */
+typedef const struct mkldnn_primitive_attr *const_mkldnn_primitive_attr_t;
 
 /** @} */
 
@@ -861,5 +920,5 @@ typedef const struct mkldnn_stream *const_mkldnn_stream_t;
 }
 #endif
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+/* vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s */
 #endif

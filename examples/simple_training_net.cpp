@@ -47,7 +47,7 @@ void simple_net()
 
     /* initializing non-zero values for src */
     for (size_t i = 0; i < net_src.size(); ++i)
-        net_src[i] = static_cast<float>(sin(i));
+        net_src[i] = sinf((float)i);
 
     /* AlexNet: conv
      * {batch, 3, 227, 227} (x) {96, 3, 11, 11} -> {batch, 96, 55, 55}
@@ -69,9 +69,9 @@ void simple_net()
 
     /* initializing non-zero values for weights and bias */
     for (size_t i = 0; i < conv_weights.size(); ++i)
-        conv_weights[i] = static_cast<float>(sin(i));
+        conv_weights[i] = sinf((float)i);
     for (size_t i = 0; i < conv_bias.size(); ++i)
-        conv_bias[i] = static_cast<float>(sin(i));
+        conv_bias[i] = sinf((float)i);
 
     /* create memory for user data */
     auto conv_user_src_memory = memory(
@@ -141,7 +141,7 @@ void simple_net()
     /* AlexNet: relu
      * {batch, 96, 55, 55} -> {batch, 96, 55, 55}
      */
-    const double negative_slope = 1.0;
+    const float negative_slope = 1.0;
 
     /* create relu primitive desc */
     /* keep memory format of source same as the format of convolution
@@ -165,9 +165,9 @@ void simple_net()
      * k: 1.0
      */
     const uint32_t local_size = 5;
-    const double alpha = 0.0001;
-    const double beta = 0.75;
-    const double k = 1.0;
+    const float alpha = 0.0001;
+    const float beta = 0.75;
+    const float k = 1.0;
 
     /* create a lrn primitive descriptor */
     auto lrn_desc = lrn_forward::desc(prop_kind::forward, lrn_across_channels,
@@ -251,7 +251,7 @@ void simple_net()
     /* ... user diff_data ...*/
     std::vector<float> net_diff_dst(batch * 96 * POOL_OSZ * POOL_OSZ);
     for (size_t i = 0; i < net_diff_dst.size(); ++i)
-        net_diff_dst[i] = static_cast<float>(sin(i));
+        net_diff_dst[i] = sinf((float)i);
 
     /* create memory for user diff dst data */
     auto pool_user_diff_dst_memory = memory(

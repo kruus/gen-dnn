@@ -106,14 +106,14 @@ struct jit_reorder_kernel_f32<JIT_REORDER_TEMPL_INST,
                     vunpckhps(Ymm(i), Ymm(2 * i), Ymm(2 * i + 1));
                 }
 
-                const unsigned int ldouble = 0x44;
-                const unsigned int udouble = 0xee;
+                const unsigned int lfloat = 0x44;
+                const unsigned int ufloat = 0xee;
                 for (int i = 0; i < blksize / 2; i++) {
                     int j = i % 2 == 0 ? blksize + i : i - 1;
                     vshufps(Ymm(blksize / 2 + 2 * i), Ymm(j), Ymm(j + 1),
-                            ldouble);
+                            lfloat);
                     vshufps(Ymm(blksize / 2 + 2 * i + 1), Ymm(j), Ymm(j + 1),
-                            udouble);
+                            ufloat);
                 }
 
                 const unsigned int lquad = 0x20;
@@ -160,16 +160,14 @@ template <JIT_REORDER_TEMPL_DECL, typename spec=void>
 struct jit_reorder_t : public cpu_primitive_t {
     struct pd_t : public cpu_reorder_pd_t {
         pd_t(const cpu_memory_pd_t *input_pd, const cpu_memory_pd_t *output_pd,
-                const double alpha, const double beta)
-            : cpu_reorder_pd_t(input_pd, output_pd, alpha, beta) {}
+                const primitive_attr_t *attr, float beta)
+            : cpu_reorder_pd_t(input_pd, output_pd, attr, beta) {}
 
         DECLARE_COMMON_PD_T(jit_reorder_t);
 
         static status_t create(reorder_pd_t **reorder_pd,
-                const memory_pd_t *input_pd,
-                const memory_pd_t *output_pd,
-                const double alpha,
-                const double beta) {
+                const memory_pd_t *input_pd, const memory_pd_t *output_pd,
+                const primitive_attr_t *attr, float beta) {
             assert(input_pd->engine()->kind() == engine_kind::cpu);
             assert(output_pd->engine()->kind() == engine_kind::cpu);
 
@@ -182,7 +180,7 @@ struct jit_reorder_t : public cpu_primitive_t {
                 return impl::status::invalid_arguments;
 
             auto _pd = new pd_t((const cpu_memory_pd_t *)input_pd,
-                    (const cpu_memory_pd_t *)output_pd, alpha, beta);
+                    (const cpu_memory_pd_t *)output_pd, attr, beta);
             return safe_ptr_assign<reorder_pd_t>(*reorder_pd, _pd);
         }
     };

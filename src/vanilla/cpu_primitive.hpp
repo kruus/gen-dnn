@@ -51,6 +51,7 @@ struct cpu_primitive_t: public primitive_t {
                 this->outputs()[output_index]);
         return p->const_memory();
     }
+
     const char *input_memory(size_t index = 0) const {
         if (index >= this->inputs().size()) {
 #if CPU_PRIMITIVE_HPP_DBG

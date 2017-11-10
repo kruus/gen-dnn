@@ -78,12 +78,16 @@ enum { CRIT = 1, WARN = 2 };
 #define CONCAT2(a,b) CONCAt2(a,b)
 
 #if ! defined(_SX)
-inline void *zmalloc(size_t size, int align) {
+inline void *zmalloc(size_t size, size_t align) {
     void *ptr;
 #ifdef _WIN32
     ptr = _aligned_malloc(size, align);
     int rc = ((ptr) ? 0 : errno);
 #else
+    // TODO. Heuristics: Increasing the size to alignment increases
+    // the stability of performance results.
+    if (size < align)
+        size = align;
     int rc = ::posix_memalign(&ptr, align, size);
 #endif /* _WIN32 */
     return rc == 0 ? ptr : 0;
@@ -97,7 +101,7 @@ inline void zfree(void *ptr) {
 }
 
 #else // SX architecture does not have/need posix_memalign
-inline void *zmalloc(size_t size, int align) {
+inline void *zmalloc(size_t size, size_t align) {
     return ::malloc(size);
 }
 inline void zfree(void *ptr) { return ::free(ptr); }
@@ -139,7 +143,7 @@ struct stat_t {
 extern stat_t benchdnn_stat;
 
 enum prim_t {
-    CONV, IP, DEF = CONV,
+    SELF, CONV, IP, DEF = CONV,
 };
 
 enum dir_t {
@@ -188,9 +192,13 @@ struct benchdnn_timer_t {
     double ms(mode_t mode = benchdnn_timer_t::min) const
     { return ms_[mode] / (mode == avg ? times_ : 1); }
 
+    long long ticks(mode_t mode = min) const
+    { return ticks_[mode] / (mode == avg ? times_ : 1); }
+
     benchdnn_timer_t &operator=(const benchdnn_timer_t &rhs);
 
     int times_;
+    long long ticks_[n_modes], ticks_start_;
     double ms_[n_modes], ms_start_;
 #if USE_RDPMC || USE_RDTSC
     long long ticks_[n_modes], ticks_start_;
@@ -201,7 +209,7 @@ struct benchdnn_timer_t {
 
 struct res_t {
     res_state_t state;
-    int errors, total;
+    size_t errors, total;
     benchdnn_timer_t timer;
 };
 

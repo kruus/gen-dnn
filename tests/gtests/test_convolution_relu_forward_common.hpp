@@ -25,7 +25,7 @@ template <typename data_t_src, typename data_t_wei,
           typename data_t_acc, typename data_t_dst>
 void compute_ref_conv_relu_fwd(const test_convolution_sizes_t &c,
         const memory &src, const memory &weights, const memory &bias,
-        const memory &dst, bool w_bias, double negative_slope)
+        const memory &dst, bool w_bias, float negative_slope)
 {
     data_t_src *src_data = (data_t_src *)src.get_data_handle();
     data_t_wei *weights_data = (data_t_wei *)weights.get_data_handle();
@@ -103,7 +103,7 @@ protected:
         ASSERT_TRUE(p.engine_kind == engine::kind::cpu);
         ASSERT_EQ(p.aalgorithm, convolution_direct);
         auto eng = engine(p.engine_kind, 0);
-        double negative_slope = p.relu_negative_slope;
+        float negative_slope = p.relu_negative_slope;
 
         memory::data_type data_type_src = data_traits<data_t_src>::data_type;
         memory::data_type data_type_dst = data_traits<data_t_dst>::data_type;
@@ -135,7 +135,7 @@ protected:
             (c_src.get_primitive_desc().get_size() / sizeof(data_t_src))
             / cd.mb );
         for (int i = 0; i < cd.mb * mb_chunk; ++i) {
-            if ((i / mb_chunk) % 2) src_data[i] *= -1.;
+            if ((i / mb_chunk) % 2) src_data[i] *= (data_t_src)-1.;
         }
 
         fill_data<data_t_wei>(

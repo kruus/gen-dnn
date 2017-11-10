@@ -27,6 +27,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
 #file(GLOB API_TEST_CASES_SRC api_tests/*.cpp)
 #file(GLOB PRIM_TEST_CASES_SRC test_*.cpp)
 file(GLOB PRIM_TEST_CASES_SRC
+                              test_iface_attr.cpp
                               test_sum.cpp
                               test_reorder.cpp
                               test_concat.cpp
@@ -60,13 +61,16 @@ foreach(TEST_FILE ${PRIM_TEST_CASES_SRC})
         #    LINK_FLAGS -prelink)
         set_target_properties(${CURR_APP_NAME} PROPERTIES
             LINK_FLAGS -Wl,-h,muldefs,-h,lib_cyclic)
+        #list(APPEND EXTRA_LIBS mkldnn)
     endif(NECSX)
-    target_link_libraries(${CURR_APP_NAME} mkldnn mkldnn_gtest)
+    #target_link_libraries(${CURR_APP_NAME} mkldnn mkldnn_gtest)
+    target_link_libraries(${CURR_APP_NAME}
+        ${LIB_NAME} mkldnn_gtest ${EXTRA_LIBS})
     add_test(${CURR_APP_NAME} ${CURR_APP_NAME})
     if(WIN32)
+        set_property(TEST ${CURR_APP_NAME} PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
         configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
             ${CURR_APP_NAME}.vcxproj.user @ONLY)
-        set_property(TEST ${CURR_APP_NAME} PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
     endif()
 endforeach()
 

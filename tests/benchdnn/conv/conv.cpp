@@ -89,7 +89,8 @@ double get_trust_nz_level(const prb_t *p, int what, bool final_compare) {
 
 inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
         dnn_mem_t &mem_fp, res_t *r, bool final_compare = false) {
-    int nelems = static_cast<int>(mem_dt.nelems()); // making 'i' size_t is not as easy as in ip/ip.cpp
+    //int nelems = static_cast<int>(mem_dt.nelems()); // making 'i' size_t is not as easy as in ip/ip.cpp
+    size_t nelems = mem_dt.nelems();
 
     const char *swhat = inp_type2str(what);
 
@@ -98,17 +99,27 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
     int non_zero = 0;
 
     diff_norm_t diff_norm;
-    float max_rel_diff = 0;
 
     r->errors = 0;
     r->total = nelems;
 
-    for (int i = 0; i < nelems; ++i) {
+    for (size_t i = 0; i < nelems; ++i) {
         const float dt = ((float*)mem_dt)[i];
-        const float fp = ((float*)mem_fp)[i];
-        const float diff = fabs(fp - dt);
-        const float rel_diff = diff / (fabs(fp) > FLT_MIN ? fabs(fp) : 1);
-        if (max_rel_diff < rel_diff) max_rel_diff = rel_diff;
+        const float fp0 = ((float*)mem_fp)[i];
+
+        float fp = fp0;
+        if (p->cfg[what].dt != mkldnn_f32) {
+            using R = attr_t::round_mode_t;
+            switch (p->attr.irmode) {
+                case R::DOWN: fp = floorf(fp0); break;
+                case R::NEAREST: fp = rintf(fp0); break;
+                default:
+                    return UNTESTED;
+            }
+        }
+
+        const float diff = fabsf(fp - dt);
+        const float rel_diff = diff / (fabsf(fp) > FLT_MIN ? fabsf(fp) : 1);
 
         bool ok = true;
         if (fp < p->cfg[what].min) {
@@ -137,11 +148,12 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
                 case BIA: inv_bia_off_f(p, i, mb_or_g, g_or_oc); break;
                 case DST: inv_dst_off_f(p, i, mb_or_g, g_or_oc, c, h, w); break;
                 }
-                print(0, "[%4d][%s%s][%d,%d,%d,%d,%d] "
-                        "fp:%8g dt:%8g diff:%8g rdiff:%8g\n",
-                        i, final_compare == false ? "REORDER " : "",
+                print(0, "[%4lu][%s%s][%d,%d,%d,%d,%d] "
+                        "fp:%8g fp0:%8g dt:%8g diff:%8g rdiff:%8g\n",
+                        (unsigned long)i,
+                        final_compare == false ? "REORDER " : "",
                         swhat, mb_or_g, g_or_oc, c, h, w,
-                        fp, dt, diff, rel_diff);
+                        fp, fp0, dt, diff, rel_diff);
             }
         }
 
@@ -155,8 +167,9 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
             case DST: inv_dst_off_f(p, i, mb_or_g, g_or_oc, c, h, w); break;
             }
 
-            print(0, "[%4d][%s][%d,%d,%d,%d,%d] fp:%8g dt:%8g\n",
-                    i, swhat, mb_or_g, g_or_oc, c, h, w, fp, dt);
+            print(0, "[%4lu][%s][%d,%d,%d,%d,%d] fp:%8g fp0:%8g dt:%8g\n",
+                    (unsigned long)i,
+                    swhat, mb_or_g, g_or_oc, c, h, w, fp, fp0, dt);
         }
 
         non_zero += fp != 0;
@@ -196,17 +209,18 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
         print(0, "@@@ [%s] %strust range:%.2f nz:%.2f "
                 "(level range:%.2f nz:%.2f). "
                 "in:%d (ok:%d) below:%d (ok:%d) above:%d (ok:%d) nz:%d "
-                "total:%d\n", swhat, final_compare ? "final: " : "",
+                "total:%lu\n", swhat, final_compare ? "final: " : "",
                 trust_rg, trust_nz, trust_rg_level, trust_nz_level, in, in_ok,
-                below, below_ok, above, above_ok, non_zero, r->total);
+                below, below_ok, above, above_ok, non_zero,
+                (unsigned long)r->total);
     }
 
     if (no_trust) {
         r->state = MISTRUSTED;
         print(0, "@@@ [%s] test-bug: trust is too low. "
-                "range:%.2f (?<%.2f) nz:%.2f (?<%.2f) (nz: %d total: %d)\n",
+                "range:%.2f (?<%.2f) nz:%.2f (?<%.2f) (nz: %d total: %lu)\n",
                 swhat, trust_rg, trust_rg_level, trust_nz, trust_nz_level,
-                non_zero, r->total);
+                non_zero, (unsigned long)r->total);
     }
 
     if (r->errors)
@@ -379,9 +393,9 @@ inline int fill_bia(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
     const auto &c = p->cfg[BIA];
     const int range = c.f_max - c.f_min + 1;
 
-    const int sz = static_cast<int>(mem_00.nelems());
-    for (int i = 0; i < sz; ++i) {
-        const int gen = 19 * i;
+    const size_t sz = mem_00.nelems();
+    for (size_t i = 0; i < sz; ++i) {
+        const int gen = (int)(19 * i);
         const bool non_base = true
             && gen % (p->kh * p->kw) <= c.f_sparsity * (p->kh * p->kw);
         const float value = static_cast<float>(
@@ -480,14 +494,15 @@ int init_conv_desc(mkldnn_convolution_desc_t &cd, const prb_t *p )
                     padding, padding_r, mkldnn_padding_zero), WARN);
         break;
     case BWD_D:
-        DNN_SAFE(mkldnn_convolution_backward_data_desc_init(&cd, alg, &src_d,
-                    &wei_d, &dst_d, strides, padding, padding_r,
-                    mkldnn_padding_zero), WARN);
+        DNN_SAFE(mkldnn_dilated_convolution_backward_data_desc_init(&cd, alg,
+                    &src_d, &wei_d, &dst_d, strides, dilates, padding,
+                    padding_r, mkldnn_padding_zero), WARN);
         break;
     case BWD_W: case BWD_WB:
-        DNN_SAFE(mkldnn_convolution_backward_weights_desc_init(&cd, alg,
-                    &src_d, &wei_d, p->dir == BWD_W ? NULL : &bia_d, &dst_d,
-                    strides, padding, padding_r, mkldnn_padding_zero), WARN);
+        DNN_SAFE(mkldnn_dilated_convolution_backward_weights_desc_init(&cd,
+                    alg, &src_d, &wei_d, p->dir == BWD_W ? NULL : &bia_d,
+                    &dst_d, strides, dilates, padding, padding_r,
+                    mkldnn_padding_zero), WARN);
         break;
     default: DNN_SAFE(mkldnn_invalid_arguments, WARN);
              print(0,"%s\n", "bad init_conv_desc call : unsupported p->dir");
@@ -523,9 +538,11 @@ int init_conv_prim_any( mkldnn_primitive_desc_t &cpd, const prb_t *p,
     if (p->merge == RELU) {
         mkldnn_convolution_relu_desc_t crd;
         DNN_SAFE(mkldnn_convolution_relu_desc_init(&crd, &cd, 0), WARN);
-        init_status = mkldnn_primitive_desc_create(&cpd, &crd, engine, NULL);
+        init_status = mkldnn_primitive_desc_create_v2(&cpd, &crd,
+                p->attr.mkldnn_attr, engine, NULL);
     } else {
-        init_status = mkldnn_primitive_desc_create(&cpd, &cd, engine, NULL);
+        init_status = mkldnn_primitive_desc_create_v2(&cpd, &cd,
+                p->attr.mkldnn_attr, engine, NULL);
     }
 
     if (init_status == mkldnn_unimplemented){

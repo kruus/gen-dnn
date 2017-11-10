@@ -57,37 +57,36 @@ void _gemm_convolution_fwd_t<with_relu, run_jit, isa>::execute_forward() {
 
     const size_t src_step = jcp.ic * jcp.ih * jcp.iw;
     const size_t dst_step = jcp.oc * jcp.os;
+    const size_t weights_g_size = jcp.ic * jcp.oc * jcp.ks;
 
     const int M = jcp.os;
     const int K = jcp.ic * jcp.ks;
+    const int N = jcp.oc;
+
     const data_t zero = 0.0, one = 1.0;
 
-    int num_thr = (jcp.mb * jcp.oc != 1) ? omp_get_max_threads() : 1;
-    const size_t work_amount = jcp.ngroups * jcp.mb * jcp.oc;
+    const size_t work_amount = jcp.ngroups * jcp.mb;
+    //Check: Can we use GEMM parallelism or do parallelization by minibatch?
+    int num_thr = ((jcp.oh * jcp.ow) / omp_get_max_threads() < 256 && jcp.mb != 1)
+        ? omp_get_max_threads()
+        : 1;
+    MAYBE_UNUSED(num_thr);
 #pragma omp parallel num_threads(num_thr)
     {
         const int ithr = omp_get_thread_num();
         const int nthr = omp_get_num_threads();
 
-        int g{0}, n{0}, oc_s{0};
+        int g{0}, n{0};
         size_t start = 0, end = 0;
+
         balance211(work_amount, nthr, ithr, start, end);
+        nd_iterator_init(start, g, jcp.ngroups, n, jcp.mb);
 
-        nd_iterator_init(start, g, jcp.ngroups, n, jcp.mb, oc_s, jcp.oc);
-        while (start < end)
-        {
-            int work_rem = end - start;
-            int oc_e = (oc_s + work_rem) > jcp.oc ? jcp.oc : oc_s + work_rem;
-            int oc_  = oc_e - oc_s;
-
-            int dst_offset = oc_s * jcp.oh * jcp.ow;
-            int weights_offset = (g * jcp.oc + oc_s) * jcp.ic * jcp.kh * jcp.kw;
-
-            const data_t *_src = src+(n * jcp.ngroups + g) * src_step;
-                  data_t *_dst = dst+(n * jcp.ngroups + g) * dst_step + dst_offset;
-            const data_t *_weights = weights + weights_offset;
+        for (size_t iwork = start; iwork < end; ++iwork) {
+            const data_t *_src = src + (n * jcp.ngroups + g) * src_step;
+            data_t *_dst = dst + (n * jcp.ngroups + g) * dst_step;
+            const data_t *_weights = weights + g * weights_g_size;
             data_t *_col = this->ws + (int64_t)ithr * jcp.ic * jcp.ks * jcp.os;
-            const int N = oc_;
 
             if (jcp.need_im2col)
                 jit_gemm_convolution_utils::im2col(jcp, _src, _col);
@@ -103,18 +102,18 @@ void _gemm_convolution_fwd_t<with_relu, run_jit, isa>::execute_forward() {
 
             if (jcp.with_bias || jcp.with_relu) {
                 data_t *d = _dst, b = 0.0;
-                for (int oc = oc_s; oc < oc_e; ++oc) {
+                for (int oc = 0; oc < jcp.oc; ++oc) {
                     if(jcp.with_bias) b = bias[g * jcp.oc + oc];
                     for (int oS = 0; oS < jcp.os; ++oS) {
                         if (jcp.with_bias) d[oS] += b;
                         if (jcp.with_relu)
-                            d[oS] *= (d[oS] > 0) ? 1. : jcp.relu_negative_slope;
+                            d[oS] *= (d[oS] > 0)
+                                ? (data_t)1.0 : jcp.relu_negative_slope;
                     }
                     d += jcp.os;
                 }
             }
-            nd_iterator_jump(start, end,
-                g, jcp.ngroups, n, jcp.mb, oc_s, jcp.oc);
+            nd_iterator_step(g, jcp.ngroups, n, jcp.mb);
         }
     }
 }
@@ -138,6 +137,7 @@ void _gemm_convolution_bwd_data_t<run_jit, isa>::execute_backward_data() {
 
     const size_t work_amount = jcp.ngroups * jcp.mb;
     int num_thr = (jcp.mb != 1) ? omp_get_max_threads() : 1;
+    MAYBE_UNUSED(num_thr);
 #pragma omp parallel num_threads(num_thr)
     {
         const int ithr = omp_get_thread_num();
@@ -189,6 +189,7 @@ void _gemm_convolution_bwd_weights_t<run_jit, isa>::execute_backward_weights() {
     const data_t zero = 0.0, one = 1.0;
 
     int num_thr = (jcp.mb != 1) ? omp_get_max_threads() : 1;
+    MAYBE_UNUSED(num_thr);
 #pragma omp parallel num_threads(num_thr)
     {
         const int ithr = omp_get_thread_num();
@@ -263,6 +264,7 @@ void _gemm_convolution_bwd_weights_t<run_jit, isa>::execute_backward_weights() {
                 *db = data_t(0);
                 for (int mb = 0; mb < jcp.mb; ++mb)
                     for (int oh = 0; oh < jcp.oh; ++oh)
+#                       pragma omp simd
                         for (int ow = 0; ow < jcp.ow; ++ow)
                             *db += diff_dst[diff_dst_d.off(mb,g*jcp.oc+oc,oh,ow)];
                 nd_iterator_step(g, jcp.ngroups, oc, jcp.oc);

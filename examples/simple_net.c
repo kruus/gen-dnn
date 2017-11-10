@@ -14,15 +14,21 @@
 * limitations under the License.
 *******************************************************************************/
 
+// Required for posix_memalign
+#define _POSIX_C_SOURCE 200112L
+
 #include <string.h>
-#include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "mkldnn.h"
-#define MKLDNN_IO 1 // awaiting bugfixes
+
+#define MKLDNN_IO 1
 #include "mkldnn_io.h"
 
 #include <assert.h>
+#ifdef WIN32
+#include <malloc.h>
+#endif
 
 #define BATCH 8
 
@@ -59,7 +65,8 @@ void *aligned_malloc(size_t size, size_t alignment) {
 #elif defined(_SX)
     return malloc(size);
 #else
-    return memalign(alignment, size);
+    void *p;
+    return !posix_memalign(&p, alignment, size) ? p : NULL;
 #endif
 }
 #endif
@@ -315,7 +322,7 @@ mkldnn_status_t simple_net(){
     /* AlexNet: relu
      * {BATCH, 96, 55, 55} -> {BATCH, 96, 55, 55}
      */
-    double negative_slope = 1.0;
+    float negative_slope = 1.0;
 
     int *relu_dst_sizes = conv_dst_sizes;
     float *relu_dst_buffer =
@@ -363,9 +370,9 @@ mkldnn_status_t simple_net(){
      * beta: 0.75
      */
     uint32_t local_size = 5;
-    double alpha = 0.0001;
-    double beta = 0.75;
-    double k = 1.0;
+    float alpha = 0.0001;
+    float beta = 0.75;
+    float k = 1.0;
 
     int32_t *lrn_dst_sizes = relu_dst_sizes;
 

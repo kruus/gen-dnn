@@ -84,20 +84,20 @@ status_t cpu_engine_t::view_primitive_desc_create(view_pd_t **view_pd,
 
 status_t cpu_engine_t::concat_primitive_desc_create(concat_pd_t **concat_pd,
         const memory_desc_t *output_d, int n, int concat_dim,
-        const memory_pd_t **input_pds) {
+        const memory_pd_t **input_pds, const primitive_attr_t *attr) {
     assert(input_pds[0]->engine() == this);
     auto i_pds = (const cpu_memory_t::pd_t **)input_pds;
     return safe_ptr_assign<concat_pd_t>(*concat_pd,
-            new cpu_concat_t::pd_t(this, output_d, n, concat_dim, i_pds));
+            new cpu_concat_t::pd_t(this, output_d, n, concat_dim, i_pds, attr));
 }
 
 status_t cpu_engine_t::sum_primitive_desc_create(sum_pd_t **sum_pd,
-        const memory_desc_t *output_d, int n, double* scale,
-        const memory_pd_t **input_pds) {
+        const memory_desc_t *output_d, int n, const float *scales,
+        const memory_pd_t **input_pds, const primitive_attr_t *attr) {
     assert(input_pds[0]->engine() == this);
     auto i_pds = (const cpu_memory_t::pd_t **)input_pds;
     return safe_ptr_assign<sum_pd_t>(*sum_pd,
-            new cpu_sum_t::pd_t(this, output_d, n, scale, i_pds));
+            new cpu_sum_t::pd_t(this, output_d, n, scales, i_pds, attr));
 }
 
 using pd_create_f = mkldnn::impl::engine_t::primitive_desc_create_f;
@@ -118,6 +118,7 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_avx512_common_convolution_winograd_bwd_data_t),
     INSTANCE(jit_avx512_common_convolution_winograd_bwd_weights_t),
     INSTANCE(jit_avx512_common_convolution_fwd_t<f32>),
+    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, f32>),
     INSTANCE(jit_avx512_common_convolution_bwd_data_t<f32>),
     INSTANCE(jit_avx512_common_convolution_bwd_weights_t),
     INSTANCE(jit_avx2_1x1_convolution_fwd_t),
@@ -146,6 +147,7 @@ static const pd_create_f cpu_impl_list[] = {
     /* conv (int) */
 #if JITFUNCS > 99
     INSTANCE(jit_avx512_common_convolution_fwd_t<s16, s16, s32>),
+    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, f32>),
     INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, s32>),
     INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, s8>),
     INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, u8>),
@@ -258,6 +260,8 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(ref_convolution_relu_t<f32>),
     /* conv_eltwise (int) */
 #if JITFUNCS > 99
+    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, f32>),
+    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, f32>),
     INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, s32>),
     INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, s8>),
     INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, u8>),

@@ -38,8 +38,9 @@ struct _convolution_fwd_pd_t: public primitive_desc_t {
         primitive_kind::convolution_relu, primitive_kind::convolution>::value;
 
     _convolution_fwd_pd_t(mkldnn::impl::engine_t *engine,
-            const base_desc_t *adesc, const _convolution_fwd_pd_t *hint_fwd_pd)
-        : primitive_desc_t(engine, base_pkind), desc_(*adesc)
+            const base_desc_t *adesc, const primitive_attr_t *attr,
+            const _convolution_fwd_pd_t *hint_fwd_pd)
+        : primitive_desc_t(engine, attr, base_pkind), desc_(*adesc)
         , hint_fwd_pd_(hint_fwd_pd) {}
     virtual ~_convolution_fwd_pd_t() {}
 
@@ -100,7 +101,7 @@ struct _convolution_fwd_pd_t: public primitive_desc_t {
     inline int padL() const { return cdesc_().padding[0][1]; }
     inline int padR() const { return cdesc_().padding[1][1]; }
 
-    inline double negative_slope() const;
+    inline float negative_slope() const;
 
     inline bool with_bias() const
     { return !memory_desc_wrapper(cdesc_().bias_desc).is_zero(); }
@@ -119,9 +120,9 @@ protected:
 using convolution_fwd_pd_t = mkldnn::impl::_convolution_fwd_pd_t<false>;
 using convolution_relu_fwd_pd_t = mkldnn::impl::_convolution_fwd_pd_t<true>;
 
-template<> inline double convolution_fwd_pd_t::negative_slope() const
+template<> inline float convolution_fwd_pd_t::negative_slope() const
 { return 0.; }
-template<> inline double convolution_relu_fwd_pd_t::negative_slope() const
+template<> inline float convolution_relu_fwd_pd_t::negative_slope() const
 { return desc()->negative_slope; }
 
 template<bool with_relu> inline const
@@ -138,8 +139,9 @@ struct convolution_bwd_data_pd_t: public primitive_desc_t {
 
     convolution_bwd_data_pd_t(mkldnn::impl::engine_t *engine,
             const convolution_desc_t *adesc,
+            const primitive_attr_t *attr,
             const convolution_fwd_pd_t *hint_fwd_pd)
-        : primitive_desc_t(engine, base_pkind), desc_(*adesc)
+        : primitive_desc_t(engine, attr, base_pkind), desc_(*adesc)
         , hint_fwd_pd_(hint_fwd_pd) {}
     virtual ~convolution_bwd_data_pd_t() {}
 
@@ -192,6 +194,9 @@ struct convolution_bwd_data_pd_t: public primitive_desc_t {
     inline int KSH() const { return desc_.strides[0]; }
     inline int KSW() const { return desc_.strides[1]; }
 
+    inline int KDH() const { return desc_.dilates[0]; }
+    inline int KDW() const { return desc_.dilates[1]; }
+
     inline int padT() const { return desc_.padding[0][0]; }
     inline int padB() const { return desc_.padding[1][0]; }
     inline int padL() const { return desc_.padding[0][1]; }
@@ -216,8 +221,9 @@ struct convolution_bwd_weights_pd_t: public primitive_desc_t {
 
     convolution_bwd_weights_pd_t(mkldnn::impl::engine_t *engine,
             const convolution_desc_t *adesc,
+            const primitive_attr_t *attr,
             const convolution_fwd_pd_t *hint_fwd_pd)
-        : primitive_desc_t(engine, base_pkind), desc_(*adesc)
+        : primitive_desc_t(engine, attr, base_pkind), desc_(*adesc)
         , hint_fwd_pd_(hint_fwd_pd) {}
     virtual ~convolution_bwd_weights_pd_t() {}
 
@@ -274,6 +280,9 @@ struct convolution_bwd_weights_pd_t: public primitive_desc_t {
 
     inline int KSH() const { return desc_.strides[0]; }
     inline int KSW() const { return desc_.strides[1]; }
+
+    inline int KDH() const { return desc_.dilates[0]; }
+    inline int KDW() const { return desc_.dilates[1]; }
 
     inline int padT() const { return desc_.padding[0][0]; }
     inline int padB() const { return desc_.padding[1][0]; }

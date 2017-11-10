@@ -14,6 +14,10 @@
 * limitations under the License.
 *******************************************************************************/
 
+#ifdef __INTEL_COMPILER
+#include <immintrin.h>
+#endif
+
 #include "mkldnn_types.h"
 
 #include "c_types_map.hpp"
@@ -74,62 +78,7 @@ private:
     const int _dims[Tdims];
 };
 
-void trans_I_4x4_3x3(float Iw[6][6][16], float I[6][6][16])
-{
-    float T[6][6][16];
-    float t0[16];
-    float t1[16];
-    float t2[16];
-    float t3[16];
-    float t4[16];
-    float t5[16];
-
-pragma_unroll
-    for (int i = 0; i < 6; i++) {
-#pragma omp simd
-        for (int v = 0; v < 16; v++) {
-            t0[v] = -4.0f * I[2][i][v] + I[4][i][v];
-            t1[v] = -4.0f * I[1][i][v] + I[3][i][v];
-            t2[v] = I[4][i][v] - I[2][i][v];
-            t3[v] = I[3][i][v] - I[1][i][v];
-            t4[v] = -5.0f * I[2][i][v] + I[4][i][v];
-            t5[v] = -5.0f * I[3][i][v] + I[5][i][v];
-
-            T[0][i][v] = 4.0f * I[0][i][v] + t4[v];
-            T[1][i][v] = t0[v] + t1[v];
-            T[2][i][v] = t0[v] - t1[v];
-            T[3][i][v] = 2.0f * t3[v] + t2[v];
-            T[4][i][v] = -2.0f * t3[v] + t2[v];
-            T[5][i][v] = 4.0f * I[1][i][v] + t5[v];
-        }
-    }
-pragma_unroll
-    for (int i = 0; i < 6; i++) {
-#pragma omp simd
-        for (int v = 0; v < 16; v++) {
-            t0[v] = -4.0f * T[i][2][v] + T[i][4][v];
-            t1[v] = -4.0f * T[i][1][v] + T[i][3][v];
-            t2[v] = T[i][4][v] - T[i][2][v];
-            t3[v] = T[i][3][v] - T[i][1][v];
-            t4[v] = -5.0f * T[i][2][v] + T[i][4][v];
-            t5[v] = -5.0f * T[i][3][v] + T[i][5][v];
-
-            Iw[i][0][v] = 4.0f * T[i][0][v] + t4[v];
-            Iw[i][1][v] = t0[v] + t1[v];
-            Iw[i][2][v] = t0[v] - t1[v];
-            Iw[i][3][v] = 2.0f * t3[v] + t2[v];
-            Iw[i][4][v] = -2.0f * t3[v] + t2[v];
-            Iw[i][5][v] = 4.0f * T[i][1][v] + t5[v];
-        }
-    }
-}
-
-void trans_W_4x4_3x3(float Fw_[6][6][16][16], float F[3][3][16][16])
-{
-    const float rcp4 = 1.0f / 4.0f;
-    const float rcp6 = 1.0f / 6.0f;
-    const float rcp12 = 1.0f / 12.0f;
-    const float rcp24 = 1.0f / 24.0f;
+void trans_W_4x4_3x3(float Fw_[6][6][16][16], float F[3][3][16][16]) {
     float Fw[6][16];
     float T[6][3][16];
     float t0[16];
@@ -137,35 +86,37 @@ void trans_W_4x4_3x3(float Fw_[6][6][16][16], float F[3][3][16][16])
     float t2[16];
 
     for (int j = 0; j < 16; j++) {
-pragma_unroll
+#pragma unroll
         for (int i = 0; i < 3; i++) {
 #pragma omp simd
             for (int k = 0; k < 16; k++) {
-                t0[k] = rcp6 * F[2][i][j][k];
-                t1[k] = -t0[k] - rcp6 * F[0][i][j][k];
-                t2[k] = t0[k] + rcp24 * F[0][i][j][k];
-                T[0][i][k] = rcp4 * F[0][i][j][k];
-                T[1][i][k] = t1[k] - rcp6 * F[1][i][j][k];
-                T[2][i][k] = t1[k] + rcp6 * F[1][i][j][k];
-                T[3][i][k] = t2[k] + rcp12 * F[1][i][j][k];
-                T[4][i][k] = t2[k] - rcp12 * F[1][i][j][k];
+                t0[k] = 0.26890756302521f * F[2][i][j][k];
+                t1[k] = -t0[k] - 0.688403361344538f * F[0][i][j][k];
+                t2[k] = t0[k] + 0.119514472455649f * F[0][i][j][k];
+
+                T[0][i][k] = 1.13777777777778f * F[0][i][j][k];
+                T[1][i][k] = t1[k] - 0.430252100840336f * F[1][i][j][k];
+                T[2][i][k] = t1[k] + 0.430252100840336f * F[1][i][j][k];
+                T[3][i][k] = t2[k] + 0.179271708683473f * F[1][i][j][k];
+                T[4][i][k] = t2[k] - 0.179271708683473f * F[1][i][j][k];
                 T[5][i][k] = F[2][i][j][k];
             }
         }
-pragma_unroll
+#pragma unroll
         for (int i = 0; i < 6; i++) {
 #pragma omp simd
             for (int k = 0; k < 16; k++) {
-                t0[k] = rcp6 * T[i][2][k];
-                t1[k] = -t0[k] - rcp6 * T[i][0][k];
-                t2[k] = t0[k] + rcp24 * T[i][0][k];
-                Fw[0][k] = rcp4 * T[i][0][k];
-                Fw[1][k] = t1[k] - rcp6 * T[i][1][k];
-                Fw[2][k] = t1[k] + rcp6 * T[i][1][k];
-                Fw[3][k] = t2[k] + rcp12 * T[i][1][k];
-                Fw[4][k] = t2[k] - rcp12 * T[i][1][k];
+                t0[k] = 0.26890756302521f * T[i][2][k];
+                t1[k] = -t0[k] - 0.688403361344538f * T[i][0][k];
+                t2[k] = t0[k] + 0.119514472455649f * T[i][0][k];
+
+                Fw[0][k] = 1.13777777777778f * T[i][0][k];
+                Fw[1][k] = t1[k] - 0.430252100840336f * T[i][1][k];
+                Fw[2][k] = t1[k] + 0.430252100840336f * T[i][1][k];
+                Fw[3][k] = t2[k] + 0.179271708683473f * T[i][1][k];
+                Fw[4][k] = t2[k] - 0.179271708683473f * T[i][1][k];
                 Fw[5][k] = T[i][2][k];
-pragma_unroll
+#pragma unroll
                 for (int l = 0; l < 6; l++) {
                     Fw_[i][l][j][k] = Fw[l][k];
                 }
@@ -174,15 +125,14 @@ pragma_unroll
     }
 }
 
-void trans_O_4x4_3x3(float Mw[6][6][16], float O[4][4][16])
-{
+void trans_O_4x4_3x3(float Mw[6][6][16], float O[4][4][16]) {
     float T[4][6][16];
     float t0[16];
     float t1[16];
     float t2[16];
     float t3[16];
 
-pragma_unroll
+#pragma unroll
     for (int i = 0; i < 6; i++) {
 #pragma omp simd
         for (int v = 0; v < 16; v++) {
@@ -192,12 +142,12 @@ pragma_unroll
             t3[v] = Mw[3][i][v] - Mw[4][i][v];
 
             T[0][i][v] = t0[v] + t1[v] + Mw[0][i][v];
-            T[1][i][v] = t2[v] + t3[v] * 2.0f;
-            T[2][i][v] = t0[v] + t1[v] * 4.0f;
-            T[3][i][v] = t2[v] + t3[v] * 8.0f + Mw[5][i][v];
+            T[1][i][v] = t2[v] * 0.625f + t3[v] * 1.5f;
+            T[2][i][v] = t0[v] * 0.390625f + t1[v] * 2.25f;
+            T[3][i][v] = t2[v] * 0.244140625f + t3[v] * 3.375f + Mw[5][i][v];
         }
     }
-pragma_unroll
+#pragma unroll
     for (int i = 0; i < 4; i++) {
 #pragma omp simd
         for (int v = 0; v < 16; v++) {
@@ -207,12 +157,13 @@ pragma_unroll
             t3[v] = T[i][3][v] - T[i][4][v];
 
             O[i][0][v] = t0[v] + t1[v] + T[i][0][v];
-            O[i][1][v] = t2[v] + t3[v] * 2.0f;
-            O[i][2][v] = t0[v] + t1[v] * 4.0f;
-            O[i][3][v] = t2[v] + t3[v] * 8.0f + T[i][5][v];
+            O[i][1][v] = t2[v] * 0.625f + t3[v] * 1.5f;
+            O[i][2][v] = t0[v] * 0.390625f + t1[v] * 2.25f;
+            O[i][3][v] = t2[v] * 0.244140625f + t3[v] * 3.375f + T[i][5][v];
         }
     }
 }
+
 
 void trans_W_3x3_4x4(float Fw[6][6][16], float F[4][6][16])
 {
@@ -310,7 +261,7 @@ pragma_unroll
     }
 }
 
-void trans_I_4x4_3x3_wu(float Iw[6][6][16], float I[6][6][16])
+void trans_I_4x4_3x3(float Iw[6][6][16], float I[6][6][16])
 {
     float T[6][6][16];
     float t0[16];
@@ -603,7 +554,6 @@ void dst_transform_fwd(int image, jit_conv_winograd_conf_t conv, float *toutp,
     const int simd_w = 16;
     const int alpha = 6;
     const int tile_size = alpha - 2;
-    const int total_tiles = conv.itiles * conv.jtiles;
     float Ow[alpha][alpha][simd_w];
     float O[tile_size][tile_size][simd_w];
 
@@ -624,7 +574,6 @@ void dst_transform_fwd(int image, jit_conv_winograd_conf_t conv, float *toutp,
 
     for (int tj = 0; tj < conv.jtiles; tj++) {
         for (int ti = 0; ti < conv.itiles; ti++) {
-            int tile_number = tile_base_index + tj * conv.itiles + ti;
             for (int j = 0; j < alpha; j++) {
                 for (int i = 0; i < alpha; i++) {
 #pragma omp simd
@@ -676,7 +625,6 @@ void diff_dst_transform_bwd_data( int image, jit_conv_winograd_conf_t conv,
     const int simd_w = 16;
     const int alpha = 6;
     const int tile_size = alpha - 2;
-    const int total_tiles = conv.itiles * conv.jtiles;
     const int l_pad_winograd = conv.iw + conv.r_pad - conv.ow;
     const int t_pad_winograd = conv.ih + conv.b_pad - conv.oh;
     const int ofwp = conv.ow + l_pad_winograd;
@@ -806,7 +754,6 @@ void diff_src_transform_bwd_data(int image, jit_conv_winograd_conf_t conv,
     const int simd_w = 16;
     const int alpha = 6;
     const int tile_size = alpha - 2;
-    const int total_tiles = conv.itiles * conv.jtiles;
 
     array_offset_calculator<float, 8> input(toutp,
             conv.tile_block, conv.nb_ic,
@@ -870,7 +817,8 @@ void diff_src_transform_bwd_data(int image, jit_conv_winograd_conf_t conv,
 
 template <bool ver_4fma>
 void diff_src_transform_bwd_weights(int image, jit_conv_winograd_conf_t conv,
-        float *inp, float *tinp, void (*transpose_4fma_ker)(float *, float *))
+        float *inp, float *tinp, float *Iw_temp,
+        void (*transpose_4fma_ker)(float *, float *))
 {
     const int simd_w = 16;
     const int alpha = 6;
@@ -880,9 +828,7 @@ void diff_src_transform_bwd_weights(int image, jit_conv_winograd_conf_t conv,
     float I[conv.alpha][conv.alpha][simd_w];
     float Iw[conv.alpha][conv.alpha][simd_w];
 
-    float *Iw_buffer = (float *) malloc(alpha * alpha * conv.tile_4fma
-            * simd_w * sizeof(float), 64);
-    array_offset_calculator<float, 4> Iw_scratchpad(Iw_buffer,
+    array_offset_calculator<float, 4> Iw_trans_temp(Iw_temp,
             alpha, alpha, conv.tile_4fma, simd_w);
     array_offset_calculator<float, 5> input(inp,
             conv.mb, conv.ic/simd_w, conv.ih, conv.iw, simd_w);
@@ -932,14 +878,16 @@ void diff_src_transform_bwd_weights(int image, jit_conv_winograd_conf_t conv,
                     }
                 }
             }
-            trans_I_4x4_3x3_wu(Iw, I);
+            trans_I_4x4_3x3(Iw, I);
 
             if (ver_4fma) {
                 for (int j = 0; j < conv.alpha; j++) {
                     for (int i = 0; i < conv.alpha; i++) {
+                        float *Iw_temp_base = &(Iw_trans_temp(j, i,
+                                                        tile_4fma, 0));
 #pragma omp simd
                         for (int v = 0; v < simd_w; v++) {
-                            Iw_scratchpad(j, i, tile_4fma, v) = Iw[j][i][v];
+                            Iw_temp_base[v] = Iw[j][i][v];
                         }
                     }
                 }
@@ -948,7 +896,7 @@ void diff_src_transform_bwd_weights(int image, jit_conv_winograd_conf_t conv,
                     float *outp = &(output(0, 0, 0,
                                 tile_block, 0,
                                 nb_tile_block_ur, tile_block_ur, 0));
-                    transpose_4fma_ker(outp, (float *)Iw_buffer);
+                    transpose_4fma_ker(outp, (float *)Iw_temp);
                     tile_4fma = 0;
                     tile_block_ur++;
                 }
@@ -981,9 +929,10 @@ void diff_src_transform_bwd_weights(int image, jit_conv_winograd_conf_t conv,
         for (int j = 0; j < conv.alpha; j++) {
             for (int i = 0; i < conv.alpha; i++) {
                 for (int tb = tile_4fma; tb < conv.tile_4fma; tb++) {
+                    float *Iw_temp_base = &(Iw_trans_temp(j, i, tb, 0));
 #                   pragma omp simd
                     for (int v = 0; v < simd_w; v++) {
-                        Iw_scratchpad(j, i, tb, v) = 0;
+                        Iw_temp_base[v] = 0;
                     }
                 }
             }
@@ -991,12 +940,13 @@ void diff_src_transform_bwd_weights(int image, jit_conv_winograd_conf_t conv,
         float *outp = &(output(0, 0, 0,
                     tile_block, 0,
                     nb_tile_block_ur, tile_block_ur, 0));
-        transpose_4fma_ker(outp, (float *)Iw_buffer);
+        transpose_4fma_ker(outp, (float *)Iw_temp);
     }
 }
 
+template <bool with_bias>
 void diff_dst_transform_bwd_weights(int image, jit_conv_winograd_conf_t conv,
-        float *inp, float *tinp)
+        float *inp, float *tinp, float *dbias)
 {
     const int simd_w = 16;
     const int tile_size = conv.alpha - 2;
@@ -1028,9 +978,16 @@ void diff_dst_transform_bwd_weights(int image, jit_conv_winograd_conf_t conv,
                     for (int i = 0; i < conv.alpha; i++) {
                         int xdim = ti * tile_size + i;
                         if (xdim < conv.ow) {
+                            float *input_base = &(input(0, 0, ydim, xdim, 0));
 #pragma omp simd
                             for (int v = 0; v < simd_w; v++) {
-                                I[j][i][v] = input(0, 0, ydim, xdim, v);
+                                I[j][i][v] = input_base[v];
+                            }
+                            if (with_bias && j < tile_size && i < tile_size) {
+#pragma omp simd
+                                for (int v = 0; v < simd_w; v++) {
+                                    dbias[v] += input_base[v];
+                                }
                             }
                         } else {
 #pragma omp simd
@@ -1139,17 +1096,20 @@ void _jit_avx512_common_convolution_winograd_fwd_t<with_relu>::execute_forward()
             jcp.oc/simd_w, simd_w);
 
     char *base_ptr = scratchpad_buffer_->get();
-    array_offset_calculator<float, 8> M((float *)(base_ptr + mp_offset_),
+    array_offset_calculator<float, 8> M(
+            (float *)(base_ptr + sp_offsets_.mp_offset_),
             jcp.tile_block, jcp.nb_oc,
             alpha, alpha,
             jcp.nb_tile_block_ur, jcp.oc_block,
             jcp.tile_block_ur, simd_w);
-    array_offset_calculator<float, 8> U((float *)(base_ptr + up_offset_),
+    array_offset_calculator<float, 8> U(
+            (float *)(base_ptr + sp_offsets_.up_offset_),
             alpha, alpha,
             jcp.nb_oc, jcp.nb_ic,
             jcp.oc_block, jcp.ic_block,
             simd_w, simd_w);
-    array_offset_calculator<float, 8> V((float *)(base_ptr + vp_offset_),
+    array_offset_calculator<float, 8> V(
+            (float *)(base_ptr + sp_offsets_.vp_offset_),
             jcp.tile_block, alpha, alpha,
             jcp.nb_tile_block_ur, jcp.nb_ic,
             jcp.ic_block, jcp.tile_block_ur, simd_w);
@@ -1253,7 +1213,6 @@ _jit_avx512_common_convolution_winograd_fwd_t<false>::execute_forward();
 void jit_avx512_common_convolution_winograd_bwd_data_t::execute_backward_data()
 {
     const int simd_w = 16;
-    const int alpha = 6;
     const auto &jcp = kernel_->jcp;
 
     array_offset_calculator<float, 5> diff_src((float *)this->memory(),
@@ -1264,18 +1223,21 @@ void jit_avx512_common_convolution_winograd_bwd_data_t::execute_backward_data()
             jcp.oc/simd_w, jcp.ic/simd_w, jcp.kh, jcp.kw, simd_w, simd_w);
 
     char *base_ptr = scratchpad_buffer_->get();
-    array_offset_calculator<float, 8> U((float *)(base_ptr + up_offset_),
-            alpha, alpha,
+    array_offset_calculator<float, 8> U(
+            (float *)(base_ptr + sp_offsets_.up_offset_),
+            jcp.alpha, jcp.alpha,
             jcp.nb_ic, jcp.nb_oc,
             jcp.ic_block, jcp.oc_block,
             simd_w, simd_w);
-    array_offset_calculator<float, 8> V((float *)(base_ptr + vp_offset_),
+    array_offset_calculator<float, 8> V(
+            (float *)(base_ptr + sp_offsets_.vp_offset_),
             jcp.tile_block, jcp.nb_ic,
-            alpha, alpha,
+            jcp.alpha, jcp.alpha,
             jcp.nb_tile_block_ur, jcp.ic_block,
             jcp.tile_block_ur, simd_w);
-    array_offset_calculator<float, 8> M((float *)(base_ptr + mp_offset_),
-            jcp.tile_block, alpha, alpha,
+    array_offset_calculator<float, 8> M(
+            (float *)(base_ptr + sp_offsets_.mp_offset_),
+            jcp.tile_block, jcp.alpha, jcp.alpha,
             jcp.nb_tile_block_ur, jcp.nb_oc,
             jcp.oc_block, jcp.tile_block_ur, simd_w);
 
@@ -1312,8 +1274,8 @@ void jit_avx512_common_convolution_winograd_bwd_data_t::execute_backward_data()
 #pragma omp barrier
         for (int tile_block = 0; tile_block < jcp.tile_block; tile_block++) {
 #pragma omp for collapse(3) nowait schedule(static)
-            for (int oj = 0; oj < alpha; oj++) {
-                for (int oi = 0; oi < alpha; oi++) {
+            for (int oj = 0; oj < jcp.alpha; oj++) {
+                for (int oi = 0; oi < jcp.alpha; oi++) {
                     for (int ifm1 = 0; ifm1 < jcp.nb_ic; ifm1++) {
                         for (int nb_tile_block_ur = 0;
                                 nb_tile_block_ur < jcp.nb_tile_block_ur;
@@ -1367,12 +1329,15 @@ void jit_avx512_common_convolution_winograd_bwd_weights_t::
        execute_backward_weights()
 {
     const int simd_w = 16;
-    const int alpha = 6;
     const auto &jcp = kernel_->jcp;
+    int nthreads;
 
     auto diff_src_transform_bwd_weights_ver = jcp.ver == ver_4fma ?
             diff_src_transform_bwd_weights<true> :
             diff_src_transform_bwd_weights<false>;
+    auto diff_dst_transform_bwd_weights_ver = jcp.with_bias
+                                            ? diff_dst_transform_bwd_weights<true>
+                                            : diff_dst_transform_bwd_weights<false>;
 
     array_offset_calculator<float, 5> diff_src((float *)this->input_memory(0),
             jcp.mb, jcp.ic/simd_w, jcp.ih, jcp.iw, simd_w);
@@ -1385,33 +1350,71 @@ void jit_avx512_common_convolution_winograd_bwd_weights_t::
 
     char *base_ptr = scratchpad_buffer_->get();
 
-    array_offset_calculator<float, 8> U((float *)(base_ptr + up_offset_),
+    array_offset_calculator<float, 8> U(
+            (float *)(base_ptr + sp_offsets_.up_offset_),
             jcp.nb_ic, jcp.nb_oc,
             jcp.alpha, jcp.alpha,
             jcp.oc_block, jcp.ic_block,
             jcp.ic_simd_block, jcp.oc_simd_block);
 
-    array_offset_calculator<float, 8> M((float *)(base_ptr + mp_offset_),
+    array_offset_calculator<float, 8> M(
+            (float *)(base_ptr + sp_offsets_.mp_offset_),
             jcp.nb_oc, jcp.alpha, jcp.alpha,
             jcp.tile_block, jcp.oc_block,
             jcp.nb_tile_block_ur, jcp.tile_block_ur * jcp.tile_4fma,
             jcp.oc_simd_block);
-    array_offset_calculator<float, 8> V((float *)(base_ptr + vp_offset_),
+    array_offset_calculator<float, 8> V(
+            (float *)(base_ptr + sp_offsets_.vp_offset_),
             jcp.nb_ic, jcp.alpha, jcp.alpha,
             jcp.tile_block, jcp.ic_block,
             jcp.nb_tile_block_ur, jcp.tile_block_ur,
             jcp.ic_simd_block * jcp.tile_4fma);
 
+    const int trans_buffer_size = jcp.alpha * jcp.alpha * jcp.tile_4fma
+                                * jcp.ic_simd_block;
+    array_offset_calculator<float, 2> trans_buffer(
+            (float *)(base_ptr + sp_offsets_.diff_src_trans_offset_),
+            omp_get_max_threads(),
+            trans_buffer_size);
+
+    array_offset_calculator<float, 2> diff_bias_prv(
+            (float *)(base_ptr + sp_offsets_.biasu_offset_),
+            omp_get_max_threads(),
+            jcp.oc);
+
 #pragma omp parallel
     {
+        if (jcp.with_bias) {
+            nthreads = omp_get_num_threads();
+#pragma omp for nowait collapse(2)
+            for (int ithr = 0; ithr < nthreads; ithr++) {
+                for (int ofm = 0; ofm < jcp.oc; ofm++) {
+                    diff_bias_prv(ithr, ofm) = 0.0f;
+                }
+            }
+
+
+#pragma omp for nowait
+            for (int bofm = 0; bofm < jcp.oc / simd_w; bofm++) {
+#pragma omp simd
+                for (int v = 0; v < simd_w; v++)
+                    diff_bias(bofm, v) = 0.0f;
+            }
+        }
+
+        const int ithread = omp_get_thread_num();
 #pragma omp for nowait collapse(3)
         for (int img = 0; img < jcp.mb; img++) {
             for (int ifm1 = 0; ifm1 < jcp.nb_ic; ++ifm1) {
                 for (int ifm2 = 0; ifm2 < jcp.ic_block; ++ifm2) {
+                    float *transb = jcp.ver == ver_4fma
+                                  ? &(trans_buffer(ithread, 0))
+                                  : NULL;
                     diff_src_transform_bwd_weights_ver(img, jcp,
                             &(diff_src(img, ifm1 * jcp.ic_block + ifm2,
                                     0, 0, 0)),
                             &(V(ifm1, 0, 0, 0, ifm2, 0, 0, 0)),
+                            transb,
                             kernel_->transpose_4fma_ker);
                 }
             }
@@ -1421,10 +1424,15 @@ void jit_avx512_common_convolution_winograd_bwd_weights_t::
         for (int img = 0; img < jcp.mb; img++) {
             for (int ofm1 = 0; ofm1 < jcp.nb_oc; ofm1++) {
                 for (int ofm2 = 0; ofm2 < jcp.oc_block; ofm2++) {
-                    diff_dst_transform_bwd_weights(img, jcp,
+                    float *dbias = jcp.with_bias
+                           ? &(diff_bias_prv(ithread,
+                                       simd_w * (ofm1 * jcp.oc_block + ofm2)))
+                           : NULL;
+                    diff_dst_transform_bwd_weights_ver(img, jcp,
                             &(diff_dst(img, ofm1 * jcp.oc_block + ofm2,
                                     0, 0, 0)),
-                            &(M(ofm1, 0, 0, 0, ofm2, 0, 0, 0)));
+                            &(M(ofm1, 0, 0, 0, ofm2, 0, 0, 0)),
+                            dbias);
                 }
             }
         }
@@ -1461,7 +1469,7 @@ void jit_avx512_common_convolution_winograd_bwd_weights_t::
 
 #pragma omp barrier
 
-#pragma omp for collapse(4)
+#pragma omp for nowait collapse(4)
         for (int ifm1 = 0; ifm1 < jcp.nb_ic; ifm1++) {
             for (int ofm1 = 0; ofm1 < jcp.nb_oc; ofm1++) {
                 for (int ofm2 = 0; ofm2 < jcp.oc_block; ofm2++) {
@@ -1478,18 +1486,14 @@ void jit_avx512_common_convolution_winograd_bwd_weights_t::
 
         if (jcp.with_bias) {
 #pragma omp for
-            for (int bofm = 0; bofm < jcp.oc / simd_w; bofm++) {
-                for (int v = 0; v < 16; v++)
-                    diff_bias(bofm, v) = 0.0f;
-                for (int img = 0; img < jcp.mb; img++) {
-                    for (int h = 0; h < jcp.oh; h++) {
-                        for (int w = 0; w < jcp.ow; w++) {
+            for (int ofm1 = 0; ofm1 < jcp.oc / simd_w; ofm1++) {
+                for (int ithr = 0; ithr < nthreads; ithr++) {
+                    float* base_bias_ptr = &(diff_bias(ofm1, 0));
+                    float* base_bias_prv_ptr = &(diff_bias_prv(
+                                ithr * jcp.oc + ofm1 * simd_w));
 #pragma omp simd
-                            for (int v = 0; v < simd_w; v++) {
-                                diff_bias(bofm, v) +=
-                                    diff_dst(img, bofm, h, w, v);
-                            }
-                        }
+                    for (int ofm2 = 0; ofm2 < simd_w; ofm2++) {
+                        base_bias_ptr[ofm2] += base_bias_prv_ptr[ofm2];
                     }
                 }
             }

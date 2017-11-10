@@ -48,8 +48,10 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
     struct pd_t: public _cpu_convolution_fwd_pd_t<with_relu> {
         pd_t(engine_t *engine,
                 const typename pd_t::base_desc_t *adesc,
+                const primitive_attr_t *attr,
                 const typename pd_t::base_class *hint_fwd_pd)
-            : _cpu_convolution_fwd_pd_t<with_relu>(engine, adesc, hint_fwd_pd)
+            : _cpu_convolution_fwd_pd_t<with_relu>(engine, adesc, attr,
+                    hint_fwd_pd)
             , jcp_({}) {}
 
         DECLARE_COMMON_PD_T(_gemm_convolution_fwd_t<with_relu, run_jit, isa>);
@@ -151,8 +153,9 @@ struct _gemm_convolution_bwd_data_t: public cpu_primitive_t {
     struct pd_t: public cpu_convolution_bwd_data_pd_t {
         pd_t(engine_t *engine,
                 const convolution_desc_t *adesc,
+                const primitive_attr_t *attr,
                 const convolution_fwd_pd_t *hint_fwd_pd)
-            : cpu_convolution_bwd_data_pd_t(engine, adesc, hint_fwd_pd)
+            : cpu_convolution_bwd_data_pd_t(engine, adesc, attr, hint_fwd_pd)
             , jcp_({})
         {}
 
@@ -177,7 +180,9 @@ struct _gemm_convolution_bwd_data_t: public cpu_primitive_t {
                 && this->diff_src_pd_.desc()->format == nchw
                 && this->diff_dst_pd_.desc()->format == nchw
                 && this->weights_pd_.desc()->format == (this->with_groups()
-                        ? goihw : oihw);
+                        ? goihw : oihw)
+                && this->desc()->dilates[0] == 0
+                && this->desc()->dilates[1] == 0;
             return ok ? status::success : status::unimplemented;
         }
 
@@ -252,8 +257,9 @@ struct _gemm_convolution_bwd_weights_t: public cpu_primitive_t {
     struct pd_t: public cpu_convolution_bwd_weights_pd_t {
         pd_t(engine_t *engine,
                 const convolution_desc_t *adesc,
+                const primitive_attr_t *attr,
                 const convolution_fwd_pd_t *hint_fwd_pd)
-            : cpu_convolution_bwd_weights_pd_t(engine, adesc, hint_fwd_pd)
+            : cpu_convolution_bwd_weights_pd_t(engine, adesc, attr, hint_fwd_pd)
             , jcp_({})
         {}
 
@@ -280,7 +286,9 @@ struct _gemm_convolution_bwd_weights_t: public cpu_primitive_t {
             && this->src_pd_.desc()->format == nchw
             && this->diff_dst_pd_.desc()->format == nchw
             && this->diff_weights_pd_.desc()->format == (this->with_groups()
-                    ? goihw : oihw);
+                    ? goihw : oihw)
+            && this->desc()->dilates[0] == 0
+            && this->desc()->dilates[1] == 0;
             return ok ? status::success : status::unimplemented;
         }
 
@@ -361,4 +369,5 @@ using mkl_gemm_convolution_bwd_weights_t =
 }
 }
 
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
 #endif

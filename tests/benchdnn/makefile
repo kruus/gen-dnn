@@ -21,12 +21,12 @@ CXXFLAGS = -std=c++11 -g -O0 -fopenmp
 LDFLAGS = -liomp5 -lrt -lpthread -ldl -lm
 
 MKLDNN_ROOT ?= ../../.install
-INC = -I$(MKLDNN_ROOT)/include
+INC = -I$(MKLDNN_ROOT)/include -I.
 
 build_dir = .build
 
-srcs = $(wildcard *.cpp */*.cpp)
-hdrs = $(wildcard *.hpp */*.hpp)
+srcs = $(wildcard *.cpp */*.cpp */*/*.cpp)
+hdrs = $(wildcard *.hpp */*.hpp */*/*.hpp)
 objs = $(addprefix $(build_dir)/,$(subst .cpp,.o,$(srcs)))
 dirs = $(dir $(objs))
 

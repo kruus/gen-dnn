@@ -37,7 +37,7 @@ struct jit_avx512_common_1x1_conv_kernel : public jit_generator {
                                 const memory_desc_wrapper &src_d,
                                 const memory_desc_wrapper &weights_d,
                                 const memory_desc_wrapper &dst_d,
-                                bool with_relu, double relu_negative_slope,
+                                bool with_relu, float relu_negative_slope,
                                 int nthreads, bool reduce_src);
 
     static status_t init_conf(jit_1x1_conv_conf_t &jcp,
@@ -66,11 +66,11 @@ struct jit_avx512_common_1x1_conv_kernel : public jit_generator {
     reg64_t aux1_reg_bcast_data = rbx;
     reg64_t aux_reg_load_data = r15;
     reg64_t imm_addr64 = aux_reg_load_data;
-    reg64_t aux_reg_output_data = rcx;
+    reg64_t aux_reg_output_data = abi_not_param1;
     reg64_t reg_load_loop_work = rsi;
     reg64_t reg_reduce_loop_work = r11;
     reg64_t bcast_loop_iter = rdx;
-    reg64_t reduce_loop_iter = rdi;
+    reg64_t reduce_loop_iter = abi_param1;
     reg64_t reg_reduce_pos_flag = rax;
     reg64_t reg_output_stride = r13;
     reg64_t reg_bias_data = r12;

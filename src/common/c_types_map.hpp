@@ -63,6 +63,13 @@ namespace alg_kind {
     const alg_kind_t eltwise_relu = mkldnn_eltwise_relu;
     const alg_kind_t eltwise_tanh = mkldnn_eltwise_tanh;
     const alg_kind_t eltwise_elu = mkldnn_eltwise_elu;
+    const alg_kind_t eltwise_square = mkldnn_eltwise_square;
+    const alg_kind_t eltwise_abs = mkldnn_eltwise_abs;
+    const alg_kind_t eltwise_sqrt = mkldnn_eltwise_sqrt;
+    const alg_kind_t eltwise_linear = mkldnn_eltwise_linear;
+    const alg_kind_t eltwise_bounded_relu = mkldnn_eltwise_bounded_relu;
+    const alg_kind_t eltwise_soft_relu = mkldnn_eltwise_soft_relu;
+    const alg_kind_t eltwise_logistic = mkldnn_eltwise_logistic;
     const alg_kind_t pooling_max = mkldnn_pooling_max;
     const alg_kind_t pooling_avg = mkldnn_pooling_avg;
     const alg_kind_t pooling_avg_include_padding = mkldnn_pooling_avg_include_padding;
@@ -79,6 +86,12 @@ namespace data_type {
     const data_type_t s16 = mkldnn_s16;
     const data_type_t s8 = mkldnn_s8;
     const data_type_t u8 = mkldnn_u8;
+}
+
+using round_mode_t = mkldnn_round_mode_t;
+namespace round_mode {
+    const round_mode_t nearest = mkldnn_round_nearest;
+    const round_mode_t down = mkldnn_round_down;
 }
 
 using memory_format_t = mkldnn_memory_format_t;
@@ -109,6 +122,7 @@ namespace memory_format {
     const memory_format_t OIhw8o16i2o = mkldnn_OIhw8o16i2o;
     const memory_format_t OIhw8o8i = mkldnn_OIhw8o8i;
     const memory_format_t OIhw16o16i = mkldnn_OIhw16o16i;
+    const memory_format_t IOhw16o16i = mkldnn_IOhw16o16i;
     const memory_format_t Oihw8o = mkldnn_Oihw8o;
     const memory_format_t Oihw16o = mkldnn_Oihw16o;
     const memory_format_t Ohwi8o = mkldnn_Ohwi8o;
@@ -123,6 +137,7 @@ namespace memory_format {
     const memory_format_t gOIhw8o16i2o = mkldnn_gOIhw8o16i2o;
     const memory_format_t gOIhw8o8i = mkldnn_gOIhw8o8i;
     const memory_format_t gOIhw16o16i = mkldnn_gOIhw16o16i;
+    const memory_format_t gIOhw16o16i = mkldnn_gIOhw16o16i;
     const memory_format_t gOihw8o = mkldnn_gOihw8o;
     const memory_format_t gOihw16o = mkldnn_gOihw16o;
     const memory_format_t gOhwi8o = mkldnn_gOhwi8o;
@@ -254,6 +269,7 @@ struct op_desc_t {
 using engine_t = mkldnn_engine;
 using primitive_desc_iterator_t = mkldnn_primitive_desc_iterator;
 using primitive_desc_t = mkldnn_primitive_desc;
+using primitive_attr_t = mkldnn_primitive_attr;
 using primitive_t = mkldnn_primitive;
 using primitive_at_t = mkldnn_primitive_at_t;
 

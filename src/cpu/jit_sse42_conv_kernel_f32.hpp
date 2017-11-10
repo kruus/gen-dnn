@@ -36,7 +36,7 @@ struct jit_sse42_conv_fwd_kernel_f32: public jit_generator {
             const convolution_desc_t &cd, const memory_desc_wrapper &src_d,
             const memory_desc_wrapper &weights_d,
             const memory_desc_wrapper &dst_d, bool with_relu = false,
-            double relu_negative_slope = 0.);
+            float relu_negative_slope = 0.);
 
     jit_conv_conf_t jcp;
     void (*jit_ker)(jit_conv_call_s *);
@@ -53,7 +53,7 @@ private:
     reg64_t kj = r10;
     reg64_t oi_iter = r11;
     reg64_t ki_iter = r12;
-    reg64_t reg_kh = rcx;
+    reg64_t reg_kh = abi_not_param1;
     reg64_t simd_iter = r15;
     reg64_t reg_oc_blocks = r14;
     reg64_t imm_addr64 = reg_oc_blocks;

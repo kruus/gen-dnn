@@ -33,8 +33,10 @@ template <bool with_relu, data_type_t dst_data_type>
 struct _jit_avx512_core_u8s8s32x_convolution_fwd_t : public cpu_primitive_t {
     struct pd_t : public _cpu_convolution_fwd_pd_t<with_relu> {
         pd_t(engine_t *engine, const typename pd_t::base_desc_t *adesc,
+                const primitive_attr_t *attr,
                 const typename pd_t::base_class *hint_fwd_pd)
-            : _cpu_convolution_fwd_pd_t<with_relu>(engine, adesc, hint_fwd_pd)
+            : _cpu_convolution_fwd_pd_t<with_relu>(engine, adesc, attr,
+                    hint_fwd_pd)
             , jcp_({})
         {}
 
@@ -53,7 +55,7 @@ struct _jit_avx512_core_u8s8s32x_convolution_fwd_t : public cpu_primitive_t {
                 && this->cdesc_().dst_desc.data_type == dst_data_type
                 && this->cdesc_().weights_desc.data_type == data_type::s8
                 && utils::implication(this->with_bias(), utils::one_of(
-                            this->cdesc_().bias_desc.data_type,
+                            this->cdesc_().bias_desc.data_type, data_type::f32,
                             data_type::s32, data_type::s8, data_type::u8))
                 && this->cdesc_().accum_data_type == data_type::s32;
 

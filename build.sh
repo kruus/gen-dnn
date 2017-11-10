@@ -20,6 +20,7 @@ JOBS="-j8"
 #JOBS="-j1"
 CMAKETRACE=""
 USE_CBLAS=1
+QUICK=0
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -54,8 +55,8 @@ while getopts ":htvjdDqQpsSTb" arg; do
         D) # [no] Doxygen-only : build documentation and then stop
             DOJUSTDOC="y"
             ;;
-        q) # quick: skip doxygen docs [default: run doxygen if build OK]
-            DODOC="n"
+        q) # quick: once, skip doxygen on OK build; twice, rebuild existing
+            QUICK=$((QUICK+1))
             ;;
         Q) # really quick: skip build and doxygen docs [JUST run cmake and stop]
             BUILDOK="n"; DODOC="n"
@@ -135,6 +136,12 @@ if [ "$DOJUSTDOC" == "y" ]; then
     ) 2>&1 | tee ../doxygen.log
     exit 0
 fi
+if [ $QUICK -gt 0 ]; then DODOC="n"; fi
+if [ $QUICK -gt 1 ]; then
+    if [ ! -f "${BUILDDIR}/Makefile" ]; then # running cmake is absolutely required
+        QUICK=1
+    fi
+fi
 timeoutPID() { # unused
     PID="$1"
     timeout="$2"
@@ -156,24 +163,28 @@ timeoutPID() { # unused
         kill -s SIGKILL $$
     ) 2> /dev/null &
 }
-if [ -d "${BUILDDIR}" ]; then
+if [ -d "${BUILDDIR}" -a $QUICK -lt 2 ]; then
     rm -rf "${BUILDDIR}".bak && mv -v "${BUILDDIR}" "${BUILDDIR}".bak
     if [ -f "${BUILDDIR}.log" ]; then
        mv "${BUILDDIR}.log" "${BUILDDIR}".bak/
     fi
 fi
-if [ -d "$INSTALLDIR}" ]; then
+if [ -d "$INSTALLDIR}" -a $QUICK -lt 2 ]; then
     rm -rf "$INSTALLDIR}".bak && mv -v "$INSTALLDIR}" "$INSTALLDIR}".bak
 fi
 (
+    echo "# vim: set ro ft=log:"
     echo "DOTARGET   $DOTARGET"
     echo "DOJIT      $DOJIT"
     echo "DOTEST     $DOTEST"
     echo "DODEBUG    $DODEBUG"
     echo "DODOC      $DODOC"
+    echo "QUICK      $QUICK"
     echo "BUILDDIR   ${BUILDDIR}"
     echo "INSTALLDIR ${INSTALLDIR}"
-    mkdir "${BUILDDIR}"
+    if [ $QUICK -lt 2 ]; then
+        mkdir "${BUILDDIR}"
+    fi
     cd "${BUILDDIR}"
     #
     CMAKEOPT=""
@@ -249,14 +260,20 @@ fi
     #    TODO: cblas / mathkeisan alternatives?
     if [ "$BUILDOK" == "y" ]; then
         BUILDOK="n"
-        rm -f ./stamp-BUILDOK ./CMakeCache.txt
-        echo "${CMAKEENV}; cmake ${CMAKEOPT} ${CMAKETRACE} .."
-        set -x
-        { if [ x"${CMAKEENV}" == x"" ]; then ${CMAKEENV}; fi; \
-            cmake ${CMAKEOPT} ${CMAKETRACE} .. \
+        if [ $QUICK -gt 1 ]; then # rebuild in existing directory, WITHOUT rerunning cmake
+            pwd
+            { make VERBOSE=1 ${JOBS} \
+                && BUILDOK="y"; }
+        else
+            rm -f ./stamp-BUILDOK ./CMakeCache.txt
+            echo "${CMAKEENV}; cmake ${CMAKEOPT} ${CMAKETRACE} .."
+            set -x
+            { if [ x"${CMAKEENV}" == x"" ]; then ${CMAKEENV}; fi; \
+                cmake ${CMAKEOPT} ${CMAKETRACE} .. \
                 && make VERBOSE=1 ${JOBS} \
                 && BUILDOK="y"; }
-        set +x
+            set +x
+        fi
     else # skip the build, just run cmake ...
         echo "CMAKEENV   <${CMAKEENV}>"
         echo "CMAKEOPT   <${CMAKEOPT}>"
@@ -305,15 +322,17 @@ echo "INSTALLDIR ${INSTALLDIR}"
 echo "DOTARGET=${DOTARGET}, DOJIT=${DOJIT}, DODEBUG=${DODEBUG}, DOTEST=${DOTEST}, DODOC=${DODOC}, DONEEDMKL=${DONEEDMKL}"
 LOGDIR="log-${DOTARGET}${DOJIT}${DODEBUG}${DOTEST}${DODOC}${DONEEDMKL}"
 if [ "$BUILDOK" == "y" ]; then
-    echo "BUILDOK !"
-    (
+    echo "BUILDOK !    QUICK=$QUICK"
+    if [ $QUICK -lt 2 ]; then # make install ?
+        (
         cd "${BUILDDIR}"
         # trouble with cmake COMPONENTs ...
         echo "Installing :"; make install;
         #if [ "$DODOC" == "y" ]; then { echo "Installing docs ..."; make install-doc; } fi
-    ) 2>&1 >> "${BUILDDIR}".log || { echo "'make install' in ${BUILDDIR} had issues"; }
+        ) 2>&1 >> "${BUILDDIR}".log || { echo "'make install' in ${BUILDDIR} had issues (ignored)"; }
+    fi
     echo "Testing ?"
-    if [ ! $DOTEST -eq 0 -a ! "$DOTARGET" == "s" ]; then
+    if [ ! $DOTEST -eq 0 -a ! "$DOTARGET" == "s" ]; then # non-SX: -t might run some tests
         rm -f test1.log test2.log test3.log
         echo "Testing ... test1"
         if [ true ]; then
@@ -337,6 +356,8 @@ if [ "$BUILDOK" == "y" ]; then
 else
     echo "Build NOT OK..."
 fi
+
+# maintain directories of "success" log files
 echo "BUILDDIR   ${BUILDDIR}"
 echo "INSTALLDIR ${INSTALLDIR}"
 echo "DOTARGET=${DOTARGET}, DOJIT=${DOJIT}, DODEBUG=${DODEBUG}, DOTEST=${DOTEST}, DODOC=${DODOC}, DONEEDMKL=${DONEEDMKL}"

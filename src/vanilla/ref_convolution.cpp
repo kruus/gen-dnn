@@ -116,8 +116,8 @@ static inline char const* after_last_colon(const char* msg) {
 #endif
 
 template <bool with_relu, data_type_t src_type, data_type_t wei_type,
-         data_type_t acc_type, data_type_t dst_type>
-_ref_convolution_fwd_t<with_relu, src_type, wei_type, acc_type, dst_type>
+         data_type_t dst_type, data_type_t acc_type>
+_ref_convolution_fwd_t<with_relu, src_type, wei_type, dst_type, acc_type>
 ::_ref_convolution_fwd_t (const pd_t *pd, const input_vector &inputs,
                           const output_vector &outputs)
 : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {
@@ -186,7 +186,7 @@ void _ref_convolution_fwd_t<with_relu, src_type, wei_type, dst_type, acc_type>
     const int padT = conf_.padT();
     const int padL = conf_.padL();
 
-    const double nslope = conf_.negative_slope();
+    const float nslope = conf_.negative_slope();
 
     auto ker = [=](acc_data_t &d, int g, int mb, int oc, int oh, int ow) {
         for (int ic = 0; ic < IC; ++ic) {
@@ -198,6 +198,7 @@ void _ref_convolution_fwd_t<with_relu, src_type, wei_type, dst_type, acc_type>
                     // So lims of 'kh' loop are
                     // ih==0 --> kh = max(0,  (   - oh*KSH + padT) / (1+KDH)) )
                     // ih==IH -> kh = min(IH, (IH - oh*KSH + padT) / (1+KDH) )
+                    // [see benchdnn ref_conv3.cpp (?)]
 
                     if (ih < 0 || ih >= IH) continue;
                     if (iw < 0 || iw >= IW) continue;
@@ -234,7 +235,8 @@ void _ref_convolution_fwd_t<with_relu, src_type, wei_type, dst_type, acc_type>
                         acc_data_t a = bias
                             ? get_bias(bias_d.off(g*OC + oc)) : (acc_data_t)0;
                         ker(a, g, mb, oc, oh, ow);
-                        if (with_relu && a < (acc_data_t)0) a *= nslope;
+                        if (with_relu && a < (acc_data_t)0)
+                            a = (acc_data_t)((float)a * nslope);
                         dst[dst_d.off(mb, g*OC + oc, oh, ow)]
                             = saturate<dst_data_t>(a);
                     }
@@ -274,6 +276,9 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
     const int KSH = conf_.KSH();
     const int KSW = conf_.KSW();
 
+    const int KDH = conf_.KDH();
+    const int KDW = conf_.KDW();
+
     const int padT = conf_.padT();
     const int padL = conf_.padL();
 
@@ -281,12 +286,14 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
         for (int oc = 0; oc < OC; ++oc) {
             for (int kh = 0; kh < KH; ++kh) {
                 for (int kw = 0; kw < KW; ++kw) {
-                    if (iw + padL < kw || ih + padT < kh)
+                    if (iw + padL < kw * (1 + KDW)
+                       || ih + padT < kh * (1 + KDH))
                         continue;
-                    int ow = iw - kw + padL;
-                    int oh = ih - kh + padT;
+                    int ow = iw - kw * (1 + KDW) + padL;
+                    int oh = ih - kh * (1 + KDH) + padT;
                     if (ow % KSW != 0 || oh % KSH != 0)
                         continue;
+
                     ow /= KSW;
                     oh /= KSH;
 
@@ -350,6 +357,9 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
     const int KSH = conf_.KSH();
     const int KSW = conf_.KSW();
 
+    const int KDH = conf_.KDH();
+    const int KDW = conf_.KDW();
+
     const int padT = conf_.padT();
     const int padL = conf_.padL();
 
@@ -357,14 +367,14 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
         for (int mb = 0; mb < MB; ++mb) {
             for (int oh = 0; oh < OH; ++oh) {
                 for (int ow = 0; ow < OW; ++ow) {
-                    if (ow*KSW + kw < padL
-                            || oh*KSH + kh < padT
-                            || ow*KSW + kw >= IW + padL
-                            || oh*KSH + kh >= IH + padT)
+                    if (ow*KSW + kw * (1 + KDW) < padL
+                            || oh*KSH + kh * (1 + KDH) < padT
+                            || ow*KSW + kw * (1 + KDW) >= IW + padL
+                            || oh*KSH + kh * (1 + KDH) >= IH + padT)
                         continue;
 
-                    int ih = oh*KSH - padT + kh;
-                    int iw = ow*KSW - padL + kw;
+                    int ih = oh*KSH - padT + kh * (1 + KDH);
+                    int iw = ow*KSW - padL + kw * (1 + KDW);
 
                     d += (acc_data_t)diff_dst[diff_dst_d.off(mb, g*OC + oc, oh,
                             ow)] * src[src_d.off(mb, g*IC + ic, ih, iw)];

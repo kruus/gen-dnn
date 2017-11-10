@@ -145,6 +145,7 @@ inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
     case f::OIhw8o16i2o:
     case f::OIhw8o8i:
     case f::OIhw16o16i:
+    case f::IOhw16o16i:
     case f::Ohwi8o:
     case f::Ohwi16o:
 #endif
@@ -157,6 +158,7 @@ inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
     case f::gOIhw8o16i2o:
     case f::gOIhw8o8i:
     case f::gOIhw16o16i:
+    case f::gIOhw16o16i:
 #endif
         ndims = 5; break;
     case f::format_undef:
@@ -253,8 +255,9 @@ static void compare_data(mkldnn::memory& ref, mkldnn::memory& dst)
 
         if (data_traits<data_t>::data_type == data_type::f32) {
             data_t diff = got - ref;
-            data_t e = std::abs(ref) > 1e-4 ? diff / ref : diff;
-            EXPECT_NEAR(e, 0.0, 1e-4) << "Index: " << i << " Total: " << num;
+            data_t e = (std::abs(ref) > (data_t)1e-4) ? diff / ref : diff;
+            EXPECT_NEAR(e, (data_t)0.0, (data_t)1e-4)
+                << "Index: " << i << " Total: " << num;
         } else if (data_traits<data_t>::data_type == data_type::s32) {
             EXPECT_EQ(ref, got) << "Index: " << i << " Total: " << num;
         }
@@ -300,7 +303,7 @@ struct test_convolution_formats_t {
 struct test_convolution_params_t {
     const mkldnn::engine::kind engine_kind;
     mkldnn::algorithm aalgorithm;
-    const double relu_negative_slope;
+    const float relu_negative_slope;
     test_convolution_formats_t formats;
     test_convolution_sizes_t sizes;
 };

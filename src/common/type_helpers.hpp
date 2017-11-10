@@ -68,7 +68,7 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
 #if MKLDNN_JIT_TYPES > 0
                 , gOIhw8i8o, gOIhw16i16o, gOIhw8i16o2i, gOIhw8o16i2o
                 , gOIhw8o8i, gOIhw16o16i, gOihw8o, gOihw16o, gOhwi8o
-                , gOhwi16o, gOhIw16o4i
+                , gOhwi16o, gOhIw16o4i ,IOhw16o16i, gIOhw16o16i
 #endif
                 ))
         return blocked;
@@ -143,7 +143,7 @@ inline data_type_t default_accum_data_type(data_type_t src_dt,
         if (src_dt == s16 && wei_dt == s16 && dst_dt == s32)
             return s32;
 
-        if (src_dt == u8 && wei_dt == s8 && one_of(dst_dt, s32, s8, u8))
+        if (src_dt == u8 && wei_dt == s8 && one_of(dst_dt, f32, s32, s8, u8))
             return s32;
     } else if (prop_kind == backward_data) {
         if (src_dt == s32 && wei_dt == s16 && dst_dt == s16)

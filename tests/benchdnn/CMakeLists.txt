@@ -14,8 +14,6 @@
 # limitations under the License.
 #===============================================================================
 
-set(TARGET_NAME ${LIB_NAME})
-
 file(GLOB_RECURSE HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.hpp
@@ -32,15 +30,28 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/ip
     )
 
+option(BENCHDNN_USE_RDPMC
+    "enables rdpms counter to report precise cpu frequency.
+     CAUTION: may not work on all cpus (hence disable by default)"
+    OFF) # disabled by default
+if(BENCHDNN_USE_RDPMC)
+    add_definitions(-DBENCHDNN_USE_RDPMC)
+endif()
+
 add_executable(benchdnn ${SOURCES})
 if(WIN32)
     configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
         benchdnn.vcxproj.user @ONLY)
-    set_property(TARGET benchdnn PROPERTY ENVIRONMENT "PATH=${TEST_PATH}")
+    set_property(TARGET benchdnn PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
 endif()
+
 set_property(TARGET benchdnn PROPERTY CXX_STANDARD 11)
-set_property(TARGET benchdnn PROPERTY C_STANDARD 11)
-target_link_libraries(benchdnn ${LIB_NAME})
+# [ejk] ease switching between #ifdef'ed code blocks with unused vars/fns
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error")
+
+#set_property(TARGET benchdnn PROPERTY C_STANDARD 11)
+target_link_libraries(benchdnn ${LIB_NAME} ${EXTRA_LIBS})
 if(NECSX) # dirname and strnlen extensions in a special library:
     find_library(LIBGEN libgen) # NEW [ejk] probably need to tweak paths!!!
     message(STATUS, "libgen ?? ${LIBGEN} ...")
@@ -70,7 +81,7 @@ add_custom_target(test_conv
 if(WIN32)
     configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
         test_conv.vcxproj.user @ONLY)
-    set_property(TARGET test_conv PROPERTY ENVIRONMENT "PATH=${TEST_PATH}")
+    set_property(TARGET test_conv PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
 endif()
 add_custom_target(test_conv_regression
     COMMAND benchdnn --conv --batch=inputs/test_conv_regression
@@ -80,5 +91,5 @@ add_custom_target(test_conv_regression
 if(WIN32)
     configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
         test_conv_regression.vcxproj.user @ONLY)
-    set_property(TARGET test_conv_regression PROPERTY ENVIRONMENT "PATH=${TEST_PATH}")
+    set_property(TARGET test_conv_regression PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
 endif()

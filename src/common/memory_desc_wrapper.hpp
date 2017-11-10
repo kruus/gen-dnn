@@ -84,14 +84,14 @@ struct memory_desc_wrapper: public c_compatible {
         using namespace mkldnn::impl::memory_format;
         if (is_zero() || format() == memory_format::any) return 0;
         assert(utils::one_of(format(), blocked, x, nc, nchw, nhwc, chwn,
-            oi, io, oihw, ihwo, hwio, goihw
+                    oi, io, oihw, ihwo, hwio, goihw
 #if MKLDNN_JIT_TYPES > 0
-            , nChw8c, nChw16c, oIhw8i, oIhw16i,
-            OIhw8i8o, OIhw16i16o, OIhw8i16o2i, OIhw8o16i2o, OIhw8o8i,
-            OIhw16o16i, Oihw8o, Oihw16o, Ohwi8o, Ohwi16o, OhIw16o4i,
-            gOIhw8i8o, gOIhw16i16o, gOIhw8i16o2i, gOIhw8o16i2o,
-            gOIhw8o8i, gOIhw16o16i, gOihw8o, gOihw16o, gOhwi8o,
-            gOhwi16o, gOhIw16o4i
+                    , nChw8c, nChw16c, oIhw8i, oIhw16i,
+                    OIhw8i8o, OIhw16i16o, OIhw8i16o2i, OIhw8o16i2o, OIhw8o8i,
+                    OIhw16o16i, Oihw8o, Oihw16o, Ohwi8o, Ohwi16o, OhIw16o4i,
+                    gOIhw8i8o, gOIhw16i16o, gOIhw8i16o2i, gOIhw8o16i2o,
+                    gOIhw8o8i, gOIhw16o16i, gOihw8o, gOihw16o, gOhwi8o,
+                    gOhwi16o, gOhIw16o4i, IOhw16o16i, gIOhw16o16i
 #endif
             ));
 
@@ -258,7 +258,8 @@ private:
 
     template<typename T, typename ...Args>
     inline size_t _blk_off(Args ...args, T xn) const {
-        return static_cast<size_t>(size_t(xn)*blocking_desc().strides[0][sizeof...(args)] +
+        return static_cast<size_t>(
+            (size_t)(xn)*blocking_desc().strides[0][sizeof...(args)] +
             _blk_off<Args...>(args...));
     }
 };

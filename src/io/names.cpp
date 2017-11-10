@@ -92,6 +92,7 @@ NAMEENUM_T(memory_format){
     case(mkldnn_OIhw8o16i2o): ret = "memory_format:OIhw8o16i2o"; break;
     case(mkldnn_OIhw8o8i): ret = "memory_format:OIhw8o8i"; break;
     case(mkldnn_OIhw16o16i): ret = "memory_format:OIhw16o16i"; break;
+    case(mkldnn_IOhw16o16i): ret = "memory_format:IOhw16o16i"; break;
     case(mkldnn_Oihw8o): ret = "memory_format:Ohwi8o"; break;
     case(mkldnn_Oihw16o): ret = "memory_format:Ohwi16o"; break;
     case(mkldnn_Ohwi8o): ret = "memory_format:Ohwi8o"; break;
@@ -106,6 +107,7 @@ NAMEENUM_T(memory_format){
     case(mkldnn_gOIhw8o16i2o): ret = "memory_format:gOIhw8i16o2i"; break;
     case(mkldnn_gOIhw8o8i): ret = "memory_format:gOIhw8o8i"; break;
     case(mkldnn_gOIhw16o16i): ret = "memory_format:gOIhw16o16i"; break;
+    case(mkldnn_gIOhw16o16i): ret = "memory_format:gIOhw16o16i"; break;
     case(mkldnn_gOihw8o): ret = "memory_format:gOIhwi8o"; break;
     case(mkldnn_gOihw16o): ret = "memory_format:gOIhwi16o"; break;
     case(mkldnn_gOhwi8o): ret = "memory_format:gOIhwi8o"; break;
@@ -168,6 +170,13 @@ NAMEENUM_T(alg_kind){
       case(mkldnn_eltwise_relu): ret = "alg_kind:eltwise_relu"; break;
       case(mkldnn_eltwise_tanh): ret = "alg_kind:eltwise_tanh"; break;
       case(mkldnn_eltwise_elu): ret = "alg_kind:eltwise_elu"; break;
+      case(mkldnn_eltwise_square): ret = "alg_kind:eltwise_square"; break;
+      case(mkldnn_eltwise_abs): ret = "alg_kind:eltwise_abs"; break;
+      case(mkldnn_eltwise_sqrt): ret = "alg_kind:eltwise_sqrt"; break;
+      case(mkldnn_eltwise_linear): ret = "alg_kind:eltwise_linear"; break;
+      case(mkldnn_eltwise_bounded_relu): ret = "alg_kind:eltwise_bounded_relu"; break;
+      case(mkldnn_eltwise_soft_relu): ret = "alg_kind:eltwise_soft_relu"; break;
+      case(mkldnn_eltwise_logistic): ret = "alg_kind:eltwise_logistic"; break;
       case(mkldnn_pooling_max): ret = "alg_kind:pooling_max"; break;
       case(mkldnn_pooling_avg_include_padding): ret = "alg_kind:pooling_avg+padding"; break;
       case(mkldnn_pooling_avg_exclude_padding): ret = "alg_kind:pooling_avg-padding"; break;

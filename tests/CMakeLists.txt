@@ -33,24 +33,30 @@ if((UNIX OR APPLE) AND NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "SX")
 endif()
 
 #add_executable(api-check-c api_check.c)
-#target_link_libraries(api-check-c ${LIB_NAME})
+#target_link_libraries(api-check-c ${LIB_NAME} ${EXTRA_LIBS})
 #add_test(api-check-c api-check-c)
 
-#add_executable(simple_convolution-c simple_convolution.c)
-#set_property(TARGET simple_convolution-c PROPERTY C_STANDARD 99)
-#target_link_libraries(simple_convolution-c ${LIB_NAME})
-#add_test(simple_convolution-c simple_convolution-c)
+# add_executable(simple_convolution-c simple_convolution.c)
+# set_property(TARGET simple_convolution-c PROPERTY C_STANDARD 99)
+# target_link_libraries(simple_convolution-c ${LIB_NAME} ${EXTRA_LIBS})
+# add_test(simple_convolution-c simple_convolution-c)
 
 add_executable(api-c api.c)
 set_property(TARGET api-c PROPERTY C_STANDARD 99)
-target_link_libraries(api-c ${LIB_NAME})
+target_link_libraries(api-c ${LIB_NAME} ${EXTRA_LIBS})
 add_test(api-c api-c)
 
 if(WIN32)
     set_property(TEST api-c PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
     configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
         api-c.vcxproj.user @ONLY)
+    # c4244: conversion with possible loss of data
+    # c4996: unsafe / deprecated functions
+    set(SUPPRESS_SOME_WARNINGS "/wd4996 /wd4244")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SUPPRESS_SOME_WARNINGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SUPPRESS_SOME_WARNINGS}")
 endif()
+
 if(UNIX OR APPLE) # Is NECSX a UNIX ?
     set(test_c_symbols "${CMAKE_CURRENT_BINARY_DIR}/test_c_symbols.c")
     add_executable(test_c_symbols-c ${test_c_symbols})
@@ -59,7 +65,7 @@ if(UNIX OR APPLE) # Is NECSX a UNIX ?
         COMMAND /bin/bash ${CMAKE_CURRENT_SOURCE_DIR}/generate_c_symbols_refs.sh
         ${CMAKE_CURRENT_SOURCE_DIR}/.. ${test_c_symbols}
     )
-    target_link_libraries(test_c_symbols-c ${LIB_NAME})
+    target_link_libraries(test_c_symbols-c ${LIB_NAME} ${EXTRA_LIBS})
     add_test(test_c_symbols-c test_c_symbols-c)
 
     add_executable(api-io-c api-io.c)
@@ -70,10 +76,5 @@ if(UNIX OR APPLE) # Is NECSX a UNIX ?
 # No Windows support for: test_c_symbols.c
 endif()
 
-
-
-
-
 add_subdirectory(gtests)
-
 add_subdirectory(benchdnn)

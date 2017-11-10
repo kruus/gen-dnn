@@ -42,8 +42,10 @@ dir_t dir = FWD_B;
 int mb = 0;
 alg_t alg = DIRECT;
 merge_t merge = NONE;
+attr_t attr;
 const char *skip_impl = "";
 bool allow_unimpl = false;
+// old: const char *perf_template = "perf,%n,%d,%GO,%GF,%-t,%-Gp,%0t,%0Gp";
 const char *perf_template = "perf,%n,%d,%GO,%-t,%-Gp,%0t,%0Gp,%i";
 
 void reset_parameters() {
@@ -53,6 +55,7 @@ void reset_parameters() {
     mb = 0;
     alg = DIRECT;
     merge = NONE;
+    attr = attr_t();
     skip_impl = "";
     allow_unimpl = false;
 }
@@ -76,7 +79,7 @@ bool check_mkldnn_support( const prb_t *p, res_t *res ) {
     return errmsg == nullptr;
 }
 void check_correctness(const desc_t *c) {
-    const prb_t p(*c, dir, cfg, alg, merge, mb);
+    const prb_t p(*c, dir, cfg, alg, merge, attr, mb);
     char pstr[max_prb_len];
     prb2str(&p, pstr);
     //RT_ASSERT( p.oh > 0 && p.ow > 0 );
@@ -104,14 +107,20 @@ void check_correctness(const desc_t *c) {
     switch (res.state) {
     case UNTESTED:
         ++bs.skipped; // ???
+#if 0 // MASTER, UNUSED
+        if (!(bench_mode & CORR)) {
+            want_perf_report = true;
+            break;
+        }
+#endif
     case SKIPPED:
         assert(status == OK);
         print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
         break;
     case FAILED:
         // XXX assert(status == FAIL);
-        print(0, "%d:%s (errors:%d total:%d) __REPRO: %s\n", bs.tests, state,
-                res.errors, res.total, pstr);
+        print(0, "%d:%s (errors:%lu total:%lu) __REPRO: %s\n", bs.tests, state,
+                (long unsigned)res.errors, (long unsigned)res.total, pstr);
         break;
     case UNIMPLEMENTED:
         assert(status == FAIL);
@@ -168,6 +177,8 @@ int bench(int argc, char **argv, bool main_bench) {
             alg = str2alg(argv[arg] + 6);
         else if (!strncmp("--merge=", argv[arg], 8))
             merge = str2merge(argv[arg] + 8);
+        //else if (!strncmp("--attr=", argv[arg], 7)) // mkldnn never uses this [ejk]
+        //    SAFE(str2attr(&attr, argv[arg] + 7), CRIT);
         else if (!strncmp("--skip-impl=", argv[arg], 12))
             skip_impl = argv[arg] + 12;
         else if (!strncmp("--allow-unimpl=", argv[arg], 15))
@@ -282,7 +293,7 @@ int batch(const char *fname) {
             if (buf[0] == '#')
                 break; /* stop reading till eol */
 
-            const int len = strnlen(buf, maxlen) + 1;
+            const size_t len = strnlen(buf, maxlen) + 1;
             opts[n_opts] = (char *)malloc(len);
             SAFE(opts[n_opts] ? OK : FAIL, CRIT);
             strncpy(opts[n_opts], buf, len);
