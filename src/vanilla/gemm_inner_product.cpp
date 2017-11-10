@@ -164,7 +164,7 @@ void gemm_inner_product_bwd_weights_t<data_type>::execute_backward_weights() {
 
             for (cblas_int mb = 1; mb < MB; ++mb) {
 #               pragma omp simd
-                for (size_t oc = oc_st; oc < oc_e; ++oc) {
+                for (cblas_int oc = oc_st; oc < oc_e; ++oc) {
                     diff_bias[oc] += diff_dst[mb * OC + oc];
                 }
             }
