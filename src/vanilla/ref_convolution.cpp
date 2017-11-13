@@ -54,65 +54,11 @@ inline int mem_fmt_tag(mkldnn_memory_format_t s, mkldnn_memory_format_t wb, mkld
 // maintain a registry, and avoid outputting duplicates
 static std::unordered_set<int> seen;
 
-/** return a short substring of the possibly long convolution function name.
- * Layer conf_`->name()` can return a very long function name, like
- * `<retval> <namespaces>::LAYER_t<template args>::pd_t::name() [with ...]`.
- * So try to pick out just the **LAYER_t** portion. */
-static inline char const* short_impl(char const* impl_str)
-{
-    int const lenmax=64;
-    static char buffer[lenmax];
-    char *buf = &buffer[0];
-    int rem_len = lenmax;
-#define DPRINT(...) do \
-    { \
-        int n = snprintf(buf, rem_len, __VA_ARGS__); \
-        if( n > rem_len ){ rem_len = 0; } \
-        else { buf+=n; rem_len-=n; } \
-    } while(0)
-    if (impl_str == nullptr){
-        DPRINT("noimpl");
-        return &buffer[0];
-    }
-    /* search for a reasonable 'end' character */
-    char const* q = strstr(impl_str, "(");     /* until __FUNCTION__ ( */
-    char const* q2 = strstr(impl_str, "::pd_t::name");       /* common */
-    if (q==nullptr || (q2 && q2 < q)) q = q2;
-    q2 = strstr(impl_str, "<");         /* ignore template-spec if any */
-    if (q==nullptr || (q2 && q2 < q)) q = q2;
-
-    if( q==nullptr ){ /* give up */
-        DPRINT("%s", impl_str);
-        return &buffer[0];
-    }
-
-    /* search for a nice 'start' character */
-    char const *p = impl_str;
-    char const * p2;
-    for( p2=q; p2>p; --p2) if(*p2==' ') break; /* ignore return type */
-    if (*p2==' ') p = p2 + 1;
-    for( p2=q; p2>p; --p2) if(*p2==':') break; /* ignore namespace */
-    if (*p2==':') p = p2 + 1;
-
-    /* copy range [p,q), and null-terminate */
-    for(int i=0; i<lenmax; ++i){
-        if( p+i < q ){
-            buffer[i] = p[i];
-        } else {
-            buffer[i] = '\0';
-            break;
-        }
-    }
-    buffer[lenmax-1] = '\0';
-    return &buffer[0];
-#undef DPRINT
-}
-/** substring after the last ':' */
+/** char after the last ':'. \return ptr within \c msg; or \c msg if no ':'. */
 static inline char const* after_last_colon(const char* msg) {
     const char * last_colon = strrchr(msg, ':');
     return last_colon? last_colon+1: msg;
 }
-
 #endif
 
 template <bool with_relu, data_type_t src_type, data_type_t wei_type,
@@ -130,7 +76,7 @@ _ref_convolution_fwd_t<with_relu, src_type, wei_type, dst_type, acc_type>
 #define LEN 500
     if(ins.second){ // a one-line message
         printf("\n *** NEW FMTS for %s *** src %s,  wei|bia %s,  dst %s\n",
-                    short_impl(conf_.name()),
+                    mkldnn_primitive_desc_shorten(conf_.name()),
                     after_last_colon(mkldnn_name_memory_format( sfmt )),
                     after_last_colon(mkldnn_name_memory_format( wbfmt )),
                     after_last_colon(mkldnn_name_memory_format( dfmt )));
@@ -444,4 +390,4 @@ template struct ref_convolution_bwd_weights_t<s16, s32, s16, s32>;
 }
 }
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

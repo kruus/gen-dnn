@@ -19,8 +19,12 @@
 #include <float.h>
 #include <math.h>
 
-#if defined(JITFUNCS)    // only for necla-ml fork...
 #include "mkldnn_io.hpp" // set MKLDNN_IO and provide mkldnn_name_XXX funcs
+// Note: mainly for the 'shorten' function to make layer impl strings readable
+//       It is a simple heuristric to shorten the oft-long __PRETTY_FUNCTION__
+//       names returned via the mkl-dnn query API for primitive descriptors.
+
+#if defined(JITFUNCS)    // only for necla-ml fork...
 //   for additional quick debug...
 #include <iomanip>
 using mkldnn::operator <<;
@@ -890,55 +894,13 @@ static void benchdnn_stat_update( res_state_t st, res_t *r )
     ++bs.impls;
 }
 
-/** return a short substring of the possibly long convolution function name */        
+/** return a short substring of the possibly long convolution function name.
+ * Short and generic enough to move into \c mkldnn_primitive_desc as a
+ * static helper function.
+ */
 static char const* shorten(char const* impl_str)
 {
-    int const lenmax=64;
-    static char buffer[lenmax];
-    char *buf = &buffer[0];
-    int rem_len = lenmax;
-#define DPRINT(...) do \
-    { \
-        int n = snprintf(buf, rem_len, __VA_ARGS__); \
-        if( n > rem_len ){ rem_len = 0; } \
-        else { buf+=n; rem_len-=n; } \
-    } while(0)
-    if (impl_str == nullptr){
-        DPRINT("noimpl");
-        return &buffer[0];
-    }
-    /* search for a reasonable 'end' character */
-    char const* q = strstr(impl_str, "(");     /* until __FUNCTION__ ( */
-    char const* q2 = strstr(impl_str, "::pd_t::name");       /* common */
-    if (q==nullptr || (q2 && q2 < q)) q = q2;
-    q2 = strstr(impl_str, "<");         /* ignore template-spec if any */
-    if (q==nullptr || (q2 && q2 < q)) q = q2;
-
-    if( q==nullptr ){ /* give up */
-        DPRINT("%s", impl_str);
-        return &buffer[0];
-    }
-
-    /* search for a nice 'start' character */
-    char const *p = impl_str;
-    char const * p2;
-    for( p2=q; p2>p; --p2) if(*p2==' ') break; /* ignore return type */
-    if (*p2==' ') p = p2 + 1;
-    for( p2=q; p2>p; --p2) if(*p2==':') break; /* ignore namespace */
-    if (*p2==':') p = p2 + 1;
-
-    /* copy range [p,q), and null-terminate */
-    for(int i=0; i<lenmax; ++i){
-        if( p+i < q ){
-            buffer[i] = p[i];
-        } else {
-            buffer[i] = '\0';
-            break;
-        }
-    }
-    buffer[lenmax-1] = '\0';
-    return &buffer[0];
-#undef DPRINT
+    return mkldnn_primitive_desc_shorten(impl_str);
 }
 
 /** \c run_fn a benchdnn test loop and return status of \c compare_fn.
@@ -1301,4 +1263,4 @@ int doit(const prb_t *p, res_t *r) {
 }
 
 } 
-// vim: et ts=4 sw=4 cindent ai cino=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent ai cino=^=l0,\:0,N-s

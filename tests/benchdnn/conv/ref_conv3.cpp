@@ -247,6 +247,7 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
 #elif 1 // inline kernel, longhand hoist, short-circuit --> regr 8.28x
   // musek(avx):regr 14.0x
   // writes go to  dst_off_f(p, mb, g, oc, oh, ow);
+  // on alexnet, this got me about 15x speedup
 #   pragma omp parallel for collapse(5)
   for (int g = 0; g < p->g; ++g) {
     for (int mb = 0; mb < p->mb; ++mb) {
@@ -259,6 +260,8 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
             d = (p->dir & FLAG_BIA)? ((float*)bia_m)[bia_off] : 0.f;
             int kh_beg, kh_end, kw_beg, kw_end;
 
+            // trick to easy calc of kh, kw loop limits is that division must
+            // round more consistently.  'C' round-to-zero is not so useful!
             kh_beg = div_floor( 0     - (oh * p->sh - p->ph) + p->dh, (p->dh+1) );
             kh_end = div_floor( p->ih - (oh * p->sh - p->ph) + p->dh, (p->dh+1) );
             if( kh_beg < 0     ) kh_beg = 0;
@@ -272,8 +275,7 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
             if( kw_beg < kw_end && kh_beg < kh_end ) {
 
               for (int ic = 0; ic < p->ic/p->g; ++ic) {
-                for (int kh = kh_beg; kh < kh_end; ++kh)
-                {
+                for (int kh = kh_beg; kh < kh_end; ++kh) {
                   const int ih = oh * p->sh - p->ph + kh * (p->dh + 1);
                   for (int kw = kw_beg; kw < kw_end; ++kw) {
                     const int iw = ow * p->sw - p->pw + kw * (p->dw + 1);

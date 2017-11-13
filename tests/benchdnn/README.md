@@ -93,6 +93,8 @@ is 1.0. Known policies are:
   - `common` corresponds to `mask=0` with common scale factor
   - `per_oc` corresponds to `mask=1<<1` (i.e. output channels) with different scale factors
 
+*attr_str* is used for `--mode` C[orrectness] or P[erformance], not for T[est].
+
 
 ### convolution configurations (aka precision specification)
 

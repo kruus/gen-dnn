@@ -64,11 +64,30 @@ NAMEFUNC_T(inner_product_desc);
 NAMEFUNC_T(convolution_relu_desc);
 NAMEFUNC_T(primitive_at); // this is mostly opaque at C level (use C++ version for details)
 
-/** get primitive name from mkldnn query API.
- * Any error just returns "noname".
+/** get primitive name from primitive descriptor via mkldnn query API.
+ * This is a shortcut to calling \c  mkldnn_primitive_desc_query( pdesc,
+ * mkldnn_query_impl_info_str, 0, (void*)&result ) and returning the result.
+ */
+char const* mkldnn_name_primitive_desc_impl(
+        const_mkldnn_primitive_desc_t pdesc ) MKLDNN_API;
+/** get primitive name from primitive [implementation].
  * This can add detail to mkldnn_name_primitive_(...) result.
+ * \sa query_impl_info(const_mkldnn_primitive_desc_t pd).
  */
 char const* mkldnn_name_primitive_impl( const_mkldnn_primitive_t prim ) MKLDNN_API;
+
+/** Shorten primitive layer names.
+ * - Some layer names can be long and difficult to read.
+ * - Layer names can come from:
+ *   - mkl-dnn query API, or
+ *   - from shortcut utils \c mkldnn_name_primitive_desc_impl
+ *   - or \c mkldnn_name_primitive_impl.
+ *     - These ultimately invoke the internal \c mkldnn_primitive_desc::name()
+ *       function, which typically returns some __PRETTY_FUNCTION__ string.
+ * - We use simple heuristics to remove return type, common namespace segments,
+ *   template args, and args
+ */
+char const* mkldnn_primitive_desc_shorten(char const* impl_str) MKLDNN_API;
 
 #define NAMEFUNC_TPTR( TYPENAME ) int MKLDNN_API mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const, char * const buf, int len )
 NAMEFUNC_TPTR(primitive); // mkldnn_primitive_t is a ptr-to-opaque-type (mkldnn_primitive*)
@@ -98,5 +117,5 @@ NAMEFUNC_T2(stream, const_mkldnn_stream_t);
 #endif
 
 #endif // MKLDNN_IO
-// vim: et ts=4 sw=4 cindent
+// vim: et ts=4 sw=4 cindent ai cino=^=l0,\:0,N-s
 #endif // MKLDNN_IO_H

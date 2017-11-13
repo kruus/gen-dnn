@@ -35,6 +35,88 @@ char const* mkldnn_name_primitive_impl( const_mkldnn_primitive_t prim )
     }
     return result;
 }
+char const* mkldnn_name_primitive_desc_impl( const_mkldnn_primitive_desc_t pdesc )
+{
+    char const* result = "noname";
+    mkldnn_primitive_desc_query( pdesc, mkldnn_query_impl_info_str,
+                                 0, (void*)&result );
+    return result;
+}
+
+/** char after the last ':'. \return ptr within \c msg; or \c msg if no ':'. */
+static inline char const* after_last_colon(const char* msg) {
+    const char * last_colon = strrchr(msg, ':');
+    return last_colon? last_colon+1: msg;
+}
+
+/** Especially for some templated primitve descriptors, the \c name()
+ * function can be difficult to read due to its length. But usually, the
+ * \c name() string is generated as a __PRETTY_FUNCTION__ via the
+ * \c DECLARE_COMMON_PD_T(...) macro, and has a common parts.
+ *
+ * Layer conf_`->name()` often looks like
+ * `<retval> <namespaces>::LAYER_t<template args>::pd_t::name() [with ...]`.
+ * So we try to pick out just the **LAYER_t** portion.
+ *
+ * - Method:
+ *   1. Determine \b end char:
+ *     - remove from '(' onward [<em>function arguments</em>]
+ *     - or from '::pd_t::name' onward [<em>common __FUNCTION__ namespace</em>]
+ *     - or remove from '<' onward [<em>template args</em>]
+ *     - ... whichever occurs first
+ *   2. Determine \b beg char:
+ *     - From \b end, search backward until ' ' [<em> return type</em>]
+ *     - or backward until ':' [<em>namespace</em>]
+ */
+char const* mkldnn_primitive_desc_shorten(char const* impl_str)
+{
+    int const lenmax=64;
+    static char buffer[lenmax];
+    char *buf = &buffer[0];
+    int rem_len = lenmax;
+#define DPRINT(...) do \
+    { \
+        int n = snprintf(buf, rem_len, __VA_ARGS__); \
+        if( n > rem_len ){ rem_len = 0; } \
+        else { buf+=n; rem_len-=n; } \
+    } while(0)
+    if (impl_str == nullptr){
+        DPRINT("noimpl");
+        return &buffer[0];
+    }
+    /* search for a reasonable 'end' character */
+    char const* q = strstr(impl_str, "(");     /* until __FUNCTION__ ( */
+    char const* q2 = strstr(impl_str, "::pd_t::name");       /* common */
+    if (q==nullptr || (q2 && q2 < q)) q = q2;
+    q2 = strstr(impl_str, "<");         /* ignore template-spec if any */
+    if (q==nullptr || (q2 && q2 < q)) q = q2;
+
+    if( q==nullptr ){ /* give up */
+        DPRINT("%s", impl_str);
+        return &buffer[0];
+    }
+
+    /* search for a nice 'start' character */
+    char const *p = impl_str;
+    char const * p2;
+    for( p2=q; p2>p; --p2) if(*p2==' ') break; /* ignore return type */
+    if (*p2==' ') p = p2 + 1;
+    for( p2=q; p2>p; --p2) if(*p2==':') break; /* ignore namespace */
+    if (*p2==':') p = p2 + 1;
+
+    /* copy range [p,q), and null-terminate */
+    for(int i=0; i<lenmax; ++i){
+        if( p+i < q ){
+            buffer[i] = p[i];
+        } else {
+            buffer[i] = '\0';
+            break;
+        }
+    }
+    buffer[lenmax-1] = '\0';
+    return &buffer[0];
+#undef DPRINT
+}
 
 #define NAMEENUM_T( TYPENAME ) char const* mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const e )
 /*NAMEENUM_T(status){*/
@@ -566,6 +648,7 @@ NAMEFUNC_TPTR(primitive,prim){
     std::ostringstream oss;
     using mkldnn::operator<<;
     oss<<*prim; //<<"\n\t...impl: "<<mkldnn_name_primitive_impl(prim);
+    oss<<mkldnn_primitive_desc_shorten(mkldnn_name_primitive_impl(prim));
     {int n=snprintf(b,len," mkldnn_primitive_t:%s",oss.str().c_str()); CHKBUF;}
     return ret;
 }

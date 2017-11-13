@@ -20,6 +20,7 @@
 #include "nstl.hpp"
 #include "primitive_desc.hpp"
 #include "memory_pd.hpp"
+#include "string.h"
 
 using namespace mkldnn::impl;
 using namespace mkldnn::impl::status;
@@ -65,3 +66,5 @@ status_t mkldnn_primitive_desc_get_attr(const primitive_desc_t *primitive_desc,
     *attr = primitive_desc->attr();
     return success;
 }
+
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
