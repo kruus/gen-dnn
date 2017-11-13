@@ -46,7 +46,7 @@ attr_t attr;
 const char *skip_impl = "";
 bool allow_unimpl = false;
 // old: const char *perf_template = "perf,%n,%d,%GO,%GF,%-t,%-Gp,%0t,%0Gp";
-const char *perf_template = "perf,%n,%d,%GO,%GF,%-t,%-Gp,%0t,%0Gp,%0t,%i";
+const char *perf_template = "perf,%n,%d,%GO,%GF,%-t,%-Gp,%0t,%0Gp,%i";
 
 void reset_parameters() {
     cfg = conf_f32;

@@ -158,7 +158,7 @@ The definition of expanded problem descriptor is:
 `g,mb,ic,ih,iw,oc,oh,ow,kh,kw,sh,sw,ph,pw`.
 
 The default template can be found in conv/bench_conv.cpp that is defined as
-`perf,\%n,\%d,\%GO,\%GF,\%-t,\%-Gp,\%0t,\%0Gp,\%c,\%i`. That will produce the following output
+`perf,\%n,\%d,\%GO,\%GF,\%-t,\%-Gp,\%-t,\%-Gp,\%0t,%0Gp,\%i`. That will produce the following output
 in CSV format:
 ```
 string: perf
@@ -169,7 +169,7 @@ number of giga ops calculated
 minimum time spent in ms
 best gigaops (since it corresponds to mimimum time)
 average time spent in ms
-[*] average gigaops (since it corresponds to average time)
+average gigaops (since it corresponds to average time)
 convolution implementation name
 ```
 
