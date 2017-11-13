@@ -156,11 +156,6 @@ INSTANTIATE_TEST_CASE_P(TestConvolutionAnyFmtForward, conv_any_fmt_test_float,
     { 2, 1, 4, 4, 4, 6, 4, 4, 3, 3, 1, 1, 1, 1 }/* conv sizes */ }));
 
 #if !defined(TARGET_VANILLA)
-INSTANTIATE_TEST_CASE_P(TestConvolutionAnyFmtForward_NCHWxC, conv_any_fmt_test_float,
-    ::testing::Values(conv_any_fmt_test_params_float{ PROP_KIND, ENGINE, ALG,
-    ANY_NCHWxC, ANY_OIHW, ANY_X, ANY_NCHWxC,
-    { 2, 1, 4, 4, 4, 6, 4, 4, 3, 3, 1, 1, 1, 1 } }));
-
 /* For now, these formats all require JIT (cpu/) code */
 INSTANTIATE_TEST_CASE_P(
         TestConvolutionAlexnetAnyFmtForwardxlocked, conv_any_fmt_test_float,

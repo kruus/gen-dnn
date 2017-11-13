@@ -66,6 +66,7 @@ merge_t str2merge(const char *str) {
     return NONE;
 }
 
+
 const char *merge2str(merge_t merge) {
     if (merge == NONE) return "none";
     if (merge == RELU) return "relu";
@@ -88,7 +89,7 @@ static int compute_pad(int o, int i, int k, int s, int d) {
 //    so we correct the old formula ...
     const int A = i - ((k-1) * (d+1) + 1);
     const int top = (o-1)*s - A; 
-#if 0 // recommended
+#if 0 // perhaps safer?
     int ret = (top+1)/2; // round UP
     int ret0 = div_floorx(top+1, 2); 
     if ( (A+2*ret)/s+1 < o ) ++ret0;  // explicit verification that consistent o is >=
@@ -107,7 +108,8 @@ void dbg_out(int i, int k, int s, int p, int d, int o){
           (i - ((k-1)*(d+1)+1) + 2*p) / s + 1, p
          );
 }
-#if 0 // MASTER, UNUSED
+
+#if 1 // attr support
 attr_t::round_mode_t attr_t::str2rmode(const char *str) {
 #define CASE(_rmd) if (!strncasecmp(STRINGIFY(_rmd), str, \
             strlen(STRINGIFY(_rmd)))) return _rmd
@@ -248,7 +250,7 @@ void attr2str(const attr_t *attr, char *buffer) {
     buffer += sprintf(buffer, ";oscale=");
     attr->oscale.scale2str(buffer, NULL);
 }
-#endif
+#endif // attr support
 
 int str2desc(desc_t *desc, const char *str) {
     desc_t d{0};
@@ -454,7 +456,7 @@ void prb_t::count_ops() {
 }
 
 void prb2str(const prb_t *p, char *buffer, bool canonical) {
-    char desc_buf[max_desc_len];
+    char desc_buf[max_desc_len], attr_buf[max_attr_len];
     char dir_str[32] = {0}, cfg_str[32] = {0}, alg_str[32] = {0},
          merge_str[32] = {0};
     desc2str(p, desc_buf, canonical);
@@ -462,11 +464,19 @@ void prb2str(const prb_t *p, char *buffer, bool canonical) {
     snprintf(cfg_str, sizeof(cfg_str), "--cfg=%s ", cfg2str(p->cfg));
     snprintf(alg_str, sizeof(alg_str), "--alg=%s ", alg2str(p->alg));
     snprintf(merge_str, sizeof(merge_str), "--merge=%s ", merge2str(p->merge));
-    snprintf(buffer, max_prb_len, "%s%s%s%s%s",
+    bool is_attr_def = p->attr.is_def();
+    if (!is_attr_def) {
+        int len = snprintf(attr_buf, max_attr_len, "--attr=\"");
+        attr2str(&p->attr, attr_buf + len);
+        len = strnlen(attr_buf, max_attr_len);
+        snprintf(attr_buf + len, max_attr_len - len, "\" ");
+    }
+    snprintf(buffer, max_prb_len, "%s%s%s%s%s%s",
             p->dir == FWD_B ? "" : dir_str,
             p->cfg == conf_f32 ? "" : cfg_str,
             p->alg == DIRECT ? "" : alg_str,
             p->merge == NONE ? "" : merge_str,
+            is_attr_def ? "" : attr_buf,
             desc_buf);
 }
 

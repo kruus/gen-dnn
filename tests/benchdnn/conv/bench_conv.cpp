@@ -46,7 +46,7 @@ attr_t attr;
 const char *skip_impl = "";
 bool allow_unimpl = false;
 // old: const char *perf_template = "perf,%n,%d,%GO,%GF,%-t,%-Gp,%0t,%0Gp";
-const char *perf_template = "perf,%n,%d,%GO,%-t,%-Gp,%0t,%0Gp,%i";
+const char *perf_template = "perf,%n,%d,%GO,%GF,%-t,%-Gp,%0t,%0Gp,%0t,%i";
 
 void reset_parameters() {
     cfg = conf_f32;
@@ -57,6 +57,7 @@ void reset_parameters() {
     merge = NONE;
     attr = attr_t();
     skip_impl = "";
+    attr = attr_t();
     allow_unimpl = false;
 }
 
@@ -177,8 +178,8 @@ int bench(int argc, char **argv, bool main_bench) {
             alg = str2alg(argv[arg] + 6);
         else if (!strncmp("--merge=", argv[arg], 8))
             merge = str2merge(argv[arg] + 8);
-        //else if (!strncmp("--attr=", argv[arg], 7)) // mkldnn never uses this [ejk]
-        //    SAFE(str2attr(&attr, argv[arg] + 7), CRIT);
+        else if (!strncmp("--attr=", argv[arg], 7))
+            SAFE(str2attr(&attr, argv[arg] + 7), CRIT);
         else if (!strncmp("--skip-impl=", argv[arg], 12))
             skip_impl = argv[arg] + 12;
         else if (!strncmp("--allow-unimpl=", argv[arg], 15))

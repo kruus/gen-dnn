@@ -27,8 +27,10 @@ where:
 
  - `MODE` -- string that contains flags for benchmark mode.
    - Use `C` or `c` for correctness (used by default), and `P` or `p` for performance.
+     - ... of mkl-dnn implementations
    - For `--conv`, an `A` in `--mode` will loop over all available mkl-dnn implementations
-   - For `--conv`, a `T` in `--mode` will loop over alt benchdnn reference impls [if any].
+   - For `--conv`, a `T` in `--mode` will loop over alt benchdnn reference impls.
+     - `--conv --mode=PT` will do timing runs *just* for alt benchdnn reference impls.
 
  - `N` -- verbose level (integer from 0 [default] to ...)
 
@@ -51,6 +53,7 @@ where *harness-knobs* are:
  - `--dir={FWD_D (forward data), FWD_B (forward data + bias), BWD_D (backward data), BWD_W (backward weights), BWD_WB (backward weights + bias)}` direction, default `FWD_B`
  - `--alg={DIRECT, WINO}` convolution algorithm, default DIRECT
  - `--merge={NONE, RELU}` merged primitive, default NONE (nothing merged)
+ - `--attr="attr_str"` convolution attributes (see in the section below), default `""` (no attributes set)
  - `--mb=N` override minibatch that is specified in convolution description, default `0` (use mb specified in conv desc)
  - `--match=regex` check only convolutions that match with regex, default is `".*"`. Notice: Windows may only interpret string arguments surrounded by double quotation marks.
  - `--skip-impl="str1[:str2]..."` skip implementation (see mkldnn_query_impl_info_str), default `""`
@@ -71,6 +74,24 @@ can be derived from the input one and kernel). Also if either width or height
 is not specified than it is assumed height == width. Special symbol `_` is
 ignored, hence maybe used as delimiter. See `str2desc()` in conv/conv_aux.cpp
 for more details and implicit rules :^)
+
+The attribute string *attr_str* is defined as (new lines for readability):
+```
+    [irmode={nearest,down};]
+    [oscale={none,common,per_oc}[:scale];]
+```
+
+Here `irmode` defines the rounding mode for integer output (default is nearest).
+
+Next, `oscale` stands for output_scales. The first parameter is the policy that
+is defined below. The second optional parameter is a scale that specifies
+either the one common output scale (for `none` and `common` polices) or a
+starting point for `per_oc` policy, which uses many scales. The default scale
+is 1.0. Known policies are:
+
+  - `none` (default) means no output scales set (i.e. scale = 1.)
+  - `common` corresponds to `mask=0` with common scale factor
+  - `per_oc` corresponds to `mask=1<<1` (i.e. output channels) with different scale factors
 
 
 ### convolution configurations (aka precision specification)
@@ -113,8 +134,10 @@ table of modifiers below.
 | \%D           | expanded problem descriptor (conv parameters in csv format)
 | \%n           | problem name
 | \%z           | direction
+| \%@F          | [\*] effective cpu frequency computed as clocks[@] / time[s]
 | \%O           | number of ops required (padding is not taken into account)
 | \%@t          | time in ms
+| \%@c          | [\*] time in ops
 | \%@p          | ops per second
 | \%i           | convolution implementation string
 
@@ -129,22 +152,24 @@ table of modifiers below.
 | M         | Mega (1e6)
 | G         | Giga (1e9)
 
+[\*] not currently useful, (time stamp counter code currently disabled)
+
 The definition of expanded problem descriptor is:
 `g,mb,ic,ih,iw,oc,oh,ow,kh,kw,sh,sw,ph,pw`.
 
 The default template can be found in conv/bench_conv.cpp that is defined as
-`perf,\%n,\%d,\%GO,\%-t,\%-Gp,\%0t,\%0Gp,\%i`. That will produce the following output
+`perf,\%n,\%d,\%GO,\%GF,\%-t,\%-Gp,\%0t,\%0Gp,\%c,\%i`. That will produce the following output
 in CSV format:
 ```
 string: perf
 convolution name
 full conv-desc
 number of giga ops calculated
-effective cpu frequency in GHz (amb clocks[min] / time[min])
+[*] effective cpu frequency in GHz (amb clocks[min] / time[min])
 minimum time spent in ms
 best gigaops (since it corresponds to mimimum time)
 average time spent in ms
-average gigaops (since it corresponds to average time)
+[*] average gigaops (since it corresponds to average time)
 convolution implementation name
 ```
 
@@ -212,11 +237,11 @@ one of them.
     0:PASSED __REPRO: --dir=FWD_D ic3ih227oc96oh55kh11sh4nalexnet:conv1
     tests:1 impls:3 passed:2 skipped:1 mistrusted:0 unimplemented:0 failed:0
 ```
-- Yahoo. For this convolution, `avx2` was over 3x faster than the `sse2` (473 vs 148
+- For this convolution, `avx2` was over 3x faster than the `sse2` (473 vs 148
   Mops).  Prefacing the command with `OMP_NUM_THREADS=1`, I got 81 vs 27 Mops.
 - If you were to runn with `--mode=CAP`, the final output line should read
   `correct:2` instead of `passed:2`.
-- If you were to runn with `--mode=CAPT`, and you have defined reference loops other
+- If you were to run with `--mode=CAPT`, and you have defined reference loops other
   than the normal ones in `benchdnn/conv/ref_conv.cpp`, then you *may* see lines like:
   `TEST #1 ... time 471.092000 ms CORRECT`
 
@@ -229,6 +254,15 @@ Winograd:
         --alg=DIRECT --batch=convs.in \
         --allow-unimpl=true \
         --alg=WINO   --batch=convs.in
+```
+
+Run the default set of u8s8u8s32 forward convolutions w/o bias, default
+minibatch, and one common output scale set to 0.5 with rounding mode set to
+down (via attributes):
+```ShellSession
+    $ ./benchdnn --conv \
+        --cfg=u8s8u8s32 --dir=FWD_D \
+        --attr="irmode=down;oscale=common:.5"
 ```
 
 
@@ -245,9 +279,9 @@ Winograd:
 | ih, iw        | Input height and width
 | oh, ow        | Output height and width
 | kh, kw        | Kernel (filter, weights) height and width
-| sh, sw        | Convolution stride over height and width (0=&gt;stride 1)
+| sh, sw        | Convolution stride over height and width (stride&gt;=1)
 | ph, pw        | Convolution top and left padding (0=none)
-| dh, dw        | Dilation of image region covered by kernel (0=&gt;x1)
+| dh, dw        | Dilation of image region covered by kernel (0 =&gt; x1)
 | mb            | Minibatch (amount of images processed at once)
 | g             | Groups (a way to reduce the amount of computations, see Alexnet topology)
 | FWD_{D,B}     | forward w/o and w/ bias
