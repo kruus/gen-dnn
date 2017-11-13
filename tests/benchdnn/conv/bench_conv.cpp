@@ -64,11 +64,13 @@ void reset_parameters() {
 /** return true if we think mkldnn ought to support this problem. */
 bool check_mkldnn_support( const prb_t *p, res_t *res ) {
     char const *errmsg = nullptr;
+#if 0 // v0.11 mkl-dnn now allows dilates for backward convolutions
     if ((p->dir == BWD_D || p->dir == BWD_W || p->dir == BWD_WB)
             && (p->dh>0 || p->dw>0)) {
         printf(" dilation: p->dh=%d, p->dw=%d", p->dh, p->dw);
         errmsg="mkl-dnn BWD + dilation not possible (yet?)";
     }
+#endif
     // others? ...
     if (errmsg != nullptr){
         printf("\nUNTESTABLE: mkl-dnn probably doesn't handle this case yet\n"

@@ -366,7 +366,7 @@ if [ "${BUILDOK}" == "y" ]; then
         echo "LOGDIR:       ${LOGDIR}" 2>&1 >> "${BUILDDIR}".log
     fi
     if [ $DOTEST -gt 0 ]; then
-        if [ -d "${LOGDIR}" ]; then rm -rf "${LOGIDR}.bak"; mv -v "${LOGDIR}" "${LOGDIR}.bak"; fi
+        if [ -d "${LOGDIR}" ]; then rm -rf "${LOGDIR}.bak"; mv -v "${LOGDIR}" "${LOGDIR}.bak"; fi
         mkdir ${LOGDIR}
         pwd -P
         ls "${BUILDDIR}/*log"

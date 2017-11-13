@@ -386,13 +386,17 @@ static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
 }
 void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
     dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m) {
+#if 0
+    refconv_2_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
 
-#if 0 // regr 4.07x 4.17x
+#elif 0 // regr 4.07x 4.17x
+  // + dilates: 1.90x
 #if 1 // the stride calc for dilation is VERY tricky!
-  if (p->dh != 0) { // A fast version here does not support dilation
+  if (p->dh != 0 || p->dw != 0) { // A fast version here does not support dilation
     // This is no big deal, since mkl-dnn does not even allow you to
     // create the descriptors for it.
     refconv_4_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
+    return;
   }
 #endif
 
@@ -404,14 +408,17 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
       , const int kh_beg, const int kh_end
       , const int kw_beg, const int kw_end
       ) {
-    RT_ASSERT(p->sh > 0);
+    RT_ASSERT(p->sh > 0 );
+    RT_ASSERT(p->dh == 0);
     //bool const s0 = kh_beg >= kh_end || p->sh <= 1; // this IMPLIES skips remains 0
     for (int oc = 0; oc < p->oc/p->g; ++oc) {
       // next: loop over allowed oh values, THEN over kh
-      //int const khh = p->sh; // only for p->dh==0 !!!
+      int const khh = p->sh; // only for p->dh==0 !!!
       for (int kh = kh_beg; kh < kh_end; kh+=p->sh) { /// XXX increment maybe gcm(sh,dh+1) ?
         int oh = ih+p->ph - kh /* * (p->dh + 1) */; // loop vars: kh, ih
+        RT_ASSERT( oh>=0 && oh % p->sh==0 ); 
         oh /= p->sh;
+        RT_ASSERT( oh < p->oh );
 
         int const kww = p->sw; // perhaps lcd of p-sh and p->dh+1 ? XXX
         for (int kw = kw_beg; kw < kw_end; kw += kww) {
@@ -429,31 +436,35 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
     }
   };
 
-#   pragma omp parallel for collapse(4)
+#   pragma omp parallel for collapse(5)
   for (int g = 0; g < p->g; ++g) {
     for (int mb = 0; mb < p->mb; ++mb) {
       for (int ic = 0; ic < p->ic/p->g; ++ic) {
         for (int ih = 0; ih < p->ih; ++ih) {
-          int kh_beg, kh_end;
-          hoist_AmiB_in( kh_beg, kh_end,
-              /*i  in   */ 0, p->kh,
-              /*oh=A+iB */ (ih + p->ph), (p->dh+1),
-              /*oh in   */ 0, p->oh*p->sh );
-          { // jump kh_beg up to 1st non-skipped index
-            int oh_beg = ih+p->ph - kh_beg * (p->dh+1);
-            int rem_beg = oh_beg % p->sh;
-            if (rem_beg){
-              // XXX closed-form formula ???  (should be easy now that know p->dh==0)
-              // ref_conv4 has a strictly correct similar corrective example
-              do {
-                ++kh_beg;
-                oh_beg = ih+p->ph - kh_beg * (p->dh+1);
-              } while( oh_beg % p->sh != 0 && kh_beg < kh_end );
-              //print(0, " ... kh_beg --> %d, oh_beg --> %d\n", kh_beg, oh_beg);
-              DMUST( kh_beg >= kh_end || (ih+p->ph - kh_beg * (p->dh+1)) % p->sh == 0 );
-            }
-          }
           for (int iw = 0; iw < p->iw; ++iw) {
+            int kh_beg, kh_end;
+            hoist_AmiB_in( kh_beg, kh_end,
+                /*i  in   */ 0, p->kh,
+                /*oh=A+iB */ (ih + p->ph), (p->dh+1),
+                /*oh in   */ 0, p->oh*p->sh );
+            { // jump kh_beg up to 1st non-skipped index
+              int oh_beg = ih+p->ph - kh_beg * (p->dh+1);
+              int rem_beg = oh_beg % p->sh;
+              if (rem_beg){
+                // XXX closed-form formula ???  (should be easy now that know p->dh==0)
+                // ref_conv4 has a strictly correct similar corrective example
+                do {
+                  ++kh_beg;
+                  oh_beg = ih+p->ph - kh_beg * (p->dh+1);
+                } while( oh_beg % p->sh != 0 && kh_beg < kh_end );
+                //print(0, " ... kh_beg --> %d, oh_beg --> %d\n", kh_beg, oh_beg);
+                DMUST( kh_beg >= kh_end || (ih+p->ph - kh_beg * (p->dh+1)) % p->sh == 0 );
+              }
+            }
+            RT_ASSERT( kh_beg >= 0 );
+            // no RT_ASSERT( kh_beg % p->sh == 0 );
+            RT_ASSERT( kh_beg >= kh_end || (ih+p->ph - kh_beg * (p->dh+1)) % p->sh == 0 );
+
             int kw_beg, kw_end;
             hoist_AmiB_in( kw_beg, kw_end,
                 /*i  in   */ 0, p->kw,
@@ -492,18 +503,54 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
       }
     }
   }
-#elif 0
+
+#elif 0 // kw_beg, oh_end loop ---> calculation (debug)
   //  MOVED to separate routine
   refconv_3_bwd_d_generic(p, diff_src_m, wei_m, diff_dst_m);
-  //
+
 #elif 0 // specialize to p->dh, p->dw == 0
   // the stride calc for dilation is VERY tricky!
   if (p->dh != 0 || p->dw != 0) { // A fast version here does not support dilation
     // This is no big deal, since mkl-dnn does not even allow you to
     // create the descriptors for it.
-    refconv_3_bwd_d_generic(p, diff_src_m, wei_m, diff_dst_m);
+    //refconv_3_bwd_d_generic(p, diff_src_m, wei_m, diff_dst_m);
+    refconv_4_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
     return;
   }
+
+  auto ker = [](
+      const prb_t *p, const dnn_mem_t &diff_dst_m, const dnn_mem_t &wei_m,
+      float &ds, int g, int mb, int ic, int ih, int iw
+      , const int kh_beg, const int kh_end
+      , const int kw_beg, const int kw_end
+      ) {
+    RT_ASSERT(p->sh > 0 );
+    RT_ASSERT(p->dh == 0);
+    //bool const s0 = kh_beg >= kh_end || p->sh <= 1; // this IMPLIES skips remains 0
+    for (int oc = 0; oc < p->oc/p->g; ++oc) {
+      // next: loop over allowed oh values, THEN over kh
+      int const khh = p->sh; // only for p->dh==0 !!!
+      for (int kh = kh_beg; kh < kh_end; kh+=khh) { /// XXX increment maybe gcm(sh,dh+1) ?
+        int oh = ih+p->ph - kh /* * (p->dh + 1) */; // loop vars: kh, ih
+        RT_ASSERT( oh>=0 && oh % p->sh==0 ); 
+        oh /= p->sh;
+        RT_ASSERT( oh < p->oh );
+
+        int const kww = p->sw; // perhaps lcd of p-sh and p->dh+1 ? XXX
+        for (int kw = kw_beg; kw < kw_end; kw += kww) {
+          int ow = iw - kw * (p->dw + 1) + p->pw; // loop vars: iw, kw
+          //if (ow < 0 || ow % p->sw) continue;
+          ow /= p->sw;
+          //if (ow >= p->ow) continue;
+
+          size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+          size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+          ds += ((float*)diff_dst_m)[dst_off]
+            * ((float*)wei_m)[wei_off];
+        }
+      }
+    }
+  };
 
 #   pragma omp parallel for collapse(4)
   for (int g = 0; g < p->g; ++g) {
@@ -526,8 +573,7 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
             //int oh_beg = ih+p->ph - kh_beg * (p->dh+1); // must always be a mult of p->sh
             oh_beg = ih+p->ph - kh_beg; // must always be a mult of p->sh
             RT_ASSERT( oh_beg >= 0 );
-            //if (kh_beg<kh_end)
-                RT_ASSERT(oh_beg/p->sh <  p->oh);
+            RT_ASSERT(oh_beg/p->sh <  p->oh);
             //NO RT_ASSERT( oh_beg % p->sh == (ih+p->ph) % p->sh );
             if ((oh_beg % p->sh)){
               // maybe I need a custom hoister here... the following is hard to patch
@@ -535,23 +581,76 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
                 ++kh_beg;
                 oh_beg = ih+p->ph - kh_beg /* * (p->dh+1) */;
                 RT_ASSERT( oh_beg >= 0 );
-                //if (kh_beg<kh_end)
-                    RT_ASSERT(oh_beg/p->sh <  p->oh);
+                RT_ASSERT(oh_beg/p->sh <  p->oh);
               } while( oh_beg % p->sh != 0 && kh_beg < kh_end );
             }
             oh_beg /= p->sh;
           }
-          //int khb2 = div_floor(ih + p->ph + 1 , p->sh) - p->oh;
-          //if (khb2 < 0) khb2 = 0;
-          //int khb2s = khb2 * p->sh;
-          //RT_ASSERT( khb2s <= kh_beg && khb2s % p->sh == 0 );
+          RT_ASSERT( kh_beg >= kh_end || (ih+p->ph - kh_beg * (p->dh+1)) % p->sh == 0 );
+#if 1
+          oh_beg = ih+p->ph - kh_beg;
+          RT_ASSERT( oh_beg == ih+p->ph - kh_beg ); // hi limit
+          RT_ASSERT( oh_beg >= 0 );
+
+          int khb2 =            (ih + p->ph) - p->oh*p->sh              + 1;
+          if (khb2 < 0) khb2 = 0;
+#if 0
+          int ohb2 = ih+p->ph - kh_beg;       // <-- cheating !!!
+          int ohb2s = (ohb2) / p->sh * p->sh; // ohb2 rounded DOWN to mult of p->sh
+#else
+          int ohb2 = ih+p->ph - khb2;
+          int ohb2s = (ohb2) / p->sh * p->sh; // ohb2 rounded DOWN to mult of p->sh
+#endif
+
+          // test ohb2s calc:
+          int khb2s = 0;
+          if (kh_beg < kh_end && ohb2s != oh_beg )
+          {
+              printf("ohb2: ih=%d p->ph=%d p->sh=%d p->oh=%d     kh_beg=%d khb2=%d khb2s=%d    oh_beg=%d ohb2=%d ohb2s=%d\n",
+                      ih,p->ph,p->sh,p->oh,  kh_beg,khb2,khb2s, oh_beg,ohb2,ohb2s);
+              exit(0);
+          }
+          RT_ASSERT( kh_beg >= kh_end || ohb2s == oh_beg );
+
+          if( kh_beg < kh_end ){
+              khb2s =  (ih+p->ph) - ohb2s;
+              if( khb2s != kh_beg )
+              {
+                  print(0,"khb2s: ih=%d p->ph=%d p->sh=%d p->oh=%d     kh_beg=%d khb2=%d khb2s=%d    oh_beg=%d ohb2=%d ohb2s=%d\n",
+                          ih,p->ph,p->sh,p->oh,  kh_beg,khb2,khb2s, oh_beg,ohb2,ohb2s);
+                  exit(0);
+              }
+              RT_ASSERT( kh_beg == khb2s );
+          }
+          RT_ASSERT( ohb2s <= oh_beg );
+
+          khb2s = (ih + p->ph) - ohb2s;
+          RT_ASSERT( khb2s >= 0 );
+          //if( khb2s < 0 ) khb2s = 0;
+          if( kh_beg < kh_end ) RT_ASSERT( khb2s == kh_beg );
+          else                  RT_ASSERT( khb2s >= kh_end );
+#elif 1 // wrong?
+#if 0 // would need more careful calc.
+          int oh_end = ih+p->ph - kh_end;
+          if (!( (kh_beg >= kh_end) == (oh_beg <= oh_end) )){
+              printf(" [kh_beg=%d] cf. [kh_end=%d], but oh_beg=%d, oh_end=%d\n",
+                      kh_beg, kh_end, oh_beg, oh_end );
+              exit(0);
+          }
+#endif
+#if 1
+          int khb2 = div_floor(ih + p->ph + 1 , p->sh) - p->oh;
+          if (khb2 < 0) khb2 = 0;
+          int khb2s = khb2 * p->sh;
+          RT_ASSERT( khb2s >= kh_end || khb2s % p->sh == 0 );
+#elif 1
           int khb2 = ih+p->ph + 1 - p->oh*p->sh;
           if (khb2 < 0) khb2 = 0;
           int khb2s = (khb2+p->sh-1)/p->sh *p->sh;
+#endif
           int ohb2 = ih+p->ph - khb2s;
           RT_ASSERT( ohb2 >= 0 );
-          //if (ohb2 < 0) ohb2 = 0;
-          ohb2 = ohb2 / p->sh;
+          if (ohb2 < 0) ohb2 = 0;
           int ohb2s = ohb2 * p->sh;
           if ( ohb2 != oh_beg )
           {
@@ -562,6 +661,7 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
           //const int oh = (ih+p->ph - kh /* * (p->dh + 1) */) / p->sh;
           // --->  kh = ih+p->ph - oh*p->sh;
           khb2 = ih+p->ph  - (ohb2) * p->sh;
+          RT_ASSERT( khb2 >= 0 );
           if (khb2 < 0) khb2 = 0;
           khb2s = khb2/p->sh * p->sh;
           //RT_ASSERT( khb2 == khb2s );
@@ -573,6 +673,7 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
               exit(0);
           }
 
+#else
           //  oh_beg = (ih+p->ph - kh_beg)/p->sh ~  (ih+p->ph -  ((ih+p->ph) - p->oh*p->sh + 1))/p->sh
           //             = (p->oh * p->sh + 1)/p->sh ???
           //int ohb2 = (p->oh * p->sh + 1) / p->sh;
@@ -581,12 +682,13 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
           //int khb2s = khb2 * p->sh;
           //int ohb2s = ((ih+p->ph) - khb2s) / p->sh;
           //
-          //int ohb2 = div_floor(p->oh + p->sh - 1, p->sh);
-          //if( ohb2 < 0 ) ohb2 = 0;
-          //int ohb2s = ohb2 * p->sh;
-          //int ohb2 = p->oh*p->sh;
-          //printf(" oh_beg=%d ohb2=%d ohb2s=%d\n",oh_beg,ohb2, ohb2s);
-          //RT_ASSERT( ohb2s == oh_beg );
+          int ohb2 = div_floor(p->oh + p->sh - 1, p->sh);
+          if( ohb2 < 0 ) ohb2 = 0;
+          //ohb2 = p->oh*p->sh;
+          int ohb2s = ohb2 * p->sh;
+          print(0," oh_beg=%d ohb2=%d ohb2s=%d\n",oh_beg,ohb2, ohb2s);
+          RT_ASSERT( ohb2s == oh_beg );
+#endif
           for (int iw = 0; iw < p->iw; ++iw) {
             int kw_beg, kw_end;
             //hoist_AmiB_in( kw_beg, kw_end,
@@ -615,6 +717,12 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
               ; //DPRINTF("t");
             } else {
               //DPRINTF(".");
+#if 0
+              ker( p, diff_dst_m, wei_m,
+                  ds, g, mb, ic, ih, iw
+                  , kh_beg, kh_end, kw_beg, kw_end
+                 );
+#else
               //bool const s0 = kh_beg >= kh_end || p->sh <= 1; // this IMPLIES skips remains 0
               for (int oc = 0; oc < p->oc/p->g; ++oc) {
                 // next: loop over allowed oh values, THEN over kh
@@ -639,18 +747,20 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
                   }
                 }
               }
+#endif
             }
           }
         }
       }
     }
   }
-#elif 0 // specialize to p->dh, p->dw == 0
+#elif 0 // remove kernel [again?] and some dead code and unused debug prints
   // the stride calc for dilation is VERY tricky!
   if (p->dh != 0 || p->dw != 0) { // A fast version here does not support dilation
     // This is no big deal, since mkl-dnn does not even allow you to
     // create the descriptors for it.
-    refconv_3_bwd_d_generic(p, diff_src_m, wei_m, diff_dst_m);
+    //refconv_3_bwd_d_generic(p, diff_src_m, wei_m, diff_dst_m);
+    refconv_4_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
     return;
   }
 
@@ -666,18 +776,16 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
           //    /*oh in   */ 0, p->oh*p->sh );
           //kh_beg = div_floor( (ih + p->ph) - p->oh*p->sh, (p->dh+1) ) + 1;
           //kh_end = div_floor( (ih + p->ph) - 0          , (p->dh+1) ) + 1;
-          // REPL kh_beg =            (ih + p->ph) - p->oh*p->sh              + 1;
+          kh_beg =            (ih + p->ph) - p->oh*p->sh              + 1;
           kh_end =            (ih + p->ph) - 0                        + 1;
-          // REPL if (kh_beg < 0    ) kh_beg = 0;
+          if (kh_beg < 0    ) kh_beg = 0;
           if (kh_end > p->kh) kh_end = p->kh;
-#if 0 // first correct non-loop calc ...
           int oh_beg;
           { // jump kh_beg up to 1st non-skipped index
             //int oh_beg = ih+p->ph - kh_beg * (p->dh+1); // must always be a mult of p->sh
             oh_beg = ih+p->ph - kh_beg; // must always be a mult of p->sh
             RT_ASSERT( oh_beg >= 0 );
-            //if (kh_beg<kh_end)
-                RT_ASSERT(oh_beg/p->sh <  p->oh);
+            RT_ASSERT(oh_beg/p->sh <  p->oh);
             //NO RT_ASSERT( oh_beg % p->sh == (ih+p->ph) % p->sh );
             if ((oh_beg % p->sh)){
               // maybe I need a custom hoister here... the following is hard to patch
@@ -685,44 +793,255 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
                 ++kh_beg;
                 oh_beg = ih+p->ph - kh_beg /* * (p->dh+1) */;
                 RT_ASSERT( oh_beg >= 0 );
-                //if (kh_beg<kh_end)
-                    RT_ASSERT(oh_beg/p->sh <  p->oh);
+                RT_ASSERT(oh_beg/p->sh <  p->oh);
               } while( oh_beg % p->sh != 0 && kh_beg < kh_end );
             }
             oh_beg /= p->sh;
           }
-          //int khb2 = div_floor(ih + p->ph + 1 , p->sh) - p->oh;
-          //if (khb2 < 0) khb2 = 0;
-          //int khb2s = khb2 * p->sh;
-          //RT_ASSERT( khb2s <= kh_beg && khb2s % p->sh == 0 );
-          int khb2 = ih+p->ph + 1 - p->oh*p->sh;
+          RT_ASSERT( kh_beg >= kh_end || (ih+p->ph - kh_beg * (p->dh+1)) % p->sh == 0 );
+
+          oh_beg = ih+p->ph - kh_beg;
+          RT_ASSERT( oh_beg == ih+p->ph - kh_beg ); // hi limit
+          RT_ASSERT( oh_beg >= 0 );
+
+          int khb2 =            (ih + p->ph) - p->oh*p->sh              + 1;
           if (khb2 < 0) khb2 = 0;
-          int khb2s = (khb2+p->sh-1)/p->sh *p->sh;
-          int ohb2 = ih+p->ph - khb2s;
-          RT_ASSERT( ohb2 >= 0 );
-          //if (ohb2 < 0) ohb2 = 0;
-          ohb2 = ohb2 / p->sh;
-          int ohb2s = ohb2 * p->sh;
-          if ( ohb2 != oh_beg )
+          int ohb2 = ih+p->ph - khb2;
+          int ohb2s = (ohb2) / p->sh * p->sh; // ohb2 rounded DOWN to mult of p->sh
+
+          // test ohb2s calc:
+          int khb2s = 0;
+          if (kh_beg < kh_end && ohb2s != oh_beg )
           {
               printf("ohb2: ih=%d p->ph=%d p->sh=%d p->oh=%d     kh_beg=%d khb2=%d khb2s=%d    oh_beg=%d ohb2=%d ohb2s=%d\n",
                       ih,p->ph,p->sh,p->oh,  kh_beg,khb2,khb2s, oh_beg,ohb2,ohb2s);
               exit(0);
           }
-          //const int oh = (ih+p->ph - kh /* * (p->dh + 1) */) / p->sh;
-          // --->  kh = ih+p->ph - oh*p->sh;
-          khb2 = ih+p->ph  - (ohb2) * p->sh;
+          RT_ASSERT( kh_beg >= kh_end || ohb2s == oh_beg );
+
+          if( kh_beg < kh_end ){
+              khb2s =  (ih+p->ph) - ohb2s;
+              if( khb2s != kh_beg )
+              {
+                  print(0,"khb2s: ih=%d p->ph=%d p->sh=%d p->oh=%d     kh_beg=%d khb2=%d khb2s=%d    oh_beg=%d ohb2=%d ohb2s=%d\n",
+                          ih,p->ph,p->sh,p->oh,  kh_beg,khb2,khb2s, oh_beg,ohb2,ohb2s);
+                  exit(0);
+              }
+              RT_ASSERT( kh_beg == khb2s );
+          }
+          RT_ASSERT( ohb2s <= oh_beg );
+
+          khb2s = (ih + p->ph) - ohb2s;
+          RT_ASSERT( khb2s >= 0 );
+          //if( khb2s < 0 ) khb2s = 0;
+          if( kh_beg < kh_end ) RT_ASSERT( khb2s == kh_beg );
+          else                  RT_ASSERT( khb2s >= kh_end );
+
+          for (int iw = 0; iw < p->iw; ++iw) {
+            int kw_beg, kw_end;
+            //hoist_AmiB_in( kw_beg, kw_end,
+            //    /*i  in   */ 0, p->kw,
+            //    /*ow=A+iB */ (iw + p->pw), (p->dw+1),
+            //    /*ow in   */ 0, p->ow*p->sw );
+            kw_beg =            (iw + p->pw) - p->ow*p->sw              + 1;
+            kw_end =            (iw + p->pw) - 0                        + 1;
+            if (kw_beg < 0    ) kw_beg = 0;
+            if (kw_end > p->kw) kw_end = p->kw;
+            { // jump kw_beg up to 1st non-skipped index
+              int ow_beg = iw+p->pw - kw_beg /* * (p->dw+1) */;
+              if ((ow_beg % p->sw)){
+                do {
+                  ++kw_beg;
+                  ow_beg = iw+p->pw - kw_beg /* * (p->dw+1) */;
+                } while( ow_beg % p->sw != 0 && kw_beg < kw_end );
+                //print(0, " ... kw_beg --> %d, ow_beg --> %d\n", kw_beg, ow_beg);
+                DMUST( (kw_beg >= kw_end || (iw+p->pw - kw_beg * (p->dw+1)) % p->sw == 0) );
+              }
+            }
+            size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+            float &ds = ((float*)diff_src_m)[src_off];
+            ds = 0;
+            if (kh_beg < kh_end && kw_beg < kw_end) {
+              //DPRINTF(".");
+              for (int oc = 0; oc < p->oc/p->g; ++oc) {
+                // next: loop over allowed oh values, THEN over kh
+                //int const khh = p->sh; // only for p->dh==0 !!!
+                for (int kh = kh_beg; kh < kh_end; kh+=p->sh) {
+                  const int oh = (ih+p->ph - kh /* * (p->dh + 1) */) / p->sh;
+                  //int const kww = p->sw; // perhaps lcd of p-sh and p->dh+1 ? XXX
+                  for (int kw = kw_beg; kw < kw_end; kw += p->sw) {
+                    const int ow = (iw+p->pw - kw /* * (p->dw + 1) */) / p->sw;
+
+                    size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+                    size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+                    ds += ((float*)diff_dst_m)[dst_off]
+                      * ((float*)wei_m)[wei_off];
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+#elif 0 // remove kernel [again?] and some dead code and unused debug prints
+  // the stride calc for dilation is VERY tricky!
+  if (p->dh != 0 || p->dw != 0) { // A fast version here does not support dilation
+    // This is no big deal, since mkl-dnn does not even allow you to
+    // create the descriptors for it.
+    //refconv_3_bwd_d_generic(p, diff_src_m, wei_m, diff_dst_m);
+    refconv_4_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
+    return;
+  }
+
+#   pragma omp parallel for collapse(4)
+  for (int g = 0; g < p->g; ++g) {
+    for (int mb = 0; mb < p->mb; ++mb) {
+      for (int ic = 0; ic < p->ic/p->g; ++ic) {
+        for (int ih = 0; ih < p->ih; ++ih) {
+          int kh_beg, kh_end;
+          kh_end =            (ih + p->ph) - 0                        + 1;
+          if (kh_end > p->kh) kh_end = p->kh;
+#if 0
+          kh_beg =            (ih + p->ph) - p->oh*p->sh              + 1;
+          if (kh_beg < 0    ) kh_beg = 0;
+          int oh_beg;
+          { // jump kh_beg up to 1st non-skipped index
+            //int oh_beg = ih+p->ph - kh_beg * (p->dh+1); // must always be a mult of p->sh
+            oh_beg = ih+p->ph - kh_beg; // must always be a mult of p->sh
+            RT_ASSERT( oh_beg >= 0 );
+            RT_ASSERT(oh_beg/p->sh <  p->oh);
+            //NO RT_ASSERT( oh_beg % p->sh == (ih+p->ph) % p->sh );
+            if ((oh_beg % p->sh)){
+              // maybe I need a custom hoister here... the following is hard to patch
+              do {
+                ++kh_beg;
+                oh_beg = ih+p->ph - kh_beg /* * (p->dh+1) */;
+                RT_ASSERT( oh_beg >= 0 );
+                RT_ASSERT(oh_beg/p->sh <  p->oh);
+              } while( oh_beg % p->sh != 0 && kh_beg < kh_end );
+            }
+            oh_beg /= p->sh;
+          }
+          RT_ASSERT( kh_beg >= kh_end || (ih+p->ph - kh_beg * (p->dh+1)) % p->sh == 0 );
+
+          oh_beg = ih+p->ph - kh_beg;
+          RT_ASSERT( oh_beg == ih+p->ph - kh_beg ); // hi limit
+          RT_ASSERT( oh_beg >= 0 );
+
+          int khb2 =            (ih + p->ph) - p->oh*p->sh              + 1;
           if (khb2 < 0) khb2 = 0;
-          khb2s = khb2/p->sh * p->sh;
-          //RT_ASSERT( khb2 == khb2s );
-          //if ( kh_beg < kh_end && khb2 != kh_beg )
-          if ( khb2 != kh_beg )
+          int ohb2 = ih+p->ph - khb2;
+          int ohb2s = (ohb2) / p->sh * p->sh; // ohb2 rounded DOWN to mult of p->sh
+
+          // test ohb2s calc:
+          int khb2s = 0;
+          if (kh_beg < kh_end && ohb2s != oh_beg )
           {
-              printf("khb2s: ih=%d p->ph=%d p->sh=%d p->oh=%d     kh_beg=%d khb2=%d khb2s=%d    oh_beg=%d ohb2=%d ohb2s=%d\n",
+              printf("ohb2: ih=%d p->ph=%d p->sh=%d p->oh=%d     kh_beg=%d khb2=%d khb2s=%d    oh_beg=%d ohb2=%d ohb2s=%d\n",
                       ih,p->ph,p->sh,p->oh,  kh_beg,khb2,khb2s, oh_beg,ohb2,ohb2s);
               exit(0);
           }
-#elif 0 // simplifications...
+          RT_ASSERT( kh_beg >= kh_end || ohb2s == oh_beg );
+
+          if( kh_beg < kh_end ){
+              khb2s =  (ih+p->ph) - ohb2s;
+              if( khb2s != kh_beg )
+              {
+                  print(0,"khb2s: ih=%d p->ph=%d p->sh=%d p->oh=%d     kh_beg=%d khb2=%d khb2s=%d    oh_beg=%d ohb2=%d ohb2s=%d\n",
+                          ih,p->ph,p->sh,p->oh,  kh_beg,khb2,khb2s, oh_beg,ohb2,ohb2s);
+                  exit(0);
+              }
+              RT_ASSERT( kh_beg == khb2s );
+          }
+          RT_ASSERT( ohb2s <= oh_beg );
+
+          khb2s = (ih + p->ph) - ohb2s;
+          RT_ASSERT( khb2s >= 0 );
+          //if( khb2s < 0 ) khb2s = 0;
+          if( kh_beg < kh_end ) RT_ASSERT( khb2s == kh_beg );
+          else                  RT_ASSERT( khb2s >= kh_end );
+#elif 0 // remove some debug printout
+          kh_beg =            (ih + p->ph) - p->oh*p->sh              + 1;
+          if (kh_beg < 0    ) kh_beg = 0;
+          int oh_beg;
+          { // jump kh_beg up to 1st non-skipped index
+            //int oh_beg = ih+p->ph - kh_beg * (p->dh+1); // must always be a mult of p->sh
+            oh_beg = ih+p->ph - kh_beg; // must always be a mult of p->sh
+            RT_ASSERT( oh_beg >= 0 );
+            RT_ASSERT(oh_beg/p->sh <  p->oh);
+            //NO RT_ASSERT( oh_beg % p->sh == (ih+p->ph) % p->sh );
+            if ((oh_beg % p->sh)){
+              // maybe I need a custom hoister here... the following is hard to patch
+              do {
+                ++kh_beg;
+                oh_beg = ih+p->ph - kh_beg /* * (p->dh+1) */;
+                RT_ASSERT( oh_beg >= 0 );
+                RT_ASSERT(oh_beg/p->sh <  p->oh);
+              } while( oh_beg % p->sh != 0 && kh_beg < kh_end );
+            }
+            oh_beg /= p->sh;
+          }
+          oh_beg = ih+p->ph - kh_beg;
+          RT_ASSERT( oh_beg == ih+p->ph - kh_beg ); // hi limit
+          RT_ASSERT( oh_beg >= 0 );
+
+          int khb2 = ih+p->ph + 1 - p->oh*p->sh;
+          if (khb2 < 0) khb2 = 0;
+
+          int ohb2 = ih+p->ph - khb2;
+          int ohb2s = (ohb2) / p->sh * p->sh;
+          RT_ASSERT( kh_beg >= kh_end || ohb2s == oh_beg );
+
+          int khb2s = (ih + p->ph) - ohb2s;
+          RT_ASSERT( khb2s >= 0 );
+          if( kh_beg < kh_end ) RT_ASSERT( khb2s == kh_beg );
+          else                  RT_ASSERT( khb2s >= kh_end );
+#elif 0 // use second method (calc) and remove assertions
+          int oh_beg;
+          int khb2 = ih+p->ph + 1 - p->oh*p->sh;
+          if (khb2 < 0) khb2 = 0;
+          int ohb2 = ih+p->ph - khb2;
+          int ohb2s = (ohb2) / p->sh * p->sh;
+
+          int khb2s = (ih + p->ph) - ohb2s;
+          kh_beg = khb2s;
+          oh_beg = ohb2s;
+#elif 0 // change variable names
+          int khb2 = ih+p->ph + 1 - p->oh*p->sh;
+          if (khb2 < 0) khb2 = 0;
+          int ohb2 = ih+p->ph - khb2;
+          int oh_beg = (ohb2) / p->sh * p->sh;
+          kh_beg = (ih + p->ph) - oh_beg;
+#elif 0 // elide variable
+          {
+              int khb2 = ih+p->ph + 1 - p->oh*p->sh;
+              if (khb2 < 0) khb2 = 0;
+              int ohb2 = ih+p->ph - khb2;
+              kh_beg = (ih+p->ph) - ohb2 / p->sh * p->sh;
+          }
+#elif 0 // expand and derive a simplification (now BORKEN !)
+          {
+              int khb2 = ih+p->ph + 1 - p->oh*p->sh;
+              if (khb2 < 0) khb2 = 0;
+              int ohb2 = ih+p->ph - khb2;
+              kh_beg = (ih+p->ph) - ohb2 / p->sh * p->sh;
+              // expand ohb2:
+              //   kh_beg = (ih+p->ph) - (ih+p->ph - khb2) / p->sh * p->sh
+              //          = A - (A-B) /C*C, for A>=0, B>=0, C>0
+              //          where B =  ih+p->ph + 1 - p->oh*p->sh = A+1-p->oh*C
+              //          = A - (A-(A+1-p->oh*C)/C*C
+              //          = A - (   -1 + p->oh*C) /C*C
+              // Let d = A/C and r = A%C
+              //   kh_beg = (d*C+r) - (d*C+r - B)/C*C
+              // If r==0,
+              //   kh_beg = d*C - (d*C - B)/C*C
+              //          = d*C - d*C + B/C*C
+              //          = B/C*C
+              //          = (A+1 - p->oh)/C*C
+              //   ... ???
+          }
           {
             int khb2s = (kh_beg+p->sh-1)/p->sh *p->sh; // round kh_beg up to mult of p->sh
             int khbbb = ((ih+p->ph+p->sh)/p->sh - p->oh) * p->sh;
@@ -742,7 +1061,7 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
             kh_beg = khccc*p->sh + ((ih+p->ph)%p->sh);
             if (kh_beg < 0) kh_beg = 0;
           }
-#elif 1
+#elif 0 // switch to simplification only
           {
             int const d = (ih+p->ph)/p->sh; //, r = (ih+p->ph)%p->sh;
             kh_beg = (ih+p->ph)%p->sh;
@@ -757,33 +1076,25 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
             //RT_ASSERT( kh_beg >= 0 );
             //if (kh_beg < 0) kh_beg = 0;
           }
+#elif 1 // remove comments
+          {
+            int const d = (ih+p->ph)/p->sh; //, r = (ih+p->ph)%p->sh;
+            kh_beg = (ih+p->ph)%p->sh;
+            int khccc = d + 1 - p->oh;
+            if( khccc >= 0 ) kh_beg += khccc*p->sh;
+          }
 #endif
 
-          //  oh_beg = (ih+p->ph - kh_beg)/p->sh ~  (ih+p->ph -  ((ih+p->ph) - p->oh*p->sh + 1))/p->sh
-          //             = (p->oh * p->sh + 1)/p->sh ???
-          //int ohb2 = (p->oh * p->sh + 1) / p->sh;
-          //int khb2 = (ih+p->ph)/p->sh - ohb2s;
-          //if (khb2 < 0) khb2 = 0;
-          //int khb2s = khb2 * p->sh;
-          //int ohb2s = ((ih+p->ph) - khb2s) / p->sh;
-          //
-          //int ohb2 = div_floor(p->oh + p->sh - 1, p->sh);
-          //if( ohb2 < 0 ) ohb2 = 0;
-          //int ohb2s = ohb2 * p->sh;
-          //int ohb2 = p->oh*p->sh;
-          //printf(" oh_beg=%d ohb2=%d ohb2s=%d\n",oh_beg,ohb2, ohb2s);
-          //RT_ASSERT( ohb2s == oh_beg );
           for (int iw = 0; iw < p->iw; ++iw) {
             int kw_beg, kw_end;
             //hoist_AmiB_in( kw_beg, kw_end,
             //    /*i  in   */ 0, p->kw,
             //    /*ow=A+iB */ (iw + p->pw), (p->dw+1),
             //    /*ow in   */ 0, p->ow*p->sw );
-            // REPL kw_beg =            (iw + p->pw) - p->ow*p->sw              + 1;
+            kw_beg =            (iw + p->pw) - p->ow*p->sw              + 1;
             kw_end =            (iw + p->pw) - 0                        + 1;
-            // REPL if (kw_beg < 0    ) kw_beg = 0;
+            if (kw_beg < 0    ) kw_beg = 0;
             if (kw_end > p->kw) kw_end = p->kw;
-#if 0
             { // jump kw_beg up to 1st non-skipped index
               int ow_beg = iw+p->pw - kw_beg /* * (p->dw+1) */;
               if ((ow_beg % p->sw)){
@@ -795,41 +1106,18 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
                 DMUST( (kw_beg >= kw_end || (iw+p->pw - kw_beg * (p->dw+1)) % p->sw == 0) );
               }
             }
-#else
-          {
-            int const d = (iw+p->pw)/p->sw; //, r = (iw+p->pw)%p->sw;
-            kw_beg = (iw+p->pw)%p->sw;
-            int kwccc = d + 1 - p->ow;
-            //if (kwccc < 0) kwccc = 0;
-            //kw_beg = kwccc*p->sw + r;
-            //kw_beg = (kwccc < 0? 0: kwccc*p->sw) + r;
-            if( kwccc >= 0 ) kw_beg += kwccc*p->sw;
-            //kw_beg += (kwccc < 0? 0: kwccc*p->sw);
-            //kw_beg += ((kwccc < 0? 0: ~0) & kwccc*p->sw);
-          }
-#endif
             size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
             float &ds = ((float*)diff_src_m)[src_off];
             ds = 0;
-            if( TRIVIAL(kh_beg >= kh_end || kw_beg >= kw_end) ){
-              ; //DPRINTF("t");
-            } else {
+            if (kh_beg < kh_end && kw_beg < kw_end) {
               //DPRINTF(".");
-              //bool const s0 = kh_beg >= kh_end || p->sh <= 1; // this IMPLIES skips remains 0
               for (int oc = 0; oc < p->oc/p->g; ++oc) {
                 // next: loop over allowed oh values, THEN over kh
                 //int const khh = p->sh; // only for p->dh==0 !!!
                 for (int kh = kh_beg; kh < kh_end; kh+=p->sh) {
-                  //int oh = ih+p->ph - kh * (p->dh + 1) ; // loop vars: kh, ih
-                  //oh /= p->sh;
                   const int oh = (ih+p->ph - kh /* * (p->dh + 1) */) / p->sh;
-
                   //int const kww = p->sw; // perhaps lcd of p-sh and p->dh+1 ? XXX
                   for (int kw = kw_beg; kw < kw_end; kw += p->sw) {
-                    //int ow = iw+p->pw - kw * (p->dw + 1); // loop vars: iw, kw
-                    ////if (ow < 0 || ow % p->sw) continue;
-                    //ow /= p->sw;
-                    ////if (ow >= p->ow) continue;
                     const int ow = (iw+p->pw - kw /* * (p->dw + 1) */) / p->sw;
 
                     size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
@@ -845,12 +1133,102 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
       }
     }
   }
-#elif 0 // specialize to p->dh, p->dw == 0
+#elif 0 // simplify the oh_beg calc and repeat for ow_beg
   // the stride calc for dilation is VERY tricky!
   if (p->dh != 0 || p->dw != 0) { // A fast version here does not support dilation
     // This is no big deal, since mkl-dnn does not even allow you to
     // create the descriptors for it.
-    refconv_3_bwd_d_generic(p, diff_src_m, wei_m, diff_dst_m);
+    //refconv_3_bwd_d_generic(p, diff_src_m, wei_m, diff_dst_m);
+    refconv_4_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
+    return;
+  }
+
+#   pragma omp parallel for collapse(4)
+  for (int g = 0; g < p->g; ++g) {
+    for (int mb = 0; mb < p->mb; ++mb) {
+      for (int ic = 0; ic < p->ic/p->g; ++ic) {
+        for (int ih = 0; ih < p->ih; ++ih) {
+          int kh_beg, kh_end;
+#if 0
+          kh_end =            (ih + p->ph) - 0                        + 1;
+          if (kh_end > p->kh) kh_end = p->kh;
+          {
+            int d = (ih+p->ph)/p->sh; //, r = (ih+p->ph)%p->sh;
+            kh_beg = (ih+p->ph)%p->sh;
+            d += 1 - p->oh;
+            if( d >= 0 ) kh_beg += d*p->sh;
+          }
+#else
+          kh_end = (ih + p->ph);
+          kh_beg = kh_end%p->sh;
+          int d = kh_end/p->sh + 1 - p->oh;
+          if( d >= 0 ) kh_beg += d*p->sh;
+          if (++kh_end > p->kh) kh_end = p->kh;
+#endif
+
+          for (int iw = 0; iw < p->iw; ++iw) {
+            int kw_beg, kw_end;
+            //hoist_AmiB_in( kw_beg, kw_end,
+            //    /*i  in   */ 0, p->kw,
+            //    /*ow=A+iB */ (iw + p->pw), (p->dw+1),
+            //    /*ow in   */ 0, p->ow*p->sw );
+#if 0
+            kw_beg =            (iw + p->pw) - p->ow*p->sw              + 1;
+            kw_end =            (iw + p->pw) - 0                        + 1;
+            if (kw_beg < 0    ) kw_beg = 0;
+            if (kw_end > p->kw) kw_end = p->kw;
+            { // jump kw_beg up to 1st non-skipped index
+              int ow_beg = iw+p->pw - kw_beg /* * (p->dw+1) */;
+              if ((ow_beg % p->sw)){
+                do {
+                  ++kw_beg;
+                  ow_beg = iw+p->pw - kw_beg /* * (p->dw+1) */;
+                } while( ow_beg % p->sw != 0 && kw_beg < kw_end );
+                //print(0, " ... kw_beg --> %d, ow_beg --> %d\n", kw_beg, ow_beg);
+                DMUST( (kw_beg >= kw_end || (iw+p->pw - kw_beg * (p->dw+1)) % p->sw == 0) );
+              }
+            }
+#else
+          kw_end =            (iw + p->pw) - 0                        + 1;
+          if (kw_end > p->kw) kw_end = p->kw;
+          {
+            int d = (iw+p->pw)/p->sw; //, r = (iw+p->pw)%p->sw;
+            kw_beg = (iw+p->pw)%p->sw;
+            d += 1 - p->ow;
+            if( d >= 0 ) kw_beg += d*p->sw;
+          }
+
+#endif
+            size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+            float &ds = ((float*)diff_src_m)[src_off];
+            ds = 0;
+            if (kh_beg < kh_end && kw_beg < kw_end) {
+              //DPRINTF(".");
+              for (int oc = 0; oc < p->oc/p->g; ++oc) {
+                // next: loop over allowed oh values, THEN over kh
+                //int const khh = p->sh; // only for p->dh==0 !!!
+                for (int kh = kh_beg; kh < kh_end; kh+=p->sh) {
+                  const int oh = (ih+p->ph - kh /* * (p->dh + 1) */) / p->sh;
+                  //int const kww = p->sw; // perhaps lcd of p-sh and p->dh+1 ? XXX
+                  for (int kw = kw_beg; kw < kw_end; kw += p->sw) {
+                    const int ow = (iw+p->pw - kw /* * (p->dw + 1) */) / p->sw;
+
+                    size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+                    size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+                    ds += ((float*)diff_dst_m)[dst_off]
+                      * ((float*)wei_m)[wei_off];
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+#elif 0 // clean up
+  if (p->dh != 0 || p->dw != 0) { // A fast version here does not support dilation
+    refconv_4_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
     return;
   }
 
@@ -861,20 +1239,18 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
         for (int ih = 0; ih < p->ih; ++ih) {
           int kh_beg, kh_end;
           kh_end = (ih + p->ph);
-          kh_beg = kh_end/*(ih+p->ph)*/ % p->sh;
-          int khccc = kh_end/*(ih+p->ph)*/ / p->sh - p->oh + 1;
-          if( khccc >= 0 ) kh_beg += khccc*p->sh;
-          ++kh_end;
-          if (kh_end > p->kh) kh_end = p->kh;
+          kh_beg = kh_end%p->sh;
+          int d = kh_end/p->sh + 1 - p->oh;
+          if( d >= 0 ) kh_beg += d*p->sh;
+          if (++kh_end > p->kh) kh_end = p->kh;
 
           for (int iw = 0; iw < p->iw; ++iw) {
             int kw_beg, kw_end;
             kw_end = (iw + p->pw);
-            kw_beg = kw_end/*(iw+p->pw)*/ % p->sw;
-            int kwccc = kw_end/*(iw+p->pw)*/ / p->sw - p->ow + 1;
-            if( kwccc >= 0 ) kw_beg += kwccc*p->sw;
-            ++kw_end;
-            if (kw_end > p->kw) kw_end = p->kw;
+            kw_beg = kw_end%p->sw;
+            int d = kw_end/p->sw + 1 - p->ow;
+            if( d >= 0 ) kw_beg += d*p->sw;
+            if (++kw_end > p->kw) kw_end = p->kw;
 
             size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
             float &ds = ((float*)diff_src_m)[src_off];
@@ -901,12 +1277,11 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
       }
     }
   }
-#elif 0 // specialize to p->dh, p->dw == 0
+#elif 0 // speed up oh_beg re-calculation inside loop
+  // regr-dilate: 2.50x
   // the stride calc for dilation is VERY tricky!
   if (p->dh != 0 || p->dw != 0) { // A fast version here does not support dilation
-    // This is no big deal, since mkl-dnn does not even allow you to
-    // create the descriptors for it.
-    refconv_3_bwd_d_generic(p, diff_src_m, wei_m, diff_dst_m);
+    refconv_4_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
     return;
   }
 
@@ -915,11 +1290,15 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
     for (int mb = 0; mb < p->mb; ++mb) {
       for (int ic = 0; ic < p->ic/p->g; ++ic) {
         for (int ih = 0; ih < p->ih; ++ih) {
-          int kh_beg, kh_end;
+          int kh_beg, oh_beg, kh_end;
           kh_end = (ih + p->ph);
+          oh_beg= kh_end / p->sh;
           kh_beg = kh_end/*(ih+p->ph)*/ % p->sh;
-          int khccc = kh_end/*(ih+p->ph)*/ / p->sh - p->oh + 1;
-          if( khccc >= 0 ) kh_beg += khccc*p->sh;
+          int khccc = oh_beg - p->oh + 1;
+          //if( khccc >= 0 ) { kh_beg += khccc*p->sh; oh_beg -= khccc; }
+          if( khccc < 0 ) khccc = 0;
+          kh_beg += khccc*p->sh;
+          oh_beg -= khccc;
           ++kh_end;
           if (kh_end > p->kh) kh_end = p->kh;
 
@@ -934,17 +1313,23 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
           //int ohb2 = ih+p->ph - kh_beg;
           //if (ohb2 < 0) ohb2 = 0;
           //ohb2 /= p->sh; // <-------- this is "oh_beg"
-          const int oh_beg = (ih+p->ph - kh_beg) / p->sh;
+          //const int oh_beg = (ih+p->ph - kh_beg) / p->sh;
+          //print(0," oh_beg=%d r=%d khccc=%d\n", oh_beg, r, khccc);
+          //if( oh_beg != (r - (khccc>0? khccc:0)) ) {print(0," %s","oops"); exit(0);}
 
           for (int iw = 0; iw < p->iw; ++iw) {
-            int kw_beg, kw_end;
+            int kw_beg, ow_beg, kw_end;
             kw_end = (iw + p->pw);
-            kw_beg = kw_end/*(iw+p->pw)*/ % p->sw;
-            int kwccc = kw_end/*(iw+p->pw)*/ / p->sw - p->ow + 1;
-            if( kwccc >= 0 ) kw_beg += kwccc*p->sw;
+            ow_beg = kw_end / p->sh;
+            kw_beg = kw_end % p->sw;
+            int kwccc = ow_beg - p->ow + 1;
+            ///if( kwccc >= 0 ) { kw_beg += kwccc*p->sw; ow_beg -= kwccc; }
+            if( kwccc < 0 ) kwccc = 0;
+            kw_beg += kwccc*p->sw;
+            ow_beg -= kwccc;
             ++kw_end;
             if (kw_end > p->kw) kw_end = p->kw;
-            const int ow_beg = (iw+p->pw - kw_beg) / p->sw;
+            //const int ow_beg = (iw+p->pw - kw_beg) / p->sw;
 
             size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
             float &ds = ((float*)diff_src_m)[src_off];
@@ -974,11 +1359,10 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
       }
     }
   }
-#elif 1 // oh calc becomes --oh; regr BWD_D=8.23x, 7.83x
+#elif 1 // alternate oh_beg,ow_beg calc (simpler, same speed)
+  // regr-dilate: 2.50x
   if (p->dh != 0 || p->dw != 0) { // A fast version here does not support dilation
-    // This is no big deal, since mkl-dnn does not even allow you to
-    // create the descriptors for it.
-    refconv_3_bwd_d_generic(p, diff_src_m, wei_m, diff_dst_m);
+    refconv_4_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
     return;
   }
 

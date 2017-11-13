@@ -818,7 +818,7 @@ typedef struct {
  *    | *_s32                        | int *
  *    | *_s64                        | ptrdiff_t *
  *    | *_f64                        | double *
- *    | *_str                        | const char **
+ *    | *_str                        | [1] const char **
  *    | *_md                         | const mkldnn_memory_desc_t **
  *    | *_${op}_d                    | const mkldnn_${op}_desc_t **
  *    | *_pd                         | const_mkldnn_primitive_desc_t *
@@ -828,11 +828,13 @@ typedef struct {
  *     reference. All numbers are returned by value.
  *
  * @warning
- *     All returned references point to constant objects and valid only during
- *     the lifetime of queried primitive descriptor. Returned objects must not
- *     be destroyed by user. If there is a need to keep the object longer than
- *     a lifetime of queried primitive descriptor use
+ *     All[\*] returned references point to constant objects and valid only
+ *     during the lifetime of queried primitive descriptor. Returned objects
+ *     must not be destroyed by user. If there is a need to keep the object
+ *     longer than a lifetime of queried primitive descriptor use
  *     \c mkldnn_primitive_desc_clone() to make a copy.
+ *
+ * - [1] For now, string return values are exempt from the lifetime warning.
  *
  * @sa mkldnn_status_t mkldnn_primitive_desc_query(
  *                        const_mkldnn_primitive_desc_t primitive_desc,
