@@ -298,10 +298,11 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
 #endif
 }
 
-/** inline the kernel.  regr 4.31x musek(avx) 4.91x */
+/** inline the kernel.  regr 4.31x musek(avx) 4.91x FIXME */
 static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
         dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m)
 {
+#if 0 // WRONG
   const int lcm_w = lcm( p->sw, p->dw+1 );
   const int lcm_h = lcm( p->sh, p->dh+1 );
 #   pragma omp parallel for collapse(4)
@@ -355,7 +356,8 @@ static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
               //DPRINTF(".");
               //bool const s0 = kh_beg >= kh_end || p->sh <= 1; // this IMPLIES skips remains 0
               // next: loop over allowed oh values, THEN over kh
-              //int const khh = p->sh; // only for p->dh==0 !!!
+              int const khh = p->sh; // only for p->dh==0 !!!
+              int const khh = lcm_h;
               for (int kh = kh_beg; kh < kh_end; kh += lcm_h) {
                 //int oh = ih+p->ph - kh * (p->dh + 1) ; // loop vars: kh, ih
                 //oh /= p->sh;
@@ -383,11 +385,735 @@ static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
       }
     }
   }
+#elif 0 // OK -- change only if found to be borken!
+  # pragma omp parallel for collapse(5)
+  for (int g = 0; g < p->g; ++g) {
+    for (int mb = 0; mb < p->mb; ++mb) {
+      for (int ic = 0; ic < p->ic/p->g; ++ic) {
+        for (int ih = 0; ih < p->ih; ++ih) {
+          for (int iw = 0; iw < p->iw; ++iw) {
+            size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+            float &ds = ((float*)diff_src_m)[src_off];
+            ds = 0;
+            for (int kh = 0; kh < p->kh; ++kh) {
+              int oh = ih - kh * (p->dh + 1) + p->ph;
+              bool const ohok = oh >= 0 && oh % p->sh == 0;
+              oh = oh / p->sh;
+
+              for (int kw = 0; kw < p->kw; ++kw) {
+                int ow = iw - kw * (p->dw + 1) + p->pw;
+                bool const owok = ow >= 0 && ow % p->sw == 0;
+                ow = ow / p->sw;
+                if (!(ohok && owok && oh < p->oh && ow < p->ow)) continue;
+
+                for (int oc = 0; oc < p->oc/p->g; ++oc) { // <---- moved
+                  size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+                  size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+                  ds += ((float*)diff_dst_m)[dst_off]
+                    * ((float*)wei_m)[wei_off];
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+#elif 0 // some simplifications, printout, ... finally dkh == lcm_h/DH;
+  const int gcd_h = gcd( p->sh, p->dh+1 );
+  const int lcm_h = lcm( p->sh, p->dh+1 );
+  # pragma omp parallel for collapse(5)
+  for (int g = 0; g < p->g; ++g) {
+    for (int mb = 0; mb < p->mb; ++mb) {
+      for (int ic = 0; ic < p->ic/p->g; ++ic) {
+        for (int ih = 0; ih < p->ih; ++ih) {
+          for (int iw = 0; iw < p->iw; ++iw) {
+            size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+            float &ds = ((float*)diff_src_m)[src_off];
+            ds = 0;
+            const bool doprt = true;
+
+            int kh_beg, oh_beg, kh_end;
+            //hoist_AmiB_in( kh_beg, kh_end,
+            //    /*i  in      */ 0, p->kh,
+            //    /*ohxsh=A+iB */ (ih + p->ph), (p->dh+1),
+            //    /*ohxsh in   */ 0, p->oh*p->sh );
+            //kh_beg = div_floor(    a      -      d      ,   b    ) + 1;
+            //kh_end = div_floor(    a      -      c      ,   b    ) + 1;
+            kh_end = div_floor((ih + p->ph) -      0      , p->dh+1) + 1;
+            if (kh_end > p->kh) kh_end = p->kh;
+            kh_beg = div_floor( (ih + p->ph) - p->oh*p->sh, p->dh+1) + 1;
+            if (kh_beg < 0    ) kh_beg = 0;
+            { // jump kh_beg up to 1st non-skipped index
+              int ohxsh = ih+p->ph - kh_beg * (p->dh+1);
+              int rem_beg = ohxsh % p->sh;
+              if (rem_beg){
+                // XXX closed-form formula ???  (should be easy now that know p->dh==0)
+                // ref_conv4 has a strictly correct similar corrective example
+                do {
+                  ++kh_beg;
+                  ohxsh = ih+p->ph - kh_beg * (p->dh+1);
+                } while( ohxsh % p->sh != 0 && kh_beg < kh_end );
+                //print(0, " ... kh_beg --> %d, ohxsh --> %d\n", kh_beg, ohxsh);
+                DMUST( kh_beg >= kh_end || (ih+p->ph - kh_beg * (p->dh+1)) % p->sh == 0 );
+              }
+            }
+            RT_ASSERT( kh_beg >= 0 );
+            //RT_ASSERT( kh_beg >= kh_end || (ih+p->ph - kh_beg * (p->dh+1)) % p->sh == 0 );
+            oh_beg = (ih+p->ph - kh_beg * (p->dh+1)) / p->sh;
+            if( kh_beg < kh_end ){
+                RT_ASSERT( oh_beg < p->oh );
+                // no RT_ASSERT( oh_beg >= 0 );
+            }
+            int oha = ih - kh_beg * (p->dh+1) + p->ph;
+            if(kh_beg < kh_end){
+                RT_ASSERT( oha >= 0 );
+                RT_ASSERT( oha % p->sh == 0 );
+            }
+
+            bool prt = false;
+            //for (int kh = kh_beg; kh < kh_end; kh+=p->sw)
+            //const int khh = lcm_h;
+            int khh = 1;
+            //if( p->dh== 0 ) khh = p->sh; // safe case
+            int kh_prev = kh_beg;
+            int dkh_prev = 0, dkh = 0;
+            int ok=0, skip=0;
+            for (int kh = kh_beg, oh0=ih+p->ph-kh_beg*(p->dh+1);
+                    kh < kh_end;
+                    oh0-=(p->dh+1)*khh, kh+=khh)
+            {
+              //int oh0 = ih - kh * (p->dh + 1) + p->ph;
+              //int oh0 = oha; oha -= (p->dh+1)*khh;
+              bool const ohok = oh0 >= 0 && oh0 % p->sh == 0;
+              
+              int oh = oh0 / p->sh;
+              RT_ASSERT( oh <= oh_beg );
+              RT_ASSERT( kh < kh_end );
+              if(kh == kh_beg){
+                  RT_ASSERT( oh == oha/p->sh );
+                  RT_ASSERT( oh0 % p->sh == 0 );
+                  RT_ASSERT( oh >= 0 );
+                  RT_ASSERT( ohok );
+                  // the *next* good kh is such that oh0 - N*DH is also a multiple of SH
+                  // This happens when N*DH /SH*SH == N*DH,  (here N ~ dkh)
+                  // or lowest N s.t. (N*DH) % SH == 0
+              }
+              RT_ASSERT( oh >= 0 ); // if not, kh_end may be incorrect
+              //RT_ASSERT( oh0 % p->sh == 0 ); // <-- would be nice
+
+              if(doprt && g==0 && mb==0 && ic==0 && iw==0){
+                if(ohok){
+                  dkh = kh-kh_prev;
+                  if( dkh_prev != 0 ) RT_ASSERT( dkh == dkh_prev );
+                  dkh_prev = dkh;
+                  RT_ASSERT( oh < p->oh );
+                  if( 1 ){
+                    prt=true;
+                    ++ok;
+                    print(0, " kh,oh=%d,%d", kh,oh);
+                  }
+                  kh_prev = kh;
+                }else{
+                  if( oh0 >= 0 ){
+                    RT_ASSERT( oh0 % p->sh != 0 ); // how is this possible?
+                    prt=true;
+                    ++skip;
+                    print(0, " x%%%d<%d,%d>", oh0 % p->sh, kh, oh);
+                  }
+                }
+              }
+
+              for (int kw = 0; kw < p->kw; ++kw) {
+                int ow = iw - kw * (p->dw + 1) + p->pw;
+                bool const owok = ow >= 0 && ow % p->sw == 0;
+                ow = ow / p->sw;
+
+                if (!(ohok && owok && oh < p->oh && ow < p->ow)) continue;
+
+                for (int oc = 0; oc < p->oc/p->g; ++oc) { // <---- moved
+                  size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+                  size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+                  ds += ((float*)diff_dst_m)[dst_off]
+                    * ((float*)wei_m)[wei_off];
+                }
+              }
+            }
+            if(doprt){
+              RT_ASSERT( (ok + skip > 0)  ==  prt );
+              int const DH = p->dh + 1;
+              int const SH = p->sh;
+              // discover truths ?
+              if(prt){
+                print(0, "\n\t\tok,skip=%d,%d; dkh=%d; sh,dh+1,ph=%d,%d,%d; ih=%d",
+                      ok,skip, dkh, SH, DH, p->ph, ih);
+                if(dkh > 0 && p->dh==0) RT_ASSERT( dkh == SH );
+                if(dkh > 0 && SH==1) RT_ASSERT( dkh == 1 );
+                // n if(dkh > 0) RT_ASSERT( dkh == SH );
+                // n if(dkh > 0) RT_ASSERT( dkh % SH == 0 );
+                //   kh,oh=0,3 kh,oh=1,2 kh,oh=2,1   ok,skip=3,0; dkh=1; sh,dh+1,ph=2,2,5; ih=1
+                if(dkh > 0 && p->dh==0) {
+                  // or dkh= N*DH/SH where N is lowest N>0 s.t. (N*DH) % SH == 0
+                  // N = (N*DH + SH-1)/SH
+                  RT_ASSERT( dkh % SH == 0 );
+                  RT_ASSERT( (dkh * (DH)) % SH == 0 );
+                  //int N = SH;
+                  int N = lcm_h/DH;             // <-------- (whew, finally!)
+                  print(0," dkh=%d  N=%d, DH=%d", dkh, N, DH );
+                  RT_ASSERT( (N*DH) % SH == 0 );
+                  RT_ASSERT( dkh == N );
+                }else if(dkh > 0 && p->dh!=0) {
+                  // or lowest N>0 s.t. (N*DH) % SH == 0
+                  RT_ASSERT( (dkh * DH) % SH == 0 );
+                  for(int i=1; i<dkh; ++i)
+                      RT_ASSERT( (i * DH) % SH != 0 );
+                  //int N = (DH)/lcm_h;
+                  int N = lcm_h/DH;
+                  print(0," dkh=%d  N=%d, DH=%d SH=%d lcm=%d gcd=%d\n", dkh, N, DH, SH, lcm_h, gcd_h );
+                  RT_ASSERT(N>0);
+                  RT_ASSERT( (N*DH) % SH == 0 );
+                  RT_ASSERT( N == dkh );
+                }
+
+                // no if(kh_beg<kh_end) RT_ASSERT( dkh == 0 || dkh == SH );
+                //  kh,oh=0,3 kh,oh=1,2 kh,oh=2,1    ok,skip=3,0; dkh=1; sh,dh+1,ph=2,2,5; ih=1
+                // no if(dkh > 0) RT_ASSERT( dkh == lcm(SH, DH) );
+                // no if(dkh > 0) RT_ASSERT( dkh == gcd(SH, DH) );
+                // no if(dkh > 0) RT_ASSERT( dkh == lcm(SH, DH) * SH );
+                if(dkh > 0 && p->dh!=0) print(0," %s", " dkh?");
+                print(0, "%c",'\n');
+              }
+            }
+
+          }
+        }
+      }
+    }
+  }
+#elif 0 // remove a little bit of printout, use khh=lcm_h/(p->dh+1) step
+  const int gcd_h = gcd( p->sh, p->dh+1 );
+  const int lcm_h = lcm( p->sh, p->dh+1 );
+  # pragma omp parallel for collapse(5)
+  for (int g = 0; g < p->g; ++g) {
+    for (int mb = 0; mb < p->mb; ++mb) {
+      for (int ic = 0; ic < p->ic/p->g; ++ic) {
+        for (int ih = 0; ih < p->ih; ++ih) {
+          for (int iw = 0; iw < p->iw; ++iw) {
+            size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+            float &ds = ((float*)diff_src_m)[src_off];
+            ds = 0;
+            const bool doprt = true;
+
+            int kh_beg, oh_beg, kh_end;
+            //hoist_AmiB_in( kh_beg, kh_end,
+            //    /*i  in      */ 0, p->kh,
+            //    /*ohxsh=A+iB */ (ih + p->ph), (p->dh+1),
+            //    /*ohxsh in   */ 0, p->oh*p->sh );
+            //kh_beg = div_floor(    a      -      d      ,   b    ) + 1;
+            //kh_end = div_floor(    a      -      c      ,   b    ) + 1;
+            kh_end = div_floor((ih + p->ph) -      0      , p->dh+1) + 1;
+            if (kh_end > p->kh) kh_end = p->kh;
+            kh_beg = div_floor( (ih + p->ph) - p->oh*p->sh, p->dh+1) + 1;
+            if (kh_beg < 0    ) kh_beg = 0;
+            { // jump kh_beg up to 1st non-skipped index
+              int ohxsh = ih+p->ph - kh_beg * (p->dh+1);
+              int rem_beg = ohxsh % p->sh;
+              if (rem_beg){
+                // XXX closed-form formula ???  (should be easy now that know p->dh==0)
+                // ref_conv4 has a strictly correct similar corrective example
+                do {
+                  ++kh_beg;
+                  ohxsh = ih+p->ph - kh_beg * (p->dh+1);
+                } while( ohxsh % p->sh != 0 && kh_beg < kh_end );
+                //print(0, " ... kh_beg --> %d, ohxsh --> %d\n", kh_beg, ohxsh);
+                DMUST( kh_beg >= kh_end || (ih+p->ph - kh_beg * (p->dh+1)) % p->sh == 0 );
+              }
+            }
+            RT_ASSERT( kh_beg >= 0 );
+            //RT_ASSERT( kh_beg >= kh_end || (ih+p->ph - kh_beg * (p->dh+1)) % p->sh == 0 );
+            oh_beg = (ih+p->ph - kh_beg * (p->dh+1)) / p->sh;
+            if( kh_beg < kh_end ){
+                RT_ASSERT( oh_beg < p->oh );
+                // no RT_ASSERT( oh_beg >= 0 );
+            }
+            int oha = ih - kh_beg * (p->dh+1) + p->ph;
+            if(kh_beg < kh_end){
+                RT_ASSERT( oha >= 0 );
+                RT_ASSERT( oha % p->sh == 0 );
+            }
+
+            bool prt = false;
+            //for (int kh = kh_beg; kh < kh_end; kh+=p->sw)
+            //const int khh = lcm_h;
+            //int khh = 1; // safe bet
+            //if( p->dh== 0 ) khh = p->sh; // safe case
+            // NEW:
+            int khh = lcm_h / (p->dh+1);
+            int kh_prev = kh_beg;
+            int dkh_prev = 0, dkh = 0;
+            int ok=0, skip=0;
+            for (int kh = kh_beg, oh0=ih+p->ph-kh_beg*(p->dh+1);
+                    kh < kh_end;
+                    oh0-=(p->dh+1)*khh, kh+=khh)
+            {
+              //int oh0 = ih - kh * (p->dh + 1) + p->ph;
+              //int oh0 = oha; oha -= (p->dh+1)*khh;
+              bool const ohok = oh0 >= 0 && oh0 % p->sh == 0;
+              
+              int oh = oh0 / p->sh;
+              RT_ASSERT( oh <= oh_beg );
+              RT_ASSERT( kh < kh_end );
+              if(kh == kh_beg){
+                  RT_ASSERT( oh == oha/p->sh );
+                  RT_ASSERT( oh0 % p->sh == 0 );
+                  RT_ASSERT( oh >= 0 );
+                  RT_ASSERT( ohok );
+                  // the *next* good kh is such that oh0 - N*DH is also a multiple of SH
+                  // This happens when N*DH /SH*SH == N*DH,  (here N ~ dkh)
+                  // or lowest N s.t. (N*DH) % SH == 0
+              }
+              RT_ASSERT( oh >= 0 ); // if not, kh_end may be incorrect
+              //RT_ASSERT( oh0 % p->sh == 0 ); // <-- would be nice
+
+              if(doprt && g==0 && mb==0 && ic==0 && iw==0){
+                if(ohok){
+                  dkh = kh-kh_prev;
+                  if( dkh_prev != 0 ) RT_ASSERT( dkh == dkh_prev );
+                  dkh_prev = dkh;
+                  RT_ASSERT( oh < p->oh );
+                  if( 1 ){
+                    prt=true;
+                    ++ok;
+                    print(0, " kh,oh=%d,%d", kh,oh);
+                  }
+                  kh_prev = kh;
+                }else{
+                  if( oh0 >= 0 ){
+                    RT_ASSERT( oh0 % p->sh != 0 ); // how is this possible?
+                    prt=true;
+                    ++skip;
+                    print(0, " x%%%d<%d,%d>", oh0 % p->sh, kh, oh);
+                  }
+                }
+              }
+
+              for (int kw = 0; kw < p->kw; ++kw) {
+                int ow = iw - kw * (p->dw + 1) + p->pw;
+                bool const owok = ow >= 0 && ow % p->sw == 0;
+                ow = ow / p->sw;
+
+                if (!(ohok && owok && oh < p->oh && ow < p->ow)) continue;
+
+                for (int oc = 0; oc < p->oc/p->g; ++oc) { // <---- moved
+                  size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+                  size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+                  ds += ((float*)diff_dst_m)[dst_off]
+                    * ((float*)wei_m)[wei_off];
+                }
+              }
+            }
+            if(doprt){
+              RT_ASSERT( (ok + skip > 0)  ==  prt );
+              int const DH = p->dh + 1;
+              int const SH = p->sh;
+              // discover truths ?
+              if(prt){
+                print(0, "\n\t\tok,skip=%d,%d; dkh=%d; sh,dh+1,ph=%d,%d,%d; ih=%d",
+                      ok,skip, dkh, SH, DH, p->ph, ih);
+                if(dkh > 0 && p->dh==0) RT_ASSERT( dkh == SH );
+                if(dkh > 0 && SH==1) RT_ASSERT( dkh == 1 );
+                if(dkh > 0) RT_ASSERT( dkh == lcm_h/DH ); // **************
+                print(0, "%c",'\n');
+              }
+            }
+
+          }
+        }
+      }
+    }
+  }
+#elif 0 // clean up 'kh' calcs
+  const int gcd_h = gcd( p->sh, p->dh+1 );
+  const int lcm_h = lcm( p->sh, p->dh+1 );
+  const int khh = lcm_h / (p->dh+1);
+  # pragma omp parallel for collapse(5)
+  for (int g = 0; g < p->g; ++g) {
+    for (int mb = 0; mb < p->mb; ++mb) {
+      for (int ic = 0; ic < p->ic/p->g; ++ic) {
+        for (int ih = 0; ih < p->ih; ++ih) {
+          for (int iw = 0; iw < p->iw; ++iw) {
+            size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+            float &ds = ((float*)diff_src_m)[src_off];
+            ds = 0;
+
+            int kh_beg, oh_beg, kh_end;
+            kh_end = div_floor((ih + p->ph) -      0      , p->dh+1) + 1;
+            if (kh_end > p->kh) kh_end = p->kh;
+            kh_beg = div_floor( (ih + p->ph) - p->oh*p->sh, p->dh+1) + 1;
+            if (kh_beg < 0    ) kh_beg = 0;
+            { // jump kh_beg up to 1st non-skipped index
+              int ohxsh = ih+p->ph - kh_beg * (p->dh+1);
+              int rem_beg = ohxsh % p->sh;
+              if (rem_beg){
+                // XXX closed-form formula ???  (should be easy now that know p->dh==0)
+                // ref_conv4 has a strictly correct similar corrective example
+                do {
+                  ++kh_beg;
+                  ohxsh = ih+p->ph - kh_beg * (p->dh+1);
+                } while( ohxsh % p->sh != 0 && kh_beg < kh_end );
+                //print(0, " ... kh_beg --> %d, ohxsh --> %d\n", kh_beg, ohxsh);
+                DMUST( kh_beg >= kh_end || (ih+p->ph - kh_beg * (p->dh+1)) % p->sh == 0 );
+              }
+            }
+            //RT_ASSERT( kh_beg >= 0 );
+            oh_beg = (ih+p->ph - kh_beg * (p->dh+1)) / p->sh;
+
+            for (int kh = kh_beg, oh0=ih+p->ph-kh_beg*(p->dh+1);
+                    kh < kh_end;
+                    oh0-=(p->dh+1)*khh, kh+=khh)
+            {
+              //bool const ohok = oh0 >= 0 && oh0 % p->sh == 0;
+              // y RT_ASSERT( oh0 >= 0 ); // would be nice!
+              // y RT_ASSERT( ohok ); // if true, then NO tests inside loop
+              DMUST( oh0 >= 0 && oh0 % p->sh == 0 );
+              int oh = oh0 / p->sh;
+              for (int kw = 0; kw < p->kw; ++kw) {
+                int ow = iw - kw * (p->dw + 1) + p->pw;
+                bool const owok = ow >= 0 && ow % p->sw == 0;
+                ow = ow / p->sw;
+
+                if (!(ohok && owok && oh < p->oh && ow < p->ow)) continue;
+
+                for (int oc = 0; oc < p->oc/p->g; ++oc) { // <---- moved
+                  size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+                  size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+                  ds += ((float*)diff_dst_m)[dst_off]
+                    * ((float*)wei_m)[wei_off];
+                }
+              }
+            }
+
+          }
+        }
+      }
+    }
+  }
+#elif 0 // removing oh0 variable? impossible. do same for kw loop, loop order (no diff)
+  // bwd_d,regr.sh ~ 4.30x  YAHOO
+  //const int gcd_h = gcd( p->sh, p->dh+1 );
+  const int lcm_h = lcm( p->sh, p->dh+1 );
+  const int khh = lcm_h / (p->dh+1);
+  const int lcm_w = lcm( p->sw, p->dw+1 );
+  const int kww = lcm_w / (p->dw+1);
+  //const int ohh = khh/p->sh;
+  // oh step MAY be irregular, I think. cannot elide oh0 variable
+  # pragma omp parallel for collapse(5)
+  for (int g = 0; g < p->g; ++g) {
+    for (int mb = 0; mb < p->mb; ++mb) {
+      for (int ic = 0; ic < p->ic/p->g; ++ic) {
+        for (int ih = 0; ih < p->ih; ++ih) {
+          for (int iw = 0; iw < p->iw; ++iw) {
+            size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+            float &ds = ((float*)diff_src_m)[src_off];
+            ds = 0;
+
+            int kh_beg, oh_beg, kh_end;
+            kh_end = div_floor((ih + p->ph) -      0      , p->dh+1) + 1;
+            if (kh_end > p->kh) kh_end = p->kh;
+            kh_beg = div_floor( (ih + p->ph) - p->oh*p->sh, p->dh+1) + 1;
+            if (kh_beg < 0    ) kh_beg = 0;
+            //RT_ASSERT( kh_beg >= 0 );
+            { // jump kh_beg up to 1st non-skipped index
+              int ohxsh = ih+p->ph - kh_beg * (p->dh+1);
+              int rem_beg = ohxsh % p->sh;
+              if (rem_beg){
+                do {
+                  ++kh_beg;
+                  ohxsh = ih+p->ph - kh_beg * (p->dh+1);
+                } while( ohxsh % p->sh != 0 && kh_beg < kh_end );
+                DMUST( kh_beg >= kh_end || (ih+p->ph - kh_beg * (p->dh+1)) % p->sh == 0 );
+              }
+            }
+            DMUST( kh_beg >= 0 );
+            //oh_beg = (ih+p->ph - kh_beg*(p->dh+1)) / p->sh;
+            if( kh_beg >= kh_end ) continue;
+
+            int kw_beg, ow_beg, kw_end;
+            kw_end = div_floor((iw + p->pw) -      0      , p->dw+1) + 1;
+            if (kw_end > p->kw) kw_end = p->kw;
+            kw_beg = div_floor( (iw + p->pw) - p->ow*p->sw, p->dw+1) + 1;
+            if (kw_beg < 0    ) kw_beg = 0;
+            { // jump kw_beg up to 1st non-skipped index
+                int owxsw = iw+p->pw - kw_beg * (p->dw+1);
+                int rem_beg = owxsw % p->sw;
+                if (rem_beg){
+                    do {
+                        ++kw_beg;
+                        owxsw = iw+p->pw - kw_beg * (p->dw+1);
+                    } while( owxsw % p->sw != 0 && kw_beg < kw_end );
+                    DMUST( kw_beg >= kw_end || (iw+p->pw - kw_beg * (p->dw+1)) % p->sw == 0 );
+                }
+            }
+            DMUST( kw_beg >= 0 );
+            if( kw_beg >= kw_end ) continue;
+
+            for (int oc = 0; oc < p->oc/p->g; ++oc) { // <---- moved
+            for (int kh = kh_beg, /*oh=oh_beg,*/ oh0=ih+p->ph - kh_beg*(p->dh+1) ;
+                    kh < kh_end;
+                    /*oh-=ohh,*/ /*oh0-=(p->dh+1)*khh*/ oh0 -= lcm_w, kh += khh)
+            {
+              //if( kh == kh_beg ){ RT_ASSERT( oh == oh0 / p->sh ); }
+              //bool const ohok = oh0 >= 0 && oh0 % p->sh == 0;
+              // y RT_ASSERT( oh0 >= 0 ); // would be nice!
+              // y RT_ASSERT( ohok ); // if true, then NO tests inside loop
+              //DMUST( oh0 >= 0 && oh0 % p->sh == 0 );
+              ///int oh = oh0 / p->sh;
+              ///DMUST( oh < p->oh ); // didn't test earlier!
+              //if(g==0 && mb==0 && ic==0 && iw==0) print(0," oh0 oh00 oh   %d  %d  %d\n", oh0, oh00, oh); }
+              //RT_ASSERT( oh == oh00 );
+
+              //for (int kw = 0; kw < p->kw; ++kw)
+              for (int kw = kw_beg, ow0=iw+p->pw - kw_beg*(p->dw+1) ;
+                      kw < kw_end;
+                      ow0 -= lcm_w, kw += kww)
+              {
+                //int ow = iw - kw * (p->dw + 1) + p->pw;
+                //bool const owok = ow >= 0 && ow % p->sw == 0;
+                //int ow = ow0 / p->sw;
+                //if (!(owok && ow < p->ow)) continue;
+
+                  size_t dst_off = dst_off_f(p, mb, g, oc, oh0/p->sh, ow0/p->sw);
+                  size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+                  ds += ((float*)diff_dst_m)[dst_off]
+                    * ((float*)wei_m)[wei_off];
+                }
+              }
+            }
+
+          }
+        }
+      }
+    }
+  }
+#elif 1 // cleanup -- speed champion [so far]
+  // bwd_d,regr.sh ~ 4.30x  YAHOO
+  //const int gcd_h = gcd( p->sh, p->dh+1 );
+  const int lcm_h = lcm( p->sh, p->dh+1 );
+  const int khh = lcm_h / (p->dh+1);
+  const int lcm_w = lcm( p->sw, p->dw+1 );
+  const int kww = lcm_w / (p->dw+1);
+  # pragma omp parallel for collapse(5)
+  for (int g = 0; g < p->g; ++g) {
+    for (int mb = 0; mb < p->mb; ++mb) {
+      for (int ic = 0; ic < p->ic/p->g; ++ic) {
+        for (int ih = 0; ih < p->ih; ++ih) {
+          // calc kh_beg, kh_end here? 4.28x
+          for (int iw = 0; iw < p->iw; ++iw) {
+            size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+            float &ds = ((float*)diff_src_m)[src_off];
+            ds = 0;
+
+            int kh_beg, /*oh_beg,*/ kh_end;
+            kh_end = (ih + p->ph) / (p->dh+1) + 1;
+            if (kh_end > p->kh) kh_end = p->kh;
+            // n RT_ASSERT( (ih + p->ph) - p->oh*p->sh >= 0);
+            kh_beg = div_floor( (ih + p->ph) - p->oh*p->sh, p->dh+1) + 1;
+            if (kh_beg < 0    ) kh_beg = 0;
+            { // jump kh_beg up to 1st non-skipped index
+              int ohxsh = ih+p->ph - kh_beg * (p->dh+1);
+              if (ohxsh % p->sh){
+                do {
+                  ++kh_beg;
+                  ohxsh = ih+p->ph - kh_beg * (p->dh+1);
+                } while( ohxsh % p->sh != 0 && kh_beg < kh_end );
+                DMUST( kh_beg >= kh_end || (ih+p->ph - kh_beg * (p->dh+1)) % p->sh == 0 );
+              }
+            }
+            DMUST( kh_beg >= 0 );
+            if( kh_beg >= kh_end ) continue;
+
+            int kw_beg, /*ow_beg,*/ kw_end;
+            kw_end = (iw + p->pw) / (p->dw+1) + 1;
+            if (kw_end > p->kw) kw_end = p->kw;
+            kw_beg = div_floor( (iw + p->pw) - p->ow*p->sw, p->dw+1) + 1;
+            if (kw_beg < 0    ) kw_beg = 0;
+            { // jump kw_beg up to 1st non-skipped index
+              int owxsw = iw+p->pw - kw_beg * (p->dw+1);
+              if (owxsw % p->sw){
+                do {
+                  ++kw_beg;
+                  owxsw = iw+p->pw - kw_beg * (p->dw+1);
+                } while( owxsw % p->sw != 0 && kw_beg < kw_end );
+                DMUST( kw_beg >= kw_end || (iw+p->pw - kw_beg * (p->dw+1)) % p->sw == 0 );
+              }
+            }
+            DMUST( kw_beg >= 0 );
+            if( kw_beg >= kw_end ) continue;
+
+            for (int oc = 0; oc < p->oc/p->g; ++oc) {
+              for (int kh = kh_beg, oh0=ih+p->ph - kh_beg*(p->dh+1) ;
+                  kh < kh_end;
+                  oh0 -= lcm_w, kh += khh)
+              {
+                for (int kw = kw_beg, ow0=iw+p->pw - kw_beg*(p->dw+1) ;
+                    kw < kw_end;
+                    ow0 -= lcm_w, kw += kww)
+                {
+                  size_t dst_off = dst_off_f(p, mb, g, oc, oh0/p->sh, ow0/p->sw);
+                  size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+                  ds += ((float*)diff_dst_m)[dst_off]
+                    * ((float*)wei_m)[wei_off];
+                }
+              }
+            }
+
+          }
+        }
+      }
+    }
+  }
+#elif 1 // cleanup -- speed champion [so far]
+  // bwd_d,regr.sh ~ 4.30x  YAHOO
+  const int lcm_h = lcm( p->sh, p->dh+1 );
+  const int khh = lcm_h / (p->dh+1);
+  const int lcm_w = lcm( p->sw, p->dw+1 );
+  const int kww = lcm_w / (p->dw+1);
+  # pragma omp parallel for collapse(5)
+  for (int g = 0; g < p->g; ++g) {
+    for (int mb = 0; mb < p->mb; ++mb) {
+      for (int ic = 0; ic < p->ic/p->g; ++ic) {
+        for (int ih = 0; ih < p->ih; ++ih) {
+          // calc kh_beg, kh_end here? 4.28x
+          for (int iw = 0; iw < p->iw; ++iw) {
+            size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+            float &ds = ((float*)diff_src_m)[src_off];
+            ds = 0;
+
+            int kh_end = (ih + p->ph) / (p->dh+1) + 1;
+            if (kh_end > p->kh) kh_end = p->kh;
+            // n RT_ASSERT( (ih + p->ph) - p->oh*p->sh >= 0);
+            int kh_beg = div_floor( (ih + p->ph) - p->oh*p->sh, p->dh+1) + 1;
+            if (kh_beg < 0    ) kh_beg = 0;
+            { // jump kh_beg up to 1st non-skipped index
+              int ohxsh = ih+p->ph - kh_beg * (p->dh+1);
+              if (ohxsh % p->sh){
+                do {
+                  ++kh_beg;
+                  ohxsh = ih+p->ph - kh_beg * (p->dh+1);
+                } while( ohxsh % p->sh != 0 && kh_beg < kh_end );
+                DMUST( kh_beg >= kh_end || (ih+p->ph - kh_beg * (p->dh+1)) % p->sh == 0 );
+              }
+            }
+            DMUST( kh_beg >= 0 );
+#if 1
+            if(g==0 && mb==0 && ic==0 && iw==0){
+              int oh_beg = (ih+p->ph - kh_beg * (p->dh+1)) / p->sh;
+              int const DH = p->dh + 1;
+              int const SH = p->sh;
+              int const OH = p->oh;
+              int const PH = p->ph;
+              {
+                int khb0 = div_floor( (ih + PH) - OH*SH, DH) + 1;
+                int khb = khb0
+                if( khb > 0 ){
+                  // Want first khb >= khb0 such that
+                  //   ohsh = (ih+PH - khb*DH) is a multiple of SH
+                  //     [ and >= 0, and < oh_end ]
+
+                  // or smallest N>=0 s.t.
+                  //   khb' = (ih+PH - (khb+N)*DH) has khb'/SH*SH == khb'
+                  //
+                  //int ohsh = (ih+PH - khb * (DH));
+                  //       ~ (ih+PH - ((ih + PH) - OH*SH + DH))
+                  //       ~ OH*SH - (DH)
+                  //int ohsh = OH*SH - (DH);
+                  //if( ohsh % SH != 0 ) ohsh -= lcm_h;
+                  int ohsh = (ih+PH - khb * (DH));
+                  if( ohsh % SH != 0 ) ohsh -= ohsh % SH;
+                  if( ohsh % SH == 0 && kh_beg < kh_end ) RT_ASSERT( ohsh == oh_beg * p->sh );
+                  RT_ASSERT( ohsh %SH == 0 );
+                  //int khb2 = div_floor( (ih+PH) - ohsh + DH , DH );
+                  //int khb2 = div_floor( (ih+PH) - div_floor(ohsh,SH)*SH + DH-1 , DH ); // almost!
+                  int khb2 = div_floor( (ih+PH) - div_floor(ih+PH-ohsh,SH)*SH + DH-1 , DH ); // almost!
+                  print(0, "\n\t\t SH,DH,PH,OH=%d,%d,%d,%d; ih=%d; oh_beg=%d, ohsh=%d, ohsh/SH=%d lcm_h=%d khh=%d khb=%d,%d, khbeg,end=%d,%d",
+                      SH,DH,PH,OH, ih, oh_beg,ohsh,ohsh/SH, lcm_h,khh, khb,khb2, kh_beg,kh_end);
+                  if( kh_beg < kh_end ) RT_ASSERT( khb2 == kh_beg );
+                  ohsh = (ih+PH - khb2 * (DH));
+                  print(0, " ohsh'=%d ", ohsh);
+                  //ohsh -= ohsh % SH;
+                  //if( kh_beg < kh_end ) RT_ASSERT( rem_floor(ohsh, SH) != 0 );
+                  // n RT_ASSERT( oh_beg == ohsh/SH );
+                  //if( !( oh_beg == ohsh/SH )){
+                  //  print(0, "\n\t\t SH,DH,PH,OH=%d,%d,%d,%d; ih=%d; oh_beg=%d, ohsh=%d, ohsh/SH=%d lcm_h=%d khh=%d khb=%d, khbeg,end=%d,%d\n",
+                  //      SH, DH, PH, OH, ih, oh_beg, ohsh, ohsh/SH, lcm_h, khh, khb, kh_beg,kh_end);
+                  //}
+                  //if( kh_beg < kh_end ) RT_ASSERT( oh_beg == ohsh/SH );
+                  //RT_ASSERT( kh_beg == khb );
+                  print(0,"%c",'\n');
+                }
+              }
+            }
+#endif
+            if( kh_beg >= kh_end ) continue;
+
+            int kw_beg, /*ow_beg,*/ kw_end;
+            kw_end = (iw + p->pw) / (p->dw+1) + 1;
+            if (kw_end > p->kw) kw_end = p->kw;
+            kw_beg = div_floor( (iw + p->pw) - p->ow*p->sw, p->dw+1) + 1;
+            if (kw_beg < 0    ) kw_beg = 0;
+            { // jump kw_beg up to 1st non-skipped index
+              int owxsw = iw+p->pw - kw_beg * (p->dw+1);
+              if (owxsw % p->sw){
+                do {
+                  ++kw_beg;
+                  owxsw = iw+p->pw - kw_beg * (p->dw+1);
+                } while( owxsw % p->sw != 0 && kw_beg < kw_end );
+                DMUST( kw_beg >= kw_end || (iw+p->pw - kw_beg * (p->dw+1)) % p->sw == 0 );
+              }
+            }
+            DMUST( kw_beg >= 0 );
+            if( kw_beg >= kw_end ) continue;
+
+            for (int oc = 0; oc < p->oc/p->g; ++oc) {
+              for (int kh = kh_beg, oh0=ih+p->ph - kh_beg*(p->dh+1) ;
+                  kh < kh_end;
+                  oh0 -= lcm_w, kh += khh)
+              {
+                for (int kw = kw_beg, ow0=iw+p->pw - kw_beg*(p->dw+1) ;
+                    kw < kw_end;
+                    ow0 -= lcm_w, kw += kww)
+                {
+                  size_t dst_off = dst_off_f(p, mb, g, oc, oh0/p->sh, ow0/p->sw);
+                  size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+                  ds += ((float*)diff_dst_m)[dst_off]
+                    * ((float*)wei_m)[wei_off];
+                }
+              }
+            }
+
+          }
+        }
+      }
+    }
+  }
+#else
+#error "select one"
+#endif
 }
+
+
+
+
+
+
 void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
     dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m) {
 #if 0
     refconv_2_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
+
+#elif 1 // kw_beg, oh_end loop ---> calculation (debug)
+  //  MOVED to separate routine
+  refconv_3_bwd_d_generic(p, diff_src_m, wei_m, diff_dst_m);
 
 #elif 0 // regr 4.07x 4.17x
   // + dilates: 1.90x
@@ -503,10 +1229,6 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
       }
     }
   }
-
-#elif 0 // kw_beg, oh_end loop ---> calculation (debug)
-  //  MOVED to separate routine
-  refconv_3_bwd_d_generic(p, diff_src_m, wei_m, diff_dst_m);
 
 #elif 0 // specialize to p->dh, p->dw == 0
   // the stride calc for dilation is VERY tricky!
@@ -1022,46 +1744,76 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
               kh_beg = (ih+p->ph) - ohb2 / p->sh * p->sh;
           }
 #elif 0 // expand and derive a simplification (now BORKEN !)
-          {
-              int khb2 = ih+p->ph + 1 - p->oh*p->sh;
-              if (khb2 < 0) khb2 = 0;
-              int ohb2 = ih+p->ph - khb2;
-              kh_beg = (ih+p->ph) - ohb2 / p->sh * p->sh;
-              // expand ohb2:
-              //   kh_beg = (ih+p->ph) - (ih+p->ph - khb2) / p->sh * p->sh
-              //          = A - (A-B) /C*C, for A>=0, B>=0, C>0
-              //          where B =  ih+p->ph + 1 - p->oh*p->sh = A+1-p->oh*C
-              //          = A - (A-(A+1-p->oh*C)/C*C
-              //          = A - (   -1 + p->oh*C) /C*C
-              // Let d = A/C and r = A%C
-              //   kh_beg = (d*C+r) - (d*C+r - B)/C*C
-              // If r==0,
-              //   kh_beg = d*C - (d*C - B)/C*C
-              //          = d*C - d*C + B/C*C
-              //          = B/C*C
-              //          = (A+1 - p->oh)/C*C
-              //   ... ???
+          { // new.  With a derivation of the alternate calculation.
+            int khb2 = ih+p->ph + 1 - p->oh*p->sh;
+            if (khb2 < 0) khb2 = 0;
+            int ohb2 = ih+p->ph - khb2;
+            RT_ASSERT( ohb2 >= 0 );
+            kh_beg = (ih+p->ph) - ohb2 / p->sh * p->sh;
+            const int oh_beg = (ih+p->ph - kh_beg) / p->sh;
+            // expand ohb2:
+            //   kh_beg = (ih+p->ph) - (ih+p->ph - khb2) / p->sh * p->sh
+            //          = A - (A-B) /C*C, for A>=0, B>=0, C>0
+            //   kh_beg-B = (A-B) - (A-B)/C*C
+            //            = (A-B) % C            ! rem_floor, if A-B<0
+            // So
+            //   kh_beg = khb2 + (ih+p->ph - khb2) % p->sh
+            //          = khb2 + ohb2 % p->sh
+            RT_ASSERT( kh_beg == khb2 + ohb2 % p->sh );
+
+            // But khb2 = ih+p->ph+1-p->oh*p->sh, so
+            //   kh_beg = khb2 + (ih+p->ph - [ih+p->ph+1 - p->oh*p->sh]) % p->sh
+            //   kh_beg = khb2 + (p->oh*p->sh-1) % p->sh
+            //   kh_beg = khb2 + p->sh-1 ???
+            //if( ih+p->ph + 1 - p->oh*p->sh >= 0 )
+            if( ih+p->ph >= p->oh*p->sh - 1)
+            //if( ih+p->ph >= p->oh*p->sh ) // also might be OK
+            {
+              RT_ASSERT( khb2 == ih+p->ph + 1 - p->oh*p->sh );
+              RT_ASSERT( ohb2 ==  (p->oh*p->sh-1) );
+              RT_ASSERT( kh_beg == khb2 + (p->oh*p->sh-1) % p->sh );
+              RT_ASSERT( kh_beg == khb2 + p->sh-1 );
+              //RT_ASSERT( kh_beg == (ih+p->ph + 1 - p->oh*p->sh) + p->sh-1 );
+              RT_ASSERT( kh_beg == ih+p->ph - p->oh*p->sh + p->sh );
+              RT_ASSERT( kh_beg >= p->sh - 1);
+              //RT_ASSERT( kh_beg == ih+p->ph - (p->oh*p->sh-1) + p->sh-1 );
+              //RT_ASSERT( oh_beg == (p->oh*p->sh - p->sh) / p->sh );
+              RT_ASSERT( oh_beg == p->oh - 1 );
+            } else {
+              RT_ASSERT( khb2 == 0 );
+              RT_ASSERT( ohb2 ==  ih+p->ph );
+              RT_ASSERT( kh_beg == (ih+p->ph) % p->sh );
+              //RT_ASSERT( oh_beg == ((ih+p->ph) - (ih+p->ph)%p->sh) / p->sh );
+              //RT_ASSERT( oh_beg == ((ih+p->ph)/p->sh*p->sh) / p->sh );
+              RT_ASSERT( oh_beg == (ih+p->ph) / p->sh );
+            }
           }
+#elif 0 // clean up simplified calc and test
           {
-            int khb2s = (kh_beg+p->sh-1)/p->sh *p->sh; // round kh_beg up to mult of p->sh
-            int khbbb = ((ih+p->ph+p->sh)/p->sh - p->oh) * p->sh;
-            if (khbbb < 0) khbbb = 0;
-            RT_ASSERT( khbbb == khb2s );
-            int ohb2 = (ih+p->ph - khb2s) / p->sh;
-            //int ohb2x = (ih+p->ph)/p->sh - ((kh_beg+p->sh-1)/p->sh);
-            //int ohb2x = (ih+p->ph)/p->sh - (khbbb/p->sh);
-              //int khccc = ((ih+p->ph + p->sh)/p->sh - p->oh);
-              int khccc = ((ih+p->ph)/p->sh + 1 - p->oh);
-              if (khccc < 0) khccc = 0;
-              int ohb2x = (ih+p->ph)/p->sh - (khccc);
-            RT_ASSERT( ohb2x == ohb2 );
-            //kh_beg = ih+p->ph  - ohb2 * p->sh;
-            //kh_beg = ih+p->ph  -  (ih+p->ph)/p->sh*p->sh + khccc*p->sh;
-            //kh_beg = khccc*p->sh + ((ih+p->ph)%p->sh);
-            kh_beg = khccc*p->sh + ((ih+p->ph)%p->sh);
-            if (kh_beg < 0) kh_beg = 0;
+            int khb2 = ih+p->ph + 1 - p->oh*p->sh;
+            if (khb2 < 0) khb2 = 0;
+            int ohb2 = ih+p->ph - khb2;
+            RT_ASSERT( ohb2 >= 0 );
+            kh_beg = (ih+p->ph) - ohb2 / p->sh * p->sh;
+            const int oh_beg = (ih+p->ph - kh_beg) / p->sh;
+
+            int khb3 = ih+p->ph - p->oh*p->sh + p->sh;
+            int ohb3 = p->oh - 1;
+            if( khb3 < p->sh - 1 ){
+              ohb3 = (ih+p->ph) / p->sh;
+              khb3 = (ih+p->ph) % p->sh;
+            }
+            RT_ASSERT( khb3 == kh_beg );
+            RT_ASSERT( ohb3 == oh_beg );
           }
-#elif 0 // switch to simplification only
+#elif 1
+          kh_beg = ih+p->ph - p->oh*p->sh + p->sh;
+          int oh_beg = p->oh - 1;
+          if( kh_beg < p->sh - 1 ){
+            oh_beg = (ih+p->ph) / p->sh;
+            kh_beg = (ih+p->ph) % p->sh;
+          }
+#elif 0 // Another simplification, but more multiply,divide
           {
             int const d = (ih+p->ph)/p->sh; //, r = (ih+p->ph)%p->sh;
             kh_beg = (ih+p->ph)%p->sh;
@@ -1359,7 +2111,7 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
       }
     }
   }
-#elif 1 // alternate oh_beg,ow_beg calc (simpler, same speed)
+#elif 0 // alternate oh_beg,ow_beg calc (simpler, same speed)
   // regr-dilate: 2.50x
   if (p->dh != 0 || p->dw != 0) { // A fast version here does not support dilation
     refconv_4_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
@@ -1404,6 +2156,61 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
                     ds += ((float*)diff_dst_m)[dst_off]
                       * ((float*)wei_m)[wei_off];
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+#elif 1 // a new simplification of loop limits (same speed as above)
+  // regr-dilate: 2.50x
+  if (p->dh != 0 || p->dw != 0) { // A fast version here does not support dilation
+    refconv_4_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
+    return;
+  }
+
+#   pragma omp parallel for collapse(4)
+  for (int g = 0; g < p->g; ++g) {
+    for (int mb = 0; mb < p->mb; ++mb) {
+      for (int ic = 0; ic < p->ic/p->g; ++ic) {
+        for (int ih = 0; ih < p->ih; ++ih) {
+          //int ocend = (p->oc/p->g);
+          register int kh_end = ih + p->ph;
+          int oh_beg = p->oh - 1;
+          int kh_beg = kh_end - p->oh*p->sh + p->sh;
+          if( kh_beg < p->sh - 1 ){ // unlikely?
+            oh_beg = kh_end / p->sh;
+            kh_beg = kh_end % p->sh;
+          }
+          if (++kh_end > p->kh) kh_end = p->kh;
+          //ocend = (kh_beg < kh_end? ocend: 0);
+          for (int iw = 0; iw < p->iw; ++iw) {
+            size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+            float &ds = ((float*)diff_src_m)[src_off];
+            ds = 0; // always!
+            //if( ocend == 0 ) continue;
+
+            register int kw_end = iw + p->pw;
+            int ow_beg = p->ow - 1;
+            int kw_beg = kw_end - p->ow*p->sw + p->sw;
+            if( kw_beg < p->sw - 1 ){ // unlikely?
+              ow_beg = kw_end / p->sw;
+              kw_beg = kw_end % p->sw;
+            }
+            if (++kw_end > p->kw) kw_end = p->kw;
+            //if (kw_beg >= kw_end ) continue;
+            //ocend = (kw_beg < kw_end? ocend: 0);
+
+            if( kh_beg >= kh_end || kw_beg >= kw_end ) continue;
+            for (int oc = 0; oc < p->oc/p->g; ++oc) {
+              for (int kh = kh_beg, oh=oh_beg; kh < kh_end; --oh, kh+=p->sh) {
+                for (int kw = kw_beg, ow=ow_beg; kw < kw_end; --ow, kw += p->sw) {
+                  size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+                  size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+                  ds += ((float*)diff_dst_m)[dst_off]
+                    * ((float*)wei_m)[wei_off];
                 }
               }
             }
