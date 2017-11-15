@@ -270,7 +270,8 @@ int str2desc(desc_t *desc, const char *str) {
      *  - if padding is undefined => compute trivial padding
      */
 
-    d.g = 1; d.mb = 2; d.sh = d.sw = 1; d.dh = d.dw = 0; d.name = "\"wip\"";
+    d.g = 1; d.mb = 2; d.sh = d.sw = 1; d.dh = d.dw = 0;
+    d.name = "\"wip\"";
 
     const char *s = str;
     assert(s);
@@ -294,7 +295,10 @@ int str2desc(desc_t *desc, const char *str) {
         CASE_N(dh); CASE_N(dw);
         if (*s == 'n') { d.name = s + 1; break; }
         if (*s == '_') ++s;
-        if (!ok) return FAIL;
+        if (!ok){
+            printf(" str2desc: unparsed desc is %s\n", s);
+            return FAIL;
+        }
     }
 #   undef CASE_NN
 #   undef CASE_N
@@ -311,11 +315,12 @@ int str2desc(desc_t *desc, const char *str) {
     if (!no_h) {
         // Force user to fix nonsense spec strings
         if (!d.ih || !d.kh ) return FAIL;                      // required!
-        if ( d.sh<1 || d.ih<0 || d.oh<0 || d.ph<0 ) return FAIL;  // range!
-
+        if ( d.sh<1 || d.ih<0 || d.oh<0 || d.ph<0 ){
+            printf(" str2desc range: sh%d_ih%d_oh%d_ph%d\n", d.sh,d.ih,d.oh,d.ph);
+            return FAIL;
+        }
         if (d.oh<=0) // illegal/unset
             d.oh = compute_out(d.ih, d.kh, d.sh, d.ph, d.dh);
-
         if (d.oh<=0){ // illegal/unset (may be -ve because of too-low pad?)
             int tgt_out = (d.oh > 0? d.oh: 1);
             int tgt_pad = compute_pad(tgt_out, d.ih, d.kh, d.sh, d.dh);
@@ -331,8 +336,10 @@ int str2desc(desc_t *desc, const char *str) {
 
     if (!no_w) {
         if (!d.iw || !d.kw) return FAIL;
-        if ( d.sh<1 || d.ih<0 || d.oh<0 || d.ph<0 ) return FAIL;  // range!
-
+        if ( d.sh<1 || d.ih<0 || d.oh<0 || d.ph<0 ){
+            printf(" str2desc range: sw%d_iw%d_ow%d_pw%d\n", d.sw,d.iw,d.ow,d.pw);
+            return FAIL;
+        }
         if (d.ow<=0) // illegal/unset
             d.ow = compute_out(d.iw, d.kw, d.sw, d.pw, d.dw);
 
