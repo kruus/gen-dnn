@@ -30,6 +30,8 @@ usage() {
     echo " and other F_i are supplied verbatim to the 'benchdnn' command"
     echo "    (example: ./bench-run.sh -qmPT -itest_conv_regression"
     echo "              to quickly run Performance Tests with a batchfile)"
+    echo "     or  ./bench-run.sh -mPT -D'FWD_B BWD_D BWD_WB' -i'conv_alexnet'"
+    echo "         to run longer benchdnn impl comparisons"
     echo " Note:"
     echo "   We do not capture output into a logfile"
     ls -l ./tests/benchdnn/inputs

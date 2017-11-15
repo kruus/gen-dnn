@@ -820,7 +820,7 @@ void refconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
                    /*ih in    */ 0, p->iw);
 #else
     oh_beg = div_floor(       + p->ph - kh * (p->dh + 1) + p->sh - 1, p->sh);//(c-a+b-1)/b
-    oh_end = div_floor( p->iw + p->ph - kh * (p->dh + 1) + p->sh - 1, p->sh);//(d-a+b-1)/b
+    oh_end = div_floor( p->ih + p->ph - kh * (p->dh + 1) + p->sh - 1, p->sh);//(d-a+b-1)/b
     if (oh_beg < 0    ) oh_beg = 0;
     if (oh_end > p->oh) oh_end = p->oh;
 #endif
@@ -899,7 +899,7 @@ void refconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
   for (int kh = 0; kh < p->kh; ++kh) { //
     int oh_beg, oh_end;
     oh_beg = div_floor(       + p->ph - kh * (p->dh + 1) + p->sh - 1, p->sh);//(c-a+b-1)/b
-    oh_end = div_floor( p->iw + p->ph - kh * (p->dh + 1) + p->sh - 1, p->sh);//(d-a+b-1)/b
+    oh_end = div_floor( p->ih + p->ph - kh * (p->dh + 1) + p->sh - 1, p->sh);//(d-a+b-1)/b
     if (oh_beg < 0    ) oh_beg = 0;
     if (oh_end > p->oh) oh_end = p->oh;
     if( oh_beg >= oh_end ) continue;
@@ -936,6 +936,7 @@ void refconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
   }
   xdst_relu(p, dst_m);
 #elif 1 // join omp-||, musek 7.8x
+  // FIXME 1 test fails (mixed up ih/iw  TYPO)
 #pragma omp parallel
   {
     //xdst_init(p, bia_m, dst_m);
@@ -968,7 +969,7 @@ void refconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
     for (int kh = 0; kh < p->kh; ++kh) {
       int oh_beg, oh_end;
       oh_beg = div_floor(       + p->ph - kh * (p->dh + 1) + p->sh - 1, p->sh);//(c-a+b-1)/b
-      oh_end = div_floor( p->iw + p->ph - kh * (p->dh + 1) + p->sh - 1, p->sh);//(d-a+b-1)/b
+      oh_end = div_floor( p->ih + p->ph - kh * (p->dh + 1) + p->sh - 1, p->sh);//(d-a+b-1)/b
       if (oh_beg < 0    ) oh_beg = 0;
       if (oh_end > p->oh) oh_end = p->oh;
       if( oh_beg >= oh_end ) continue;

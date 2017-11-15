@@ -73,5 +73,11 @@ echo "LOGFILE : $LOGFILE"
     ) >& "$LOGFILE" && {
 	echo YAY;
 	tail -n40 "$LOGFILE";
-} || { echo "ohoh"; tail -n80 $LOGFILE | grep '^[Tt@]'; echo "See LOGFILE = $LOGFILE"; }
+} || \
+    {
+        echo "ohoh"
+        #tail -n80 $LOGFILE | grep '^[Tt@]'
+        tail -n80 $LOGFILE
+        echo "See LOGFILE = $LOGFILE"
+    }
 # vim: set ts=4 sw=4 et :
