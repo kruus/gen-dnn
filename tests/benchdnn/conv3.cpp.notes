@@ -44,6 +44,80 @@ static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
           //          osh = ih+PH - khb*DH
           //      AND osh % SH == 0.
           //          Then oh_beg = osh / SH;
+    First check if khb == kh_beg solves the problem. If not, we
+    formulate the problem as two linear equations with integer constraints.
+Diophantine...
+    Let o=osh
+    and p=ih+PH - kh_beg*DH
+    1)  o = p - k*D   s.t. k > 0
+    2)  o == j*S      (integer j, j >= 0)
+    i.e.   k*D = p-o = j*S.
+Equivalently, solve
+    k*D - j*S = 0   for integers j,k, choosing the solution with lowest k>=0.
+    (D and S are both positive, so will also be >= 0)
+
+Problem-specific, using definition of gcd:
+    The gcd(D,S) is one value dividing D and S evenly.
+    Now S/G * D = D/G * S  looks just like  k*D = j *S.
+    We identify k=S/G and j=D/G.
+    We can multiply (k,j) by any integer and still have a solution,
+    but we only need the lowest-k solution.
+  Ex. gcd(54,24) = 6, so k*24 = j*54 has solutions k=54/6=9 and j=24/6=4.
+      Check: 9*24 = 4*54 = (54*24)/6
+
+In general, a generic approach is like:
+Steps:
+ - Divide a, b and c by gcd(a,b).
+ - Now gcd(a,b) == 1
+ - Find solution to aU + bV = 1 using Extended Euclidean algorithm
+ - Multiply equation by c. Now you have a(Uc) + b (Vc) = c
+ - You found solution x = U*c and y = V * c
+Extended Euclidean Algorithm:
+// C function for extended Euclidean Algorithm
+int gcdExtended(int a, int b, int *x, int *y)
+{
+    // Base Case
+    if (a == 0)
+    {
+        *x = 0;
+        *y = 1;
+        return b;
+    }
+ 
+    int x1, y1; // To store results of recursive call
+    int gcd = gcdExtended(b%a, a, &x1, &y1);
+ 
+    // Update x and y using results of recursive
+    // call
+    *x = y1 - (b/a) * x1;
+    *y = x1;
+ 
+    return gcd;
+}
+/* return the gcd of a and b followed by the pair x and y of 
+  equation ax + by = gcd(a,b)
+*/
+pair<int, pair<int, int> > extendedEuclid(int a, int b) 
+{
+    int x = 1, y = 0;
+    int xLast = 0, yLast = 1;
+    int q, r, m, n;
+    while (a != 0) 
+    {
+        q = b / a;
+        r = b % a;
+        m = xLast - q * x;
+        n = yLast - q * y;
+        xLast = x; 
+        yLast = y;
+        x = m; 
+        y = n;
+        b = a; 
+        a = r;
+    }
+    return make_pair(b, make_pair(xLast, yLast));
+}
+	
           //
           // Alt: Let osh0 = (ih+PH - khb0 * DH)
           //      and ohb0 = osh/SH.
