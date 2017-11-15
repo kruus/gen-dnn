@@ -302,19 +302,6 @@ static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
 {
   const int lcm_w = lcm( p->sw, p->dw+1 );
   const int lcm_h = lcm( p->sh, p->dh+1 );
-  const int DH = p->dh+1;
-  const int SH = p->sh;
-  const int PH = p->ph;
-  const int OH = p->oh;
-  const int DW = p->dw+1;
-  const int SW = p->sw;
-  const int PW = p->pw;
-  const int OW = p->ow;
-  //int const khh = SH; // only for DH==1 !!!
-  int const khh = 1; // safe (if check conditions)
-  int const kww = 1; // safe (if check conditions)
-  //int const khh = lcm_h / SH;
-  //int const kww = lcm_w / PW;
 #   pragma omp parallel for collapse(4)
   for (int g = 0; g < p->g; ++g) {
     for (int mb = 0; mb < p->mb; ++mb) {
@@ -323,53 +310,35 @@ static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
           int kh_beg, kh_end;
           hoist_AmiB_in( kh_beg, kh_end,
               /*kh  in   */ 0, p->kh,
-              /*oh=A+khB */ (ih + PH), DH,
-              /*oh in   */ 0, OH*SH );
-          int const khb0 = kh_beg;
+              /*oh=A+khB */ (ih + p->ph), (p->dh+1),
+              /*oh in   */ 0, p->oh*p->sh );
           { // jump kh_beg up to 1st non-skipped index
-            // 
-            int ohsh = ih+PH - kh_beg * DH; // must always be a mult of SH
-            int rem_beg = ohsh % SH;
+            int oh_beg = ih+p->ph - kh_beg * (p->dh+1); // must always be a mult of p->sh
+            int rem_beg = oh_beg % p->sh;
             if (rem_beg){
               // maybe I need a custom hoister here... the following is hard to patch
               do {
                 ++kh_beg;
-                ohsh = ih+PH - kh_beg * DH;
-              } while( ohsh % SH != 0 && kh_beg < kh_end );
+                oh_beg = ih+p->ph - kh_beg * (p->dh+1);
+              } while( oh_beg % p->sh != 0 && kh_beg < kh_end );
             }
-            int oh_beg = ohsh / SH;
           }
-          // problem: Find the lowest khb >= kh_beg such that
-          //          osh = ih+PH - khb*DH
-          //      AND osh % SH == 0.
-          //          Then oh_beg = osh / SH;
-          //
-          // Alt: Let osh0 = (ih+PH - khb0 * DH)
-          //      and ohb0 = osh/SH.
-          //      Find the highest osh <= osh0 such that
-          //      osh % SH == 0
-          //  AND (ih+PH - osh) % DH = 0.
-          //      Then kh_beg = (ih+PH - osh) / DH
-          //       and oh_beg = osh / SH;
-          //
-          //
           for (int iw = 0; iw < p->iw; ++iw) {
             int kw_beg, kw_end;
             hoist_AmiB_in( kw_beg, kw_end,
                 /*i  in   */ 0, p->kw,
-                /*ow=A+iB */ (iw + PW), DW,
-                /*ow in   */ 0, OW*SW );
+                /*ow=A+iB */ (iw + p->pw), (p->dw+1),
+                /*ow in   */ 0, p->ow*p->sw );
             { // jump kw_beg up to 1st non-skipped index
-              int owsw = iw+PW - kw_beg * DW;
-              int rem_beg = owsw % SW;
+              int ow_beg = iw+p->pw - kw_beg * (p->dw+1);
+              int rem_beg = ow_beg % p->sw;
               if (rem_beg){
                 do {
                   ++kw_beg;
-                  owsw = iw+PW - kw_beg * DW;
-                } while( owsw % SW != 0 && kw_beg < kw_end );
+                  ow_beg = iw+p->pw - kw_beg * (p->dw+1);
+                } while( ow_beg % p->sw != 0 && kw_beg < kw_end );
                 //print(0, " ... kw_beg --> %d, ow_beg --> %d\n", kw_beg, ow_beg);
-                DMUST( (kw_beg >= kw_end || (iw+PW - kw_beg * DW) % SW == 0) );
-                int ow_beg = owsw / SW;
+                DMUST( (kw_beg >= kw_end || (iw+p->pw - kw_beg * (p->dw+1)) % p->sw == 0) );
               }
             }
             size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
@@ -382,19 +351,21 @@ static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
               // 3 nested loops, with NO conditional tests
               //
               //DPRINTF(".");
-              //bool const s0 = kh_beg >= kh_end || SH <= 1; // this IMPLIES skips remains 0
+              //bool const s0 = kh_beg >= kh_end || p->sh <= 1; // this IMPLIES skips remains 0
               // next: loop over allowed oh values, THEN over kh
-              for (int kh = kh_beg; kh < kh_end; kh += khh) {
-                int oh0 = ih+PH - kh * DH ; // loop vars: kh, ih
-                if( oh0<0 || oh0%SH ) continue;
-                int oh = oh0 / SH;
-                ///const int oh = (ih+PH - kh * DH) / SH;
+              //int const khh = p->sh; // only for p->dh==0 !!!
+              for (int kh = kh_beg; kh < kh_end; kh += lcm_h) {
+                //int oh = ih+p->ph - kh * (p->dh + 1) ; // loop vars: kh, ih
+                //oh /= p->sh;
+                const int oh = (ih+p->ph - kh * (p->dh + 1)) / p->sh;
 
-                for (int kw = kw_beg; kw < kw_end; kw += kww) {
-                  int ow0 = iw+PW - kw * DW; // loop vars: iw, kw
-                  if ( ow0<0 || ow0%SW ) continue;
-                  int ow = ow0 / SW;
-                  ///const int ow = (iw+PW - kw * DW) / SW;
+                //int const kww = p->sw; // perhaps lcd of p-sh and p->dh+1 ? XXX
+                for (int kw = kw_beg; kw < kw_end; kw += lcm_w) {
+                  //int ow = iw+p->pw - kw * (p->dw + 1); // loop vars: iw, kw
+                  ////if (ow < 0 || ow % p->sw) continue;
+                  //ow /= p->sw;
+                  ////if (ow >= p->ow) continue;
+                  const int ow = (iw+p->pw - kw * (p->dw + 1)) / p->sw;
 
                   for (int oc = 0; oc < p->oc/p->g; ++oc) {
                     size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
@@ -414,10 +385,7 @@ static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
 void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
     dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m) {
 
-#if 1
-    refconv_3_bwd_d_generic( p, diff_src_m, wei_m, diff_dst_m );
-
-#elif 0 // regr 4.07x 4.17x
+#if 0 // regr 4.07x 4.17x
 #if 1 // the stride calc for dilation is VERY tricky!
   if (p->dh != 0) { // A fast version here does not support dilation
     // This is no big deal, since mkl-dnn does not even allow you to
