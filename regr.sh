@@ -35,6 +35,7 @@ case $DIRN in
         ;;
     ALEX*) # alexnet (mix)
         BATCH="--dir=FWD_B --batch=inputs/conv_alexnet --dir=BWD_D --batch=inputs/conv_alexnet --dir=BWD_WB --batch=inputs/conv_alexnet"
+        ;;
     h | *) # help
         usage
         exit
