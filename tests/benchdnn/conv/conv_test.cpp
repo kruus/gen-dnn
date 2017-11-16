@@ -62,9 +62,21 @@ void test_stats::update_impl(const prb_t *p, res_t *r, int status,
 {
     char pstr[max_prb_len];
     prb2str(p, pstr);
-    print(0, "TEST #%-4lu time %-10.3f ms %s  %s %s\n",
-          (unsigned long)imp,
-          1e-3*(long)(1e3*tt.total_ms()+0.5),
+
+    double ms = 1e-3*(long)(1e3*tt.total_ms()+0.5);
+    char bms[15]; int lms=15;
+    const int oms = snprintf(&bms[0], lms, "%.3f ms", ms);
+
+    char const* impname = get_ref_impls()[imp].name;
+    const int ll2 = 28; char b2[ll2]; int l2=ll2;
+    const int o2 = snprintf(&b2[0], l2, "Test #%d %s", imp, impname);
+    snprintf(&b2[o2], ll2-o2, "%s", &bms[0]);
+    for(int i=o2; i<ll2-oms-1; ++i) b2[i] = ' ';
+    for(int i=0; i<oms; ++i) b2[ll2-oms+i-1] = bms[i];
+    b2[ll2-1]='\0';
+
+    print(0, "%s %s  %s %s\n",
+          &b2[0],
           (status==OK? "CORRECT": "INCORRECT"),
           dir2str(p->dir),
           pstr);
@@ -92,15 +104,17 @@ void test_stats::prt(){
     print(vdbg, "TESTN=%d get_nref_impls=%lu sizeof(wins)=%lu",
           (int)TESTN, (long unsigned)get_nref_impls(), (long unsigned)sizeof(td->wins));
     print(vdbg, "%c", '\n');
+
     for(unsigned i=imp0; i<TESTN; ++i){
         int wins=0;
         for(unsigned j=0; j<i; ++j){
             wins += td->wins[i*TESTN+j];
         }
-        printf("T loops: %-3u impl:%u  speedup: %-6.3fx  wins: %-4d"
+        char const* impname = get_ref_impls()[i].name;
+        printf("T:%-2u %-6s loops: %-3u speedup: %-6.3fx  wins: %-4d"
                "  tot_ms: %-8.3f  avg_ms: %.3f  avg speedup: %.3f x\n",
-                (unsigned)td->loops, i, td->ms[imp0] / td->ms[i], wins,
-                td->ms_tot[i], td->ms_tot[i] / td->loops,
+                i, impname, (unsigned)td->loops, td->ms[imp0] / td->ms[i],
+                wins, td->ms_tot[i], td->ms_tot[i] / td->loops,
                 td->ms_tot[imp0] / td->ms_tot[i]);
     }
 }

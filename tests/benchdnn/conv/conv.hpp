@@ -322,6 +322,7 @@ COMPUTE_REF_DECL( refconv_4 )   /* ref_conv4.cpp */
 COMPUTE_REF_DECL( refconv_99 )   /* ref_conv99.cpp */
 
 typedef struct {
+    char const*   name;
     conv_fwd_fn   fwd;
     conv_bwd_d_fn bwd_d;
     conv_bwd_w_fn bwd_w;

@@ -12,6 +12,11 @@
 --dir=FWD_B  --batch=conv_regression_dilate
 #--dir=BWD_D  --batch=conv_regression_dilate
 #--dir=BWD_WB --batch=conv_regression_dilate
+--dir=FWD_B  --batch=conv_regression_group
+#--dir=BWD_D  --batch=conv_regression_group
+#--dir=BWD_WB --batch=conv_regression_group
 --merge=RELU
 --dir=FWD_B --batch=conv_regression_small_spatial
 --dir=FWD_B --batch=conv_regression_padding
+--dir=FWD_B --batch=conv_regression_dilate
+--dir=FWD_B --batch=conv_regression_group

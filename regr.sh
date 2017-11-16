@@ -33,17 +33,24 @@ case $DIRN in
     ALL) # test_conv_regression mix
         BATCH="inputs/test_conv_regression"
         ;;
-    #ALEX*) # alexnet (mix)
-    #    BATCH="inputs/conv_alexnet"
+    ALEX*) # alexnet (mix)
+        BATCH="--dir=FWD_B --batch=inputs/conv_alexnet --dir=BWD_D --batch=inputs/conv_alexnet --dir=BWD_WB --batch=inputs/conv_alexnet"
     h | *) # help
         usage
         exit
         ;;
 esac
+# Alexnet: better to run as
+# (cd build && make && cd tests/benchdnn && OMP_NUM_THREADS=6 ./benchdnn --mode=PT --dir=FWD_B --batch=inputs/conv_alexnet) 2>&1 | tee alex-fwd.log
+# etc. to control which direction
 echo "BATCH   : $BATCH"
 if [ "$BATCH" = "" ]; then
     usage
     exit
+fi
+# if batch is a file, prepend --batch=
+if [ -f "./tests/benchdnn/${BATCH}" ]; then
+    BATCH="--batch=${BATCH}"
 fi
 if [ "$THREADS" ]; then
     if [ ! "$THREADS" -ge 0 ]; then
@@ -64,20 +71,13 @@ echo "LOGFILE : $LOGFILE"
             if [ "$THREADS" = "" ]; then unset OMP_NUM_THREADS;
             else THREADS="OMP_NUM_THREADS=$THREADS"; fi
             echo "THREADS  : $THREADS"
-            echo "cmd      : $THREADS /usr/bin/time -v ./benchdnn --mode=PT --batch=$BATCH"
+            echo "cmd      : $THREADS /usr/bin/time -v ./benchdnn --mode=PT $BATCH"
             cd tests/benchdnn;
             ls -l inputs;
-            eval $THREADS /usr/bin/time -v ./benchdnn --mode=PT --batch=$BATCH
+            eval $THREADS /usr/bin/time -v ./benchdnn --mode=PT $BATCH
         }
-    } || { echo "Build problems?"; false; }
-    ) >& "$LOGFILE" && {
-	echo YAY;
-	tail -n40 "$LOGFILE";
-} || \
-    {
-        echo "ohoh"
-        #tail -n80 $LOGFILE | grep '^[Tt@]'
-        tail -n80 $LOGFILE
-        echo "See LOGFILE = $LOGFILE"
-    }
+    } || { echo "Problems?"; false; }
+    ) >& "$LOGFILE" \
+        && { echo 'regr.sh OK'; tail -n40 $LOGFILE | awk '/final stats/{f=1} /kbytes/{f=0} f==1{print $0;}'; } \
+        || { echo "regr.sh FAIL"; tail -n80 $LOGFILE; echo "See LOGFILE = $LOGFILE"; }
 # vim: set ts=4 sw=4 et :

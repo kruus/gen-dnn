@@ -219,7 +219,10 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
   MUST( p->dh >= 0 && p->dw >= 0 );
   MUST( p->sh >= 0 && p->sw >= 0 );
 
-#if 0 // original hoist, regr 4.72x
+#if 0
+  refconv_2_fwd(p, src_m, wei_m, bia_m, dst_m);
+
+#elif 0 // original hoist, regr 4.72x
   auto ker = [](
       const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &wei_m,
       float &d, const int g, const int mb, const int oc, const int oh, const int ow
@@ -276,6 +279,7 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
   // musek(avx):regr 14.0x
   // writes go to  dst_off_f(p, mb, g, oc, oh, ow);
   // on alexnet, this got me about 15x speedup
+  // regr.sh-FWD 2.42x,2.38x
 #   pragma omp parallel for collapse(5)
   for (int g = 0; g < p->g; ++g) {
     for (int mb = 0; mb < p->mb; ++mb) {
@@ -379,7 +383,9 @@ if( (ih+PH) % gcd_h == 0 ){ // Do solutions exist?
 }
 kh_beg = k;
 \endverbatim
-*/
+ * Discovering such formulas <em>by guesswork</em> did not work out
+ * well for me at all !
+ */
 static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
         dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m)
 {

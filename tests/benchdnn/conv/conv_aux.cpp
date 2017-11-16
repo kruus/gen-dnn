@@ -26,6 +26,8 @@
 #include "conv/conv.hpp"
 #include "../idiv.hpp"
 
+#include <cstdarg>
+
 namespace conv {
 
 const char *inp_type2str(int what) {
@@ -273,6 +275,23 @@ int str2desc(desc_t *desc, const char *str) {
     d.g = 1; d.mb = 2; d.sh = d.sw = 1; d.dh = d.dw = 0;
     d.name = "\"wip\"";
 
+    auto fail = [&](char const* fmt, ...){
+        const int len = 256;
+        char buf[len];
+        char *b = &buf[0];
+        int l = len;
+        int o = snprintf(b, l, " str2desc: %s\n"
+                /*          */ "           ", str);
+        b += o; l -= o;
+        va_list args;
+        va_start(args, fmt);
+        o = vsnprintf(b, l, fmt, args);
+        //b += o; l -= o;
+        va_end(args);
+        print(0,"%s\n",buf);
+        return FAIL;
+    };
+
     const char *s = str;
     assert(s);
 
@@ -295,16 +314,14 @@ int str2desc(desc_t *desc, const char *str) {
         CASE_N(dh); CASE_N(dw);
         if (*s == 'n') { d.name = s + 1; break; }
         if (*s == '_') ++s;
-        if (!ok){
-            printf(" str2desc: unparsed desc is %s\n", s);
-            return FAIL;
-        }
+        if (!ok) return fail("unparsed desc is %s\n", s);
     }
 #   undef CASE_NN
 #   undef CASE_N
 
-    if (d.ic == 0 || d.oc == 0) return FAIL;
-    if (d.sh < 1  || d.sw <  1) return FAIL;
+    if (d.ic < 1 || d.oc < 1) return fail(" need ic, oc > 0");
+    if (d.sh < 1 || d.sw < 1) return fail(" need sh, sw > 0");
+    if (d.oc % d.g != 0) return fail(" oc must be a multiple of g");
 
     const bool no_h = (d.ih | d.kh | d.oh | d.ph | d.dh) == 0 && d.sh == 1;
     const bool no_w = (d.iw | d.kw | d.ow | d.pw | d.dw) == 0 && d.sw == 1;
@@ -315,10 +332,8 @@ int str2desc(desc_t *desc, const char *str) {
     if (!no_h) {
         // Force user to fix nonsense spec strings
         if (!d.ih || !d.kh ) return FAIL;                      // required!
-        if ( d.sh<1 || d.ih<0 || d.oh<0 || d.ph<0 ){
-            printf(" str2desc range: sh%d_ih%d_oh%d_ph%d\n", d.sh,d.ih,d.oh,d.ph);
-            return FAIL;
-        }
+        if ( d.sh<1 || d.ih<0 || d.oh<0 || d.ph<0 )
+            return fail(" range! sh%d_ih%d_oh%d_ph%d\n", d.sh,d.ih,d.oh,d.ph);
         if (d.oh<=0) // illegal/unset
             d.oh = compute_out(d.ih, d.kh, d.sh, d.ph, d.dh);
         if (d.oh<=0){ // illegal/unset (may be -ve because of too-low pad?)
@@ -337,8 +352,7 @@ int str2desc(desc_t *desc, const char *str) {
     if (!no_w) {
         if (!d.iw || !d.kw) return FAIL;
         if ( d.sh<1 || d.ih<0 || d.oh<0 || d.ph<0 ){
-            printf(" str2desc range: sw%d_iw%d_ow%d_pw%d\n", d.sw,d.iw,d.ow,d.pw);
-            return FAIL;
+            return fail(" range! sw%d_iw%d_ow%d_pw%d\n", d.sw,d.iw,d.ow,d.pw);
         }
         if (d.ow<=0) // illegal/unset
             d.ow = compute_out(d.iw, d.kw, d.sw, d.pw, d.dw);
@@ -394,7 +408,7 @@ int str2desc(desc_t *desc, const char *str) {
 #endif
 
     if( strange ){
-        printf("Error: Tried to make things consistend,"
+        printf("Error: Tried to make things consistent,"
                " but still bad output width/height\n");
         printf("       i,k,s,p,d %d,%d,%d,%d,%d -> ow=%d\n",
                d.iw, d.kw, d.sw, d.pw, d.dw, d.ow );
@@ -525,4 +539,4 @@ bool maybe_skip(const char *impl_str) {
 }
 
 }
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

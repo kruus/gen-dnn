@@ -47,16 +47,16 @@ using std::cout; using std::endl; using std::setw;
 namespace conv {
 
 static conv_impls_t conv_impls_[] = {
-    {compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
-    {refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
+    {"orig", compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
+    {"ref2", refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
 
     //{refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
-    {refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
+    {"ref3", refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
 
     //{refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
-    {refconv_4_fwd,         refconv_4_bwd_d,            refconv_4_bwd_w},
+    {"ref4", refconv_4_fwd,         refconv_4_bwd_d,            refconv_4_bwd_w},
 
-    {refconv_99_fwd,         refconv_99_bwd_d,            refconv_99_bwd_w}
+    {"rf99", refconv_99_fwd,         refconv_99_bwd_d,            refconv_99_bwd_w}
 };
 
 #define TESTN (sizeof(conv_impls_) / sizeof(conv_impls_t))
@@ -906,14 +906,16 @@ static char const* shorten(char const* impl_str)
 /** \c run_fn a benchdnn test loop and return status of \c compare_fn.
  * Accumulate stats and report as per \c bench_mode TEST/PERF. */
 static void test_impl_compare( const prb_t* p, res_t* r, const size_t imp,
-        std::function<void(void)> run_fn, std::function<int(void)> compare_fn  )
+        std::function<void(void)> run_fn, std::function<int(void)> compare_fn )
 { /* always do a single test run, for pass/error status */
     auto &bs = benchdnn_stat;
+    assert( imp <= get_nref_impls() && imp >= 0 );
+    char const* impname = get_ref_impls()[imp].name;
     benchdnn_timer_t tt;
     tt.start();
     run_fn();
     tt.stop();
-    print(5, "compare impl[%lu] vs impl[0]", (unsigned long)imp);
+    print(5, "compare impl[%lu] %s vs impl[0]", (unsigned long)imp, impname);
     int status = compare_fn();
     if (!(bench_mode & PERF)) {
         bs.ts->update_impl(p, r, status, tt, imp);
@@ -935,8 +937,8 @@ static void test_impl_compare( const prb_t* p, res_t* r, const size_t imp,
             if (stop) break;
         }
         if(0) {
-            char impl_str[16];
-            snprintf(&impl_str[0], 16, "TEST:%lu", imp);
+            char impl_str[20];
+            snprintf(&impl_str[0], 20, "TEST:%2lu %-8s", imp, impname);
             char pstr[max_prb_len];
             prb2str(p, pstr);
             perf_report(p, r, pstr, &impl_str[0]);
@@ -1108,6 +1110,8 @@ int doit(const prb_t *p, res_t *r) {
                 const char *impl_str = query_impl_info(pd_n); \
                 impl = (verbose>0? impl_str: shorten(impl_str)); \
                 res_state_t pitst = UNTESTED;
+                // in: bench_mode, pit
+                // out: impl_str, impl pitst, pd_n
                 ITERATE_OVER_IMPLS_BEGIN;
 #define ITERATE_OVER_IMPLS_TEST( test_ok_fail ) \
                 if (maybe_skip(impl_str)) pitst = SKIPPED; \
@@ -1117,6 +1121,8 @@ int doit(const prb_t *p, res_t *r) {
                     SAFE((bool)prim_create? OK: FAIL, WARN); \
                     pitst = (test_ok_fail() != OK? FAILED: PASSED); \
                 }
+                // in: impl_str, pitst, p, pd_n, inputs, outputs
+                // out: c
                 ITERATE_OVER_IMPLS_TEST( fwd_test );
 #define ITERATE_OVER_IMPLS_END \
                 benchdnn_stat_update(pitst, r); \
@@ -1125,6 +1131,8 @@ int doit(const prb_t *p, res_t *r) {
                       impl, dir2str(p->dir)); \
                 if (pitst == SKIPPED) continue; \
                 if(! (bench_mode & ALL)) break;
+                // in: pitst, r, pit, impl, p, bench_mode
+                // out: <> + continue/break
                 ITERATE_OVER_IMPLS_END;
             }
             if (r->state == UNTESTED){ // paranoia
