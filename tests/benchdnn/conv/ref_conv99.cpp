@@ -40,7 +40,7 @@ void refconv_99_fwd(const prb_t *p, dnn_mem_t &src_m,
   // musek(avx)-->3
   // snake10(avx2)-->3
     //refconv_3_fwd(p, src_m, wei_m, bia_m, dst_m);
-    //refconv_4_fwd(p, src_m, wei_m, bia_m, dst_m);
+    refconv_4_fwd(p, src_m, wei_m, bia_m, dst_m);
 }
 
 void refconv_99_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
