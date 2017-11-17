@@ -47,16 +47,20 @@ using std::cout; using std::endl; using std::setw;
 namespace conv {
 
 static conv_impls_t conv_impls_[] = {
+    // Always keep this one, to calculate speedup factors
     {"orig", compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
+
     {"ref2", refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
+    //{"NULL", nullptr, nullptr, nullptr},      // save time?
 
-    //{refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
     {"ref3", refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
+    //{"NULL", nullptr, nullptr, nullptr},
 
-    //{refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
     {"ref4", refconv_4_fwd,         refconv_4_bwd_d,            refconv_4_bwd_w},
+    //{"NULL", nullptr, nullptr, nullptr} // save time
 
     {"rf99", refconv_99_fwd,         refconv_99_bwd_d,            refconv_99_bwd_w}
+    //{"NULL", nullptr, nullptr, nullptr}
 };
 
 #define TESTN (sizeof(conv_impls_) / sizeof(conv_impls_t))

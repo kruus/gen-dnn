@@ -68,8 +68,10 @@ bench_mode_t str2bench_mode(const char *str) {
         mode = (bench_mode_t)((int)mode | (int)ALL);
     if (strchr(str, 't') || strchr(str, 'T') )
         mode = (bench_mode_t)((int)mode | (int)TEST);
-    if (mode == MODE_UNDEF)
+    if (mode == MODE_UNDEF){
+        print(0," bad mode: %s\n", str);
         []() { SAFE(FAIL, CRIT); return 0; }();
+    }
 
     if ( (mode & ALL) && ! (mode & PERF || mode & CORR) )
         mode = (bench_mode_t)((int)mode | (int)CORR);

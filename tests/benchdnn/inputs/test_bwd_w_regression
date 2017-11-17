@@ -1,7 +1,7 @@
 # f32
 --reset --cfg=f32_full
---dir=BWD_WB --batch=conv_regression_small_spatial
---dir=BWD_WB --batch=conv_regression_padding
---dir=BWD_WB --batch=conv_regression_stride
---dir=BWD_WB --batch=conv_regression_dilate
 --dir=BWD_WB --batch=conv_regression_group
+--dir=BWD_WB --batch=conv_regression_dilate
+--dir=BWD_WB --batch=conv_regression_stride
+--dir=BWD_WB --batch=conv_regression_padding
+--dir=BWD_WB --batch=conv_regression_small_spatial
