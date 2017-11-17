@@ -1,0 +1,7 @@
+# minialex ; reduce minibatch 256 --> 16
+
+g1mb16ic3ih227iw227oc96oh55ow55kh11kw11sh4sw4ph0pw0n"alex-mb16:conv1"
+g2mb16ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+mb2516256ih13oc384oh13kh3ph1n"alex-mb16:conv3"
+g2mb16ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+g2mb16ic384ih13oc256oh13kh3ph1n"alex-mb16:conv5"
