@@ -332,6 +332,7 @@ COMPUTE_REF_DECL( compute_ref ) /* ref_conv.cpp */
 COMPUTE_REF_DECL( refconv_2 )   /* ref_conv2.cpp */
 COMPUTE_REF_DECL( refconv_3 )   /* ref_conv3.cpp */
 COMPUTE_REF_DECL( refconv_4 )   /* ref_conv4.cpp */
+COMPUTE_REF_DECL( refconv_5 )   /* ref_conv4.cpp */
 COMPUTE_REF_DECL( refconv_99 )   /* ref_conv99.cpp */
 
 typedef struct {

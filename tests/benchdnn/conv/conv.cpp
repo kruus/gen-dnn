@@ -50,7 +50,8 @@ static conv_impls_t conv_impls_[] = {
     // Always keep this one, to calculate speedup factors
     {"orig", compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
 
-    {"ref2", refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
+    //{"ref2", refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
+    {"ref5", refconv_5_fwd,         refconv_5_bwd_d,            refconv_5_bwd_w},
     //{"NULL", nullptr, nullptr, nullptr},      // save time?
 
     {"ref3", refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},

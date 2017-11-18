@@ -51,7 +51,7 @@ for ((i=0; i<${#ARGS[*]}; ++i)); do
     chkfile=0
     case $xform in
         FWD|FWD_B|FWD_D) # mostly FWD_B and some with --merge=RELU
-            BASE=""; xform="test_fwd_regression"; chkfile=1; ((++nopt))
+            BASE="FWD"; xform="test_fwd_regression"; chkfile=1; ((++nopt))
             ;;
         BWD_D) # backward data
             BASE="BWD_D;" xform="test_bwd_d_regression"; chkfile=1; ((++nopt))
@@ -65,6 +65,11 @@ for ((i=0; i<${#ARGS[*]}; ++i)); do
         ALEX|ALEXNET) # alexnet (mix)
             BASE="ALEX";
             xform="--dir=FWD_B --batch=inputs/conv_alexnet --dir=BWD_D --batch=inputs/conv_alexnet --dir=BWD_WB --batch=inputs/conv_alexnet"
+            ((++nopt))
+            ;;
+        MINI) # low-minibatch alexnet
+            BASE="MINIALEX";
+            xform="--dir=FWD_B --batch=inputs/minialex --dir=BWD_D --batch=inputs/minialex --dir=BWD_WB --batch=inputs/minialex"
             ((++nopt))
             ;;
         h) # help
@@ -105,7 +110,7 @@ BUILDDIR=build
 #(cd build && make && cd tests/benchdnn && /usr/bin/time -v ./benchdnn --mode=PT --batch=inputs/test_fwd_regression) 2>&1 | tee PT.log
 HOSTNAME=`hostname --short`
 LOGFILE="${BASE}-${HOSTNAME}.log"
-if [ ! "$THREADS" = "" ]; then LOGFILE="${DIRN}-t${THREADS}-${HOSTNAME}.log"; fi
+if [ ! "$THREADS" = "" ]; then LOGFILE="${BASE}-t${THREADS}-${HOSTNAME}.log"; fi
 echo "LOGFILE : $LOGFILE"
 (
 {
@@ -116,11 +121,13 @@ echo "LOGFILE : $LOGFILE"
             echo "THREADS  : $THREADS"
             echo "cmd      : $THREADS /usr/bin/time -v ./benchdnn --mode=PT ${ARGS[@]}"
             cd tests/benchdnn;
-            ls -l inputs;
+            #ls -l inputs;
+            echo " `pwd` inputs:"
+            (cd inputs && ls -1) | awk '//{p=p " " $0;++n} n>=4{print p; p=""; n=0} END{print p}' | column -t
             eval $THREADS /usr/bin/time -v ./benchdnn --mode=PT ${ARGS[@]}
         }
     } || { echo "Problems?"; false; }
     ) >& "$LOGFILE" \
         && { echo 'regr.sh OK'; tail -n40 $LOGFILE | awk '/final stats/{f=1} /kbytes/{f=0} f==1{print $0;}'; } \
-        || { echo "regr.sh FAIL"; tail -n80 $LOGFILE; echo "See LOGFILE = $LOGFILE"; }
+        || { echo "regr.sh FAIL"; tail -n40 $LOGFILE | awk 'BEGIN{f=1} /kbytes/{f=0} f==1{print $0}'; echo "See LOGFILE = $LOGFILE"; }
 # vim: set ts=4 sw=4 et :
