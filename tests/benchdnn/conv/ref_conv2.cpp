@@ -17,6 +17,23 @@
  * no lambda parms by reference, test_conv_regression avg speedup = 1.557 x */
 #include "conv/conv.hpp"
 
+#define G  p->g
+#define MB p->mb
+#define IC p->ic
+#define OC p->oc
+
+#define KH p->kh
+#define IH p->ih
+#define OH p->oh
+#define SH p->sh
+#define PH p->ph
+
+#define KW p->kw
+#define IW p->iw
+#define OW p->ow
+#define SW p->sw
+#define PW p->pw
+
 namespace conv {
 
 void refconv_2_fwd(const prb_t *p, dnn_mem_t &src_m,
@@ -24,14 +41,14 @@ void refconv_2_fwd(const prb_t *p, dnn_mem_t &src_m,
   auto ker = [](
                 const prb_t *p, const dnn_mem_t &src_m, const dnn_mem_t &wei_m,
                 float &d, int g, int mb, int oc, int oh, int ow) {
-    for (int ic = 0; ic < p->ic/p->g; ++ic) {
-      for (int kh = 0; kh < p->kh; ++kh) {
-        const int ih = oh * p->sh - p->ph + kh * (p->dh + 1);
-        if (ih < 0 || ih >= p->ih) continue;
+    for (int ic = 0; ic < IC/G; ++ic) {
+      for (int kh = 0; kh < KH; ++kh) {
+        const int ih = oh * SH - PH + kh * (p->dh + 1);
+        if (ih < 0 || ih >= IH) continue;
 
-        for (int kw = 0; kw < p->kw; ++kw) {
-          const int iw = ow * p->sw - p->pw + kw * (p->dw + 1);
-          if (iw < 0 || iw >= p->iw) continue;
+        for (int kw = 0; kw < KW; ++kw) {
+          const int iw = ow * SW - PW + kw * (p->dw + 1);
+          if (iw < 0 || iw >= IW) continue;
 
           size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
           size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
@@ -42,11 +59,11 @@ void refconv_2_fwd(const prb_t *p, dnn_mem_t &src_m,
   };
 
 #   pragma omp parallel for collapse(5)
-  for (int g = 0; g < p->g; ++g) {
-    for (int mb = 0; mb < p->mb; ++mb) {
-      for (int oc = 0; oc < p->oc/p->g; ++oc) {
-        for (int oh = 0; oh < p->oh; ++oh) {
-          for (int ow = 0; ow < p->ow; ++ow) {
+  for (int g = 0; g < G; ++g) {
+    for (int mb = 0; mb < MB; ++mb) {
+      for (int oc = 0; oc < OC/G; ++oc) {
+        for (int oh = 0; oh < OH; ++oh) {
+          for (int ow = 0; ow < OW; ++ow) {
             size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
             size_t bia_off = bia_off_f(p, g, oc);
             float &d = ((float*)dst_m)[dst_off];
@@ -68,18 +85,18 @@ void refconv_2_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
   auto ker = [](
                 const prb_t *p, const dnn_mem_t &diff_dst_m, const dnn_mem_t &wei_m,
                 float &ds, int g, int mb, int ic, int ih, int iw) {
-    for (int oc = 0; oc < p->oc/p->g; ++oc) {
-      for (int kh = 0; kh < p->kh; ++kh) {
-        int oh = ih - kh * (p->dh + 1) + p->ph;
-        if (oh < 0 || oh % p->sh) continue;
-        oh /= p->sh;
-        if (oh >= p->oh) continue;
+    for (int oc = 0; oc < OC/G; ++oc) {
+      for (int kh = 0; kh < KH; ++kh) {
+        int oh = ih - kh * (p->dh + 1) + PH;
+        if (oh < 0 || oh % SH) continue;
+        oh /= SH;
+        if (oh >= OH) continue;
 
-        for (int kw = 0; kw < p->kw; ++kw) {
-          int ow = iw - kw * (p->dw + 1) + p->pw;
-          if (ow < 0 || ow % p->sw) continue;
-          ow /= p->sw;
-          if (ow >= p->ow) continue;
+        for (int kw = 0; kw < KW; ++kw) {
+          int ow = iw - kw * (p->dw + 1) + PW;
+          if (ow < 0 || ow % SW) continue;
+          ow /= SW;
+          if (ow >= OW) continue;
 
           size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
           size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
@@ -91,11 +108,11 @@ void refconv_2_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
   };
 
 #   pragma omp parallel for collapse(5)
-  for (int g = 0; g < p->g; ++g) {
-    for (int mb = 0; mb < p->mb; ++mb) {
-      for (int ic = 0; ic < p->ic/p->g; ++ic) {
-        for (int ih = 0; ih < p->ih; ++ih) {
-          for (int iw = 0; iw < p->iw; ++iw) {
+  for (int g = 0; g < G; ++g) {
+    for (int mb = 0; mb < MB; ++mb) {
+      for (int ic = 0; ic < IC/G; ++ic) {
+        for (int ih = 0; ih < IH; ++ih) {
+          for (int iw = 0; iw < IW; ++iw) {
             size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
             float &ds = ((float*)diff_src_m)[src_off];
             ds = 0;
@@ -109,28 +126,28 @@ void refconv_2_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
 #elif 1
   //RT_ASSERT( p->dh == 0 && p->dw == 0 );
 # pragma omp parallel for collapse(5)
-  for (int g = 0; g < p->g; ++g) {
-    for (int mb = 0; mb < p->mb; ++mb) {
-      for (int ic = 0; ic < p->ic/p->g; ++ic) {
-        for (int ih = 0; ih < p->ih; ++ih) {
-          for (int iw = 0; iw < p->iw; ++iw) {
+  for (int g = 0; g < G; ++g) {
+    for (int mb = 0; mb < MB; ++mb) {
+      for (int ic = 0; ic < IC/G; ++ic) {
+        for (int ih = 0; ih < IH; ++ih) {
+          for (int iw = 0; iw < IW; ++iw) {
             size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
             float &ds = ((float*)diff_src_m)[src_off];
             ds = 0;
-            for (int kh = 0; kh < p->kh; ++kh) {
-              int oh = ih - kh * (p->dh + 1) + p->ph;
-              bool const ohok = oh >= 0 && oh % p->sh == 0;
-              oh = oh / p->sh;
+            for (int kh = 0; kh < KH; ++kh) {
+              int oh = ih - kh * (p->dh + 1) + PH;
+              bool const ohok = oh >= 0 && oh % SH == 0;
+              oh = oh / SH;
 
-              for (int kw = 0; kw < p->kw; ++kw) {
-                int ow = iw - kw * (p->dw + 1) + p->pw;
-                bool const owok = ow >= 0 && ow % p->sw == 0;
-                ow = ow / p->sw;
-                if (!(ohok && owok && oh < p->oh && ow < p->ow)) continue;
+              for (int kw = 0; kw < KW; ++kw) {
+                int ow = iw - kw * (p->dw + 1) + PW;
+                bool const owok = ow >= 0 && ow % SW == 0;
+                ow = ow / SW;
+                if (!(ohok && owok && oh < OH && ow < OW)) continue;
                 // test fail 40 ??? why ...
-                //if (!(ohok && owok && (oh=oh/p->sh)<p->oh && (ow=ow/p->sw)<p->ow)) continue;
+                //if (!(ohok && owok && (oh=oh/SH)<OH && (ow=ow/SW)<OW)) continue;
 
-                for (int oc = 0; oc < p->oc/p->g; ++oc) { // <---- moved
+                for (int oc = 0; oc < OC/G; ++oc) { // <---- moved
                   size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
                   size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
                   ds += ((float*)diff_dst_m)[dst_off]
@@ -154,13 +171,13 @@ void refconv_2_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   auto ker = [](
                 const prb_t *p, const dnn_mem_t &diff_dst_m, const dnn_mem_t &src_m,
                 float &dw, int g, int oc, int ic, int kh, int kw) {
-    for (int mb = 0; mb < p->mb; ++mb) {
-      for (int oh = 0; oh < p->oh; ++oh) {
-        for (int ow = 0; ow < p->ow; ++ow) {
-          const int ih = oh * p->sh - p->ph + kh * (p->dh + 1);
-          const int iw = ow * p->sw - p->pw + kw * (p->dw + 1);
-          if (ih < 0 || ih >= p->ih) continue;
-          if (iw < 0 || iw >= p->iw) continue;
+    for (int mb = 0; mb < MB; ++mb) {
+      for (int oh = 0; oh < OH; ++oh) {
+        for (int ow = 0; ow < OW; ++ow) {
+          const int ih = oh * SH - PH + kh * (p->dh + 1);
+          const int iw = ow * SW - PW + kw * (p->dw + 1);
+          if (ih < 0 || ih >= IH) continue;
+          if (iw < 0 || iw >= IW) continue;
 
           size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
           size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
@@ -172,11 +189,11 @@ void refconv_2_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   };
 
 #   pragma omp parallel for collapse(5)
-  for (int g = 0; g < p->g; ++g) {
-    for (int oc = 0; oc < p->oc/p->g; ++oc) {
-      for (int ic = 0; ic < p->ic/p->g; ++ic) {
-        for (int kh = 0; kh < p->kh; ++kh) {
-          for (int kw = 0; kw < p->kw; ++kw) {
+  for (int g = 0; g < G; ++g) {
+    for (int oc = 0; oc < OC/G; ++oc) {
+      for (int ic = 0; ic < IC/G; ++ic) {
+        for (int kh = 0; kh < KH; ++kh) {
+          for (int kw = 0; kw < KW; ++kw) {
             size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
             float &dw = ((float*)diff_wei_m)[wei_off];
             dw = 0;
@@ -191,15 +208,15 @@ void refconv_2_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   if (!(p->dir & FLAG_BIA)) return;
 
 #   pragma omp parallel for collapse(2)
-  for (int g = 0; g < p->g; ++g) {
-    for (int oc = 0; oc < p->oc/p->g; ++oc) {
+  for (int g = 0; g < G; ++g) {
+    for (int oc = 0; oc < OC/G; ++oc) {
       size_t bia_off = bia_off_f(p, g, oc);
       float &db = ((float*)diff_bia_m)[bia_off];
       db = 0;
 
-      for (int mb = 0; mb < p->mb; ++mb) {
-        for (int oh = 0; oh < p->oh; ++oh) {
-          for (int ow = 0; ow < p->ow; ++ow) {
+      for (int mb = 0; mb < MB; ++mb) {
+        for (int oh = 0; oh < OH; ++oh) {
+          for (int ow = 0; ow < OW; ++ow) {
             size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
             db += ((float*)diff_dst_m)[dst_off];
           }
