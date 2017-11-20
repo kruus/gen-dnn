@@ -52,6 +52,26 @@ static bool trivial( int const verb, bool const cond, char const* msg,
 #define DMUST(...)   MUST(__VA_ARGS__)
 #endif
 
+#define G  p->g
+#define MB p->mb
+#define IC p->ic
+#define OC p->oc
+
+#define KH p->kh
+#define IH p->ih
+#define OH p->oh
+#define SH p->sh
+#define PH p->ph
+
+#define KW p->kw
+#define IW p->iw
+#define OW p->ow
+#define SW p->sw
+#define PW p->pw
+
+const int DH = p->dh + 1;
+const int DW = p->dw + 1;
+
 //----------------------------
 
 /** greatest common denominator, a,b > 0 */

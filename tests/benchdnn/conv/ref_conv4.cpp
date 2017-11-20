@@ -1688,16 +1688,38 @@ void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
         }
         for (int kh = 0; kh < p->kh; ++kh) {
           int oh_beg, oh_end;
+          // TODO: optimize, same as fwd
+#define HOIST_OH 1
+#if HOIST_OH==0
           hoist_ApiB_in( /* set     */ oh_beg, oh_end,
                          /*oh  in   */ oh_lowest, p->oh,
                          /*ih=A+ohB */ -p->ph + kh*(p->dh+1), p->sh, // B>0, ApiB OK
                          /*ih in    */ 0, p->ih);
+#elif HOIST_OH==1 // see ref_conv3 for this version, ref_conv5 for yet another
+    oh_beg = div_floor(       + p->ph - kh * (p->dh + 1) + p->sh - 1, p->sh);//(c-a+b-1)/b
+    oh_end = div_floor( p->ih + p->ph - kh * (p->dh + 1) + p->sh - 1, p->sh);//(d-a+b-1)/b
+    if (oh_beg < 0    ) oh_beg = 0;
+    if (oh_end > p->oh) oh_end = p->oh;
+#else
+#error "huh"
+#endif
           for (int kw = 0; kw < p->kw; ++kw) {
             int ow_beg, ow_end;
+#if HOIST_OH==0
             hoist_ApiB_in( /* set     */ ow_beg, ow_end,
                            /*ow  in   */ ow_lowest, p->ow,
                            /*iw=A+owB */ -p->pw + kw*(p->dw+1), p->sw, // B>0, ApiB OK
                            /*iw in    */ 0, p->iw);
+#elif HOIST_OH==1
+      ow_beg = div_floor(       + p->pw - kw * (p->dw + 1) + p->sw - 1, p->sw);//(c-a+b-1)/b
+      ow_end = div_floor( p->iw + p->pw - kw * (p->dw + 1) + p->sw - 1, p->sw);//(d-a+b-1)/b
+      if (ow_beg < 0    ) ow_beg = 0;
+      if (ow_end > p->ow) ow_end = p->ow;
+#else
+#error "huh"
+#endif
+      // TODO: figure out aliasing issues
+#if 0
             for (int oh = oh_beg; oh < oh_end; ++oh) {
               const int ih  =  oh*p->sh - p->ph + kh * (p->dh+1);
               for (int ow = ow_beg; ow < ow_end; ++ow) {
@@ -1714,6 +1736,41 @@ void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
                 ds += tmp;
               }
             }
+#else
+            // aliasing analysis does not seem easy. (between kh/ih and kh/iw)
+            // src_off_f:
+            //    ((mb * p->ic + g * p->ic/p->g + ic) * p->ih + ih) * p->iw
+            // Q: when is ih for one kh equal to ih for some other kh?
+            // Usual case has lots of aliasing happening!
+            // Soln would be to split into 3 cases (each)
+            // kh "left" kh "full-range" kh "right"
+            //and the reorder to loops oh-first...
+            //........
+            //but this ends up looking a lot like plain refconv3
+            int ih = oh_beg * p->sh - p->ph + kh * (p->dh+1);
+            const int Aiw = kw * (p->dw+1) - p->pw;
+            for (int oh = oh_beg; oh < oh_end; ++oh) {
+              //const int ih  =  oh*p->sh - p->ph + kh * (p->dh+1);
+              //int iw= ow_beg * p->sw - p->pw + kw * (p->dw+1);
+              int iw = ow_beg * p->sw + Aiw;
+              for (int ow = ow_beg; ow < ow_end; ++ow) {
+                float tmp=0.0f;
+                for (int oc = 0; oc < p->oc/p->g; ++oc) {
+                  size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+                  size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+                  tmp += ((float*)diff_dst_m)[dst_off] * ((float*)wei_m)[wei_off];
+                }
+                //const int iw  =  ow*p->sw - p->pw + kw * (p->dw+1);
+                //RT_ASSERT( iw == iw2 );
+                const size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+                float &ds = ((float*)diff_src_m)[src_off];
+#pragma omp atomic
+                ds += tmp;
+                iw += p->sw;
+              }
+              ih += p->sh;
+            }
+#endif
           }
         }
       }
@@ -2879,6 +2936,8 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
         }
       }
     }
+    // NOTE: we've arrived at something very similar to ref_conv3, but
+    //   mb-loop is outside omp-loop
     for (int mb = 0; mb < p->mb; ++mb) {
 #pragma omp parallel
 #pragma omp for collapse(4)

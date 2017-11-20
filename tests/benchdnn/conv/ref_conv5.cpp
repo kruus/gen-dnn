@@ -486,35 +486,58 @@ kh_beg = k;
 static void refconv_5_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
         dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m)
 {
-#if 0 // shorten, do same for kw,ow loop. tweaks to kh calc
+#define G  p->g
+#define MB p->mb
+#define IC p->ic
+#define OC p->oc
+
+#if 0
   int const KH = p->kh;
+  int const IH = p->ih;
   int const OH = p->oh;
-  int const DH = p->dh + 1;
   int const SH = p->sh;
   int const PH = p->ph;
-  const int gcd_h = gcd( SH, DH );
-  const int lcm_h = SH * DH/gcd_h; //lcm( SH, DH ) = SH*DH / gcd(SH,DH)
-  const int khh = lcm_h / DH;
-  DMUST( khh == SH / gcd(SH,DH) );
-  const int jhh = lcm_h / SH;
+#else
+#define KH p->kh
+#define IH p->ih
+#define OH p->oh
+#define SH p->sh
+#define PH p->ph
+#endif
+  int const DH = p->dh + 1;
+
   int ha, hb, hg;
   extendedEuclid( ha, DH, hb, SH, hg);
+  const int gcd_h = hg;                 // = gcd( SH, DH );
+  const int lcm_h = SH * DH/gcd_h;      // lcm( SH, DH ) = SH*DH / gcd(SH,DH)
+  const int khh = SH / gcd_h;           // = lcm_h / DH;
+  DMUST( khh == SH / gcd(SH,DH) );
+  const int jhh = lcm_h / SH;
   //print(0," extendedEuclid: %d * [DH=%d] + %d * [SH=%d] = %d[gcd(DH,SH)]\n", ha,DH, hb,SH, hg);
   DMUST( hg == gcd_h );
-
-  int const KW = p->kh;
-  int const DW = p->dw + 1;
-  int const SW = p->sw;
+#if 0
+  int const KW = p->kw;
+  int const IW = p->iw;
   int const OW = p->ow;
+  int const SW = p->sw;
   int const PW = p->pw;
-  const int gcd_w = gcd( SW, DW );
-  //const int lcm_w = lcm( SW, DW );
-  const int lcm_w = SW * DW/gcd_w;
-  const int kww = lcm_w / DW;
-  const int jww = lcm_w / SW;
+#else
+#define KW p->kw
+#define IW p->iw
+#define OW p->ow
+#define SW p->sw
+#define PW p->pw
+#endif
+  const int DW = p->dw + 1;
+
   int wa, wb, wg;
-  extendedEuclid( wa, DW, wb, SW, wg);
-  DMUST( wg == gcd_w );
+  extendedEuclid( wa, DW, wb, SW, wg); // DMUST( wg == gcd_w );
+  const int gcd_w = wg;                // = gcd( SW, DW );
+  const int lcm_w = SW * DW/gcd_w; // = lcm( SW, DW ) = SW*DW/gcd_w;
+  const int kww = SW / gcd_w;      // = lcm_w / DW;
+  const int jww = DW / gcd_w;      // = lcm_w / SW
+
+#if 0 // shorten, do same for kw,ow loop. tweaks to kh calc
   # pragma omp parallel for collapse(5)
   for (int g = 0; g < p->g; ++g) {
     for (int mb = 0; mb < p->mb; ++mb) {
@@ -624,34 +647,6 @@ static void refconv_5_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
     }
   }
 #elif 1 // clean up
-  int const KH = p->kh;
-  int const OH = p->oh;
-  int const DH = p->dh + 1;
-  int const SH = p->sh;
-  int const PH = p->ph;
-  const int gcd_h = gcd( SH, DH );
-  const int lcm_h = SH * DH/gcd_h; //lcm( SH, DH ) = SH*DH / gcd(SH,DH)
-  const int khh = lcm_h / DH;
-  DMUST( khh == SH / gcd(SH,DH) );
-  const int jhh = lcm_h / SH;
-  int ha, hb, hg;
-  extendedEuclid( ha, DH, hb, SH, hg);
-  //print(0," extendedEuclid: %d * [DH=%d] + %d * [SH=%d] = %d[gcd(DH,SH)]\n", ha,DH, hb,SH, hg);
-  DMUST( hg == gcd_h );
-
-  int const KW = p->kh;
-  int const DW = p->dw + 1;
-  int const SW = p->sw;
-  int const OW = p->ow;
-  int const PW = p->pw;
-  const int gcd_w = gcd( SW, DW );
-  //const int lcm_w = lcm( SW, DW );
-  const int lcm_w = SW * DW/gcd_w;
-  const int kww = lcm_w / DW;
-  const int jww = lcm_w / SW;
-  int wa, wb, wg;
-  extendedEuclid( wa, DW, wb, SW, wg);
-  DMUST( wg == gcd_w );
   # pragma omp parallel for collapse(5)
   for (int g = 0; g < p->g; ++g) {
     for (int mb = 0; mb < p->mb; ++mb) {
@@ -780,43 +775,46 @@ void refconv_5_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
     return;
   }
 
-#   pragma omp parallel for collapse(4)
-  for (int g = 0; g < p->g; ++g) {
-    for (int mb = 0; mb < p->mb; ++mb) {
-      for (int ic = 0; ic < p->ic/p->g; ++ic) {
-        for (int ih = 0; ih < p->ih; ++ih) {
-          //int ocend = (p->oc/p->g);
-          register int kh_e = ih + p->ph;
-          int oh_b = p->oh - 1;
-          int kh_b = kh_e - p->oh*p->sh + p->sh;
-          if( kh_b < p->sh - 1 ){ // unlikely?
-            oh_b = kh_e / p->sh;
-            kh_b = kh_e % p->sh;
+    for (int mb = 0; mb < MB; ++mb) { // 1: move here, cf ref_conv3
+#   pragma omp parallel for collapse(3)
+  for (int g = 0; g < G; ++g) {
+      for (int ic = 0; ic < IC/G; ++ic) {
+        for (int ih = 0; ih < IH; ++ih) {
+
+          register int kh_e = ih + PH;
+          int oh_b = OH - 1;
+          int kh_b = kh_e - OH*SH + SH;
+          if( kh_b < SH - 1 ){ // unlikely?
+            oh_b = kh_e / SH;
+            kh_b = kh_e % SH;
           }
-          if (++kh_e > p->kh) kh_e = p->kh;
+          if (++kh_e > KH) kh_e = KH;
+          if( kh_b >= kh_e ) continue;
+
           //ocend = (kh_b < kh_e? ocend: 0);
-          for (int iw = 0; iw < p->iw; ++iw) {
+          for (int iw = 0; iw < IW; ++iw) {
             size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
             float &ds = ((float*)diff_src_m)[src_off];
             ds = 0; // always!
             //if( ocend == 0 ) continue;
 
-            register int kw_e = iw + p->pw;
-            int ow_b = p->ow - 1;
-            int kw_b = kw_e - p->ow*p->sw + p->sw;
-            if( kw_b < p->sw - 1 ){ // unlikely?
-              ow_b = kw_e / p->sw;
-              kw_b = kw_e % p->sw;
+            register int kw_e = iw + PW;
+            int ow_b = OW - 1;
+            int kw_b = kw_e - OW*SW + SW;
+            if( kw_b < SW - 1 ){ // unlikely?
+              ow_b = kw_e / SW;
+              kw_b = kw_e % SW;
             }
-            if (++kw_e > p->kw) kw_e = p->kw;
+            if (++kw_e > KW) kw_e = KW;
             //if (kw_b >= kw_e ) continue;
             //ocend = (kw_b < kw_e? ocend: 0);
 
-            if( kh_b >= kh_e || kw_b >= kw_e ) continue;
+            if( kw_b >= kw_e ) continue;
+            //if( kh_b >= kh_e || kw_b >= kw_e ) continue;
 
-            for (int oc = 0; oc < p->oc/p->g; ++oc) {
-              for (int kh = kh_b, oh=oh_b; kh < kh_e; --oh, kh+=p->sh) {
-                for (int kw = kw_b, ow=ow_b; kw < kw_e; --ow, kw += p->sw) {
+            for (int oc = 0; oc < OC/G; ++oc) {
+              for (int kh = kh_b, oh=oh_b; kh < kh_e; --oh, kh+=SH) {
+                for (int kw = kw_b, ow=ow_b; kw < kw_e; --ow, kw+=SW) {
                   size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
                   size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
                   ds += ((float*)diff_dst_m)[dst_off]

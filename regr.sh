@@ -54,7 +54,7 @@ for ((i=0; i<${#ARGS[*]}; ++i)); do
             BASE="FWD"; xform="test_fwd_regression"; chkfile=1; ((++nopt))
             ;;
         BWD_D) # backward data
-            BASE="BWD_D;" xform="test_bwd_d_regression"; chkfile=1; ((++nopt))
+            BASE="BWD_D"; xform="test_bwd_d_regression"; chkfile=1; ((++nopt))
             ;;
         BWD_W*) # backward weights (runs BWD_WB tests)
             BASE="BWD_W"; xform="test_bwd_w_regression"; chkfile=1; ((++nopt))
