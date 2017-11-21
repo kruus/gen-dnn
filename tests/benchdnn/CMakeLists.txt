@@ -47,8 +47,10 @@ endif()
 
 set_property(TARGET benchdnn PROPERTY CXX_STANDARD 11)
 # [ejk] ease switching between #ifdef'ed code blocks with unused vars/fns
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error")
+if(NOT NECSX)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error")
+endif()
 
 #set_property(TARGET benchdnn PROPERTY C_STANDARD 11)
 target_link_libraries(benchdnn ${LIB_NAME} ${EXTRA_LIBS})

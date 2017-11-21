@@ -230,7 +230,7 @@ fi
 
         # REMOVE WHEN FINISHED SX DEBUGGING
         SXOPT="${SXOPT} -g -traceback" # enable source code tracing ALWAYS
-        SXOPT="${SXOPT} -DVERBOSE_PRIMITIVE_CREATE"
+        #SXOPT="${SXOPT} -DVERBOSE_PRIMITIVE_CREATE" # this DOES NOT COMPILE with sxcc: c++11 features missing
 
         export CFLAGS="${CFLAGS} -size_t${SIZE_T} -Kc99,gcc ${SXOPT}"
         # An object file that is generated with -Kexceptions and an object file

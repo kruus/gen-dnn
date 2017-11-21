@@ -28,6 +28,15 @@
 
 #include <cstdarg>
 
+#if defined(_SX) /* missing function */
+static size_t strnlen(const char *s, size_t max_len)
+{
+    size_t i = 0;
+    for(; (i < max_len) && s[i]; ++i);
+    return i;
+}
+#endif
+
 namespace conv {
 
 const char *inp_type2str(int what) {

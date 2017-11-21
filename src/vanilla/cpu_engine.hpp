@@ -38,6 +38,14 @@
 #endif
 #endif
 
+// oops SX VERBOSE_PRIMITIVE_CREATE uses unsupported c++1 features???
+#if defined(_SX)
+#if defined(VERBOSE_PRIMITIVE_CREATE)
+#undef VERBOSE_PRIMITIVE_CREATE
+#endif
+#define VERBOSE_PRIMITIVE_CREATE 0
+#endif
+
 #ifdef TARGET_VANILLA
 /** In principle could have multiple TARGETS.
  * For example: VANILLA, and later perhaps SSE42, AVX2, AVX512.

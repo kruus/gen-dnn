@@ -31,13 +31,19 @@ fi
 if [ "$#" -lt 1 ]; then usage; exit; fi
 ARGS=($*)
 BASE=''
+COPY="cp -uav"
+if [ "`uname -m`" = "SX-ACE" ]; then COPY="cp -a"; fi
+echo "COPY    : $COPY"
+BUILDDIR=build
+if [ "`uname -m`" = "SX-ACE" ]; then BUILDDIR=build-sx; fi
+echo "BUILDDIR: $BUILDDIR"
 batch_check() {
     BATCH="$1"
     # if batch is a file, copy to build dir and prepend --batch=
     for DIR in ./tests/benchdnn ./tests/benchdnn/inputs .; do
         #echo "file? ${DIR}/${BATCH}"
         if [ -f "${DIR}/${BATCH}" ]; then
-            cp -uav "${DIR}/${BATCH}" "./build/tests/benchdnn/inputs/${BATCH}"
+            ${COPY} "${DIR}/${BATCH}" "./${BUILDDIR}/tests/benchdnn/inputs/${BATCH}"
             BATCH="--batch=inputs/${1}"
             return
         fi
@@ -100,34 +106,45 @@ echo "nopt    : $nopt"
 #    echo "$i : ${ARGS[i]}"
 #done
 # Alexnet: better to run as
-# (cd build && make && cd tests/benchdnn && OMP_NUM_THREADS=6 ./benchdnn --mode=PT --dir=FWD_B --batch=inputs/conv_alexnet) 2>&1 | tee alex-fwd.log
+# (cd "${BUILDDIR}" && make && cd tests/benchdnn && OMP_NUM_THREADS=6 ./benchdnn --mode=PT --dir=FWD_B --batch=inputs/conv_alexnet) 2>&1 | tee alex-fwd.log
 # etc. to control which direction
 
 # zero in on a particular failure (by hand):
-# (cd build && make && cd tests/benchdnn && OMP_NUM_THREADS=6 ./benchdnn --mode=PT --dir=BWD_W --batch=inputs/conv_regression_group) >& x.log && { echo 'OK'; tail -n40 x.log | awk '/final stats/{f=1} /kbytes/{f=0} f==1{print $0;}'; } || { echo 'FAIL'; tail -n80 x.log; echo 'See x.log'; }
+# (cd "${BUILDDIR}" && make && cd tests/benchdnn && OMP_NUM_THREADS=6 ./benchdnn --mode=PT --dir=BWD_W --batch=inputs/conv_regression_group) >& x.log && { echo 'OK'; tail -n40 x.log | awk '/final stats/{f=1} /kbytes/{f=0} f==1{print $0;}'; } || { echo 'FAIL'; tail -n80 x.log; echo 'See x.log'; }
 #
-BUILDDIR=build
-#(cd build && make && cd tests/benchdnn && /usr/bin/time -v ./benchdnn --mode=PT --batch=inputs/test_fwd_regression) 2>&1 | tee PT.log
-HOSTNAME=`hostname --short`
+#(cd "${BUILDDIR}" && make && cd tests/benchdnn && /usr/bin/time -v ./benchdnn --mode=PT --batch=inputs/test_fwd_regression) 2>&1 | tee PT.log
+HOSTNAME=`hostname -s` # SX-ACCE does not support --short
 LOGFILE="${BASE}-${HOSTNAME}.log"
 if [ ! "$THREADS" = "" ]; then LOGFILE="${BASE}-t${THREADS}-${HOSTNAME}.log"; fi
 echo "LOGFILE : $LOGFILE"
+COLUMN="column -t"
+if [ "`uname -m`" = "SX-ACE" ]; then COLUMN='cat'; fi # I could not put spaces here, for SX-ACE (so no awk/sed)
+echo "COLUMN  : $COLUMN"
+TIME="/usr/bin/time -v"
+if [ "`uname -m`" = "SX-ACE" ]; then TIME="time"; fi # just use the bash builtin
+set +x
 (
 {
-    cd "$BUILDDIR" && make && cp -uarv ../tests/benchdnn/inputs/* ./tests/benchdnn/inputs/ && \
+    cd "$BUILDDIR" && { if [ ! "`uname -m`" = "SX-ACE" ]; then make; fi; } \
+    && $COPY -r ../tests/benchdnn/inputs/* ./tests/benchdnn/inputs/ && \
         { 
             if [ "$THREADS" = "" ]; then unset OMP_NUM_THREADS;
             else THREADS="OMP_NUM_THREADS=$THREADS"; fi
             echo "THREADS  : $THREADS"
             echo "cmd      : $THREADS /usr/bin/time -v ./benchdnn --mode=PT ${ARGS[@]}"
             cd tests/benchdnn;
+pwd
+ls -l .
             #ls -l inputs;
             echo " `pwd` inputs:"
-            (cd inputs && ls -1) | awk '//{p=p " " $0;++n} n>=4{print p; p=""; n=0} END{print p}' | column -t
-            eval $THREADS /usr/bin/time -v ./benchdnn --mode=PT ${ARGS[@]}
+set +x
+echo "COLUMN ... $COLUMN"
+            (cd inputs && ls -1) | awk '//{p=p " " $0;++n} n>=4{print p; p=""; n=0} END{print p}' | ${COLUMN}
+            eval $THREADS ${TIME} ./benchdnn --mode=PT ${ARGS[@]}
         }
     } || { echo "Problems?"; false; }
     ) >& "$LOGFILE" \
-        && { echo 'regr.sh OK'; tail -n40 $LOGFILE | awk '/final stats/{f=1} /kbytes/{f=0} f==1{print $0;}'; } \
-        || { echo "regr.sh FAIL"; tail -n40 $LOGFILE | awk 'BEGIN{f=1} /kbytes/{f=0} f==1{print $0}'; echo "See LOGFILE = $LOGFILE"; }
+        && { echo 'regr.sh OK'; tail -40 $LOGFILE | awk '/final stats/{f=1} /kbytes/{f=0} f==1{print $0;}'; } \
+        || { echo "regr.sh FAIL"; tail -40 $LOGFILE | awk 'BEGIN{f=1} /kbytes/{f=0} f==1{print $0}'; echo "See LOGFILE = $LOGFILE"; }
+# Note: SX-ACE does not support tail -n40
 # vim: set ts=4 sw=4 et :

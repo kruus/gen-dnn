@@ -119,7 +119,10 @@ using namespace mkldnn::impl::data_type;
 #if VERBOSE_PRIMITIVE_CREATE
 /** A verbose version of primitive_desc_t::create<pd_t>. \sa primitive_desc.hpp */
 template<typename prim>
-static mkldnn::impl::status_t verbose_primitive_desc_create(
+#if !defined(_SX)
+static
+#endif
+mkldnn::impl::status_t verbose_primitive_desc_create(
     mkldnn::impl::primitive_desc_t **pd,
     const mkldnn::impl::op_desc_t *adesc,
     mkldnn::impl::engine_t *engine,
