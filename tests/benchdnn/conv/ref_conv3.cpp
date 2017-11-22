@@ -300,6 +300,10 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
   // writes go to  dst_off_f(p, mb, g, oc, oh, ow);
   // on alexnet, this got me about 15x speedup
   // regr.sh-FWD 2.42x,2.38x
+#if defined(_SX)
+  float * restrict dsrc = (float*)src_m;
+  float * restrict dwei = (float*)wei_m;
+#endif
 #   pragma omp parallel for collapse(5)
   for (int g = 0; g < G; ++g) {
     for (int mb = 0; mb < MB; ++mb) {
@@ -333,7 +337,11 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
                     const int iw = ow * SW - PW + kw * (p->dw + 1);
                     size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
                     size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+#if !defined(_SX)
                     d += ((float*)src_m)[src_off] * ((float*)wei_m)[wei_off];
+#else
+                    d += dsrc[src_off] * dwei[wei_off];
+#endif
                   }
                 }
               }
@@ -576,6 +584,10 @@ static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
   int wa, wb, wg;
   extendedEuclid( wa, DW, wb, SW, wg);
   DMUST( wg == gcd_w );
+#if defined(_SX)
+  float * const restrict pdiff_dst = (float*)diff_dst_m;
+  float * const restrict pwei      = (float*)wei_m;
+#endif
   # pragma omp parallel for collapse(5)
   for (int g = 0; g < G; ++g) {
     for (int mb = 0; mb < MB; ++mb) {
@@ -624,8 +636,12 @@ static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
                 {
                   size_t dst_off = dst_off_f(p, mb, g, oc, oh0/SH, ow0/SW);
                   size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+#if !defined(_SX)
                   ds += ((float*)diff_dst_m)[dst_off]
                     * ((float*)wei_m)[wei_off];
+#else
+                  ds += pdiff_dst[dst_off] * pwei[wei_off];
+#endif
                 }
               }
             }
@@ -704,6 +720,9 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
     return;
   }
 
+  float const* const restrict pwei      = (float*)wei_m;
+  float      * const restrict psrc      = (float*)diff_src_m;
+  float const* const restrict pdiff_dst = (float*)diff_dst_m;
 #   pragma omp parallel for collapse(4)
   for (int g = 0; g < G; ++g) {
     for (int mb = 0; mb < MB; ++mb) {
@@ -721,7 +740,8 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
           //ocend = (kh_b < kh_e? ocend: 0);
           for (int iw = 0; iw < IW; ++iw) {
             size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
-            float &ds = ((float*)diff_src_m)[src_off];
+            //float &ds = ((float*)diff_src_m)[src_off];
+            float &ds = psrc[src_off];
             ds = 0; // always!
             //if( ocend == 0 ) continue;
 
@@ -743,8 +763,9 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
                 for (int kw = kw_b, ow=ow_b; kw < kw_e; --ow, kw += SW) {
                   size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
                   size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
-                  ds += ((float*)diff_dst_m)[dst_off]
-                    * ((float*)wei_m)[wei_off];
+                  //ds += ((float*)diff_dst_m)[dst_off]
+                  //  * ((float*)wei_m)[wei_off];
+                  ds += pdiff_dst[dst_off] * pwei[wei_off];
                 }
               }
             }
@@ -1079,6 +1100,9 @@ void refconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   const int DH = p->dh + 1;
   const int DW = p->dw + 1;
 
+  float * const restrict psrc      = (float*)src_m;
+  float * const restrict pdiff_wei = (float*)diff_wei_m;
+  float * const restrict pdiff_dst = (float*)diff_dst_m;
 # pragma omp parallel
   {
 #   pragma omp for collapse(5)
@@ -1116,7 +1140,8 @@ void refconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 
               for (int ic = 0; ic < IC/G; ++ic) {
                 size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
-                float &dw = ((float*)diff_wei_m)[wei_off];
+                //float &dw = ((float*)diff_wei_m)[wei_off];
+                float &dw = pdiff_wei[wei_off];
                 for (int mb = 0; mb < MB; ++mb) {
                   for (int oh = oh_beg; oh < oh_end; ++oh) {
                     for (int ow = ow_beg; ow < ow_end; ++ow) {
@@ -1124,8 +1149,9 @@ void refconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
                       const int iw = ow * SW - PW + kw * DW;
                       size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
                       size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
-                      dw += ((float*)diff_dst_m)[dst_off]
-                        * ((float*)src_m)[src_off];
+                      //dw += ((float*)diff_dst_m)[dst_off]
+                      //  * ((float*)src_m)[src_off];
+                      dw += pdiff_dst[dst_off] * psrc[src_off];
                     }
                   }
                 }
