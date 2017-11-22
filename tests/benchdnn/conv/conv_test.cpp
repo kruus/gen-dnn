@@ -65,11 +65,12 @@ void test_stats::update_impl(const prb_t *p, res_t *r, int status,
 
     double ms = 1e-3*(long)(1e3*tt.total_ms()+0.5);
     char bms[15]; int lms=15;
-    const int oms = snprintf(&bms[0], lms, "%.3f ms", ms);
+    int oms = snprintf(&bms[0], lms, "%.3f ms", ms);
+    if( oms > 10 ) oms = snprintf(&bms[0], lms, "%.0f s", ms*1e-3);
 
     char const* impname = get_ref_impls()[imp].name;
     const int ll2 = 28; char b2[ll2]; int l2=ll2;
-    const int o2 = snprintf(&b2[0], l2, "Test #%d %s", imp, impname);
+    const int o2 = snprintf(&b2[0], l2, "Test%d %s ", imp, impname);
     snprintf(&b2[o2], ll2-o2, "%s", &bms[0]);
     for(int i=o2; i<ll2-oms-1; ++i) b2[i] = ' ';
     for(int i=0; i<oms; ++i) b2[ll2-oms+i-1] = bms[i];
