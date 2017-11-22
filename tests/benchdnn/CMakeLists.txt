@@ -14,21 +14,30 @@
 # limitations under the License.
 #===============================================================================
 
-file(GLOB_RECURSE HEADERS
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.hpp
-    )
-file(GLOB_RECURSE SOURCES
+# main benchdnn files
+#file(GLOB_RECURSE HEADERS
+#    ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.h
+#    ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.hpp
+#    )
+#message(STATUS "benchdnn HEADERS are ${HEADERS}") # empty!!
+file(GLOB SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/*.c
     ${CMAKE_CURRENT_SOURCE_DIR}/*.h
     )
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/conv
-    ${CMAKE_CURRENT_SOURCE_DIR}/ip
-    )
+include_directories( ${CMAKE_CURRENT_SOURCE_DIR} )
+# benchdnn subtests
+foreach(subdir (conv ip self self/conv))
+    file(GLOB subfiles
+        ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/*.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/*.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/*.h
+        )
+    list(APPEND SOURCES ${subfiles})
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${subdir})
+endforeach()
 
 option(BENCHDNN_USE_RDPMC
     "enables rdpms counter to report precise cpu frequency.
@@ -95,3 +104,4 @@ if(WIN32)
         test_conv_regression.vcxproj.user @ONLY)
     set_property(TARGET test_conv_regression PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
 endif()
+# vim: et ts=4 sw=4 ai cino=^=l0,\:0,N-s
