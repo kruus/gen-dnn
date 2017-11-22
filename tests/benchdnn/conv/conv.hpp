@@ -334,6 +334,9 @@ COMPUTE_REF_DECL( refconv_3 )   /* ref_conv3.cpp */
 COMPUTE_REF_DECL( refconv_4 )   /* ref_conv4.cpp */
 COMPUTE_REF_DECL( refconv_5 )   /* ref_conv4.cpp */
 COMPUTE_REF_DECL( refconv_99 )   /* ref_conv99.cpp */
+#if defined(_SX)
+COMPUTE_REF_DECL( sxconv_3 )   /* ref_conv3.cpp */
+#endif
 
 typedef struct {
     char const*   name;
