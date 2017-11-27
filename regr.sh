@@ -73,6 +73,22 @@ for ((i=0; i<${#ARGS[*]}; ++i)); do
             xform="--dir=FWD_B --batch=inputs/conv_alexnet --dir=BWD_D --batch=inputs/conv_alexnet --dir=BWD_WB --batch=inputs/conv_alexnet"
             ((++nopt))
             ;;
+        A1) # alexnet conv1, mb=8
+            BASE="A1";
+            xform='--dir=FWD_B g1mb8ic3ih227oc96oh55kh11sh4ph0n"alexnet:conv1"';
+            if [ "`uname -m`" = "SX-ACE" ]; then
+                xform='--dir=FWD_B g1mb8ic3ih60oc96oh25kh11sh4ph0n"alexnet:conv1"';
+            fi;
+            ((++nopt))
+            ;;
+        A3) # alexnet conv3, mb=8
+            BASE="A3";
+            xform='--dir=FWD_B g1mb8ic256ih13oc384oh13kh3ph1n"alexnet:conv3"'
+            if [ "`uname -m`" = "SX-ACE" ]; then
+                xform='--dir=FWD_B g1mb8ic32ih13oc48oh13kh3ph1n"alexnet:conv3"'
+            fi;
+            ((++nopt))
+            ;;
         MINI) # low-minibatch alexnet
             BASE="MINIALEX";
             xform="--dir=FWD_B --batch=inputs/minialex --dir=BWD_D --batch=inputs/minialex --dir=BWD_WB --batch=inputs/minialex"
