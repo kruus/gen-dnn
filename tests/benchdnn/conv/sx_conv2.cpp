@@ -13,6 +13,11 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+/** \file
+ * sx vectorization ref_conv2.cpp */
+#if ! defined(_SX)
+#define restrict
+#endif
 
 #include "conv/conv.hpp"
 namespace conv {

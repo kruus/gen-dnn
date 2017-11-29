@@ -15,7 +15,10 @@
 *******************************************************************************/
 /** \file
  * sx vectorization ref_conv3.cpp */
-#if defined(_SX)
+#if ! defined(_SX)
+#define restrict
+#endif
+
 #include "conv/conv.hpp"
 #include "idiv.hpp"
 
@@ -863,5 +866,4 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 }
 
 }
-#endif // defined(_SX)
 // vim: et ts=2 sw=2 cindent nopaste ai cino=^=l0,\:0,N-s
