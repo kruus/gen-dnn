@@ -29,6 +29,8 @@
 
 namespace conv {
 
+typedef ptrdiff_t sssize_t;
+
 enum { SRC = 0, WEI = 1, BIA = 2, DST = 3, ACC = 4, DAT_TOTAL };
 const char *inp_type2str(int what);
 
@@ -159,6 +161,11 @@ inline size_t src_off_f(const prb_t *p, int mb, int g, int ic, int ih, int iw)
     return (((size_t)mb * p->ic + g * p->ic/p->g + ic) * p->ih + ih) * p->iw
         + iw;
 }
+inline ssize_t src_off_f2(const prb_t *p, ssize_t mb, ssize_t g, ssize_t ic, ssize_t ih, ssize_t iw)
+{
+    return ((mb * p->ic + g * p->ic/p->g + ic) * p->ih + ih) * p->iw + iw;
+}
+
 
 inline size_t src_off_f_nog(const prb_t *p, int mb, /*int g,*/ int ic, int ih, int iw)
 {
@@ -183,6 +190,10 @@ inline size_t wei_off_f(const prb_t *p, int g, int oc, int ic, int kh, int kw)
 {
     return ((((size_t)g * p->oc / p->g + oc) * p->ic / p->g + ic) * p->kh + kh)
         * p->kw + kw;
+}
+inline ssize_t wei_off_f2(const prb_t *p, size_t g, size_t oc, size_t ic, size_t kh, size_t kw)
+{
+    return (((g * p->oc / p->g + oc) * p->ic / p->g + ic) * p->kh + kh) * p->kw + kw;
 }
 
 /** A non-optimization if within an innermost loop.
@@ -236,6 +247,9 @@ inline size_t bia_off_f(const prb_t *p, int g, int oc) {
     return (size_t)g * p->oc / p->g + oc;
 }
 
+inline constexpr ssize_t bia_off_f2(const prb_t *p, ssize_t const g, ssize_t const oc) {
+    return g * p->oc / p->g + oc;
+}
 /** occasionally it is useful [ex memset loops] to get largest possible
  * loop ranges by ignoring the loop over groups.
  *
@@ -288,6 +302,10 @@ inline size_t dst_off_f(const prb_t *p, int mb, int g, int oc, int oh, int ow)
     return (((size_t)mb * p->oc + g * p->oc/p->g + oc) * p->oh + oh) * p->ow
         + ow;
 }
+inline ssize_t dst_off_f2(const prb_t *p, ssize_t mb, ssize_t g, ssize_t oc, ssize_t oh, ssize_t ow)
+{
+    return ((mb * p->oc + g * p->oc/p->g + oc) * p->oh + oh) * p->ow + ow;
+}
 
 inline size_t dst_off_f_nog(const prb_t *p, int mb, /*int g,*/ int oc, int oh, int ow)
 {
@@ -334,7 +352,8 @@ COMPUTE_REF_DECL( refconv_3 )   /* ref_conv3.cpp */
 COMPUTE_REF_DECL( refconv_4 )   /* ref_conv4.cpp */
 COMPUTE_REF_DECL( refconv_5 )   /* ref_conv4.cpp */
 COMPUTE_REF_DECL( refconv_99 )   /* ref_conv99.cpp */
-#if defined(_SX)
+#if 1 || defined(_SX)
+COMPUTE_REF_DECL( sxconv_2 )   /* ref_conv3.cpp */
 COMPUTE_REF_DECL( sxconv_3 )   /* ref_conv3.cpp */
 #endif
 

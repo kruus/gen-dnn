@@ -75,17 +75,17 @@ for ((i=0; i<${#ARGS[*]}; ++i)); do
             ;;
         A1) # alexnet conv1, mb=8
             BASE="A1";
-            xform='--dir=FWD_B g1mb8ic3ih227oc96oh55kh11sh4ph0n"alexnet:conv1"';
+            xform='g1mb8ic3ih227oc96oh55kh11sh4ph0n"mini:conv1"';
             if [ "`uname -m`" = "SX-ACE" ]; then
-                xform='--dir=FWD_B g1mb8ic3ih60oc96oh25kh11sh4ph0n"alexnet:conv1"';
+                xform='g1mb8ic3ih60oc32oh25kh11sh4ph0n"minisx:conv1"';
             fi;
             ((++nopt))
             ;;
         A3) # alexnet conv3, mb=8
             BASE="A3";
-            xform='--dir=FWD_B g1mb8ic256ih13oc384oh13kh3ph1n"alexnet:conv3"'
+            xform='g1mb8ic256ih13oc384oh13kh3ph1n"mini:conv3"'
             if [ "`uname -m`" = "SX-ACE" ]; then
-                xform='--dir=FWD_B g1mb8ic32ih13oc48oh13kh3ph1n"alexnet:conv3"'
+                xform='g1mb8ic32ih13oc48oh13kh3ph1n"minisx:conv3"'
             fi;
             ((++nopt))
             ;;
@@ -94,9 +94,13 @@ for ((i=0; i<${#ARGS[*]}; ++i)); do
             xform="--dir=FWD_B --batch=inputs/minialex --dir=BWD_D --batch=inputs/minialex --dir=BWD_WB --batch=inputs/minialex"
             ((++nopt))
             ;;
-        h) # help
+        h|-h|--help) # help
             usage
             exit
+            ;;
+        n*|-n*) # base name for logfile; ex. -nFOO (no space)
+            s="${xform#-}"; s="${s#n}"
+            if [ "$s" != "" ]; then BASE="$s"; xform=''; fi
             ;;
         *) # other? arbitrary benchdnn args or test files ...
             chkfile=1
@@ -113,7 +117,7 @@ for ((i=0; i<${#ARGS[*]}; ++i)); do
 
     ARGS[$i]="${xform}"
 done
-if [ -z "${BASE}" -o $nopt -gt 1 ]; then BASE='x'; fi
+if [ "${BASE}" == "" ]; then BASE='x'; fi
 echo "THREADS': ${THREADS}"
 echo "BASE    : ${BASE}"
 echo "ARGS    : ${ARGS[@]}"
@@ -130,6 +134,7 @@ echo "nopt    : $nopt"
 #
 #(cd "${BUILDDIR}" && make && cd tests/benchdnn && /usr/bin/time -v ./benchdnn --mode=PT --batch=inputs/test_fwd_regression) 2>&1 | tee PT.log
 HOSTNAME=`hostname -s` # SX-ACCE does not support --short
+if [ "`uname -m`" = "SX-ACE" ]; then HOSTNAME='sx'; fi # I could not put spaces here, for SX-ACE (so no awk/sed)
 LOGFILE="${BASE}-${HOSTNAME}.log"
 if [ ! "$THREADS" = "" ]; then LOGFILE="${BASE}-t${THREADS}-${HOSTNAME}.log"; fi
 echo "LOGFILE : $LOGFILE"
