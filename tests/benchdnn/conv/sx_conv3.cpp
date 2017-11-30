@@ -249,6 +249,139 @@ static inline void hoist_AmiB_in( int& beg, int& end,
     //end = div_floor( a-c, b) + 1;
     if( end > imax ) end = imax;
 }
+
+/** shows a new hoisting method.
+ *
+ * Hoisting conditionals refers to replacing conditionals with
+ * formulas for loop limits.  A simple example can be found in
+ * \ref hoist_ApiB_in, which uses the following examples:
+ *
+ * Original:
+ * \code
+ * for(i=imin; i<imax; ++i){       // original loop
+ *   int const ApiB = a + i*b;      // linear fn, ( b>=0 ? )
+ *   if( ApiB < c || ApiB > d ) continue;
+ *   // Loop Body
+ * }
+ * \endcode
+ *
+ * Transformed:
+ * \code
+ * int const ibeg, iend;
+ * hoist_ApiB_in( ibeg, iend, imin,imax, a,b, c,d );
+ * for(i=ibeg; i<iend; ++i){       // original loop
+ *   int const ApiB = a + i*b;
+ *   // GONE: if( ApiB < c || ApiB > d ) continue;
+ *   // Loop Body
+ * }
+ * \endcode
+ *
+ * For \c kh, for examples we replaced and simplified the \em hoist routine
+ * in steps:
+ *
+ * \ref ref_conv2.cpp
+ * \code
+ *  for (int kh = 0; kh < p->kh; ++kh) {
+ *      const int ih = oh * p->sh - p->ph + kh * (p->dh + 1);
+ *      if (ih < 0 || ih >= p->ih) continue;
+ *      // etc
+ * \endcode
+ * With hoisting, \ref refconv3_fwd
+ * \code   
+ * int kh_beg, kh_end;
+ * hoist_ApiB_in( kh_beg, kh_end,
+ *                0, p->kh                          // i  in  [0, p->kh)
+ *               (oh * p->sh - p->ph), (p->dh + 1), // ih=A+iB
+ *               0, p->ih);                         // ih in [0, p->ih)
+ * //if (kh_beg >= kh_end) continue;
+ * for (int kh = kh_beg; kh < kh_end; ++kh) {
+ *     const int ih = oh * p->sh - p->ph + kh * (p->dh + 1);
+ *     // etc
+ * \endcode
+ * which simplifies to
+ * \code
+ * kh_beg = div_floor( 0     - (oh * SH - PH) + p->dh, (p->dh+1) );
+ * kh_end = div_floor( IH - (oh * SH - PH) + p->dh, (p->dh+1) );
+ * if( kh_beg < 0     ) kh_beg = 0;
+ * if( kh_end > p->kh ) kh_end = p->kh;
+ * //if (kh_beg >= kh_end) continue;
+ * for (int kh = kh_beg; kh < kh_end; ++kh) {
+ *     const int ih = oh * p->sh - p->ph + kh * (p->dh + 1);
+ *     // etc
+ * \endcode
+ *
+ * A key feature for the mathematics of such formulas is that integer
+ * rounding should go toward negative infinity.  Unfortunately, C99
+ * and C++11 round toward zero.  So div_floor, which has been optimized
+ * for x86, may have conditionals that don't behave so well for other
+ * chips.
+ *
+ * So here we derive a way to do all calculations with positive integers,
+ * avoiding negatives.  Such a calculation is now correct when evaluated
+ * with unsigned integers, and also allows normal division to be used.
+ *
+ * - First, solve for \c kh, assuming div_floor rounding.
+ *   - ih = oh * p->sh - p->ph + kh * (p->dh + 1)
+ *   - \f$ih = oh*SH - PH + kh*DH\f$
+ *   - \f$kh*DH = ih + PH - oh*SH\f$
+ *   - \f$kh = div\_floor( ih+PH-oh*SH+DH-1, DH )\f$, which we'll loosely call
+ *   - \f$kh(ih,oh) = (ih+DH-1+PH-oh*SH) / DH\f$ (true for positive numerator & denominator)
+ *
+ * - \f$kh_{beg}\f$, the lowest \c kh value, is associated with the lowest possible \c oh.
+ *   - We avoid testing for values of zero, since division values of zero can
+ *     result by rounding negative integers upward
+ * - Consider \f$kh(ih,oh) >= 1\f$
+ *   - \f$ (0 + DH-1+PH-oh*SH) / DH >= 1\f$  (for +ve numerator & denominator)
+ *   - \f$ DH-1+PH-oh*SH >= DH\f$
+ *   - \f$ PH-1 - oh*SH >= 0\f$
+ *   - \f$ oh*SH <= PH-1 \f$
+ *   - \f$ oh*SH < PH \f$
+ * - Therefore if \f$oh*SH < PH\f$, we use the formula \f$kh_{beg}=(DH-1+[PH-oh*SH]) / DH\f$
+ *   - Notice that both numerator and denominator are both strictly positive.
+ *   - So this formula is correct for signed/unsigned integers.
+ * - Otherwise, \f$kh_{beg} = 0\f$, the lowest possible value.
+ * - We'll avoid \f$kh_{beg} > KH\f$, by testing \f$kh_{beg} < kh_{end}\f$
+ *
+ *
+ * - Now Consider \f$kh_{end} >= KH\f$, where KH is the highest valid value for \f$kh_{end}\f$
+ *   - The largest \f$kh\f$ occurs when \c ih has it's largest possible value, \c IH.
+ * - Let's first check for \f$kh(ih,oh) >= KH\f$
+ *   - \f$ (IH + DH-1 + PH - oh*SH) / DH >= KH \f$
+ *   - \f$ IH + DH - 1 + PH - oh*SH  >= KH*DH \f$
+ *   - \f$ KH*DH + oh*SH + 1 <= IH+PH+DH \f$, now RHS and LHS are positive
+ *   - \f$ KH*DH + oh*SH < IH+PH+DH \f$
+ *   - When the above condition holds, we can set \f$kh_{end} = KH\f$ (maximal value)
+ * - Otherwise we can also check for \f$kh(ih,oh) >= 1\f$, so that we can safely use
+ *   division with positive integers.
+ *   - Replacing 'KH' with '1' in above...  \f$ 1*DH + oh*SH < IH+PH+DH \f$
+ *   - So when \f$oh*SH < IH+PH\f$, \f$kh_{end} =  (DH-1 + [IH+PH - oh*SH]) / DH \f$
+ *     will be \f$ > 0\f$
+ *     - Otherwise we can set \f$kh_{end} = 0\f$
+ *
+ * So the \em long-hand postive-integer solutions for \c kh_beg and \c kh_end are:
+ *
+ * \code
+ * if( oh*SH < PH )
+ *   kh_beg = (p->dh + (PH - oh * SH)) / DH;
+ * else
+ *   kh_beg = 0;
+ * \endcode
+ * and
+ * \code
+ * if (oh*SH + KH*DH < IH + PH + DH)
+ *   kh_end = KH;
+ * else if (oh*SH >= IH+PH)
+ *   kh_end = 0;
+ * else
+ *   kh_end = ([IH+PH - oh*SH] + DH-1) / DH;
+ * \endcode
+ *
+ * \ref sxconv_3_fwd shows how this can be done, and results in big speedups for sxc++,
+ * whose compiler can vectorize the few remaining simple conditionals quite well (apparently).
+ *
+ * Other SX optimizations include using unit-stride temporaries, since complex expressions
+ * with multiple strided vectors are sometimes not vectorized very well.
+ */
 void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
         dnn_mem_t &wei_m, dnn_mem_t &bia_m, dnn_mem_t &dst_m) {
 #define V 6
