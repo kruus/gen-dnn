@@ -52,7 +52,7 @@ if(WIN32)
         set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -QxHOST")
     endif()
 elseif(NECSX)
-    message(STATUS "cmake/platform.cmake WIN32 branch")
+    message(STATUS "cmake/platform.cmake NECSX branch")
     #show_cmake_stuff("NECSX, after project(... C CXX)")
     message(STATUS "Other NEC SX options here ...")
     # OHOH. this appear *before* -lmkldnn, and we want it to appear *after*

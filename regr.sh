@@ -161,11 +161,11 @@ ls -l .
 set +x
 echo "COLUMN ... $COLUMN"
             (cd inputs && ls -1) | awk '//{p=p " " $0;++n} n>=4{print p; p=""; n=0} END{print p}' | ${COLUMN}
-            eval $THREADS ${TIME} ./benchdnn --mode=PT ${ARGS[@]}
+            eval $THREADS ${TIME} C_PROGINF=DETAIL ./benchdnn --mode=PT ${ARGS[@]}
         }
     } || { echo "Problems?"; false; }
     ) >& "$LOGFILE" \
-        && { echo 'regr.sh OK'; tail -40 $LOGFILE | awk '/final stats/{f=1} /kbytes/{f=0} f==1{print $0;}'; } \
-        || { echo "regr.sh FAIL"; tail -40 $LOGFILE | awk 'BEGIN{f=1} /kbytes/{f=0} f==1{print $0}'; echo "See LOGFILE = $LOGFILE"; }
+        && { echo 'regr.sh OK'; tail -60 $LOGFILE | awk '/final stats/{f=1} /kbytes/ || /Sys  Time/{f=0} f==1{print $0; next} /MFLOPS/ || /Concurr/ || /Ratio/'; } \
+        || { echo "regr.sh FAIL"; tail -60 $LOGFILE | awk 'BEGIN{f=1} /kbytes/{f=0} f==1{print $0}'; echo "See LOGFILE = $LOGFILE"; }
 # Note: SX-ACE does not support tail -n40
 # vim: set ts=4 sw=4 et :

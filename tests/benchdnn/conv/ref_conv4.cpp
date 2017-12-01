@@ -511,6 +511,7 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 // --------------------------------------------------impls
 // -------------------------------------------------------
 #if BW4==14 // tidy up, try some questionable omp mods
+  // TODO I think the omp mods are WRONG
 #if 0
   bwd_w_bias_update(p, diff_bia_m, diff_dst_m);
   zero_wei(p, diff_wei_m);
@@ -528,7 +529,7 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 //#pragma omp single //// makes omp for illegally nested?
       for (int mb = 0; mb < MB; ++mb) {
         if ((p->dir & FLAG_BIA)) {
-# pragma omp for nowait
+# pragma omp parallel for nowait
           for (int oc = 0; oc < OC     ; ++oc) {
             size_t bia_off = bia_off_f_nog(p, /*g,*/ oc);
             float &db = ((float*)diff_bia_m)[bia_off];
