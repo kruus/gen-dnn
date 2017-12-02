@@ -67,8 +67,8 @@ elseif(NECSX)
     #       (should be -gv -ftrace -CVopt ???)
     #
     # Note: do not use -Cdbeug or -Cnoopt (semantics of language changes?)
-    set(CMAKE_C_FLAGS_DEBUG "-g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg")
-    set(CMAKE_CXX_FLAGS_DEBUG "-g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,nomsg")
+    set(CMAKE_C_FLAGS_DEBUG "-g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,fullmsg")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,fullmsg")
     #set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-g") # should NOT conflict (but did!)
     # -----------------------------------------------------------------------
     show_cmake_stuff("NECSX, after project(... C CXX)")

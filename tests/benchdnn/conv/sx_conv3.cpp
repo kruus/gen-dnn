@@ -369,10 +369,15 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
   const ssize_t DW = p->dw + 1;
 
   const ssize_t ICOG = IC/G;
-  const ssize_t ICOG_KH_KW = ICOG * KH * KW;
   const ssize_t OCOG = OC/G;
+  const ssize_t KH_KW = KH * KW;
+  const ssize_t ICOG_KH_KW = ICOG * KH_KW;
   const ssize_t OH_OW = OH * OW;
+  const ssize_t OCOG_ICOG_KH_KW = OCOG * ICOG_KH_KW;
+  const ssize_t OCOG_ICOG_KH = OCOG * ICOG * KH;
   const ssize_t IH_IW = IH * IW;
+  const ssize_t SH_IW = SH * IW;
+  const ssize_t DH_IW = DH * IW;
 
   MUST( p->kh > 0 && KW > 0 );
   MUST( p->dh >= 0 && p->dw >= 0 );
@@ -381,13 +386,24 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
   float const * restrict const pwei = (float*)wei_m;
   float const * restrict const pbia = (float*)bia_m;
   float       * restrict const pdst = (float*)dst_m;
-# pragma omp parallel for collapse(4)
+# pragma omp parallel
+  {
+    //ssize_t kh_beg_prv=0, kh_end_prv=0, kw_beg_prv=0, kw_end_prv=0, w0_prv=0;
+    ssize_t khash, w0, s0, s00;
+    ssize_t khash_prv = ~0;
+    ssize_t six[ICOG*KH*KW];
+#pragma cdir on_adb(six)
+    ssize_t wix[ICOG*KH*KW];
+#pragma cdir on_adb(wix)
+   float tmp[OCOG];
+#pragma cdir on_adb(tmp)
+
+# pragma omp for collapse(4)
   for (ssize_t g = 0; g < G; ++g) {
     for (ssize_t mb = 0; mb < MB; ++mb) {
       for (ssize_t oh = 0; oh < OH; ++oh) {
         for (ssize_t ow = 0; ow < OW; ++ow) {
           // ---- 1 omp thread ----
-          float tmp[OCOG];
           if ((p->dir & FLAG_BIA) == 0){
             for (ssize_t oc = 0; oc < OCOG; ++oc)
               tmp[oc] = 0.f;
@@ -397,7 +413,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
               tmp[oc] = pbia[bia_off0 + oc];
           }
           // this alt to div_floor avoids negatives.
-          // ... so it is correct for ussize_ts AND normal div.
+          // ... so it is correct for unsigned types AND normal div.
           ssize_t kh_beg=0, kh_end=0;
           if (oh*SH < PH) kh_beg = (PH - oh*SH + (DH - 1)) / DH;
           kh_end = 0;
@@ -410,13 +426,32 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
           if (kw_end >= KW) kw_end = KW;
 
           if( kw_beg < kw_end && kh_beg < kh_end ) {
+#if 1 // SX regr.sh A1, FWD: 27.0x 18.5x
+            kh_end -= kh_beg;
+            kw_end -= kw_beg;
+            const ssize_t w0 = (((g * OCOG + 0 ) * ICOG + 0) * KH + kh_beg) * KW + kw_beg; // oc,ic,kh,kw=0
+            const ssize_t s0 = ((mb * IC + g * ICOG + 0 ) * IH + (oh*SH-PH+kh_beg*DH)) * IW + (ow*SW-PW+kw_beg*DW); //ic,kh,kw=0
+            for (ssize_t ic = 0; ic < ICOG; ++ic) {
+#pragma cdir shortloop
+              for (ssize_t kh = 0; kh < kh_end; ++kh) {
+#pragma cdir shortloop
+                for (ssize_t kw = 0; kw < kw_end; ++kw) {
+                  for (ssize_t oc = 0; oc < OCOG; ++oc) {
+                    tmp[oc] += psrc[s0 + ic*IH*IW + kh*DH*IW + kw*DW] * pwei[w0 + oc * ICOG*KH*KW + ic * KH*KW + kh*KW + kw];
+                  }
+                }
+              }
+            }
+#elif 0 // A1,FWD 20.1x 15.3x
+#pragma cdir shortloop
             for (ssize_t kh = kh_beg; kh < kh_end; ++kh) {
               const ssize_t ih = oh * SH - PH + kh * DH;
+#pragma cdir shortloop
               for (ssize_t kw = kw_beg; kw < kw_end; ++kw) {
                 const ssize_t iw = ow * SW - PW + kw * DW;
                 ssize_t const src_off0 =  ((mb * IC + g * ICOG + 0 ) * IH + ih) * IW + iw;
                 for (ssize_t ic = 0; ic < ICOG; ++ic) {
-                  ssize_t const wei_off0 = ((((ssize_t)g * OCOG + 0 ) * ICOG + ic) * KH + kh) * KW + kw;
+                  ssize_t const wei_off0 = (((g * OCOG + 0 ) * ICOG + ic) * KH + kh) * KW + kw;
                   float wei[OCOG];
                   float vsrc = psrc[src_off0 + ic * IH_IW];
                   for (ssize_t oc = 0; oc < OCOG; ++oc) {
@@ -426,6 +461,147 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
                 }
               }
             }
+#elif 0 // 19.8x 15.8x
+            ssize_t const w0 = (((g * OCOG + 0 ) * ICOG + 0) * KH + 0) * KW + 0; // oc,ic,kh,kw=0
+#pragma cdir shortloop
+            for (ssize_t kh = kh_beg; kh < kh_end; ++kh) {
+              //const ssize_t ih = oh * SH - PH + kh * DH;
+#pragma cdir shortloop
+              for (ssize_t kw = kw_beg; kw < kw_end; ++kw) {
+                ssize_t const src_off0 =  ((mb * IC + g * ICOG + 0 ) * IH + (oh*SH-PH+kh*DH)) * IW + (ow*SW-PW+kw*DW);
+                for (ssize_t ic = 0; ic < ICOG; ++ic) {
+                  float wei[OCOG];
+                  for (ssize_t oc = 0; oc < OCOG; ++oc) {
+                    //wei[oc] = pwei[wei_off0 + oc * ICOG*KH*KW];
+                    wei[oc] = pwei[w0 + oc * ICOG*KH*KW + ic * KH*KW + kh*KW + kw];
+                    tmp[oc] += psrc[src_off0 + ic*IH*IW] * wei[oc];
+                  }
+                }
+              }
+            }
+#elif 0 // 19.9x 15.7x
+            const ssize_t w0 = (((g * OCOG + 0 ) * ICOG + 0) * KH + 0) * KW + 0; // oc,ic,kh,kw=0
+            const ssize_t s0 = ((mb * IC + g * ICOG + 0 ) * IH + (oh*SH-PH+0*DH)) * IW + (ow*SW-PW+0*DW); //ic,kh,kw=0
+#pragma cdir shortloop
+            for (ssize_t kh = kh_beg; kh < kh_end; ++kh) {
+#pragma cdir shortloop
+              for (ssize_t kw = kw_beg; kw < kw_end; ++kw) {
+                for (ssize_t ic = 0; ic < ICOG; ++ic) {
+                  float wei[OCOG];
+                  for (ssize_t oc = 0; oc < OCOG; ++oc) {
+                    wei[oc] = pwei[w0 + oc * ICOG*KH*KW + ic * KH*KW + kh*KW + kw];
+                    tmp[oc] += psrc[s0 + ic*IH*IW + kh*DH*IW + kw*DW] * wei[oc];
+                  }
+                }
+              }
+            }
+#elif 1 // 17.8x FWD regr.sh .. A1, FWD: 27.0x 18.5x
+            kh_end -= kh_beg;
+            kw_end -= kw_beg;
+            const ssize_t w0 = (((g * OCOG + 0 ) * ICOG + 0) * KH + kh_beg) * KW + kw_beg; // oc,ic,kh,kw=0
+            const ssize_t s0 = ((mb * IC + g * ICOG + 0 ) * IH + (oh*SH-PH+kh_beg*DH)) * IW + (ow*SW-PW+kw_beg*DW); //ic,kh,kw=0
+#if 0 // 0: 26.8x 18.6x  27.2x 17.7x
+            for (ssize_t ic = 0; ic < ICOG; ++ic) {
+#pragma cdir shortloop
+              for (ssize_t kh = 0; kh < kh_end; ++kh) {
+#pragma cdir shortloop
+                for (ssize_t kw = 0; kw < kw_end; ++kw) {
+                  six[ ic * kh_end*kw_end + kh * kw_end + kw ] = psrc[s0 + ic*IH*IW + kh*DH*IW + kw*DW];
+                  wix[ ic * kh_end*kw_end + kh * kw_end + kw ] = w0 + ic * KH*KW + kh*KW + kw;
+                }
+              }
+            }
+#endif
+            for (ssize_t ic = 0; ic < ICOG; ++ic) {
+#pragma cdir shortloop
+              for (ssize_t kh = 0; kh < kh_end; ++kh) {
+#pragma cdir shortloop
+                for (ssize_t kw = 0; kw < kw_end; ++kw) {
+
+                  for (ssize_t oc = 0; oc < OCOG; ++oc) {
+                    tmp[oc] += psrc[s0 + ic*IH*IW + kh*DH*IW + kw*DW] * pwei[w0 + oc * ICOG*KH*KW + ic * KH*KW + kh*KW + kw];
+                    //tmp[oc] += six[ic*kh_end*kw_end + kh*kw_end + kw] * pwei[wix[ic*kh_end*kw_end+kh*kw_end+kw] + oc * ICOG*KH*KW];
+                  }
+                }
+              }
+            }
+#elif 0 // 27.0 17.9x (both)
+            kh_end -= kh_beg;
+            kw_end -= kw_beg;
+            const ssize_t w0 = (((g * OCOG + 0 ) * ICOG + 0) * KH + kh_beg) * KW + kw_beg; // oc,ic,kh,kw=0
+            const ssize_t s0 = ((mb * IC + g * ICOG + 0 ) * IH + (oh*SH-PH+kh_beg*DH)) * IW + (ow*SW-PW+kw_beg*DW); //ic,kh,kw=0
+            for (ssize_t ic = 0; ic < ICOG; ++ic) {
+#pragma cdir shortloop
+              for (ssize_t kh = 0; kh < kh_end; ++kh) {
+#pragma cdir shortloop
+                for (ssize_t kw = 0; kw < kw_end; ++kw) {
+                  six[ ic * kh_end*kw_end + kh * kw_end + kw ] = psrc[s0 + ic*IH*IW + kh*DH*IW + kw*DW];
+                  //wix[ ic * kh_end*kw_end + kh * kw_end + kw ] = w0 + ic * KH*KW + kh*KW + kw;
+                  wix[ ic * kh_end*kw_end + kh * kw_end + kw ] = ic * KH*KW + kh*KW + kw;
+                }
+              }
+            }
+            for (ssize_t ickhkw = 0; ickhkw < ICOG*kh_end*kw_end; ++ickhkw){
+              for (ssize_t oc = 0; oc < OCOG; ++oc) {
+                //tmp[oc] += six[ickhkw] * pwei[wix[ickhkw] + oc * ICOG*KH*KW];
+                tmp[oc] += six[ickhkw] * pwei[w0 + wix[ickhkw] + oc * ICOG*KH*KW];
+              }
+            }
+#elif 0 //
+            kh_end -= kh_beg;
+            kw_end -= kw_beg;
+            const ssize_t w0 = (((g * OCOG + 0 ) * ICOG + 0) * KH + kh_beg) * KW + kw_beg; // oc,ic,kh,kw=0
+            const ssize_t s0 = ((mb * IC + g * ICOG + 0 ) * IH + (oh*SH-PH+kh_beg*DH)) * IW + (ow*SW-PW+kw_beg*DW); //ic,kh,kw=0
+            for (ssize_t ic = 0; ic < ICOG; ++ic) {
+#pragma cdir shortloop
+              for (ssize_t kh = 0; kh < kh_end; ++kh) {
+#pragma cdir shortloop
+                for (ssize_t kw = 0; kw < kw_end; ++kw) {
+                  //wix[ ic * kh_end*kw_end + kh * kw_end + kw ] = w0 + ic * KH*KW + kh*KW + kw;
+                  wix[ ic * kh_end*kw_end + kh * kw_end + kw ] = ic * KH*KW + kh*KW + kw;
+                  six[ ic * kh_end*kw_end + kh * kw_end + kw ] = ic*IH*IW + kh*DH*IW + kw*DW;
+                }
+              }
+            }
+            for (ssize_t ickhkw = 0; ickhkw < ICOG*kh_end*kw_end; ++ickhkw){
+              for (ssize_t oc = 0; oc < OCOG; ++oc) {
+                tmp[oc] += psrc[s0 + six[ickhkw]] * pwei[w0 + wix[ickhkw] + oc * ICOG*KH*KW];
+              }
+            }
+#elif 0 // 27.3 18.2 .. 26.7 17.7
+            kh_end -= kh_beg;
+            kw_end -= kw_beg;
+            const ssize_t s000 = ((mb*IC+g*ICOG)*IH -PH)*IW -PW;
+            khash = s000 + ((kh_beg*KW + kw_beg)<<32) + ((kh_end*KW + kw_end)<<40);
+            if (khash != khash_prv) {
+              //w0 = (((g * OCOG + 0 ) * ICOG + 0) * KH + kh_beg) * KW + kw_beg; // oc,ic,kh,kw=0
+              //s00 = ((mb * IC + g * ICOG + 0 ) * IH + (0*SH-PH+kh_beg*DH)) * IW + (0*SW-PW+kw_beg*DW); //ic,kh,kw=0
+              //w0 = (((g * OCOG ) * ICOG ) * KH + kh_beg) * KW + kw_beg; // oc,ic,kh,kw=0
+              w0 = (g * OCOG_ICOG_KH + kh_beg) * KW + kw_beg; // oc,ic,kh,kw=0
+              //s00 = ((mb * IC + g * ICOG ) * IH + (-PH+kh_beg*DH)) * IW + (-PW+kw_beg*DW); //ic,kh,kw=0
+              s00 = s000 + kh_beg*DH_IW + kw_beg*DW;
+              for (ssize_t ic = 0; ic < ICOG; ++ic) {
+#pragma cdir shortloop
+                for (ssize_t kh = 0; kh < kh_end; ++kh) {
+#pragma cdir shortloop
+                  for (ssize_t kw = 0; kw < kw_end; ++kw) {
+                    //wix[ ic * kh_end*kw_end + kh * kw_end + kw ] = w0 + ic * KH*KW + kh*KW + kw;
+                    wix[ ic * kh_end*kw_end + kh * kw_end + kw ] = ic*KH*KW + kh*KW + kw;
+                    six[ ic * kh_end*kw_end + kh * kw_end + kw ] = ic*IH*IW + kh*DH*IW + kw*DW;
+                  }
+                }
+              }
+              khash_prv = khash;
+            }
+            s0 = s00 + oh*SH_IW + ow*SW;
+
+            for (ssize_t ickhkw = 0; ickhkw < ICOG*kh_end*kw_end; ++ickhkw){
+              ssize_t x[OCOG];
+              for (ssize_t oc = 0; oc < OCOG; ++oc) {
+                tmp[oc] += psrc[s0 + six[ickhkw]] * pwei[w0 + wix[ickhkw] + oc * ICOG_KH_KW];
+              }
+            }
+#endif
           }
           //for (size_t oc = 0; oc < OCOG; ++oc) pdst[dst_off0 + oc * OH_OW] = tmp[oc];
           if (p->merge == RELU) {
@@ -442,6 +618,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
 #else
 #error "please select one"
 #endif
+  }
 }
 
 /** hoisting for generic dilations is complicated by modulo conditions. */
@@ -1406,7 +1583,7 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
         for (ssize_t kw = 0; kw < KW; ++kw) {
           const ssize_t ih0 = /*0 * SH*/ - PH + kh * DH;
           typedef int hoist_t; /*but it could even be unsigned int, now*/
-#if 0 // SX 24.5x BWD_WB regr.sh
+#if 1 // SX 24.5x BWD_WB regr.sh
           ssize_t oh_beg, oh_end;
           oh_beg = div_floor(      SH - ih0 - 1, SH);//(c-a+b-1)/b
           oh_end = div_floor( IH + SH - ih0 - 1, SH);//(d-a+b-1)/b
@@ -1429,7 +1606,7 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
           if( kw*DW < PW ) ow_beg = ((PW-kw*DW) + SW-1)/ SW;
           if( kw*DW < IW+PW ) ow_end = ((IW + PW - kw*DW) + SW-1) / SW;
           if( ow_end >= OW ) ow_end = OW;
-#elif 1 // SX 24.3x
+#elif 1 // SX 24.1x
           const ssize_t oh_beg = ( kh*DH < PH ? ((PH-kh*DH) + SH-1)/ SH : 0 );
           ssize_t oh_end = ( kh*DH < IH+PH ? ((IH + PH - kh*DH) + SH-1) / SH : 0 );
           if( oh_end >= OH ) oh_end = OH;
