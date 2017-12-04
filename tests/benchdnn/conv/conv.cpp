@@ -928,6 +928,9 @@ static void test_impl_compare( const prb_t* p, res_t* r, const size_t imp,
     auto &bs = benchdnn_stat;
     assert( imp <= get_nref_impls() && imp >= 0 );
     char const* impname = get_ref_impls()[imp].name;
+    if (maybe_skip(impname))
+        return;
+
     benchdnn_timer_t tt;
     tt.start();
     run_fn();

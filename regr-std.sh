@@ -1,4 +1,8 @@
 #!/bin/bash
+SXskip=""
+if [ `uname -m` = "SX-ACE" ]; then
+	SXskip="--skip-impl=orig:sx2" # these are both extremely slow
+fi
 ./regr.sh --dir=FWD_B A1 -nA1-FWD_B \
 	&& ./regr.sh --dir=BWD_D A1 -nA1-BWD_D \
 	&& ./regr.sh --dir=BWD_WB A1 -nA1-BWD_WB \
@@ -9,6 +13,6 @@
 	&& ./regr.sh BWD_D \
 	&& ./regr.sh BWD_WB \
 	&& ./regr.sh ALL \
-	&& ./regr.sh MINI \
+	&& ./regr.sh ${SXskip} MINI \
 	&& echo YAY
 

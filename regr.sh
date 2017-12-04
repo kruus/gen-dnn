@@ -89,6 +89,21 @@ for ((i=0; i<${#ARGS[*]}; ++i)); do
             fi;
             ((++nopt))
             ;;
+        minifwd*) # fast fwd minialex
+            BASE="minifwd"
+            xform="--dir=FWD_B --skip-impl=orig:sx --batch=inputs/minialex"
+            ((++nopt))
+            ;;
+        minibwd_d*) # fast minialex
+            BASE="minibwd_d"
+            xform="--dir=BWD_D --skip-impl=orig:sx --batch=inputs/minialex"
+            ((++nopt))
+            ;;
+        minibwd_w*) # fast minialex
+            BASE="minibwd_w"
+            xform="--dir=BWD_WB --skip-impl=orig:sx --batch=inputs/minialex"
+            ((++nopt))
+            ;;
         MINI) # low-minibatch alexnet
             BASE="MINIALEX";
             xform="--dir=FWD_B --batch=inputs/minialex --dir=BWD_D --batch=inputs/minialex --dir=BWD_WB --batch=inputs/minialex"
