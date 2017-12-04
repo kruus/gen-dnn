@@ -483,6 +483,7 @@ void prb_t::count_ops() {
     }
 
     ops = 2 * this->mb * this->oc * this->ic / this->g * sp_ops;
+    //print(0, " ops=%f\n",ops);
 }
 
 void prb2str(const prb_t *p, char *buffer, bool canonical) {

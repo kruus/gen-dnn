@@ -26,11 +26,15 @@ struct test_data_t {
     /** was the last (loop-over-impls) all-PASSED? */
     bool impls_ok;
 
-    /** for each loop-over-impls, record time taken */
+    /** for each loop-over-impls, record avg time taken [per convolution, single test case]  */
     double ms[get_nref_impls()];
+    /** and ops for this test convolution (same for every impl) */
+    double ops;
 
-    /** running total time per test impl */
+    /** running total [avg time per test impl], summed over different test cases */
     double ms_tot[get_nref_impls()];
+    /** and running total ops */
+    double ops_tot;
 
     /** wins[N x N] is a count matrix where wins[i,j] increments if
      * impl i was faster than impl j  (else decrements).

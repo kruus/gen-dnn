@@ -97,7 +97,7 @@ void check_correctness(const desc_t *c) {
 #if 1
     // Nicely avoid unsupported things:
     const bool mkldnn_ok = check_mkldnn_support(&p, &res);
-    int status = (mkldnn_ok? conv::doit(&p, &res): OK);
+    int status = (mkldnn_ok? conv::doit(&p, &res): OK); // <-- run benchmark
 #else
     const bool mkldnn_ok = true;
     int status = conv::doit(&p, &res);

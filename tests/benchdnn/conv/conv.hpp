@@ -133,7 +133,8 @@ struct prb_t: public desc_t {
     prb_t(const desc_t &desc, dir_t dir, const dt_conf_t *cfg, alg_t alg,
             merge_t merge, const attr_t &attr, int mb = 0)
         : desc_t(desc), dir(dir), cfg(cfg), alg(alg), merge(merge), attr(attr)
-        , ops(0) {
+        , ops(0)
+    {
         if (mb) this->mb = mb;
         count_ops();
     }
