@@ -13,6 +13,8 @@ fi
 	&& ./regr.sh BWD_D \
 	&& ./regr.sh BWD_WB \
 	&& ./regr.sh ALL \
-	&& ./regr.sh ${SXskip} MINI \
+	&& ./regr.sh ${SXskip} minifwd \
+	&& ./regr.sh ${SXskip} minibwd_d \
+	&& ./regr.sh ${SXskip} minibwd_w \
 	&& echo YAY
 
