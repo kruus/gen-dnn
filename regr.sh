@@ -161,7 +161,7 @@ ls -l .
 set +x
 echo "COLUMN ... $COLUMN"
             (cd inputs && ls -1) | awk '//{p=p " " $0;++n} n>=4{print p; p=""; n=0} END{print p}' | ${COLUMN}
-            eval $THREADS ${TIME} C_PROGINF=DETAIL ./benchdnn --mode=PT ${ARGS[@]}
+            eval $THREADS C_PROGINF=DETAIL ${TIME} ./benchdnn --mode=PT ${ARGS[@]}
         }
     } || { echo "Problems?"; false; }
     ) >& "$LOGFILE" \

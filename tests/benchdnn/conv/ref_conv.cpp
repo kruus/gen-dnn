@@ -78,11 +78,11 @@ void compute_ref_fwd(const prb_t *p, dnn_mem_t &src_m,
     };
 
 #   pragma omp parallel for collapse(5)
-    for (size_t g = 0; g < p->g; ++g) {
-    for (size_t mb = 0; mb < p->mb; ++mb) {
-        for (size_t oc = 0; oc < p->oc/p->g; ++oc) {
-        for (size_t oh = 0; oh < p->oh; ++oh) {
-        for (size_t ow = 0; ow < p->ow; ++ow) {
+    for (int g = 0; g < p->g; ++g) {
+    for (int mb = 0; mb < p->mb; ++mb) {
+        for (int oc = 0; oc < p->oc/p->g; ++oc) {
+        for (int oh = 0; oh < p->oh; ++oh) {
+        for (int ow = 0; ow < p->ow; ++ow) {
             const size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
 #if PTRMOD==1
             float &d = pdst[dst_off];
