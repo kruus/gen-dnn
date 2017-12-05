@@ -292,6 +292,40 @@ down (via attributes):
 | NONE, RELU    | merged primitives: nothing or ReLU
 
 
+## Performance testing
+
+A number of approaches to vectorizing and parallelizing the convolutions can be
+tested via --mode=PT (Performance Test).  The general approach was to replace
+conditional tests in inner loops with exactly calculated loop limits in a more
+outer loop.
+
+Condition <B>hoisting</B> was tricky for two reasons:
+
+- signed integer division in C rounds to zero, so just manipulating the
+  mathematical equations won't in general work.
+  - a set of round-to-negative-infinity routines ease developing a set
+    of mathematically correct hoists.
+- stride and dilation sometimes involves a modulo condition.
+  - this leads to a pair of linear Diophantine equations, whose efficient
+    solution involves running the extended Euclid algorithm.
+
+After hoisting with \c idiv.hpp division routines, one can derive alternative
+formulations that will work with signed/unsigned integers by keeping all
+intermediate quantities >= 1.  Then one can get *if* -based formulas that would
+also be valid for unsigned calculation, as well as begin able to use C
+integer division without problems with zero or negatives.  The *idiv*
+approach is actually pretty fast on Intel hardware since it produces
+branchless code (cmov) and is written to allow the compiler to use
+masking instructions for some other *if* statements.
+
+In coding for the SX chipset, the compiler needed much hand-holding, but the
+resulting benchdnn impls (for gnchw data format) also worked better than what
+I had arrived at for Intel.
+
+Todays Intel performance tests on 6-core avx2 yielded 100x speedup for a
+'minialex' test in FWD, but BWD\_D and BWD\_WB still lag at only 7-12x speedup.
+             
+    
 ## Installation
 
 **benchdnn** is automatically built with Intel MKL-DNN. For the convenience one

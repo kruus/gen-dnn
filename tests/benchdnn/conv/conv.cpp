@@ -70,10 +70,11 @@ static conv_impls_t conv_impls_[] = {
     {"sx4",  sxconv_4_fwd,  sxconv_4_bwd_d,  sxconv_4_bwd_w},
     //{"NULL", nullptr, nullptr, nullptr},
 
+    {"ref3", refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
     {"ref4", refconv_4_fwd,         refconv_4_bwd_d,            refconv_4_bwd_w},
     //{"NULL", nullptr, nullptr, nullptr},
 
-    {"rf99", refconv_99_fwd,         refconv_99_bwd_d,            refconv_99_bwd_w}
+    //{"rf99", refconv_99_fwd,         refconv_99_bwd_d,            refconv_99_bwd_w}
     //{"NULL", nullptr, nullptr, nullptr}
 #endif
 };

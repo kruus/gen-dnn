@@ -1130,7 +1130,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 #endif
   //memset( (float*)diff_bia_m, 0, diff_bia_m.size() ); // single loop, always equiv
   //zero_bia(p, diff_bia_m);
-#if 0 // A1,A3 x86 cf. sx3 : 9.6, 8.0   (sxconv3: 7.1, 19.3)
+#if 0 // A1,A3 x86 cf. sx3 : 9.6, 8.0   (sxconv3: 7.1, 19.3)   x86:8.5,7.7,1.1
 # pragma omp parallel
   {
 #   pragma omp for collapse(3)
@@ -1235,7 +1235,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
-#elif 0 // x86 9.9, 9.0
+#elif 0 // x86 9.9, 9.0   x86:8.4,7.4,1.8
   // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
 # pragma omp parallel for collapse(4)
   for (ssize_t g = 0; g < G; ++g) {
@@ -1305,7 +1305,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
-#elif 0 // x86 6.0, 8.2
+#elif 0 // x86 6.0, 8.2 x86:8.8,7.2,1.8
   // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
 # pragma omp parallel for collapse(4)
   for (ssize_t g = 0; g < G; ++g) {
@@ -1420,7 +1420,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
-#elif 0 // loop order change, much better 24x for regr.sh BWD_WB (x86:6.9,19.3)
+#elif 0 // loop order change, much better 24x for regr.sh BWD_WB (x86:6.9,19.3)  // XXX FAIL GOOD for ic >~ omp_num_threads ??? XXX
   // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
 # pragma omp parallel for collapse(4)
   for (ssize_t g = 0; g < G; ++g) {
@@ -1454,6 +1454,8 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
                 for (size_t ow = 0; ow < ow_end; ++ow) {
                   for (ssize_t ic = 0; ic < ICOG; ++ic) {
                     dw_ic[ic] += pdiff_dst[dst_off_beg+oh*OW+ow] * psrc[s0+ic*IH*IW + oh*SH_IW + ow*SW];
+                    // slower ...
+                    //dw_ic[ic] += pdiff_dst[d0+mb*OC*OH*OW + oh*OW+ow] * psrc[s00+mb*IC*IH*IW + ic*IH*IW + oh*SH_IW + ow*SW];
                   }
                 }
               }
@@ -1487,7 +1489,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
-#elif 0 // BWD_W SX 24.2x
+#elif 0 // BWD_W SX 24.2x FAIL
   // loop order change, much better 24x for regr.sh BWD_WB (x86:7.9,19.1)
   // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
 # pragma omp parallel for collapse(4)
@@ -1498,8 +1500,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 #pragma cdir shortloop
         for (ssize_t kw = 0; kw < KW; ++kw) {
           const ssize_t ih0 = /*0 * SH*/ - PH + kh * DH;
-          typedef int hoist_t; /*but it could even be unsigned int, now*/
-#if 1 // SX 24.5x BWD_WB regr.sh
+#if 1 // SX 24.5x BWD_WB regr.sh  x86:7.6,13.2,1.73
           ssize_t oh_beg, oh_end;
           oh_beg = div_floor(      SH - ih0 - 1, SH);//(c-a+b-1)/b
           oh_end = div_floor( IH + SH - ih0 - 1, SH);//(d-a+b-1)/b
@@ -1511,18 +1512,18 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
           if (ow_beg < 0    ) ow_beg = 0;
           if (ow_end > OW) ow_end = OW;
           //const size_t iw_beg = ow_beg * SW - PW + kw * DW;
-#elif 0 // SX 24.3x
+#elif 1 // SX 24.3x  x86:6.9,16.2 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< XXX x86 XXX
           // equiv, but OK for unsigned hoist_t and "normal" division op
           typedef ssize_t hoist_t; /*but it could even be unsigned int, now*/
           hoist_t oh_beg = 0, oh_end=0;
           if( kh*DH < PH ) oh_beg = ((PH-kh*DH) + SH-1)/ SH;
           if( kh*DH < IH+PH ) oh_end = ((IH + PH - kh*DH) + SH-1) / SH;
           if( oh_end >= OH ) oh_end = OH;
-          hoist_t ow_beg = 0, ow_end=0;
+          hoist_t ow_beg = 1, ow_end=0;
           if( kw*DW < PW ) ow_beg = ((PW-kw*DW) + SW-1)/ SW;
           if( kw*DW < IW+PW ) ow_end = ((IW + PW - kw*DW) + SW-1) / SW;
           if( ow_end >= OW ) ow_end = OW;
-#elif 1 // SX 24.1x
+#elif 0 // SX 24.1x  x86:6.8,12.3
           const ssize_t oh_beg = ( kh*DH < PH ? ((PH-kh*DH) + SH-1)/ SH : 0 );
           ssize_t oh_end = ( kh*DH < IH+PH ? ((IH + PH - kh*DH) + SH-1) / SH : 0 );
           if( oh_end >= OH ) oh_end = OH;
@@ -1578,7 +1579,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
-#elif 0 // A1,A3 SX 1.5,1.1
+#elif 0 // A1,A3 SX 1.5,1.1     x86:6.9,13.1
   // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
 # pragma omp parallel for collapse(4)
   for (ssize_t g = 0; g < G; ++g) {
@@ -1631,7 +1632,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     }
   }
   bwd_w_bias_update( p, diff_bia_m, diff_dst_m);
-#elif 0 // A1,A3 SX 1.5,1.1
+#elif 0 // A1,A3 SX 1.5,1.1       x86:HORRIBLE
   // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
 # pragma omp parallel
   {
@@ -1748,7 +1749,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     }
   }
   bwd_w_bias_update( p, diff_bia_m, diff_dst_m);
-#elif 0 // A1,A3,BWD_WB SX 13.8,13.8,14
+#elif 0 // A1,A3,BWD_WB SX 13.8,13.8,14    x86:HORRIBLE
   // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
 # pragma omp parallel
   {
@@ -1888,15 +1889,15 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
               }
 
               for (ssize_t mb = 0; mb < MB; ++mb) {
-                //const ssize_t dst_off_beg = d0 + mb * OC*OH*OW;
-                //const ssize_t s0 = s00 + mb*IC*IH*IW;
+                const ssize_t dst_off_beg = d0 + mb * OC*OH*OW;
+                const ssize_t s0 = s00 + mb*IC*IH*IW;
                 for (ssize_t ic = 0; ic < ICOG; ++ic) {
                   for (ssize_t ohw = 0; ohw< OH_OW; ++ohw) {
-#if 0
+#if 1 // x86:HORRIBLE
                     if( ohw_off[ohw] >= 0 ){
                       dw_ic[ic] += psrc[s0+ic*IH*IW + ohw_off[ohw]] * pdiff_dst[dst_off_beg+ohw];
                     }
-#elif 0 // half-speed
+#elif 0 // SX:half-speed
                     tmpsrc[ohw] = (ohw_off[ohw] >= 0? psrc[s0+ic*IH*IW + ohw_off[ohw]]: 0.f);
                     dw_ic[ic] += tmpsrc[ohw] * pdiff_dst[dst_off_beg+ohw];
 #elif 1 // very slightly slower, but allows checking loop re-orderings
@@ -1974,7 +1975,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
                   }
                 }
               }
-#if 0
+#if 1
               ssize_t src_mbic[MB*ICOG];
               for (ssize_t mb = 0; mb < MB; ++mb) {
                 for (ssize_t ic = 0; ic < ICOG; ++ic) {
@@ -1987,7 +1988,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
               for (ssize_t mb = 0; mb < MB; ++mb) {
                 for (ssize_t ic = 0; ic < ICOG; ++ic) {
                   for (ssize_t ohw = 0; ohw< OH_OW; ++ohw) {
-#if 1
+#if 0
                     if( ohw_off[ohw] >= 0 ){
                       dw_ic[ic] += psrc[s00+(mb*IC+ic)*IH_IW + ohw_off[ohw]] * pdiff_dst[d0+mb*OC_OH_OW+ohw];
                     }
@@ -2013,7 +2014,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     }
   }
   bwd_w_bias_update( p, diff_bia_m, diff_dst_m);
-#elif 1 // cleaned up
+#elif 1 // cleaned up, SX ~ 11x speedup.    SUCKS on x86 with gcc (0.34x speedup)!
   // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
 # pragma omp parallel
   {
@@ -2021,7 +2022,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 #pragma cdir on_adb(ohw_off)
 //#pragma alloc_on_vreg(ohw_off)
     //int icohw_off[ICOG*OH*OW]
-    //float tmpsrc[OH*OW];
+    float tmpsrc[OH*OW];
 //#pragma cdir alloc_on_vreg(tmpsrc)
     float dw_ic[ICOG];
 #pragma cdir alloc_on_vreg(dw_ic)
@@ -2078,11 +2079,11 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
               for (ssize_t mb = 0; mb < MB; ++mb) {
                 for (ssize_t ic = 0; ic < ICOG; ++ic) {
                   for (ssize_t ohw = 0; ohw< OH_OW; ++ohw) {
-#if 1
+#if 1 || defined(_SX)
                     if( ohw_off[ohw] >= 0 ){
                       dw_ic[ic] += psrc[s00+(mb*IC+ic)*IH_IW + ohw_off[ohw]] * pdiff_dst[d0+mb*OC_OH_OW+ohw];
                     }
-#else // slightly slower
+#elif 1 // slightly slower
                       dw_ic[ic] += (ohw_off[ohw] >= 0? psrc[s00+(mb*IC+ic)*IH_IW + ohw_off[ohw]]: 0.f)
                         * pdiff_dst[d0+mb*OC_OH_OW+ohw];
 #endif
