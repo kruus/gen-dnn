@@ -387,7 +387,7 @@ void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
 void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
                      dnn_mem_t &diff_wei_m, dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m)
 {
-#define BW4 14 
+#define BW4 15 
   //  Speedups Table
   //     Test: regr.sh 6 BWD_W, snake10(avx2)
   //     |   descr.............
@@ -405,6 +405,7 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   //                     changed Y to "better" posn (after hoist)
   //                     YAF=2.0 YAG=1.83 YBF=1.87 YBG=1.77
   //  50 1.97 tidy ZAG
+  //  -------- mb ouside is not omp-safe !!!! (discovered later)
   //  6 1.82 alt mb:Z loop posn not better
   //  7 1.56 omp(g,oc,ic,kh,kw) ic&zero, mb,oh,ow ?? zeroing back inside
   //  8 1.54 ?? init bias inside loop
@@ -576,6 +577,8 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
                   size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
                   const int iw = ow * SW - PW + kw * (p->dw + 1);
                   size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+                  // Here's the problem: multiple 'mb' might update the same 'dw'
+#pragma omp atomic
                   dw += ((float*)diff_dst_m)[dst_off]
                     * ((float*)src_m)[src_off];
                 }
@@ -586,6 +589,54 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
+#elif 1 || BW4==15 // tidy up, try some questionable omp mods
+  bwd_w_bias_update(p, diff_bia_m, diff_dst_m);
+  zero_wei(p, diff_wei_m);
+#pragma omp parallel
+    {
+      // NOTE: we've arrived at something very similar to ref_conv3, but
+      //   mb-loop is outside omp-loop
+        //#pragma omp parallel
+#pragma omp for collapse(4)
+        for (int g = 0; g < G; ++g) {
+          for (int oc = 0; oc < OC/G; ++oc) {
+            for (int kh = 0; kh < p->kh; ++kh) {
+              for (int kw = 0; kw < KW; ++kw) {
+                int oh_beg, oh_end;
+                oh_beg=div_floor(       + PH - kh * (p->dh + 1) + SH - 1, SH);//(c-a+b-1)/b
+                oh_end=div_floor( IH + PH - kh * (p->dh + 1) + SH - 1, SH);//(d-a+b-1)/b
+                if (oh_beg < 0    ) oh_beg = 0;
+                if (oh_end > OH) oh_end = OH;
+                int ow_beg, ow_end;
+                ow_beg=div_floor(       + PW - kw * (p->dw + 1) + SW - 1, SW);//(c-a+b-1)/b
+                ow_end=div_floor( IW + PW - kw * (p->dw + 1) + SW - 1, SW);//(d-a+b-1)/b
+                if (ow_beg < 0    ) ow_beg = 0;
+                if (ow_end > OW) ow_end = OW;
+                if( oh_beg >= oh_end || ow_beg >= ow_end ) continue; // oh, still need to set dw=0
+
+                for (int ic = 0; ic < IC/G; ++ic) { // B
+                  size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw); // WRITTEN
+                  float &dw = ((float*)diff_wei_m)[wei_off];
+                  //dw = 0.f; // 2.2x --> 2.0x
+                  for (int mb = 0; mb < MB; ++mb) {
+                    for (int oh = oh_beg; oh < oh_end; ++oh) {
+                      const int ih = oh * SH - PH + kh * (p->dh + 1);
+                      for (int ow = ow_beg; ow < ow_end; ++ow) {
+                        size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+                        const int iw = ow * SW - PW + kw * (p->dw + 1);
+                        size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+                        // Here's the problem: multiple 'mb' might update the same 'dw'
+                        dw += ((float*)diff_dst_m)[dst_off]
+                          * ((float*)src_m)[src_off];
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
 #else
 #error "oops enable a code section!"
 #endif

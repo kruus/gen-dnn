@@ -803,8 +803,8 @@ void refconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
               if (ow_end > OW) ow_end = OW;
               if( ow_beg >= ow_end || oh_beg >= oh_end ) continue;
 
-              for (int ic = 0; ic < IC/G; ++ic) {
-                size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+              for (int ic = 0; ic < IC/G; ++ic) { // involved in WRITE
+                size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw); //<- WRITTEN
                 float &dw = ((float*)diff_wei_m)[wei_off];
                 for (int mb = 0; mb < MB; ++mb) {
                   for (int oh = oh_beg; oh < oh_end; ++oh) {

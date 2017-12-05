@@ -1670,7 +1670,29 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   float       * restrict const pdiff_wei = (float*)diff_wei_m;
   float       * restrict const pdiff_bia = (float*)diff_bia_m;
   float const * restrict const pdiff_dst = (float*)diff_dst_m;
-#if 0
+#if 1
+  // It is hard to measure any speed difference from modifying the bwd_w_bias_update
+  auto bwd_w_bias_update = [&](const prb_t* p, dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m){
+    if ((p->dir & FLAG_BIA)) {
+      for (int oc = 0; oc < OC     ; ++oc) {
+        size_t bia_off = bia_off_f_nog(p, /*g,*/ oc);
+        float &db = ((float*)diff_bia_m)[bia_off];
+        db = 0.f;
+# pragma omp parallel for collapse(2) reduction(+:db)
+        for (int mb = 0; mb < MB; ++mb) {
+          for (int ohw = 0; ohw < OH*OW; ++ohw) {
+            size_t dst_off = dst_off_f_nog_ohw(p, mb, /*g,*/ oc, ohw);
+            db += ((float*)diff_dst_m)[dst_off];
+          }
+        }
+      }
+    }
+  };
+#endif
+#define BW 6
+  // SX BWD_WB tests
+  // 6 3.34x
+#if BW==0
 # pragma omp parallel
   {
 #   pragma omp for collapse(3)
@@ -1775,7 +1797,8 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
-#elif 0
+#endif
+#if BW==1
   // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
 # pragma omp parallel for collapse(4)
   for (ssize_t g = 0; g < G; ++g) {
@@ -1845,7 +1868,8 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
-#elif 0
+#endif
+#if BW==2
   // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
 # pragma omp parallel for collapse(4)
   for (ssize_t g = 0; g < G; ++g) {
@@ -1960,7 +1984,9 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
-#elif 0 // loop order change, much better 24x for regr.sh BWD_WB
+#endif
+#if BW==3
+  // loop order change, much better 24x for regr.sh BWD_WB
   // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
 # pragma omp parallel for collapse(4)
   for (ssize_t g = 0; g < G; ++g) {
@@ -2027,7 +2053,8 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
-#elif 1 // loop order change, much better 24x for regr.sh BWD_WB
+#endif
+#if BW==5// loop order change, much better 24x for regr.sh BWD_WB
   // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
 # pragma omp parallel for collapse(4)
   for (ssize_t g = 0; g < G; ++g) {
@@ -2116,7 +2143,11 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
-#elif 1 // from ref_conv4
+#endif
+#if BW==6 // from ref_conv4
+#if 0
+#define PREZERO 1
+#if PREZERO
 #if 0
 # pragma omp for collapse(3)
   for (ssize_t g = 0; g < G; ++g) {
@@ -2131,48 +2162,162 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
+#else
+  zero_wei(p, diff_wei_m);
 #endif
-  // NOTE: we've arrived at something very similar to ref_conv3, but
-  //   mb-loop is outside omp-loop
-  for (int mb = 0; mb < MB; ++mb) {
+#endif
+#if 1
+  bwd_w_bias_update(p, diff_bia_m, diff_dst_m);
+#else
+  if ((p->dir & FLAG_BIA)) {
+#   pragma omp for collapse(2) nowait
+    for (ssize_t g = 0; g < G; ++g) {
+      for (ssize_t oc = 0; oc < OCOG; ++oc) {
+        ssize_t bia_off = bia_off_f2(p, g, oc);
+        //float &db = pdiff_bia[bia_off];
+        pdiff_bia[bia_off] = 0.f;
+        for (ssize_t mb = 0; mb < MB; ++mb) {
+          const ssize_t dst_off00 = ((mb * OC + g * OCOG + oc) * OH + 0) * OW + 0;
+          for (ssize_t oh = 0; oh < OH; ++oh) {
+            for (ssize_t ow = 0; ow < OW; ++ow) {
+              pdiff_bia[bia_off] += pdiff_dst[dst_off00 + oh*OW + ow];
+            }
+          }
+        }
+      }
+    }
+  }
+#endif
+#endif
+#define TMP_IC 0
+#if TMP_IC==0
+  zero_wei(p, diff_wei_m);
+#endif
+  bwd_w_bias_update(p, diff_bia_m, diff_dst_m);
+  //for (int mb = 0; mb < MB; ++mb) // <------ XXX WRONG position. not omp-safe
 #pragma omp parallel
+  {
 #pragma omp for collapse(4)
     for (int g = 0; g < G; ++g) {
       for (int oc = 0; oc < OC/G; ++oc) {
         for (int kh = 0; kh < p->kh; ++kh) {
           for (int kw = 0; kw < KW; ++kw) {
-#if 0
-            if( kh+kw == 0 ){
-              const ssize_t wei_off000 = (((g * OCOG + oc) * ICOG + 0) * KH + 0) * KW + 0;
-              for (ssize_t ic = 0; ic < ICOG; ++ic) {
-                //const ssize_t wei_off00 = (((g * OCOG + oc) * ICOG + ic) * KH + 0) * KW + 0;
-                for (ssize_t kh = 0; kh < KH; ++kh) {
-                  for (ssize_t kw = 0; kw < KW; ++kw) {
-                    pdiff_wei[wei_off000 + ic*KH*KW + kh*KW + kw] = 0.f;
-                  }
-                }
-              }
-            }
-#endif
             int oh_beg, oh_end;
-            oh_beg=div_floor(       + PH - kh * (p->dh + 1) + SH - 1, SH);//(c-a+b-1)/b
+            oh_beg=div_floor(    + PH - kh * (p->dh + 1) + SH - 1, SH);//(c-a+b-1)/b
             oh_end=div_floor( IH + PH - kh * (p->dh + 1) + SH - 1, SH);//(d-a+b-1)/b
             if (oh_beg < 0    ) oh_beg = 0;
             if (oh_end > OH) oh_end = OH;
             int ow_beg, ow_end;
-            ow_beg=div_floor(       + PW - kw * (p->dw + 1) + SW - 1, SW);//(c-a+b-1)/b
+            ow_beg=div_floor(    + PW - kw * (p->dw + 1) + SW - 1, SW);//(c-a+b-1)/b
             ow_end=div_floor( IW + PW - kw * (p->dw + 1) + SW - 1, SW);//(d-a+b-1)/b
             if (ow_beg < 0    ) ow_beg = 0;
             if (ow_end > OW) ow_end = OW;
-            //if( oh_beg >= oh_end || ow_beg >= ow_end ) continue; // oh, still need to set dw=0
+            if( oh_beg >= oh_end || ow_beg >= ow_end ) continue; // oh, still need to set dw=0
+
+#if TMP_IC
             float tmp[ICOG];
             for (int ic = 0; ic < IC/G; ++ic) tmp[ic] = 0.f; // MUST always execute!
-            if( oh_beg < oh_end && ow_beg < ow_end ){
+#endif
 
-              const size_t ih_beg = oh_beg*SH - PH + kh*DH;
-              const size_t iw_beg = ow_beg*SW - PW + kw*DW;
+            for (int ic = 0; ic < IC/G; ++ic) { // B
+              size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw); // WRITTEN
+              float &dw = pdiff_wei[wei_off];
+              //dw = 0.f; // 2.2x --> 2.0x
+              for (int mb = 0; mb < MB; ++mb) // OK inside
+              {
+                for (int oh = oh_beg; oh < oh_end; ++oh) {
+                  const int ih = oh * SH - PH + kh * (p->dh + 1);
+                  for (int ow = ow_beg; ow < ow_end; ++ow) {
+                    size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+                    const int iw = ow * SW - PW + kw * (p->dw + 1);
+                    size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+#if TMP_IC
+                    tmp[ic] += pdiff_dst[dst_off] * psrc[src_off];
+#else
+                    dw += pdiff_dst[dst_off] * psrc[src_off];
+#endif
+                  }
+                }
+              }
+            }
+#if TMP_IC
+            size_t wei_off = wei_off_f2(p, g, oc, 0, kh, kw); // WRITTEN
+            for (int ic = 0; ic < ICOG; ++ic) { // B
+              pdiff_wei[wei_off + ic*KH_KW] = tmp[ic];
+            }
+#endif
+          }
+        }
+      }
+    }
+  }
+#endif
+#if BW==7 // from ref_conv4 XXX NOT OMP-SAFE XXX
+  bwd_w_bias_update(p, diff_bia_m, diff_dst_m);
+  for (int mb = 0; mb < MB; ++mb) // <---- wrong
+  {
+#pragma omp parallel for collapse(4)
+    for (int g = 0; g < G; ++g) {
+      for (int oc = 0; oc < OC/G; ++oc) {
+        for (int kh = 0; kh < p->kh; ++kh) {
+          for (int kw = 0; kw < KW; ++kw) {
+            int oh_beg, oh_end;
+            oh_beg=div_floor(    + PH - kh * (p->dh + 1) + SH - 1, SH);//(c-a+b-1)/b
+            oh_end=div_floor( IH + PH - kh * (p->dh + 1) + SH - 1, SH);//(d-a+b-1)/b
+            if (oh_beg < 0    ) oh_beg = 0;
+            if (oh_end > OH) oh_end = OH;
+            int ow_beg, ow_end;
+            ow_beg=div_floor(    + PW - kw * (p->dw + 1) + SW - 1, SW);//(c-a+b-1)/b
+            ow_end=div_floor( IW + PW - kw * (p->dw + 1) + SW - 1, SW);//(d-a+b-1)/b
+            if (ow_beg < 0    ) ow_beg = 0;
+            if (ow_end > OW) ow_end = OW;
+#if TMP_IC
+            if( oh_beg < oh_end || ow_beg < ow_end )
+#else
+            if( oh_beg >= oh_end || ow_beg >= ow_end ) continue; // oh, still need to set dw=0
+            else
+#endif
+            {
+#if TMP_IC
+              float tmp[ICOG];
+              for (int ic = 0; ic < IC/G; ++ic) tmp[ic] = 0.f; // MUST always execute!
+#endif
+
+              for (int ic = 0; ic < IC/G; ++ic) { // B
+                size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw); // WRITTEN
+                float &dw = pdiff_wei[wei_off];
+                //dw = 0.f; // 2.2x --> 2.0x
+                for (int oh = oh_beg; oh < oh_end; ++oh) {
+                  const int ih = oh * SH - PH + kh * (p->dh + 1);
+                  for (int ow = ow_beg; ow < ow_end; ++ow) {
+                    size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+                    const int iw = ow * SW - PW + kw * (p->dw + 1);
+                    size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+#if TMP_IC
+                    tmp[ic] += pdiff_dst[dst_off] * psrc[src_off];
+#else
+                    dw += pdiff_dst[dst_off] * psrc[src_off];
+#endif
+                  }
+                }
+              }
+            }
+#if TMP_IC
+            size_t wei_off = wei_off_f2(p, g, oc, 0, kh, kw); // WRITTEN
+            for (int ic = 0; ic < ICOG; ++ic) { // B
+              pdiff_wei[wei_off + ic*KH_KW] = tmp[ic];
+            }
+#endif
+          }
+        }
+      }
+    }
+  }
+#endif
+}
 
 #if 0
+#elif 0
               for (int ic = 0; ic < IC/G; ++ic) { // B
                 //size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw); // WRITTEN
                 //float &dw = ((float*)diff_wei_m)[wei_off];
@@ -2211,8 +2356,7 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
                 size_t wei_off = wei_off_f2(p, g, oc, ic, kh, kw); // WRITTEN
                 pdiff_wei[wei_off] = tmp;
               }
-#else
-#if 1 // a1,a3 1.4,1.1
+#elif 0 // a1,a3 1.4,1.1
               for (int ic = 0; ic < IC/G; ++ic) { // B
                 size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw); // WRITTEN
                 float &dw = ((float*)diff_wei_m)[wei_off];
@@ -2246,7 +2390,7 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
               for (int ic = 0; ic < ICOG; ++ic) { // B
                 pdiff_wei[wei_off + ic] = tmp[ic];
               }
-#elif 1 // 1.3,3.3
+#elif 0 // 1.3,3.3
               float tmp[ICOG];
               for (int ic = 0; ic < ICOG; ++ic) { // B
                 tmp[ic] = 0.f;
@@ -2260,39 +2404,5 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
                 }
               }
 #endif
-#endif
-            }
-            size_t wei_off = wei_off_f2(p, g, oc, 0, kh, kw); // WRITTEN
-            for (int ic = 0; ic < ICOG; ++ic) { // B
-              pdiff_wei[wei_off + ic] = tmp[ic];
-            }
-          }
-        }
-      }
-    }
-  }
-  if ((p->dir & FLAG_BIA)) {
-#   pragma omp for collapse(2) nowait
-    for (ssize_t g = 0; g < G; ++g) {
-      for (ssize_t oc = 0; oc < OCOG; ++oc) {
-        ssize_t bia_off = bia_off_f(p, g, oc);
-        float &db = ((float*)diff_bia_m)[bia_off];
-        db = 0;
-        for (ssize_t mb = 0; mb < MB; ++mb) {
-          const ssize_t dst_off00 = ((mb * OC + g * OCOG + oc) * OH + 0) * OW + 0;
-          for (ssize_t oh = 0; oh < OH; ++oh) {
-            for (ssize_t ow = 0; ow < OW; ++ow) {
-              db += pdiff_dst[dst_off00 + oh*OW + ow];
-            }
-          }
-        }
-      }
-    }
-  }
-#else
-#error "select one"
-#endif
-}
-
 }
 // vim: et ts=2 sw=2 cindent nopaste ai cino=^=l0,\:0,N-s
