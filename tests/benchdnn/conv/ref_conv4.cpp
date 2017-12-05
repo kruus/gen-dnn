@@ -512,7 +512,7 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 // -------------------------------------------------------
 #if BW4==14 // tidy up, try some questionable omp mods
   // TODO I think the omp mods are WRONG
-#if 0
+#if 1
   bwd_w_bias_update(p, diff_bia_m, diff_dst_m);
   zero_wei(p, diff_wei_m);
   for (int mb = 0; mb < MB; ++mb)
@@ -526,11 +526,11 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     zero_bia(p, diff_bia_m);
 #pragma omp single
       zero_wei(p, diff_wei_m);
-//#pragma omp single //// makes omp for illegally nested?
+#pragma omp single //// makes omp for illegally nested?
       for (int mb = 0; mb < MB; ++mb) {
         if ((p->dir & FLAG_BIA)) {
-//# pragma omp parallel for nowait
-# pragma omp parallel for
+//# pragma omp parallel
+# pragma omp for
           for (int oc = 0; oc < OC     ; ++oc) {
             size_t bia_off = bia_off_f_nog(p, /*g,*/ oc);
             float &db = ((float*)diff_bia_m)[bia_off];
@@ -547,7 +547,7 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     // NOTE: we've arrived at something very similar to ref_conv3, but
     //   mb-loop is outside omp-loop
     for (int mb = 0; mb < MB; ++mb) {
-#pragma omp parallel
+//#pragma omp parallel
 #pragma omp for collapse(4)
 #endif
     for (int g = 0; g < G; ++g) {

@@ -7,7 +7,7 @@ usage() {
     echo " command: $ORIGINAL_CMD"
     echo "$0 usage:"
     echo " regr.sh [threads] {[<benchdnn_arg>|<batch_file>|FWD*|BWD_D|BWD_W*|ALEX|MINI] ...}"
-    #head -n 30 "$0" | grep "^[^#]*.)\ #"
+    head -n140 "$0" | grep "^[^#]*.)\ #"
     awk '/getopts/{flag=1;next} /done/{flag=0} flag&&/^[^#]+\) #/; flag&&/^ *# /' $0
     echo " Substitutions:"
     echo "   FWD|BWD_D|BWD_W* --> test_fwd_regrssion, ..."
@@ -51,6 +51,8 @@ batch_check() {
     echo "Not-a-file: ${BATCH}"
 }
 nopt=0
+SXskip=''
+if [ `uname -m` == "SX-ACE" ]; then SXskip='--skip-impl=orig:sx2'; fi
 for ((i=0; i<${#ARGS[*]}; ++i)); do
     #echo "$i : ${ARGS[i]}"
     xform="${ARGS[i]}"
@@ -91,17 +93,17 @@ for ((i=0; i<${#ARGS[*]}; ++i)); do
             ;;
         minifwd*) # fast fwd minialex
             BASE="minifwd"
-            xform="--dir=FWD_B --skip-impl=orig:sx --batch=inputs/minialex"
+            xform="--dir=FWD_B ${SXskip} --batch=inputs/minialex"
             ((++nopt))
             ;;
         minibwd_d*) # fast minialex
             BASE="minibwd_d"
-            xform="--dir=BWD_D --skip-impl=orig:sx --batch=inputs/minialex"
+            xform="--dir=BWD_D ${SXskip} --batch=inputs/minialex"
             ((++nopt))
             ;;
         minibwd_w*) # fast minialex
             BASE="minibwd_w"
-            xform="--dir=BWD_WB --skip-impl=orig:sx --batch=inputs/minialex"
+            xform="--dir=BWD_WB ${SXskip} --batch=inputs/minialex"
             ((++nopt))
             ;;
         MINI) # low-minibatch alexnet

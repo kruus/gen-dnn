@@ -62,7 +62,8 @@ static conv_impls_t conv_impls_[] = {
     //{"ref2", refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
     //{"ref5", refconv_5_fwd,         refconv_5_bwd_d,            refconv_5_bwd_w},
     //{"ref5", refconv_5_fwd,         refconv_5_bwd_d,            refconv_5_bwd_w},
-    {"sx2", sxconv_2_fwd, sxconv_2_bwd_d, sxconv_2_bwd_w},
+    //{"sx2", sxconv_2_fwd, sxconv_2_bwd_d, sxconv_2_bwd_w},
+    {"sx3", sxconv_3_fwd, sxconv_3_bwd_d, sxconv_3_bwd_w},
     //{"NULL", nullptr, nullptr, nullptr},      // save time?
 
     {"ref3", refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
