@@ -2166,7 +2166,7 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
             if (ow_end > OW) ow_end = OW;
             //if( oh_beg >= oh_end || ow_beg >= ow_end ) continue; // oh, still need to set dw=0
             float tmp[ICOG];
-            for (int ic = 0; ic < IC/G; ++ic) tmp[ICOG] = 0.f; // MUST always execute!
+            for (int ic = 0; ic < IC/G; ++ic) tmp[ic] = 0.f; // MUST always execute!
             if( oh_beg < oh_end && ow_beg < ow_end ){
 
               const size_t ih_beg = oh_beg*SH - PH + kh*DH;
