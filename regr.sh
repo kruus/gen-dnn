@@ -52,7 +52,7 @@ batch_check() {
 }
 nopt=0
 SXskip=''
-if [ `uname -m` == "SX-ACE" ]; then SXskip='--skip-impl=orig:sx2'; fi
+if [ `uname -m` == "SX-ACE" ]; then SXskip='--skip-impl=sx2'; fi
 for ((i=0; i<${#ARGS[*]}; ++i)); do
     #echo "$i : ${ARGS[i]}"
     xform="${ARGS[i]}"
