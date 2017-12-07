@@ -51,6 +51,9 @@ set(PROJECT_VERSION "0.11")
 
 set(LIB_NAME mkldnn)
 
+set(CMAKE_C_COMPILER "/opt/nec/ve/bin/ncc")
+set(CMAKE_CXX_COMPILER "/opt/nec/ve/bin/nc++")
+
 project(${PROJECT_NAME} C CXX) # This runs any CMAKE_TOOLCHAIN_FILE (twice)
 # If enabled, generate a compile_commands.json file of the exact compiler
 # commands (for Makefile and Ninja generators)
@@ -303,6 +306,7 @@ include("cmake/platform.cmake")
 include("cmake/OpenMP.cmake")
 include("cmake/SDL.cmake")
 include("cmake/MKL.cmake")
+include("cmake/NLC.cmake")
 include("cmake/Doxygen.cmake")
 
 enable_testing()

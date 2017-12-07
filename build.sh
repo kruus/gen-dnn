@@ -16,8 +16,8 @@ DOJUSTDOC="n"
 DOWARN="y"
 BUILDOK="y"
 SIZE_T=32 # or 64, for -s or -S SX compile
-JOBS="-j8"
-#JOBS="-j1"
+#JOBS="-j8"
+JOBS="-j1"
 CMAKETRACE=""
 USE_CBLAS=1
 QUICK=0
@@ -32,9 +32,16 @@ usage() {
     echo "Debug: Individual tests can be run like build-sx/tests/gtests/test_relu"
     exit 0
 }
-while getopts ":htvjdDqQpsSTb" arg; do
+while getopts ":hatvjdDqQpsSTb" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
+        a) # NEC Aurora VE
+            COMPILER_AURORA=1
+            DOTARGET="v"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
+            export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
+            export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
+            #export LDFLAGS="${LDFLAGS} -L/opt/nec/ve/musl/lib"
+            ;;
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
             # Apr-14-2017 build timings:
             # 0   : build    ~ ?? min  (jit), 1     min  (vanilla)
