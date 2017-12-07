@@ -2044,6 +2044,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 
             // conditionals --> loop limit calculations   "hoisting"
             // equiv, but OK for unsigned hoist_t and "normal" division op
+            //   kh,kw + constants ---> oh/ow_beg/end
             typedef ssize_t hoist_t; /*but it could even be unsigned int, now*/
             hoist_t oh_beg = 0, oh_end=0;
             //if( kh*DH < PH ) oh_beg = ((PH-kh*DH) + SH-1)/ SH;

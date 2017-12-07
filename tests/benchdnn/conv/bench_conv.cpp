@@ -91,7 +91,8 @@ void check_correctness(const desc_t *c) {
         return;
     print(1, "run: %s", pstr);
 
-    res_t res{ .state=UNTESTED };
+    //res_t res{ .state=UNTESTED };
+    res_t res{};
     auto &bs = benchdnn_stat;
 
 #if 1

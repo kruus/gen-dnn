@@ -1689,6 +1689,7 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     }
   };
 #endif
+  // 6 is a safe one
 #define BW 6
   // SX BWD_WB tests
   // 6 3.34x
@@ -2252,9 +2253,9 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     }
   }
 #endif
-#if BW==7 // from ref_conv4 XXX NOT OMP-SAFE XXX
+#if BW==7 // from ref_conv4 XXX NOT OMP-SAFE XXX ???
   bwd_w_bias_update(p, diff_bia_m, diff_dst_m);
-  for (int mb = 0; mb < MB; ++mb) // <---- wrong
+  for (int mb = 0; mb < MB; ++mb) // <---- wrong ???
   {
 #pragma omp parallel for collapse(4)
     for (int g = 0; g < G; ++g) {
