@@ -1093,18 +1093,19 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   // It is hard to measure any speed difference from modifying the bwd_w_bias_update
   auto bwd_w_bias_update = [&](const prb_t* p, dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m){
     if ((p->dir & FLAG_BIA)) {
+      float       * restrict const pdiff_bia = (float*)diff_bia_m;
+      float const * restrict const pdiff_dst = (float*)diff_dst_m;
 #if 1
       for (int oc = 0; oc < OC     ; ++oc) {
-        size_t bia_off = bia_off_f_nog(p, /*g,*/ oc);
-        float &db = ((float*)diff_bia_m)[bia_off];
-        db = 0.f;
-# pragma omp parallel for collapse(2) reduction(+:db)
+        float tmp = 0.f;
+# pragma omp parallel for collapse(2) reduction(+:tmp) if(mb*ohw>1024)
         for (int mb = 0; mb < MB; ++mb) {
           for (int ohw = 0; ohw < OH*OW; ++ohw) {
-            size_t dst_off = dst_off_f_nog_ohw(p, mb, /*g,*/ oc, ohw);
-            db += ((float*)diff_dst_m)[dst_off];
+            tmp += pdiff_dst[dst_off_f_nog_ohw(p,mb,/*g,*/oc,ohw)];
           }
         }
+        size_t bia_off = bia_off_f_nog(p, /*g,*/ oc);
+        pdiff_bia[ bia_off_f_nog(p,/*g,*/oc) ] = tmp;
       }
     }
 #else
