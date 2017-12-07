@@ -1098,7 +1098,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 #if 1
       for (int oc = 0; oc < OC     ; ++oc) {
         float tmp = 0.f;
-# pragma omp parallel for collapse(2) reduction(+:tmp) if(mb*ohw>1024)
+# pragma omp parallel for collapse(2) reduction(+:tmp)
         for (int mb = 0; mb < MB; ++mb) {
           for (int ohw = 0; ohw < OH*OW; ++ohw) {
             tmp += pdiff_dst[dst_off_f_nog_ohw(p,mb,/*g,*/oc,ohw)];
