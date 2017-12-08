@@ -66,6 +66,7 @@ This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
     - especially for a 'none' flag that uses only C/C++ code and no JIT code at all
 
   - For SX-specific details, see [README-SX](doc/README-SX.md)
+  - For SX-Aurora-specific details, see [README-Aurora](doc/README-Aurora.md)
 
 ## Original README.md ...
 
