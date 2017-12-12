@@ -32,7 +32,7 @@ usage() {
     echo "Debug: Individual tests can be run like build-sx/tests/gtests/test_relu"
     exit 0
 }
-while getopts ":hatvjdDqQpsSTb" arg; do
+while getopts ":hatvjdDqQpsSTbF" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
@@ -41,6 +41,12 @@ while getopts ":hatvjdDqQpsSTb" arg; do
             export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
             export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
             #export LDFLAGS="${LDFLAGS} -L/opt/nec/ve/musl/lib"
+            ;;
+        F) # NEC Aurora VE ftrace
+            if [ "$COMPILER_AURORA" -eq 1 ]; then
+              export CFLAGS="${CFLAGS} -ftrace"
+              export CXXFLAGS="${CXXFLAGS} -ftrace"
+	    fi
             ;;
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
             # Apr-14-2017 build timings:
