@@ -16,8 +16,7 @@ DOJUSTDOC="n"
 DOWARN="y"
 BUILDOK="y"
 SIZE_T=32 # or 64, for -s or -S SX compile
-#JOBS="-j8"
-JOBS="-j1"
+JOBS="-j8"
 CMAKETRACE=""
 USE_CBLAS=1
 QUICK=0
@@ -38,9 +37,10 @@ while getopts ":hatvjdDqQpsSTbF" arg; do
         a) # NEC Aurora VE
             COMPILER_AURORA=1
             DOTARGET="v"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
-            export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
-            export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
+            export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
+            export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
             #export LDFLAGS="${LDFLAGS} -L/opt/nec/ve/musl/lib"
+            JOBS="-j1"
             ;;
         F) # NEC Aurora VE ftrace
             if [ "$COMPILER_AURORA" -eq 1 ]; then
