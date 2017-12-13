@@ -4,7 +4,9 @@
 #elif defined(_SX)
 #else // linux ...
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE // strerror_r return char*, sched_getcpu available, ...
+#endif
 
 #include <string.h>
 #include <stdbool.h>
