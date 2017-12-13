@@ -28,7 +28,7 @@ file(GLOB SOURCES
     )
 include_directories( ${CMAKE_CURRENT_SOURCE_DIR} )
 # benchdnn subtests
-foreach(subdir (conv ip self self/conv))
+foreach(subdir conv ip self self/conv)
     file(GLOB subfiles
         ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/*.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/*.hpp
@@ -63,6 +63,37 @@ else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error")
 endif()
+
+# -- not working -- still need to do it by hand, something like:
+#                 ( cd build/tests/benchdnn && make conv/sx_conv4.cpp.s )
+# Just for fun, take a look at assembler output for any conv/*.cxx files.
+# These outputs are left in the cmake binary directory ~ build/tests/benchdnn.
+file(GLOB ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/*.cxx)
+# hack: get the .o and .s rules into Makefiles, but skip the link step
+add_library(unused SHARED ${ASM_SOURCES})
+set_target_properties(unused PROPERTIES
+    EXCLUDE_FROM_ALL 1)
+#    # does not actually avoid the linking.
+#    # actually i want to skip producing the .o files too
+#    set_target_properties(unused PROPERTIES RULE_LAUNCH_LINK "${asm_ECHO}")
+#message(STATUS "benchdnn ASM_SOURCES = ${ASM_SOURCES}")
+string(REGEX REPLACE "${CMAKE_CURRENT_SOURCE_DIR}/conv/(.*)" "conv/\\1.s"
+    ASM_TARGETS ${ASM_SOURCES} )
+message(STATUS "benchdnn ASM_TARGETS = ${ASM_TARGETS}")
+
+
+##add_custom_command(OUTPUT AssemblyCode DEPENDS ${ASM_TARGETS}
+##    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+#add_custom_target(AssemblyCode ALL
+#    COMMAND ${CMAKE_MAKE_PROGRAM} ${ASM_TARGETS}
+#    )
+#foreach(asm_tgt ${ASM_TARGETS})
+#    #string(REGEX REPLACE "conv/(.*)" "\\1" asm_tgt2 ${asm_tgt} )
+#    #add_custom_target(${asm_tgt} ALL)
+#    add_custom_command(TARGET benchdnn POST_BUILD
+#        COMMAND ${CMAKE_MAKE_PROGRAM} ARGS ${asm_tgt}
+#        WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+#endforeach()
 
 #set_property(TARGET benchdnn PROPERTY C_STANDARD 11)
 target_link_libraries(benchdnn ${LIB_NAME} ${EXTRA_LIBS})

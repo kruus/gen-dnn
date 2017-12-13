@@ -15,9 +15,16 @@
 *******************************************************************************/
 /** \file
  * sx vectorization ref_conv3.cpp */
-#if defined(_SX)
+#if 1 || defined(_SX)
 #include "conv/conv.hpp"
 #include "idiv.hpp"
+
+#if !defined(_SX)
+#define restrict __restrict__
+#endif
+
+#include <algorithm>            // std::max
+//#include <static_assert>            // std::max
 
 namespace conv {
 
@@ -38,6 +45,93 @@ static bool trivial( int const verb, bool const cond, char const* msg,
 
     return cond;
 }
+
+template<typename INT>
+struct ImgBegEnd {
+   explicit ImgBegEnd( INT const rangeBeg, INT const rangeEnd,
+        const INT krn, // kernel height or width value
+        const INT img, const INT pad, const INT stride, // image, padding & stride size
+        const INT dilate // dilation, BEGINNING AT ONE (e.g. (p->dh+1))
+        );
+    INT beg; INT end;
+};
+
+#if 0
+template<typename INT>
+ImgBegEnd<INT>::ImgBegEnd( INT const range_beg, INT const rangeEnd,
+        const INT krn, // kernel height or width value
+        const INT img, const INT pad, const INT stride, // image, padding & stride size
+        const INT dilate // dilation, BEGINNING AT ONE (e.g. (p->dh+1))
+        )
+{
+    // Which of these create simd instructions?
+    const INT a[2] = { pad + stride - 1, img + pad + stride - 1 };
+    const INT kd = krn * dilate;
+    INT d[2] = { kd, kd };
+#pragma omp simd
+    for(INT i=0; i<2; ++i) d[i] += a[i];
+    INT m[2];
+#pragma omp simd
+    for(INT i=0; i<2; ++i) m[i] = d[i] / stride;
+#pragma omp simd
+    for(INT i=0; i<2; ++i) d[i] = d[i] % stride;
+#pragma omp simd
+    for(INT i=0; i<2; ++i) d[i] = (d[i] < 0? 1: 0);
+#pragma omp simd
+    for(INT i=0; i<2; ++i) m[i] -= d[i];
+    beg = m[0];
+    end = m[1];
+};
+#elif 1
+template<typename INT>
+inline constexpr INT DivFloor( const INT n, const INT d ){
+    return (n/d) - (n%d<0? 1: 0);
+}
+
+template<typename INT>
+ImgBegEnd<INT>::ImgBegEnd( INT const rangeBeg, INT const rangeEnd,
+        const INT krn, // kernel height or width value
+        const INT img, const INT pad, const INT stride, // image, padding & stride size
+        const INT dilate // dilation, BEGINNING AT ONE (e.g. (p->dh+1))
+        )
+    : beg(     + pad - krn*dilate + stride - 1)
+    //, end( img + pad - krn*dilate + stride - 1)
+    , end( img + beg )
+{
+    static_assert( std::is_signed<INT>::value, "this ImgBegEnd needs signed integers" );
+    beg = DivFloor( beg, stride );
+    end = DivFloor( end, stride );
+    beg = std::max( beg, rangeBeg );
+    end = std::min( end, rangeEnd );
+};
+#else
+template<typename INT>
+inline constexpr INT DivFloor( const INT n, const INT d ){
+    return (n/d) - (n%d<0? 1: 0);
+}
+
+template<typename INT>
+ImgBegEnd<INT>::ImgBegEnd( INT const rangeBeg, INT const rangeEnd,
+        const INT krn, // kernel height or width value
+        const INT img, const INT pad, const INT stride, // image, padding & stride size
+        const INT dilate // dilation, BEGINNING AT ONE (e.g. (p->dh+1))
+        )
+    : beg( std::max( rangeBeg, DivFloor(     + pad - krn*dilate + stride - 1, stride)))
+    , end( std::min( rangeEnd, DivFloor( img + pad - krn*dilate + stride - 1, stride)))
+{
+    static_assert( std::is_signed<INT>::value, "this ImgBegEnd needs signed integers" );
+};
+#endif
+template class ImgBegEnd<int>;
+template class ImgBegEnd<ssize_t>;
+
+int main(int,char**){
+    exit(0);
+}
+
+
+
+
 //#define MUST( COND )
 #define MUST( COND )    chk(    (COND), #COND, __PRETTY_FUNCTION__, __LINE__)
 #define PRINTF(...)     do{ printf(__VA_ARGS__); fflush(stdout);}while(0)

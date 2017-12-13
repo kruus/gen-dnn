@@ -29,6 +29,8 @@ usage() {
     echo "         SX debug compile, quick (no doxygen)         --- time $0 -Sdq"
     echo "         *just* run cmake, for SX debug compile       ---      $0 -SdQ"
     echo "         *just* create doxygen docs                   ---      $0 -D"
+    echo "     see what cmake is doing, and create build.log"
+    echo "         CMAKEOPT='--trace -LAH' ./build.sh -q >&/dev/null"
     echo "Debug: Individual tests can be run like build-sx/tests/gtests/test_relu"
     exit 0
 }
@@ -115,7 +117,10 @@ fi
 #
 #
 if [ "$DOTARGET" == "j" ]; then DOJIT=100; INSTALLDIR='install-jit'; BUILDDIR='build-jit'; fi
-if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx'; fi
+if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx';
+# Hack -- I was toying with g++-7 today ...
+elif $(gcc-7 -v); then export CXX=g++-7; export CC=gcc-7;
+fi
 #if [ "$DOTARGET" == "v" ]; then ; fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; BUILDDIR="${BUILDDIR}d"; fi
 if [ "$DOJUSTDOC" == "y" ]; then
@@ -187,7 +192,7 @@ fi
     fi
     cd "${BUILDDIR}"
     #
-    CMAKEOPT=""
+    # CMAKEOPT="" # allow user to pass flag, ex. CMAKEOPT='--trace -LAH' ./build.sh
     CMAKEOPT="${CMAKEOPT} -DCMAKE_CCXX_FLAGS=-DJITFUNCS=${DOJIT}"
     if [ $USE_CBLAS -ne 0 ]; then
         export CFLAGS="${CFLAGS} -DUSE_CBLAS"
@@ -274,6 +279,13 @@ fi
                 && BUILDOK="y"; }
             set +x
         fi
+        # Make some assembly-source translations automatically...
+        cxxfiles=`(cd ../tests/benchdnn && ls -1 conv/*conv?.cpp conv/*.cxx)`
+        echo "cxxfiles = $cxxfiles"
+        (cd tests/benchdnn && { for f in ${cxxfiles}; do make -j1 VERBOSE=1 $f.s; done; }) || true
+        pwd
+        ls -l asm || true
+
     else # skip the build, just run cmake ...
         echo "CMAKEENV   <${CMAKEENV}>"
         echo "CMAKEOPT   <${CMAKEOPT}>"
