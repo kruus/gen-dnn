@@ -2,7 +2,9 @@
 #elif defined(_SX)
 #else // linux ...
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <features.h>
 #include "perf_common.h"
 #include "perf_cloexec.h"
