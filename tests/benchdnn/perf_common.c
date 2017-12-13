@@ -1,5 +1,5 @@
 #if defined(_WIN32)
-#elif defined(_SX)
+#elif defined(_SX) || defined(SXAURORA)
 #else // linux ...
 #include "perf_common.h"
 #include <stdio.h>

@@ -1,6 +1,6 @@
 #include "perf.h"
 
-#if defined(_WIN32) || defined(_SX)
+#if defined(_WIN32) || defined(_SX) || defined(SXAURORA)
 static perf_t perf_ctx_unused = {.fd=0, .page_size=0, .addr = (void*)0 };
 perf_t const* perf_begin() { return &perf_ctx_unused; }
 void perf_end(perf_t const* perf_ctx){ (void)perf_ctx/*unused*/; }
