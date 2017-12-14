@@ -349,7 +349,13 @@ static inline void hoist_AmiB_in( int& beg, int& end,
  */
 void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
         dnn_mem_t &wei_m, dnn_mem_t &bia_m, dnn_mem_t &dst_m) {
-#define V 8
+#define V 10
+  // regr.sh FWD A3 (Intel)
+  // 6 : ok, 10.8
+  // 7 : ok, 99.4
+  // 8 : ok, 98.4
+  // 9 : ok, 97.0  
+  // 10 : ok, 
 #if V==6
   const ssize_t G = p->g;
   const ssize_t MB = p->mb;
@@ -1070,6 +1076,391 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
+#elif V==9 // A1, A3 : 74, 108x
+  const ssize_t G = p->g;
+  const ssize_t MB = p->mb;
+  const ssize_t IC = p->ic;
+  const ssize_t IH = p->ih;
+  const ssize_t IW = p->iw;
+  const ssize_t OC = p->oc;
+  const ssize_t OH = p->oh;
+  const ssize_t OW = p->ow;
+  const ssize_t KH = p->kh;
+  const ssize_t KW = p->kw;
+  const ssize_t PH = p->ph;
+  const ssize_t PW = p->pw;
+  const ssize_t SH = p->sh;
+  const ssize_t SW = p->sw;
+  const ssize_t DH = p->dh + 1;
+  const ssize_t DW = p->dw + 1;
+
+  const ssize_t ICOG = IC/G;
+  const ssize_t OCOG = OC/G;
+  const ssize_t KH_KW = KH * KW;
+  const ssize_t ICOG_KH_KW = ICOG * KH_KW;
+  const ssize_t OH_OW = OH * OW;
+  const ssize_t OCOG_ICOG_KH_KW = OCOG * ICOG_KH_KW;
+  const ssize_t OCOG_ICOG_KH = OCOG * ICOG * KH;
+  const ssize_t IH_IW = IH * IW;
+  const ssize_t SH_IW = SH * IW;
+  const ssize_t DH_IW = DH * IW;
+
+  MUST( p->kh > 0 && KW > 0 );
+  MUST( p->dh >= 0 && p->dw >= 0 );
+  MUST( SH >= 0 && SW >= 0 );
+  float const * restrict const psrc = (float*)src_m;
+  float const * restrict const pwei = (float*)wei_m;
+  float const * restrict const pbia = (float*)bia_m;
+  float       * restrict const pdst = (float*)dst_m;
+  ssize_t khb[OH], khe[OH];
+#pragma cdir alloc_on_vreg(khb,OH)
+#pragma cdir alloc_on_vreg(khe,OH)
+  ssize_t kwb[OW], kwe[OW];
+#pragma cdir alloc_on_vreg(kwb,OW)
+#pragma cdir alloc_on_vreg(kwe,OW)
+#if 0
+#pragma omp single
+  for (ssize_t oh = 0; oh < OH; ++oh) {
+    // this alt to div_floor avoids negatives.
+    // ... so it is correct for unsigned types AND normal div.
+    khb[oh] = 0;
+    khe[oh] = 0;
+    if (oh*SH < PH)    khb[oh] = (   PH - oh*SH + (DH - 1)) / DH;
+    if (oh*SH < IH+PH) khe[oh] = (IH+PH - oh*SH + (DH - 1)) / DH;
+    if (khe[oh] >= KH) khe[oh] = KH;
+  }
+#pragma omp single
+  for (ssize_t ow = 0; ow < OW; ++ow) {
+    kwb[ow]=0;
+    kwe[ow]=0;
+    if (ow*SW < PW)    kwb[ow] = (   PW - ow*SW + (DW - 1)) / DW;
+    if (ow*SW < IW+PW) kwe[ow] = (IW+PW - ow*SW + (DW - 1)) / DW;
+    if (kwe[ow] >= KW) kwe[ow] = KW;
+  }
+#else
+#pragma omp single nowait
+  for (int oh = 0; oh < OH; ++oh) {
+    // trick to easy calc of kh, kw loop limits is that division must
+    // round more consistently.  'C' round-to-zero is not so useful!
+    khb[oh] = div_floor( 0  - (oh * SH - PH) + p->dh, (p->dh+1) );
+    khe[oh] = div_floor( IH - (oh * SH - PH) + p->dh, (p->dh+1) );
+    if( khb[oh] < 0     ) khb[oh] = 0;
+    if( khe[oh] > p->kh ) khe[oh] = p->kh;
+  }
+#pragma omp single nowait
+  for (int ow = 0; ow < OW; ++ow) {
+    kwb[ow] = div_floor( 0  - (ow * SW - PW) + p->dw, (p->dw+1) );
+    kwe[ow] = div_floor( IW - (ow * SW - PW) + p->dw, (p->dw+1) );
+    if( kwb[ow] < 0  ) kwb[ow] = 0;
+    if( kwe[ow] > KW ) kwe[ow] = KW;
+  }
+#endif
+
+# pragma omp parallel
+  {
+    ssize_t khkw_begend[4];
+    ssize_t kh_beg=0, kh_end=0;
+    ssize_t kw_beg=0, kw_end=0;
+#pragma vreg(khkw_begend)
+    ssize_t khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW};
+#pragma vreg(khkw_begend)
+    //ssize_t kh_beg_prv=0, kh_end_prv=0, kw_beg_prv=0, kw_end_prv=0, w0_prv=0;
+    ssize_t khash, w0, s0, s00;
+    ssize_t khash_prv = ~0;
+    //ssize_t khash_prv2 = (KH+KW)*4; // impossibly high hash
+    bool kok[KH][KW];
+#pragma vreg(kok)
+    float src[ICOG*KH*KW];
+#pragma cdir alloc_on_vreg(src)
+    float tmp[OCOG];
+//#pragma cdir on_adb(tmp)
+#pragma cdir alloc_on_vreg(tmp,OCOG) // roughly double the speed
+
+# pragma omp for collapse(4)
+  for (ssize_t g = 0; g < G; ++g) {
+    for (ssize_t mb = 0; mb < MB; ++mb) {
+      for (ssize_t oh = 0; oh < OH; ++oh) {
+        for (ssize_t ow = 0; ow < OW; ++ow) {
+          // ---- 1 omp thread ----
+          if ((p->dir & FLAG_BIA) == 0){
+            for (ssize_t oc = 0; oc < OCOG; ++oc)
+              tmp[oc] = 0.f;
+          }else{
+            ssize_t bia_off0 = (ssize_t)g * OCOG + 0;
+            for (ssize_t oc = 0; oc < OCOG; ++oc)
+              tmp[oc] = pbia[bia_off0 + oc];
+          }
+#if 0
+          // this alt to div_floor avoids negatives.
+          // ... so it is correct for unsigned types AND normal div.
+          kh_beg=0, kh_end=0;
+          if (oh*SH < PH) kh_beg = (PH - oh*SH + (DH - 1)) / DH;
+          kh_end = 0;
+          if (oh*SH < IH+PH) kh_end = (IH+PH - oh*SH + (DH - 1)) / DH;
+          if (kh_end >= KH) kh_end = KH;
+
+          kw_beg=0, kw_end=0;
+          if (ow*SW < PW) kw_beg = (PW - ow*SW + (DW - 1)) / DW;
+          if (ow*SW < IW+PW) kw_end = (IW+PW - ow*SW + (DW - 1)) / DW;
+          if (kw_end >= KW) kw_end = KW;
+          RT_ASSERT( kh_beg == khb[oh] );
+          RT_ASSERT( kh_end == khe[oh] );
+          RT_ASSERT( kw_beg == kwb[ow] );
+          RT_ASSERT( kw_end == kwe[ow] );
+#else
+          kh_beg = khb[oh];
+          kh_end = khe[oh];
+          kw_beg = kwb[ow];
+          kw_end = kwe[ow];
+#endif
+
+          bool const khw_ok = ( khb[oh] < kh_end && kwb[ow] < kw_end );
+          if (khw_ok)
+          {
+            //unsigned khash = ((kw_beg+kh_beg) | ((kw_end+kh_end) - (KH+KW)) | khash_prv);
+            // --> FAIL. ?better hash needed?
+            khkw_begend[0] = kh_beg;
+            khkw_begend[1] = kh_end;
+            khkw_begend[2] = kw_beg;
+            khkw_begend[3] = kw_end;
+            khash = 0;
+            for (size_t i=0; i<4; ++i)
+              khash += khkw_begend[i] * khkw_muls[i];
+            if (khash != khash_prv){
+              khash_prv = khash;
+#pragma cdir shortloop
+              for (ssize_t kh = 0; kh < KH; ++kh) {
+#pragma cdir shortloop
+                for (ssize_t kw = 0; kw < KH; ++kw) {
+                  kok[kh][kw] = (kh>=kh_beg && kw>=kw_beg) && (kh<kh_end && kw<kw_end);
+                }
+              }
+            }
+            const ssize_t w0 = (((g * OCOG + 0 ) * ICOG + 0) * KH + 0) * KW + 0; // oc,ic,kh,kw=0
+            const ssize_t s0 = ((mb * IC + g * ICOG + 0 ) * IH + (oh*SH-PH+0*DH)) * IW + (ow*SW-PW+0*DW); //ic,kh,kw=0
+            // slower for (ssize_t ic = 0, ickhkw=0; ic < ICOG; ++ickhkw, ++ic)
+            for (ssize_t ic = 0; ic < ICOG; ++ic)
+            {
+#pragma cdir shortloop
+              for (ssize_t kh = 0; kh < KH; ++kh) {
+#pragma cdir shortloop
+                for (ssize_t kw = 0; kw < KW; ++kw) {
+                  src[ic*KH*KW + kh*KW + kw] = (kok[kh][kw]? psrc[s0 + ic*IH*IW + kh*DH*IW + kw*DW]: 0.f);
+                }
+              }
+            }
+
+            // this may fail if wei access also needs to be protected.
+            for (ssize_t oc = 0; oc < OCOG; ++oc) {
+              for (ssize_t ickhkw = 0; ickhkw < ICOG_KH_KW; ++ickhkw) {
+                tmp[oc] += src[ickhkw] * pwei[w0 + ickhkw + oc * ICOG*KH*KW];
+              }
+            }
+          }
+          //for (size_t oc = 0; oc < OCOG; ++oc) pdst[dst_off0 + oc * OH_OW] = tmp[oc];
+          if (p->merge == RELU) {
+            for (size_t oc = 0; oc < OCOG; ++oc)
+              tmp[oc] = (tmp[oc] < 0.f? 0.f: tmp[oc]);
+          }
+          const ssize_t dst_off0 = (((ssize_t)mb * OC + g * OCOG + 0) * OH + oh) * OW + ow;
+          for (size_t oc = 0; oc < OCOG; ++oc)
+            pdst[dst_off0 + oc * OH_OW] = tmp[oc];
+        }
+      }
+    }
+  }
+#elif V==10 // something WRONG (failed 15)
+  const ssize_t G = p->g;
+  const ssize_t MB = p->mb;
+  const ssize_t IC = p->ic;
+  const ssize_t IH = p->ih;
+  const ssize_t IW = p->iw;
+  const ssize_t OC = p->oc;
+  const ssize_t OH = p->oh;
+  const ssize_t OW = p->ow;
+  const ssize_t KH = p->kh;
+  const ssize_t KW = p->kw;
+  const ssize_t PH = p->ph;
+  const ssize_t PW = p->pw;
+  const ssize_t SH = p->sh;
+  const ssize_t SW = p->sw;
+  const ssize_t DH = p->dh + 1;
+  const ssize_t DW = p->dw + 1;
+
+  const ssize_t ICOG = IC/G;
+  const ssize_t OCOG = OC/G;
+  const ssize_t KH_KW = KH * KW;
+  const ssize_t ICOG_KH_KW = ICOG * KH_KW;
+  const ssize_t OH_OW = OH * OW;
+  const ssize_t OCOG_ICOG_KH_KW = OCOG * ICOG_KH_KW;
+  const ssize_t OCOG_ICOG_KH = OCOG * ICOG * KH;
+  const ssize_t IH_IW = IH * IW;
+  const ssize_t SH_IW = SH * IW;
+  const ssize_t DH_IW = DH * IW;
+
+  MUST( p->kh > 0 && KW > 0 );
+  MUST( p->dh >= 0 && p->dw >= 0 );
+  MUST( SH >= 0 && SW >= 0 );
+  float const * restrict const psrc = (float*)src_m;
+  float const * restrict const pwei = (float*)wei_m;
+  float const * restrict const pbia = (float*)bia_m;
+  float       * restrict const pdst = (float*)dst_m;
+  ssize_t khb[OH], khe[OH];
+#pragma cdir alloc_on_vreg(khb,OH)
+#pragma cdir alloc_on_vreg(khe,OH)
+  ssize_t kwb[OW], kwe[OW];
+#pragma cdir alloc_on_vreg(kwb,OW)
+#pragma cdir alloc_on_vreg(kwe,OW)
+#if 0
+#pragma omp single
+  for (ssize_t oh = 0; oh < OH; ++oh) {
+    // this alt to div_floor avoids negatives.
+    // ... so it is correct for unsigned types AND normal div.
+    khb[oh] = 0;
+    khe[oh] = 0;
+    if (oh*SH < PH)    khb[oh] = (   PH - oh*SH + (DH - 1)) / DH;
+    if (oh*SH < IH+PH) khe[oh] = (IH+PH - oh*SH + (DH - 1)) / DH;
+    if (khe[oh] >= KH) khe[oh] = KH;
+  }
+#pragma omp single
+  for (ssize_t ow = 0; ow < OW; ++ow) {
+    kwb[ow]=0;
+    kwe[ow]=0;
+    if (ow*SW < PW)    kwb[ow] = (   PW - ow*SW + (DW - 1)) / DW;
+    if (ow*SW < IW+PW) kwe[ow] = (IW+PW - ow*SW + (DW - 1)) / DW;
+    if (kwe[ow] >= KW) kwe[ow] = KW;
+  }
+#elif 0
+#pragma omp single nowait
+  for (int oh = 0; oh < OH; ++oh) {
+    // trick to easy calc of kh, kw loop limits is that division must
+    // round more consistently.  'C' round-to-zero is not so useful!
+    khb[oh] = div_floor( 0  - (oh * SH - PH) + p->dh, (p->dh+1) );
+    khe[oh] = div_floor( IH - (oh * SH - PH) + p->dh, (p->dh+1) );
+    if( khb[oh] < 0     ) khb[oh] = 0;
+    if( khe[oh] > p->kh ) khe[oh] = p->kh;
+  }
+#pragma omp single nowait
+  for (int ow = 0; ow < OW; ++ow) {
+    kwb[ow] = div_floor( 0  - (ow * SW - PW) + p->dw, (p->dw+1) );
+    kwe[ow] = div_floor( IW - (ow * SW - PW) + p->dw, (p->dw+1) );
+    if( kwb[ow] < 0  ) kwb[ow] = 0;
+    if( kwe[ow] > KW ) kwe[ow] = KW;
+  }
+#endif
+
+# pragma omp parallel
+  {
+    ssize_t khkw_begend[4];
+    ssize_t kh_beg=0, kh_end=0;
+    ssize_t kw_beg=0, kw_end=0;
+#pragma vreg(khkw_begend)
+    ssize_t khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW};
+#pragma vreg(khkw_begend)
+    //ssize_t kh_beg_prv=0, kh_end_prv=0, kw_beg_prv=0, kw_end_prv=0, w0_prv=0;
+    ssize_t khash, w0, s0, s00;
+    ssize_t khash_prv = ~0;
+    //ssize_t khash_prv2 = (KH+KW)*4; // impossibly high hash
+    bool kok[KH][KW];
+#pragma vreg(kok)
+    float src[ICOG*KH*KW];
+#pragma cdir alloc_on_vreg(src)
+    float tmp[OCOG];
+//#pragma cdir on_adb(tmp)
+#pragma cdir alloc_on_vreg(tmp,OCOG) // roughly double the speed
+
+#pragma omp single nowait
+  for (int oh = 0; oh < OH; ++oh) {
+    // trick to easy calc of kh, kw loop limits is that division must
+    // round more consistently.  'C' round-to-zero is not so useful!
+    khb[oh] = div_floor( 0  - (oh * SH - PH) + p->dh, (p->dh+1) );
+    khe[oh] = div_floor( IH - (oh * SH - PH) + p->dh, (p->dh+1) );
+    if( khb[oh] < 0     ) khb[oh] = 0;
+    if( khe[oh] > p->kh ) khe[oh] = p->kh;
+  }
+#pragma omp single nowait
+  for (int ow = 0; ow < OW; ++ow) {
+    kwb[ow] = div_floor( 0  - (ow * SW - PW) + p->dw, (p->dw+1) );
+    kwe[ow] = div_floor( IW - (ow * SW - PW) + p->dw, (p->dw+1) );
+    if( kwb[ow] < 0  ) kwb[ow] = 0;
+    if( kwe[ow] > KW ) kwe[ow] = KW;
+  }
+#pragma omp barrier
+
+# pragma omp for collapse(4)
+  for (ssize_t g = 0; g < G; ++g) {
+    for (ssize_t mb = 0; mb < MB; ++mb) {
+      for (ssize_t oh = 0; oh < OH; ++oh) {
+        for (ssize_t ow = 0; ow < OW; ++ow) {
+          // ---- 1 omp thread ----
+          if ((p->dir & FLAG_BIA) == 0){
+            for (ssize_t oc = 0; oc < OCOG; ++oc)
+              tmp[oc] = 0.f;
+          }else{
+            ssize_t bia_off0 = (ssize_t)g * OCOG + 0;
+            for (ssize_t oc = 0; oc < OCOG; ++oc)
+              tmp[oc] = pbia[bia_off0 + oc];
+          }
+          //kh_beg = khb[oh];
+          //kh_end = khe[oh];
+          //kw_beg = kwb[ow];
+          //kw_end = kwe[ow];
+
+          bool const khw_ok = ( khb[oh] < khe[oh] && kwb[ow] < kwe[ow] );
+          if (khw_ok)
+          {
+            //unsigned khash = ((kw_beg+kh_beg) | ((kw_end+kh_end) - (KH+KW)) | khash_prv);
+            // --> FAIL. ?better hash needed?
+            khkw_begend[0] = khb[oh];
+            khkw_begend[1] = khe[oh];
+            khkw_begend[2] = kwb[ow];
+            khkw_begend[3] = kwe[ow];
+            khash = 0;
+            for (size_t i=0; i<4; ++i)
+              khash += khkw_begend[i] * khkw_muls[i];
+            if (khash != khash_prv){
+              khash_prv = khash;
+#pragma cdir shortloop
+              for (ssize_t kh = 0; kh < KH; ++kh) {
+#pragma cdir shortloop
+                for (ssize_t kw = 0; kw < KH; ++kw) {
+                  kok[kh][kw] = (kh>=khb[oh] && kw>=kwb[ow]) && (kh<khe[oh] && kw<kwe[ow]);
+                }
+              }
+            }
+            const ssize_t w0 = (((g * OCOG + 0 ) * ICOG + 0) * KH + 0) * KW + 0; // oc,ic,kh,kw=0
+            const ssize_t s0 = ((mb * IC + g * ICOG + 0 ) * IH + (oh*SH-PH+0*DH)) * IW + (ow*SW-PW+0*DW); //ic,kh,kw=0
+            // slower for (ssize_t ic = 0, ickhkw=0; ic < ICOG; ++ickhkw, ++ic)
+            for (ssize_t ic = 0; ic < ICOG; ++ic)
+            {
+#pragma cdir shortloop
+              for (ssize_t kh = 0; kh < KH; ++kh) {
+#pragma cdir shortloop
+                for (ssize_t kw = 0; kw < KW; ++kw) {
+                  src[ic*KH*KW + kh*KW + kw] = (kok[kh][kw]? psrc[s0 + ic*IH*IW + kh*DH*IW + kw*DW]: 0.f);
+                }
+              }
+            }
+
+            // this may fail if wei access also needs to be protected.
+            for (ssize_t oc = 0; oc < OCOG; ++oc) {
+              for (ssize_t ickhkw = 0; ickhkw < ICOG_KH_KW; ++ickhkw) {
+                tmp[oc] += src[ickhkw] * pwei[w0 + ickhkw + oc * ICOG*KH*KW];
+              }
+            }
+          }
+          //for (size_t oc = 0; oc < OCOG; ++oc) pdst[dst_off0 + oc * OH_OW] = tmp[oc];
+          if (p->merge == RELU) {
+            for (size_t oc = 0; oc < OCOG; ++oc)
+              tmp[oc] = (tmp[oc] < 0.f? 0.f: tmp[oc]);
+          }
+          const ssize_t dst_off0 = (((ssize_t)mb * OC + g * OCOG + 0) * OH + oh) * OW + ow;
+          for (size_t oc = 0; oc < OCOG; ++oc)
+            pdst[dst_off0 + oc * OH_OW] = tmp[oc];
+        }
+      }
+    }
+  }
 #else
 #error "please select one"
 #endif
@@ -1576,10 +1967,14 @@ void sxconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
 
             float tmp = 0.f;
             if( kh_b < kh_e && kw_b < kw_e ){
+              //const ssize_t w0 = (((g * OCOG + 0 ) * ICOG + ic) * KH + 0) * KW + 0;
+              //const ssize_t d0 = ((mb * OC + g * OCOG + 0) * OH + 0) * OW + 0;
               for (ssize_t kh = kh_b, oh=oh_b; kh < kh_e; --oh, kh+=SH) {
                 for (ssize_t kw = kw_b, ow=ow_b; kw < kw_e; --ow, kw += SW) {
                   const ssize_t wei_off0 = (((g * OCOG + 0 ) * ICOG + ic) * KH + kh) * KW + kw;
                   const ssize_t dst_off0 = ((mb * OC + g * OCOG + 0) * OH + oh) * OW + ow;
+                  //const ssize_t wei_off0 = w0 + (ssize_t)((float)kh*KW+(float)kw);
+                  //const ssize_t dst_off0 = d0 + (ssize_t)((float)oh*OW+(float)ow);
                   for (ssize_t oc = 0; oc < OCOG; ++oc) {
                     //ds += pdiff_dst[dst_off0 + oc*OH_OW] * pwei[wei_off0 + oc*ICOG_KH_KW];
                     tmp += pdiff_dst[dst_off0 + oc*OH_OW] * pwei[wei_off0 + oc*ICOG_KH_KW];
@@ -1689,6 +2084,7 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     }
   };
 #endif
+  // 6 is a safe one
 #define BW 6
   // SX BWD_WB tests
   // 6 3.34x
@@ -2252,9 +2648,9 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     }
   }
 #endif
-#if BW==7 // from ref_conv4 XXX NOT OMP-SAFE XXX
+#if BW==7 // from ref_conv4 XXX NOT OMP-SAFE XXX ???
   bwd_w_bias_update(p, diff_bia_m, diff_dst_m);
-  for (int mb = 0; mb < MB; ++mb) // <---- wrong
+  for (int mb = 0; mb < MB; ++mb) // <---- wrong ???
   {
 #pragma omp parallel for collapse(4)
     for (int g = 0; g < G; ++g) {

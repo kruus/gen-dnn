@@ -67,7 +67,10 @@ void io0() {
         char buf[len]; // On SX, this gives a warning:
         // "use of a const variable in a constant expression is nonstandard in C"
         mkldnn_dims_t d = {1};
-        printf("\n\nmkldnn_name_dims, buf[%d]...\n",len); fflush(stdout);
+        printf("\n\nmkldnn_name_dims, buf[%d]...\n",len);
+        fflush(stdout);
+        for(int i=0; i<TENSOR_MAX_DIMS; ++i) printf(" %d",d[i]);
+        fflush(stdout);
         int sz0 = mkldnn_name_dims( d, buf, len );
         fflush(stdout);
 #if defined(_SX)
@@ -75,6 +78,7 @@ void io0() {
 #else
         printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
 #endif
+        fflush(stdout);
         CHECK_TRUE(sz0 < len);
         CHECK_TRUE(buf[sz0] == '\0');
 #undef len
@@ -84,12 +88,15 @@ void io0() {
         //int const len=9;
         char buf[len];
         mkldnn_dims_t d = {1};
+        for(int i=0; i<TENSOR_MAX_DIMS; ++i) printf(" %d",d[i]);
+        fflush(stdout);
         int sz0 = mkldnn_name_dims( d, buf, len );
 #if defined(_SX)
         printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %lu\n", sz0, len, buf, (long unsigned)strlen(&buf[0]));
 #else
         printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
 #endif
+        fflush(stdout);
         CHECK_TRUE(sz0 < len);
         CHECK_TRUE(buf[sz0] == '\0');
 #undef len
@@ -105,6 +112,7 @@ void io0() {
 #else
         printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
 #endif
+        fflush(stdout);
         CHECK_TRUE(sz0 == len);
         CHECK_TRUE(buf[len-1] == '\0');
 #undef len

@@ -9,6 +9,10 @@ SET(CMAKE_C_COMPILER   sxcc)
 # stop the normal id stuff from running
 set(CMAKE_C_COMPILER_ID_RUN 1)
 
+# NEW :
+set(CMAKE_C_CREATE_PREPROCESSED_SOURCE "<CMAKE_C_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -E <SOURCE> > <PREPROCESSED_SOURCE>" )
+set(CMAKE_C_CREATE_ASSEMBLY_SOURCE     "<CMAKE_C_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -S <SOURCE> -o <ASSEMBLY_SOURCE>" )
+
 # stop normal abi detection (may need to hardwire some stuff (see SX-CXX comments))
 # This is reset AFTER here, try Platform/SX instead for this short-circuit ...
 #set(CMAKE_C_ABI_COMPILED 1)

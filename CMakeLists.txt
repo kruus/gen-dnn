@@ -299,6 +299,7 @@ endif()
 #    # maybe also -ffinite-math or -funsafe-math-optimizations ?
 #endif()
 
+include("cmake/asm.cmake")
 include("cmake/platform.cmake")
 include("cmake/OpenMP.cmake")
 include("cmake/SDL.cmake")
@@ -321,3 +322,4 @@ add_subdirectory(tests)
 
 install(FILES LICENSE DESTINATION share/doc/${LIB_NAME} COMPONENT doc)
 message(STATUS "CMakeLists.txt DONE!")
+# vim: et ts=4 sw=4 ai

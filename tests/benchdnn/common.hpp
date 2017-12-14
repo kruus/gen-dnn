@@ -205,11 +205,11 @@ struct benchdnn_timer_t {
 #endif
 };
 
-/* result structure */
-
+/** result structure. \c errors / \c total now now valid only for
+ * current impl within a single \c doit test. */
 struct res_t {
-    res_state_t state;
-    size_t errors, total;
+    res_state_t state;          ///< final status of one or more impls
+    int errors, total;          ///< elementwise compare errors/total
     benchdnn_timer_t timer;
 };
 
