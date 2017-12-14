@@ -306,6 +306,10 @@ include("cmake/SDL.cmake")
 include("cmake/MKL.cmake")
 include("cmake/Doxygen.cmake")
 
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Aurora")
+  include("cmake/NLC.cmake")
+endif()
+
 enable_testing()
 
 include_directories(include)

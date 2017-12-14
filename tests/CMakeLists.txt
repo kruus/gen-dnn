@@ -25,7 +25,7 @@ if((UNIX OR APPLE) AND NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "SX")
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel" AND
             CMAKE_CXX_COMPILER_VERSION VERSION_LESS "17.0")
         set(SUPPRESS_DEPRECATE_WARNS "-diag-disable:1478")
-    else()
+    elseif(NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Aurora")
         set(SUPPRESS_DEPRECATE_WARNS "-Wno-deprecated-declarations")
     endif()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SUPPRESS_DEPRECATE_WARNS}")

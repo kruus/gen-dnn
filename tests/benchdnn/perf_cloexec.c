@@ -1,8 +1,10 @@
 #if defined(_WIN32)
-#elif defined(_SX)
+#elif defined(_SX) || defined(SXAURORA)
 #else // linux ...
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <features.h>
 #include "perf_common.h"
 #include "perf_cloexec.h"

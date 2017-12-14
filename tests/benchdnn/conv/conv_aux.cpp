@@ -35,6 +35,8 @@ static size_t strnlen(const char *s, size_t max_len)
     for(; (i < max_len) && s[i]; ++i);
     return i;
 }
+#elif defined(SXAURORA)
+#define strnlen strnlen_s
 #endif
 
 namespace conv {

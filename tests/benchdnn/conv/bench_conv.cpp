@@ -297,7 +297,7 @@ int batch(const char *fname) {
             if (buf[0] == '#')
                 break; /* stop reading till eol */
 
-            const size_t len = strnlen(buf, maxlen) + 1;
+            const size_t len = strnlen_s(buf, maxlen) + 1;
             opts[n_opts] = (char *)malloc(len);
             SAFE(opts[n_opts] ? OK : FAIL, CRIT);
             strncpy(opts[n_opts], buf, len);
