@@ -16,7 +16,8 @@
 /** \file
  * sx vectorization ref_conv3.cpp */
 #if ! defined(_SX)
-#define restrict
+// TODO ok for gcc, but others ???
+#define restrict __restrict__
 #endif
 
 #include "conv/conv.hpp"
@@ -349,7 +350,8 @@ static inline void hoist_AmiB_in( int& beg, int& end,
  */
 void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
         dnn_mem_t &wei_m, dnn_mem_t &bia_m, dnn_mem_t &dst_m) {
-#define V 8
+  // V 8 is default
+#define V 9
 #if V==8 // A1, A3 : 74, 108x
   const ssize_t G = p->g;
   const ssize_t MB = p->mb;
@@ -388,21 +390,21 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
   float       * restrict const pdst = (float*)dst_m;
 # pragma omp parallel
   {
-    ssize_t khkw_begend[4];
+    ssize_t alignas(4*sizeof(ssize_t)) khkw_begend[4];
     ssize_t kh_beg=0, kh_end=0;
     ssize_t kw_beg=0, kw_end=0;
 #pragma vreg(khkw_begend)
-    ssize_t khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW};
+    ssize_t alignas(4*sizeof(ssize_t)) khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW};
 #pragma vreg(khkw_begend)
     //ssize_t kh_beg_prv=0, kh_end_prv=0, kw_beg_prv=0, kw_end_prv=0, w0_prv=0;
     ssize_t khash, w0, s0, s00;
     ssize_t khash_prv = ~0;
     //ssize_t khash_prv2 = (KH+KW)*4; // impossibly high hash
-    bool kok[KH][KW];
+    bool kok[KH][KW] alignas(128);
 #pragma vreg(kok)
-    float src[ICOG*KH*KW];
+    float src[ICOG*KH*KW] alignas(128);
 #pragma cdir alloc_on_vreg(src)
-    float tmp[OCOG];
+    float tmp[OCOG] alignas(128);
 //#pragma cdir on_adb(tmp)
 #pragma cdir alloc_on_vreg(tmp,OCOG) // roughly double the speed
 
@@ -474,6 +476,232 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
               for (ssize_t ickhkw = 0; ickhkw < ICOG_KH_KW; ++ickhkw) {
                 tmp[oc] += src[ickhkw] * pwei[w0 + ickhkw + oc * ICOG*KH*KW];
               }
+            }
+          }
+          //for (size_t oc = 0; oc < OCOG; ++oc) pdst[dst_off0 + oc * OH_OW] = tmp[oc];
+          if (p->merge == RELU) {
+            for (size_t oc = 0; oc < OCOG; ++oc)
+              tmp[oc] = (tmp[oc] < 0.f? 0.f: tmp[oc]);
+          }
+          const ssize_t dst_off0 = (((ssize_t)mb * OC + g * OCOG + 0) * OH + oh) * OW + ow;
+          for (size_t oc = 0; oc < OCOG; ++oc)
+            pdst[dst_off0 + oc * OH_OW] = tmp[oc];
+        }
+      }
+    }
+  }
+#elif V==9 // A1, A3 : 74, 108x
+  const ssize_t G = p->g;
+  const ssize_t MB = p->mb;
+  const ssize_t IC = p->ic;
+  const ssize_t IH = p->ih;
+  const ssize_t IW = p->iw;
+  const ssize_t OC = p->oc;
+  const ssize_t OH = p->oh;
+  const ssize_t OW = p->ow;
+  const ssize_t KH = p->kh;
+  const ssize_t KW = p->kw;
+  const ssize_t PH = p->ph;
+  const ssize_t PW = p->pw;
+  const ssize_t SH = p->sh;
+  const ssize_t SW = p->sw;
+  const ssize_t DH = p->dh + 1;
+  const ssize_t DW = p->dw + 1;
+
+  const ssize_t ICOG = IC/G;
+  const ssize_t OCOG = OC/G;
+  const ssize_t KH_KW = KH * KW;
+  const ssize_t ICOG_KH_KW = ICOG * KH_KW;
+  const ssize_t OH_OW = OH * OW;
+  const ssize_t OCOG_ICOG_KH_KW = OCOG * ICOG_KH_KW;
+  const ssize_t OCOG_ICOG_KH = OCOG * ICOG * KH;
+  const ssize_t IH_IW = IH * IW;
+  const ssize_t SH_IW = SH * IW;
+  const ssize_t DH_IW = DH * IW;
+
+  MUST( p->kh > 0 && KW > 0 );
+  MUST( p->dh >= 0 && p->dw >= 0 );
+  MUST( SH >= 0 && SW >= 0 );
+  float const * restrict const psrc = (float*)src_m;
+  float const * restrict const pwei = (float*)wei_m;
+  float const * restrict const pbia = (float*)bia_m;
+  float       * restrict const pdst = (float*)dst_m;
+  const int khkw_end = (int)KH_KW;
+  float khkw_zeros[khkw_end];
+  for (int khkw=0; khkw < khkw_end; ++khkw){
+      khkw_zeros[khkw] = 0.f;
+  }
+  float const * restrict const pkhkw_zeros = &khkw_zeros[0];
+# pragma omp parallel
+  {
+    ssize_t khkw_begend[4];
+    ssize_t kh_beg=0, kh_end=0;
+    ssize_t kw_beg=0, kw_end=0;
+#pragma vreg(khkw_begend)
+    ssize_t khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW};
+#pragma vreg(khkw_begend)
+    //ssize_t kh_beg_prv=0, kh_end_prv=0, kw_beg_prv=0, kw_end_prv=0, w0_prv=0;
+    ssize_t khash, w0, s0, s00;
+    ssize_t khash_prv = ~0;
+    //ssize_t khash_prv2 = (KH+KW)*4; // impossibly high hash
+    //bool kok[KH][KW];
+    int kok[KH_KW] alignas(128);
+#pragma vreg(kok)
+    float src[ICOG*KH*KW] alignas(128);
+#pragma cdir alloc_on_vreg(src)
+    float tmp[OCOG] alignas(128);
+    float seq[KH_KW] alignas(128);
+    for(int i=0; i<KH_KW; ++i) seq[KH_KW] = (float)i;
+//#pragma cdir on_adb(tmp)
+#pragma cdir alloc_on_vreg(tmp,OCOG) // roughly double the speed
+
+# pragma omp for collapse(4)
+  for (ssize_t g = 0; g < G; ++g) {
+    for (ssize_t mb = 0; mb < MB; ++mb) {
+      for (ssize_t oh = 0; oh < OH; ++oh) {
+        for (ssize_t ow = 0; ow < OW; ++ow) {
+          // ---- 1 omp thread ----
+          if ((p->dir & FLAG_BIA) == 0){
+            for (ssize_t oc = 0; oc < OCOG; ++oc)
+              tmp[oc] = 0.f;
+          }else{
+            ssize_t bia_off0 = (ssize_t)g * OCOG + 0;
+            for (ssize_t oc = 0; oc < OCOG; ++oc)
+              tmp[oc] = pbia[bia_off0 + oc];
+          }
+          // this alt to div_floor avoids negatives.
+          // ... so it is correct for unsigned types AND normal div.
+          kh_beg=0, kh_end=0;
+          if (oh*SH < PH) kh_beg = (PH - oh*SH + (DH - 1)) / DH;
+          kh_end = 0;
+          if (oh*SH < IH+PH) kh_end = (IH+PH - oh*SH + (DH - 1)) / DH;
+          if (kh_end >= KH) kh_end = KH;
+
+          kw_beg=0, kw_end=0;
+          if (ow*SW < PW) kw_beg = (PW - ow*SW + (DW - 1)) / DW;
+          if (ow*SW < IW+PW) kw_end = (IW+PW - ow*SW + (DW - 1)) / DW;
+          if (kw_end >= KW) kw_end = KW;
+
+          bool const khw_ok = ( kw_beg < kw_end && kh_beg < kh_end );
+          if (khw_ok)
+          {
+            //unsigned khash = ((kw_beg+kh_beg) | ((kw_end+kh_end) - (KH+KW)) | khash_prv);
+            // --> FAIL. ?better hash needed?
+            khkw_begend[0] = kh_beg;
+            khkw_begend[1] = kh_end;
+            khkw_begend[2] = kw_beg;
+            khkw_begend[3] = kw_end;
+            khash = 0;
+            for (size_t i=0; i<4; ++i)
+              khash += khkw_begend[i] * khkw_muls[i];
+            if (khash != khash_prv){
+              khash_prv = khash;
+#if 1
+              int khkw_end = (int)KH_KW;
+#pragma omp simd
+              for (int khkw = 0; khkw < khkw_end; ++khkw) { // this does not simd-ize very well.
+                const int kh = khkw / p->kw;
+                const int kw = khkw % p->kw;
+                kok[khkw] = ((kh>=kh_beg && kw>=kw_beg) && (kh<kh_end && kw<kw_end)? 0xffFFffFF: 0);
+                //kok[khkw] = ((kh>=kh_beg && kw>=kw_beg) && (kh<kh_end && kw<kw_end)? 0xffFFffFF: 0);
+                //kok[khkw] = (kh>=kh_beg ? ~0: 0)
+                //    &       (kw>=kw_beg ? ~0: 0)
+                //    &       (kh<kh_end  ? ~0: 0)
+                //    &       (kw<kw_end  ? ~0: 0)
+                //    ;
+              }
+#else
+              int khkw_end = (int)KH_KW;
+              const int khh = (int)KH;
+              const int kww = (int)KW;
+              for (int khkw = 0; khkw < khkw_end; ++khkw) kok[khkw] = 0;
+              bool alignas(128) khok[khh]; for(int i=0; i<khh; ++i) khok[i] = (i>=kh_beg? ~0: 0) & (i<kh_end? ~0: 0);
+              bool alignas(128) kwok[kww]; for(int i=0; i<kww; ++i) kwok[i] = (i>=kw_beg? ~0: 0) & (i<kw_end? ~0: 0);
+              for (ssize_t kh = 0; kh < khh; ++kh) {
+                for (ssize_t kw = 0; kw < kww; ++kw) {
+                  kok[kh*kww+kw] = khok[kh];
+                }
+                for (ssize_t kw = 0; kw < kww; ++kw) {
+                  kok[kh*kww+kw] &= kwok[kw];
+                }
+              }
+#endif
+            }
+            const ssize_t w0 = (((g * OCOG + 0 ) * ICOG + 0) * KH + 0) * KW + 0; // oc,ic,kh,kw=0
+            const ssize_t s0 = ((mb * IC + g * ICOG + 0 ) * IH + (oh*SH-PH+0*DH)) * IW + (ow*SW-PW+0*DW); //ic,kh,kw=0
+            // slower for (ssize_t ic = 0, ickhkw=0; ic < ICOG; ++ickhkw, ++ic)
+            for (ssize_t ic = 0; ic < ICOG; ++ic)
+            {
+#if 0
+              for (int khkw = 0; khkw < khkw_end; ++khkw) {
+                //const int kh = khkw / p->kw;
+                //const int kw = khkw % p->kw;
+                //src[ic*KH*KW + khkw] = (kok[khkw]? psrc[s0 + ic*IH*IW + kh*DH*IW + kw*DW]: 0.f);
+                //src[ic*KH*KW + khkw] = (kok[khkw]? psrc[s0 + ic*IH*IW + kh*DH*IW + kw*DW]: 0.f);
+                src[ic*KH*KW + khkw] = ((kok[khkw] & (1<<31))? psrc[s0 + ic*IH_IW + (khkw/p->kw)*DH_IW + (khkw%p->kw)*DW]: 0.f);
+              }
+#elif 1
+              float idx[khkw_end] alignas(128);
+              //for (int khkw = 0; khkw < khkw_end; ++khkw) {
+              const int khh = KH;
+              const int kww = KW;
+              for (int kh=0; kh<khh; ++kh){
+                for (int kw=0; kw<kww; ++kw){
+                  // using integer calc no longer results in vgather !
+                  //idx[kh*kww+kw] = s0 + ic*IH_IW + kh*DH_IW + kw*DW;
+                  idx[kh*kww+kw] = (float)s0 + (float)ic*IH*IW + (float)kh*DH*IW + (float)kw*DW;
+                  //src[ic*khh*kww + kh*kww+kw] = 0.f;
+                  //if (kok[kh*kww+kw]) src[ic*khh*kww + kh*kww+kw] += psrc[(int)(idx[kh*kww+kw])];
+                  src[ic*khh*kww + kh*kww+kw] = ((kok[kh*kww+kw])? psrc[(int)(idx[kh*kww+kw])]: 0.f);
+                  //src[ic*khh*kww + kh*kww+kw] = ((kok[kh*kww+kw])? psrc[(int)(idx[kh*kww+kw])]: kok[kh*kww+kw]);
+                }
+              }
+#else
+              float idx[khkw_end] alignas(128);
+              const int khh = KH;
+              const int kww = KW;
+              for (int kh=0; kh<khh; ++kh){
+                for (int kw=0; kw<kww; ++kw){
+                  idx[kh*kww+kw] = (float)s0 + (float)ic*IH*IW + (float)kh*DH*IW + (float)kw*DW;
+                }
+              }
+              for (int khkw=0; khkw < khkw_end; ++khkw){
+                // AHAAAAAA  this is the magic to generate vmaskmovps and vgatherdps ... but it is no faster :)
+                src[ic*khkw_end + khkw] = ((kok[khkw] & (1<<31))? psrc[(int)(idx[khkw])]: 0.f);
+                //
+                //src[ic*khh*kww + khkw] = 0.f;
+                //if (kok[khkw]) src[ic*khh*kww + khkw] += psrc[(int)(idx[khkw])];
+                //  not nice
+                //if (kok[khkw]) src[ic*khh*kww + khkw] = psrc[(int)(idx[khkw])];
+                //else           src[ic*khh*kww + khkw] = 0.f;
+                //src[ic*khh*kww + khkw] = (kok[khkw]? psrc[(int)(idx[khkw])]: pkhkw_zeros[khkw]);
+              }
+#endif
+            }
+
+            // this may fail if wei access also needs to be protected.
+            //float const * restrict pwei_oc = pwei + w0;
+            //for (ssize_t oc = 0; oc < OCOG; pwei_oc+=ICOG_KH_KW, ++oc)
+            for (ssize_t oc = 0; oc < OCOG; ++oc) {
+#if 1
+#pragma omp simd
+              for (ssize_t ickhkw = 0; ickhkw < ICOG_KH_KW; ++ickhkw) {
+                tmp[oc] += src[ickhkw] * pwei[w0 + ickhkw + oc * ICOG_KH_KW];
+                //tmp[oc] += src[ickhkw] * pwei_oc[ickhkw];
+              }
+#else
+              float x = 0.f;
+              for (ssize_t ickhkw = 0; ickhkw < ICOG_KH_KW-16+1; ickhkw+=16) {
+#pragma omp simd
+                for (ssize_t i = ickhkw; i < ickhkw+16; ++i) {
+                  x += src[i] * pwei_oc[i];
+                }
+                for (ssize_t i = ickhkw; i < ICOG_KH_KW; ++i) {
+                  x += src[i] * pwei_oc[i];
+                }
+                tmp[oc] = x;
+              }
+#endif
             }
           }
           //for (size_t oc = 0; oc < OCOG; ++oc) pdst[dst_off0 + oc * OH_OW] = tmp[oc];
@@ -967,46 +1195,81 @@ void sxconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
   const ssize_t OCOG = OC / G;
   const ssize_t OH_OW = OH * OW;
 #endif
+  ssize_t khb[IH], khe[IH], ohb[IH];
+  for (ssize_t ih = 0; ih < IH; ++ih) {
+    khe[ih] = ih + PH;
+    ohb[ih] = OH - 1;
+    khb[ih] = khe[ih] - OH*SH + SH;
+    if( khb[ih] < SH - 1 ){ // unlikely?
+      ohb[ih] = khe[ih] / SH;
+      khb[ih] = khe[ih] % SH;
+    }
+    if (++khe[ih] > KH) khe[ih] = KH;
+  }
+  ssize_t kwb[IW], kwe[IW], owb[IW];
+  for (ssize_t iw = 0; iw < IW; ++iw) {
+    kwe[iw] = iw + PW;
+    owb[iw] = OW - 1;
+    kwb[iw] = kwe[iw] - OW*SW + SW;
+    if( kwb[iw] < SW - 1 ){ // unlikely?
+      owb[iw] = kwe[iw] / SW;
+      kwb[iw] = kwe[iw] % SW;
+    }
+    if (++kwe[iw] > KW) kwe[iw] = KW;
+  }
 # pragma omp parallel for collapse(4)
   for (ssize_t g = 0; g < G; ++g) {
     for (ssize_t mb = 0; mb < MB; ++mb) {
       for (ssize_t ic = 0; ic < ICOG; ++ic) {
         for (ssize_t ih = 0; ih < IH; ++ih) {
-          register ssize_t kh_e = ih + PH;
-          ssize_t oh_b = OH - 1;
-          ssize_t kh_b = kh_e - OH*SH + SH;
-          if( kh_b < SH - 1 ){ // unlikely?
-            oh_b = kh_e / SH;
-            kh_b = kh_e % SH;
-          }
-          if (++kh_e > KH) kh_e = KH;
+          const ssize_t kh_b = khb[ih];
+          const ssize_t kh_e = khe[ih];
+          const ssize_t oh_b = ohb[ih];
 
-          ssize_t src_off0 = src_off_f2(p, mb, g, ic, ih, 0);
+          float tmp_iw[IW] alignas(128);
           for (ssize_t iw = 0; iw < IW; ++iw) {
-            register ssize_t kw_e = iw + PW;
-            ssize_t ow_b = OW - 1;
-            ssize_t kw_b = kw_e - OW*SW + SW;
-            if( kw_b < SW - 1 ){ // unlikely?
-              ow_b = kw_e / SW;
-              kw_b = kw_e % SW;
-            }
-            if (++kw_e > KW) kw_e = KW;
+            const ssize_t kw_b = kwb[iw];
+            const ssize_t kw_e = kwe[iw];
+            const ssize_t ow_b = owb[iw];
 
             float tmp = 0.f;
             if( kh_b < kh_e && kw_b < kw_e ){
+              float tmp_oc[OCOG] alignas(128);
+              //const ssize_t tmp_oc_sz = (kh_e-kh_b)*(kw_e-kw_b)*OCOG;
+              //float tmp_oc[tmp_oc_sz] alignas(128); // introducing this was perhaps a bit slower
+              //ssize_t ixoc = 0;
+              const ssize_t w0 = (((g * OCOG + 0 ) * ICOG + ic) * KH + 0) * KW + 0;
+              const ssize_t d0 = ((mb * OC + g * OCOG + 0) * OH + 0) * OW + 0;
               for (ssize_t kh = kh_b, oh=oh_b; kh < kh_e; --oh, kh+=SH) {
                 for (ssize_t kw = kw_b, ow=ow_b; kw < kw_e; --ow, kw += SW) {
-                  const ssize_t wei_off0 = (((g * OCOG + 0 ) * ICOG + ic) * KH + kh) * KW + kw;
-                  const ssize_t dst_off0 = ((mb * OC + g * OCOG + 0) * OH + oh) * OW + ow;
+                  //const ssize_t wei_off0 = (((g * OCOG + 0 ) * ICOG + ic) * KH + kh) * KW + kw;
+                  //const ssize_t dst_off0 = ((mb * OC + g * OCOG + 0) * OH + oh) * OW + ow;
+                  const ssize_t wei_off0 = w0 + kh*KW+kw;
+                  const ssize_t dst_off0 = d0 + oh*OW+ow;
                   for (ssize_t oc = 0; oc < OCOG; ++oc) {
                     //ds += pdiff_dst[dst_off0 + oc*OH_OW] * pwei[wei_off0 + oc*ICOG_KH_KW];
-                    tmp += pdiff_dst[dst_off0 + oc*OH_OW] * pwei[wei_off0 + oc*ICOG_KH_KW];
+                    // slower index calc...
+                    //tmp += pdiff_dst[dst_off0 + oc*OH_OW] * pwei[wei_off0 + oc*ICOG_KH_KW];
+                    //tmp_oc[oc] = pdiff_dst[(int)((float)dst_off0 + (float)oc*OH_OW)]
+                    //           * pwei[(int)((float)wei_off0 + (float)oc*ICOG_KH_KW)];
+                    tmp_oc[oc]  = pdiff_dst[(dst_off0 + oc*OH_OW)];
+                    tmp_oc[oc] *= pwei[(wei_off0 + oc*ICOG_KH_KW)];
+                    tmp += tmp_oc[oc];
+                    //itmp_oc[ixoc] = pdiff_dst[(int)((float)dst_off0 + (float)oc*OH_OW)]
+                    //           * pwei[(int)((float)wei_off0 + (float)oc*ICOG_KH_KW)];
+                    //++ixoc;
                   }
                 }
               }
+              //for (ssize_t oc = 0; oc < tmp_oc_sz; ++oc) { tmp += tmp_oc[oc]; }
             }
 
-            pdiff_src[src_off0+iw] = tmp; // MUST always be executed (even to store 0.f)
+            //pdiff_src[src_off0+iw] = tmp; // MUST always be executed (even to store 0.f)
+            tmp_iw[iw] = tmp; // MUST always be executed (even to store 0.f)
+          }
+          ssize_t src_off0 = src_off_f2(p, mb, g, ic, ih, 0);
+          for (ssize_t iw = 0; iw < IW; ++iw) {
+            pdiff_src[src_off0+iw] = tmp_iw[iw]; // MUST always be executed (even to store 0.f)
           }
 
         }
@@ -1093,18 +1356,19 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   // It is hard to measure any speed difference from modifying the bwd_w_bias_update
   auto bwd_w_bias_update = [&](const prb_t* p, dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m){
     if ((p->dir & FLAG_BIA)) {
+      float       * restrict const pdiff_bia = (float*)diff_bia_m;
+      float const * restrict const pdiff_dst = (float*)diff_dst_m;
 #if 1
       for (int oc = 0; oc < OC     ; ++oc) {
-        size_t bia_off = bia_off_f_nog(p, /*g,*/ oc);
-        float &db = ((float*)diff_bia_m)[bia_off];
-        db = 0.f;
-# pragma omp parallel for collapse(2) reduction(+:db)
+        float tmp = 0.f;
+# pragma omp parallel for collapse(2) reduction(+:tmp)
         for (int mb = 0; mb < MB; ++mb) {
           for (int ohw = 0; ohw < OH*OW; ++ohw) {
-            size_t dst_off = dst_off_f_nog_ohw(p, mb, /*g,*/ oc, ohw);
-            db += ((float*)diff_dst_m)[dst_off];
+            tmp += pdiff_dst[dst_off_f_nog_ohw(p,mb,/*g,*/oc,ohw)];
           }
         }
+        size_t bia_off = bia_off_f_nog(p, /*g,*/ oc);
+        pdiff_bia[ bia_off_f_nog(p,/*g,*/oc) ] = tmp;
       }
     }
 #else
@@ -2044,6 +2308,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 
             // conditionals --> loop limit calculations   "hoisting"
             // equiv, but OK for unsigned hoist_t and "normal" division op
+            //   kh,kw + constants ---> oh/ow_beg/end
             typedef ssize_t hoist_t; /*but it could even be unsigned int, now*/
             hoist_t oh_beg = 0, oh_end=0;
             //if( kh*DH < PH ) oh_beg = ((PH-kh*DH) + SH-1)/ SH;
@@ -2200,7 +2465,7 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 #endif
 #endif
   //bwd_w_bias_update(p, diff_bia_m, diff_dst_m);
-  for (int mb = 0; mb < MB; ++mb) // XXX <------ WRONG ------ XXX
+  for (int mb = 0; mb < MB; ++mb) // XXX <-- take care about zeroing wei
   {
 #pragma omp parallel
     {

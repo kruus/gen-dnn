@@ -74,25 +74,26 @@ void test_stats::update_impl(const prb_t *p, res_t *r, int status,
     }
 
     char const* impname = get_ref_impls()[imp].name;
-    const int ll2 = 28; char b2[ll2];
+    const int ll2 = 25; char b2[ll2];
     {
       int l2=ll2;
-      const int o2 = snprintf(&b2[0], l2, "Test%d %s ", imp, impname);
+      const int o2 = snprintf(&b2[0], l2, "t:%d %s ", imp, impname);
       snprintf(&b2[o2], ll2-o2, "%s", &bms[0]);
       for(int i=o2; i<ll2-oms-1; ++i) b2[i] = ' ';
       for(int i=0; i<oms; ++i) b2[ll2-oms+i-1] = bms[i];
       b2[ll2-1]='\0';
     }
 
-    double mflops = ops*1.e-3/ms_tot; // ops*1.e-6 / (ms_tot * 1.e-3)
-    print(0, "%s %s  %g ops %.3f MFlops %s %s\n",
-          &b2[0],
-          (status==OK? "CORRECT": "INCORRECT"),
-          ops, mflops,
-          dir2str(p->dir),
-          pstr);
     td->ms[imp] = ms_tot;
     td->ops = p->ops;
+
+    print(0, "%s %s", &b2[0], (status==OK? "ok": "INCORRECT"));
+    double mflops = ops*1.e-3/ms_tot; // ops*1.e-6 / (ms_tot * 1.e-3)
+    if (mflops >= 999.999) print(0, " %7.3f GFlops", mflops*1.e-3);
+    else                   print(0, " %7.3f MFlops", mflops);
+    print(0, " %6.2f x %s %s\n", (td->ms[0]>0.f? (double)td->ms[0]/td->ms[imp]: 0.0),
+            dir2str(p->dir), pstr);
+
     if (r->state==UNTESTED) r->state = PASSED;
     if (r->state!=PASSED) { td->impls_ok = false; /*printf(" !impls_ok ");*/ }
     //else printf(" ??impls_ok=%d ",(int)(td->impls_ok));

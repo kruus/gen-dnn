@@ -34,6 +34,7 @@ usage() {
     echo "         to run longer benchdnn impl comparisons"
     echo " Note:"
     echo "   We do not capture output into a logfile"
+    echo "   SX/Aurora builds not supported"
     ls -l ./tests/benchdnn/inputs
     exit 0
 }

@@ -27,9 +27,6 @@
 #endif /* _WIN32 */
 #endif /* HAVE_REGEX */
 
-#include <iostream> // tmp XXX
-using std::cout; using std::endl;
-
 static const char *modes[] = { "CORR", "PERF", "TEST", "ALL" };
 static int const lenmax = sizeof "CORR+PERF+TEST+ALL"; // max-length result
 static char bench_mode_string[lenmax];
@@ -45,7 +42,6 @@ const char *bench_mode2str(bench_mode_t mode) {
     char const* sep = "";
     auto add_mode = [&](char const* m) {
         int const n = snprintf(b, len, "%s%s",sep,m);
-        //cout<<" lenmax"<<lenmax<<" len"<<len<<" sep"<<sep<<" m"<<m<<" b"<<b<<" n"<<n<<endl;
         assert(n>0);
         if( n>len ){ /*b[len-1]='\0';*/ len=0;}
         else {b+=n; len-=n;}
@@ -59,6 +55,7 @@ const char *bench_mode2str(bench_mode_t mode) {
 }
 
 bench_mode_t str2bench_mode(const char *str) {
+    /* corr perf all test : c p a t each occur in exactly 1 position (good) */
     bench_mode_t mode = MODE_UNDEF;
     if (strchr(str, 'c') || strchr(str, 'C'))
         mode = (bench_mode_t)((int)mode | (int)CORR);
@@ -72,7 +69,7 @@ bench_mode_t str2bench_mode(const char *str) {
         print(0," bad mode: %s\n", str);
         []() { SAFE(FAIL, CRIT); return 0; }();
     }
-
+    /* ALL implies CORR if neither CORR nor PERF is specified */
     if ( (mode & ALL) && ! (mode & PERF || mode & CORR) )
         mode = (bench_mode_t)((int)mode | (int)CORR);
     return mode;

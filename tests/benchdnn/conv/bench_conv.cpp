@@ -91,7 +91,8 @@ void check_correctness(const desc_t *c) {
         return;
     print(1, "run: %s", pstr);
 
-    res_t res{ .state=UNTESTED };
+    //res_t res{ .state=UNTESTED };
+    res_t res{};
     auto &bs = benchdnn_stat;
 
 #if 1
@@ -122,20 +123,20 @@ void check_correctness(const desc_t *c) {
         break;
     case FAILED:
         // XXX assert(status == FAIL);
-        print(0, "%d:%s (errors:%lu total:%lu) __REPRO: %s\n", bs.tests, state,
-                (long unsigned)res.errors, (long unsigned)res.total, pstr);
+        print(0, "%d:%s (errors:%lu total:%lu) __REPRO: %11g ops %s %s\n", bs.tests, state,
+                (long unsigned)res.errors, (long unsigned)res.total, p.ops, dir2str(p.dir), pstr);
         break;
     case UNIMPLEMENTED:
         assert(status == FAIL);
-        print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
+        print(0, "%d:%s __REPRO: %11.2g ops %s %s\n", bs.tests, state, p.ops, dir2str(p.dir), pstr);
         break;
     case MISTRUSTED:
         assert(status == OK);
-        print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
+        print(0, "%d:%s __REPRO: %11.2g ops %s %s\n", bs.tests, state, p.ops, dir2str(p.dir), pstr);
         break;
     case PASSED:
         assert(status == OK);
-        print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
+        print(0, "%d:%s __REPRO: %11.2g ops %s %s\n", bs.tests, state, p.ops, dir2str(p.dir), pstr);
         break;
     default:
         RT_ASSERT(!"unknown state");

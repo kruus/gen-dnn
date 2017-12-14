@@ -1,0 +1,95 @@
+[ 23%] Built target mkldnn
+[ 24%] Built target simple-training-net-c
+[ 26%] Built target simple-net-c
+[ 27%] Built target simple-net-cpp
+[ 29%] Built target simple-training-net-cpp
+[ 30%] Built target api-c
+[ 32%] Built target test_c_symbols-c
+[ 33%] Built target api-io-c
+[ 34%] Built target mkldnn_gtest
+[ 36%] Built target test_convolution_backward_weights
+[ 38%] Built target test_lrn_forward
+[ 40%] Built target test_sum
+[ 42%] Built target test_relu
+[ 44%] Built target test_lrn_backward
+[ 46%] Built target test_softmax_forward
+[ 48%] Built target test_eltwise
+[ 51%] Built target test_convolution_relu_forward_s16s16s32
+[ 53%] Built target test_inner_product_backward_weights
+[ 55%] Built target test_iface_attr
+[ 57%] Built target test_concat
+[ 59%] Built target test_convolution_backward_data_f32
+[ 61%] Built target test_pooling_backward
+[ 63%] Built target test_batch_normalization
+[ 65%] Built target test_reorder
+[ 67%] Built target test_convolution_format_any
+[ 69%] Built target test_inner_product_forward
+[ 71%] Built target test_pooling_forward
+[ 73%] Built target test_inner_product_backward_data
+[ 75%] Built target test_convolution_forward_f32
+[ 77%] Built target test_convolution_forward_s16s16s32
+[ 79%] Built target test_convolution_relu_forward_f32
+[ 81%] Built target test_convolution_backward_data_s16s16s32
+[100%] Built target benchdnn
+THREADS  : 
+cmd      :  /usr/bin/time -v ./benchdnn --mode=PT --dir=BWD_WB g1mb8ic256ih13oc384oh13kh3ph1n"mini:conv3"
+/home/kruus/w/gen-dnn/build/tests/benchdnn
+total 300
+-rwxrwxr-x 1 kruus kruus 252784 Dec  5 00:05 benchdnn
+drwxrwxr-x 5 kruus kruus   4096 Dec  4 22:14 CMakeFiles
+-rw-rw-r-- 1 kruus kruus   1017 Dec  4 22:14 cmake_install.cmake
+-rw-rw-r-- 1 kruus kruus    291 Dec  4 22:14 CTestTestfile.cmake
+drwxrwxr-x 2 kruus kruus   4096 Dec  4 22:14 inputs
+-rw-rw-r-- 1 kruus kruus  33242 Dec  4 22:14 Makefile
+ /home/kruus/w/gen-dnn/build/tests/benchdnn inputs:
+COLUMN ... column -t
+conv_alexnet             conv_all                       conv_dilated                conv_googlenet_v1
+conv_googlenet_v2        conv_googlenet_v3              conv_regression_dilate      conv_regression_group
+conv_regression_padding  conv_regression_small_spatial  conv_regression_stride      conv_resnet_50
+conv_resnet_50_sparse    conv_segnet                    conv_ssd_300_voc0712        conv_vgg_11
+conv_vgg_19              deepbench                      deepbench_inference_device  deepbench_inference_server
+deepbench_training       minialex                       test_bwd_d_regression       test_bwd_w_regression
+test_conv_all            test_conv_regression           test_fwd_regression
+benchdnn --conv --mode=PERF+TEST -v0 ... init omp_max_thr=4  OK
+
+Test0 orig              2 s CORRECT  2.15325e+09 ops 1055.534 MFlops BWD_WB --dir=BWD_WB mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+Test1 sx3        105.832 ms CORRECT  2.15325e+09 ops 20345.927 MFlops BWD_WB --dir=BWD_WB mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+Test2 sx4        256.295 ms CORRECT  2.15325e+09 ops 8401.465 MFlops BWD_WB --dir=BWD_WB mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+Test3 ref4       221.169 ms CORRECT  2.15325e+09 ops 9735.785 MFlops BWD_WB --dir=BWD_WB mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+Test4 rf99       221.054 ms CORRECT  2.15325e+09 ops 9740.838 MFlops BWD_WB --dir=BWD_WB mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+ TEST all_passed=1 0:PASSED __REPRO: --dir=BWD_WB mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 2039.964  avg_ms: 2039.964  avg speedup: 1.000 x 1055.5 Mflops
+T:1  sx3    loops: 1   speedup: 19.275x  wins: 1     tot_ms: 105.832   avg_ms: 105.832  avg speedup: 19.275 x 20345.9 Mflops
+T:2  sx4    loops: 1   speedup: 7.959 x  wins: 0     tot_ms: 256.295   avg_ms: 256.295  avg speedup: 7.959 x 8401.5 Mflops
+T:3  ref4   loops: 1   speedup: 9.224 x  wins: 1     tot_ms: 221.169   avg_ms: 221.169  avg speedup: 9.224 x 9735.8 Mflops
+T:4  rf99   loops: 1   speedup: 9.228 x  wins: 2     tot_ms: 221.054   avg_ms: 221.054  avg speedup: 9.228 x 9740.8 Mflops
+TEST final stats:
+T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 2039.964  avg_ms: 2039.964  avg speedup: 1.000 x 1055.5 Mflops
+T:1  sx3    loops: 1   speedup: 19.275x  wins: 1     tot_ms: 105.832   avg_ms: 105.832  avg speedup: 19.275 x 20345.9 Mflops
+T:2  sx4    loops: 1   speedup: 7.959 x  wins: 0     tot_ms: 256.295   avg_ms: 256.295  avg speedup: 7.959 x 8401.5 Mflops
+T:3  ref4   loops: 1   speedup: 9.224 x  wins: 1     tot_ms: 221.169   avg_ms: 221.169  avg speedup: 9.224 x 9735.8 Mflops
+T:4  rf99   loops: 1   speedup: 9.228 x  wins: 2     tot_ms: 221.054   avg_ms: 221.054  avg speedup: 9.228 x 9740.8 Mflops
+tests:1 impls:1 passed:0 skipped:0 mistrusted:1 unimplemented:0 failed:0 test_fail: 0
+	Command being timed: "./benchdnn --mode=PT --dir=BWD_WB g1mb8ic256ih13oc384oh13kh3ph1nmini:conv3"
+	User time (seconds): 30.92
+	System time (seconds): 0.02
+	Percent of CPU this job got: 398%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:07.77
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 39688
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 1101
+	Voluntary context switches: 14
+	Involuntary context switches: 33698
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

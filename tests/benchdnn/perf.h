@@ -2,8 +2,11 @@
 #define PERF_H
 /** \file
  * perf_begin/end.
- * To activate the rdpmc performance counters in linux, I snarfed some code from
- * the linux tools [ejk] */
+ * - Initialize tick-level timing.  (Inactive for now)
+ *   - rdtsc / rdpmd / freq governor settings?
+ *
+ * Note: rdpmc performance counters in linux can be [safely] used,
+ *       it seems, after mmaping as per kernel tools source code. */
 #if defined(__cplusplus)
 extern "C" {
 #endif

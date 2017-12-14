@@ -342,14 +342,15 @@ NAMEENUM_T(stream_kind){
 
 #define NAMEFUNC_TPTR( TYPENAME, VAR ) int mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const VAR, char * const buf, int len )
 
-#define SCAN_LASTNZ( ARR, SZ ) do{lastnz= -1; for(int i=0; i<(SZ); ++i){ if( ARR[i] > 0 ){ lastnz=i; }}}while(0)
+// volatile l_nz introduced to avoid a g++-7 optimization bug.
+#define SCAN_LASTNZ( ARR, SZ ) do{volatile int l_nz= -1; for(int i=0; i<(SZ); ++i){ if( ARR[i] > 0 ){ l_nz=i; }} lastnz=l_nz;}while(0)
 
 /** debug flag for SX compiler bug with -Cdebug or -Cnoopt */
 // - C99 behavior always returns the # of chars that would have been written.
 // - Format conversion errors MIGHT still return -ve (error), so these lib
 //   functions will just *assert* that no conversion errors happen.
 // - and release-mode will just do-nothing (just in case)
-#define SNPRINTF_DBG 0
+#define SNPRINTF_DBG 1
 
 #if SNPRINTF_DBG
 // paranoia: set NUL into last char explicitly (*all* snprintfs should do this already)

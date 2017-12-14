@@ -71,6 +71,8 @@ static conv_impls_t conv_impls_[] = {
     //{"NULL", nullptr, nullptr, nullptr},
 
     {"ref3", refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
+    //{"NULL", nullptr, nullptr, nullptr},
+
     {"ref4", refconv_4_fwd,         refconv_4_bwd_d,            refconv_4_bwd_w},
     //{"NULL", nullptr, nullptr, nullptr},
 
