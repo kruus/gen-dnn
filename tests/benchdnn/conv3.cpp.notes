@@ -52,6 +52,9 @@ Diophantine...
     1)  o = p - k*D   s.t. k > 0
     2)  o == j*S      (integer j, j >= 0)
     i.e.   k*D = p-o = j*S.
+          k*D + j*S = (p-o) + o = p   (S,D,p known, k,j unknown ints)
+------------------------------
+MISTAKE:
 Equivalently, solve
     k*D - j*S = 0   for integers j,k, choosing the solution with lowest k>=0.
     (D and S are both positive, so will also be >= 0)
@@ -64,6 +67,7 @@ Problem-specific, using definition of gcd:
     but we only need the lowest-k solution.
   Ex. gcd(54,24) = 6, so k*24 = j*54 has solutions k=54/6=9 and j=24/6=4.
       Check: 9*24 = 4*54 = (54*24)/6
+------------------------------
 
 In general, a generic approach is like:
 Steps:
