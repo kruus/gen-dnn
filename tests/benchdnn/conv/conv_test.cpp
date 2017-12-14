@@ -84,13 +84,13 @@ void test_stats::update_impl(const prb_t *p, res_t *r, int status,
       b2[ll2-1]='\0';
     }
 
+    print(0, "%s %s %9.2g ops", &b2[0],
+            (status==OK? "CORRECT": "INCORRECT"), ops);
     double mflops = ops*1.e-3/ms_tot; // ops*1.e-6 / (ms_tot * 1.e-3)
-    print(0, "%s %s  %g ops %.3f MFlops %s %s\n",
-          &b2[0],
-          (status==OK? "CORRECT": "INCORRECT"),
-          ops, mflops,
-          dir2str(p->dir),
-          pstr);
+    if (mflops >= 999.999) print(0, " %7.3f GFlops", mflops*1.e-3);
+    else                   print(0, " %7.3f MFlops", mflops);
+    print(0, " %s %s\n", dir2str(p->dir), pstr);
+
     td->ms[imp] = ms_tot;
     td->ops = p->ops;
     if (r->state==UNTESTED) r->state = PASSED;
