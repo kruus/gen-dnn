@@ -297,7 +297,11 @@ int batch(const char *fname) {
             if (buf[0] == '#')
                 break; /* stop reading till eol */
 
+#if defined(SXAURORA)
             const size_t len = strnlen_s(buf, maxlen) + 1;
+#else
+            const size_t len = strnlen(buf, maxlen) + 1;
+#endif
             opts[n_opts] = (char *)malloc(len);
             SAFE(opts[n_opts] ? OK : FAIL, CRIT);
             strncpy(opts[n_opts], buf, len);
