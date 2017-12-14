@@ -52,7 +52,12 @@ struct scales_t: public c_compatible {
 
 private:
     enum { scales_buf_size = 16 };
+
+#if defined(SXAURORA)
     alignas(8) float scales_buf_[scales_buf_size];
+#else
+    alignas(64) float scales_buf_[scales_buf_size];
+#endif
 
     void cleanup() {
         if (scales_ != scales_buf_ && scales_ != nullptr)

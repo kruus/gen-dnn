@@ -206,6 +206,9 @@ fi
         export CFLAGS="${CFLAGS} -DUSE_CBLAS"
         export CXXFLAGS="${CXXFLAGS} -DUSE_CBLAS"
     fi
+    if [ $COMPILER_AURORA ]; then
+        CMAKEOPT="${CMAKEOPT} -DCMAKE_C_COMPILER=ncc -DCMAKE_CXX_COMPILER=nc++ -DCMAKE_AR=nar -DCMAKE_C_COMPILER_ID=Aurora -DCMAKE_CXX_COMPILER_ID=Aurora"
+    fi
     if [ ! "$DOTARGET" == "j" ]; then
         CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
         export CFLAGS="${CFLAGS} -DTARGET_VANILLA"
