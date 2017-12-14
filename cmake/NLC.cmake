@@ -22,11 +22,13 @@ endif()
 set(NLC_cmake_included true)
 
 #
-# No detection right now. Just hardcoded paths to libs.
+# No detection right now, just specify the base path to the NLC.
+# TODO: detect if lib available in canonical location and use
+#       env var alternatively.
 #
-set(NLCINC /opt/nec/ve/nlc/0.9.0/include)
-set(NLCLIB /opt/nec/ve/nlc/0.9.0/lib/libcblas.a)
-set(NLCLIBBLAS /opt/nec/ve/nlc/0.9.0/lib/libblas_pthread.a)
+set(NLCINC $ENV{NLC_BASE}/include)
+set(NLCLIB $ENV{NLC_BASE}/lib/libcblas.a)
+set(NLCLIBBLAS $ENV{NLC_BASE}/lib/libblas_pthread.a)
 #set(NLCLIBBLAS /opt/nec/ve/nlc/0.9.0/lib/libblas_sequential.a)
 add_definitions(-DUSE_CBLAS)
 include_directories(AFTER ${NLCINC})
