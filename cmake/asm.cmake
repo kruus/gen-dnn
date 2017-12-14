@@ -35,7 +35,7 @@ message(STATUS "??? ${asm_CAT} <ASSEMBLY_SOURCE>.0 | ${asm_CXXFILT} > <ASSEMBLY_
 if(asm_CXXFILT AND asm_CAT)
     set(asm_FILTER_COMMAND "${asm_CAT} <ASSEMBLY_SOURCE>.0 | ${asm_CXXFILT} > <ASSEMBLY_SOURCE>")
 else()
-    set(asm_FILTER_COMMAND "${CMAKE_COMMAND -E move \"<ASSEMBLY_SOURCE>.0\" \"<ASSEMBLY_SOURCE>\"")
+    set(asm_FILTER_COMMAND "${CMAKE_COMMAND} -E move \"<ASSEMBLY_SOURCE>.0\" \"<ASSEMBLY_SOURCE>\"")
 endif()
 
 #file(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/asm" asm_OUTPUT_DIR))
@@ -43,10 +43,10 @@ set(asm_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/asm")
 file(MAKE_DIRECTORY ${asm_OUTPUT_DIR})
 
 if(CMAKE_C_COMPILER_LOADED)
-    if(UNIX AND NOT APPLE)
+    if(UNIX AND NOT APPLE AND NOT NECSX)
         # cmake docs do not really recommend overriding the cmake macros, but
         # it seemed an easy way to nicer asm outputs for gcc
-        message(STATUS "CMAKE_C_COMPILER_ID ${CMAKE_C_COMPILER_ID}")
+        message(STATUS "unix-like CMAKE_C_COMPILER_ID ${CMAKE_C_COMPILER_ID}")
         if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
             if(0)
                 # this way still does not produce very readable asm, imho.
