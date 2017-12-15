@@ -87,7 +87,13 @@ elseif(UNIX OR APPLE)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -O3 -finline -finline-functions")
         #set(CMAKE_C_FLAGS_RELEASE "-O3 -finline -ftrace")
         #set(CMAKE_CXX_FLAGS_RELEASE "-O3 -finline -ftrace")
+
         SET(CMAKE_AR nar)
+
+        set(CMAKE_C_CREATE_PREPROCESSED_SOURCE "<CMAKE_C_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -E <SOURCE> > <PREPROCESSED_SOURCE>" )
+        set(CMAKE_C_CREATE_ASSEMBLY_SOURCE     "<CMAKE_C_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -S <SOURCE> -o <ASSEMBLY_SOURCE>" )
+        set(CMAKE_CXX_CREATE_PREPROCESSED_SOURCE "<CMAKE_CXX_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -E <SOURCE> > <PREPROCESSED_SOURCE>" )
+        set(CMAKE_CXX_CREATE_ASSEMBLY_SOURCE     "<CMAKE_CXX_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -S <SOURCE> -o <ASSEMBLY_SOURCE>" )
     else()
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fvisibility-inlines-hidden")
         set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -fvisibility=internal -Wno-unknown-pragmas")
