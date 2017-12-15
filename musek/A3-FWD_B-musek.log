@@ -35,12 +35,12 @@ THREADS  :
 cmd      :  /usr/bin/time -v ./benchdnn --mode=PT --dir=FWD_B g1mb8ic256ih13oc384oh13kh3ph1n"mini:conv3" 
 /home/kruus/w/gen-dnn/build/tests/benchdnn
 total 304
--rwxrwxr-x 1 kruus kruus 257112 Dec 14 02:30 benchdnn
-drwxrwxr-x 6 kruus kruus   4096 Dec 14 00:06 CMakeFiles
--rw-rw-r-- 1 kruus kruus   1017 Dec 14 00:06 cmake_install.cmake
--rw-rw-r-- 1 kruus kruus    291 Dec 14 00:06 CTestTestfile.cmake
-drwxrwxr-x 2 kruus kruus   4096 Dec 14 00:06 inputs
--rw-rw-r-- 1 kruus kruus  34857 Dec 14 00:06 Makefile
+-rwxrwxr-x 1 kruus kruus 257112 Dec 14 18:17 benchdnn
+drwxrwxr-x 6 kruus kruus   4096 Dec 14 18:17 CMakeFiles
+-rw-rw-r-- 1 kruus kruus   1017 Dec 14 18:17 cmake_install.cmake
+-rw-rw-r-- 1 kruus kruus    291 Dec 14 18:17 CTestTestfile.cmake
+drwxrwxr-x 2 kruus kruus   4096 Dec 14 18:17 inputs
+-rw-rw-r-- 1 kruus kruus  34857 Dec 14 18:17 Makefile
  /home/kruus/w/gen-dnn/build/tests/benchdnn inputs:
 COLUMN ... column -t
 conv_alexnet             conv_all                       conv_dilated                conv_googlenet_v1
@@ -52,39 +52,39 @@ deepbench_training       minialex                       test_bwd_d_regression   
 test_conv_all            test_conv_regression           test_fwd_regression
 benchdnn --conv --mode=PERF+TEST -v0 ... init omp_max_thr=4  OK
 
-Test0 orig              7 s CORRECT   2.2e+09 ops 310.712 MFlops FWD_B mb8ic256ih13oc384oh13kh3ph1nmini:conv3
-Test1 sx3         62.737 ms CORRECT   2.2e+09 ops  34.322 GFlops FWD_B mb8ic256ih13oc384oh13kh3ph1nmini:conv3
-Test2 sx4         64.950 ms CORRECT   2.2e+09 ops  33.152 GFlops FWD_B mb8ic256ih13oc384oh13kh3ph1nmini:conv3
-Test3 ref3       397.218 ms CORRECT   2.2e+09 ops   5.421 GFlops FWD_B mb8ic256ih13oc384oh13kh3ph1nmini:conv3
-Test4 ref4       277.009 ms CORRECT   2.2e+09 ops   7.773 GFlops FWD_B mb8ic256ih13oc384oh13kh3ph1nmini:conv3
- TEST all_passed=1 0:PASSED __REPRO: mb8ic256ih13oc384oh13kh3ph1nmini:conv3
-T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 6930.053  avg_ms: 6930.053  avg speedup: 1.000 x 310.7 Mflops
-T:1  sx3    loops: 1   speedup: 110.462x  wins: 1     tot_ms: 62.737    avg_ms: 62.737  avg speedup: 110.462 x 34322.0 Mflops
-T:2  sx4    loops: 1   speedup: 106.698x  wins: 0     tot_ms: 64.950    avg_ms: 64.950  avg speedup: 106.698 x 33152.5 Mflops
-T:3  ref3   loops: 1   speedup: 17.446x  wins: -1    tot_ms: 397.218   avg_ms: 397.218  avg speedup: 17.446 x 5420.8 Mflops
-T:4  ref4   loops: 1   speedup: 25.017x  wins: 0     tot_ms: 277.009   avg_ms: 277.009  avg speedup: 25.017 x 7773.2 Mflops
+t:0 orig             7 s ok 301.548 MFlops   1.00 x FWD_B mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+t:1 sx3        67.341 ms ok  31.975 GFlops 106.04 x FWD_B mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+t:2 sx4        66.714 ms ok  32.276 GFlops 107.03 x FWD_B mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+t:3 ref3      404.088 ms ok   5.329 GFlops  17.67 x FWD_B mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+t:4 ref4      330.525 ms ok   6.515 GFlops  21.60 x FWD_B mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+ TEST all_passed=1 0:PASSED __REPRO:     2.2e+09 ops FWD_B mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 7140.654  avg_ms: 7140.654  avg speedup: 1.000 x 301.5 Mflops
+T:1  sx3    loops: 1   speedup: 106.037x  wins: 1     tot_ms: 67.341    avg_ms: 67.341  avg speedup: 106.037 x 31975.2 Mflops
+T:2  sx4    loops: 1   speedup: 107.034x  wins: 2     tot_ms: 66.714    avg_ms: 66.714  avg speedup: 107.034 x 32275.8 Mflops
+T:3  ref3   loops: 1   speedup: 17.671x  wins: -1    tot_ms: 404.088   avg_ms: 404.088  avg speedup: 17.671 x 5328.7 Mflops
+T:4  ref4   loops: 1   speedup: 21.604x  wins: 0     tot_ms: 330.525   avg_ms: 330.525  avg speedup: 21.604 x 6514.6 Mflops
 TEST final stats:
-T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 6930.053  avg_ms: 6930.053  avg speedup: 1.000 x 310.7 Mflops
-T:1  sx3    loops: 1   speedup: 110.462x  wins: 1     tot_ms: 62.737    avg_ms: 62.737  avg speedup: 110.462 x 34322.0 Mflops
-T:2  sx4    loops: 1   speedup: 106.698x  wins: 0     tot_ms: 64.950    avg_ms: 64.950  avg speedup: 106.698 x 33152.5 Mflops
-T:3  ref3   loops: 1   speedup: 17.446x  wins: -1    tot_ms: 397.218   avg_ms: 397.218  avg speedup: 17.446 x 5420.8 Mflops
-T:4  ref4   loops: 1   speedup: 25.017x  wins: 0     tot_ms: 277.009   avg_ms: 277.009  avg speedup: 25.017 x 7773.2 Mflops
+T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 7140.654  avg_ms: 7140.654  avg speedup: 1.000 x 301.5 Mflops
+T:1  sx3    loops: 1   speedup: 106.037x  wins: 1     tot_ms: 67.341    avg_ms: 67.341  avg speedup: 106.037 x 31975.2 Mflops
+T:2  sx4    loops: 1   speedup: 107.034x  wins: 2     tot_ms: 66.714    avg_ms: 66.714  avg speedup: 107.034 x 32275.8 Mflops
+T:3  ref3   loops: 1   speedup: 17.671x  wins: -1    tot_ms: 404.088   avg_ms: 404.088  avg speedup: 17.671 x 5328.7 Mflops
+T:4  ref4   loops: 1   speedup: 21.604x  wins: 0     tot_ms: 330.525   avg_ms: 330.525  avg speedup: 21.604 x 6514.6 Mflops
 tests:1 impls:1 passed:0 skipped:0 mistrusted:1 unimplemented:0 failed:0 test_fail: 0
 	Command being timed: "./benchdnn --mode=PT --dir=FWD_B g1mb8ic256ih13oc384oh13kh3ph1nmini:conv3"
-	User time (seconds): 72.01
-	System time (seconds): 0.11
-	Percent of CPU this job got: 324%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:22.21
+	User time (seconds): 67.41
+	System time (seconds): 0.14
+	Percent of CPU this job got: 312%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:21.60
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 40540
+	Maximum resident set size (kbytes): 39764
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 776
-	Voluntary context switches: 22
-	Involuntary context switches: 81994
+	Minor (reclaiming a frame) page faults: 1126
+	Voluntary context switches: 30
+	Involuntary context switches: 116661
 	Swaps: 0
 	File system inputs: 0
 	File system outputs: 8

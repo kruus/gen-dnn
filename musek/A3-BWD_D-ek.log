@@ -34,13 +34,13 @@
 THREADS  : 
 cmd      :  /usr/bin/time -v ./benchdnn --mode=PT --dir=BWD_D g1mb8ic256ih13oc384oh13kh3ph1n"mini:conv3" 
 /home/kruus/w/gen-dnn/build/tests/benchdnn
-total 300
--rwxrwxr-x 1 kruus kruus 253176 Dec 14 02:54 benchdnn
-drwxrwxr-x 6 kruus kruus   4096 Dec 14 02:47 CMakeFiles
--rw-rw-r-- 1 kruus kruus   1017 Dec 14 02:47 cmake_install.cmake
--rw-rw-r-- 1 kruus kruus    291 Dec 14 02:47 CTestTestfile.cmake
-drwxrwxr-x 2 kruus kruus   4096 Dec 14 02:47 inputs
--rw-rw-r-- 1 kruus kruus  34759 Dec 14 02:47 Makefile
+total 304
+-rwxrwxr-x 1 kruus kruus 257272 Dec 14 18:32 benchdnn
+drwxrwxr-x 6 kruus kruus   4096 Dec 14 18:25 CMakeFiles
+-rw-rw-r-- 1 kruus kruus   1017 Dec 14 18:25 cmake_install.cmake
+-rw-rw-r-- 1 kruus kruus    291 Dec 14 18:25 CTestTestfile.cmake
+drwxrwxr-x 2 kruus kruus   4096 Dec 14 18:25 inputs
+-rw-rw-r-- 1 kruus kruus  34759 Dec 14 18:25 Makefile
  /home/kruus/w/gen-dnn/build/tests/benchdnn inputs:
 COLUMN ... column -t
 conv_alexnet             conv_all                       conv_dilated                conv_googlenet_v1
@@ -52,39 +52,39 @@ deepbench_training       minialex                       test_bwd_d_regression   
 test_conv_all            test_conv_regression           test_fwd_regression
 benchdnn --conv --mode=PERF+TEST -v0 ... init omp_max_thr=2  OK
 
-Test0 orig             22 s CORRECT   2.2e+09 ops  98.988 MFlops BWD_D --dir=BWD_D mb8ic256ih13oc384oh13kh3ph1nmini:conv3
-Test1 sx3               2 s CORRECT   2.2e+09 ops   1.038 GFlops BWD_D --dir=BWD_D mb8ic256ih13oc384oh13kh3ph1nmini:conv3
-Test2 sx4               2 s CORRECT   2.2e+09 ops 890.812 MFlops BWD_D --dir=BWD_D mb8ic256ih13oc384oh13kh3ph1nmini:conv3
-Test3 ref3              3 s CORRECT   2.2e+09 ops 808.872 MFlops BWD_D --dir=BWD_D mb8ic256ih13oc384oh13kh3ph1nmini:conv3
-Test4 ref4              8 s CORRECT   2.2e+09 ops 279.096 MFlops BWD_D --dir=BWD_D mb8ic256ih13oc384oh13kh3ph1nmini:conv3
- TEST all_passed=1 0:PASSED __REPRO: --dir=BWD_D mb8ic256ih13oc384oh13kh3ph1nmini:conv3
-T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 21752.606  avg_ms: 21752.606  avg speedup: 1.000 x 99.0 Mflops
-T:1  sx3    loops: 1   speedup: 10.485x  wins: 1     tot_ms: 2074.555  avg_ms: 2074.555  avg speedup: 10.485 x 1037.9 Mflops
-T:2  sx4    loops: 1   speedup: 8.999 x  wins: 0     tot_ms: 2417.177  avg_ms: 2417.177  avg speedup: 8.999 x 890.8 Mflops
-T:3  ref3   loops: 1   speedup: 8.171 x  wins: -1    tot_ms: 2662.042  avg_ms: 2662.042  avg speedup: 8.171 x 808.9 Mflops
-T:4  ref4   loops: 1   speedup: 2.819 x  wins: -2    tot_ms: 7715.083  avg_ms: 7715.083  avg speedup: 2.819 x 279.1 Mflops
+t:0 orig            22 s ok  99.049 MFlops   1.00 x BWD_D --dir=BWD_D mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+t:1 sx3              2 s ok   1.038 GFlops  10.48 x BWD_D --dir=BWD_D mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+t:2 sx4              2 s ok 891.648 MFlops   9.00 x BWD_D --dir=BWD_D mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+t:3 ref3             3 s ok 810.528 MFlops   8.18 x BWD_D --dir=BWD_D mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+t:4 ref4             8 s ok 279.183 MFlops   2.82 x BWD_D --dir=BWD_D mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+ TEST all_passed=1 0:PASSED __REPRO:     2.2e+09 ops BWD_D --dir=BWD_D mb8ic256ih13oc384oh13kh3ph1nmini:conv3
+T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 21739.330  avg_ms: 21739.330  avg speedup: 1.000 x 99.0 Mflops
+T:1  sx3    loops: 1   speedup: 10.476x  wins: 1     tot_ms: 2075.184  avg_ms: 2075.184  avg speedup: 10.476 x 1037.6 Mflops
+T:2  sx4    loops: 1   speedup: 9.002 x  wins: 0     tot_ms: 2414.912  avg_ms: 2414.912  avg speedup: 9.002 x 891.6 Mflops
+T:3  ref3   loops: 1   speedup: 8.183 x  wins: -1    tot_ms: 2656.604  avg_ms: 2656.604  avg speedup: 8.183 x 810.5 Mflops
+T:4  ref4   loops: 1   speedup: 2.819 x  wins: -2    tot_ms: 7712.698  avg_ms: 7712.698  avg speedup: 2.819 x 279.2 Mflops
 TEST final stats:
-T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 21752.606  avg_ms: 21752.606  avg speedup: 1.000 x 99.0 Mflops
-T:1  sx3    loops: 1   speedup: 10.485x  wins: 1     tot_ms: 2074.555  avg_ms: 2074.555  avg speedup: 10.485 x 1037.9 Mflops
-T:2  sx4    loops: 1   speedup: 8.999 x  wins: 0     tot_ms: 2417.177  avg_ms: 2417.177  avg speedup: 8.999 x 890.8 Mflops
-T:3  ref3   loops: 1   speedup: 8.171 x  wins: -1    tot_ms: 2662.042  avg_ms: 2662.042  avg speedup: 8.171 x 808.9 Mflops
-T:4  ref4   loops: 1   speedup: 2.819 x  wins: -2    tot_ms: 7715.083  avg_ms: 7715.083  avg speedup: 2.819 x 279.1 Mflops
+T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 21739.330  avg_ms: 21739.330  avg speedup: 1.000 x 99.0 Mflops
+T:1  sx3    loops: 1   speedup: 10.476x  wins: 1     tot_ms: 2075.184  avg_ms: 2075.184  avg speedup: 10.476 x 1037.6 Mflops
+T:2  sx4    loops: 1   speedup: 9.002 x  wins: 0     tot_ms: 2414.912  avg_ms: 2414.912  avg speedup: 9.002 x 891.6 Mflops
+T:3  ref3   loops: 1   speedup: 8.183 x  wins: -1    tot_ms: 2656.604  avg_ms: 2656.604  avg speedup: 8.183 x 810.5 Mflops
+T:4  ref4   loops: 1   speedup: 2.819 x  wins: -2    tot_ms: 7712.698  avg_ms: 7712.698  avg speedup: 2.819 x 279.2 Mflops
 tests:1 impls:1 passed:0 skipped:0 mistrusted:1 unimplemented:0 failed:0 test_fail: 0
 	Command being timed: "./benchdnn --mode=PT --dir=BWD_D g1mb8ic256ih13oc384oh13kh3ph1nmini:conv3"
-	User time (seconds): 189.78
-	System time (seconds): 0.22
+	User time (seconds): 189.76
+	System time (seconds): 0.17
 	Percent of CPU this job got: 199%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:35.09
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:35.06
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 48516
+	Maximum resident set size (kbytes): 33632
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 680
+	Minor (reclaiming a frame) page faults: 1011
 	Voluntary context switches: 3
-	Involuntary context switches: 18407
+	Involuntary context switches: 18275
 	Swaps: 0
 	File system inputs: 0
 	File system outputs: 16

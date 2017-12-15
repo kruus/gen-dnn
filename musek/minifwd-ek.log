@@ -34,13 +34,13 @@
 THREADS  : 
 cmd      :  /usr/bin/time -v ./benchdnn --mode=PT --dir=FWD_B  --batch=inputs/minialex
 /home/kruus/w/gen-dnn/build/tests/benchdnn
-total 300
--rwxrwxr-x 1 kruus kruus 253176 Dec 14 02:54 benchdnn
-drwxrwxr-x 6 kruus kruus   4096 Dec 14 02:47 CMakeFiles
--rw-rw-r-- 1 kruus kruus   1017 Dec 14 02:47 cmake_install.cmake
--rw-rw-r-- 1 kruus kruus    291 Dec 14 02:47 CTestTestfile.cmake
-drwxrwxr-x 2 kruus kruus   4096 Dec 14 02:47 inputs
--rw-rw-r-- 1 kruus kruus  34759 Dec 14 02:47 Makefile
+total 304
+-rwxrwxr-x 1 kruus kruus 257272 Dec 14 18:32 benchdnn
+drwxrwxr-x 6 kruus kruus   4096 Dec 14 18:25 CMakeFiles
+-rw-rw-r-- 1 kruus kruus   1017 Dec 14 18:25 cmake_install.cmake
+-rw-rw-r-- 1 kruus kruus    291 Dec 14 18:25 CTestTestfile.cmake
+drwxrwxr-x 2 kruus kruus   4096 Dec 14 18:25 inputs
+-rw-rw-r-- 1 kruus kruus  34759 Dec 14 18:25 Makefile
  /home/kruus/w/gen-dnn/build/tests/benchdnn inputs:
 COLUMN ... column -t
 conv_alexnet             conv_all                       conv_dilated                conv_googlenet_v1
@@ -53,77 +53,77 @@ test_conv_all            test_conv_regression           test_fwd_regression
 benchdnn --conv --mode=PERF+TEST -v0 ... init omp_max_thr=2  OK
 batch: inputs/minialex ???batch: inputs/minialex OK
 
-Test0 orig             21 s CORRECT   2.3e+09 ops 109.503 MFlops FWD_B mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
-Test1 sx3        519.569 ms CORRECT   2.3e+09 ops   4.464 GFlops FWD_B mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
-Test2 sx4        526.417 ms CORRECT   2.3e+09 ops   4.406 GFlops FWD_B mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
-Test3 ref3              1 s CORRECT   2.3e+09 ops   1.714 GFlops FWD_B mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
-Test4 ref4              1 s CORRECT   2.3e+09 ops   1.843 GFlops FWD_B mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
- TEST all_passed=1 0:PASSED __REPRO: mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
-T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 21178.699  avg_ms: 21178.699  avg speedup: 1.000 x 109.5 Mflops
-T:1  sx3    loops: 1   speedup: 40.762x  wins: 1     tot_ms: 519.569   avg_ms: 519.569  avg speedup: 40.762 x 4463.6 Mflops
-T:2  sx4    loops: 1   speedup: 40.232x  wins: 0     tot_ms: 526.417   avg_ms: 526.417  avg speedup: 40.232 x 4405.5 Mflops
-T:3  ref3   loops: 1   speedup: 15.654x  wins: -1    tot_ms: 1352.902  avg_ms: 1352.902  avg speedup: 15.654 x 1714.2 Mflops
-T:4  ref4   loops: 1   speedup: 16.830x  wins: 0     tot_ms: 1258.366  avg_ms: 1258.366  avg speedup: 16.830 x 1843.0 Mflops
+t:0 orig            21 s ok 109.561 MFlops   1.00 x FWD_B mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+t:1 sx3       519.542 ms ok   4.464 GFlops  40.74 x FWD_B mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+t:2 sx4       526.609 ms ok   4.404 GFlops  40.20 x FWD_B mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+t:3 ref3             1 s ok   1.708 GFlops  15.59 x FWD_B mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+t:4 ref4             1 s ok   1.843 GFlops  16.82 x FWD_B mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+ TEST all_passed=1 0:PASSED __REPRO:     2.3e+09 ops FWD_B mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 21167.543  avg_ms: 21167.543  avg speedup: 1.000 x 109.6 Mflops
+T:1  sx3    loops: 1   speedup: 40.743x  wins: 1     tot_ms: 519.542   avg_ms: 519.542  avg speedup: 40.743 x 4463.8 Mflops
+T:2  sx4    loops: 1   speedup: 40.196x  wins: 0     tot_ms: 526.609   avg_ms: 526.609  avg speedup: 40.196 x 4403.9 Mflops
+T:3  ref3   loops: 1   speedup: 15.586x  wins: -1    tot_ms: 1358.136  avg_ms: 1358.136  avg speedup: 15.586 x 1707.6 Mflops
+T:4  ref4   loops: 1   speedup: 16.818x  wins: 0     tot_ms: 1258.613  avg_ms: 1258.613  avg speedup: 16.818 x 1842.6 Mflops
 
-Test0 orig             42 s CORRECT   4.5e+09 ops 106.421 MFlops FWD_B g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
-Test1 sx3        736.390 ms CORRECT   4.5e+09 ops   6.109 GFlops FWD_B g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
-Test2 sx4        750.488 ms CORRECT   4.5e+09 ops   5.994 GFlops FWD_B g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
-Test3 ref3              2 s CORRECT   4.5e+09 ops   1.935 GFlops FWD_B g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
-Test4 ref4              2 s CORRECT   4.5e+09 ops   2.638 GFlops FWD_B g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
- TEST all_passed=1 1:PASSED __REPRO: g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
-T:0  orig   loops: 2   speedup: 1.000 x  wins: 0     tot_ms: 63451.148  avg_ms: 31725.574  avg speedup: 1.000 x 107.4 Mflops
-T:1  sx3    loops: 2   speedup: 57.405x  wins: 2     tot_ms: 1255.960  avg_ms: 627.980  avg speedup: 50.520 x 5428.4 Mflops
-T:2  sx4    loops: 2   speedup: 56.327x  wins: 0     tot_ms: 1276.905  avg_ms: 638.453  avg speedup: 49.691 x 5339.3 Mflops
-T:3  ref3   loops: 2   speedup: 18.184x  wins: -2    tot_ms: 3677.603  avg_ms: 1838.801  avg speedup: 17.253 x 1853.9 Mflops
-T:4  ref4   loops: 2   speedup: 24.790x  wins: 0     tot_ms: 2963.568  avg_ms: 1481.784  avg speedup: 21.410 x 2300.5 Mflops
+t:0 orig            42 s ok 106.230 MFlops   1.00 x FWD_B g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+t:1 sx3       733.562 ms ok   6.133 GFlops  57.73 x FWD_B g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+t:2 sx4       750.302 ms ok   5.996 GFlops  56.44 x FWD_B g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+t:3 ref3             2 s ok   1.933 GFlops  18.19 x FWD_B g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+t:4 ref4             2 s ok   2.643 GFlops  24.88 x FWD_B g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+ TEST all_passed=1 1:PASSED __REPRO:     4.5e+09 ops FWD_B g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+T:0  orig   loops: 2   speedup: 1.000 x  wins: 0     tot_ms: 63515.735  avg_ms: 31757.867  avg speedup: 1.000 x 107.3 Mflops
+T:1  sx3    loops: 2   speedup: 57.730x  wins: 2     tot_ms: 1253.103  avg_ms: 626.552  avg speedup: 50.687 x 5440.7 Mflops
+T:2  sx4    loops: 2   speedup: 56.442x  wins: 0     tot_ms: 1276.911  avg_ms: 638.456  avg speedup: 49.742 x 5339.3 Mflops
+T:3  ref3   loops: 2   speedup: 18.193x  wins: -2    tot_ms: 3685.837  avg_ms: 1842.918  avg speedup: 17.232 x 1849.7 Mflops
+T:4  ref4   loops: 2   speedup: 24.882x  wins: 0     tot_ms: 2960.580  avg_ms: 1480.290  avg speedup: 21.454 x 2302.9 Mflops
 
-Test0 orig             29 s CORRECT     3e+09 ops 103.685 MFlops FWD_B mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
-Test1 sx3        539.884 ms CORRECT     3e+09 ops   5.484 GFlops FWD_B mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
-Test2 sx4        543.388 ms CORRECT     3e+09 ops   5.449 GFlops FWD_B mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
-Test3 ref3              2 s CORRECT     3e+09 ops   1.509 GFlops FWD_B mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
-Test4 ref4              1 s CORRECT     3e+09 ops   2.130 GFlops FWD_B mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
- TEST all_passed=1 2:PASSED __REPRO: mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
-T:0  orig   loops: 3   speedup: 1.000 x  wins: 0     tot_ms: 92006.229  avg_ms: 30668.743  avg speedup: 1.000 x 106.3 Mflops
-T:1  sx3    loops: 3   speedup: 52.891x  wins: 3     tot_ms: 1795.844  avg_ms: 598.615  avg speedup: 51.233 x 5445.1 Mflops
-T:2  sx4    loops: 3   speedup: 52.550x  wins: 0     tot_ms: 1820.293  avg_ms: 606.764  avg speedup: 50.545 x 5371.9 Mflops
-T:3  ref3   loops: 3   speedup: 14.557x  wins: -3    tot_ms: 5639.148  avg_ms: 1879.716  avg speedup: 16.316 x 1734.0 Mflops
-T:4  ref4   loops: 3   speedup: 20.546x  wins: 0     tot_ms: 4353.347  avg_ms: 1451.116  avg speedup: 21.135 x 2246.2 Mflops
+t:0 orig            29 s ok 103.673 MFlops   1.00 x FWD_B mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+t:1 sx3       540.935 ms ok   5.473 GFlops  52.79 x FWD_B mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+t:2 sx4       545.968 ms ok   5.423 GFlops  52.31 x FWD_B mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+t:3 ref3             2 s ok   1.509 GFlops  14.56 x FWD_B mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+t:4 ref4             1 s ok   2.131 GFlops  20.55 x FWD_B mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+ TEST all_passed=1 2:PASSED __REPRO:       3e+09 ops FWD_B mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+T:0  orig   loops: 3   speedup: 1.000 x  wins: 0     tot_ms: 92074.076  avg_ms: 30691.359  avg speedup: 1.000 x 106.2 Mflops
+T:1  sx3    loops: 3   speedup: 52.794x  wins: 3     tot_ms: 1794.038  avg_ms: 598.013  avg speedup: 51.322 x 5450.6 Mflops
+T:2  sx4    loops: 3   speedup: 52.308x  wins: 0     tot_ms: 1822.879  avg_ms: 607.626  avg speedup: 50.510 x 5364.3 Mflops
+T:3  ref3   loops: 3   speedup: 14.559x  wins: -3    tot_ms: 5647.334  avg_ms: 1882.445  avg speedup: 16.304 x 1731.5 Mflops
+T:4  ref4   loops: 3   speedup: 20.552x  wins: 0     tot_ms: 4350.170  avg_ms: 1450.057  avg speedup: 21.166 x 2247.8 Mflops
 
-Test0 orig             23 s CORRECT   2.2e+09 ops  95.018 MFlops FWD_B g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
-Test1 sx3        364.698 ms CORRECT   2.2e+09 ops   6.089 GFlops FWD_B g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
-Test2 sx4        383.135 ms CORRECT   2.2e+09 ops   5.796 GFlops FWD_B g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
-Test3 ref3              1 s CORRECT   2.2e+09 ops   1.504 GFlops FWD_B g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
-Test4 ref4       996.852 ms CORRECT   2.2e+09 ops   2.228 GFlops FWD_B g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
- TEST all_passed=1 3:PASSED __REPRO: g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
-T:0  orig   loops: 4   speedup: 1.000 x  wins: 0     tot_ms: 115375.937  avg_ms: 28843.984  avg speedup: 1.000 x 104.0 Mflops
-T:1  sx3    loops: 4   speedup: 64.080x  wins: 4     tot_ms: 2160.542  avg_ms: 540.135  avg speedup: 53.401 x 5553.7 Mflops
-T:2  sx4    loops: 4   speedup: 60.996x  wins: 0     tot_ms: 2203.428  avg_ms: 550.857  avg speedup: 52.362 x 5445.6 Mflops
-T:3  ref3   loops: 4   speedup: 15.828x  wins: -4    tot_ms: 7115.641  avg_ms: 1778.910  avg speedup: 16.214 x 1686.3 Mflops
-T:4  ref4   loops: 4   speedup: 23.444x  wins: 0     tot_ms: 5350.199  avg_ms: 1337.550  avg speedup: 21.565 x 2242.7 Mflops
+t:0 orig            23 s ok  95.526 MFlops   1.00 x FWD_B g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+t:1 sx3       365.562 ms ok   6.074 GFlops  63.59 x FWD_B g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+t:2 sx4       384.326 ms ok   5.778 GFlops  60.48 x FWD_B g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+t:3 ref3             1 s ok   1.506 GFlops  15.76 x FWD_B g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+t:4 ref4      996.946 ms ok   2.227 GFlops  23.32 x FWD_B g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+ TEST all_passed=1 3:PASSED __REPRO:     2.2e+09 ops FWD_B g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+T:0  orig   loops: 4   speedup: 1.000 x  wins: 0     tot_ms: 115319.493  avg_ms: 28829.873  avg speedup: 1.000 x 104.1 Mflops
+T:1  sx3    loops: 4   speedup: 63.588x  wins: 4     tot_ms: 2159.601  avg_ms: 539.900  avg speedup: 53.399 x 5556.1 Mflops
+T:2  sx4    loops: 4   speedup: 60.484x  wins: 0     tot_ms: 2207.205  avg_ms: 551.801  avg speedup: 52.247 x 5436.3 Mflops
+T:3  ref3   loops: 4   speedup: 15.762x  wins: -4    tot_ms: 7122.150  avg_ms: 1780.538  avg speedup: 16.192 x 1684.8 Mflops
+T:4  ref4   loops: 4   speedup: 23.317x  wins: 0     tot_ms: 5347.116  avg_ms: 1336.779  avg speedup: 21.567 x 2244.0 Mflops
 TEST final stats:
-T:0  orig   loops: 4   speedup: 1.000 x  wins: 0     tot_ms: 115375.937  avg_ms: 28843.984  avg speedup: 1.000 x 104.0 Mflops
-T:1  sx3    loops: 4   speedup: 64.080x  wins: 4     tot_ms: 2160.542  avg_ms: 540.135  avg speedup: 53.401 x 5553.7 Mflops
-T:2  sx4    loops: 4   speedup: 60.996x  wins: 0     tot_ms: 2203.428  avg_ms: 550.857  avg speedup: 52.362 x 5445.6 Mflops
-T:3  ref3   loops: 4   speedup: 15.828x  wins: -4    tot_ms: 7115.641  avg_ms: 1778.910  avg speedup: 16.214 x 1686.3 Mflops
-T:4  ref4   loops: 4   speedup: 23.444x  wins: 0     tot_ms: 5350.199  avg_ms: 1337.550  avg speedup: 21.565 x 2242.7 Mflops
+T:0  orig   loops: 4   speedup: 1.000 x  wins: 0     tot_ms: 115319.493  avg_ms: 28829.873  avg speedup: 1.000 x 104.1 Mflops
+T:1  sx3    loops: 4   speedup: 63.588x  wins: 4     tot_ms: 2159.601  avg_ms: 539.900  avg speedup: 53.399 x 5556.1 Mflops
+T:2  sx4    loops: 4   speedup: 60.484x  wins: 0     tot_ms: 2207.205  avg_ms: 551.801  avg speedup: 52.247 x 5436.3 Mflops
+T:3  ref3   loops: 4   speedup: 15.762x  wins: -4    tot_ms: 7122.150  avg_ms: 1780.538  avg speedup: 16.192 x 1684.8 Mflops
+T:4  ref4   loops: 4   speedup: 23.317x  wins: 0     tot_ms: 5347.116  avg_ms: 1336.779  avg speedup: 21.567 x 2244.0 Mflops
 tests:4 impls:4 passed:0 skipped:0 mistrusted:4 unimplemented:0 failed:0 test_fail: 0
 	Command being timed: "./benchdnn --mode=PT --dir=FWD_B --batch=inputs/minialex"
-	User time (seconds): 754.54
-	System time (seconds): 0.52
+	User time (seconds): 754.80
+	System time (seconds): 0.54
 	Percent of CPU this job got: 198%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 6:20.49
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 6:20.56
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 82232
+	Maximum resident set size (kbytes): 81308
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 5552
-	Voluntary context switches: 7
-	Involuntary context switches: 73685
+	Minor (reclaiming a frame) page faults: 5813
+	Voluntary context switches: 6
+	Involuntary context switches: 73161
 	Swaps: 0
-	File system inputs: 256
+	File system inputs: 0
 	File system outputs: 48
 	Socket messages sent: 0
 	Socket messages received: 0

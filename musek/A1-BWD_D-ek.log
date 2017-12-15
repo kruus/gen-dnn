@@ -34,13 +34,13 @@
 THREADS  : 
 cmd      :  /usr/bin/time -v ./benchdnn --mode=PT --dir=BWD_D g1mb8ic3ih227oc96oh55kh11sh4ph0n"mini:conv1" 
 /home/kruus/w/gen-dnn/build/tests/benchdnn
-total 300
--rwxrwxr-x 1 kruus kruus 253176 Dec 14 02:54 benchdnn
-drwxrwxr-x 6 kruus kruus   4096 Dec 14 02:47 CMakeFiles
--rw-rw-r-- 1 kruus kruus   1017 Dec 14 02:47 cmake_install.cmake
--rw-rw-r-- 1 kruus kruus    291 Dec 14 02:47 CTestTestfile.cmake
-drwxrwxr-x 2 kruus kruus   4096 Dec 14 02:47 inputs
--rw-rw-r-- 1 kruus kruus  34759 Dec 14 02:47 Makefile
+total 304
+-rwxrwxr-x 1 kruus kruus 257272 Dec 14 18:32 benchdnn
+drwxrwxr-x 6 kruus kruus   4096 Dec 14 18:25 CMakeFiles
+-rw-rw-r-- 1 kruus kruus   1017 Dec 14 18:25 cmake_install.cmake
+-rw-rw-r-- 1 kruus kruus    291 Dec 14 18:25 CTestTestfile.cmake
+drwxrwxr-x 2 kruus kruus   4096 Dec 14 18:25 inputs
+-rw-rw-r-- 1 kruus kruus  34759 Dec 14 18:25 Makefile
  /home/kruus/w/gen-dnn/build/tests/benchdnn inputs:
 COLUMN ... column -t
 conv_alexnet             conv_all                       conv_dilated                conv_googlenet_v1
@@ -52,41 +52,41 @@ deepbench_training       minialex                       test_bwd_d_regression   
 test_conv_all            test_conv_regression           test_fwd_regression
 benchdnn --conv --mode=PERF+TEST -v0 ... init omp_max_thr=2  OK
 
-Test0 orig             26 s CORRECT   1.7e+09 ops  65.052 MFlops BWD_D --dir=BWD_D mb8ic3ih227oc96oh55kh11sh4nmini:conv1
-Test1 sx3               1 s CORRECT   1.7e+09 ops   1.487 GFlops BWD_D --dir=BWD_D mb8ic3ih227oc96oh55kh11sh4nmini:conv1
-Test2 sx4               1 s CORRECT   1.7e+09 ops   1.393 GFlops BWD_D --dir=BWD_D mb8ic3ih227oc96oh55kh11sh4nmini:conv1
-Test3 ref3              2 s CORRECT   1.7e+09 ops 701.458 MFlops BWD_D --dir=BWD_D mb8ic3ih227oc96oh55kh11sh4nmini:conv1
-Test4 ref4              6 s CORRECT   1.7e+09 ops 284.524 MFlops BWD_D --dir=BWD_D mb8ic3ih227oc96oh55kh11sh4nmini:conv1
- TEST all_passed=1 0:PASSED __REPRO: --dir=BWD_D mb8ic3ih227oc96oh55kh11sh4nmini:conv1
-T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 25927.541  avg_ms: 25927.541  avg speedup: 1.000 x 65.1 Mflops
-T:1  sx3    loops: 1   speedup: 22.855x  wins: 1     tot_ms: 1134.453  avg_ms: 1134.453  avg speedup: 22.855 x 1486.7 Mflops
-T:2  sx4    loops: 1   speedup: 21.407x  wins: 0     tot_ms: 1211.199  avg_ms: 1211.199  avg speedup: 21.407 x 1392.5 Mflops
-T:3  ref3   loops: 1   speedup: 10.783x  wins: -1    tot_ms: 2404.482  avg_ms: 2404.482  avg speedup: 10.783 x 701.5 Mflops
-T:4  ref4   loops: 1   speedup: 4.374 x  wins: -2    tot_ms: 5927.944  avg_ms: 5927.944  avg speedup: 4.374 x 284.5 Mflops
+t:0 orig            26 s ok  64.555 MFlops   1.00 x BWD_D --dir=BWD_D mb8ic3ih227oc96oh55kh11sh4nmini:conv1
+t:1 sx3              1 s ok   1.469 GFlops  22.75 x BWD_D --dir=BWD_D mb8ic3ih227oc96oh55kh11sh4nmini:conv1
+t:2 sx4              1 s ok   1.378 GFlops  21.35 x BWD_D --dir=BWD_D mb8ic3ih227oc96oh55kh11sh4nmini:conv1
+t:3 ref3             2 s ok 697.278 MFlops  10.80 x BWD_D --dir=BWD_D mb8ic3ih227oc96oh55kh11sh4nmini:conv1
+t:4 ref4             6 s ok 284.687 MFlops   4.41 x BWD_D --dir=BWD_D mb8ic3ih227oc96oh55kh11sh4nmini:conv1
+ TEST all_passed=1 0:PASSED __REPRO:     1.7e+09 ops BWD_D --dir=BWD_D mb8ic3ih227oc96oh55kh11sh4nmini:conv1
+T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 26127.053  avg_ms: 26127.053  avg speedup: 1.000 x 64.6 Mflops
+T:1  sx3    loops: 1   speedup: 22.753x  wins: 1     tot_ms: 1148.274  avg_ms: 1148.274  avg speedup: 22.753 x 1468.9 Mflops
+T:2  sx4    loops: 1   speedup: 21.350x  wins: 0     tot_ms: 1223.728  avg_ms: 1223.728  avg speedup: 21.350 x 1378.3 Mflops
+T:3  ref3   loops: 1   speedup: 10.801x  wins: -1    tot_ms: 2418.897  avg_ms: 2418.897  avg speedup: 10.801 x 697.3 Mflops
+T:4  ref4   loops: 1   speedup: 4.410 x  wins: -2    tot_ms: 5924.553  avg_ms: 5924.553  avg speedup: 4.410 x 284.7 Mflops
 TEST final stats:
-T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 25927.541  avg_ms: 25927.541  avg speedup: 1.000 x 65.1 Mflops
-T:1  sx3    loops: 1   speedup: 22.855x  wins: 1     tot_ms: 1134.453  avg_ms: 1134.453  avg speedup: 22.855 x 1486.7 Mflops
-T:2  sx4    loops: 1   speedup: 21.407x  wins: 0     tot_ms: 1211.199  avg_ms: 1211.199  avg speedup: 21.407 x 1392.5 Mflops
-T:3  ref3   loops: 1   speedup: 10.783x  wins: -1    tot_ms: 2404.482  avg_ms: 2404.482  avg speedup: 10.783 x 701.5 Mflops
-T:4  ref4   loops: 1   speedup: 4.374 x  wins: -2    tot_ms: 5927.944  avg_ms: 5927.944  avg speedup: 4.374 x 284.5 Mflops
+T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 26127.053  avg_ms: 26127.053  avg speedup: 1.000 x 64.6 Mflops
+T:1  sx3    loops: 1   speedup: 22.753x  wins: 1     tot_ms: 1148.274  avg_ms: 1148.274  avg speedup: 22.753 x 1468.9 Mflops
+T:2  sx4    loops: 1   speedup: 21.350x  wins: 0     tot_ms: 1223.728  avg_ms: 1223.728  avg speedup: 21.350 x 1378.3 Mflops
+T:3  ref3   loops: 1   speedup: 10.801x  wins: -1    tot_ms: 2418.897  avg_ms: 2418.897  avg speedup: 10.801 x 697.3 Mflops
+T:4  ref4   loops: 1   speedup: 4.410 x  wins: -2    tot_ms: 5924.553  avg_ms: 5924.553  avg speedup: 4.410 x 284.7 Mflops
 tests:1 impls:1 passed:0 skipped:0 mistrusted:1 unimplemented:0 failed:0 test_fail: 0
 	Command being timed: "./benchdnn --mode=PT --dir=BWD_D g1mb8ic3ih227oc96oh55kh11sh4ph0nmini:conv1"
-	User time (seconds): 198.18
-	System time (seconds): 0.14
-	Percent of CPU this job got: 199%
-	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:39.31
+	User time (seconds): 198.48
+	System time (seconds): 0.20
+	Percent of CPU this job got: 198%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:39.86
 	Average shared text size (kbytes): 0
 	Average unshared data size (kbytes): 0
 	Average stack size (kbytes): 0
 	Average total size (kbytes): 0
-	Maximum resident set size (kbytes): 59936
+	Maximum resident set size (kbytes): 75528
 	Average resident set size (kbytes): 0
 	Major (requiring I/O) page faults: 0
-	Minor (reclaiming a frame) page faults: 2516
-	Voluntary context switches: 3
-	Involuntary context switches: 19473
+	Minor (reclaiming a frame) page faults: 2219
+	Voluntary context switches: 5
+	Involuntary context switches: 20015
 	Swaps: 0
-	File system inputs: 0
+	File system inputs: 256
 	File system outputs: 16
 	Socket messages sent: 0
 	Socket messages received: 0
