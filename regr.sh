@@ -2,6 +2,9 @@
 # Usage:
 #  regr.sh {FWD*|BWD_D|BWD_W*} ...other bench.sh args
 #
+if [ $NLC_BASE ]; then    # NEC SX Aurora VE
+    VEEXEC=ve_exec
+fi
 ORIGINAL_CMD="$0 $*"
 usage() {
     echo " command: $ORIGINAL_CMD"
@@ -169,7 +172,7 @@ set +x
             if [ "$THREADS" = "" ]; then unset OMP_NUM_THREADS;
             else THREADS="OMP_NUM_THREADS=$THREADS"; fi
             echo "THREADS  : $THREADS"
-            echo "cmd      : $THREADS /usr/bin/time -v ./benchdnn --mode=PT ${ARGS[@]}"
+            echo "cmd      : $THREADS C_PROGINF=DETAIL ${TIME} $VEEXEC ./benchdnn --mode=PT ${ARGS[@]}"
             cd tests/benchdnn;
 pwd
 ls -l .
@@ -178,7 +181,8 @@ ls -l .
 set +x
 echo "COLUMN ... $COLUMN"
             (cd inputs && ls -1) | awk '//{p=p " " $0;++n} n>=4{print p; p=""; n=0} END{print p}' | ${COLUMN}
-            eval $THREADS C_PROGINF=DETAIL ${TIME} ./benchdnn --mode=PT ${ARGS[@]}
+            echo "eval $THREADS C_PROGINF=DETAIL ${TIME} $VEEXEC ./benchdnn --mode=PT ${ARGS[@]}"
+            eval $THREADS C_PROGINF=DETAIL ${TIME} $VEEXEC ./benchdnn --mode=PT ${ARGS[@]}
         }
     } || { echo "Problems?"; false; }
     ) >& "$LOGFILE" \
