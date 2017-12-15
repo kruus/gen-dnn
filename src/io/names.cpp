@@ -342,7 +342,7 @@ NAMEENUM_T(stream_kind){
 
 #define NAMEFUNC_TPTR( TYPENAME, VAR ) int mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const VAR, char * const buf, int len )
 
-// volatile l_nz introduced to avoid a g++-7 optimization bug.
+// volatile l_nz introduced to avoid a g++-7.2.0 optimization bug.
 #define SCAN_LASTNZ( ARR, SZ ) do{volatile int l_nz= -1; for(int i=0; i<(SZ); ++i){ if( ARR[i] > 0 ){ l_nz=i; }} lastnz=l_nz;}while(0)
 
 /** debug flag for SX compiler bug with -Cdebug or -Cnoopt */
