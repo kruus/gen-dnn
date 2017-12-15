@@ -17,18 +17,9 @@ The ```-proginf``` build option links with libveperf, which must be added to the
 
 ```
 export LDFLAGS="-L/usr/uhome/aurora/mpc/pub/veperf/latest/lib"
+or
+export LDFLAGS="-L/opt/nec/ve/veperf/latest/lib"
 ```
-
-Install the coreutils-arch-ve RPM.
-
-Set the environment variable
-```
-export VE_NODE_NUMBER=0
-```
-such that the Aurora specific *arch* and *uname -p* located in /opt/nec/ve/bin return only the architecture string.
-
-The NLC NEC Library Collection is expected to be in /opt/nec/ve/nlc/0.9.0. Currently this path is hardcoded in cmake/NLC.cmake.
-
 
 ## Building
 
