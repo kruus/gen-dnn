@@ -393,21 +393,41 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
     ssize_t alignas(4*sizeof(ssize_t)) khkw_begend[4];
     ssize_t kh_beg=0, kh_end=0;
     ssize_t kw_beg=0, kw_end=0;
+#ifdef __ve
+#pragma _NEC vreg(khkw_begend)
+#else
 #pragma vreg(khkw_begend)
+#endif
     ssize_t alignas(4*sizeof(ssize_t)) khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW};
-#pragma vreg(khkw_begend)
+#ifdef __ve
+#pragma _NEC vreg(khkw_muls)
+#else
+#pragma vreg(khkw_muls)
+#endif
     //ssize_t kh_beg_prv=0, kh_end_prv=0, kw_beg_prv=0, kw_end_prv=0, w0_prv=0;
     ssize_t khash, w0, s0, s00;
     ssize_t khash_prv = ~0;
     //ssize_t khash_prv2 = (KH+KW)*4; // impossibly high hash
     bool kok[KH][KW] alignas(128);
+#ifdef __ve
+#pragma _NEC vreg(kok)
+#else
 #pragma vreg(kok)
+#endif
     float src[ICOG*KH*KW] alignas(128);
+#ifdef __ve
+#pragma _NEC vreg(src)
+#else
 #pragma cdir alloc_on_vreg(src)
+#endif
     float tmp[OCOG] alignas(128);
 //#pragma cdir on_adb(tmp)
+#ifdef __ve
+#pragma _NEC vreg(tmp)
+#pragma _NEC vreg(OCOG)
+#else
 #pragma cdir alloc_on_vreg(tmp,OCOG) // roughly double the speed
-
+#endif
 # pragma omp for collapse(4)
   for (ssize_t g = 0; g < G; ++g) {
     for (ssize_t mb = 0; mb < MB; ++mb) {
@@ -449,9 +469,17 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
               khash += khkw_begend[i] * khkw_muls[i];
             if (khash != khash_prv){
               khash_prv = khash;
+#ifdef __ve
+#pragma _NEC shortloop
+#else
 #pragma cdir shortloop
+#endif
               for (ssize_t kh = 0; kh < KH; ++kh) {
+#ifdef __ve
+#pragma _NEC shortloop
+#else
 #pragma cdir shortloop
+#endif
                 for (ssize_t kw = 0; kw < KH; ++kw) {
                   kok[kh][kw] = (kh>=kh_beg && kw>=kw_beg) && (kh<kh_end && kw<kw_end);
                 }
@@ -462,9 +490,17 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
             // slower for (ssize_t ic = 0, ickhkw=0; ic < ICOG; ++ickhkw, ++ic)
             for (ssize_t ic = 0; ic < ICOG; ++ic)
             {
+#ifdef __ve
+#pragma _NEC shortloop
+#else
 #pragma cdir shortloop
+#endif
               for (ssize_t kh = 0; kh < KH; ++kh) {
+#ifdef __ve
+#pragma _NEC shortloop
+#else
 #pragma cdir shortloop
+#endif
                 for (ssize_t kw = 0; kw < KW; ++kw) {
                   src[ic*KH*KW + kh*KW + kw] = (kok[kh][kw]? psrc[s0 + ic*IH*IW + kh*DH*IW + kw*DW]: 0.f);
                 }
@@ -537,23 +573,44 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
     ssize_t khkw_begend[4];
     ssize_t kh_beg=0, kh_end=0;
     ssize_t kw_beg=0, kw_end=0;
+#ifdef __ve
+#pragma _NEC vreg(khkw_begend)
+#else
 #pragma vreg(khkw_begend)
+#endif
     ssize_t khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW};
-#pragma vreg(khkw_begend)
+#ifdef __ve
+#pragma _NEC vreg(khkw_muls)
+#else
+#pragma vreg(khkw_muls)
+#endif
     //ssize_t kh_beg_prv=0, kh_end_prv=0, kw_beg_prv=0, kw_end_prv=0, w0_prv=0;
     ssize_t khash, w0, s0, s00;
     ssize_t khash_prv = ~0;
     //ssize_t khash_prv2 = (KH+KW)*4; // impossibly high hash
     //bool kok[KH][KW];
     int kok[KH_KW] alignas(128);
+#ifdef __ve
+#pragma _NEC vreg(kok)
+#else
 #pragma vreg(kok)
+#endif
     float src[ICOG*KH*KW] alignas(128);
+#ifdef __ve
+#pragma _NEC vreg(src)
+#else
 #pragma cdir alloc_on_vreg(src)
+#endif
     float tmp[OCOG] alignas(128);
     float seq[KH_KW] alignas(128);
     for(int i=0; i<KH_KW; ++i) seq[KH_KW] = (float)i;
 //#pragma cdir on_adb(tmp)
+#ifdef __ve
+#pragma _NEC vreg(tmp)
+#pragma _NEC vreg(OCOG)
+#else
 #pragma cdir alloc_on_vreg(tmp,OCOG) // roughly double the speed
+#endif
 
 # pragma omp for collapse(4)
   for (ssize_t g = 0; g < G; ++g) {
@@ -599,6 +656,9 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
 #if 1
               int khkw_end = (int)KH_KW;
 #pragma omp simd
+#ifdef __ve
+#pragma _NEC ivdep
+#endif
               for (int khkw = 0; khkw < khkw_end; ++khkw) { // this does not simd-ize very well.
                 const int kh = khkw / p->kw;
                 const int kw = khkw % p->kw;
@@ -2283,26 +2343,50 @@ void sxconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 # pragma omp parallel
   {
     int ohw_off[OH*OW];
+#ifdef __ve
+#pragma _NEC retain(ohw_off)
+#else
 #pragma cdir on_adb(ohw_off)
 //#pragma alloc_on_vreg(ohw_off)
+#endif
     //int icohw_off[ICOG*OH*OW]
     float tmpsrc[OH*OW];
 //#pragma cdir alloc_on_vreg(tmpsrc)
     float dw_ic[ICOG];
+#ifdef __ve
+#pragma _NEC vreg(dw_ic)
+#else
 #pragma cdir alloc_on_vreg(dw_ic)
+#endif
     ssize_t ohash;
     ssize_t ohash_prv = -1;
     float ohw_begend[4];
+#ifdef __ve
+#pragma _NEC vreg(ohw_begend)
+#else
 #pragma vreg(ohw_begend)
+#endif
     float ohw_muls[4] = {1, OH, (1<<16), (1<<16)*OW};
+#ifdef __ve
+#pragma _NEC vreg(ohw_muls)
+#else
 #pragma vreg(ohw_muls)
+#endif
 
 # pragma omp parallel for collapse(4)
     for (ssize_t g = 0; g < G; ++g) {
       for (ssize_t oc = 0; oc < OCOG; ++oc) {
+#ifdef __ve
+#pragma _NEC shortloop
+#else
 #pragma cdir shortloop
+#endif
         for (ssize_t kh = 0; kh < p->kh; ++kh) {
+#ifdef __ve
+#pragma _NEC shortloop
+#else
 #pragma cdir shortloop
+#endif
           for (ssize_t kw = 0; kw < KW; ++kw) {
             const ssize_t ih0 = /*0 * SH*/ - PH + kh * DH;
 
