@@ -417,7 +417,9 @@ void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
     owe[kw] = ow_end;
   }
   //print(10, "bwd_d oh/ow_lowest = %d,%d\n", oh_lowest, ow_lowest );
+#if !defined(SXAURORA)
 # pragma omp parallel for collapse(3)
+#endif
   for (int mb = 0; mb < MB; ++mb) {
     for (int g = 0; g < G; ++g) {
       for (int ic = 0; ic < IC/G; ++ic) {
