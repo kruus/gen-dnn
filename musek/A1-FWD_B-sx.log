@@ -1,0 +1,84 @@
+THREADS  : 
+cmd      :  /usr/bin/time -v ./benchdnn --mode=PT --dir=FWD_B g1mb8ic3ih60oc32oh25kh11sh4ph0n"minisx:conv1" 
+/usr/uhome/aurora/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/benchdnn
+total 34260
+drwxr-srwx    6 nlabhpg  4gi           36864 Dec 15 13:16 CMakeFiles
+-rw-r--r--    1 nlabhpg  4gi             344 Dec 15 13:16 CTestTestfile.cmake
+-rw-r--r--    1 nlabhpg  4gi           38447 Dec 15 13:16 Makefile
+-rwxr-xr-x    1 nlabhpg  4gi        17184845 Dec 15 13:53 benchdnn
+-rw-r--r--    1 nlabhpg  4gi             887 Dec 15 13:16 cmake_install.cmake
+-rw-r--r--    1 nlabhpg  4gi          167672 Dec 15 13:51 ftrace.out
+drwxrwsrwx    2 nlabhpg  4gi          110592 Dec 15 13:54 inputs
+ /usr/uhome/aurora/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/benchdnn inputs:
+COLUMN ... cat
+ conv_alexnet conv_all conv_dilated conv_googlenet_v1
+ conv_googlenet_v2 conv_googlenet_v3 conv_regression_dilate conv_regression_group
+ conv_regression_padding conv_regression_small_spatial conv_regression_stride conv_resnet_50
+ conv_resnet_50_sparse conv_segnet conv_ssd_300_voc0712 conv_vgg_11
+ conv_vgg_19 deepbench deepbench_inference_device deepbench_inference_server
+ deepbench_training minialex test_bwd_d_regression test_bwd_w_regression
+ test_conv_all test_conv_regression test_fwd_regression
+benchdnn --conv --mode=PERF+TEST -v0 ... init omp_max_thr=1  OK
+
+t:0 orig 3 s ok  13.012 MFlops   1.00 x FWD_B mb8ic3ih60oc32oh25kh11sh4nminisx:conv1
+t:1 sx3 40.532 ms ok 910.451 MFlops  69.97 x FWD_B mb8ic3ih60oc32oh25kh11sh4nminisx:conv1
+t:2 sx4 144.111 ms ok 256.069 MFlops  19.68 x FWD_B mb8ic3ih60oc32oh25kh11sh4nminisx:conv1
+t:3 ref3 913.999 ms ok  40.375 MFlops   3.10 x FWD_B mb8ic3ih60oc32oh25kh11sh4nminisx:conv1
+t:4 ref4 953.790 ms ok  38.690 MFlops   2.97 x FWD_B mb8ic3ih60oc32oh25kh11sh4nminisx:conv1
+ TEST all_passed=1 0:PASSED __REPRO:     3.7e+07 ops FWD_B mb8ic3ih60oc32oh25kh11sh4nminisx:conv1
+T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 2836.133  avg_ms: 2836.133  avg speedup: 1.000 x 13.0 Mflops
+T:1  sx3    loops: 1   speedup: 69.973x  wins: 1     tot_ms: 40.532    avg_ms: 40.532  avg speedup: 69.973 x 910.5 Mflops
+T:2  sx4    loops: 1   speedup: 19.680x  wins: 0     tot_ms: 144.111   avg_ms: 144.111  avg speedup: 19.680 x 256.1 Mflops
+T:3  ref3   loops: 1   speedup: 3.103 x  wins: -1    tot_ms: 913.999   avg_ms: 913.999  avg speedup: 3.103 x 40.4 Mflops
+T:4  ref4   loops: 1   speedup: 2.974 x  wins: -2    tot_ms: 953.790   avg_ms: 953.790  avg speedup: 2.974 x 38.7 Mflops
+TEST final stats:
+T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 2836.133  avg_ms: 2836.133  avg speedup: 1.000 x 13.0 Mflops
+T:1  sx3    loops: 1   speedup: 69.973x  wins: 1     tot_ms: 40.532    avg_ms: 40.532  avg speedup: 69.973 x 910.5 Mflops
+T:2  sx4    loops: 1   speedup: 19.680x  wins: 0     tot_ms: 144.111   avg_ms: 144.111  avg speedup: 19.680 x 256.1 Mflops
+T:3  ref3   loops: 1   speedup: 3.103 x  wins: -1    tot_ms: 913.999   avg_ms: 913.999  avg speedup: 3.103 x 40.4 Mflops
+T:4  ref4   loops: 1   speedup: 2.974 x  wins: -2    tot_ms: 953.790   avg_ms: 953.790  avg speedup: 2.974 x 38.7 Mflops
+tests:1 impls:1 passed:0 skipped:0 mistrusted:1 unimplemented:0 failed:0 test_fail: 0
+
+     ******  Program Information  ******
+  Real Time (sec)               :            13.080956
+  User Time (sec)               :            15.470809
+  Sys  Time (sec)               :             0.016567
+  Vector Time (sec)             :             8.033595
+  Inst. Count                   :           4001523944.
+  V. Inst. Count                :            431906052.
+  V. Element Count              :          48466537485.
+  V. Load Element Count         :           5201789785.
+  FLOP Count                    :           3874303908.
+  MOPS                          :          3363.505773
+  MFLOPS                        :           250.426717
+  MOPS   (concurrent)           :          3982.975073
+  MFLOPS (concurrent)           :           296.548732
+  A. V. Length                  :           112.215463
+  V. Op. Ratio (%)              :            93.140120
+  Memory Size (MB)              :           448.000000
+  Max Concurrent Proc.          :                    4.
+    Conc. Time(>= 1) (sec)      :            13.064645
+    Conc. Time(>= 2) (sec)      :             0.805965
+    Conc. Time(>= 3) (sec)      :             0.803507
+    Conc. Time(>= 4) (sec)      :             0.796691
+  Event Busy Count              :                    0.
+  Event Wait (sec)              :             0.000000
+  Lock Busy Count               :                    5.
+  Lock Wait (sec)               :             0.003006
+  Barrier Busy Count            :                    0.
+  Barrier Wait (sec)            :             0.000000
+  MIPS                          :           258.649948
+  MIPS (concurrent)             :           306.286466
+  I-Cache (sec)                 :             0.019430
+  O-Cache (sec)                 :             1.009594
+  Bank Conflict Time
+    CPU Port Conf. (sec)        :             0.006850
+    Memory Network Conf. (sec)  :             0.491062
+  ADB Hit Element Ratio (%)     :             0.000000
+
+  Start Time (date)    :  Fri Dec 15 13:53:57 GMT 2017
+  End   Time (date)    :  Fri Dec 15 13:54:10 GMT 2017
+
+real       13.1
+user       15.4
+sys         0.0
