@@ -23,6 +23,10 @@
 #include "conv/conv.hpp"
 #include "idiv.hpp"
 
+#ifdef __ve
+#define alignas(x) alignas((x) > 16 ? 16 : (x))
+#endif
+
 namespace conv {
 
 // BWD + dilate is not fast for these loops (and mkl-dnn doesn't allow it yet)
