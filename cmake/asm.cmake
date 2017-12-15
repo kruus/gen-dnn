@@ -76,7 +76,7 @@ if(CMAKE_C_COMPILER_LOADED)
             )
     endif()
 endif()
-if(CMAKE_C_COMPILER_LOADED)
+if(CMAKE_CXX_COMPILER_LOADED)
     if(UNIX AND NOT APPLE)
         # cmake docs do not really recommend overriding the cmake macros, but
         # it seemed an easy way to nicer asm outputs for gcc
@@ -103,8 +103,8 @@ if(CMAKE_C_COMPILER_LOADED)
         endif()
     else()
         # use default assembler sequence -- just copy the buried output to build/asm
-        set(CMAKE_C_CREATE_ASSEMBLY_SOURCE
-            "${CMAKE_C_CREATE_ASSEMBLY_SOURCE}"
+        set(CMAKE_CXX_CREATE_ASSEMBLY_SOURCE
+            "${CMAKE_CXX_CREATE_ASSEMBLY_SOURCE}"
             "${CMAKE_COMMAND} -E copy \"<ASSEMBLY_SOURCE>\" \"${asm_OUTPUT_DIR}/\"" 
             )
     endif()
