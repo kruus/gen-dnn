@@ -263,7 +263,9 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
   };
 
   // writes go to  dst_off_f(p, mb, g, oc, oh, ow);
+#ifndef __ve
 #   pragma omp parallel for collapse(5)
+#endif
   for (int g = 0; g < G; ++g) {
     for (int mb = 0; mb < MB; ++mb) {
       for (int oc = 0; oc < OC/G; ++oc) {
@@ -315,7 +317,9 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
     if( kwb[ow] < 0  ) kwb[ow] = 0;
     if( kwe[ow] > KW ) kwe[ow] = KW;
   }
+#ifndef __ve
 # pragma omp parallel for collapse(5)
+#endif
   for (int g = 0; g < G; ++g) {
     for (int mb = 0; mb < MB; ++mb) {
       for (int oc = 0; oc < OC/G; ++oc) {
@@ -443,7 +447,9 @@ static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
   int wa, wb, wg;
   extendedEuclid( wa, DW, wb, SW, wg);
   DMUST( wg == gcd_w );
+#ifndef __ve
   # pragma omp parallel for collapse(5)
+#endif
   for (int g = 0; g < G; ++g) {
     for (int mb = 0; mb < MB; ++mb) {
       for (int ic = 0; ic < IC/G; ++ic) {
@@ -581,7 +587,9 @@ static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
   int wa, wb, wg;
   extendedEuclid( wa, DW, wb, SW, wg);
   DMUST( wg == gcd_w );
+#ifndef __ve
   # pragma omp parallel for collapse(5)
+#endif
   for (int g = 0; g < G; ++g) {
     for (int mb = 0; mb < MB; ++mb) {
       for (int ic = 0; ic < IC/G; ++ic) {
@@ -733,7 +741,9 @@ void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
     if (++kwe[iw] > KW) kwe[iw] = KW;
   }
 
+#ifndef __ve
 # pragma omp parallel for collapse(5)
+#endif
   for (int g = 0; g < G; ++g) {
     for (int mb = 0; mb < MB; ++mb) {
       for (int ic = 0; ic < IC/G; ++ic) {
@@ -779,9 +789,13 @@ void refconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   const int DH = p->dh + 1;
   const int DW = p->dw + 1;
 
+#ifndef __ve
 # pragma omp parallel
+#endif
   {
+#ifndef __ve
 #   pragma omp for collapse(5)
+#endif
     for (int g = 0; g < G; ++g) {
       for (int oc = 0; oc < OC/G; ++oc) {
         for (int ic = 0; ic < IC/G; ++ic) {
@@ -796,7 +810,9 @@ void refconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
     // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
+#ifndef __ve
 #   pragma omp for collapse(4)
+#endif
     for (int g = 0; g < G; ++g) {
       for (int oc = 0; oc < OC/G; ++oc) {
         //for (int ic = 0; ic < IC/G; ++ic)
@@ -837,7 +853,9 @@ void refconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     }
 
     if ((p->dir & FLAG_BIA)) {
+#ifndef __ve
 #   pragma omp for collapse(2) nowait
+#endif
       for (int g = 0; g < G; ++g) {
         for (int oc = 0; oc < OC/G; ++oc) {
           size_t bia_off = bia_off_f(p, g, oc);
@@ -885,9 +903,13 @@ void refconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     }
   }
 
+#ifndef __ve
 # pragma omp parallel
+#endif
   {
+#ifndef __ve
 #   pragma omp for collapse(5)
+#endif
     for (int g = 0; g < G; ++g) {
       for (int oc = 0; oc < OC/G; ++oc) {
         for (int ic = 0; ic < IC/G; ++ic) {
@@ -902,7 +924,9 @@ void refconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
     // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
+#ifndef __ve
 #   pragma omp for collapse(4)
+#endif
     for (int g = 0; g < G; ++g) {
       for (int oc = 0; oc < OC/G; ++oc) {
         //for (int ic = 0; ic < IC/G; ++ic)
@@ -952,7 +976,9 @@ void refconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     }
 
     if ((p->dir & FLAG_BIA)) {
+#ifndef __ve
 #   pragma omp for collapse(2) nowait
+#endif
       for (int g = 0; g < G; ++g) {
         for (int oc = 0; oc < OC/G; ++oc) {
           size_t bia_off = bia_off_f(p, g, oc);

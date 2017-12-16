@@ -284,7 +284,9 @@ static int fill_src_f32(const prb_t *p, dnn_mem_t &mem_fp)
 
     const auto &c = p->cfg[SRC];
     const int range = c.f_max - c.f_min + 1;
+#ifndef __ve
 #   pragma omp parallel for collapse(4)
+#endif
     for (int mb = 0; mb < p->mb; ++mb)
     for (int ic = 0; ic < p->ic; ++ic)
     for (int ih = 0; ih < p->ih; ++ih)
@@ -344,7 +346,9 @@ inline int fill_src_ouch(const prb_t *p, dnn_mem_t *mem_dt, dnn_mem_t *mem_fp,
     const auto &c = p->cfg[SRC];
     const int range = c.f_max - c.f_min + 1;
 
+#ifndef __ve
 #   pragma omp parallel for collapse(4)
+#endif
     for (int mb = 0; mb < p->mb; ++mb)
     for (int ic = 0; ic < p->ic; ++ic)
     for (int ih = 0; ih < p->ih; ++ih)
@@ -386,7 +390,9 @@ inline int fill_wei(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
     const auto &c = p->cfg[WEI];
     const int range = c.f_max - c.f_min + 1;
 
+#ifndef __ve
 #   pragma omp parallel for collapse(5)
+#endif
     for (int g = 0; g < p->g; ++g)
     for (int oc = 0; oc < p->oc / p->g; ++oc)
     for (int ic = 0; ic < p->ic / p->g; ++ic)
@@ -457,7 +463,9 @@ inline int fill_dst(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
     const auto &c = p->cfg[DST];
     const int range = c.f_max - c.f_min + 1;
 
+#ifndef __ve
 #   pragma omp parallel for collapse(4)
+#endif
     for (int mb = 0; mb < p->mb; ++mb)
     for (int oc = 0; oc < p->oc; ++oc)
     for (int oh = 0; oh < p->oh; ++oh)
