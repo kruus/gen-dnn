@@ -40,6 +40,9 @@ void test_stats::reset_all(){
         td = new test_data_t;
     }
     td->loops = 0U;
+    td->impls_ok = true;
+    td->ops = 0.0;
+    td->ops_tot = 0.0;
     for(unsigned i=imp0; i<TESTN; ++i){
         td->ms[i] = 0.0;
         td->ms_tot[i] = 0.0;
@@ -47,7 +50,6 @@ void test_stats::reset_all(){
             td->wins[i*TESTN+j] = 0U;
         }
     }
-    td->impls_ok = true;
     // check... this->prt();
 }
 void test_stats::begin_impls(){
@@ -125,6 +127,7 @@ void test_stats::prt(){
             wins += td->wins[i*TESTN+j];
         }
         char const* impname = get_ref_impls()[i].name;
+        if( impname == NULL ) impname="Huh";
         printf("T:%-2u %-6s loops: %-3u speedup: %-6.3fx  wins: %-4d"
                "  tot_ms: %-8.3f  avg_ms: %.3f  avg speedup: %.3f x %.1f Mflops\n",
                 i, impname, (unsigned)td->loops, td->ms[imp0] / td->ms[i],
@@ -133,5 +136,4 @@ void test_stats::prt(){
                 td->ops_tot *1.e-3 / td->ms_tot[i]);
     }
 }
-
 // vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s

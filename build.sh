@@ -132,8 +132,9 @@ fi
 if [ "$DOTARGET" == "j" ]; then DOJIT=100; INSTALLDIR='install-jit'; BUILDDIR='build-jit'; fi
 if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx';
 # Hack -- I was toying with g++-7 today ...
-elif $(gcc-7 -v); then export CXX=g++-7; export CC=gcc-7;
+#elif $(gcc-7 -v); then export CXX=g++-7; export CC=gcc-7;
 fi
+
 #if [ "$DOTARGET" == "v" ]; then ; fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; BUILDDIR="${BUILDDIR}d"; fi
 if [ "$DOJUSTDOC" == "y" ]; then
