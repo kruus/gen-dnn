@@ -51,24 +51,12 @@ static conv_impls_t conv_impls_[] = {
     {"orig", compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
 
 #if defined(_SX)
-    //{"sx2", sxconv_2_fwd, sxconv_2_bwd_d, sxconv_2_bwd_w},
-    //{"NULL", nullptr, nullptr, nullptr},
     {"sx3",  sxconv_3_fwd,  sxconv_3_bwd_d,  sxconv_3_bwd_w},
     {"sx4",  sxconv_4_fwd,  sxconv_4_bwd_d,  sxconv_4_bwd_w},
-    //{"NULL", nullptr, nullptr, nullptr}
-    //{"ref3", refconv_3_fwd, refconv_3_bwd_d, refconv_3_bwd_w},
-    //{"ref4", refconv_4_fwd, refconv_4_bwd_d, refconv_4_bwd_w}
+    //{"NULL", nullptr, nullptr, nullptr},
     {"ref3", refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
-    //{"NULL", nullptr, nullptr, nullptr},
-
     {"ref4", refconv_4_fwd,         refconv_4_bwd_d,            refconv_4_bwd_w},
-    //{"NULL", nullptr, nullptr, nullptr},
-
-#else
-    //{"ref2", refconv_2_fwd,         refconv_2_bwd_d,            refconv_2_bwd_w},
-    //{"ref5", refconv_5_fwd,         refconv_5_bwd_d,            refconv_5_bwd_w},
-    //{"ref5", refconv_5_fwd,         refconv_5_bwd_d,            refconv_5_bwd_w},
-    //{"sx2", sxconv_2_fwd, sxconv_2_bwd_d, sxconv_2_bwd_w},
+#elif defined(SXAURORA)
     {"sx3", sxconv_3_fwd, sxconv_3_bwd_d, sxconv_3_bwd_w},
     //{"NULL", nullptr, nullptr, nullptr},      // save time?
 
@@ -79,6 +67,19 @@ static conv_impls_t conv_impls_[] = {
     {"ref3", refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
     //{"NULL", nullptr, nullptr, nullptr},
 
+    {"NULL", nullptr, nullptr, nullptr},
+#else
+    {"sx3", sxconv_3_fwd, sxconv_3_bwd_d, sxconv_3_bwd_w},
+    //{"NULL", nullptr, nullptr, nullptr},      // save time?
+
+    //{"ref3", refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
+    {"sx4",  sxconv_4_fwd,  sxconv_4_bwd_d,  sxconv_4_bwd_w},
+    //{"NULL", nullptr, nullptr, nullptr},
+
+    {"ref3", refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
+    //{"NULL", nullptr, nullptr, nullptr},
+
+    // {"ref4", refconv_4_fwd,         refconv_4_bwd_d,            refconv_4_bwd_w},
     {"ref4", refconv_4_fwd,         refconv_4_bwd_d,            refconv_4_bwd_w},
     //{"NULL", nullptr, nullptr, nullptr},
 
