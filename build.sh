@@ -20,7 +20,7 @@ JOBS="-j8"
 CMAKETRACE=""
 USE_CBLAS=1
 QUICK=0
-COMPILE_AURORA=0
+NEC_FTRACE=0
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -38,18 +38,13 @@ while getopts ":hatvjdDqQpsSTbF" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
-            COMPILER_AURORA=1
-            DOTARGET="v"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
-            export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
-            export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
+            #COMPILER_AURORA=1
+            DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
             #export LDFLAGS="${LDFLAGS} -L/opt/nec/ve/musl/lib"
             JOBS="-j1"
             ;;
-        F) # NEC Aurora VE ftrace
-            if [ "$COMPILER_AURORA" -eq 1 ]; then
-              export CFLAGS="${CFLAGS} -ftrace"
-              export CXXFLAGS="${CXXFLAGS} -ftrace"
-	        fi
+        F) # NEC Aurora VE or SX : add ftrace support (generate ftrace.out)
+            NEC_FTRACE=1
             ;;
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
             # Apr-14-2017 build timings:
@@ -135,7 +130,6 @@ if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='
 # Hack -- I was toying with g++-7 today ...
 #elif $(gcc-7 -v); then export CXX=g++-7; export CC=gcc-7;
 fi
-
 #if [ "$DOTARGET" == "v" ]; then ; fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; BUILDDIR="${BUILDDIR}d"; fi
 if [ "$DOJUSTDOC" == "y" ]; then
@@ -213,13 +207,20 @@ fi
         export CFLAGS="${CFLAGS} -DUSE_CBLAS"
         export CXXFLAGS="${CXXFLAGS} -DUSE_CBLAS"
     fi
-    if [ $COMPILER_AURORA ]; then
-        CMAKEOPT="${CMAKEOPT} -DCMAKE_C_COMPILER=ncc -DCMAKE_CXX_COMPILER=nc++ -DCMAKE_AR=nar -DCMAKE_C_COMPILER_ID=Aurora -DCMAKE_CXX_COMPILER_ID=Aurora"
-    fi
     if [ ! "$DOTARGET" == "j" ]; then
         CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
         export CFLAGS="${CFLAGS} -DTARGET_VANILLA"
         export CXXFLAGS="${CXXFLAGS} -DTARGET_VANILLA"
+    fi
+    if [ "$DOTARGET" == "a" ]; then
+        CMAKEOPT="${CMAKEOPT} -DCMAKE_C_COMPILER=ncc -DCMAKE_CXX_COMPILER=nc++ -DCMAKE_AR=nar -DCMAKE_C_COMPILER_ID=Aurora -DCMAKE_CXX_COMPILER_ID=Aurora"
+        # -proginf  : Run with 'export VE_PROGINF=YES' to get some stats output
+        export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
+        export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
+        if [ "$NEC_FTRACE" -eq 1 ]; then
+            export CFLAGS="${CFLAGS} -ftrace"
+            export CXXFLAGS="${CXXFLAGS} -ftrace"
+        fi
     fi
     if [ ${DOWARN} == 'y' ]; then
         DOWARNFLAGS=""
@@ -227,8 +228,6 @@ fi
         else DOWARNFLAGS="-Wall"; fi
         export CFLAGS="${CFLAGS} ${DOWARNFLAGS}"
         export CXXFLAGS="${CXXFLAGS} ${DOWARNFLAGS}"
-        #echo "DOWARN --> CFLAGS   = ${CFLAGS}"
-        #echo "DOWARN --> CXXFLAGS = ${CXXFLAGS}"
     fi
     if [ "$DOTARGET" == "s" ]; then
         TOOLCHAIN=../cmake/sx.cmake
@@ -239,6 +238,8 @@ fi
         #      Solution: do these changes within CMakeLists.txt
         #CMAKEOPT="${CMAKEOPT} -DCMAKE_C_FLAGS=-g\ -ftrace\ -Cdebug" # override Cvopt
         SXOPT="-DTARGET_VANILLA -D__STDC_LIMIT_MACROS"
+        # __STDC_LIMIT_MACROS is a way to force definitions like INT8_MIN in stdint.h (cstdint)
+        #    (it **should** be autmatic in C++11, imho)
         SXOPT="${SXOPT} -woff=1097 -woff=4038" # turn off warnings about not using attributes
         SXOPT="${SXOPT} -woff=1901"  # turn off sxcc warning defining arr[len0] for constant len0
         SXOPT="${SXOPT} -wnolongjmp" # turn off warnings about setjmp/longjmp (and tracing)
@@ -248,8 +249,10 @@ fi
 
         # Generate 'ftrace.out' profiling that can be displayed with ftrace++
         #  BUT not compatible with POSIX threads
-        #SXOPT="${SXOPT} -Nftrace"
-        SXOPT="${SXOPT} -ftrace demangled"
+        if [ "$NEC_FTRACE" -eq 1 ]; then
+            export CFLAGS="${CFLAGS} -ftrace demangled"
+            export CXXFLAGS="${CXXFLAGS} -ftrace demangled"
+        fi
 
         # REMOVE WHEN FINISHED SX DEBUGGING
         SXOPT="${SXOPT} -g -traceback" # enable source code tracing ALWAYS
@@ -264,8 +267,6 @@ fi
         #export CXXFLAGS="${CXXFLAGS} -size_t${SIZE_T} -Kcpp11,gcc,rtti,exceptions ${SXOPT}"
         export CXXFLAGS="${CXXFLAGS} -size_t${SIZE_T} -Kcpp11,gcc,exceptions ${SXOPT}"
         #export CXXFLAGS="${CXXFLAGS} -size_t${SIZE_T} -Kcpp11,gcc,rtti"
-        # __STDC_LIMIT_MACROS is a way to force definitions like INT8_MIN in stdint.h (cstdint)
-        #    (it **should** be autmatic in C++11, imho)
     fi
     CMAKEOPT="${CMAKEOPT} -DCMAKE_INSTALL_PREFIX=../${INSTALLDIR}"
     if [ "$DODEBUG" == "y" ]; then
