@@ -198,7 +198,7 @@ if [ "$NEC_FTRACE" -gt 0 ]; then
     export C_PROGINF=YES;
 else
     unset VE_PROGINF
-    unset C_PROGINF=YES;
+    unset C_PROGINF
 fi
 VE_EXEC=''
 if [ "$DOTARGET" = "a" ]; then
