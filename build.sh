@@ -29,6 +29,8 @@ usage() {
     echo "         SX debug compile, quick (no doxygen)         --- time $0 -Sdq"
     echo "         *just* run cmake, for SX debug compile       ---      $0 -SdQ"
     echo "         *just* create doxygen docs                   ---      $0 -D"
+    echo "Aurora : quick Aurora Ftrace Trace-Cmake)  --- $0 -qaFT"
+    echo "         quick, quick: no cmake, just make --- $0 -qqa"
     echo "     see what cmake is doing, and create build.log"
     echo "         CMAKEOPT='--trace -LAH' ./build.sh -q >&/dev/null"
     echo "Debug: Individual tests can be run like build-sx/tests/gtests/test_relu"
@@ -38,10 +40,8 @@ while getopts ":hatvjdDqQpsSTbF" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
-            #COMPILER_AURORA=1
-            DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
+            DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"; JOBS="-j8"
             #export LDFLAGS="${LDFLAGS} -L/opt/nec/ve/musl/lib"
-            JOBS="-j1"
             ;;
         F) # NEC Aurora VE or SX : add ftrace support (generate ftrace.out)
             NEC_FTRACE=1
@@ -186,6 +186,19 @@ fi
 if [ -d "$INSTALLDIR}" -a $QUICK -lt 2 ]; then
     rm -rf "$INSTALLDIR}".bak && mv -v "$INSTALLDIR}" "$INSTALLDIR}".bak
 fi
+
+TESTRUNNER='time'
+if { /usr/bin/time -v echo Hello > /dev/null; } then TESTRUNNER='/usr/bin/time -v'; fi
+if [ "$DOTARGET" -gt 0 ]; then
+    if [ -x ve_exec ]; then
+        if [ "$NEC_FTRACE" -gt 0 ]; then TESTRUNNER="VE_PROGINF=YES ${TESTRUNNER}"; fi
+        TESTRUNNER="${TESTRUNNER} ve_exec";
+    else
+        TESTRUNNER='echo Not-Running ';
+        echo "Aurora: ve_exec not found";
+    fi
+fi
+
 (
     echo "# vim: set ro ft=log:"
     echo "DOTARGET   $DOTARGET"
@@ -196,6 +209,7 @@ fi
     echo "QUICK      $QUICK"
     echo "BUILDDIR   ${BUILDDIR}"
     echo "INSTALLDIR ${INSTALLDIR}"
+    echo "TESTRUNNER ${TESTRUNNER}"
     if [ $QUICK -lt 2 ]; then
         mkdir "${BUILDDIR}"
     fi
@@ -364,23 +378,19 @@ if [ "$BUILDOK" == "y" ]; then
     fi
     echo "Testing ?"
     if [ ! $DOTEST -eq 0 -a ! "$DOTARGET" == "s" ]; then # non-SX: -t might run some tests
-        TESTRUN='/usr/bin/time -v'
-        #if [ COMPILER_AURORA -gt 0 ]; then
-        #    TESTRUN='/usr/bin/time -v ve_exec'
-        #fi
         rm -f test1.log test2.log test3.log
         echo "Testing ... test1"
         if [ true ]; then
-            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' ${TESTRUN} make test) 2>&1 | tee "${BUILDDIR}/test1.log" || true
+            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' ${TESTRUNNER} make test) 2>&1 | tee "${BUILDDIR}/test1.log" || true
         fi
         if [ $DOTEST -ge 2 ]; then
             echo "Testing ... test2"
-            (cd "${BUILDDIR}" && ARGS='-VV -N' ${TESTRUN} make test \
-            && ARGS='-VV -R .*test_.*' ${TESTRUN}  make test) 2>&1 | tee "${BUILDDIR}/test2.log" || true
+            (cd "${BUILDDIR}" && ARGS='-VV -N' ${TESTRUNNER} make test \
+            && ARGS='-VV -R .*test_.*' ${TESTRUNNER}  make test) 2>&1 | tee "${BUILDDIR}/test2.log" || true
         fi
         if [ $DOTEST -ge 3 ]; then
             if [ -x ./bench.sh ]; then
-                ${TESTRUN} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
+                ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
             fi
         fi
         echo "Tests done"
