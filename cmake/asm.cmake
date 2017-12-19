@@ -29,7 +29,11 @@ int main() {
 }
 ")
 
-find_program(asm_CXXFILT c++filt)
+if(${CMAKE_C_COMPILER_ID} STREQUAL "Aurora")
+    find_program(asm_CXXFILT nc++filt)
+else()
+    find_program(asm_CXXFILT c++filt)
+endif()
 find_program(asm_CAT cat)
 message(STATUS "??? ${asm_CAT} <ASSEMBLY_SOURCE>.0 | ${asm_CXXFILT} > <ASSEMBLY_SOURCE>")
 if(asm_CXXFILT AND asm_CAT)
@@ -42,31 +46,28 @@ endif()
 set(asm_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/asm")
 file(MAKE_DIRECTORY ${asm_OUTPUT_DIR})
 
+unset(asm_VERBOSE_FLAG)
+if(UNIX AND NOT APPLE AND NOT NECSX AND ${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
+    set(asm_VERBOSE_FLAG "-fverbose-asm")
+endif()
+
 if(CMAKE_C_COMPILER_LOADED)
     if(UNIX AND NOT APPLE AND NOT NECSX)
         # cmake docs do not really recommend overriding the cmake macros, but
         # it seemed an easy way to nicer asm outputs for gcc
         message(STATUS "unix-like CMAKE_C_COMPILER_ID ${CMAKE_C_COMPILER_ID}")
         if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
-            if(0)
-                # this way still does not produce very readable asm, imho.
-                string(REPLACE " -S <SOURCE>" " -fverbose-asm -S <SOURCE>"
-                    asm_C_CREATE_ASSEMBLY "${CMAKE_C_CREATE_ASSEMBLY_SOURCE}")
-                string(REPLACE "<ASSEMBLY_SOURCE>" "<ASSEMBLY_SOURCE>.orig"
-                    asm_C_CREATE_ASSEMBLY "${asm_C_CREATE_ASSEMBLY}")
-            else()
-                # gcc: interspersed source/assembler
-                string(REPLACE " -S <SOURCE>" " -g -fverbose-asm -Wa,-adhln -c <SOURCE>"
-                    asm_C_CREATE_ASSEMBLY "${CMAKE_C_CREATE_ASSEMBLY_SOURCE}")
-                string(REPLACE "-o <ASSEMBLY_SOURCE>" "-o /dev/null > <ASSEMBLY_SOURCE>.0"
-                    asm_C_CREATE_ASSEMBLY "${asm_C_CREATE_ASSEMBLY}")
-                # demangle and copy FOO.c.s upwards into the binary dir (easier to find)
-                set(CMAKE_C_CREATE_ASSEMBLY_SOURCE
-                    "${asm_C_CREATE_ASSEMBLY}"
-                    "${asm_FILTER_COMMAND}"
-                    "${CMAKE_COMMAND} -E copy \"<ASSEMBLY_SOURCE>\" \"${asm_OUTPUT_DIR}/\"" 
-                    )
-            endif()
+            # gcc: interspersed source/assembler
+            string(REPLACE " -S <SOURCE>" " -g ${asm_VERBOSE_FLAG} -Wa,-adhln -c <SOURCE>"
+                asm_C_CREATE_ASSEMBLY "${CMAKE_C_CREATE_ASSEMBLY_SOURCE}")
+            string(REPLACE "-o <ASSEMBLY_SOURCE>" "-o /dev/null > <ASSEMBLY_SOURCE>.0"
+                asm_C_CREATE_ASSEMBLY "${asm_C_CREATE_ASSEMBLY}")
+            # demangle and copy FOO.c.s upwards into the binary dir (easier to find)
+            set(CMAKE_C_CREATE_ASSEMBLY_SOURCE
+                "${asm_C_CREATE_ASSEMBLY}"
+                "${asm_FILTER_COMMAND}"
+                "${CMAKE_COMMAND} -E copy \"<ASSEMBLY_SOURCE>\" \"${asm_OUTPUT_DIR}/\"" 
+                )
             message(STATUS "CMAKE_C_CREATE_ASSEMBLY_SOURCE has been set to :\n${CMAKE_C_CREATE_ASSEMBLY_SOURCE}")
         endif()
     else()
@@ -77,28 +78,21 @@ if(CMAKE_C_COMPILER_LOADED)
     endif()
 endif()
 if(CMAKE_CXX_COMPILER_LOADED)
-    if(UNIX AND NOT APPLE)
+    if(UNIX AND NOT APPLE AND NOT NECSX)
         # cmake docs do not really recommend overriding the cmake macros, but
         # it seemed an easy way to nicer asm outputs for gcc
-        message(STATUS "CMAKE_C_COMPILER_ID ${CMAKE_C_COMPILER_ID}")
-        if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
-            if(0)
-                string(REPLACE " -S <SOURCE>" " -fverbose-asm -S <SOURCE>"
-                    asm_CXX_CREATE_ASSEMBLY "${CMAKE_CXX_CREATE_ASSEMBLY_SOURCE}")
-                string(REPLACE "<ASSEMBLY_SOURCE>" "<ASSEMBLY_SOURCE>.orig"
-                    asm_CXX_CREATE_ASSEMBLY "${asm_CXX_CREATE_ASSEMBLY}")
-            else()
-                # gcc: interspersed source/assembler, and copy .s files to easy-to-find spot
-                string(REPLACE " -S <SOURCE>" " -g -fverbose-asm -Wa,-adhln -c <SOURCE>"
-                    asm_CXX_CREATE_ASSEMBLY "${CMAKE_CXX_CREATE_ASSEMBLY_SOURCE}")
-                string(REPLACE "-o <ASSEMBLY_SOURCE>" "-o /dev/null > <ASSEMBLY_SOURCE>.0"
-                    asm_CXX_CREATE_ASSEMBLY "${asm_CXX_CREATE_ASSEMBLY}")
-                set(CMAKE_CXX_CREATE_ASSEMBLY_SOURCE
-                    "${asm_CXX_CREATE_ASSEMBLY}"
-                    "${asm_FILTER_COMMAND}"
-                    "${CMAKE_COMMAND} -E copy \"<ASSEMBLY_SOURCE>\" \"${asm_OUTPUT_DIR}/\"" 
-                    )
-            endif()
+        message(STATUS "CMAKE_CXX_COMPILER_ID ${CMAKE_CXX_COMPILER_ID}")
+        if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "Aurora")
+            # gcc: interspersed source/assembler, and copy .s files to easy-to-find spot
+            string(REPLACE " -S <SOURCE>" " -g ${asm_VERBOSE_FLAG} -Wa,-adhln -c <SOURCE>"
+                asm_CXX_CREATE_ASSEMBLY "${CMAKE_CXX_CREATE_ASSEMBLY_SOURCE}")
+            string(REPLACE "-o <ASSEMBLY_SOURCE>" "-o /dev/null > <ASSEMBLY_SOURCE>.0"
+                asm_CXX_CREATE_ASSEMBLY "${asm_CXX_CREATE_ASSEMBLY}")
+            set(CMAKE_CXX_CREATE_ASSEMBLY_SOURCE
+                "${asm_CXX_CREATE_ASSEMBLY}"
+                "${asm_FILTER_COMMAND}"
+                "${CMAKE_COMMAND} -E copy \"<ASSEMBLY_SOURCE>\" \"${asm_OUTPUT_DIR}/\"" 
+                )
             message(STATUS "CMAKE_CXX_CREATE_ASSEMBLY_SOURCE has been set to :\n${CMAKE_CXX_CREATE_ASSEMBLY_SOURCE}")
         endif()
     else()
