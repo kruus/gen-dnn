@@ -1037,13 +1037,12 @@ static void sxconv_4_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
             }
             if( kw_beg >= kw_end ) continue;
 
-            for (size_t kh = kh_beg, oh0=ih+PH - kh_beg*DH ;
-                kh < kh_end;
-                oh0 -= lcm_h, kh += khh)
+            size_t oh0  = ih+PH - kh_beg*DH;
+            size_t ow00 = iw+PW - kw_beg*DH;
+            for (size_t kh = kh_beg; kh < kh_end; kh += khh)
             {
-              for (size_t kw = kw_beg, ow0=iw+PW - kw_beg*(p->dw+1) ;
-                  kw < kw_end;
-                  ow0 -= lcm_w, kw += kww)
+              size_t ow0 = ow00;
+              for (size_t kw = kw_beg; kw < kw_end; kw += kww)
               {
                 const size_t dst_off0 = (((size_t)mb * OC + g * OCOG + 0) * OH + oh0/SH) * OW + ow0/SH;
                 const size_t wei_off0 = ((((size_t)g * OCOG + 0 ) * ICOG + ic) * KH + kh) * KW + kw;
@@ -1056,7 +1055,9 @@ static void sxconv_4_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
                   w[oc] = pwei     [wei_off0 + oc*ICOG_KH_KW];
                   ds += d[oc] * w[oc];
                 }
+                ow0 -= lcm_w;
               }
+              oh0 -= lcm_h;
             }
 
           }

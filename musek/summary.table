@@ -22,19 +22,19 @@ SSE  sx3  41 x     2       4.5 G  FWD_B
 AVX  sx3  80 x     4       29  G  FWD_B
 AVX2 sx3  87 x     12      81  G  FWD_B
 SX   sx3  94 x     4       2.6 G  FWD_B
-Aur
+Aur  sx3  58 x     1       6.8 G  FWD_B
 ---- ---- -------  ------- -----  ------
 SSE  sx3  23 x     2       1.5 G  BWD_D
 AVX  sx3  35 x     4       6.5 G  BWD_D
 AVX2 sx3  27 x     12      14  G  BWD_D
 SX   sx3  238 x    4       1.9 G  BWD_D
-Aur
+Aur  sx3  105 x    1       1.6 G  BWD_D
 ---- ---- -------  ------- -----  ------
 SSE  sx3  6.3 x    2       1.4 G  BWD_WB
 AVX  sx3  4.7 x    4       3.8 G  BWD_WB
 AVX2 ref3 7.4 x    12      13  G  BWD_WB
 SX   sx4  10 x     4       2.0 G  BWD_WB
-Aur
+Aur  ref3 1.1 x    1       0.6 G  BWD_WB
 ----------------------------------------
 
 Layer: g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
@@ -44,19 +44,19 @@ SSE  sx3  58 x     2       6.1 G  FWD_B
 AVX  sx3  54 x     4       20  G  FWD_B
 AVX2 sx3  96 x     12      85  G  FWD_B
 SX   sx3  425 x    4       7.3 G  FWD_B
-Aur
+Aur  sx3  192 x    1       10  G  FWD_B
 ---- ---- -------  ------- -----  ------
 SSE  sx3  13 x     2       1.9 G  BWD_D
 AVX  sx3  27 x     4       8.0 G  BWD_D
 AVX2 sx3  16 x     12      13  G  BWD_D
 SX   sx3  148 x    4       2.3 G  BWD_D
-Aur
+Aur  sx3  98 x     1       3.1 G  BWD_D
 ---- ---- -------  ------- -----  ------
 SSE  ref4 9.9 x    2       2.4 G  BWD_WB
 AVX  sx3  7.2 x    4       6.2 G  BWD_WB
 AVX2 ref3 9.3 x    12      16  G  BWD_WB
 SX   sx4  14  x    4       1.3 G  BWD_WB
-Aur
+Aur  ref3 1.1 x    1       0.3 G  BWD_WB
 ----------------------------------------
 
 layer: mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
@@ -66,19 +66,19 @@ SSE  sx3  53 x     2       5.4 G  FWD_B
 AVX  sx3  99 x     4       33  G  FWD_B
 AVX2 sx3  99 x     12      91  G  FWD_B
 SX   sx3  1629 x   4       17  G  FWD_B
-Aur
+Aur  sx3  427 x    1       13  G  FWD_B
 ---- ---- -------  ------- -----  ------
 SSE  sx3  10 x     2       1.0 G  BWD_D
 AVX  sx3  13 x     4       3.8 G  BWD_D
 AVX2 sx3  6.2 x    12      4.8 G  BWD_D
 SX   sx3  45 x     4       0.43G  BWD_D
-Aur
+Aur  sx3  160 x    1       3.0 G  BWD_D
 ---- ---- -------  ------- -----  ------
 SSE  sx3  8.5 x    2       1.8 G  BWD_WB
 AVX  sx3  7.4 x    4       6.0 G  BWD_WB
 AVX2 sx3  7.2 x    12      13  G  BWD_WB
 SX   ref4 26 x     4       1.1 G  BWD_WB
-Aur
+Aur  ref3 1.1 x    1       0.15 G BWD_WB
 ----------------------------------------
 
 layer: g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
@@ -88,17 +88,17 @@ SSE  sx3  64 x     2       6.0 G  FWD_B
 AVX  sx4  95 x     4       32  G  FWD_B
 AVX2 sx3  106 x    12      95  G  FWD_B
 SX   sx3  948 x    4       10  G  FWD_B
-Aur
+Aur  sx3  260 x    1       8.0 G  FWD_B
 ---- ---- -------  ------- -----  ------
 SSE  sx3  11 x     2       1.1 G  BWD_D
 AVX  sx4  19 x     4       5.4 G  BWD_D
 AVX2 sx3  13 x     12      11  G  BWD_D
 SX   sx3  142 x    4       1.3 G  BWD_D
-Aur
+Aur  sx3  149 x    1       2.9 G  BWD_D
 ---- ---- -------  ------- -----  ------
 SSE  ref4 16 x     2       3.0 G  BWD_WB
 AVX  ref4 15 x     4       11  G  BWD_WB
 AVX2 ref4 17 x     12      30  G  BWD_WB
 SX   ref4 23 x     4       1.0 G  BWD_WB
-Aur
+Aur  ref3 1.1 x    1       0.15 G BWD_WB
 ----------------------------------------
