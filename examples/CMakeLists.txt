@@ -16,10 +16,14 @@
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
+#message(STATUS "ex: CMAKE_CROSSCOMPILING ${CMAKE_CROSSCOMPILING}")
+#message(STATUS "ex: CMAKE_CROSSCOMPILING_EMULATOR ${CMAKE_CROSSCOMPILING_EMULATOR}")
+#message(STATUS "ex: VE_EXEC ${VE_EXEC}")
+# if you set up CMAKE_CROSSCOMPILING_EMULATOR, then you do not need VE_EXEC or such.
 add_executable(simple-net-c simple_net.c)
 set_property(TARGET simple-net-c PROPERTY C_STANDARD 99)
 target_link_libraries(simple-net-c ${LIB_NAME})
-add_test(simple-net-c simple-net-c)
+add_test(NAME simple-net-c COMMAND simple-net-c)
 if(WIN32)
     configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
         simple-net-c.vcxproj.user @ONLY)
@@ -29,7 +33,7 @@ endif()
 add_executable(simple-net-cpp simple_net.cpp)
 set_property(TARGET simple-net-cpp PROPERTY CXX_STANDARD 11)
 target_link_libraries(simple-net-cpp ${LIB_NAME})
-add_test(simple-net-cpp simple-net-cpp)
+add_test(NAME simple-net-cpp COMMAND simple-net-cpp)
 if(WIN32)
     configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
         simple-net-cpp.vcxproj.user @ONLY)
@@ -43,7 +47,7 @@ target_link_libraries(simple-training-net-c ${LIB_NAME})
 else()
 target_link_libraries(simple-training-net-c ${LIB_NAME} m)
 endif()
-add_test(simple-training-net-c simple-training-net-c)
+add_test(NAME simple-training-net-c COMMAND simple-training-net-c)
 if(WIN32)
     configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
         simple-training-net-c.vcxproj.user @ONLY)
@@ -57,7 +61,7 @@ target_link_libraries(simple-training-net-cpp ${LIB_NAME})
 else()
 target_link_libraries(simple-training-net-cpp ${LIB_NAME} m)
 endif()
-add_test(simple-training-net-cpp simple-training-net-cpp)
+add_test(NAME simple-training-net-cpp COMMAND simple-training-net-cpp)
 if(WIN32)
     configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
         simple-training-net-cpp.vcxproj.user @ONLY)

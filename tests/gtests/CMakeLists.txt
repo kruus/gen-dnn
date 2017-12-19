@@ -66,7 +66,7 @@ foreach(TEST_FILE ${PRIM_TEST_CASES_SRC})
     #target_link_libraries(${CURR_APP_NAME} mkldnn mkldnn_gtest)
     target_link_libraries(${CURR_APP_NAME}
         ${LIB_NAME} mkldnn_gtest ${EXTRA_LIBS})
-    add_test(${CURR_APP_NAME} ${VE_EXEC} ${CURR_APP_NAME})
+    add_test(NAME ${CURR_APP_NAME} COMMAND ${CURR_APP_NAME})
     if(WIN32)
         set_property(TEST ${CURR_APP_NAME} PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
         configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user

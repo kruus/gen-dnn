@@ -61,6 +61,12 @@ add_definitions(-DCMAKE_EXPORT_COMPILE_COMMANDS=1)
 
 message(STATUS "CMAKE_TOOLCHAIN_PREFIX = ${CMAKE_TOOLCHAIN_PREFIX}")
 
+if(CMAKE_C_COMPILER_ID STREQUAL "Aurora")
+    cmake_minimum_required(VERSION 3.3) # to avoid ve_exec "everywhere" ...
+    set(CMAKE_CROSSCOMPILING YES)
+    set(CMAKE_CROSSCOMPILING_EMULATOR ve_exec)
+endif()
+
 if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     message(STATUS "CMAKE_BUILD_TYPE is unset, defaulting to RelWithDebInfo")
     set(CMAKE_BUILD_TYPE "RelWithDebInfo")

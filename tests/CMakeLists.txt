@@ -44,7 +44,7 @@ endif()
 add_executable(api-c api.c)
 set_property(TARGET api-c PROPERTY C_STANDARD 99)
 target_link_libraries(api-c ${LIB_NAME} ${EXTRA_LIBS})
-add_test(NAME api-c COMMAND ${VE_EXEC} api-c)
+add_test(NAME api-c COMMAND api-c)
 
 if(WIN32)
     set_property(TEST api-c PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
@@ -66,12 +66,12 @@ if(UNIX OR APPLE) # Is NECSX a UNIX ?
         ${CMAKE_CURRENT_SOURCE_DIR}/.. ${test_c_symbols}
     )
     target_link_libraries(test_c_symbols-c ${LIB_NAME} ${EXTRA_LIBS})
-    add_test(NAME test_c_symbols-c COMMAND ${VE_EXEC} test_c_symbols-c)
+    add_test(NAME test_c_symbols-c COMMAND test_c_symbols-c)
 
     add_executable(api-io-c api-io.c)
     set_property(TARGET api-io-c PROPERTY C_STANDARD 99)
     target_link_libraries(api-io-c ${LIB_NAME})
-    add_test(NAME api-io-c COMMAND ${VE_EXEC} api-io-c)
+    add_test(NAME api-io-c COMMAND api-io-c)
 # elseif(WIN32)
 # No Windows support for: test_c_symbols.c
 endif()

@@ -40,7 +40,8 @@ while getopts ":hatvjdDqQpsSTbF" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
-            DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"; JOBS="-j8"
+            DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
+            JOBS="-j1" # -j1 to avoid SIGSEGV in ccom
             #export LDFLAGS="${LDFLAGS} -L/opt/nec/ve/musl/lib"
             ;;
         F) # NEC Aurora VE or SX : add ftrace support (generate ftrace.out)
@@ -188,16 +189,33 @@ if [ -d "$INSTALLDIR}" -a $QUICK -lt 2 ]; then
 fi
 
 TESTRUNNER='time'
-if { /usr/bin/time -v echo Hello > /dev/null; } then TESTRUNNER='/usr/bin/time -v'; fi
-if [ "$DOTARGET" -gt 0 ]; then
-    if [ -x ve_exec ]; then
-        if [ "$NEC_FTRACE" -gt 0 ]; then TESTRUNNER="VE_PROGINF=YES ${TESTRUNNER}"; fi
-        TESTRUNNER="${TESTRUNNER} ve_exec";
+if { /usr/bin/time -v echo Hello >& /dev/null; } then
+    TESTRUNNER='/usr/bin/time -v'
+fi
+if [ "$NEC_FTRACE" -gt 0 ]; then
+    #TESTRUNNER="VE_PROGINF=YES ${TESTRUNNER}" #works if used as bash -c ${TESTRUNNER}
+    export VE_PROGINF=YES;
+    export C_PROGINF=YES;
+else
+    unset VE_PROGINF
+    unset C_PROGINF=YES;
+fi
+VE_EXEC=''
+if [ "$DOTARGET" = "a" ]; then
+    export OMP_NUM_THREADS=1; # for now XXX
+    if { ve_exec --version 2> /dev/null; } then
+        # oops, this will not work for "${TESTRUNNER} make test"
+        #TESTRUNNER="${TESTRUNNER} ve_exec"
+        #echo "ve_exec! TESTRUNNER ${TESTRUNNER}"
+        VE_EXEC=ve_exec
     else
-        TESTRUNNER='echo Not-Running ';
-        echo "Aurora: ve_exec not found";
+        TESTRUNNER="echo Not-Running "
+        echo "Aurora: ve_exec not found"
     fi
 fi
+echo "TESTRUNNER ${TESTRUNNER}"
+echo "VE_EXEC    ${VE_EXEC}"
+#read asdf
 
 (
     echo "# vim: set ro ft=log:"
@@ -227,7 +245,12 @@ fi
         export CXXFLAGS="${CXXFLAGS} -DTARGET_VANILLA"
     fi
     if [ "$DOTARGET" == "a" ]; then
-        CMAKEOPT="${CMAKEOPT} -DCMAKE_C_COMPILER=ncc -DCMAKE_CXX_COMPILER=nc++ -DCMAKE_AR=nar -DCMAKE_C_COMPILER_ID=Aurora -DCMAKE_CXX_COMPILER_ID=Aurora"
+        CMAKEOPT="${CMAKEOPT} -DCMAKE_C_COMPILER=ncc -DCMAKE_CXX_COMPILER=nc++ -DCMAKE_AR=nar"
+        CMAKEOPT="${CMAKEOPT} -DCMAKE_C_COMPILER_ID=Aurora -DCMAKE_CXX_COMPILER_ID=Aurora"
+        CMAKEOPT="${CMAKEOPT} -DCMAKE_CROSSCOMPILING=1"
+        if VE_EXEC=`which ve_exec 2>/dev/null`; then
+            CMAKEOPT="${CMAKEOPT} -DCMAKE_CROSSCOMPILING_EMULATOR=${VE_EXEC}"
+        fi
         # -proginf  : Run with 'export VE_PROGINF=YES' to get some stats output
         export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
         export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
@@ -235,6 +258,7 @@ fi
             export CFLAGS="${CFLAGS} -ftrace"
             export CXXFLAGS="${CXXFLAGS} -ftrace"
         fi
+        echo "Aurora CMAKEOPT = ${CMAKEOPT}"
     fi
     if [ ${DOWARN} == 'y' ]; then
         DOWARNFLAGS=""
@@ -300,16 +324,16 @@ fi
         BUILDOK="n"
         if [ $QUICK -gt 1 ]; then # rebuild in existing directory, WITHOUT rerunning cmake
             pwd
-            { make VERBOSE=1 ${JOBS} \
-                && BUILDOK="y"; }
+            { { make VERBOSE=1 ${JOBS} || make VERBOSE=1; } \
+                && BUILDOK="y" || echo "build failed: ret code $?"; }
         else
             rm -f ./stamp-BUILDOK ./CMakeCache.txt
             echo "${CMAKEENV}; cmake ${CMAKEOPT} ${CMAKETRACE} .."
             set -x
             { if [ x"${CMAKEENV}" == x"" ]; then ${CMAKEENV}; fi; \
                 cmake ${CMAKEOPT} ${CMAKETRACE} .. \
-                && make VERBOSE=1 ${JOBS} \
-                && BUILDOK="y"; }
+                && { make VERBOSE=1 ${JOBS} || make VERBOSE=1; } \
+                && BUILDOK="y" || echo "build failed: ret code $?"; }
             set +x
         fi
         # Make some assembly-source translations automatically...
@@ -337,12 +361,12 @@ fi
         echo "DODOC     $DODOC"
         # Whatever you are currently debugging (and is a quick sanity check) can go here
         if [ -x tests/api-io-c ]; then
-            { echo "api-io-c                ..."; time tests/api-io-c || BUILDOK="n"; }
+            { echo "api-io-c                ..."; ${TESTRUNNER} ${VE_EXEC} tests/api-io-c || BUILDOK="n"; }
         else
-            { echo "api-c                ..."; time tests/api-c || BUILDOK="n"; }
+            { echo "api-c                ..."; ${TESTRUNNER} ${VE_EXEC} tests/api-c || BUILDOK="n"; }
         fi
         if [ $DOTEST -eq 0 -a "$DOJIT" -gt 0 ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
-            { echo "simple-training-net-cpp ..."; time examples/simple-training-net-cpp || BUILDOK="n"; }
+            { echo "simple-training-net-cpp ..."; ${TESTRUNNER}  ${VE_EXEC} examples/simple-training-net-cpp || BUILDOK="n"; }
         fi
     fi
     if [ "$BUILDOK" == "y" -a "$DOTARGET" == "s" ]; then

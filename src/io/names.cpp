@@ -350,7 +350,7 @@ NAMEENUM_T(stream_kind){
 // - Format conversion errors MIGHT still return -ve (error), so these lib
 //   functions will just *assert* that no conversion errors happen.
 // - and release-mode will just do-nothing (just in case)
-#define SNPRINTF_DBG 1
+#define SNPRINTF_DBG 0
 
 #if SNPRINTF_DBG
 // paranoia: set NUL into last char explicitly (*all* snprintfs should do this already)

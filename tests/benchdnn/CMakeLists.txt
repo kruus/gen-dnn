@@ -70,11 +70,11 @@ endif()
 # These outputs are left in the cmake binary directory ~ build/tests/benchdnn.
 file(GLOB ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/*.cxx)
 # hack: get the .o and .s rules into Makefiles, but skip the link step
-add_library(unused SHARED ${ASM_SOURCES})
+add_library(unused STATIC ${ASM_SOURCES})
 set_target_properties(unused PROPERTIES
     EXCLUDE_FROM_ALL 1)
 #    # does not actually avoid the linking.
-#    # actually i want to skip producing the .o files too
+#    # actually I want to skip producing the .o files too
 #    set_target_properties(unused PROPERTIES RULE_LAUNCH_LINK "${asm_ECHO}")
 #message(STATUS "benchdnn ASM_SOURCES = ${ASM_SOURCES}")
 string(REGEX REPLACE "${CMAKE_CURRENT_SOURCE_DIR}/conv/(.*)" "conv/\\1.s"
