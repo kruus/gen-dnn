@@ -20,6 +20,7 @@ JOBS="-j8"
 CMAKETRACE=""
 USE_CBLAS=1
 QUICK=0
+COMPILE_AURORA=0
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -48,7 +49,7 @@ while getopts ":hatvjdDqQpsSTbF" arg; do
             if [ "$COMPILER_AURORA" -eq 1 ]; then
               export CFLAGS="${CFLAGS} -ftrace"
               export CXXFLAGS="${CXXFLAGS} -ftrace"
-	    fi
+	        fi
             ;;
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
             # Apr-14-2017 build timings:
@@ -109,10 +110,10 @@ done
 DOJIT=0
 INSTALLDIR=install
 BUILDDIR=build
-if [ "`echo ${CC}`" == 'sxcc' -a ! "$DOTARGET" == "s" ]; then
-    echo 'Detected $CC == sxcc --> SX compilation with 64-bit size_t'
-    DOTARGET="s"; DOJIT=0; SIZE_T=64; JOBS="-j4"
-fi
+#if [ "`echo ${CC}`" == 'sxcc' -a ! "$DOTARGET" == "s" ]; then
+#    echo 'Detected $CC == sxcc --> SX compilation with 64-bit size_t'
+#    DOTARGET="s"; DOJIT=0; SIZE_T=64; JOBS="-j4"
+#fi
 #
 # I have not yet tried icc.
 # For gcc, we will avoid the full MKL (omp issues)
@@ -362,19 +363,23 @@ if [ "$BUILDOK" == "y" ]; then
     fi
     echo "Testing ?"
     if [ ! $DOTEST -eq 0 -a ! "$DOTARGET" == "s" ]; then # non-SX: -t might run some tests
+        TESTRUN='/usr/bin/time -v'
+        #if [ COMPILER_AURORA -gt 0 ]; then
+        #    TESTRUN='/usr/bin/time -v ve_exec'
+        #fi
         rm -f test1.log test2.log test3.log
         echo "Testing ... test1"
         if [ true ]; then
-            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' /usr/bin/time -v make test) 2>&1 | tee "${BUILDDIR}/test1.log" || true
+            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' ${TESTRUN} make test) 2>&1 | tee "${BUILDDIR}/test1.log" || true
         fi
         if [ $DOTEST -ge 2 ]; then
             echo "Testing ... test2"
-            (cd "${BUILDDIR}" && ARGS='-VV -N' make test \
-            && ARGS='-VV -R .*test_.*' /usr/bin/time -v make test) 2>&1 | tee "${BUILDDIR}/test2.log" || true
+            (cd "${BUILDDIR}" && ARGS='-VV -N' ${TESTRUN} make test \
+            && ARGS='-VV -R .*test_.*' ${TESTRUN}  make test) 2>&1 | tee "${BUILDDIR}/test2.log" || true
         fi
         if [ $DOTEST -ge 3 ]; then
             if [ -x ./bench.sh ]; then
-                /usr/bin/time -v ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
+                ${TESTRUN} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
             fi
         fi
         echo "Tests done"

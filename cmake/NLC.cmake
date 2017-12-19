@@ -21,16 +21,44 @@ if(NLC_cmake_included)
 endif()
 set(NLC_cmake_included true)
 
-#
-# No detection right now, just specify the base path to the NLC.
-# TODO: detect if lib available in canonical location and use
-#       env var alternatively.
-#
-set(NLCINC $ENV{NLC_BASE}/include)
-set(NLCLIB $ENV{NLC_BASE}/lib/libcblas.a)
-set(NLCLIBBLAS $ENV{NLC_BASE}/lib/libblas_pthread.a)
-#set(NLCLIBBLAS /opt/nec/ve/nlc/0.9.0/lib/libblas_sequential.a)
-add_definitions(-DUSE_CBLAS)
-include_directories(AFTER ${NLCINC})
-list(APPEND mkldnn_LINKER_LIBS ${NLCLIB} ${NLCLIBBLAS})
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Aurora")
+    #
+    # Detect via env var NLC_BASE, or add some more locations to search
+    # to try to automatically locate CBLAS for Aurora cross-compilation.
+    #
+    #set(NLCINC $ENV{NLC_BASE}/include)
+    find_path(NLCINC cblas.h
+        NO_DEFAULT_PATH
+        PATHS /usr/uhome/aurora/bm/nlc/0.9.0/include # ok for cross-compile on zoro
+        $ENV{NLC_BASE}
+        )
 
+    if(NOT NLCINC)
+        message(STATUS "Aurora NLC cblas not found")
+        return()
+    endif()
+    get_filename_component(NLCROOT "${NLCINC}" PATH)
+    message(STATUS "NLCROOT = ${NLCROOT}")
+    message(STATUS "Using Aurora NLC cblas found under ${NLCROOT}")
+
+    find_library(NLCLIB NAMES cblas PATHS ${NLCROOT}/lib)
+    if(NLCLIB)
+        #set(NLCLIB $ENV{NLC_BASE}/lib/libcblas.a)
+    endif()
+    message(STATUS "NLCLIB = ${NLCLIB}")
+
+    #set(NLCLIBBLAS $ENV{NLC_BASE}/lib/libblas_pthread.a)
+    #set(NLCLIBBLAS /opt/nec/ve/nlc/0.9.0/lib/libblas_sequential.a)
+    find_library(NLCLIBBLAS NAMES blas_pthread PATHS ${NLCROOT}/lib)
+    if(NLCLIBBLAS)
+        #set(NLCLIBBLAS $ENV{NLC_BASE}/lib/libcblas_pthread.a)
+    endif()
+    message(STATUS "NLCLIBBLAS = ${NLCLIBBLAS}")
+
+    if(NLCLIB AND NLCLIBBLAS)
+        add_definitions(-DUSE_CBLAS)
+        include_directories(AFTER ${NLCINC})
+        list(APPEND mkldnn_LINKER_LIBS ${NLCLIB} ${NLCLIBBLAS})
+    endif()
+endif()
+# vim: et ts=4 sw=4 ai

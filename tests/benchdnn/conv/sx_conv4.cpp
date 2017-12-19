@@ -715,7 +715,11 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
                 src[ic*KH*KW + khkw] = ((kok[khkw] & (1<<31))? psrc[s0 + ic*IH_IW + (khkw/p->kw)*DH_IW + (khkw%p->kw)*DW]: 0.f);
               }
 #elif 1
+#ifndef __ve
+              float idx[khkw_end];
+#else
               float idx[khkw_end] alignas(128);
+#endif
               //for (int khkw = 0; khkw < khkw_end; ++khkw) {
               const int khh = KH;
               const int kww = KW;
@@ -1036,10 +1040,10 @@ static void sxconv_4_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
               kw_beg = kw_ibeg;
             }
             if( kw_beg >= kw_end ) continue;
-
-            size_t oh0  = ih+PH - kh_beg*DH;
-            size_t ow00 = iw+PW - kw_beg*DH;
-            for (size_t kh = kh_beg; kh < kh_end; kh += khh)
+#if 0
+            for (size_t kh = kh_beg, oh0=ih+PH - kh_beg*DH ;
+                kh < kh_end;
+                oh0 -= lcm_h, kh += khh)
             {
               size_t ow0 = ow00;
               for (size_t kw = kw_beg; kw < kw_end; kw += kww)
@@ -1059,6 +1063,30 @@ static void sxconv_4_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
               }
               oh0 -= lcm_h;
             }
+#else
+            float d[OCOG], w[OCOG];
+            size_t oh0  = ih+PH - kh_beg*DH;
+            size_t ow00 = iw+PW - kw_beg*DH;
+            for (size_t kh = kh_beg; kh < kh_end; kh += khh)
+            {
+              size_t ow0 = ow00;
+              for (size_t kw = kw_beg; kw < kw_end; kw += kww)
+              {
+                const size_t dst_off0 = (((size_t)mb * OC + g * OCOG + 0) * OH + oh0/SH) * OW + ow0/SH;
+                const size_t wei_off0 = ((((size_t)g * OCOG + 0 ) * ICOG + ic) * KH + kh) * KW + kw;
+                for (size_t oc = 0; oc < OCOG; ++oc) {
+                  //size_t dst_off = dst_off_f(p, mb, g, oc, oh0/SH, ow0/SW);
+                  //size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
+                  //ds += pdiff_dst[dst_off] * pwei[wei_off];
+                  d[oc] = pdiff_dst[dst_off0 + oc*OH_OW];
+                  w[oc] = pwei     [wei_off0 + oc*ICOG_KH_KW];
+                  ds += d[oc] * w[oc];
+                }
+                ow0 -= lcm_w;
+              }
+              oh0 -= lcm_h;
+            }
+#endif
 
           }
         }

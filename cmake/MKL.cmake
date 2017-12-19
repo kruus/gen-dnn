@@ -182,4 +182,4 @@ else()
         "set of libraries or get a full version from "
         "https://software.intel.com/en-us/intel-mkl")
 endif()
-
+# vim: et ts=4 sw=4 ai
