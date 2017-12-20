@@ -324,32 +324,16 @@ echo "VE_EXEC    ${VE_EXEC}"
         BUILDOK="n"
         if [ $QUICK -gt 1 ]; then # rebuild in existing directory, WITHOUT rerunning cmake
             pwd
-            { make VERBOSE=1 ${JOBS} ; } && BUILDOK="y"
-            while [ $? -eq 4];
-            do
-              { make VERBOSE=1 -j1 ; } && BUILDOK="y"
-            done
-            if [ "$BUILDOK" == "n" ]; then
-              echo "build failed: ret code $?"
-            fi
+            { { make VERBOSE=1 ${JOBS} || make VERBOSE=1; } \
+                && BUILDOK="y" || echo "build failed: ret code $?"; }
         else
             rm -f ./stamp-BUILDOK ./CMakeCache.txt
             echo "${CMAKEENV}; cmake ${CMAKEOPT} ${CMAKETRACE} .."
             set -x
             { if [ x"${CMAKEENV}" == x"" ]; then ${CMAKEENV}; fi; \
                 cmake ${CMAKEOPT} ${CMAKETRACE} .. \
-                && BUILDOK="y" || echo "cmake failed: ret code $?"; }
-            if [ "$BUILDOK" == "y" ]; then
-                BUILDOK="n"
-                { make VERBOSE=1 ${JOBS} ; } && BUILDOK="y"
-                while [ $? -eq 4 ];
-                do
-                    { make VERBOSE=1 -j1 ; } && BUILDOK="y"
-                done
-                if [ "$BUILDOK" == "n" ]; then
-                    echo "build failed: ret code $?"
-                fi
-            fi
+                && { make VERBOSE=1 ${JOBS} || make VERBOSE=1; } \
+                && BUILDOK="y" || echo "build failed: ret code $?"; }
             set +x
         fi
         # Make some assembly-source translations automatically...
