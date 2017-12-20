@@ -5,8 +5,8 @@
 ### Quickstart:
 
 ```
-./build.sh -h         # help</BR>
-Intel: ./build.sh -tt # build and run all tests (no jit)</BR>
+./build.sh -h          # help</BR>
+Intel: ./build.sh -tt  # build and run all tests (no jit)</BR>
            --> build/    and build.log
 Platform XX:
        ./build.sh -sdttT    # s:other system, d:debug compile, T:trace cmake decisions
