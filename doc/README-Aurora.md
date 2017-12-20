@@ -27,3 +27,14 @@ export LDFLAGS="-L/opt/nec/ve/veperf/latest/lib"
 CC=ncc CXX=nc++ ./build.sh -a
 ```
 
+### New way:
+
+*cmake* invoked with the ve.cmake TOOLCHAIN (as in *build.sh -a*) will set up
+*ncc* directories by looking in standard locations, even if not in your PATH.
+
+### Misc
+Since there are multiple people working off the nlabhpg account, you should now
+**git config user.name** and **git config user.email** *per git subdirectory*.
+
+This insulates you from having all your commits blamed on someone else (whoever
+last set the git global value).
