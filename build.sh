@@ -339,9 +339,10 @@ echo "VE_EXEC    ${VE_EXEC}"
         # Make some assembly-source translations automatically...
         cxxfiles=`(cd ../tests/benchdnn && ls -1 conv/*conv?.cpp conv/*.cxx)`
         echo "cxxfiles = $cxxfiles"
-        (cd tests/benchdnn && { for f in ${cxxfiles}; do make -j1 VERBOSE=1 $f.s; done; }) || true
+        ({ for f in ${cxxfiles}; do make -j1 VERBOSE=1 $f.s; done; }) || true
         pwd
         ls -l asm || true
+        cd "${BUILDDIR}"
 
     else # skip the build, just run cmake ...
         echo "CMAKEENV   <${CMAKEENV}>"
