@@ -108,14 +108,16 @@ enable_testing()
 
 include_directories(include)
 
-if(NECVE)
-    show_cmake_stuff("After cmake/*.cmake includes ...")
-endif()
 add_subdirectory(src)
 add_subdirectory(examples)
 add_subdirectory(tests)
 
 install(FILES LICENSE DESTINATION share/doc/${LIB_NAME} COMPONENT doc)
 message(STATUS "CMAKE_CXX_COMPILER = ${CMAKE_CXX_COMPILER}")
+if(NECVE)
+    show_cmake_stuff("After cmake/*.cmake includes ...")
+    configure_file(${CMAKE_SOURCE_DIR}/cmake/bash_help.inc.in
+        ${PROJECT_BINARY_DIR}/bash_help.inc)
+endif()
 message(STATUS "CMakeLists.txt DONE!")
 # vim: et ts=4 sw=4 ai

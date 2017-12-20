@@ -1,7 +1,7 @@
 # this one is important
 set(CMAKE_SYSTEM_NAME Linux)
 set(CMAKE_SYSTEM_PROCESSOR aurora)
-set(NECVE TRUE)
+set(NECVE 1 CACHE BOOL "Set thing up for NEC Aurora vector processor")
 
 # specify the cross compiler
 set(CMAKE_C_COMPILER   ncc)
