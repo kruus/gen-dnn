@@ -15,10 +15,11 @@
 # limitations under the License.
 #===============================================================================
 
-cmake_minimum_required(VERSION 2.8)
 if(CMAKE_TOOLCHAIN_FILE)
     # 3.8 makes it easier to construct Platform/SX-* files
     cmake_minimum_required(VERSION 3.8)
+else()
+    cmake_minimum_required(VERSION 2.8)
 endif()
 
 # Use old-style version handling
@@ -60,12 +61,6 @@ add_definitions(-DCMAKE_EXPORT_COMPILE_COMMANDS=1)
 #set(LINK_LIBRARIES "${LINK_LIBRARIES} ${SX_LINK_LIBRARIES}" CACHE STRING "will this go after -lmkldnn?")
 
 message(STATUS "CMAKE_TOOLCHAIN_PREFIX = ${CMAKE_TOOLCHAIN_PREFIX}")
-
-if(NECVE)
-    cmake_minimum_required(VERSION 3.3) # to avoid ve_exec "everywhere" ...
-    set(CMAKE_CROSSCOMPILING YES)
-    set(CMAKE_CROSSCOMPILING_EMULATOR ve_exec)
-endif()
 
 if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     message(STATUS "CMAKE_BUILD_TYPE is unset, defaulting to RelWithDebInfo")
