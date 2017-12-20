@@ -358,7 +358,6 @@ echo "VE_EXEC    ${VE_EXEC}"
         ({ for f in ${cxxfiles}; do make -j1 VERBOSE=1 $f.s; done; }) || true
         pwd
         ls -l asm || true
-        cd "${BUILDDIR}"
 
     else # skip the build, just run cmake ...
         echo "CMAKEENV   <${CMAKEENV}>"
