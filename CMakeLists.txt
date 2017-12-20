@@ -15,10 +15,11 @@
 # limitations under the License.
 #===============================================================================
 
-cmake_minimum_required(VERSION 2.8)
 if(CMAKE_TOOLCHAIN_FILE)
     # 3.8 makes it easier to construct Platform/SX-* files
     cmake_minimum_required(VERSION 3.8)
+else()
+    cmake_minimum_required(VERSION 2.8)
 endif()
 
 # Use old-style version handling
@@ -61,12 +62,6 @@ add_definitions(-DCMAKE_EXPORT_COMPILE_COMMANDS=1)
 
 message(STATUS "CMAKE_TOOLCHAIN_PREFIX = ${CMAKE_TOOLCHAIN_PREFIX}")
 
-if(NECVE)
-    cmake_minimum_required(VERSION 3.3) # to avoid ve_exec "everywhere" ...
-    set(CMAKE_CROSSCOMPILING YES)
-    set(CMAKE_CROSSCOMPILING_EMULATOR ve_exec)
-endif()
-
 if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     message(STATUS "CMAKE_BUILD_TYPE is unset, defaulting to RelWithDebInfo")
     set(CMAKE_BUILD_TYPE "RelWithDebInfo")
@@ -108,14 +103,16 @@ enable_testing()
 
 include_directories(include)
 
-if(NECVE)
-    show_cmake_stuff("After cmake/*.cmake includes ...")
-endif()
 add_subdirectory(src)
 add_subdirectory(examples)
 add_subdirectory(tests)
 
 install(FILES LICENSE DESTINATION share/doc/${LIB_NAME} COMPONENT doc)
 message(STATUS "CMAKE_CXX_COMPILER = ${CMAKE_CXX_COMPILER}")
+if(NECVE)
+    show_cmake_stuff("After cmake/*.cmake includes ...")
+    configure_file(${CMAKE_SOURCE_DIR}/cmake/bash_help.inc.in
+        ${PROJECT_BINARY_DIR}/bash_help.inc)
+endif()
 message(STATUS "CMakeLists.txt DONE!")
 # vim: et ts=4 sw=4 ai

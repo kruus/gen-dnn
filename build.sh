@@ -200,7 +200,14 @@ else
     unset VE_PROGINF
     unset C_PROGINF
 fi
+
+if [ "$DOTARGET" = "a" ]; then
+    export OMP_NUM_THREADS=1; # for now XXX
+fi
+# Obtain initial guesses for TESTRUNNER and VE_EXEC
+if [ "" ]; then
 VE_EXEC=''
+TESTRUNNER=''
 if [ "$DOTARGET" = "a" ]; then
     export OMP_NUM_THREADS=1; # for now XXX
     if { ve_exec --version 2> /dev/null; } then
@@ -216,6 +223,7 @@ fi
 echo "TESTRUNNER ${TESTRUNNER}"
 echo "VE_EXEC    ${VE_EXEC}"
 #read asdf
+fi
 
 (
     echo "# vim: set ro ft=log:"
@@ -227,7 +235,6 @@ echo "VE_EXEC    ${VE_EXEC}"
     echo "QUICK      $QUICK"
     echo "BUILDDIR   ${BUILDDIR}"
     echo "INSTALLDIR ${INSTALLDIR}"
-    echo "TESTRUNNER ${TESTRUNNER}"
     if [ $QUICK -lt 2 ]; then
         mkdir "${BUILDDIR}"
     fi
@@ -248,12 +255,6 @@ echo "VE_EXEC    ${VE_EXEC}"
         TOOLCHAIN=../cmake/ve.cmake
         if [ ! -f "${TOOLCHAIN}" ]; then echo "Ohoh. ${TOOLCHAIN} not found?"; BUILDOK="n"; fi
         CMAKEOPT="${CMAKEOPT} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}"
-        #CMAKEOPT="${CMAKEOPT} -DCMAKE_C_COMPILER=ncc -DCMAKE_CXX_COMPILER=nc++ -DCMAKE_AR=nar"
-        #CMAKEOPT="${CMAKEOPT} -DCMAKE_C_COMPILER_ID=Aurora -DCMAKE_CXX_COMPILER_ID=Aurora"
-        #CMAKEOPT="${CMAKEOPT} -DCMAKE_CROSSCOMPILING=1"
-        #if VE_EXEC=`which ve_exec 2>/dev/null`; then
-        #    CMAKEOPT="${CMAKEOPT} -DCMAKE_CROSSCOMPILING_EMULATOR=${VE_EXEC}"
-        #fi
         # -proginf  : Run with 'export VE_PROGINF=YES' to get some stats output
         export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
         export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
@@ -362,13 +363,20 @@ echo "VE_EXEC    ${VE_EXEC}"
         echo "DOTEST    $DOTEST"
         echo "DODEBUG   $DODEBUG"
         echo "DODOC     $DODOC"
+        source "./bash_help.inc" # we are already in ${BUILDDIR}
+        if [ "${CMAKE_CROSSCOMPILING_EMULATOR}" ]; then
+            VE_EXEC="${CMAKE_CROSSCOMPILING_EMULATOR}"
+            # Use TESTRUNNER VE_EXEC for explicit targets,
+            # But leave out VE_EXEC if executing 'make' within $BUILDDIR,
+            # because 'make' tragets already supply VE_EXEC if needed.
+        fi
         # Whatever you are currently debugging (and is a quick sanity check) can go here
         if [ -x tests/api-io-c ]; then
             { echo "api-io-c                ..."; ${TESTRUNNER} ${VE_EXEC} tests/api-io-c || BUILDOK="n"; }
         else
             { echo "api-c                ..."; ${TESTRUNNER} ${VE_EXEC} tests/api-c || BUILDOK="n"; }
         fi
-        if [ $DOTEST -eq 0 -a "$DOJIT" -gt 0 ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
+        if [ $DOTEST -eq 0 -a $DOJIT -gt 0 ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
             { echo "simple-training-net-cpp ..."; ${TESTRUNNER}  ${VE_EXEC} examples/simple-training-net-cpp || BUILDOK="n"; }
         fi
     fi
@@ -388,6 +396,23 @@ echo "VE_EXEC    ${VE_EXEC}"
 ) 2>&1 | tee "${BUILDDIR}".log
 ls -l "${BUILDDIR}"
 BUILDOK="n"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="y"; fi
+
+set +x
+# after cmake we might have a better idea about ve_exec (esp. if PATH is not set properly)
+if [ -f "${BUILDDIR}/bash_help.inc" ]; then
+    # snarf some CMAKE variables
+    source "${BUILDDIR}/bash_help.inc"
+    if [ "${CMAKE_CROSSCOMPILING_EMULATOR}" ]; then VE_EXEC="${CMAKE_CROSSCOMPILING_EMULATOR}"; fi
+    if [ ! -x "${VE_EXEC}" ]; then
+        TESTRUNNER="echo Not-Running "
+        echo "cmake crosscompiling emulator, such as ve_exec, not available?"
+    else
+        TESTRUNNER=''
+    fi
+fi
+set -x
+echo "TESTRUNNER ${TESTRUNNER}"
+echo "VE_EXEC    ${VE_EXEC}"
 
 echo "BUILDDIR   ${BUILDDIR}"
 echo "INSTALLDIR ${INSTALLDIR}"
