@@ -61,7 +61,7 @@ add_definitions(-DCMAKE_EXPORT_COMPILE_COMMANDS=1)
 
 message(STATUS "CMAKE_TOOLCHAIN_PREFIX = ${CMAKE_TOOLCHAIN_PREFIX}")
 
-if(CMAKE_C_COMPILER_ID STREQUAL "Aurora")
+if(NECVE)
     cmake_minimum_required(VERSION 3.3) # to avoid ve_exec "everywhere" ...
     set(CMAKE_CROSSCOMPILING YES)
     set(CMAKE_CROSSCOMPILING_EMULATOR ve_exec)
@@ -93,6 +93,9 @@ else()
 endif()
 ####################################
 
+#if(NECVE)
+#    show_cmake_stuff("Initial setup completed ...")
+#endif()
 include("cmake/platform.cmake")
 include("cmake/asm.cmake")
 include("cmake/OpenMP.cmake")
@@ -105,12 +108,14 @@ enable_testing()
 
 include_directories(include)
 
-message(STATUS "CMAKE_CXX_COMPILER = ${CMAKE_CXX_COMPILER}")
+if(NECVE)
+    show_cmake_stuff("After cmake/*.cmake includes ...")
+endif()
 add_subdirectory(src)
-#message(STATUS "CMAKE_CXX_COMPILER = ${CMAKE_CXX_COMPILER}")
 add_subdirectory(examples)
 add_subdirectory(tests)
 
 install(FILES LICENSE DESTINATION share/doc/${LIB_NAME} COMPONENT doc)
+message(STATUS "CMAKE_CXX_COMPILER = ${CMAKE_CXX_COMPILER}")
 message(STATUS "CMakeLists.txt DONE!")
 # vim: et ts=4 sw=4 ai

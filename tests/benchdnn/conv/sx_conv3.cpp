@@ -1721,21 +1721,23 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
             const ssize_t w0 = (((g * OCOG + 0 ) * ICOG + 0) * KH + 0) * KW + 0; // oc,ic,kh,kw=0
             const ssize_t s0 = ((mb * IC + g * ICOG + 0 ) * IH + (oh*SH-PH+0*DH)) * IW + (ow*SW-PW+0*DW); //ic,kh,kw=0
             // slower for (ssize_t ic = 0, ickhkw=0; ic < ICOG; ++ickhkw, ++ic)
-            for (ssize_t ic = 0; ic < ICOG; ++ic)
-            {
 #ifdef __ve
 #pragma _NEC shortloop
 #else
 #pragma cdir shortloop
 #endif
               for (ssize_t kh = 0; kh < KH; ++kh) {
+                ssize_t khDHIW = kh*DW*IW;
 #ifdef __ve
 #pragma _NEC shortloop
 #else
 #pragma cdir shortloop
 #endif
                 for (ssize_t kw = 0; kw < KW; ++kw) {
-                  src[ic*KH*KW + kh*KW + kw] = (kok[kh][kw]? psrc[s0 + ic*IH*IW + kh*DH*IW + kw*DW]: 0.f);
+                  ssize_t koff = khDHIW + kw*DW;
+            for (ssize_t ic = 0; ic < ICOG; ++ic)
+            {
+                  src[ic*KH*KW + kh*KW + kw] = (kok[kh][kw]? psrc[s0 + ic*IH*IW + koff]: 0.f);
                 }
               }
             }

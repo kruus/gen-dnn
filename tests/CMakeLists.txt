@@ -19,13 +19,13 @@ if(POLICY CMP0065)
 endif()
 
 #[ejk] library not found for cygwin -- it links with lib${LIB_NAME}.dll.a
-if((UNIX OR APPLE) AND NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "SX")
+if((UNIX OR APPLE) AND NOT NECSX)
     # workaround for Intel Compiler 16.0 that doesn't suppress warning on
     # deprecation with "-Wno-deprecated" compiler flag
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel" AND
             CMAKE_CXX_COMPILER_VERSION VERSION_LESS "17.0")
         set(SUPPRESS_DEPRECATE_WARNS "-diag-disable:1478")
-    elseif(NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Aurora")
+    elseif(NOT NECVE)
         set(SUPPRESS_DEPRECATE_WARNS "-Wno-deprecated-declarations")
     endif()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SUPPRESS_DEPRECATE_WARNS}")

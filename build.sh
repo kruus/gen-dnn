@@ -36,7 +36,7 @@ usage() {
     echo "Debug: Individual tests can be run like build-sx/tests/gtests/test_relu"
     exit 0
 }
-while getopts ":hatvjdDqQpsSTbF" arg; do
+while getopts ":hatvjdDqQpsSTwWbF" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
@@ -245,12 +245,15 @@ echo "VE_EXEC    ${VE_EXEC}"
         export CXXFLAGS="${CXXFLAGS} -DTARGET_VANILLA"
     fi
     if [ "$DOTARGET" == "a" ]; then
-        CMAKEOPT="${CMAKEOPT} -DCMAKE_C_COMPILER=ncc -DCMAKE_CXX_COMPILER=nc++ -DCMAKE_AR=nar"
-        CMAKEOPT="${CMAKEOPT} -DCMAKE_C_COMPILER_ID=Aurora -DCMAKE_CXX_COMPILER_ID=Aurora"
-        CMAKEOPT="${CMAKEOPT} -DCMAKE_CROSSCOMPILING=1"
-        if VE_EXEC=`which ve_exec 2>/dev/null`; then
-            CMAKEOPT="${CMAKEOPT} -DCMAKE_CROSSCOMPILING_EMULATOR=${VE_EXEC}"
-        fi
+        TOOLCHAIN=../cmake/ve.cmake
+        if [ ! -f "${TOOLCHAIN}" ]; then echo "Ohoh. ${TOOLCHAIN} not found?"; BUILDOK="n"; fi
+        CMAKEOPT="${CMAKEOPT} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}"
+        #CMAKEOPT="${CMAKEOPT} -DCMAKE_C_COMPILER=ncc -DCMAKE_CXX_COMPILER=nc++ -DCMAKE_AR=nar"
+        #CMAKEOPT="${CMAKEOPT} -DCMAKE_C_COMPILER_ID=Aurora -DCMAKE_CXX_COMPILER_ID=Aurora"
+        #CMAKEOPT="${CMAKEOPT} -DCMAKE_CROSSCOMPILING=1"
+        #if VE_EXEC=`which ve_exec 2>/dev/null`; then
+        #    CMAKEOPT="${CMAKEOPT} -DCMAKE_CROSSCOMPILING_EMULATOR=${VE_EXEC}"
+        #fi
         # -proginf  : Run with 'export VE_PROGINF=YES' to get some stats output
         export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
         export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"

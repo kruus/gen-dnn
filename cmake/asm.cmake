@@ -29,11 +29,7 @@ int main() {
 }
 ")
 
-if(${CMAKE_C_COMPILER_ID} STREQUAL "Aurora")
-    find_program(asm_CXXFILT nc++filt)
-else()
-    find_program(asm_CXXFILT c++filt)
-endif()
+find_program(asm_CXXFILT ${_CMAKE_TOOLCHAIN_PREFIX}c++filt)
 find_program(asm_CAT cat)
 message(STATUS "??? ${asm_CAT} <ASSEMBLY_SOURCE>.0 | ${asm_CXXFILT} > <ASSEMBLY_SOURCE>")
 if(asm_CXXFILT AND asm_CAT)
@@ -82,7 +78,7 @@ if(CMAKE_CXX_COMPILER_LOADED)
         # cmake docs do not really recommend overriding the cmake macros, but
         # it seemed an easy way to nicer asm outputs for gcc
         message(STATUS "CMAKE_CXX_COMPILER_ID ${CMAKE_CXX_COMPILER_ID}")
-        if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "Aurora")
+        if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR NECVE)
             # gcc: interspersed source/assembler, and copy .s files to easy-to-find spot
             string(REPLACE " -S <SOURCE>" " -g ${asm_VERBOSE_FLAG} -Wa,-adhln -c <SOURCE>"
                 asm_CXX_CREATE_ASSEMBLY "${CMAKE_CXX_CREATE_ASSEMBLY_SOURCE}")

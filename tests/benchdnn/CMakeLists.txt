@@ -108,7 +108,7 @@ if(NECSX) # dirname and strnlen extensions in a special library:
     # Let me try the approach Ishizaka-san uses for milde compilation:
     set_target_properties(benchdnn PROPERTIES
         LINK_FLAGS -Wl,-h,muldefs,-h,lib_cyclic)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Aurora")
+elseif(NECVE)
     message(STATUS "Aurora benchdnn : not linking with any extra libs")
 elseif(UNIX AND NOT APPLE)
     error_if_SX()

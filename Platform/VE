@@ -1,5 +1,0 @@
-message(STATUS " *** Platform/SXAURORA ***")
-set(UNIX TRUE)
-set(CMAKE_C_COMPILER ncc)
-set(CMAKE_CXX_COMPILER nc++)
-

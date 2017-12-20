@@ -21,15 +21,15 @@ if(NLC_cmake_included)
 endif()
 set(NLC_cmake_included true)
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Aurora")
+if(NECVE)
     #
     # Detect via env var NLC_BASE, or add some more locations to search
     # to try to automatically locate CBLAS for Aurora cross-compilation.
     #
     #set(NLCINC $ENV{NLC_BASE}/include)
-    find_path(NLCINC cblas.h
-        NO_DEFAULT_PATH
-        PATHS /usr/uhome/aurora/bm/nlc/0.9.0/include # ok for cross-compile on zoro
+    find_path(NLCINC cblas.h NO_DEFAULT_PATH PATHS
+        /usr/uhome/aurora/bm/nlc/0.9.0/include # ok for cross-compile on zoro
+        /opt/nec/ve/nlc/0.9.0 # I found this on aurora host
         $ENV{NLC_BASE}
         )
 

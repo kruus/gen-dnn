@@ -39,7 +39,6 @@ message(STATUS " WIN32 : ${WIN32}")
 message(STATUS " NECSX : ${NECSX}")
 message(STATUS " APPLE : ${APPLE}")
 message(STATUS " UNIX  : ${UNIX}")
-unset(VE_EXEC)
 if(WIN32)
     message(STATUS "cmake/platform.cmake WIN32 branch")
     set(USERCONFIG_PLATFORM "x64")
@@ -83,27 +82,27 @@ elseif(UNIX OR APPLE)
     #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Wall")
     #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Wall -Werror")
 
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "Aurora")
+    if(NECVE)
         add_definitions(-DSXAURORA -D_GNU_SOURCE)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -finline -finline-functions")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -O3 -finline -finline-functions")
+        set(CMAKE_CCXX_FLAGS "${CMAKE_C_FLAGS} -O3 -finline -finline-functions")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")
         #set(CMAKE_C_FLAGS_RELEASE "-O3 -finline -ftrace")
         #set(CMAKE_CXX_FLAGS_RELEASE "-O3 -finline -ftrace")
-
-        SET(CMAKE_AR nar)
-
-        set(CMAKE_C_CREATE_PREPROCESSED_SOURCE "<CMAKE_C_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -E <SOURCE> > <PREPROCESSED_SOURCE>" )
-        set(CMAKE_C_CREATE_ASSEMBLY_SOURCE     "<CMAKE_C_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -S <SOURCE> -o <ASSEMBLY_SOURCE>" )
-        set(CMAKE_CXX_CREATE_PREPROCESSED_SOURCE "<CMAKE_CXX_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -E <SOURCE> > <PREPROCESSED_SOURCE>" )
-        set(CMAKE_CXX_CREATE_ASSEMBLY_SOURCE     "<CMAKE_CXX_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -S <SOURCE> -o <ASSEMBLY_SOURCE>" )
-
-        set(VE_EXEC, "ve_exec")
+        #SET(CMAKE_AR nar) # toolchain does a better job of this
+        #set(CMAKE_C_CREATE_PREPROCESSED_SOURCE "<CMAKE_C_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -E <SOURCE> > <PREPROCESSED_SOURCE>" )
+        #set(CMAKE_C_CREATE_ASSEMBLY_SOURCE     "<CMAKE_C_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -S <SOURCE> -o <ASSEMBLY_SOURCE>" )
+        #set(CMAKE_CXX_CREATE_PREPROCESSED_SOURCE "<CMAKE_CXX_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -E <SOURCE> > <PREPROCESSED_SOURCE>" )
+        #set(CMAKE_CXX_CREATE_ASSEMBLY_SOURCE     "<CMAKE_CXX_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -S <SOURCE> -o <ASSEMBLY_SOURCE>" )
+        #find_program(VE_EXEC "ve_exec")
+        #set(VE_EXEC ${CMAKE_CROSSCOMPILING_EMULATOR})
     else()
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fvisibility-inlines-hidden")
         set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -fvisibility=internal -Wno-unknown-pragmas")
     endif()
     # compiler specific settings
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    if(NECVE) # masquerades as GNU 6.0.0, but does not quite support all the flags
+        set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -fdiag-parallel=2 -ffast-math")
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         # Clang cannot vectorize some loops with #pragma omp simd and gets
         # very upset. Tell it that it's okay and that we love it
         # unconditionnaly.

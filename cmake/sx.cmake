@@ -9,7 +9,7 @@ SET(CMAKE_SYSTEM_NAME SX)   # this would need our own Platforms/SX.cmake file
 # this seems to be somewhat flaky
 #SET(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake" CACHE PATH "cmake additional Module path")
 # but this seems to work (In fact, the module path ONLY looks in source_dir)
-SET(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}"       CACHE PATH "cmake additional Module path")
+SET(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH "cmake additional Module/Platform path")
 
 # cross-compilers CMAKE_${lang}_COMPILER moved to Platform/SX-*
 #set(CMAKE_Fortran_COMPILER "sxf03") # ?
