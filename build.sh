@@ -324,10 +324,10 @@ echo "VE_EXEC    ${VE_EXEC}"
         BUILDOK="n"
         if [ $QUICK -gt 1 ]; then # rebuild in existing directory, WITHOUT rerunning cmake
             pwd
-            { { make VERBOSE=1 ${JOBS} } && BUILDOK="y" }
-            while [ $? -eq 4];    # repeat if SIGSEGV
+            { make VERBOSE=1 ${JOBS} ; } && BUILDOK="y"
+            while [ $? -eq 4];
             do
-              { { make VERBOSE=1 -j1 } && BUILDOK="y" }
+              { make VERBOSE=1 -j1 ; } && BUILDOK="y"
             done
             if [ "$BUILDOK" == "n" ]; then
               echo "build failed: ret code $?"
@@ -341,14 +341,15 @@ echo "VE_EXEC    ${VE_EXEC}"
                 && BUILDOK="y" || echo "cmake failed: ret code $?"; }
             if [ "$BUILDOK" == "y" ]; then
                 BUILDOK="n"
-                { { make VERBOSE=1 ${JOBS} } && BUILDOK="y" }
-                while [ $? -eq 4 ];  # repeat if SIGSEGV
+                { make VERBOSE=1 ${JOBS} ; } && BUILDOK="y"
+                while [ $? -eq 4 ];
                 do
-                    { { make VERBOSE=1 -j1 } && BUILDOK="y" }
+                    { make VERBOSE=1 -j1 ; } && BUILDOK="y"
                 done
                 if [ "$BUILDOK" == "n" ]; then
                     echo "build failed: ret code $?"
                 fi
+            fi
             set +x
         fi
         # Make some assembly-source translations automatically...
