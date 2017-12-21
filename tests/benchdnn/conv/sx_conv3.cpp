@@ -349,13 +349,13 @@ static inline void hoist_AmiB_in( int& beg, int& end,
  */
 void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
         dnn_mem_t &wei_m, dnn_mem_t &bia_m, dnn_mem_t &dst_m) {
-#define V 10
+#define V 9
   // regr.sh FWD A3 (Intel)
   // 6 : ok, 10.8
   // 7 : ok, 99.4
   // 8 : ok, 98.4
   // 9 : ok, 97.0  
-  // 10 : ok, 
+  // 10 : ok,   now has 32 failures!
 #if V==6
   const ssize_t G = p->g;
   const ssize_t MB = p->mb;
@@ -1610,46 +1610,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
   }
 #endif
 
-#ifndef __ve
-# pragma omp parallel
-#endif
-  {
-    ssize_t khkw_begend[4];
-    ssize_t kh_beg=0, kh_end=0;
-    ssize_t kw_beg=0, kw_end=0;
-#ifdef __ve
-#pragma _NEC vreg(khkw_begend)
-#else
-#pragma vreg(khkw_begend)
-#endif
-    ssize_t khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW};
-#ifdef __ve
-#pragma _NEC vreg(khkw_begend)
-#else
-#pragma vreg(khkw_begend)
-#endif
-    //ssize_t kh_beg_prv=0, kh_end_prv=0, kw_beg_prv=0, kw_end_prv=0, w0_prv=0;
-    ssize_t khash, w0, s0, s00;
-    ssize_t khash_prv = ~0;
-    //ssize_t khash_prv2 = (KH+KW)*4; // impossibly high hash
-
 #define V10KHKW 0
-#if V10KHKW
-    bool kok2[KH_KW];
-#ifdef __ve
-#pragma _NEC vreg(kok2)
-#else
-#pragma vreg(kok2)
-#endif
-#else
-    bool kok[KH][KW];
-#ifdef __ve
-#pragma _NEC vreg(kok)
-#else
-#pragma vreg(kok)
-#endif
-#endif
-
 #if V10KHKW
   ssize_t khkw_off[KH*KW];
 #pragma _NEC vreg(khkw_off)
@@ -1670,6 +1631,45 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
       khkw_off[kh*KW + kw] = koff;
     }
   }
+#endif
+
+#ifndef __ve
+# pragma omp parallel
+#endif
+  {
+    ssize_t khkw_begend[5];
+    ssize_t kh_beg=0, kh_end=0;
+    ssize_t kw_beg=0, kw_end=0;
+#ifdef __ve
+#pragma _NEC vreg(khkw_begend)
+#else
+#pragma vreg(khkw_begend)
+#endif
+    ssize_t khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW};
+#ifdef __ve
+#pragma _NEC vreg(khkw_begend)
+#else
+#pragma vreg(khkw_begend)
+#endif
+    //ssize_t kh_beg_prv=0, kh_end_prv=0, kw_beg_prv=0, kw_end_prv=0, w0_prv=0;
+    ssize_t khash, w0, s0, s00;
+    ssize_t khash_prv = ~0;
+    //ssize_t khash_prv2 = (KH+KW)*4; // impossibly high hash
+
+#if V10KHKW
+    bool kok2[KH_KW];
+#ifdef __ve
+#pragma _NEC vreg(kok2)
+#else
+#pragma vreg(kok2)
+#endif
+#else
+    bool kok[KH][KW];
+#ifdef __ve
+#pragma _NEC vreg(kok)
+#else
+#pragma vreg(kok)
+#endif
 #endif
 
     float src[ICOG*KH*KW];

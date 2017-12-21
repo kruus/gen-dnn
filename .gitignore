@@ -29,3 +29,14 @@ gmon.out
 oprofile*
 src-hdr-huh
 src-io
+MINI*.log
+fwd*.log
+bwd*.log
+ALEX*.log
+ALL*.log
+FWD*.log
+A1-*.log
+A3-*.log
+minifwd*.log
+minibwd*.log
+BWD*.log
