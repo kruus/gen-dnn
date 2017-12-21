@@ -176,6 +176,7 @@ echo "nopt    : $nopt"
 #(cd "${BUILDDIR}" && make && cd tests/benchdnn && /usr/bin/time -v ./benchdnn --mode=PT --batch=inputs/test_fwd_regression) 2>&1 | tee PT.log
 HOSTNAME=`hostname -s` # SX-ACCE does not support --short
 if [ "`uname -m`" = "SX-ACE" ]; then HOSTNAME='sx'; fi # I could not put spaces here, for SX-ACE (so no awk/sed)
+if [ "${NECVE}" ]; then HOSTNAME='ve'; fi
 LOGFILE="${BASE}-${HOSTNAME}.log"
 if [ ! "$THREADS" = "" ]; then LOGFILE="${BASE}-t${THREADS}-${HOSTNAME}.log"; fi
 echo "LOGFILE : $LOGFILE"
