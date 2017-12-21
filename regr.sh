@@ -2,8 +2,28 @@
 # Usage:
 #  regr.sh {FWD*|BWD_D|BWD_W*} ...other bench.sh args
 #
-if [ $NLC_BASE ]; then    # NEC SX Aurora VE
-    VEEXEC=ve_exec
+#if [ $NLC_BASE ]; then    # NEC SX Aurora VE
+#    VE_EXEC=ve_exec
+#fi
+BUILDDIR=build
+if [ "`uname -m`" = "SX-ACE" ]; then BUILDDIR=build-sx; fi
+echo "BUILDDIR: $BUILDDIR"
+
+VE_EXEC=''
+if [ -f "${BUILDDIR}/bash_help.inc" ]; then
+    # snarf some CMAKE variables
+    source "${BUILDDIR}/bash_help.inc"
+    echo " From bash_help_inc, CMAKE_CROSSCOMPILING_EMULATOR is ${CMAKE_CROSSCOMPILING_EMULATOR}"
+    if [ "${CMAKE_CROSSCOMPILING_EMULATOR}" ]; then
+        VE_EXEC="${CMAKE_CROSSCOMPILING_EMULATOR}"
+        if [ ! -x "${VE_EXEC}" ]; then
+            VE_EXEC="echo Not-Running ${VE_EXEC}"
+            echo "cmake crosscompiling emulator, such as ve_exec, not available?"
+        fi
+    fi
+    # In this script, we do need ve_exec, because we are running test
+    #executables directly, rather than via a 'make' target
+    echo "VE_EXEC: ${VE_EXEC}"
 fi
 ORIGINAL_CMD="$0 $*"
 usage() {
@@ -31,15 +51,16 @@ if ! [[ "$THREADS" =~ $re_nonneg ]]; then # non-digits? no threads argument
 else
     shift                                 # gobble the threads arg
 fi
+# Hack : NECVE does not support omp yet
+if [ "${NECVE}" ]; then
+    THREADS=1
+fi
 if [ "$#" -lt 1 ]; then usage; exit; fi
 ARGS=($*)
 BASE=''
 COPY="cp -uav"
 if [ "`uname -m`" = "SX-ACE" ]; then COPY="cp -a"; fi
 echo "COPY    : $COPY"
-BUILDDIR=build
-if [ "`uname -m`" = "SX-ACE" ]; then BUILDDIR=build-sx; fi
-echo "BUILDDIR: $BUILDDIR"
 batch_check() {
     BATCH="$1"
     # if batch is a file, copy to build dir and prepend --batch=
@@ -172,7 +193,7 @@ set +x
             if [ "$THREADS" = "" ]; then unset OMP_NUM_THREADS;
             else THREADS="OMP_NUM_THREADS=$THREADS"; fi
             echo "THREADS  : $THREADS"
-            echo "cmd      : $THREADS C_PROGINF=DETAIL ${TIME} $VEEXEC ./benchdnn --mode=PT ${ARGS[@]}"
+            echo "cmd      : $THREADS C_PROGINF=DETAIL ${TIME} $VE_EXEC ./benchdnn --mode=PT ${ARGS[@]}"
             cd tests/benchdnn;
 pwd
 ls -l .
@@ -181,8 +202,8 @@ ls -l .
 set +x
 echo "COLUMN ... $COLUMN"
             (cd inputs && ls -1) | awk '//{p=p " " $0;++n} n>=4{print p; p=""; n=0} END{print p}' | ${COLUMN}
-            echo "eval $THREADS C_PROGINF=DETAIL ${TIME} $VEEXEC ./benchdnn --mode=PT ${ARGS[@]}"
-            eval $THREADS C_PROGINF=DETAIL ${TIME} $VEEXEC ./benchdnn --mode=PT ${ARGS[@]}
+            echo "eval $THREADS C_PROGINF=DETAIL ${TIME} $VE_EXEC ./benchdnn --mode=PT ${ARGS[@]}"
+            eval $THREADS C_PROGINF=DETAIL ${TIME} $VE_EXEC ./benchdnn --mode=PT ${ARGS[@]}
         }
     } || { echo "Problems?"; false; }
     ) >& "$LOGFILE" \

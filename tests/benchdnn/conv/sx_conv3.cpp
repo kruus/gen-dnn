@@ -613,6 +613,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
               }
             }
             for (ssize_t ickhkw = 0; ickhkw < ICOG*kh_end*kw_end; ++ickhkw){
+#pragma _NEC nolstval
               for (ssize_t oc = 0; oc < OCOG; ++oc) {
                 //tmp[oc] += six[ickhkw] * pwei[wix[ickhkw] + oc * ICOG*KH*KW];
                 tmp[oc] += six[ickhkw] * pwei[w0 + wix[ickhkw] + oc * ICOG*KH*KW];
@@ -1721,6 +1722,8 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
             const ssize_t w0 = (((g * OCOG + 0 ) * ICOG + 0) * KH + 0) * KW + 0; // oc,ic,kh,kw=0
             const ssize_t s0 = ((mb * IC + g * ICOG + 0 ) * IH + (oh*SH-PH+0*DH)) * IW + (ow*SW-PW+0*DW); //ic,kh,kw=0
             // slower for (ssize_t ic = 0, ickhkw=0; ic < ICOG; ++ickhkw, ++ic)
+            for (ssize_t ic = 0; ic < ICOG; ++ic)
+            {
 #ifdef __ve
 #pragma _NEC shortloop
 #else
@@ -1735,8 +1738,6 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
 #endif
                 for (ssize_t kw = 0; kw < KW; ++kw) {
                   ssize_t koff = khDHIW + kw*DW;
-            for (ssize_t ic = 0; ic < ICOG; ++ic)
-            {
                   src[ic*KH*KW + kh*KW + kw] = (kok[kh][kw]? psrc[s0 + ic*IH*IW + koff]: 0.f);
                 }
               }
@@ -2002,19 +2003,21 @@ static void sxconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
               if (j >= OW) kw_ibeg += (j-OW)/jww * kww + kww;
               kw_beg = kw_ibeg;
             }
-            if( kw_beg >= kw_end ) continue;
+            //if( kw_beg >= kw_end ) continue;
 
-            for (size_t kh = kh_beg, oh0=ih+PH - kh_beg*DH ;
-                kh < kh_end;
-                oh0 -= lcm_h, kh += khh)
+            float d[OCOG], w[OCOG];
+            size_t oh0 = ih + PH - kh_beg * DH;
+            //for (size_t kh = kh_beg, oh0=ih+PH - kh_beg*DH ; kh < kh_end; oh0 -= lcm_h, kh += khh)
+            for (size_t kh = kh_beg; kh < kh_end; oh0 -= lcm_h, kh += khh)
             {
-              for (size_t kw = kw_beg, ow0=iw+PW - kw_beg*(p->dw+1) ;
-                  kw < kw_end;
-                  ow0 -= lcm_w, kw += kww)
+              size_t ow0 = iw + PW - kw_beg * DW;
+              //for (size_t kw = kw_beg, ow0=iw+PW - kw_beg*(p->dw+1) ; kw < kw_end; ow0 -= lcm_w, kw += kww)
+              for (size_t kw = kw_beg; kw < kw_end; kw += kww)
               {
                 const size_t dst_off0 = (((size_t)mb * OC + g * OCOG + 0) * OH + oh0/SH) * OW + ow0/SH;
                 const size_t wei_off0 = ((((size_t)g * OCOG + 0 ) * ICOG + ic) * KH + kh) * KW + kw;
-                float d[OCOG], w[OCOG];
+                //float d[OCOG], w[OCOG]; # __ve : inhibits optimization
+#pragma _NEC nolstval
                 for (size_t oc = 0; oc < OCOG; ++oc) {
                   //size_t dst_off = dst_off_f(p, mb, g, oc, oh0/SH, ow0/SW);
                   //size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
@@ -2024,7 +2027,9 @@ static void sxconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
                   ds += d[oc] * w[oc];
                 }
               }
+              ow0 -=  lcm_w;
             }
+            oh0 -= lcm_h; // NEW (for Aurora optimization)
 
           }
         }
