@@ -25,6 +25,43 @@
 #include <float.h>
 #include <math.h>
 
+// -------- OS-specific stuff --------
+// _ve compile does something with pragma omp, but it is not officially supported,
+// so we use C++11 _Pragma to emit pragmas from macros and customize pragmas to
+// particular compilers.
+// VREG      : hint that array fits into one simd register
+// ShortLoop : hint that for-loop limit is less than max simd register length
+// RETAIN    : hint that array should be kept accesible (on adb, or cached)
+// -----------------------------------
+#if defined(_SX)
+#define ENABLE_OMP 1
+#define RETAIN(var,...) _Pragma("cdir on_adb(" #__VA_ARGS__ ")")
+#define VREG(...) _Pragma("cdir (" #__VA_ARGS__ ")")
+#define ShortLoop() _Pragma("cdir shortloop")
+#define ALLOC_ON_VREG(var,...) _Pragma("cdir alloc_on_vreg(" #var #__VA_ARGS__ ")")
+
+#elif defined(_ve)
+#define ENABLE_OMP 0
+#define RETAIN(...) _Pragma("_NEC retain(" #__VA_ARGS__ ")")
+#define VREG(...) _Pragma("_NEC " #__VA_ARGS__ ")")
+#define ShortLoop() _Pragma("_NEC shortloop")
+#define ALLOC_ON_VREG(...) RETAIN(__VA_ARGS__)
+
+#else
+#define ENABLE_OMP 1
+#define RETAIN(...)
+#define VREG(...)
+#define ShortLoop()
+#define ALLOC_ON_VREG(...)
+#define restrict
+#endif
+
+#if ENABLE_OMP
+#define OMP(...) _Pragma(#__VA_ARGS__)
+#endif
+// -----------------------------------
+
+
 #define OK 0
 #define FAIL 1
 

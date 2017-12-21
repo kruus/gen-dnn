@@ -161,9 +161,7 @@ void sxconv_2_fwd(const prb_t *p, dnn_mem_t &src_m,
         }
     };
 
-#ifndef __ve
-#   pragma omp parallel for collapse(5)
-#endif
+    OMP(parallel for collapse(5))//;
     for (ssize_t g = 0; g < G; ++g) {
     for (ssize_t mb = 0; mb < MB; ++mb) {
         for (ssize_t oc = 0; oc < OCOG; ++oc) {
@@ -293,9 +291,7 @@ void sxconv_2_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
     };
 #endif
 
-#ifndef __ve
-#   pragma omp parallel for collapse(5)
-#endif
+    OMP(parallel for collapse(5))//;
     for (int g = 0; g < G; ++g) {
     for (int mb = 0; mb < MB; ++mb) {
         for (int ic = 0; ic < ICOG; ++ic) {
@@ -384,9 +380,7 @@ void sxconv_2_bwd_w(const prb_t *p, dnn_mem_t &src_m,
         }
     };
 
-#ifndef __ve
-#   pragma omp parallel for collapse(5)
-#endif
+    OMP(parallel for collapse(5))//;
     for (ssize_t g = 0; g < p->g; ++g) {
         for (ssize_t oc = 0; oc < p->oc/p->g; ++oc) {
         for (ssize_t ic = 0; ic < p->ic/p->g; ++ic) {
@@ -405,9 +399,7 @@ void sxconv_2_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 
     if (!(p->dir & FLAG_BIA)) return;
 
-#ifndef __ve
-#   pragma omp parallel for collapse(2)
-#endif
+    OMP(parallel for collapse(2))//;
     for (ssize_t g = 0; g < p->g; ++g) {
         for (ssize_t oc = 0; oc < p->oc/p->g; ++oc) {
             ssize_t bia_off = bia_off_f2(p, g, oc);

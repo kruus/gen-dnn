@@ -20,11 +20,12 @@ JOBS="-j8"
 CMAKETRACE=""
 USE_CBLAS=1
 QUICK=0
+DOGCC_VER=0
 NEC_FTRACE=0
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
-    awk '/getopts/{flag=1;next} /done/{flag=0} flag&&/^[^#]+) #/; flag&&/^ *# /' $0
+    awk '/getopts/{flag=1;next} /^done/{flag=0} flag&&/^[^#]+) #/; flag&&/^ *# /' $0
     echo "Example: time a full test run for a debug compilation --- time $0 -dtt"
     echo "         SX debug compile, quick (no doxygen)         --- time $0 -Sdq"
     echo "         *just* run cmake, for SX debug compile       ---      $0 -SdQ"
@@ -36,7 +37,7 @@ usage() {
     echo "Debug: Individual tests can be run like build-sx/tests/gtests/test_relu"
     exit 0
 }
-while getopts ":hatvjdDqQpsSTwWbF" arg; do
+while getopts ":hatvjdDqQpsSTwWbF567" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
@@ -98,6 +99,15 @@ while getopts ":hatvjdDqQpsSTwWbF" arg; do
         T) # cmake --trace
             CMAKETRACE="--trace"
             ;;
+        5) # gcc-5, if found
+            DOGCC_VER=5
+            ;;
+        6) # gcc-6, if found
+            DOGCC_VER=6
+            ;;
+        7) # gcc-7, if found
+            DOGCC_VER=7
+            ;;
     h | *) # help
             usage
             ;;
@@ -128,8 +138,8 @@ fi
 #
 if [ "$DOTARGET" == "j" ]; then DOJIT=100; INSTALLDIR='install-jit'; BUILDDIR='build-jit'; fi
 if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx';
-# Hack -- I was toying with g++-7 today ...
-#elif $(gcc-7 -v); then export CXX=g++-7; export CC=gcc-7;
+elif [ "$DOTARGET" != "a" -a "$DOGCC_VER" -gt 0 ]; then
+    if $(gcc-${DOGCC_VER} -v); then export CXX=g++-${DOGCC_VER}; export CC=gcc-${DOGCC_VER}; fi
 fi
 #if [ "$DOTARGET" == "v" ]; then ; fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; BUILDDIR="${BUILDDIR}d"; fi

@@ -27,23 +27,24 @@ if(POLICY CMP0048)
     cmake_policy(SET CMP0048 OLD)
     cmake_policy(SET CMP0054 OLD)
 endif()
-
 # Enable RPATH on MacOS/OSX
 if(POLICY CMP0042)
     cmake_policy(SET CMP0042 NEW)
 endif()
-
 # Do not export symbols from executables
 if(POLICY CMP0065)
     cmake_policy(SET CMP0065 NEW)
 endif()
-
 # Pass all flags to try_compile
 if(POLICY CMP0056)
     cmake_policy(SET CMP0056 NEW)
 endif()
 if(POLICY CMP0066)
     cmake_policy(SET CMP0066 NEW)
+endif()
+# use full pathnames on libs (now auto-discovered from compiler frontends)
+if(POLICY CMP0060)
+    cmake_policy(SET CMP0060 NEW)
 endif()
 
 set(PROJECT_NAME "GEN-DNN generic MKL-DNN)")
@@ -99,6 +100,9 @@ include("cmake/MKL.cmake")
 include("cmake/NLC.cmake")
 include("cmake/Doxygen.cmake")
 
+# XXX hack
+include("Platform/SX-util.cmake")
+
 enable_testing()
 
 include_directories(include)
@@ -109,7 +113,7 @@ add_subdirectory(tests)
 
 install(FILES LICENSE DESTINATION share/doc/${LIB_NAME} COMPONENT doc)
 message(STATUS "CMAKE_CXX_COMPILER = ${CMAKE_CXX_COMPILER}")
-if(NECVE)
+if(1 OR NECVE)
     show_cmake_stuff("After cmake/*.cmake includes ...")
     configure_file(${CMAKE_SOURCE_DIR}/cmake/bash_help.inc.in
         ${PROJECT_BINARY_DIR}/bash_help.inc)

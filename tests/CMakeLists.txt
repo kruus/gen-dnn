@@ -17,6 +17,9 @@
 if(POLICY CMP0065)
     cmake_policy(SET CMP0065 NEW)
 endif()
+if(POLICY CMP0060)
+    cmake_policy(SET CMP0060 NEW)
+endif()
 
 #[ejk] library not found for cygwin -- it links with lib${LIB_NAME}.dll.a
 if((UNIX OR APPLE) AND NOT NECSX)

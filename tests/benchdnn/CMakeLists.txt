@@ -57,12 +57,21 @@ endif()
 set_property(TARGET benchdnn PROPERTY CXX_STANDARD 11)
 # [ejk] ease switching between #ifdef'ed code blocks with unused vars/fns
 if(NECSX)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pvctl,fullmsg")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pvctl,fullmsg")
+    set(BENCHDNN_EXTRA "${BENCHDNN_EXTRA} -pvctl,fullmsg")
+elseif(NECVE)
+    set(BENCHDNN_EXTRA "${BENCHDNN_EXTRA} -Wno-error")
 else()
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error")
+    if(UNIX AND NOT APPLE AND "${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
+        # gcc-X optimization reporting ...
+        # -finfo-vec- ... many things  (missed, all, note, vec, omp, inl, ...)
+        set(BENCHDNN_EXTRA "${BENCHDNN_EXTRA} -ftree-vectorizer-verbose=7 -fopt-info-all-loop-vec")
+        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER "5.9.9")
+            set(BENCHDNN_EXTRA "${BENCHDNN_EXTRA} -fopt-info-all-omp")
+        endif()
+    endif()
 endif()
+set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} ${BENCHDNN_EXTRA}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${BENCHDNN_EXTRA}")
 
 # -- not working -- still need to do it by hand, something like:
 #                 ( cd build/tests/benchdnn && make conv/sx_conv4.cpp.s )
@@ -80,20 +89,7 @@ set_target_properties(unused PROPERTIES
 string(REGEX REPLACE "${CMAKE_CURRENT_SOURCE_DIR}/conv/(.*)" "conv/\\1.s"
     ASM_TARGETS ${ASM_SOURCES} )
 message(STATUS "benchdnn ASM_TARGETS = ${ASM_TARGETS}")
-
-
-##add_custom_command(OUTPUT AssemblyCode DEPENDS ${ASM_TARGETS}
-##    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-#add_custom_target(AssemblyCode ALL
-#    COMMAND ${CMAKE_MAKE_PROGRAM} ${ASM_TARGETS}
-#    )
-#foreach(asm_tgt ${ASM_TARGETS})
-#    #string(REGEX REPLACE "conv/(.*)" "\\1" asm_tgt2 ${asm_tgt} )
-#    #add_custom_target(${asm_tgt} ALL)
-#    add_custom_command(TARGET benchdnn POST_BUILD
-#        COMMAND ${CMAKE_MAKE_PROGRAM} ARGS ${asm_tgt}
-#        WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-#endforeach()
+# --- moved .s rule modifications into cmake/asm.cmake
 
 #set_property(TARGET benchdnn PROPERTY C_STANDARD 11)
 target_link_libraries(benchdnn ${LIB_NAME} ${EXTRA_LIBS})
