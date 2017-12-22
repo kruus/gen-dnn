@@ -22,7 +22,9 @@ message(STATUS "find_program --> CMAKE_CROSSCOMPILING_EMULATOR = ${CMAKE_CROSSCO
 if(CMAKE_CROSSCOMPILING_EMULATOR)
     set(VE_EXEC ${CMAKE_CROSSCOMPILING_EMULATOR})
 else()
-    set(VE_EXEC echo ve_exec)
+    set(VE_EXEC "echo ve_exec")
+    set(CMAKE_CROSSCOMPILING_EMULATOR ve_exec)
+    #set(CMAKE_CROSSCOMPILING_EMULATOR "")
 endif()
 message(STATUS "VE_EXEC ends up as ${VE_EXEC}")
 

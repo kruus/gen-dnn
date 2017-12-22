@@ -10,6 +10,7 @@ if [ "`uname -m`" = "SX-ACE" ]; then BUILDDIR=build-sx; fi
 echo "BUILDDIR: $BUILDDIR"
 
 VE_EXEC=''
+# if compiled and VE_EXEC existed, use that path
 if [ -f "${BUILDDIR}/bash_help.inc" ]; then
     # snarf some CMAKE variables
     source "${BUILDDIR}/bash_help.inc"
@@ -17,14 +18,25 @@ if [ -f "${BUILDDIR}/bash_help.inc" ]; then
     if [ "${CMAKE_CROSSCOMPILING_EMULATOR}" ]; then
         VE_EXEC="${CMAKE_CROSSCOMPILING_EMULATOR}"
         if [ ! -x "${VE_EXEC}" ]; then
-            VE_EXEC="echo Not-Running ${VE_EXEC}"
-            echo "cmake crosscompiling emulator, such as ve_exec, not available?"
+            VE_EXEC='';
+            #echo "cmake crosscompiling emulator, such as ve_exec, not available?"
         fi
     fi
+    if [ "${VE_EXEC}" = "" -a "${NECVE}" -gt 0 ]; then
+        # otherwise check for VE_EXEC in PATH on this machine
+        for try in ve_exec /opt/nec/ve/bin/ve_exec; do
+            if { $try --version 2> /dev/null; } then
+                VE_EXEC="$try";
+                break;
+            fi
+        done
+    fi    
     # In this script, we do need ve_exec, because we are running test
     #executables directly, rather than via a 'make' target
     echo "VE_EXEC: ${VE_EXEC}"
 fi
+if [ ! "${VE_EXEC}" ]; then VE_EXEC="echo Not-Running"; fi
+
 ORIGINAL_CMD="$0 $*"
 usage() {
     echo " command: $ORIGINAL_CMD"

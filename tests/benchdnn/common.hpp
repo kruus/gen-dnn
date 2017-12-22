@@ -26,26 +26,40 @@
 #include <math.h>
 
 // -------- OS-specific stuff --------
-// _ve compile does something with pragma omp, but it is not officially supported,
-// so we use C++11 _Pragma to emit pragmas from macros and customize pragmas to
+// __ve compile does something with pragma omp, but it is not officially supported,
+// so we use C++11 XPragma to emit pragmas from macros and customize pragmas to
 // particular compilers.
 // VREG      : hint that array fits into one simd register
 // ShortLoop : hint that for-loop limit is less than max simd register length
 // RETAIN    : hint that array should be kept accesible (on adb, or cached)
 // -----------------------------------
+#define XPragma(str) do{(void)(str); }while(0);
+#define YPragma(str) do{int ypr=str;}while(0);
+#define ZPragma(str) _Pragma(str)
+#define Str(...) #__VA_ARGS__
+#define Str2(a,b) Str(a b)
+#define StrCat(a,b) Str(a##b)
 #if defined(_SX)
 #define ENABLE_OMP 1
-#define RETAIN(var,...) _Pragma("cdir on_adb(" #__VA_ARGS__ ")")
-#define VREG(...) _Pragma("cdir (" #__VA_ARGS__ ")")
+#define RETAIN(...) ZPragma(Str(cdir on_adb(__VA_ARGS__)))
+#define RETAIN1st(var,...) ZPragma(Str(cdir on_adb(var)))
+#define VREG(...) ZPragma(Str(cdir vreg(__VA_ARGS__)))
+//#define ShortLoop() ("cdir shortloop")
+// equiv. demo.
+//#define ShortLoop() ZPragma(Str2(cdir,shortloop))
 #define ShortLoop() _Pragma("cdir shortloop")
-#define ALLOC_ON_VREG(var,...) _Pragma("cdir alloc_on_vreg(" #var #__VA_ARGS__ ")")
+// Now fix up ALLOC_ON_VREG
+//#define ALLOC_ON_VREG(...) XPragma("cdir alloc_on_vreg(" #__VA_ARGS__ ")")
+//#define ALLOC_ON_VREG(a) YPragma(Str(cdir alloc_on_vreg(a)))
+#define ALLOC_ON_VREG(...) ZPragma(Str(cdir alloc_on_vreg(__VA_ARGS__)))
 
-#elif defined(_ve)
+#elif defined(__ve)
 #define ENABLE_OMP 0
-#define RETAIN(...) _Pragma("_NEC retain(" #__VA_ARGS__ ")")
-#define VREG(...) _Pragma("_NEC " #__VA_ARGS__ ")")
+#define RETAIN(...) ZPragma(Str(_NEC retain(__VA_ARGS__)))
+#define RETAIN1st(var,...) ZPragma(Str(_NEC retain(var)))
+#define VREG(...) ZPragma(Str(_NEC __VA_ARGS__))
 #define ShortLoop() _Pragma("_NEC shortloop")
-#define ALLOC_ON_VREG(...) RETAIN(__VA_ARGS__)
+#define ALLOC_ON_VREG(...) RETAIN1st(__VA_ARGS__)
 
 #else
 #define ENABLE_OMP 1

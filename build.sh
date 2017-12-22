@@ -43,6 +43,7 @@ while getopts ":hatvjdDqQpsSTwWbF567" arg; do
         a) # NEC Aurora VE
             DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
             JOBS="-j1" # -j1 to avoid SIGSEGV in ccom
+            if [ `uname -n` = "zoro" ]; then JOBS="-j8"; fi
             #export LDFLAGS="${LDFLAGS} -L/opt/nec/ve/musl/lib"
             ;;
         F) # NEC Aurora VE or SX : add ftrace support (generate ftrace.out)
@@ -202,7 +203,8 @@ TESTRUNNER='time'
 if { /usr/bin/time -v echo Hello >& /dev/null; } then
     TESTRUNNER='/usr/bin/time -v'
 fi
-if [ "$NEC_FTRACE" -gt 0 ]; then
+#if [ "$NEC_FTRACE" -gt 0 ]; then
+if [ "$DOTARGET" = "a" -o "$DOTARGET" = "s" ]; then
     #TESTRUNNER="VE_PROGINF=YES ${TESTRUNNER}" #works if used as bash -c ${TESTRUNNER}
     export VE_PROGINF=YES;
     export C_PROGINF=YES;

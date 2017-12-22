@@ -930,22 +930,19 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
   float       * restrict const pdst = (float*)dst_m;
   OMP(parallel)
   {
-    ssize_t khkw_begend[4];
+    ssize_t khkw_begend[4]; VREG(khkw_begend)//;
     ssize_t kh_beg=0, kh_end=0;
     ssize_t kw_beg=0, kw_end=0;
-    VREG(khkw_begend)
-      ssize_t khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW};
-    VREG(khkw_muls)
-      //ssize_t kh_beg_prv=0, kh_end_prv=0, kw_beg_prv=0, kw_end_prv=0, w0_prv=0;
-      ssize_t khash, w0, s0, s00;
+    ssize_t khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW}; VREG(khkw_muls)//;
+    //ssize_t kh_beg_prv=0, kh_end_prv=0, kw_beg_prv=0, kw_end_prv=0, w0_prv=0;
+    ssize_t khash, w0, s0, s00;
     ssize_t khash_prv = ~0;
     //ssize_t khash_prv2 = (KH+KW)*4; // impossibly high hash
-    bool kok[KH][KW];
-    VREG(kok)
-      float src[ICOG*KH*KW]; ALLOC_ON_VREG(src)
-      float tmp[OCOG];       ALLOC_ON_VREG(tmp,OCOG) // roughly double the speed
+    bool kok[KH][KW]; VREG(kok)//;
+    float src[ICOG*KH*KW]; ALLOC_ON_VREG(src)//;
+    float tmp[OCOG];       ALLOC_ON_VREG(tmp,OCOG) // roughly double the speed;
 
-      OMP(for collapse(4))//;
+    OMP(for collapse(4))//;
     for (ssize_t g = 0; g < G; ++g) {
       for (ssize_t mb = 0; mb < MB; ++mb) {
         for (ssize_t oh = 0; oh < OH; ++oh) {
@@ -1243,12 +1240,8 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
   float const * restrict const pwei = (float*)wei_m;
   float const * restrict const pbia = (float*)bia_m;
   float       * restrict const pdst = (float*)dst_m;
-  ssize_t khb[OH], khe[OH];
-  ALLOC_ON_VREG(khb,OH)
-      ALLOC_ON_VREG(khe,OH)
-  ssize_t kwb[OW], kwe[OW];
-  ALLOC_ON_VREG(kwb,OW)
-      ALLOC_ON_VREG(kwe,OW)
+  ssize_t khb[OH], khe[OH]; ALLOC_ON_VREG(khb,OH) ALLOC_ON_VREG(khe,OH)
+  ssize_t kwb[OW], kwe[OW]; ALLOC_ON_VREG(kwb,OW) ALLOC_ON_VREG(kwe,OW)
 #if 0
   OMP(single)//;
   for (ssize_t oh = 0; oh < OH; ++oh) {
@@ -1298,16 +1291,12 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
       ssize_t khash, w0, s0, s00;
     ssize_t khash_prv = ~0;
     //ssize_t khash_prv2 = (KH+KW)*4; // impossibly high hash
-    bool kok[KH][KW];
-    VREG(kok)
-      float src[ICOG*KH*KW];
-    ALLOC_ON_VREG(src)
-      float tmp[OCOG];
-    //RETAIN(tmp)
-    ALLOC_ON_VREG(tmp,OCOG) // roughly double the speed
+    bool kok[KH][KW]; VREG(kok)//;
+    //float src[ICOG*KH*KW]; ALLOC_ON_VREG(src)//;
+    float src[ICOG*KH*KW]; RETAIN(src)//;
+    float tmp[OCOG]; ALLOC_ON_VREG(tmp,OCOG) // roughly double the speed;
 
-      OMP(single nowait)//;
-    for (int oh = 0; oh < OH; ++oh) {
+    OMP(single nowait) for (int oh = 0; oh < OH; ++oh) {
       // trick to easy calc of kh, kw loop limits is that division must
       // round more consistently.  'C' round-to-zero is not so useful!
       khb[oh] = div_floor( 0  - (oh * SH - PH) + p->dh, (p->dh+1) );
@@ -1315,8 +1304,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
       if( khb[oh] < 0     ) khb[oh] = 0;
       if( khe[oh] > p->kh ) khe[oh] = p->kh;
     }
-    OMP(single nowait)//;
-    for (int ow = 0; ow < OW; ++ow) {
+    OMP(single nowait) for (int ow = 0; ow < OW; ++ow) {
       kwb[ow] = div_floor( 0  - (ow * SW - PW) + p->dw, (p->dw+1) );
       kwe[ow] = div_floor( IW - (ow * SW - PW) + p->dw, (p->dw+1) );
       if( kwb[ow] < 0  ) kwb[ow] = 0;
