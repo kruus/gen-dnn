@@ -99,23 +99,23 @@
 
 #if ENABLE_OPT_PRAGMAS && defined(_SX)
 #warning "SX optimization pragmas IN EFFECT"
-#define VREG(...) PragmaQuote(cdir vreg(__VA_ARGS__))
-#define ALLOC_ON_VREG(...) PragmaQuote(cdir alloc_on_vreg(__VA_ARGS__))
-#define ALLOC_ON_ADB(...) PragmaQuote(cdir alloc_on_adb(__VA_ARGS__))
+#define VREG(...) ZPragma(Str((cdir vreg(__VA_ARGS__)))
+#define ALLOC_ON_VREG(...) ZPragma(Str(cdir alloc_on_vreg(__VA_ARGS__)))
+#define ALLOC_ON_ADB(...) ZPragma(Str(cdir alloc_on_adb(__VA_ARGS__)))
 // Is there a pre-for-loop RETAIN for SX? For now, kludge as on_adb.
-#define RETAIN(...) PragmaQuote(cdir on_adb(__VA_ARGS__))
-#define RETAIN1st(var,...) PragmaQuote(cdir on_adb(var))
+#define RETAIN(...) ZPragma(Str(cdir on_adb(__VA_ARGS__)))
+#define RETAIN1st(var,...) ZPragma(Str(cdir on_adb(var)))
 #define ShortLoop() _Pragma("cdir shortloop")
 #define ShortLoopTest() /*?*/
 #define IVDEP() _Pragma("cdir nodep")
 
 #elif ENABLE_OPT_PRAGMAS && defined(__ve)
 #warning "__ve optimization pragmas IN EFFECT"
-#define VREG(...) PragmaQuote(_NEC vreg(__VA_ARGS__))
+#define VREG(...) ZPragma(Str(_NEC vreg(__VA_ARGS__)))
 #define ALLOC_ON_VREG(...)
 #define ALLOC_ON_ADB(...)
 #define RETAIN(...) ZPragma(Str(_NEC retain(__VA_ARGS__)))
-#define RETAIN1st(var,...) PragmaQuote(_NEC retain(var))
+#define RETAIN1st(var,...) ZPragma(Str(_NEC retain(var)))
 #define ShortLoop() _Pragma("_NEC shortloop")
 #define ShortLoopTest() _Pragma("_NEC shortloop_reduction")
 #define IVDEP() _Pragma("_NEC ivdep")
@@ -137,7 +137,7 @@
 
 
 #if ENABLE_OMP
-#define OMP(...) PragmaQuote(omp __VA_ARGS__))
+#define OMP(...) ZPragma(Str(omp __VA_ARGS__)))
 #else
 #define OMP(...)
 #endif
