@@ -17,10 +17,18 @@ void ignore_vec_dep0_plain (int *a, int k, int c, int m)
 }
 _Pragma("GCC target (\"arch=core2\")")  // Note: this may not actually be runnable on your CPU
 
+#define Str(...) #__VA_ARGS__
+#define OMP(...) _Pragma(Str(omp __VA_ARGS__))
 #define IVDEP1() _Pragma("GCC ivdep")
 void ignore_vec_dep1 (int *a, int k, int c, int m)
 {
-    IVDEP1()
+    IVDEP1()//;
+    for (int i = 0; i < m; i++)
+        a[i] = a[i + k] * c;
+    OMP(parallel for)//;
+    for (int i = 0; i < m; i++)
+        a[i] = a[i + k] * c;
+    OMP(parallel)//;
     for (int i = 0; i < m; i++)
         a[i] = a[i + k] * c;
 }
