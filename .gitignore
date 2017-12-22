@@ -16,7 +16,9 @@ install-dbg*
 *.ii
 *.o
 *.vg
-build.log
+build*.log
+mk*.log
+cmk*.log
 doxygen.log
 test*.log
 log-*
