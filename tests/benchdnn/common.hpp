@@ -71,7 +71,7 @@
 #endif
 
 #if ENABLE_OMP
-#define OMP(...) _Pragma(#__VA_ARGS__)
+#define OMP(...) ZPragma(Str(omp __VA_ARGS__))
 #endif
 // -----------------------------------
 
