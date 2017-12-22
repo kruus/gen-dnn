@@ -29,9 +29,19 @@
 // __ve compile does something with pragma omp, but it is not officially supported,
 // so we use C++11 XPragma to emit pragmas from macros and customize pragmas to
 // particular compilers.
-// VREG      : hint that array fits into one simd register
-// ShortLoop : hint that for-loop limit is less than max simd register length
-// RETAIN    : hint that array should be kept accesible (on adb, or cached)
+//
+// Allocation directives:
+//   VREG          : hint that array fits into one simd register
+//                   There may be many conditions on array access!
+//   ALLOC_ON_VREG : hint that array fits into multiple simd registers
+//   ALLOC_ON_ADB  : hint that array should be "cached" in special memory bank.
+//
+// Loop directives apply to an IMMEDIATELY FOLLOWING loop:
+//   ShortLoop : hint that for-loop limit is less than max simd register length
+//   RETAIN    : hint that array should be kept accesible (cached)
+//   IVDEP     : pretend all ptrs are independent (restrict)
+//
+// Oh! ALLOC_ON_VREG cannot "decay" into RETAIN, because syntax is different
 // -----------------------------------
 #define XPragma(str) do{(void)(str); }while(0);
 #define YPragma(str) do{int ypr=str;}while(0);
@@ -41,32 +51,35 @@
 #define StrCat(a,b) Str(a##b)
 #if defined(_SX)
 #define ENABLE_OMP 1
+// RETAIN is not-quite-the-same... is there a better SX directive?
 #define RETAIN(...) ZPragma(Str(cdir on_adb(__VA_ARGS__)))
 #define RETAIN1st(var,...) ZPragma(Str(cdir on_adb(var)))
 #define VREG(...) ZPragma(Str(cdir vreg(__VA_ARGS__)))
-//#define ShortLoop() ("cdir shortloop")
-// equiv. demo.
-//#define ShortLoop() ZPragma(Str2(cdir,shortloop))
-#define ShortLoop() _Pragma("cdir shortloop")
-// Now fix up ALLOC_ON_VREG
-//#define ALLOC_ON_VREG(...) XPragma("cdir alloc_on_vreg(" #__VA_ARGS__ ")")
-//#define ALLOC_ON_VREG(a) YPragma(Str(cdir alloc_on_vreg(a)))
 #define ALLOC_ON_VREG(...) ZPragma(Str(cdir alloc_on_vreg(__VA_ARGS__)))
+#define ALLOC_ON_ADB(...) ZPragma(Str(cdir alloc_on_adb(__VA_ARGS__)))
+#define ShortLoop() _Pragma("cdir shortloop")
+#define ShortLoopTest() /*?*/
+#define IVDEP() _Pragma("cdir ivdep") /* CHECKME */
 
 #elif defined(__ve)
 #define ENABLE_OMP 0
 #define RETAIN(...) ZPragma(Str(_NEC retain(__VA_ARGS__)))
 #define RETAIN1st(var,...) ZPragma(Str(_NEC retain(var)))
 #define VREG(...) ZPragma(Str(_NEC __VA_ARGS__))
+#define ALLOC_ON_VREG(...)
+#define ALLOC_ON_ADB(...)
 #define ShortLoop() _Pragma("_NEC shortloop")
-#define ALLOC_ON_VREG(...) RETAIN1st(__VA_ARGS__)
+#define ShortLoopTest() _Pragma("_NEC shortloop_reduction")
+#define IVDEP() _Pragma("_NEC ivdep") /* CHECKME */
 
-#else
+#else // Unknown : GNU? Intel? WIN32?
 #define ENABLE_OMP 1
 #define RETAIN(...)
 #define VREG(...)
-#define ShortLoop()
 #define ALLOC_ON_VREG(...)
+#define ShortLoop()
+#define ShortLoopTest()
+#define IVDEP()
 #define restrict
 #endif
 
