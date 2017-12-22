@@ -57,7 +57,7 @@
 #define ENABLE_OMP 0
 #define RETAIN(...) ZPragma(Str(_NEC retain(__VA_ARGS__)))
 #define RETAIN1st(var,...) ZPragma(Str(_NEC retain(var)))
-#define VREG(...) ZPragma(Str(_NEC __VA_ARGS__))
+#define VREG(...) ZPragma(Str(_NEC vreg(__VA_ARGS__)))
 #define ShortLoop() _Pragma("_NEC shortloop")
 #define ALLOC_ON_VREG(...) RETAIN1st(__VA_ARGS__)
 
@@ -72,6 +72,8 @@
 
 #if ENABLE_OMP
 #define OMP(...) ZPragma(Str(omp __VA_ARGS__))
+#else
+#define OMP(...)
 #endif
 // -----------------------------------
 
