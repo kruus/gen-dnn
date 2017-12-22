@@ -40,6 +40,17 @@
 //const int DW = p->dw + 1;
 
 namespace conv {
+extern void refconv_2_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
+        dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m);
+extern void refconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
+        dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m);
+extern void sxconv_2_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
+    dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m);
+extern void sxconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
+    dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m);
+extern void sxconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
+    dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m);
+
 
 /** greatest common denominator, a,b > 0 */
 static int gcd(int a, int b)
@@ -274,7 +285,9 @@ void refconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
 void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
                      dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m)
 {
-#if 0 // regr 1.91
+#if defined(__ve) // compiler bug! XXX TODO temporarily disabled
+  refconv_2_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
+#elif 0 // regr 1.91
   // + dilates: 1.81x
   const int ahh= div_floor( PH - (p->kh-1)*(p->dh+1), SH );
   const int bhh= ahh*SH - PH + (p->kh-1) * (p->dh+1);

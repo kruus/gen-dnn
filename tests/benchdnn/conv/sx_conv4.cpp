@@ -34,6 +34,8 @@ extern void refconv_2_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
         dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m);
 extern void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
         dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m);
+extern void sxconv_2_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
+    dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m);
 
 static void chk( bool cond, char const* msg, char const* file, int const lineno ){
     if (!cond){ printf("@@@ error: %s : [%s:%d]\n", msg, file, lineno); exit(1); }
@@ -640,10 +642,7 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
 #if 1
               int khkw_end = (int)KH_KW;
               OMP(simd)//;
-#ifdef __ve
-#pragma _NEC ivdep
-#endif
-              for (int khkw = 0; khkw < khkw_end; ++khkw) { // this does not simd-ize very well.
+              IVDEP() for (int khkw = 0; khkw < khkw_end; ++khkw) { // this does not simd-ize very well.
                 const int kh = khkw / p->kw;
                 const int kw = khkw % p->kw;
                 kok[khkw] = ((kh>=kh_beg && kw>=kw_beg) && (kh<kh_end && kw<kw_end)? 0xffFFffFF: 0);
@@ -770,7 +769,9 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
 static void sxconv_4_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
         dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m)
 {
-#if 0 // shorten, do same for kw,ow loop. tweaks to kh calc
+#if defined(__ve) // compiler bug! XXX TODO temporarily disabled
+  refconv_2_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
+#elif 0 // shorten, do same for kw,ow loop. tweaks to kh calc
   int const KH = p->kh;
   int const OH = OH;
   int const DH = p->dh + 1;

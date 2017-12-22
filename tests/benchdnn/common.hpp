@@ -25,56 +25,130 @@
 #include <float.h>
 #include <math.h>
 
-// -------- OS-specific stuff --------
+// How is the restrict keyword handled?
+#if !defined(restrict)
+#if defined(_SX)
+#elif defined(__ve)
+//#elif defined(__INTEL_COMPILER)
+//#elif defined(__GNUC__)
+#else
+#define restrict
+#endif
+#endif
+
+// ENABLE_OPT_PTRAGMAS
+//    set to 0 to debug pragma-related incorrect assumptions
+#if !defined(ENABLE_OPT_PRAGMAS)
+#if defined(_SX)
+#define ENABLE_OPT_PRAGMAS 1
+#elif defined(__ve)
+#define ENABLE_OPT_PRAGMAS 1
+#elif defined(__INTEL_COMPILER)
+#define ENABLE_OPT_PRAGMAS 1
+#elif defined(__GNUC__)
+#define ENABLE_OPT_PRAGMAS 1
+#else
+#define ENABLE_OPT_PRAGMAS 0/*XXX*/
+#endif
+#endif
+
+// ENABLE_OMP defaults to 1
+#if !defined(ENABLE_OMP)
+#if defined(_SX)
+#elif defined(__ve)
+#define ENABLE_OMP 0
+#elif defined(__INTEL_COMPILER)
+#elif defined(__GNUC__)
+#else
+#endif
+#if !defined(ENABLE_OMP)
+#define ENABLE_OMP 1
+#endif
+#endif
+
+// -------- compiler-specific pragmas --------
 // __ve compile does something with pragma omp, but it is not officially supported,
 // so we use C++11 XPragma to emit pragmas from macros and customize pragmas to
 // particular compilers.
-// VREG      : hint that array fits into one simd register
-// ShortLoop : hint that for-loop limit is less than max simd register length
-// RETAIN    : hint that array should be kept accesible (on adb, or cached)
+//
+// Allocation directives:
+//   VREG          : hint that array fits into one simd register
+//                   There may be many conditions on array access!
+//   ALLOC_ON_VREG : hint that array fits into multiple simd registers
+//   ALLOC_ON_ADB  : hint that array should be "cached" in special memory bank.
+//
+// Loop directives apply to an IMMEDIATELY FOLLOWING loop:
+//   ShortLoop : hint that for-loop limit is less than max simd register length
+//   RETAIN    : hint that array should be kept accesible (cached)
+//   IVDEP     : pretend all ptrs are independent (restrict)
+//
+// TODO: SX pre-loop macros must be SINGLE ones, because sxcc REQUIRES
+//       multiple #pragma cdir to be combined, comma-separated.
+//       So you can only use ONE pre-loop macro.  If 2 macros,
+//       compiler docs say **both** will be ignored!
+//
+// Oh! ALLOC_ON_VREG cannot "decay" into RETAIN, because syntax is different
 // -----------------------------------
 #define XPragma(str) do{(void)(str); }while(0);
 #define YPragma(str) do{int ypr=str;}while(0);
 #define ZPragma(str) _Pragma(str)
 #define Str(...) #__VA_ARGS__
-#define Str2(a,b) Str(a b)
-#define StrCat(a,b) Str(a##b)
-#if defined(_SX)
-#define ENABLE_OMP 1
-#define RETAIN(...) ZPragma(Str(cdir on_adb(__VA_ARGS__)))
-#define RETAIN1st(var,...) ZPragma(Str(cdir on_adb(var)))
-#define VREG(...) ZPragma(Str(cdir vreg(__VA_ARGS__)))
-//#define ShortLoop() ("cdir shortloop")
-// equiv. demo.
-//#define ShortLoop() ZPragma(Str2(cdir,shortloop))
+#define PragmaQuote(...) ZPragma(Str(__VA_ARGS__))
+//#define Str2(a,b) Str(a b)
+//#define StrCat(a,b) Str(a##b)
+
+#if ENABLE_OPT_PRAGMAS && defined(_SX)
+#warning "SX optimization pragmas IN EFFECT"
+#define VREG(...) PragmaQuote(cdir vreg(__VA_ARGS__))
+#define ALLOC_ON_VREG(...) PragmaQuote(cdir alloc_on_vreg(__VA_ARGS__))
+#define ALLOC_ON_ADB(...) PragmaQuote(cdir alloc_on_adb(__VA_ARGS__))
+// Is there a pre-for-loop RETAIN for SX? For now, kludge as on_adb.
+#define RETAIN(...) PragmaQuote(cdir on_adb(__VA_ARGS__))
+#define RETAIN1st(var,...) PragmaQuote(cdir on_adb(var))
 #define ShortLoop() _Pragma("cdir shortloop")
-// Now fix up ALLOC_ON_VREG
-//#define ALLOC_ON_VREG(...) XPragma("cdir alloc_on_vreg(" #__VA_ARGS__ ")")
-//#define ALLOC_ON_VREG(a) YPragma(Str(cdir alloc_on_vreg(a)))
-#define ALLOC_ON_VREG(...) ZPragma(Str(cdir alloc_on_vreg(__VA_ARGS__)))
+#define ShortLoopTest() /*?*/
+#define IVDEP() _Pragma("cdir nodep")
 
-#elif defined(__ve)
-#define ENABLE_OMP 0
-#define RETAIN(...) ZPragma(Str(_NEC retain(__VA_ARGS__)))
-#define RETAIN1st(var,...) ZPragma(Str(_NEC retain(var)))
-#define VREG(...) ZPragma(Str(_NEC vreg(__VA_ARGS__)))
-#define ShortLoop() _Pragma("_NEC shortloop")
-#define ALLOC_ON_VREG(...) RETAIN1st(__VA_ARGS__)
-
-#else
-#define ENABLE_OMP 1
-#define RETAIN(...)
-#define VREG(...)
-#define ShortLoop()
+#elif ENABLE_OPT_PRAGMAS && defined(__ve)
+#warning "__ve optimization pragmas IN EFFECT"
+#define VREG(...) PragmaQuote(_NEC vreg(__VA_ARGS__))
 #define ALLOC_ON_VREG(...)
-#define restrict
+#define ALLOC_ON_ADB(...)
+#define RETAIN(...) ZPragma(Str(_NEC retain(__VA_ARGS__)))
+#define RETAIN1st(var,...) PragmaQuote(_NEC retain(var))
+#define ShortLoop() _Pragma("_NEC shortloop")
+#define ShortLoopTest() _Pragma("_NEC shortloop_reduction")
+#define IVDEP() _Pragma("_NEC ivdep")
+
+// TODO
+//#elif ENABLE_OPT_PRAGMAS && defined(__INTEL_COMPILER)
+//#elif ENABLE_OPT_PRAGMAS && defined(__GNUC__)
+#else /* A new system might begin by ignoring the optimization pragmas */
+#warning "Please check if _Pragma macros can be defined for this platorm"
+#define VREG(...)
+#define ALLOC_ON_VREG(...)
+#define ALLOC_ON_ADB(...)
+#define RETAIN(...)
+#define ShortLoop()
+#define ShortLoopTest()
+#define IVDEP()
+
 #endif
 
+
 #if ENABLE_OMP
-#define OMP(...) ZPragma(Str(omp __VA_ARGS__))
+#define OMP(...) PragmaQuote(omp __VA_ARGS__))
 #else
 #define OMP(...)
 #endif
+
+#undef XPragma
+#undef YPragma
+#undef ZPragma
+#undef Str
+#undef PragmaQuote
+//#undef Str2
+//#undef StrCat
 // -----------------------------------
 
 

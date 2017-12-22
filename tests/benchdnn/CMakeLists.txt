@@ -73,11 +73,16 @@ endif()
 set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} ${BENCHDNN_EXTRA}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${BENCHDNN_EXTRA}")
 
-# -- not working -- still need to do it by hand, something like:
-#                 ( cd build/tests/benchdnn && make conv/sx_conv4.cpp.s )
+# by hand:
+#          ( cd build/tests/benchdnn && make conv/sx_conv4.cpp.s )
+#          ( cd build/tests/benchdnn && make conv/sx_conv4.cpp.i )
 # Just for fun, take a look at assembler output for any conv/*.cxx files.
 # These outputs are left in the cmake binary directory ~ build/tests/benchdnn.
 file(GLOB ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/*.cxx)
+list(APPEND ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/sx_conv3.cpp)
+list(APPEND ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/sx_conv3_ve.cpp)
+list(APPEND ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/sx_conv2.cpp)
+list(APPEND ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/ref_conv3.cpp)
 # hack: get the .o and .s rules into Makefiles, but skip the link step
 add_library(unused STATIC ${ASM_SOURCES})
 set_target_properties(unused PROPERTIES
