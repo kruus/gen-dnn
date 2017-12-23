@@ -87,13 +87,17 @@
 //       So you can only use ONE pre-loop macro.  If 2 macros,
 //       compiler docs say **both** will be ignored!
 //
+// Also, gcc forbids combining OMP and ivdep, it seems, and generates errors
+// on improperly positioned #pragmas !!!
+//
 // Oh! ALLOC_ON_VREG cannot "decay" into RETAIN, because syntax is different
 // -----------------------------------
 #define XPragma(str) do{(void)(str); }while(0);
 #define YPragma(str) do{int ypr=str;}while(0);
 #define ZPragma(str) _Pragma(str)
 #define Str(...) #__VA_ARGS__
-#define PragmaQuote(...) ZPragma(Str(__VA_ARGS__))
+#define StringizeAll(...) #__VA_ARGS__
+//#define PragmaQuote(...) ZPragma(StringizeAll(__VA_ARGS__))
 //#define Str2(a,b) Str(a b)
 //#define StrCat(a,b) Str(a##b)
 
@@ -120,9 +124,17 @@
 #define ShortLoopTest() _Pragma("_NEC shortloop_reduction")
 #define IVDEP() _Pragma("_NEC ivdep")
 
+#elif ENABLE_OPT_PRAGMAS && defined(__GNUC__)
+#define VREG(...)
+#define ALLOC_ON_VREG(...)
+#define ALLOC_ON_ADB(...)
+#define RETAIN(...)
+#define ShortLoop()
+#define ShortLoopTest()
+#define IVDEP() _Pragma("GCC ivdep")
+
 // TODO
 //#elif ENABLE_OPT_PRAGMAS && defined(__INTEL_COMPILER)
-//#elif ENABLE_OPT_PRAGMAS && defined(__GNUC__)
 #else /* A new system might begin by ignoring the optimization pragmas */
 #warning "Please check if _Pragma macros can be defined for this platorm"
 #define VREG(...)
@@ -137,11 +149,13 @@
 
 
 #if ENABLE_OMP
-#define OMP(...) ZPragma(Str(omp __VA_ARGS__)))
+// kludge: GNUG requires StringizAtion macro definition to stick around
+#define OMP(...) _Pragma(StringizeAll(omp __VA_ARGS__))
 #else
 #define OMP(...)
 #endif
 
+// Note: some compilers may want longer lifetimes on these macro definitions!
 #undef XPragma
 #undef YPragma
 #undef ZPragma

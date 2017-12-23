@@ -641,7 +641,7 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
               khash_prv = khash;
 #if 1
               int khkw_end = (int)KH_KW;
-              OMP(simd)//;
+              //OMP(simd)//;
               IVDEP() for (int khkw = 0; khkw < khkw_end; ++khkw) { // this does not simd-ize very well.
                 const int kh = khkw / p->kw;
                 const int kw = khkw % p->kw;
