@@ -121,7 +121,15 @@
 
 // TODO
 //#elif ENABLE_OPT_PRAGMAS && defined(__INTEL_COMPILER)
-//#elif ENABLE_OPT_PRAGMAS && defined(__GNUC__)
+#elif ENABLE_OPT_PRAGMAS && defined(__GNUC__)
+#define VREG(...)
+#define ALLOC_ON_VREG(...)
+#define ALLOC_ON_ADB(...)
+#define RETAIN(...)
+#define ShortLoop()
+#define ShortLoopTest()
+#define IVDEP() _Pragma("GCC ivdep")
+
 #else /* A new system might begin by ignoring the optimization pragmas */
 #warning "Please check if _Pragma macros can be defined for this platorm"
 #define VREG(...)
