@@ -68,7 +68,7 @@
 
 // -------- compiler-specific pragmas --------
 // __ve compile does something with pragma omp, but it is not officially supported,
-// so we use C++11 XPragma to emit pragmas from macros and customize pragmas to
+// so we use C++11 _Pragma to emit pragmas from macros and customize pragmas to
 // particular compilers.
 //
 // Allocation directives:
@@ -89,13 +89,10 @@
 //
 // Oh! ALLOC_ON_VREG cannot "decay" into RETAIN, because syntax is different
 // -----------------------------------
-#define XPragma(str) do{(void)(str); }while(0);
-#define YPragma(str) do{int ypr=str;}while(0);
-#define ZPragma(str) _Pragma(str)
-#define Str(...) #__VA_ARGS__
-#define PragmaQuote(...) ZPragma(Str(__VA_ARGS__))
-//#define Str2(a,b) Str(a b)
-//#define StrCat(a,b) Str(a##b)
+#define BENCHDNN_YPRAGMA(str) do{int ypr=str;}while(0);
+#define BENCHDNN_MPRAGMA(str) _Pragma(str)
+#define BENCHDNN_STRINGIZE(...) #__VA_ARGS__
+#define PragmaQuote(...) BENCHDNN_MPRAGMA(BENCHDNN_STRINGIZE(__VA_ARGS__))
 
 #if ENABLE_OPT_PRAGMAS && defined(_SX)
 #warning "SX optimization pragmas IN EFFECT"
@@ -114,7 +111,7 @@
 #define VREG(...) PragmaQuote(_NEC vreg(__VA_ARGS__))
 #define ALLOC_ON_VREG(...)
 #define ALLOC_ON_ADB(...)
-#define RETAIN(...) ZPragma(Str(_NEC retain(__VA_ARGS__)))
+#define RETAIN(...) PragmaQuote(_NEC retain(__VA_ARGS__))
 #define RETAIN1st(var,...) PragmaQuote(_NEC retain(var))
 #define ShortLoop() _Pragma("_NEC shortloop")
 #define ShortLoopTest() _Pragma("_NEC shortloop_reduction")
@@ -137,18 +134,11 @@
 
 
 #if ENABLE_OMP
-#define OMP(...) PragmaQuote(omp __VA_ARGS__))
+#define OMP(...) PragmaQuote(omp __VA_ARGS__)
 #else
 #define OMP(...)
 #endif
 
-#undef XPragma
-#undef YPragma
-#undef ZPragma
-#undef Str
-#undef PragmaQuote
-//#undef Str2
-//#undef StrCat
 // -----------------------------------
 
 
