@@ -68,7 +68,7 @@
 
 // -------- compiler-specific pragmas --------
 // __ve compile does something with pragma omp, but it is not officially supported,
-// so we use C++11 XPragma to emit pragmas from macros and customize pragmas to
+// so we use C++11 _Pragma to emit pragmas from macros and customize pragmas to
 // particular compilers.
 //
 // Allocation directives:
@@ -87,54 +87,39 @@
 //       So you can only use ONE pre-loop macro.  If 2 macros,
 //       compiler docs say **both** will be ignored!
 //
-// Also, gcc forbids combining OMP and ivdep, it seems, and generates errors
-// on improperly positioned #pragmas !!!
-//
 // Oh! ALLOC_ON_VREG cannot "decay" into RETAIN, because syntax is different
 // -----------------------------------
-#define XPragma(str) do{(void)(str); }while(0);
-#define YPragma(str) do{int ypr=str;}while(0);
-#define ZPragma(str) _Pragma(str)
-#define Str(...) #__VA_ARGS__
-#define StringizeAll(...) #__VA_ARGS__
-//#define PragmaQuote(...) ZPragma(StringizeAll(__VA_ARGS__))
-//#define Str2(a,b) Str(a b)
-//#define StrCat(a,b) Str(a##b)
+#define BENCHDNN_YPRAGMA(str) do{int ypr=str;}while(0);
+#define BENCHDNN_MPRAGMA(str) _Pragma(str)
+#define BENCHDNN_STRINGIZE(...) #__VA_ARGS__
+#define PragmaQuote(...) BENCHDNN_MPRAGMA(BENCHDNN_STRINGIZE(__VA_ARGS__))
 
 #if ENABLE_OPT_PRAGMAS && defined(_SX)
 #warning "SX optimization pragmas IN EFFECT"
-#define VREG(...) ZPragma(Str((cdir vreg(__VA_ARGS__)))
-#define ALLOC_ON_VREG(...) ZPragma(Str(cdir alloc_on_vreg(__VA_ARGS__)))
-#define ALLOC_ON_ADB(...) ZPragma(Str(cdir alloc_on_adb(__VA_ARGS__)))
+#define VREG(...) PragmaQuote(cdir vreg(__VA_ARGS__))
+#define ALLOC_ON_VREG(...) PragmaQuote(cdir alloc_on_vreg(__VA_ARGS__))
+#define ALLOC_ON_ADB(...) PragmaQuote(cdir alloc_on_adb(__VA_ARGS__))
 // Is there a pre-for-loop RETAIN for SX? For now, kludge as on_adb.
-#define RETAIN(...) ZPragma(Str(cdir on_adb(__VA_ARGS__)))
-#define RETAIN1st(var,...) ZPragma(Str(cdir on_adb(var)))
+#define RETAIN(...) PragmaQuote(cdir on_adb(__VA_ARGS__))
+#define RETAIN1st(var,...) PragmaQuote(cdir on_adb(var))
 #define ShortLoop() _Pragma("cdir shortloop")
 #define ShortLoopTest() /*?*/
 #define IVDEP() _Pragma("cdir nodep")
 
 #elif ENABLE_OPT_PRAGMAS && defined(__ve)
 #warning "__ve optimization pragmas IN EFFECT"
-#define VREG(...) ZPragma(Str(_NEC vreg(__VA_ARGS__)))
+#define VREG(...) PragmaQuote(_NEC vreg(__VA_ARGS__))
 #define ALLOC_ON_VREG(...)
 #define ALLOC_ON_ADB(...)
-#define RETAIN(...) ZPragma(Str(_NEC retain(__VA_ARGS__)))
-#define RETAIN1st(var,...) ZPragma(Str(_NEC retain(var)))
+#define RETAIN(...) PragmaQuote(_NEC retain(__VA_ARGS__))
+#define RETAIN1st(var,...) PragmaQuote(_NEC retain(var))
 #define ShortLoop() _Pragma("_NEC shortloop")
 #define ShortLoopTest() _Pragma("_NEC shortloop_reduction")
 #define IVDEP() _Pragma("_NEC ivdep")
 
-#elif ENABLE_OPT_PRAGMAS && defined(__GNUC__)
-#define VREG(...)
-#define ALLOC_ON_VREG(...)
-#define ALLOC_ON_ADB(...)
-#define RETAIN(...)
-#define ShortLoop()
-#define ShortLoopTest()
-#define IVDEP() _Pragma("GCC ivdep")
-
 // TODO
 //#elif ENABLE_OPT_PRAGMAS && defined(__INTEL_COMPILER)
+//#elif ENABLE_OPT_PRAGMAS && defined(__GNUC__)
 #else /* A new system might begin by ignoring the optimization pragmas */
 #warning "Please check if _Pragma macros can be defined for this platorm"
 #define VREG(...)
@@ -149,20 +134,11 @@
 
 
 #if ENABLE_OMP
-// kludge: GNUG requires StringizAtion macro definition to stick around
-#define OMP(...) _Pragma(StringizeAll(omp __VA_ARGS__))
+#define OMP(...) PragmaQuote(omp __VA_ARGS__)
 #else
 #define OMP(...)
 #endif
 
-// Note: some compilers may want longer lifetimes on these macro definitions!
-#undef XPragma
-#undef YPragma
-#undef ZPragma
-#undef Str
-#undef PragmaQuote
-//#undef Str2
-//#undef StrCat
 // -----------------------------------
 
 
