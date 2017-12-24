@@ -87,6 +87,8 @@
 //       So you can only use ONE pre-loop macro.  If 2 macros,
 //       compiler docs say **both** will be ignored!
 //
+// FIXME  SX alloc_on_vreg 2nd arg must be a compile-time constant
+//
 // Oh! ALLOC_ON_VREG cannot "decay" into RETAIN, because syntax is different
 // -----------------------------------
 #define BENCHDNN_YPRAGMA(str) do{int ypr=str;}while(0);
