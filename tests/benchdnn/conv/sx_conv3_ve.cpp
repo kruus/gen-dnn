@@ -2766,6 +2766,30 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   }
 #endif
 #if BW==6 // from ref_conv4
+  int ohb[KH], ohe[KH], owb[KW], owe[KW], ook[KH_KW];
+  for(int kh=0; kh<KW; ++kh){
+    int oh_beg, oh_end;
+    oh_beg=div_floor(    + PH - kh * (p->dh + 1) + SH - 1, SH);//(c-a+b-1)/b
+    oh_end=div_floor( IH + PH - kh * (p->dh + 1) + SH - 1, SH);//(d-a+b-1)/b
+    if (oh_beg < 0    ) oh_beg = 0;
+    if (oh_end > OH) oh_end = OH;
+    ohb[kh] = oh_beg;
+    ohe[kh] = oh_end;
+  }
+  for(int kw=0; kw<KW; ++kw){
+    int ow_beg, ow_end;
+    ow_beg=div_floor(    + PW - kw * (p->dw + 1) + SW - 1, SW);//(c-a+b-1)/b
+    ow_end=div_floor( IW + PW - kw * (p->dw + 1) + SW - 1, SW);//(d-a+b-1)/b
+    if (ow_beg < 0    ) ow_beg = 0;
+    if (ow_end > OW) ow_end = OW;
+    owb[kw] = ow_beg;
+    owe[kw] = ow_end;
+  }
+  for (int kh = 0; kh < KH; ++kh) {
+    for (int kw = 0; kw < KW; ++kw) {
+      ook[kh*KW+kw] = (ohb[kh] < ohe[kh] && owb[kw] < owe[kw]);
+    }
+  }
 #if 0
 #define PREZERO 1
 #if PREZERO
@@ -2810,7 +2834,7 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   }
 #endif
 #endif
-#define TMP_IC 0
+#define TMP_IC 1
 #if TMP_IC==0
   zero_wei(p, diff_wei_m);
 #endif
@@ -2818,44 +2842,76 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   //for (int mb = 0; mb < MB; ++mb) // <------ XXX WRONG position. not omp-safe
   OMP(parallel)
   {
+#if TMP_IC
+    float tmp[ICOG];
+#endif
     OMP(for collapse(4))//;
     for (int g = 0; g < G; ++g) {
       for (int oc = 0; oc < OC/G; ++oc) {
         for (int kh = 0; kh < p->kh; ++kh) {
           for (int kw = 0; kw < KW; ++kw) {
+#if 0
             int oh_beg, oh_end;
             oh_beg=div_floor(    + PH - kh * (p->dh + 1) + SH - 1, SH);//(c-a+b-1)/b
             oh_end=div_floor( IH + PH - kh * (p->dh + 1) + SH - 1, SH);//(d-a+b-1)/b
             if (oh_beg < 0    ) oh_beg = 0;
             if (oh_end > OH) oh_end = OH;
+            RT_ASSERT( oh_beg == ohb[kh] );
+            RT_ASSERT( oh_end == ohe[kh] );
             int ow_beg, ow_end;
             ow_beg=div_floor(    + PW - kw * (p->dw + 1) + SW - 1, SW);//(c-a+b-1)/b
             ow_end=div_floor( IW + PW - kw * (p->dw + 1) + SW - 1, SW);//(d-a+b-1)/b
             if (ow_beg < 0    ) ow_beg = 0;
             if (ow_end > OW) ow_end = OW;
+            RT_ASSERT( ow_beg == owb[kw] );
+            RT_ASSERT( ow_end == owe[kw] );
             if( oh_beg >= oh_end || ow_beg >= ow_end ) continue; // oh, still need to set dw=0
+#else
+            const int oh_beg = ohb[kh];
+            const int oh_end = ohe[kh];
+            const int ow_beg = owb[kw];
+            const int ow_end = owe[kw];
+            if( !ook[kh*KW+kw] ) continue;
+#endif
+            //if( oh_beg >= oh_end || ow_beg >= ow_end ) continue; // oh, still need to set dw=0
 
+            const int iw0 = - PW + kw * (p->dw+1);
+            const int ih0 = - PH + kh * (p->dh + 1);
 #if TMP_IC
-            float tmp[ICOG];
             for (int ic = 0; ic < IC/G; ++ic) tmp[ic] = 0.f; // MUST always execute!
 #endif
-
+            RETAIN(tmp)//;
+              for (int mb = 0; mb < MB; ++mb) // OK inside
+              {
             for (int ic = 0; ic < IC/G; ++ic) { // B
               size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw); // WRITTEN
               float &dw = pdiff_wei[wei_off];
               //dw = 0.f; // 2.2x --> 2.0x
-              for (int mb = 0; mb < MB; ++mb) // OK inside
-              {
+                size_t s_00 = src_off_f(p, mb, g, ic, 0, 0) + iw0;
+                size_t d_00 = dst_off_f(p, mb, g, oc, 0, 0);
                 for (int oh = oh_beg; oh < oh_end; ++oh) {
-                  const int ih = oh * SH - PH + kh * (p->dh + 1);
+                  //const int ih = ih0 + oh * SH; // - PH + kh * (p->dh + 1);
+                  //const int s0h = s_00 + ih*IW;
+                  const int s0h = s_00 + (ih0 + oh * SH) * IW;
+                  const int d0h = d_00 + oh*OW;
                   for (int ow = ow_beg; ow < ow_end; ++ow) {
-                    size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
-                    const int iw = ow * SW - PW + kw * (p->dw + 1);
-                    size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+                    //size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
+                    //const size_t dst_off = d_00 + oh*OW + ow;
+                    //const size_t dst_off = d0h + ow;
+                    //const int iw = iw0 + ow * SW; // - PW + kw * (p->dw + 1);
+                    //const int iw = ow * SW; // - PW + kw * (p->dw + 1);
+                    //size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
+                    //size_t src_off = s_00 + ih*IW+iw;
+                    //size_t src_off = s0h + ow*SW;
+//#if TMP_IC
+//                    tmp[ic] += pdiff_dst[dst_off] * psrc[src_off];
+//#else
+//                    dw += pdiff_dst[dst_off] * psrc[src_off];
+//#endif
 #if TMP_IC
-                    tmp[ic] += pdiff_dst[dst_off] * psrc[src_off];
+                    tmp[ic] += pdiff_dst[d0h+ow] * psrc[s0h+ow*SW];
 #else
-                    dw += pdiff_dst[dst_off] * psrc[src_off];
+                    dw += pdiff_dst[d0h+ow] * psrc[s0h+ow*SW];
 #endif
                   }
                 }
