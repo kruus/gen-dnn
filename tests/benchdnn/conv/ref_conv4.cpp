@@ -447,7 +447,7 @@ void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
 #if 1
             for (int oh = oh_beg; oh < oh_end; ++oh) {
               const int ih  =  oh*SH - PH + kh * (p->dh+1);
-              for (int ow = ow_beg; ow < ow_end; ++ow) {
+              IVDEP() for (int ow = ow_beg; ow < ow_end; ++ow) {
                 float tmp=0.0f;
                 for (int oc = 0; oc < OC/G; ++oc) {
                   size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
@@ -1056,7 +1056,7 @@ void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
                     }
                   }
                 }
-                for (int ic = 0; ic < IC/G; ++ic) {
+                IVDEP() for (int ic = 0; ic < IC/G; ++ic) {
                   size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw); // WRITTEN
                   float &dw = ((float*)diff_wei_m)[wei_off];
                   dw += tmp[ic];

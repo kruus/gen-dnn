@@ -97,7 +97,9 @@
 #define PragmaQuote(...) BENCHDNN_MPRAGMA(BENCHDNN_STRINGIZE(__VA_ARGS__))
 
 #if ENABLE_OPT_PRAGMAS && defined(_SX)
-#warning "SX optimization pragmas IN EFFECT"
+// SX preprocessor generates _Pragma(XXX) and sxc++ might be ignoring
+//    *some*, based on failure to produce some warning messages.
+//#warning "SX optimization pragmas IN EFFECT"
 #define VREG(...) PragmaQuote(cdir vreg(__VA_ARGS__))
 #define ALLOC_ON_VREG(...) PragmaQuote(cdir alloc_on_vreg(__VA_ARGS__))
 #define ALLOC_ON_ADB(...) PragmaQuote(cdir alloc_on_adb(__VA_ARGS__))
@@ -109,7 +111,7 @@
 #define IVDEP() _Pragma("cdir nodep")
 
 #elif ENABLE_OPT_PRAGMAS && defined(__ve)
-#warning "__ve optimization pragmas IN EFFECT"
+//#warning "__ve optimization pragmas IN EFFECT"
 #define VREG(...) PragmaQuote(_NEC vreg(__VA_ARGS__))
 #define ALLOC_ON_VREG(...)
 #define ALLOC_ON_ADB(...)
@@ -121,7 +123,9 @@
 
 // TODO
 //#elif ENABLE_OPT_PRAGMAS && defined(__INTEL_COMPILER)
+
 #elif ENABLE_OPT_PRAGMAS && defined(__GNUC__)
+//#warning "__GNUC optimization pragmas IN EFFECT"
 #define VREG(...)
 #define ALLOC_ON_VREG(...)
 #define ALLOC_ON_ADB(...)

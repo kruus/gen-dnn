@@ -476,7 +476,7 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
             if (khash != khash_prv){
               khash_prv = khash;
               ShortLoop() for (ssize_t kh = 0; kh < KH; ++kh) {
-                ShortLoop() for (ssize_t kw = 0; kw < KH; ++kw) {
+                ShortLoop() for (ssize_t kw = 0; kw < KW; ++kw) {
                   kok[kh][kw] = (kh>=kh_beg && kw>=kw_beg) && (kh<kh_end && kw<kw_end);
                 }
               }

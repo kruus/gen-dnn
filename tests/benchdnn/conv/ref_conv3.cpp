@@ -411,7 +411,8 @@ kh_beg = k;
  * Discovering such formulas <em>by guesswork</em> did not work out
  * well for me at all !
  */
-static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
+//static
+void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
         dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m)
 {
 #if 0 // shorten, do same for kw,ow loop. tweaks to kh calc
