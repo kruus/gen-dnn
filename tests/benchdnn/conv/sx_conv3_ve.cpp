@@ -2883,12 +2883,12 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
             RETAIN(tmp)//;
               for (int mb = 0; mb < MB; ++mb) // OK inside
               {
+                size_t d_00 = dst_off_f(p, mb, g, oc, 0, 0);
             for (int ic = 0; ic < IC/G; ++ic) { // B
               size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw); // WRITTEN
               float &dw = pdiff_wei[wei_off];
               //dw = 0.f; // 2.2x --> 2.0x
                 size_t s_00 = src_off_f(p, mb, g, ic, 0, 0) + iw0;
-                size_t d_00 = dst_off_f(p, mb, g, oc, 0, 0);
                 for (int oh = oh_beg; oh < oh_end; ++oh) {
                   //const int ih = ih0 + oh * SH; // - PH + kh * (p->dh + 1);
                   //const int s0h = s_00 + ih*IW;
@@ -2909,9 +2909,9 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 //                    dw += pdiff_dst[dst_off] * psrc[src_off];
 //#endif
 #if TMP_IC
-                    tmp[ic] += pdiff_dst[d0h+ow] * psrc[s0h+ow*SW];
+                    tmp[ic] += pdiff_dst[d0h + ow] * psrc[s0h + ow*SW];
 #else
-                    dw += pdiff_dst[d0h+ow] * psrc[s0h+ow*SW];
+                    dw += pdiff_dst[d0h + ow] * psrc[s0h + ow*SW];
 #endif
                   }
                 }
