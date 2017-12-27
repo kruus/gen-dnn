@@ -285,8 +285,10 @@ void refconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
 void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
                      dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m)
 {
-#if defined(__ve) // compiler bug! XXX TODO temporarily disabled
-  refconv_2_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
+#if 1 && defined(__ve) // compiler bug! XXX TODO temporarily disabled
+  //refconv_2_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
+  // I managed to fix a similar error for sx_conv3 with nc++ compiler.
+  sxconv_3_bwd_d(p, diff_src_m, wei_m, diff_dst_m);
 #elif 0 // regr 1.91
   // + dilates: 1.81x
   const int ahh= div_floor( PH - (p->kh-1)*(p->dh+1), SH );
@@ -402,13 +404,15 @@ void refconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
   }
 #elif 1 // regr 1.91
   // + dilates: 1.81x
+  int ohb[KH], ohe[KH], owb[KW], owe[KW]; // precalc oh_beg/end, ow_beg/end
   const int ahh= div_floor( PH - (p->kh-1)*(p->dh+1), SH );
   const int bhh= ahh*SH - PH + (p->kh-1) * (p->dh+1);
   const int oh_lowest = (bhh>0? bhh: 0); /// Wow, oh0 is INDEPENDENT of all loop vars
   const int aww= div_floor( PW - (KW-1)*(p->dw+1), SW );
   const int bww= aww*SW - PW + (KW-1) * (p->dw+1);
   const int ow_lowest = (bww>0? bww: 0);
-  int ohb[KH], ohe[KH], owb[KW], owe[KW]; // precalc oh_beg/end, ow_beg/end
+  //  if defined HERE, nc++ generates incorrect code:
+  //int ohb[KH], ohe[KH], owb[KW], owe[KW]; // precalc oh_beg/end, ow_beg/end
   for (int kh = 0; kh < p->kh; ++kh) {
     int oh_beg = div_floor(    + PH - kh * (p->dh + 1) + SH - 1, SH);//(c-a+b-1)/b
     int oh_end = div_floor( IH + PH - kh * (p->dh + 1) + SH - 1, SH);//(d-a+b-1)/b
