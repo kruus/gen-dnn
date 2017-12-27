@@ -149,8 +149,19 @@
 
 #if ENABLE_OMP
 #define OMP(...) PragmaQuote(omp __VA_ARGS__)
+#if defined(_SX)
+#elif defined(__ve)
+#elif defined(__GNUC)
+#define OMPSIMD(...) PragmaQuote(omp __VA_ARGS__)
 #else
+#endif
+#endif
+
+#ifndef OMP
 #define OMP(...)
+#endif
+#ifndef OMPSIMD
+#define OMPSIMD(...)
 #endif
 
 // -----------------------------------
