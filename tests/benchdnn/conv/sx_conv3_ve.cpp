@@ -19,8 +19,8 @@
 #include "conv/conv.hpp"
 #include "idiv.hpp"
 
-#include <iostream>
-using namespace std;
+//#include <iostream>
+//using namespace std;
 
 namespace conv {
 
@@ -1042,7 +1042,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
-#elif V==10 // something WRONG (failed 15)
+#elif V==10
   const ssize_t G = p->g;
   const ssize_t MB = p->mb;
   const ssize_t IC = p->ic;
@@ -1127,8 +1127,8 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
     VREG(khkw_begend) VREG(khkw_muls) VREG(kok)//;
 
     //float src[ICOG*KH*KW]; ALLOC_ON_VREG(src)//;
-    float src[ICOG*KH*KW]; ALLOC_ON_VREG(src)//;
-    float tmp[OCOG];       ALLOC_ON_VREG(tmp,OCOG)//; // roughly double the speed;
+    float src[ICOG*KH*KW] alignas(64); ALLOC_ON_VREG(src)//;
+    float tmp[OCOG] alignas(64);       ALLOC_ON_VREG(tmp,OCOG)//; // roughly double the speed;
 
     OMP(single nowait) for (int oh = 0; oh < OH; ++oh) {
       // trick to easy calc of kh, kw loop limits is that division must
@@ -1175,6 +1175,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
               khkw_begend[2] = kwb[ow];
               khkw_begend[3] = kwe[ow];
               khash = 0;
+              OMPSIMD()
               for (size_t i=0; i<4; ++i)
                 khash += khkw_begend[i] * khkw_muls[i];
               if (khash != khash_prv){
@@ -1207,7 +1208,8 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
             //for (size_t oc = 0; oc < OCOG; ++oc) pdst[dst_off0 + oc * OH_OW] = tmp[oc];
             if (p->merge == RELU) {
               for (size_t oc = 0; oc < OCOG; ++oc)
-                tmp[oc] = (tmp[oc] < 0.f? 0.f: tmp[oc]);
+                //tmp[oc] = (tmp[oc] < 0.f? 0.f: tmp[oc]);
+                if (tmp[oc] < 0.f) tmp[oc] = 0.f;
             }
             const ssize_t dst_off0 = (((ssize_t)mb * OC + g * OCOG + 0) * OH + oh) * OW + ow;
             for (size_t oc = 0; oc < OCOG; ++oc)
@@ -1264,7 +1266,7 @@ static void sxconv_3_bwd_d_generic_0(const prb_t *p, dnn_mem_t &diff_src_m,
           // calc kh_beg, kh_end here? 4.28x
           for (int iw = 0; iw < IW; ++iw) {
             size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
-            float &ds = ((float*)diff_src_m)[src_off];
+            float &ds = pdiff_src[src_off];
             ds = 0;
 
             int kh_end = (ih + PH) / DH + 1;
@@ -1353,8 +1355,7 @@ static void sxconv_3_bwd_d_generic_0(const prb_t *p, dnn_mem_t &diff_src_m,
                 {
                   size_t dst_off = dst_off_f(p, mb, g, oc, oh0/SH, ow0/SW);
                   size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
-                  ds += ((float*)diff_dst_m)[dst_off]
-                    * ((float*)wei_m)[wei_off];
+                  ds += pdiff_dst[dst_off] * pwei_m[wei_off];
                 }
               }
             }
@@ -1758,7 +1759,7 @@ void sxconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
           // calc kh_beg, kh_end here? 4.28x
           for (int iw = 0; iw < IW; ++iw) {
             size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
-            float &ds = ((float*)diff_src_m)[src_off];
+            float &ds = pdiff_src[src_off];
             ds = 0;
 
 #if 0
@@ -1909,7 +1910,7 @@ void sxconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
           // calc kh_beg, kh_end here? 4.28x
           for (int iw = 0; iw < IW; ++iw) {
             size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
-            float &ds = ((float*)diff_src_m)[src_off];
+            float &ds = pdiff_src[src_off];
             ds = 0;
 
             int kh_beg = khb[ih];
@@ -2027,7 +2028,7 @@ void sxconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
           // calc kh_beg, kh_end here? 4.28x
           for (int iw = 0; iw < IW; ++iw) {
             size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
-            float &ds = ((float*)diff_src_m)[src_off];
+            float &ds = pdiff_src[src_off];
             ds = 0;
 
             int kh_beg = khb[ih];
@@ -2304,7 +2305,7 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     if ((p->dir & FLAG_BIA)) {
       for (int oc = 0; oc < OC     ; ++oc) {
         size_t bia_off = bia_off_f_nog(p, /*g,*/ oc);
-        float &db = ((float*)diff_bia_m)[bia_off];
+        float &db = pdiff_bia[bia_off];
         db = 0.f;
         OMP(parallel for collapse(2) reduction(+:db))//;
         for (int mb = 0; mb < MB; ++mb) {
@@ -2834,7 +2835,7 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   }
 #endif
 #endif
-#define TMP_IC 1
+#define TMP_IC 0
 #if TMP_IC==0
   zero_wei(p, diff_wei_m);
 #endif
@@ -2842,9 +2843,6 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   //for (int mb = 0; mb < MB; ++mb) // <------ XXX WRONG position. not omp-safe
   OMP(parallel)
   {
-#if TMP_IC
-    float tmp[ICOG];
-#endif
     OMP(for collapse(4))//;
     for (int g = 0; g < G; ++g) {
       for (int oc = 0; oc < OC/G; ++oc) {
@@ -2867,20 +2865,21 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
             RT_ASSERT( ow_end == owe[kw] );
             if( oh_beg >= oh_end || ow_beg >= ow_end ) continue; // oh, still need to set dw=0
 #else
+            if( !ook[kh*KW+kw] ) continue;
             const int oh_beg = ohb[kh];
             const int oh_end = ohe[kh];
             const int ow_beg = owb[kw];
             const int ow_end = owe[kw];
-            if( !ook[kh*KW+kw] ) continue;
 #endif
             //if( oh_beg >= oh_end || ow_beg >= ow_end ) continue; // oh, still need to set dw=0
 
             const int iw0 = - PW + kw * (p->dw+1);
             const int ih0 = - PH + kh * (p->dh + 1);
 #if TMP_IC
+            float tmp[ICOG];
             for (int ic = 0; ic < IC/G; ++ic) tmp[ic] = 0.f; // MUST always execute!
-#endif
             RETAIN(tmp)//;
+#endif
               for (int mb = 0; mb < MB; ++mb) // OK inside
               {
                 size_t d_00 = dst_off_f(p, mb, g, oc, 0, 0);
