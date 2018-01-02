@@ -417,12 +417,13 @@ set +x
 if [ -f "${BUILDDIR}/bash_help.inc" ]; then
     # snarf some CMAKE variables
     source "${BUILDDIR}/bash_help.inc"
-    if [ "${CMAKE_CROSSCOMPILING_EMULATOR}" ]; then VE_EXEC="${CMAKE_CROSSCOMPILING_EMULATOR}"; fi
-    if [ ! -x "${VE_EXEC}" ]; then
-        TESTRUNNER="echo Not-Running "
-        echo "cmake crosscompiling emulator, such as ve_exec, not available?"
-    else
-        TESTRUNNER=''
+    TESTRUNNER=''
+    if [ "${CMAKE_CROSSCOMPILING_EMULATOR}" ]; then
+        VE_EXEC="${CMAKE_CROSSCOMPILING_EMULATOR}"
+        if [ ! -x "${VE_EXEC}" ]; then
+            TESTRUNNER="echo Not-Running "
+            echo "cmake crosscompiling emulator, such as ve_exec, not available?"
+        fi
     fi
 fi
 set -x
@@ -481,7 +482,7 @@ if [ "${BUILDOK}" == "y" ]; then
         if [ -d "${LOGDIR}" ]; then rm -rf "${LOGDIR}.bak"; mv -v "${LOGDIR}" "${LOGDIR}.bak"; fi
         mkdir ${LOGDIR}
         pwd -P
-        ls "${BUILDDIR}/*log"
+        ls "${BUILDDIR}/"*log
         for f in "${BUILDDIR}/"*log doxygen.log; do
             cp -av "${f}" "${LOGDIR}/" || true
         done
