@@ -93,18 +93,15 @@ void check_correctness(const desc_t *c) {
 
     //res_t res{ .state=UNTESTED };
     res_t res{};
-    auto &bs = benchdnn_stat;
-
-#if 1
     // Nicely avoid unsupported things:
     const bool mkldnn_ok = check_mkldnn_support(&p, &res);
     int status = (mkldnn_ok? conv::doit(&p, &res): OK); // <-- run benchmark
-#else
-    const bool mkldnn_ok = true;
-    int status = conv::doit(&p, &res);
-#endif
     RT_ASSERT( status == OK || status == FAIL );
 
+    bool want_perf_report = false;
+
+#if 0
+    auto &bs = benchdnn_stat;
     // XXX TODO output messages based on bs directly
     const char *state = state2str(res.state);
 
@@ -141,15 +138,15 @@ void check_correctness(const desc_t *c) {
     default:
         RT_ASSERT(!"unknown state");
     }
+#else
+    parse_result(res, want_perf_report, allow_unimpl, status, pstr);
+#endif
 
-    ++bs.tests;
-    if(mkldnn_ok && (bench_mode & TEST)){
-        bs.ts->prt();
+    benchdnn_stat.tests++;
+    if(mkldnn_ok && (bench_mode & TEST) && benchdnn_stat.ts){
+        benchdnn_stat.ts->prt();
     }
-
 }
-
-int batch(const char *fname);
 
 int bench(int argc, char **argv, bool main_bench) {
     static bool own_ts = false;
@@ -168,7 +165,7 @@ int bench(int argc, char **argv, bool main_bench) {
 
     for (int arg = 0; arg < argc; ++arg) {
         if (!strncmp("--batch=", argv[arg], 8))
-            SAFE(batch(argv[arg] + 8), CRIT);
+            SAFE(batch(argv[arg] + 8, bench), CRIT);
         else if (!strncmp("--cfg=", argv[arg], 6))
             cfg = str2cfg(argv[arg] + 6);
         else if (!strncmp("--match=", argv[arg], 8))
@@ -223,99 +220,6 @@ int bench(int argc, char **argv, bool main_bench) {
         delete benchdnn_stat.ts;
         benchdnn_stat.ts = nullptr;
     }
-
-    return OK;
-}
-
-#ifdef _WIN32
-#include <windows.h>
-#define PATH_MAX MAX_PATH
-static char *dirname(char *path) {
-    char drive[_MAX_DRIVE];
-    char dir[_MAX_DIR];
-    _splitpath(path, drive, dir, NULL, NULL);
-    path[0] = '\0';
-    if (drive != NULL) strncat(path, drive, _MAX_DRIVE);
-    if (dir != NULL) strncat(path, dir, MAX_PATH);
-    if (path[0] == '\0') strcat(path, ".");
-    return path;
-}
-#elif !defined(DOXYGEN_SHOULD_SKIP_THIS)
-#include <libgen.h>
-#endif /* WIN32 */
-
-FILE *open_batch_file(const char *fname) {
-    const int max_paths = 4;
-
-    static int n_paths = 0;
-    static char search_paths[max_paths][PATH_MAX] = {{0}};
-
-    char *fdir = NULL;
-    {
-        char fname_copy[PATH_MAX];
-        strncpy(fname_copy, fname, PATH_MAX);
-        fdir = dirname(fname_copy);
-    }
-
-    bool dir_found = false;
-    for (int n = 0; n_paths < max_paths && n < n_paths; ++n)
-        if (!strcmp(fdir, search_paths[n])) {
-            dir_found = true;
-            break;
-        }
-    if (!dir_found)
-        strcpy(search_paths[n_paths++], fdir);
-
-    FILE *fp = fopen(fname, "r");
-    if (fp) return fp;
-
-    for (int n = 0; n < n_paths; ++n) {
-        char fullname[PATH_MAX];
-        snprintf(fullname, PATH_MAX, "%s/%s", search_paths[n], fname);
-        fp = fopen(fullname, "r");
-        print(50, "batch file used: %s\n", fullname);
-        if (fp) break;
-    }
-
-    return fp;
-}
-
-int batch(const char *fname) {
-    FILE *fp = open_batch_file(fname);
-    print(0, "batch: %s ???", fname);
-    SAFE(fp ? OK : FAIL, CRIT);
-    print(0, "batch: %s OK\n", fname);
-
-    const size_t maxlen = 1024;
-    char *opts[8*1024] = {0}, buf[maxlen + 1];
-    char line[1024];
-    int n_opts = 0;
-    while (fgets(line, sizeof(line), fp)) {
-        int offset = 0;
-        const char *l = line;
-        while (sscanf(l, "%s%n", buf, &offset) == 1) {
-            if (buf[0] == '#')
-                break; /* stop reading till eol */
-
-#if defined(SXAURORA)
-            const size_t len = strnlen_s(buf, maxlen) + 1;
-#else
-            const size_t len = strnlen(buf, maxlen) + 1;
-#endif
-            opts[n_opts] = (char *)malloc(len);
-            SAFE(opts[n_opts] ? OK : FAIL, CRIT);
-            strncpy(opts[n_opts], buf, len);
-            ++n_opts;
-
-            l += offset;
-        }
-    }
-    bench(n_opts, opts, false);
-
-    for (int n = 0; n < n_opts; ++n)
-        free(opts[n]);
-
-    fclose(fp);
 
     return OK;
 }

@@ -24,14 +24,6 @@
 
 #include "jit_generator.hpp"
 
-#if (defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1600) || defined(_MSC_VER)
-/* Excluding ICC 16.0 from adding simd because it results in accuracy issues.
- * MSC doesn't support simd in _pragma */
-#    define pragma_simd
-#else
-#    define pragma_simd _Pragma("simd")
-#endif
-
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -281,7 +273,7 @@ jit_avx2_1x1_convolution_bwd_weights_t::jit_avx2_1x1_convolution_bwd_weights_t(
     : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd), kernel_(nullptr)
     , rtus_driver_(nullptr), ws_per_thread_(0), scratch_(nullptr)
 {
-    kernel_ = new jit_avx2_1x1_conv_kernel_f32(conf_.jcp_);
+    kernel_ = new jit_avx2_1x1_conv_kernel_f32(conf_.jcp_, *conf_.attr());
 
     const auto &jcp = kernel_->jcp;
 

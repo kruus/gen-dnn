@@ -48,10 +48,7 @@ inline const T& min(const T& a, const T& b) {
 // Rationale: MKL-DNN needs numeric limits implementation that does not
 // generate dependencies on C++ run-time libraries.
 
-template<typename T> struct numeric_limits {
-    static constexpr T lowest() { return T(); }
-    static constexpr T max() { return T(); }
-};
+template<typename T> struct numeric_limits;
 
 template<> struct numeric_limits<float> {
     static constexpr float lowest() { return -FLT_MAX; }
@@ -63,6 +60,11 @@ template<> struct numeric_limits<int32_t> {
     static constexpr int max() { return INT32_MAX; }
 };
 
+template<> struct numeric_limits<int16_t> {
+    static constexpr int16_t lowest() { return INT16_MIN; }
+    static constexpr int16_t max() { return INT16_MAX; }
+};
+
 template<> struct numeric_limits<int8_t> {
     static constexpr int8_t lowest() { return INT8_MIN; }
     static constexpr int8_t max() { return INT8_MAX; }
@@ -72,6 +74,18 @@ template<> struct numeric_limits<uint8_t> {
     static constexpr uint8_t lowest() { return 0; }
     static constexpr uint8_t max() { return UINT8_MAX; }
 };
+
+template<typename T> struct is_integral
+{ static constexpr bool value = false; };
+template<> struct is_integral<int32_t> { static constexpr bool value = true; };
+template<> struct is_integral<int16_t> { static constexpr bool value = true; };
+template<> struct is_integral<int8_t> { static constexpr bool value = true; };
+template<> struct is_integral<uint8_t> { static constexpr bool value = true; };
+
+template <typename T, typename U> struct is_same
+{ static constexpr bool value = false; };
+template <typename T> struct is_same<T, T>
+{ static constexpr bool value = true; };
 
 // Rationale: MKL-DNN needs container implementations that do not generate
 // dependencies on C++ run-time libraries.

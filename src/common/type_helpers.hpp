@@ -18,6 +18,7 @@
 #define TYPE_HELPERS_HPP
 
 #include <assert.h>
+#include <math.h>
 
 #include "mkldnn.h"
 
@@ -25,6 +26,7 @@
 #include "mkldnn_traits.hpp"
 #include "nstl.hpp"
 #include "utils.hpp"
+#include "math_utils.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -35,6 +37,22 @@ status_t safe_ptr_assign(T * &lhs, T* rhs) {
     lhs = rhs;
     return status::success;
 }
+
+template <typename T, typename U> struct is_subset
+{ static constexpr bool value = false; };
+template <typename T> struct is_subset<T, T>
+{ static constexpr bool value = true; };
+template <typename T> struct is_subset<T,
+         typename utils::enable_if<nstl::is_integral<T>::value, float>::type>
+{ static constexpr bool value = true; };
+#define ISSPEC(t1, t2) template <> \
+    struct is_subset<t1, t2> { static constexpr bool value = true; }
+ISSPEC(int16_t, int32_t);
+ISSPEC(int8_t, int32_t);
+ISSPEC(uint8_t, int32_t);
+ISSPEC(int8_t, int16_t);
+ISSPEC(uint8_t, int16_t);
+#undef ISSPEC
 
 namespace types {
 
@@ -54,21 +72,21 @@ inline size_t data_type_size(data_type_t data_type) {
 
 inline memory_format_t format_normalize(const memory_format_t fmt) {
     using namespace memory_format;
-    if (utils::one_of(fmt, x, nc, nchw, nhwc, chwn
+    if (utils::one_of(fmt, x, nc, nchw, nhwc, chwn, 
 #if MKLDNN_JIT_TYPES > 0
-                , nChw8c, nChw16c
+                      nChw8c, nChw16c,
 #endif
-                , oi, io, oihw, ihwo, hwio
+                      oi, io, oihw, ihwo, hwio, 
 #if MKLDNN_JIT_TYPES > 0
-                , oIhw8i, oIhw16i, OIhw8i8o, OIhw16i16o
-                , OIhw8i16o2i, OIhw8o16i2o, OIhw8o8i, OIhw16o16i, Oihw8o
-                , Oihw16o, Ohwi8o, Ohwi16o, OhIw16o4i
+                oIhw8i, oIhw16i, OIhw8i8o, OIhw16i16o,
+                OIhw8i16o2i, OIhw8o16i2o, OIhw8o8i, OIhw16o16i, Oihw8o,
+                Oihw16o, Ohwi8o, Ohwi16o, OhIw16o4i, 
 #endif
-                , goihw
+                goihw, hwigo 
 #if MKLDNN_JIT_TYPES > 0
-                , gOIhw8i8o, gOIhw16i16o, gOIhw8i16o2i, gOIhw8o16i2o
-                , gOIhw8o8i, gOIhw16o16i, gOihw8o, gOihw16o, gOhwi8o
-                , gOhwi16o, gOhIw16o4i ,IOhw16o16i, gIOhw16o16i
+                gOIhw8i8o, gOIhw16i16o, gOIhw8i16o2i, gOIhw8o16i2o, gOIhw8o8i,
+                gOIhw16o16i, gOihw8o, gOihw16o, gOhwi8o, gOhwi16o, gOhIw16o4i,
+                IOhw16o16i, gIOhw16o16i
 #endif
                 ))
         return blocked;
@@ -122,6 +140,7 @@ inline data_type_t default_accum_data_type(data_type_t src_dt,
     using namespace data_type;
 
     if (one_of(f32, src_dt, dst_dt)) return f32;
+    if (one_of(s32, src_dt, dst_dt)) return s32;
     if (one_of(s16, src_dt, dst_dt)) return s32;
 
     if (one_of(s8, src_dt, dst_dt) || one_of(u8, src_dt, dst_dt)) return s32;

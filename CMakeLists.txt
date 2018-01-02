@@ -49,7 +49,7 @@ endif()
 
 set(PROJECT_NAME "GEN-DNN generic MKL-DNN)")
 set(PROJECT_FULL_NAME "Generic (Intel(R) MKL-DNN)")
-set(PROJECT_VERSION "0.11")
+set(PROJECT_VERSION "0.12")
 
 set(LIB_NAME mkldnn)
 
@@ -125,4 +125,4 @@ if(1 OR NECVE)
         ${PROJECT_BINARY_DIR}/bash_help.inc)
 endif()
 message(STATUS "CMakeLists.txt DONE!")
-# vim: et ts=4 sw=4 ai
+# vim: et ts=4 sw=4 ai :

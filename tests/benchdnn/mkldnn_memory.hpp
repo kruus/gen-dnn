@@ -34,12 +34,11 @@ struct dnn_mem_t {
     dnn_mem_t(const mkldnn_memory_desc_t &md, void *data = NULL): active_(true)
     { if (initialize(md, data) != OK) active_ = false; }
 
-    dnn_mem_t(int ndims, mkldnn_dims_t dims, mkldnn_data_type_t dt,
+    dnn_mem_t(int ndims, const mkldnn_dims_t dims, mkldnn_data_type_t dt,
             mkldnn_memory_format_t fmt, void *data = NULL): active_(true) {
         mkldnn_memory_desc_t md;
         auto init = [&](){
-            DNN_SAFE(mkldnn_memory_desc_init(&md, ndims, dims, dt, fmt),
-                    CRIT);
+            DNN_SAFE(mkldnn_memory_desc_init(&md, ndims, dims, dt, fmt), CRIT);
             SAFE(initialize(md, data), CRIT);
             return OK;
         };
@@ -68,24 +67,50 @@ struct dnn_mem_t {
             void *data = NULL): dnn_mem_t(rhs.md_, dt, fmt, data)
     { if((active_ = rhs.active_)) reorder(rhs); }
 
+#if 1
+    /** Construct an optionally active dnn_mem_t.
+     * - if ! \c active,  use \c dnn_mem_t()
+     * - else construct using \c args ; i.e. \c dnn_mem_t(args...)
+     * \return rvalue that you can assign to an object.  */
+    template< class... REST >
+    static dnn_mem_t optional(bool const active, REST...args)
+    {
+        return active
+            ? dnn_mem_t(args...)
+            : dnn_mem_t();
+    }
+    /** Move constructor.
+     * use with \c dnn_mem_t::optional(bool, ...) tmp object helper */
+    dnn_mem_t( dnn_mem_t &&rhs ) : md_(rhs.md_), mpd_(rhs.mpd_), p_(rhs.p_),
+            data_(rhs.data_), is_data_owner_(rhs.is_data_owner_),
+            active_(rhs.active_)
+    { rhs.active_ = false; /* avoid cleanup of tmp rvalue */ }
+#endif
+
     ~dnn_mem_t() { cleanup(); }
 
     /** Make \c this to <em>look like</em> \c rhs, so \c this gets the re-ordered
      * \em content of \c rhs */
-    int reorder(const dnn_mem_t &rhs) {
+    int reorder(const dnn_mem_t &rhs) { return reorder(rhs, NULL); }
+    int reorder(const dnn_mem_t &rhs, const mkldnn_primitive_attr_t &attr) {
         if (this == &rhs) return OK;
         if (!rhs.active_) return FAIL;
 
+        mkldnn_primitive_desc_t rpd;
         mkldnn_primitive_t r;
-        //{
-            mkldnn_primitive_desc_t rpd;
-            DNN_SAFE(mkldnn_reorder_primitive_desc_create(&rpd, rhs.mpd_, mpd_),
-                     WARN);
-            mkldnn_primitive_at_t i = {rhs.p_, 0};
-            const_mkldnn_primitive_t o = p_;
-            DNN_SAFE(mkldnn_primitive_create(&r, rpd, &i, &o), WARN);
-            // perhaps? DNN_SAFE(mkldnn_primitive_desc_destroy(rpd), CRIT);
-        //}
+#if 0
+        DNN_SAFE(mkldnn_reorder_primitive_desc_create(&rpd, rhs.mpd_, mpd_),
+                 WARN);
+        mkldnn_primitive_at_t i = {rhs.p_, 0};
+        const_mkldnn_primitive_t o = p_;
+        DNN_SAFE(mkldnn_primitive_create(&r, rpd, &i, &o), WARN);
+#else
+        DNN_SAFE(mkldnn_reorder_primitive_desc_create_v2(&rpd, rhs.mpd_,
+                    mpd_, attr), WARN);
+        mkldnn_primitive_at_t i = {rhs.p_, 0};
+        const_mkldnn_primitive_t o = p_;
+        DNN_SAFE(mkldnn_primitive_create(&r, rpd, &i, &o), WARN);
+#endif
         SAFE(execute(r), WARN);
         DNN_SAFE(mkldnn_primitive_desc_destroy(rpd), CRIT);
         DNN_SAFE(mkldnn_primitive_destroy(r), CRIT);
@@ -104,34 +129,64 @@ struct dnn_mem_t {
     int W() const { return md_.dims[with_G() + 3]; } // works for both IW and KW
 
     size_t size() const { return mkldnn_memory_primitive_desc_get_size(mpd_); }
+
     size_t nelems() const {
-        DNN_SAFE(md_.data_type != mkldnn_f32
-                ? mkldnn_invalid_arguments : mkldnn_success, CRIT);
-        return size() / sizeof(float);
+        size_t n = 1;
+        for (int i = 0; i < md_.ndims; ++i)
+            n *= md_.dims[i];
+        return n;
     }
 
     mkldnn_data_type_t dt() const { return md_.data_type; }
+    size_t sizeof_dt() const { return ::sizeof_dt(dt()); }
 
     template <typename T>
     explicit operator T*() const { return static_cast<T*>(data_); }
 
-    /** Construct an optionally active dnn_mem_t.
-     * - if ! \c active,  use \c dnn_mem_t()
-     * - else construct using \c args ; i.e. \c dnn_mem_t(args...)
-     * \return rvalue that you can assign to an object.  */
-    template< class... REST >
-    static dnn_mem_t optional(bool const active, REST...args)
-    {
-        return active
-            ? dnn_mem_t(args...)
-            : dnn_mem_t();
+    float get_elem(size_t idx) const {
+        float elem = 0.0;
+        switch (dt()) {
+            case mkldnn_s8: elem = static_cast<int8_t *>(data_)[idx]; break;
+            case mkldnn_u8: elem = static_cast<uint8_t *>(data_)[idx]; break;
+            case mkldnn_s16: elem = static_cast<int16_t *>(data_)[idx]; break;
+            case mkldnn_s32: elem = static_cast<int32_t *>(data_)[idx]; break;
+            case mkldnn_f32: elem = static_cast<float *>(data_)[idx]; break;
+            default: assert(!"bad data type");
+        }
+        return elem;
     }
-    /** Move constructor.
-     * use with \c dnn_mem_t::optional(bool, ...) tmp object helper */
-    dnn_mem_t( dnn_mem_t &&rhs ) : md_(rhs.md_), mpd_(rhs.mpd_), p_(rhs.p_),
-            data_(rhs.data_), is_data_owner_(rhs.is_data_owner_),
-            active_(rhs.active_)
-    { rhs.active_ = false; /* avoid cleanup of tmp rvalue */ }
+
+    void set_elem(size_t idx, float value) {
+        switch (dt()) {
+            case mkldnn_s8: ((int8_t *)data_)[idx] = value; break;
+            case mkldnn_u8: ((uint8_t *)data_)[idx] = value; break;
+            case mkldnn_s16: ((int16_t *)data_)[idx] = value; break;
+            case mkldnn_s32: ((int32_t *)data_)[idx] = value; break;
+            case mkldnn_f32: ((float *)data_)[idx] = value; break;
+            default: assert(!"bad data type");
+        }
+    }
+
+    int get_scale_idx(size_t data_idx, int scale_mask) const {
+        const int ndims = md_.ndims;
+        const auto &dims = md_.dims;
+        int stride = 1;
+        int offset = 0;
+
+        if (scale_mask != 0) {
+            for (int i = 0; i < ndims; ++i) {
+                size_t d = md_.ndims - 1 - i;
+                auto pos = data_idx % dims[d];
+                data_idx /= dims[d];
+                if (scale_mask & (1 << d)) {
+                    offset += pos * stride;
+                    stride *= dims[d];
+                }
+            }
+        }
+
+        return offset;
+    }
 
     /* fields */
 

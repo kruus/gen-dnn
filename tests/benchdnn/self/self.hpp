@@ -49,7 +49,9 @@ namespace self {
     else benchdnn_stat.failed++; \
 } while (0)
 
+void common();
 void conv();
+void bnorm();
 
 int bench(int argc, char **argv, bool main_bench = true);
 

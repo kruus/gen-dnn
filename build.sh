@@ -37,7 +37,7 @@ usage() {
     echo "Debug: Individual tests can be run like build-sx/tests/gtests/test_relu"
     exit 0
 }
-while getopts ":hatvjdDqQpsSTwWbF567" arg; do
+while getopts ":hatvjdDqQpsSTwWbF1567" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
@@ -99,6 +99,9 @@ while getopts ":hatvjdDqQpsSTwWbF567" arg; do
             ;;
         T) # cmake --trace
             CMAKETRACE="--trace"
+            ;;
+        1) # make -j1
+            JOBS="-j1"
             ;;
         5) # gcc-5, if found
             DOGCC_VER=5

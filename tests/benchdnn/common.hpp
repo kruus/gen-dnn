@@ -25,6 +25,10 @@
 #include <float.h>
 #include <math.h>
 
+#if defined(SXAURORA)
+#define strnlen strnlen_s
+#endif
+
 // How is the restrict keyword handled?
 #if !defined(restrict)
 #if defined(_SX)
@@ -167,44 +171,6 @@
 // -----------------------------------
 
 
-#define OK 0
-#define FAIL 1
-
-#ifdef _WIN32
-#define strncasecmp _strnicmp
-#define strcasecmp _stricmp
-#define __PRETTY_FUNCTION__ __FUNCSIG__
-#endif
-
-/** \deprecated -- rdbutso REMOVED the 'ticks' functionality as the easiest fix :) */
-#define USE_RDPMC 0
-#define USE_RDTSC 0
-
-enum { CRIT = 1, WARN = 2 };
-
-#define SAFE(f, s) do { \
-    int status = f; \
-    if (status != OK) { \
-        if (s == CRIT || s == WARN) { \
-            fflush(0), fprintf(stderr, "@@@ error [%s:%d]: '%s' -> %d\n", \
-                    __PRETTY_FUNCTION__, __LINE__, \
-                    #f, status), fflush(0); \
-            if (s == CRIT) exit(1); \
-        } \
-        return status; \
-    } \
-} while(0)
-
-#define RT_ASSERT( COND ) do { \
-    bool const rt_assert_cond = (COND); \
-    if( ! rt_assert_cond ) { \
-        fflush(0), fprintf(stderr, "@@@ error [%s:%d]: '%s' -> false\n", \
-                __PRETTY_FUNCTION__, __LINE__, #COND), fflush(0); \
-        exit(1); \
-    } \
-}while(0)
-
-
 #define ABS(a) ((a)>0?(a):(-(a)))
 
 #define MIN2(a,b) ((a)<(b)?(a):(b))
@@ -219,35 +185,65 @@ enum { CRIT = 1, WARN = 2 };
 #define CONCAt2(a,b) a ## b
 #define CONCAT2(a,b) CONCAt2(a,b)
 
-#if ! defined(_SX)
-inline void *zmalloc(size_t size, size_t align) {
-    void *ptr;
 #ifdef _WIN32
-    ptr = _aligned_malloc(size, align);
-    int rc = ((ptr) ? 0 : errno);
-#else
-    // TODO. Heuristics: Increasing the size to alignment increases
-    // the stability of performance results.
-    if (size < align)
-        size = align;
-    int rc = ::posix_memalign(&ptr, align, size);
-#endif /* _WIN32 */
-    return rc == 0 ? ptr : 0;
-}
-inline void zfree(void *ptr) {
-#ifdef _WIN32
-    _aligned_free(ptr);
-#else
-    return ::free(ptr);
-#endif /* _WIN32 */
-}
-
-#else // SX architecture does not have/need posix_memalign
-inline void *zmalloc(size_t size, size_t align) {
-    return ::malloc(size);
-}
-inline void zfree(void *ptr) { return ::free(ptr); }
+#define strncasecmp _strnicmp
+#define strcasecmp _stricmp
+#define __PRETTY_FUNCTION__ __FUNCSIG__
 #endif
+
+/** \deprecated -- rdbutso REMOVED the 'ticks' functionality as the easiest fix :) */
+#define USE_RDPMC 0
+#define USE_RDTSC 0
+
+#define OK 0
+#define FAIL 1
+
+enum { CRIT = 1, WARN = 2 };
+
+#define SAFE(f, s) do { \
+    int status = f; \
+    if (status != OK) { \
+        if (s == CRIT || s == WARN) { \
+            fprintf(stderr, "@@@ error [%s:%d]: '%s' -> %d\n", \
+                    __PRETTY_FUNCTION__, __LINE__, STRINGIFY(f), status); \
+            fflush(0); \
+            if (s == CRIT) exit(1); \
+        } \
+        return status; \
+    } \
+} while(0)
+
+#define SAFE_V(f) do { \
+    int status = f; \
+    if (status != OK) { \
+        fprintf(stderr, "@@@ error [%s:%d]: '%s' -> %d\n", \
+                __PRETTY_FUNCTION__, __LINE__, STRINGIFY(f), status); \
+        fflush(0); \
+        exit(1); \
+    } \
+} while(0)
+
+
+extern int verbose;
+
+#define print(v, fmt, ...) do { \
+    if (verbose >= v) { \
+        printf(fmt, __VA_ARGS__); \
+        /* printf("[%d][%s:%d]" fmt, v, __func__, __LINE__, __VA_ARGS__); */ \
+        fflush(0); \
+    } \
+} while (0)
+
+#define RT_ASSERT( COND ) do { \
+    bool const rt_assert_cond = (COND); \
+    if( ! rt_assert_cond ) { \
+        fflush(0), fprintf(stderr, "@@@ error [%s:%d]: '%s' -> false\n", \
+                __PRETTY_FUNCTION__, __LINE__, #COND), fflush(0); \
+        exit(1); \
+    } \
+}while(0)
+
+enum prim_t { SELF, CONV, IP, REORDER, BNORM, DEF = CONV, };
 
 /** generic benchmarking operating modes/modifiers.
  * \p CORR 'C'orrectness - executes default mkldnn convolution and reference impl
@@ -258,57 +254,7 @@ inline void zfree(void *ptr) { return ::free(ptr); }
 enum bench_mode_t { MODE_UNDEF = 0x0, CORR = 0x1, PERF = 0x2, TEST=0x4, ALL=0x8 };
 const char *bench_mode2str(bench_mode_t mode);
 bench_mode_t str2bench_mode(const char *str);
-
-extern int verbose;
 extern bench_mode_t bench_mode;
-
-#define print(v, fmt, ...) do { \
-    if (verbose >= v) { \
-        printf(fmt, __VA_ARGS__); \
-        /* printf("[%d][%s:%d]" fmt, v, __func__, __LINE__, __VA_ARGS__); */ \
-        fflush(0); \
-    } \
-} while (0)
-
-struct test_stats;      ///< optional, opaque
-struct stat_t {
-    int tests;          ///< count convolution problem specs
-    int impls;          ///< count convolution impls (==tests if not iterating over impls)
-    int passed;
-    int failed;
-    int skipped;
-    int mistrusted;
-    int unimplemented;
-    int test_fail;      ///< --mode=TEST failure count
-    test_stats *ts;     ///< optional --mode=TEST stats
-};
-extern stat_t benchdnn_stat;
-
-enum prim_t {
-    SELF, CONV, IP, DEF = CONV,
-};
-
-enum dir_t {
-    DIR_UNDEF = 0,
-    FLAG_DAT = 1, FLAG_WEI = 2, FLAG_BIA = 4,
-    FLAG_FWD = 32, FLAG_BWD = 64,
-    FWD_D = FLAG_FWD + FLAG_DAT,
-    FWD_B = FLAG_FWD + FLAG_DAT + FLAG_BIA,
-    BWD_D = FLAG_BWD + FLAG_DAT,
-    BWD_W = FLAG_BWD + FLAG_WEI,
-    BWD_WB = FLAG_BWD + FLAG_WEI + FLAG_BIA,
-};
-dir_t str2dir(const char *str);
-const char *dir2str(dir_t dir);
-
-enum res_state_t { UNTESTED = 0, PASSED, SKIPPED, MISTRUSTED, UNIMPLEMENTED,
-    FAILED };
-const char *state2str(res_state_t state);
-
-bool str2bool(const char *str);
-const char *bool2str(bool value);
-
-bool match_regex(const char *str, const char *pattern);
 
 /* perf */
 extern double max_ms_per_prb; /** maximum time spends per prb in ms */
@@ -347,12 +293,50 @@ struct benchdnn_timer_t {
 #endif
 };
 
+/* global stats */
+struct test_stats;      ///< optional, opaque (for iterate-over-impls)
 /** result structure. \c errors / \c total now now valid only for
  * current impl within a single \c doit test. */
+struct stat_t {
+    int tests;          ///< count convolution problem specs
+    int impls;          ///< count convolution impls (==tests if not iterating over impls)
+    int passed;
+    int failed;
+    int skipped;
+    int mistrusted;
+    int unimplemented;
+    double ms[benchdnn_timer_t::mode_t::n_modes]; // XXX ?
+    int test_fail;      ///< --mode=TEST failure count
+    test_stats *ts;     ///< optional --mode=TEST stats
+};
+extern stat_t benchdnn_stat;
+
+/* result structure */
+enum res_state_t { UNTESTED = 0, PASSED, SKIPPED, MISTRUSTED, UNIMPLEMENTED,
+    FAILED };
+const char *state2str(res_state_t state);
+
 struct res_t {
     res_state_t state;          ///< final status of one or more impls
     int errors, total;          ///< elementwise compare errors/total
     benchdnn_timer_t timer;
 };
+
+void parse_result(res_t &res, bool &want_perf_report, bool allow_unimpl,
+        int status, char *pstr);
+
+/* misc */
+void *zmalloc(size_t size, size_t align);
+void zfree(void *ptr);
+
+bool str2bool(const char *str);
+const char *bool2str(bool value);
+
+/* TODO: why two functions??? */
+bool match_regex(const char *str, const char *pattern);
+bool maybe_skip(const char *skip_impl, const char *impl_str);
+
+typedef int (*bench_f)(int argc, char **argv, bool main_bench);
+int batch(const char *fname, bench_f bench);
 
 #endif

@@ -15,13 +15,13 @@
 # limitations under the License.
 #===============================================================================
 
-MKLURLROOT="https://github.com/01org/mkl-dnn/releases/download/v0.11/"
-MKLVERSION="2018.0.1.20171007"
+MKLURLROOT="https://github.com/01org/mkl-dnn/releases/download/v0.12/"
+MKLVERSION="2018.0.1.20171227"
 
 os=`uname`
-if [ "$os" == "Linux" ]; then
+if [ "$os" = "Linux" ]; then
   MKLPACKAGE="mklml_lnx_${MKLVERSION}.tgz"
-elif [ "$os" == "Darwin" ]; then
+elif [ "$os" = "Darwin" ]; then
   MKLPACKAGE="mklml_mac_${MKLVERSION}.tgz"
 else
   echo "Cannot identify operating system. Try downloading package manually."

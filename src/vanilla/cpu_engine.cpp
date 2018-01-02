@@ -44,6 +44,7 @@
 #include "cpu/jit_sse42_convolution.hpp"
 #endif
 #include "gemm_convolution.hpp"
+#include "gemm_u8s8s32x_convolution.hpp"
 #include "ref_convolution.hpp"
 #if JITFUNCS > 99
 #include "cpu/jit_uni_eltwise.hpp"
@@ -93,6 +94,7 @@ status_t cpu_engine_t::view_primitive_desc_create(view_pd_t **view_pd,
             new cpu_view_t::pd_t(this, mpd, dims, offsets));
 }
 
+#if 0
 status_t cpu_engine_t::concat_primitive_desc_create(concat_pd_t **concat_pd,
         const memory_desc_t *output_d, int n, int concat_dim,
         const memory_pd_t **input_pds, const primitive_attr_t *attr) {
@@ -110,6 +112,7 @@ status_t cpu_engine_t::sum_primitive_desc_create(sum_pd_t **sum_pd,
     return safe_ptr_assign<sum_pd_t>(*sum_pd,
             new cpu_sum_t::pd_t(this, output_d, n, scales, i_pds, attr));
 }
+#endif
 
 using pd_create_f = mkldnn::impl::engine_t::primitive_desc_create_f;
 

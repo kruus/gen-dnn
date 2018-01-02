@@ -91,12 +91,22 @@ conv_impls_t *conv_impls = &conv_impls_[0];
 
 conv_impls_t *get_ref_impls() { return conv_impls; }
 
-double get_trust_nz_level(const prb_t *p, int what, bool final_compare) {
+double get_trust_nz_level(const prb_t *p, data_kind_t kind, bool final_compare)
+{
     if (!final_compare)
-        return p->cfg[what].f_sparsity;
+        return p->cfg[kind].f_sparsity;
+
+    auto count_relu = [&]() {
+        const auto &po = p->attr.post_ops;
+        int count = 0;
+        for (int i = 0; i < po.len; ++i)
+            count += po.entry[i].kind == attr_t::post_ops_t::kind_t::RELU;
+        count = MAX2(count, p->merge == RELU ? 1 : 0);
+        return count;
+    };
 
     double trust = 0.3; /* why? */
-    switch (what) {
+    switch (kind) {
         case SRC:
             trust /= p->sh * p->sw;
             break;
@@ -108,19 +118,19 @@ double get_trust_nz_level(const prb_t *p, int what, bool final_compare) {
             trust = 0.8 * p->cfg[DST].f_sparsity; /* why? */
             break;
         case DST:
-            trust /= p->merge == RELU ? 2. : 1.;
+            trust /= count_relu() == 0 ? 1 : 2;
             break;
     }
 
     return trust;
 }
 
-inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
+inline int compare_dat(const prb_t *p, data_kind_t kind, dnn_mem_t &mem_dt,
         dnn_mem_t &mem_fp, res_t *r, bool final_compare = false) {
     //int nelems = static_cast<int>(mem_dt.nelems()); // making 'i' size_t is not as easy as in ip/ip.cpp
     size_t nelems = mem_dt.nelems();
 
-    const char *swhat = inp_type2str(what);
+    const char *skind = data_kind2str(kind);
 
     int in = 0, below = 0, above = 0;
     int in_ok = 0, below_ok = 0, above_ok = 0;
@@ -136,11 +146,11 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
         const float fp0 = ((float*)mem_fp)[i];
 
         float fp = fp0;
-        if (p->cfg[what].dt != mkldnn_f32) {
+        if (p->cfg[kind].dt != mkldnn_f32) {
             using R = attr_t::round_mode_t;
             switch (p->attr.irmode) {
                 case R::DOWN: fp = floorf(fp0); break;
-                case R::NEAREST: fp = rintf(fp0); break;
+                case R::NEAREST: fp = nearbyintf(fp0); break;
                 default:
                     return UNTESTED;
             }
@@ -150,19 +160,19 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
         const float rel_diff = diff / (fabsf(fp) > FLT_MIN ? fabsf(fp) : 1);
 
         bool ok = true;
-        if (fp < p->cfg[what].min) {
-            diff_norm.update(p->cfg[what].min, dt);
-            ok = dt == p->cfg[what].min;
+        if (fp < p->cfg[kind].min) {
+            diff_norm.update(p->cfg[kind].min, dt);
+            ok = dt == p->cfg[kind].min;
             below += 1;
             below_ok += ok;
-        } else if (fp > p->cfg[what].max) {
-            diff_norm.update(p->cfg[what].max, dt);
-            ok = dt == p->cfg[what].max;
+        } else if (fp > p->cfg[kind].max) {
+            diff_norm.update(p->cfg[kind].max, dt);
+            ok = dt == p->cfg[kind].max;
             above += 1;
             above_ok += ok;
         } else {
             diff_norm.update(fp, dt);
-            ok = (fabs(fp) > 1e-5 ? rel_diff : diff) <= p->cfg[what].eps;
+            ok = (fabs(fp) > 1e-5 ? rel_diff : diff) <= p->cfg[kind].eps;
             in += 1;
             in_ok += ok;
         }
@@ -170,7 +180,7 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
             r->errors++;
             if (r->errors < 10 || verbose >= 10) {
                 int mb_or_g = 0, g_or_oc = 0, c = 0, h = 0, w = 0;
-                switch (what) {
+                switch (kind) {
                 case SRC: inv_src_off_f(p, i, mb_or_g, g_or_oc, c, h, w); break;
                 case WEI: inv_wei_off_f(p, i, mb_or_g, g_or_oc, c, h, w); break;
                 case BIA: inv_bia_off_f(p, i, mb_or_g, g_or_oc); break;
@@ -180,7 +190,7 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
                         "fp:%8g fp0:%8g dt:%8g diff:%8g rdiff:%8g\n",
                         (unsigned long)i,
                         final_compare == false ? "REORDER " : "",
-                        swhat, mb_or_g, g_or_oc, c, h, w,
+                        skind, mb_or_g, g_or_oc, c, h, w,
                         fp, fp0, dt, diff, rel_diff);
             }
         }
@@ -188,7 +198,7 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
         /* for debug purposes only: dump the output */
         if (final_compare && verbose >= 50 && i < 30) {
             int mb_or_g = 0, g_or_oc = 0, c = 0, h = 0, w = 0;
-            switch (what) {
+            switch (kind) {
             case SRC: inv_src_off_f(p, i, mb_or_g, g_or_oc, c, h, w); break;
             case WEI: inv_wei_off_f(p, i, mb_or_g, g_or_oc, c, h, w); break;
             case BIA: inv_bia_off_f(p, i, mb_or_g, g_or_oc); break;
@@ -197,7 +207,7 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
 
             print(0, "[%4lu][%s][%d,%d,%d,%d,%d] fp:%8g fp0:%8g dt:%8g\n",
                     (unsigned long)i,
-                    swhat, mb_or_g, g_or_oc, c, h, w, fp, fp0, dt);
+                    skind, mb_or_g, g_or_oc, c, h, w, fp, fp0, dt);
         }
 
         non_zero += fp != 0;
@@ -211,7 +221,7 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
                 "l1:(%g,%g,%g,``%g``) "
                 "l2:(%g,%g,%g,``%g``) "
                 "l8:(%g,%g,%g,``%g``)\n",
-                swhat, final_compare ? "final: " : "",
+                skind, final_compare ? "final: " : "",
                 diff_norm.rel_diff(norm_t::L0),
                 diff_norm.a_[norm_t::L1], diff_norm.b_[norm_t::L1],
                 diff_norm.diff_[norm_t::L1], diff_norm.rel_diff(norm_t::L1),
@@ -222,7 +232,7 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
     }
 
     const double trust_rg_level = 0.3;
-    const double trust_nz_level = get_trust_nz_level(p, what, final_compare);
+    const double trust_nz_level = get_trust_nz_level(p, kind, final_compare);
 
     const double trust_rg = (double)in / r->total;
     const double trust_nz = (double)non_zero / r->total;
@@ -237,7 +247,7 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
         print(0, "@@@ [%s] %strust range:%.2f nz:%.2f "
                 "(level range:%.2f nz:%.2f). "
                 "in:%d (ok:%d) below:%d (ok:%d) above:%d (ok:%d) nz:%d "
-                "total:%lu\n", swhat, final_compare ? "final: " : "",
+                "total:%lu\n", skind, final_compare ? "final: " : "",
                 trust_rg, trust_nz, trust_rg_level, trust_nz_level, in, in_ok,
                 below, below_ok, above, above_ok, non_zero,
                 (unsigned long)r->total);
@@ -247,7 +257,7 @@ inline int compare_dat(const prb_t *p, int what, dnn_mem_t &mem_dt,
         r->state = MISTRUSTED;
         print(0, "@@@ [%s] test-bug: trust is too low. "
                 "range:%.2f (?<%.2f) nz:%.2f (?<%.2f) (nz: %d total: %lu)\n",
-                swhat, trust_rg, trust_rg_level, trust_nz, trust_nz_level,
+                skind, trust_rg, trust_rg_level, trust_nz, trust_nz_level,
                 non_zero, (unsigned long)r->total);
     }
 
@@ -570,22 +580,34 @@ int init_conv_prim_any( mkldnn_primitive_desc_t &cpd, const prb_t *p,
             mkldnn_convolution_desc_t const& cd, res_t *r)
 {
     r->state = UNTESTED;
+    auto mkldnn_attr = create_mkldnn_attr(p->attr, p->oc, p->scales);
+
     mkldnn_status_t init_status = mkldnn_success;
     if (p->merge == RELU) {
         mkldnn_convolution_relu_desc_t crd;
         DNN_SAFE(mkldnn_convolution_relu_desc_init(&crd, &cd, 0), WARN);
-        init_status = mkldnn_primitive_desc_create_v2(&cpd, &crd,
-                p->attr.mkldnn_attr, engine, NULL);
+        init_status = mkldnn_primitive_desc_create_v2(&cpd, &crd, mkldnn_attr,
+                engine, NULL);
     } else {
-        init_status = mkldnn_primitive_desc_create_v2(&cpd, &cd,
-                p->attr.mkldnn_attr, engine, NULL);
+        init_status = mkldnn_primitive_desc_create_v2(&cpd, &cd, mkldnn_attr,
+                engine, NULL);
     }
 
-    if (init_status == mkldnn_unimplemented){
+    mkldnn_primitive_attr_destroy(mkldnn_attr);
+
+    if (init_status == mkldnn_unimplemented)
         return r->state = UNIMPLEMENTED, OK;
-    } else {
-        SAFE(init_status, WARN);
+    SAFE(init_status, WARN);
+
+    const char *impl_str = query_impl_info(cpd);
+#if 0
+    if (maybe_skip(skip_impl, impl_str)) {
+        print(2, "SKIPPED: mkldnn implementation: %s\n", impl_str);
+        DNN_SAFE(mkldnn_primitive_desc_destroy(cpd), WARN);
+        return r->state = SKIPPED, OK;
     }
+#endif
+    print(5, "mkldnn implementation: %s\n", impl_str);
 
     return OK;
 }
@@ -943,7 +965,7 @@ static void test_impl_compare( const prb_t* p, res_t* r, const size_t imp,
     auto &bs = benchdnn_stat;
     assert( imp <= get_nref_impls() && imp >= 0 );
     char const* impname = get_ref_impls()[imp].name;
-    if (maybe_skip(impname))
+    if (maybe_skip(skip_impl, impname))
         return;
 
     benchdnn_timer_t tt;
@@ -1149,7 +1171,7 @@ int doit(const prb_t *p, res_t *r) {
                 // out: impl_str, impl pitst, pd_n
                 ITERATE_OVER_IMPLS_BEGIN;
 #define ITERATE_OVER_IMPLS_TEST( test_ok_fail ) \
-                if (maybe_skip(impl_str)) pitst = SKIPPED; \
+                if (maybe_skip(skip_impl, impl_str)) pitst = SKIPPED; \
                 else { \
                     print(20, " %s,%s\n", impl, dir2str(p->dir)); \
                     scoped_prim prim_create(c, pd_n, inputs, outputs); \

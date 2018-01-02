@@ -31,6 +31,8 @@
 #include "self/self.hpp"
 #include "conv/conv.hpp"
 #include "ip/ip.hpp"
+#include "reorder/reorder.hpp"
+#include "bnorm/bnorm.hpp"
 
 #if defined(_OPENMP)
 #include <omp.h>
@@ -57,6 +59,8 @@ int main(int argc, char **argv) {
         if (!strcmp("--self", argv[0])) prim = SELF;
         else if (!strcmp("--conv", argv[0])) prim = CONV;
         else if (!strcmp("--ip", argv[0])) prim = IP;
+        else if (!strcmp("--reorder", argv[0])) prim = REORDER;
+        else if (!strcmp("--bnorm", argv[0])) prim = BNORM;
         else if (!strncmp("--mode=", argv[0], 7))
             bench_mode = str2bench_mode(argv[0] + 7);
         else if (!strncmp("-v", argv[0], 2))
@@ -91,6 +95,8 @@ int main(int argc, char **argv) {
     case SELF: self::bench(argc, argv); break;
     case CONV: conv::bench(argc, argv); break;
     case IP: ip::bench(argc, argv); break;
+    case REORDER: reorder::bench(argc, argv); break;
+    case BNORM: bnorm::bench(argc, argv); break;
     default: fprintf(stderr, "err: unknown driver\n");
     }
 
@@ -104,6 +110,10 @@ int main(int argc, char **argv) {
             (bench_mode&CORR? "correct": "passed"), benchdnn_stat.passed,
             benchdnn_stat.skipped, benchdnn_stat.mistrusted,
             benchdnn_stat.unimplemented, benchdnn_stat.failed);
+    if (bench_mode & PERF)
+        printf("total perf: min(ms):%g avg(ms):%g\n",
+                benchdnn_stat.ms[benchdnn_timer_t::min],
+                benchdnn_stat.ms[benchdnn_timer_t::avg]);
     if ((bench_mode & TEST))
         printf(" test_fail: %d", benchdnn_stat.test_fail);
     printf("\n");

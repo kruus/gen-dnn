@@ -15,15 +15,15 @@ and inner products of different data types. It also implicitly tests reorders.
 ## Usage (main driver)
 
 **benchdnn** itself is a driver for different implementation specific
-harnesses. So far it has harness for Intel MKL-DNN convolution and inner
-product.
+harnesses. So far it has harness for Intel MKL-DNN convolution, inner product,
+reorder, batch normalization, and harness for testing itself.
 The usage:
 ```
     $ ./benchdnn: [--HARNESS] [--mode=MODE] [-vN|--verbose=N] HARNESS-OPTS
 ```
 where:
 
- - `HARNESS` is either `conv` [default] or `ip`
+ - `HARNESS` is either `conv` [default], `ip`, `reorder`, `bnorm`, or `self`
 
  - `MODE` -- string that contains flags for benchmark mode.
    - Use `C` or `c` for correctness (used by default), and `P` or `p` for performance.
@@ -79,6 +79,7 @@ The attribute string *attr_str* is defined as (new lines for readability):
 ```
     [irmode={nearest,down};]
     [oscale={none,common,per_oc}[:scale];]
+    [post_ops='[{relu,sum[:sum_scale]};]...';]
 ```
 
 Here `irmode` defines the rounding mode for integer output (default is nearest).
@@ -95,6 +96,11 @@ is 1.0. Known policies are:
 
 *attr_str* is used for `--mode` C[orrectness] or P[erformance], not for T[est].
 
+Next, `post_ops` stands for post operation sequence. Currently supported post
+ops are:
+
+  - `relu` with no parameters (i.e. corresponding scale is 1., alg = eltwise_relu, alpha = beta = 0.)
+  - `sum` with optional parameter scale (default 1.)
 
 ### convolution configurations (aka precision specification)
 
@@ -114,7 +120,8 @@ configurations for **benchdnn**:
 | s16     | s16      | s32      | s32      | s16s16s32s32 | optimized for processors with support of 4vnni, forward pass only (aka FWD_D, FWD_B)
 | s32     | s16      | s16      | s32      | s32s16s16s32 | optimized for processors with support of 4vnni, backward wrt data only (aka BWD_D)
 | s16     | s32      | s16      | s32      | s16s32s16s32 | optimized for processors with support of 4vnni, backward wrt weights (aka BWD_W, BWD_WB)
-| u8      | s8       | s32      | s32      | u8s8s32s32   | optimized for processors with support of avx512vl, forward pass only (aka FWD_D, FWD_B)
+| u8      | s8       | f32      | s32      | u8s8f32s32   | optimized for processors with support of avx512vl, forward pass only (aka FWD_D, FWD_B)
+| u8      | s8       | s32      | s32      | u8s8s32s32   | same notes as for u8s8s32s32
 | u8      | s8       | s8       | s32      | u8s8s8s32    | same notes as for u8s8s32s32
 | u8      | s8       | u8       | s32      | u8s8u8s32    | same notes as for u8s8s32s32
 
@@ -167,7 +174,7 @@ string: perf
 convolution name
 full conv-desc
 number of giga ops calculated
-[*] effective cpu frequency in GHz (amb clocks[min] / time[min])
+[\*] effective cpu frequency in GHz (amb clocks[min] / time[min])
 minimum time spent in ms
 best gigaops (since it corresponds to mimimum time)
 average time spent in ms
@@ -263,8 +270,17 @@ minibatch, and one common output scale set to 0.5 with rounding mode set to
 down (via attributes):
 ```ShellSession
     $ ./benchdnn --conv \
-        --cfg=u8s8u8s32 --dir=FWD_D \
+        --cfg=u8s8u8s32 --dir=FWD_D --skip-impl="ref" --allow-unimpl=true \
         --attr="irmode=down;oscale=common:.5"
+```
+
+Almost the same as above (with minor changes), but also add post operation
+sequence **(relu, then sum with scale .3, then relu)** using
+attributes/mkldnn_post_ops_t:
+```
+    $ ./benchdnn --conv \
+        --cfg=u8s8s32s32 --dir=FWD_B \
+        --attr="oscale=common:.5;post_ops='relu;sum:.3;relu'"
 ```
 
 
@@ -286,8 +302,8 @@ down (via attributes):
 | dh, dw        | Dilation of image region covered by kernel (0 =&gt; x1)
 | mb            | Minibatch (amount of images processed at once)
 | g             | Groups (a way to reduce the amount of computations, see Alexnet topology)
-| FWD_{D,B}     | forward w/o and w/ bias
-| BWD_{D,W,WB}  | backward wrt data, weights, and weights and bias
+| FWD\_{D,B}     | forward w/o and w/ bias
+| BWD\_{D,W,WB}  | backward wrt data, weights, and weights and bias
 | DIRECT, WINO  | convolution algorithm: direct or Winograd based
 | NONE, RELU    | merged primitives: nothing or ReLU
 
@@ -326,6 +342,41 @@ Todays Intel performance tests on 6-core avx2 yielded 100x speedup for a
 'minialex' test in FWD, but BWD\_D and BWD\_WB still lag at only 7-12x speedup.
              
     
+## Usage (batch normalization harness)
+
+The usage:
+```
+    ./benchdnn --bnorm [harness-knobs] bnorm-desc ...
+```
+
+where *harness-knobs* are:
+
+ - `--mb=N` override minibatch that is specified in batch normalization description, default `0` (use mb specified in bnorm-desc)
+ - `--dir={FWD_D (forward data /training), FWD_I (forward data /inference), BWD_D (backward data), BWD_DW (backward data + weights)` direction, default `FWD_D`
+ - `--dt={f32, s32, ...}` base data type, default `f32`
+ - `--fmt={nchw, nChw16c, ...}` data layout, default `nchw`
+ - `--attr="attr_str"` attributes (see in the convolution section above), default `""` (no attributes set)
+ - `--match=regex` check only convolutions that match with regex, default is `".*"`. Notice: Windows may only interpret string arguments surrounded by double quotation marks.
+ - `--skip-impl="str1[:str2]..."` skip implementation (see mkldnn_query_impl_info_str), default `""`
+ - `--perf-template=template-str` set template for performance report (very similar to the convolution one)
+ - `--reset` reset all the parameters set before to default one
+ - `-vN|--verbose=N` verbose level, default `0`
+ - `--batch=file` use options from the given file (see in subdirectory)
+
+and *bnorm-desc* is a batch normalization description. The canonical form is:
+```
+    mbXicXihXiwXepsYnS
+```
+Here X is an integer number, Y is a real number, and S is string (n stands for
+name). Special symbol `_` is ignored, hence maybe used as delimiter. There are
+some implicit rules:
+ - if mb is omitted set mb to 2
+
+ - if iw is omitted set iw to ih (and vice versa)
+
+ - if eps is omitted set eps to 1./16
+
+
 ## Installation
 
 **benchdnn** is automatically built with Intel MKL-DNN. For the convenience one

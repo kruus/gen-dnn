@@ -38,6 +38,10 @@ using namespace mkldnn::impl::types;
 
 struct jit_avx512_core_u8s8s32x_conv_fwd_ker_t: public jit_generator {
     enum { STATE_FIRST_DST_LOAD = 0x1U };
+    enum { EXPL_BCAST_LARGE_SPATIAL_MIN_IW = 38,
+           EXPL_BCAST_LARGE_SPATIAL_MIN_UR_W = 4,
+           EXPL_BCAST_MAX_IW = 28,
+           EXPL_BCAST_MIN_IC_NB = 8 };
 
     struct call_params_t {
         const void *src_u8;
@@ -50,7 +54,8 @@ struct jit_avx512_core_u8s8s32x_conv_fwd_ker_t: public jit_generator {
     };
 
     void (*ker_)(const call_params_t *);
-    jit_conv_conf_t c_;
+    const jit_conv_conf_t &c_;
+    const primitive_attr_t &attr_;
 
     Reg64 reg_kh = rax;
     Reg64 reg_ic_b2 = rbx;
@@ -62,6 +67,7 @@ struct jit_avx512_core_u8s8s32x_conv_fwd_ker_t: public jit_generator {
     Reg64 reg_off_dst = r10;
 
     Reg64 reg_ptr_scales = abi_not_param1;
+    Reg64 reg_ptr_sum_scale = reg_ic_b2;
 
     Reg64 reg_ptr_src_u8 = r11;
     Reg64 reg_ptr_wei_s8 = r12;
@@ -94,27 +100,68 @@ struct jit_avx512_core_u8s8s32x_conv_fwd_ker_t: public jit_generator {
         return Zmm(id_vreg_dst(o));
     }
 
+    Zmm vreg_src_bcast_u8(int i) {
+        const int id_reg_src = c_.ic_nb1 * c_.kw + c_.ur_ow + i;
+        return Zmm(id_reg_src);
+    }
+
+    bool maybe_relu(int position);
+
     void load_wei_s8();
     void load_acc_s32(int ur_ow);
     void store_dst(int ur_ow);
 
-    void compute(int o, int iw_off, int k);
+    void load_src_large_spatial(int ic_b1);
+    int get_src_index(int i);
+    void compute(Zmm vreg_src, Zmm vreg_wei, Zmm vreg_acc);
+    void compute_part_ur_ow_oc_block_expl_bcast_large_spatial(
+                                                       int ur_ow, int iw_start);
+    void compute_part_ur_ow_oc_block_expl_bcast(int ur_ow, int iw_start);
     void compute_part_ur_ow_oc_block(int ur_ow, int iw_start);
     void compute_part_ow_oc_block();
     void compute_ow_oc_block();
     void generate();
 
-    jit_avx512_core_u8s8s32x_conv_fwd_ker_t(const jit_conv_conf_t &c): c_(c) {
+    jit_avx512_core_u8s8s32x_conv_fwd_ker_t(const jit_conv_conf_t &c,
+            const primitive_attr_t &attr): c_(c), attr_(attr) {
         generate();
         ker_ = reinterpret_cast<decltype(ker_)>(const_cast<uint8_t*>(
                         getCode()));
     }
 
+    static bool post_ops_ok(const jit_conv_conf_t &c,
+            const primitive_attr_t &attr);
     static status_t init_conf(jit_conv_conf_t &c, const convolution_desc_t &cd,
             const memory_desc_wrapper &src_d, const memory_desc_wrapper &wei_d,
-            const memory_desc_wrapper &dst_d, const primitive_attr_t *attr,
+            const memory_desc_wrapper &dst_d, const primitive_attr_t &attr,
             bool with_relu, float negative_slope);
+    static void calculate_src_offsets(jit_conv_conf_t &c, int ur_ow);
 };
+
+bool jit_avx512_core_u8s8s32x_conv_fwd_ker_t::maybe_relu(int position) {
+    using namespace primitive_kind;
+    const auto &p = attr_.post_ops_;
+
+    if (position == 0) {
+        /* relu before sum */
+        return false
+            || c_.with_relu
+            || p.contain(eltwise, 0)
+            || (c_.dst_dt == data_type::u8 && !p.contain(sum, 0));
+    } else if (position == 1) {
+        /* relu after sum */
+        const int sum_idx = p.contain(sum, 0)
+            ? 0 : (p.contain(sum, 1) ? 1 : -1);
+        if (sum_idx == -1)
+            return false;
+
+        return false
+            || p.contain(eltwise, sum_idx + 1)
+            || c_.dst_dt == data_type::u8;
+    }
+
+    return false;
+}
 
 void jit_avx512_core_u8s8s32x_conv_fwd_ker_t::load_wei_s8() {
     assert(c_.oc_block * c_.ic_block * sizeof_wei_dt()
@@ -181,6 +228,14 @@ void jit_avx512_core_u8s8s32x_conv_fwd_ker_t::store_dst(int ur_ow) {
         vpxord(vreg_bia, vreg_bia, vreg_bia);
     }
 
+    const auto &p = attr_.post_ops_;
+    const int sum_idx = p.find(primitive_kind::sum);
+    const float *p_sum_scale = &p.entry_[sum_idx].sum.scale;
+    if (sum_idx != -1 && *p_sum_scale != 1.f) {
+        assert(reg_ic_b2 == reg_ptr_sum_scale);
+        mov(reg_ptr_sum_scale, (size_t)p_sum_scale); // ic_b2 == 0 now
+    }
+
     for (int o = 0; o < ur_ow; ++o) {
         const int r = id_vreg_dst(o);
         Address dst = ptr[reg_ptr_dst + reg_off_dst
@@ -190,13 +245,37 @@ void jit_avx512_core_u8s8s32x_conv_fwd_ker_t::store_dst(int ur_ow) {
         vaddps(Zmm(r), Zmm(r), vreg_bia);
         vmulps(Zmm(r), Zmm(r), vreg_scales);
 
-        if (c_.with_relu || c_.dst_dt == data_type::u8)
+        if (maybe_relu(0))
+            vmaxps(Zmm(r), vreg_zero, Zmm(r));
+
+        if (sum_idx != -1) {
+            auto vreg_prev_dst = vreg_zero; /* reuse register w/ zeros... */
+
+            switch (c_.dst_dt) {
+                case f32:
+                case s32: vmovups(vreg_prev_dst, dst); break;
+                case s8: vpmovsxbd(vreg_prev_dst, dst); break;
+                case u8: vpmovzxbd(vreg_prev_dst, dst); break;
+                default: assert(!"unknown dst_dt");
+            }
+            if (c_.dst_dt != f32)
+                vcvtdq2ps(vreg_prev_dst, vreg_prev_dst);
+
+            if (*p_sum_scale == 1.)
+                vaddps(Zmm(r), vreg_prev_dst);
+            else
+                vfmadd231ps(Zmm(r), vreg_prev_dst, zword_b[reg_ptr_sum_scale]);
+
+            vpxord(vreg_zero, vreg_zero, vreg_zero); /* restore zeros */
+        }
+
+        if (maybe_relu(1))
             vmaxps(Zmm(r), vreg_zero, Zmm(r));
 
         if (c_.dst_dt != f32) {
-            if (c_.rmode == round_mode::nearest)
+            if (attr_.round_mode_ == round_mode::nearest)
                 vcvtps2dq(Zmm(r) | T_rn_sae, Zmm(r));
-            else if (c_.rmode == round_mode::down)
+            else if (attr_.round_mode_ == round_mode::down)
                 vcvtps2dq(Zmm(r) | T_rd_sae, Zmm(r));
             else
                 assert(!"unimplemented");
@@ -210,60 +289,117 @@ void jit_avx512_core_u8s8s32x_conv_fwd_ker_t::store_dst(int ur_ow) {
         default: assert(!"unknown dst_dt");
         }
     }
+
+    if (sum_idx != -1 && *p_sum_scale != 1.f) {
+        assert(reg_ic_b2 == reg_ptr_sum_scale);
+        xor_(reg_ic_b2, reg_ic_b2); // restore reg_ic_b2 == 0
+    }
+
     add(reg_off_dst, ur_ow * c_.ngroups * c_.oc * sizeof_dst_dt());
 
     L(l_ret);
 }
 
-/** computes:
- *      i_u8 [ic_nb1]         [4i]
- * (*)  w_s8 [ic_nb1][kw][16o][4i]
- * (+=) --------------------------
- *      o_s32            [16o]
- *
- * parameters:
- *   i_u8 = input[reg_ptr_src_u8 + reg_off_src_u8 + width:iw_off]
- *   w_s8 = weights[width:k]
- *
- * assumptions:
- *   ic_block == 4i
- *   oc_block == 16o
- */
-void jit_avx512_core_u8s8s32x_conv_fwd_ker_t::compute(int o, int iw_off, int k)
-{
-    assert(0 <= k && k < c_.kw);
-    assert(0 <= o && o < c_.ur_ow_max);
+void jit_avx512_core_u8s8s32x_conv_fwd_ker_t::calculate_src_offsets(
+                                                jit_conv_conf_t &c, int ur_ow) {
+    const int i_start = - c.l_pad;
+    const int i_end = ur_ow * c.stride_w + c.kw - c.l_pad;
 
-    Zmm vreg_src_u8 = vreg_tmp;
-    Zmm vreg_t_s16 = vreg_src_u8;
-    Zmm vreg_t_s32 = vreg_src_u8;
-
-    for (int ic_b1 = 0; ic_b1 < c_.ic_nb1; ++ic_b1) {
-        const int off = iw_off * c_.ngroups * c_.ic + ic_b1 * c_.ic_block;
-
-        // [4i, 4i, ..., 4i] (16)
-        vpbroadcastd(vreg_src_u8, ptr[reg_ptr_src_u8 + reg_off_src_u8
-                + off * sizeof_src_dt()]);
-        // [2t, 2t, ..., 2t] (16) <-- i0 * w0 + i1 * w1
-        vpmaddubsw(vreg_t_s16, vreg_src_u8, vreg_wei_s8(ic_b1, k));
-        // [1u, 1u, ..., 1u] (16) <-- t0 * 1 + t1 * 1
-        vpmaddwd(vreg_t_s32, vreg_t_s16, vreg_one_s16);
-        // [1o, 1o, ..., 1o] (16) <-- o + u
-        vpaddd(vreg_acc_s32(o), vreg_acc_s32(o), vreg_t_s32);
+    c.src_count = 0;
+    for (int k = 0; k < c.kw; ++k)  {
+        for (int i = i_start; i < i_end; ++i) {
+            bool fflag = false;
+            if (i >= c.iw)
+                continue;
+            if ((i + k - c.l_pad) % c.stride_w != 0)
+                continue;
+            const int o = (i - k + c.l_pad) / c.stride_w;
+            if (o < 0 || o >= ur_ow)
+                continue;
+            const int offset = i * c.ngroups * c.ic;
+            for (int j = 0; j < c.src_count; ++j) {
+                if (c.src_offsets[j] == offset) {
+                    fflag = true;
+                    break;
+                }
+            }
+            if (!fflag) {
+                if (c.src_count == 28) {
+                    c.src_count = 0;
+                    return;
+                }
+                c.src_offsets[c.src_count++] = offset;
+            }
+        }
     }
 }
 
-/** computes:
- *  i_u8 [~ur_ow~][-ic_nb2][ic_nb1]         [4i] (*)
- *  w_s8                   [ic_nb1][kw][16o][4i]
- * o_s32 [ ur_ow ]                     [16o]
- *
- * with no reduction over ic_nb2
- */
-void jit_avx512_core_u8s8s32x_conv_fwd_ker_t::compute_part_ur_ow_oc_block(
-        int ur_ow, int iw_start) {
-    Label l_iw_0;
+void jit_avx512_core_u8s8s32x_conv_fwd_ker_t::load_src_large_spatial(int ic_b1) {
+    for(int i = 0; i < c_.src_count; i++) {
+        int offset = c_.src_offsets[i] + ic_b1 * c_.ic_block;
+        vpbroadcastd(vreg_src_bcast_u8(i),
+            ptr[reg_ptr_src_u8 + reg_off_src_u8 + offset * sizeof_src_dt()]);
+    }
+}
 
+int jit_avx512_core_u8s8s32x_conv_fwd_ker_t::get_src_index(int ow_i) {
+    int f, off = ow_i * c_.ngroups * c_.ic;
+    for (f = 0; f < c_.src_count; ++f)
+        if (c_.src_offsets[f] == off) break;
+    return f;
+}
+
+void jit_avx512_core_u8s8s32x_conv_fwd_ker_t::compute(
+                               Zmm vreg_acc, Zmm vreg_wei, Zmm vreg_src) {
+        Zmm vreg_t_s16 = vreg_tmp;
+        Zmm vreg_t_s32 = vreg_tmp;
+
+        // [2t, 2t, ..., 2t] (16) <-- i0 * w0 + i1 * w1
+        vpmaddubsw(vreg_t_s16, vreg_src, vreg_wei);
+        // [1u, 1u, ..., 1u] (16) <-- t0 * 1 + t1 * 1
+        vpmaddwd(vreg_t_s32, vreg_t_s16, vreg_one_s16);
+        // [1o, 1o, ..., 1o] (16) <-- o + u
+        vpaddd(vreg_acc, vreg_acc, vreg_t_s32);
+
+}
+
+void jit_avx512_core_u8s8s32x_conv_fwd_ker_t
+    ::compute_part_ur_ow_oc_block_expl_bcast_large_spatial(
+        int ur_ow, int iw_start) {
+    Label l_iw_0[4]; /* Max value of ic_nb1 = 4 */
+
+    const int i_start = - c_.l_pad;
+    const int i_end = ur_ow * c_.stride_w + c_.kw - c_.l_pad;
+
+    for (int ic_b1 = 0; ic_b1 < c_.ic_nb1; ++ic_b1) {
+        load_src_large_spatial(ic_b1);
+        for (int k = 0; k < c_.kw; ++k)  {
+            if (c_.l_pad && iw_start == 0 && k == 0) {
+                test(reg_off_src_u8, reg_off_src_u8);
+                je(l_iw_0[ic_b1], T_NEAR);
+            }
+            for (int i = i_start; i < i_end; ++i) {
+                if (i == 0 && k == 0)
+                    L(l_iw_0[ic_b1]);
+                if (iw_start + i >= c_.iw)
+                    continue;
+                if ((i + k - c_.l_pad) % c_.stride_w != 0)
+                    continue;
+                const int o = (i - k + c_.l_pad) / c_.stride_w;
+                if (o < 0 || o >= ur_ow)
+                    continue;
+
+                compute(vreg_acc_s32(o), vreg_wei_s8(ic_b1, k),
+                    vreg_src_bcast_u8(get_src_index(i)));
+            }
+        }
+    }
+}
+
+void jit_avx512_core_u8s8s32x_conv_fwd_ker_t::compute_part_ur_ow_oc_block_expl_bcast(
+    int ur_ow, int iw_start) {
+
+    Label l_iw_0;
     if (c_.l_pad && iw_start == 0) {
         /* [r1]: left padding handling happens only at the first iteration */
         test(reg_off_src_u8, reg_off_src_u8);
@@ -279,17 +415,63 @@ void jit_avx512_core_u8s8s32x_conv_fwd_ker_t::compute_part_ur_ow_oc_block(
         /* handle right padding */
         if (iw_start + i >= c_.iw)
             continue;
+        if (c_.expl_bcast) {
+            for (int ic_b1 = 0; ic_b1 < c_.ic_nb1; ++ic_b1) {
+                const int off = i * c_.ngroups * c_.ic + ic_b1 * c_.ic_block;
+                // [1o, 1o, ..., 1o] (16) <-- o + u
+                vpbroadcastd(vreg_src_bcast_u8(ic_b1),
+                    ptr[reg_ptr_src_u8 + reg_off_src_u8 + off * sizeof_src_dt()]);
+            }
+            for (int ic_b1 = 0; ic_b1 < c_.ic_nb1; ++ic_b1) {
+                for (int k = 0; k < c_.kw; ++k)  {
+                    if ((i + k - c_.l_pad) % c_.stride_w != 0)
+                        continue;
+                    const int o = (i - k + c_.l_pad) / c_.stride_w;
+                    if (o < 0 || o >= ur_ow)
+                        continue;
 
-        for (int k = 0; k < c_.kw; ++k) {
-            if ((i + k - c_.l_pad) % c_.stride_w != 0)
-                continue;
-            const int o = (i - k + c_.l_pad) / c_.stride_w;
+                    compute(vreg_acc_s32(o), vreg_wei_s8(ic_b1, k),
+                        vreg_src_bcast_u8(ic_b1));
+                }
+            }
+        } else {
+            for (int k = 0; k < c_.kw; ++k)  {
+                if ((i + k - c_.l_pad) % c_.stride_w != 0)
+                    continue;
 
-            if (o < 0 || o >= ur_ow)
-                continue;
+                const int o = (i - k + c_.l_pad) / c_.stride_w;
 
-            compute(o, i, k);
+                if (o < 0 || o >= ur_ow)
+                    continue;
+
+                for (int ic_b1 = 0; ic_b1 < c_.ic_nb1; ++ic_b1) {
+                    Zmm vreg_src_u8 = vreg_tmp;
+                    const int off = i * c_.ngroups * c_.ic + ic_b1 * c_.ic_block;
+                    // [1o, 1o, ..., 1o] (16) <-- o + u
+                    vpbroadcastd(vreg_src_u8, ptr[reg_ptr_src_u8
+                        + reg_off_src_u8 + off * sizeof_src_dt()]);
+
+                    compute(vreg_acc_s32(o), vreg_wei_s8(ic_b1, k), vreg_src_u8);
+                }
+            }
         }
+    }
+}
+
+/** computes:
+ *  i_u8 [~ur_ow~][-ic_nb2][ic_nb1]         [4i] (*)
+ *  w_s8                   [ic_nb1][kw][16o][4i]
+ * o_s32 [ ur_ow ]                     [16o]
+ *
+ * with no reduction over ic_nb2
+ */
+void jit_avx512_core_u8s8s32x_conv_fwd_ker_t::compute_part_ur_ow_oc_block(
+        int ur_ow, int iw_start) {
+
+    if (c_.large_spatial) {
+        compute_part_ur_ow_oc_block_expl_bcast_large_spatial(ur_ow, iw_start);
+    } else  {
+        compute_part_ur_ow_oc_block_expl_bcast(ur_ow, iw_start);
     }
 }
 
@@ -409,10 +591,41 @@ void jit_avx512_core_u8s8s32x_conv_fwd_ker_t::generate() {
     postamble();
 }
 
+bool jit_avx512_core_u8s8s32x_conv_fwd_ker_t::post_ops_ok(
+        const jit_conv_conf_t &c, const primitive_attr_t &attr) {
+    using namespace primitive_kind;
+    const auto &p = attr.post_ops_;
+
+    auto is_relu = [&](int idx) {
+        return p.entry_[idx].kind == eltwise
+            && p.entry_[idx].eltwise.scale == 1.
+            && p.entry_[idx].eltwise.alg == alg_kind::eltwise_relu
+            && p.entry_[idx].eltwise.alpha == 0.;
+    };
+
+    switch (p.len_) {
+    case 0: return true;
+    case 1: return true
+                && implication(c.with_relu, p.contain(sum, 0))
+                && implication(!c.with_relu, is_relu(0) || p.contain(sum, 0));
+    case 2: return true
+                && implication(c.with_relu, p.contain(sum, 0) && is_relu(1))
+                && implication(!c.with_relu, false
+                        || (p.contain(sum, 0) && is_relu(1))
+                        || (p.contain(sum, 1) && is_relu(0)));
+    case 3: return true
+                && c.with_relu == false
+                && (is_relu(0) && p.contain(sum, 1) && is_relu(2));
+    default: return false;
+    }
+
+    return false;
+}
+
 status_t jit_avx512_core_u8s8s32x_conv_fwd_ker_t::init_conf(jit_conv_conf_t &c,
         const convolution_desc_t &cd, const memory_desc_wrapper &src_d,
         const memory_desc_wrapper &wei_d, const memory_desc_wrapper &dst_d,
-        const primitive_attr_t *attr, bool with_relu, float negative_slope) {
+        const primitive_attr_t &attr, bool with_relu, float negative_slope) {
     if (!mayiuse(avx512_core))
         return status::unimplemented;
 
@@ -441,7 +654,6 @@ status_t jit_avx512_core_u8s8s32x_conv_fwd_ker_t::init_conf(jit_conv_conf_t &c,
     c.with_relu = with_relu;
     c.bia_dt = c.with_bias ? cd.bias_desc.data_type : data_type::undef;
     c.dst_dt = cd.dst_desc.data_type;
-    c.rmode = attr->round_mode_;
 
     c.ic_block = 4;
     c.oc_block = 16;
@@ -459,10 +671,13 @@ status_t jit_avx512_core_u8s8s32x_conv_fwd_ker_t::init_conf(jit_conv_conf_t &c,
         && implication(with_relu, negative_slope == 0.)
         && one_of(c.dst_dt, data_type::f32, data_type::s32, data_type::s8,
                 data_type::u8)
-        && implication(c.dst_dt != data_type::f32, one_of(c.rmode,
+        && implication(c.dst_dt != data_type::f32, one_of(attr.round_mode_,
                     round_mode::nearest, round_mode::down));
 
     if (!args_ok)
+        return status::unimplemented;
+
+    if (!post_ops_ok(c, attr))
         return status::unimplemented;
 
     c.oc_nb1 = c.oc / c.oc_block;
@@ -475,10 +690,39 @@ status_t jit_avx512_core_u8s8s32x_conv_fwd_ker_t::init_conf(jit_conv_conf_t &c,
     const int nregs_aux = 4; // scales, tmp, 0, 1_s16
     const int nregs_wei = c.ic_nb1 * c.kw;
 
-    assert(nregs_wei + nregs_aux < nregs);
-
-    c.ur_ow_max = nregs - nregs_wei - nregs_aux;
-
+    /* performance restrictions of kernel for convolutions with large spatial domains */
+    c.large_spatial = (c.iw > EXPL_BCAST_LARGE_SPATIAL_MIN_IW
+        && c.kw > 1 && c.stride_w == 1);
+    if (c.large_spatial) {
+        c.ur_ow_max = ((nregs - nregs_wei - nregs_aux) / 2)
+                        - (c.kw + c.l_pad - 1)  + 2;
+        /* convolution spatial domains don't allow to use this approach */
+        if (c.ur_ow_max > 0) {
+            calculate_src_offsets(c, c.ur_ow_max);
+            /* assert: cannot create precomputed table with offsets */
+            if (c.src_count == 0) c.large_spatial = false;
+            else if (c.src_count + c.ur_ow_max + nregs_wei + nregs_aux > nregs) {
+                c.ur_ow_max = nregs - c.src_count - nregs_wei - nregs_aux;
+                /* performance issue: number of accumulators are small */
+                if (c.ur_ow_max < EXPL_BCAST_LARGE_SPATIAL_MIN_UR_W)
+                    c.large_spatial = false;
+            }
+        } else {
+            c.large_spatial = false;
+        }
+    }
+    if (!c.large_spatial) {
+        int nregs_bcast_src = 4;
+        c.ur_ow_max = nregs - nregs_wei - nregs_aux;
+        /* performance restrictions of kernels with explicit input broadcasts */
+        c.expl_bcast = (c.stride_w == 1 && ic_nb > EXPL_BCAST_MIN_IC_NB
+            && (c.ur_ow_max < nregs / 2 || c.iw <= EXPL_BCAST_MAX_IW));
+        if (c.expl_bcast)
+            c.ur_ow_max -= nregs_bcast_src;
+        else
+            nregs_bcast_src = 0; // Bcast is a part of aux registers
+        assert(c.ur_ow_max + nregs_bcast_src + nregs_wei + nregs_aux <= nregs);
+    }
     /* ideally it would be great to have:
      *
      * c.ur_ow = nstl::min(c.ow, c.ur_ow_max);
@@ -533,7 +777,7 @@ status_t _jit_avx512_core_u8s8s32x_convolution_fwd_t<with_relu,
 {
     return jit_avx512_core_u8s8s32x_conv_fwd_ker_t::init_conf(jcp_,
             this->cdesc_(), *this->src_pd_.desc(), *this->weights_pd_.desc(),
-            *this->dst_pd_.desc(), this->attr(), with_relu,
+            *this->dst_pd_.desc(), *this->attr(), with_relu,
             this->negative_slope());
 }
 
@@ -543,7 +787,8 @@ _jit_avx512_core_u8s8s32x_convolution_fwd_t(const pd_t *pd,
         const input_vector &inputs, const output_vector &outputs)
     : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd), ker_(nullptr)
     , ws_(nullptr) {
-    ker_ = new jit_avx512_core_u8s8s32x_conv_fwd_ker_t(conf_.jcp_);
+    ker_ = new jit_avx512_core_u8s8s32x_conv_fwd_ker_t(conf_.jcp_,
+            *conf_.attr());
 
     const int nthreads = omp_get_max_threads();
     ws_per_thread_ = conf_.jcp_.ow * conf_.jcp_.oc_block;
@@ -591,8 +836,8 @@ execute_forward() {
         balance211(work_amount, nthr, ithr, start, end);
 
         int n{0}, g{0}, oh{0}, oc_b1{0};
-        nd_iterator_init(start, n, c.mb, g, c.ngroups, oh, c.oh, oc_b1,
-                c.oc_nb1);
+        nd_iterator_init(start, n, c.mb, g, c.ngroups, oh, c.oh,
+                                oc_b1, c.oc_nb1);
 
         jit_avx512_core_u8s8s32x_conv_fwd_ker_t::call_params_t p = {};
         p.acc_s32 = ws_ + ithr * ws_per_thread_;
