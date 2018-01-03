@@ -48,21 +48,19 @@ namespace conv {
 
 static conv_impls_t conv_impls_[] = {
     // Always keep this one, to calculate speedup factors
-    {"orig", compute_ref_fwd,       compute_ref_bwd_d,          compute_ref_bwd_w},
+    {"orig", compute_ref_fwd,  compute_ref_bwd_d,  compute_ref_bwd_w},
+    {"0.12", compute_ref1_fwd, compute_ref1_bwd_d, compute_ref1_bwd_w},
 
 #if defined(_SX)
     {"sx3",  sxconv_3_fwd,  sxconv_3_bwd_d,  sxconv_3_bwd_w},
     {"sx4",  sxconv_4_fwd,  sxconv_4_bwd_d,  sxconv_4_bwd_w},
-    //{"NULL", nullptr, nullptr, nullptr},
     {"ref3", refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
     {"ref4", refconv_4_fwd,         refconv_4_bwd_d,            refconv_4_bwd_w},
 #elif defined(SXAURORA)
     {"sx3", sxconv_3_fwd, sxconv_3_bwd_d, sxconv_3_bwd_w},
-    //{"NULL", nullptr, nullptr, nullptr},      // save time?
     {"sx4",  sxconv_4_fwd,  sxconv_4_bwd_d,  sxconv_4_bwd_w},
     {"ref3", refconv_3_fwd,         refconv_3_bwd_d,            refconv_3_bwd_w},
     {"ref4", refconv_4_fwd,         refconv_4_bwd_d,            refconv_4_bwd_w},
-    //{"NULL", nullptr, nullptr, nullptr},
 #else
     {"sx3", sxconv_3_fwd, sxconv_3_bwd_d, sxconv_3_bwd_w},
     //{"NULL", nullptr, nullptr, nullptr},      // save time?

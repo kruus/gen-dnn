@@ -410,7 +410,7 @@ fi
     set +x
 ) 2>&1 | tee "${BUILDDIR}".log
 ls -l "${BUILDDIR}"
-BUILDOK="n"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="y"; fi
+BUILDOK="n"; sync "${BUILDDIR}/stamp-BUILDOK"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="y"; fi
 
 set +x
 # after cmake we might have a better idea about ve_exec (esp. if PATH is not set properly)
