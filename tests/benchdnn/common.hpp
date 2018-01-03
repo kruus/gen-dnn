@@ -40,6 +40,11 @@
 #endif
 #endif
 
+// Any restrictions on the alignas attribute?
+#ifdef __ve
+#define alignas(x) alignas((x) > 16 ? 16 : (x))
+#endif
+
 // ENABLE_OPT_PTRAGMAS
 //    set to 0 to debug pragma-related incorrect assumptions
 #if !defined(ENABLE_OPT_PRAGMAS)

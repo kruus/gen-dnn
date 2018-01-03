@@ -22,6 +22,7 @@
 
 #include "conv/conv.hpp"
 #include "idiv.hpp"
+
 namespace conv {
 
 // BWD + dilate is not fast for these loops (and mkl-dnn doesn't allow it yet)
