@@ -14,15 +14,15 @@ VE_EXEC=''
 if [ -f "${BUILDDIR}/bash_help.inc" ]; then
     # snarf some CMAKE variables
     source "${BUILDDIR}/bash_help.inc"
-    echo " From bash_help_inc, CMAKE_CROSSCOMPILING_EMULATOR is ${CMAKE_CROSSCOMPILING_EMULATOR}"
-    echo " NECVE is ${NECVE}"
-    echo " VE_EXEC is ${VE_EXEC}"
+    #echo " From bash_help_inc, CMAKE_CROSSCOMPILING_EMULATOR is ${CMAKE_CROSSCOMPILING_EMULATOR}"
+    #echo " NECVE is ${NECVE}"
+    #echo " VE_EXEC is ${VE_EXEC}"
     if [ "${VE_EXEC}" ]; then
         if [ "${CMAKE_CROSSCOMPILING_EMULATOR}" ]; then
             VE_EXEC="${CMAKE_CROSSCOMPILING_EMULATOR}"
             if [ ! -x "${VE_EXEC}" ]; then
                 VE_EXEC='';
-                #echo "cmake crosscompiling emulator, such as ve_exec, not available?"
+                echo "cmake crosscompiling emulator ${CMAKE_CROSSCOMPILING_EMULATOR} [such as ve_exec] not available"
             fi
         fi
         if [ "${VE_EXEC}" = "" -a "${NECVE}" ]; then
@@ -38,7 +38,7 @@ if [ -f "${BUILDDIR}/bash_help.inc" ]; then
     fi
     # In this script, we do need ve_exec, because we are running test
     #executables directly, rather than via a 'make' target
-    echo "VE_EXEC: ${VE_EXEC}"
+    echo "VE_EXEC : ${VE_EXEC}"
 fi
 
 ORIGINAL_CMD="$0 $*"

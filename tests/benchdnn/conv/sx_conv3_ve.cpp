@@ -567,7 +567,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
               bool kok[KH][KW];
               VREG(kok)
                 ShortLoop() for (ssize_t kh = 0; kh < KH; ++kh) {
-                  ShortLoop() for (ssize_t kw = 0; kw < KH; ++kw) {
+                  ShortLoop() for (ssize_t kw = 0; kw < KW; ++kw) {
                     kok[kh][kw] = (kh>=kh_beg && kh<kh_end && kw>=kw_beg && kw<kw_end);
                   }
                 }
@@ -626,7 +626,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
                   for (ssize_t kw = 0; kw < KW; ++kw) lw[KW] = (kw >= kw_beg && kw < kw_end);
 
                 ShortLoop() for (ssize_t kh = 0; kh < KH; ++kh) {
-                  ShortLoop() for (ssize_t kw = 0; kw < KH; ++kw) {
+                  ShortLoop() for (ssize_t kw = 0; kw < KW; ++kw) {
                     kok[kh][kw] = lh[KH] && lw[KW];
                   }
                 }
@@ -635,7 +635,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
               if( 1 ){
                 //khash_prv = 0;
                 ShortLoop() for (ssize_t kh = 0; kh < KH; ++kh) {
-                  ShortLoop() for (ssize_t kw = 0; kw < KH; ++kw) {
+                  ShortLoop() for (ssize_t kw = 0; kw < KW; ++kw) {
                     kok[kh][kw] = (kh>=kh_beg && kw>=kw_beg) && (kh<kh_end && kw<kw_end);
                   }
                 }
@@ -657,7 +657,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
               if (khash != khash_prv){
                 khash_prv = khash;
                 ShortLoop() for (ssize_t kh = 0; kh < KH; ++kh) {
-                  ShortLoop() for (ssize_t kw = 0; kw < KH; ++kw) {
+                  ShortLoop() for (ssize_t kw = 0; kw < KW; ++kw) {
                     kok[kh][kw] = (kh>=kh_beg && kw>=kw_beg) && (kh<kh_end && kw<kw_end);
                   }
                 }
@@ -827,7 +827,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
               if (khash != khash_prv){
                 khash_prv = khash;
                 ShortLoop() for (ssize_t kh = 0; kh < KH; ++kh) {
-                  ShortLoop() for (ssize_t kw = 0; kw < KH; ++kw) {
+                  ShortLoop() for (ssize_t kw = 0; kw < KW; ++kw) {
                     kok[kh][kw] = (kh>=kh_beg && kw>=kw_beg) && (kh<kh_end && kw<kw_end);
                   }
                 }
@@ -1005,7 +1005,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
               if (khash != khash_prv){
                 khash_prv = khash;
                 ShortLoop() for (ssize_t kh = 0; kh < KH; ++kh) {
-                  ShortLoop() for (ssize_t kw = 0; kw < KH; ++kw) {
+                  ShortLoop() for (ssize_t kw = 0; kw < KW; ++kw) {
                     kok[kh][kw] = (kh>=kh_beg && kw>=kw_beg) && (kh<kh_end && kw<kw_end);
                   }
                 }
@@ -1181,7 +1181,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
               if (khash != khash_prv){
                 khash_prv = khash;
                 ShortLoop() for (ssize_t kh = 0; kh < KH; ++kh) {
-                  ShortLoop() for (ssize_t kw = 0; kw < KH; ++kw) {
+                  ShortLoop() for (ssize_t kw = 0; kw < KW; ++kw) {
                     kok[kh][kw] = (kh>=khb[oh] && kw>=kwb[ow]) && (kh<khe[oh] && kw<kwe[ow]);
                   }
                 }
