@@ -926,8 +926,8 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
     // round more consistently.  'C' round-to-zero is not so useful!
     khb[oh] = div_floor( 0  - (oh * SH - PH) + p->dh, (p->dh+1) );
     khe[oh] = div_floor( IH - (oh * SH - PH) + p->dh, (p->dh+1) );
-    if( khb[oh] < 0     ) khb[oh] = 0;
-    if( khe[oh] > p->kh ) khe[oh] = p->kh;
+    if( khb[oh] < 0  ) khb[oh] = 0;
+    if( khe[oh] > KH ) khe[oh] = KH;
   }
   OMP(single nowait) for (int ow = 0; ow < OW; ++ow) {
     kwb[ow] = div_floor( 0  - (ow * SW - PW) + p->dw, (p->dw+1) );

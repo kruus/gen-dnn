@@ -300,22 +300,25 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
   // writes go to  dst_off_f(p, mb, g, oc, oh, ow);
   // on alexnet, this got me about 15x speedup
   // regr.sh-FWD 2.42x,2.38x
-  int khb[OH], khe[OH], kwb[OW], kwe[OW];
+  int khb[OH] alignas(64);
+  int khe[OH] alignas(64);
+  int kwb[OW] alignas(64);
+  int kwe[OW] alignas(64);
   const int ICOG = IC / G;
-  const int OCOG = IC / G;
+  const int OCOG = OC / G;
   const int DH   = p->dh + 1;
   const int DW   = p->dw + 1;
   for (int oh = 0; oh < OH; ++oh) {
     // trick to easy calc of kh, kw loop limits is that division must
     // round more consistently.  'C' round-to-zero is not so useful!
-    khb[oh] = div_floor( 0  - (oh * SH - PH) + p->dh, (p->dh+1) );
-    khe[oh] = div_floor( IH - (oh * SH - PH) + p->dh, (p->dh+1) );
-    if( khb[oh] < 0     ) khb[oh] = 0;
-    if( khe[oh] > p->kh ) khe[oh] = p->kh;
+    khb[oh] = div_floor( 0  - (oh * SH - PH) + p->dh, DH );
+    khe[oh] = div_floor( IH - (oh * SH - PH) + p->dh, DH );
+    if( khb[oh] < 0  ) khb[oh] = 0;
+    if( khe[oh] > KH ) khe[oh] = KH;
   }
   for (int ow = 0; ow < OW; ++ow) {
-    kwb[ow] = div_floor( 0  - (ow * SW - PW) + p->dw, (p->dw+1) );
-    kwe[ow] = div_floor( IW - (ow * SW - PW) + p->dw, (p->dw+1) );
+    kwb[ow] = div_floor( 0  - (ow * SW - PW) + p->dw, DW );
+    kwe[ow] = div_floor( IW - (ow * SW - PW) + p->dw, DW );
     if( kwb[ow] < 0  ) kwb[ow] = 0;
     if( kwe[ow] > KW ) kwe[ow] = KW;
   }
@@ -329,33 +332,17 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
             size_t bia_off = bia_off_f(p, g, oc);
             float &d = ((float*)dst_m)[dst_off];
             d = (p->dir & FLAG_BIA)? ((float*)bia_m)[bia_off] : 0.f;
-#if 0
-            int const kh_beg=khb[oh];
-            int const kh_end=khe[oh];
-            int const kw_beg=kwb[ow];
-            int const kw_end=kwe[ow];
-            if( kw_beg < kw_end && kh_beg < kh_end ) {
-
-              for (int ic = 0; ic < ICOG; ++ic) {
-                for (int kh = kh_beg; kh < kh_end; ++kh) {
-                  const int ih = oh * SH - PH + kh * DH;
-                  for (int kw = kw_beg; kw < kw_end; ++kw) {
-                    const int iw = ow * SW - PW + kw * DW;
-                    size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
-                    size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
-                    d += ((float*)src_m)[src_off] * ((float*)wei_m)[wei_off];
-                  }
-                }
-              }
-            }
-#else
             if( kwb[ow] < kwe[ow] && khb[oh] < khe[oh] ) {
+              int ih0 = oh * SH - PH;
+              int iw0 = ow * SW - PW;
 
               for (int ic = 0; ic < ICOG; ++ic) {
                 for (int kh = khb[oh]; kh < khe[oh]; ++kh) {
-                  const int ih = oh * SH - PH + kh * DH;
+                  //const int ih = oh * SH - PH + kh * DH;
+                  const int ih = ih0 + kh * DH;
                   for (int kw = kwb[ow]; kw < kwe[ow]; ++kw) {
-                    const int iw = ow * SW - PW + kw * DW;
+                    //const int iw = ow * SW - PW + kw * DW;
+                    const int iw = iw0 + kw * DW;
                     size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
                     size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
                     d += ((float*)src_m)[src_off] * ((float*)wei_m)[wei_off];
@@ -363,7 +350,6 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
                 }
               }
             }
-#endif
             if (p->merge == RELU && d < 0.f)
                 d = 0.f;
           }

@@ -391,7 +391,7 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
   float       * restrict const pdst = (float*)dst_m;
   OMP(parallel)//;
   {
-    ssize_t alignas(4*sizeof(ssize_t)) khkw_begend[4];
+    ssize_t khkw_begend[4] alignas(4*sizeof(ssize_t));
     ssize_t kh_beg=0, kh_end=0;
     ssize_t kw_beg=0, kw_end=0;
 #ifdef __ve
@@ -399,7 +399,7 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
 #else
         VREG(khkw_begend)
 #endif
-    ssize_t alignas(4*sizeof(ssize_t)) khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW};
+    ssize_t khkw_muls[4] alignas(4*sizeof(ssize_t)) = {1, KH, (1<<16), (1<<16)*KW};
 #ifdef __ve
     VREG(khkw_muls)
 #else

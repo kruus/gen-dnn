@@ -1007,7 +1007,7 @@ static void test_impl_end(res_t *r){
     bool all_passed = bs.ts->end_impls();
     r->state = (all_passed? PASSED: MISTRUSTED);
     printf(" TEST all_passed=%d ",(int)all_passed);
-    RT_ASSERT( (bench_mode & PERF) );
+    // RT_ASSERT( (bench_mode & PERF) ); not always true
     if (!(bench_mode&CORR)) {
         if(all_passed) ++bs.mistrusted; else ++bs.test_fail;
         ++bs.impls;
