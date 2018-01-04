@@ -254,6 +254,10 @@ fi
         mkdir "${BUILDDIR}"
     fi
     cd "${BUILDDIR}"
+    # iterator debug code ?
+    #export CFLAGS="${CFLAGS} -DVERBOSE_PRIMITIVE_CREATE=1"
+    #export CXXFLAGS="${CXXFLAGS} -DVERBOSE_PRIMITIVE_CREATE=1"
+
     #
     # CMAKEOPT="" # allow user to pass flag, ex. CMAKEOPT='--trace -LAH' ./build.sh
     CMAKEOPT="${CMAKEOPT} -DCMAKE_CCXX_FLAGS=-DJITFUNCS=${DOJIT}"

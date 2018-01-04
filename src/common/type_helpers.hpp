@@ -84,7 +84,7 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
 #endif
                 goihw, hwigo 
 #if MKLDNN_JIT_TYPES > 0
-                gOIhw8i8o, gOIhw16i16o, gOIhw8i16o2i, gOIhw8o16i2o, gOIhw8o8i,
+                , gOIhw8i8o, gOIhw16i16o, gOIhw8i16o2i, gOIhw8o16i2o, gOIhw8o8i,
                 gOIhw16o16i, gOihw8o, gOihw16o, gOhwi8o, gOhwi16o, gOhIw16o4i,
                 IOhw16o16i, gIOhw16o16i
 #endif

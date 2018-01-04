@@ -23,6 +23,7 @@
 #include "primitive_desc.hpp"
 #include "type_helpers.hpp"
 
+//#include <iostream>
 using namespace mkldnn::impl;
 using namespace mkldnn::impl::status;
 
@@ -50,8 +51,10 @@ struct mkldnn_primitive_desc_iterator: public c_compatible {
     primitive_desc_iterator_t &operator++() {
         if (pd_) { delete pd_; pd_ = nullptr; }
         while (++idx_ != last_idx_) {
+            //std::cout<<" ++:"<<idx_;
             auto s = impl_list_[idx_](&pd_, op_desc_, &attr_, engine_,
                     hint_fwd_pd_);
+            //std::cout<<"-->s="<<s; //std::cout<<std::endl;
             if (s == success) break;
         }
         return *this;
@@ -79,6 +82,11 @@ private:
         , impl_list_(nullptr), last_idx_(last_idx) {}
 };
 
+/** Constructor with attributes.
+ * - op_desc lifetime must exceed iterator lifetime
+ * - attr is copied into iterator
+ * - hint_fwd_pd must be nullptr, or lifetime must exceed iterator lifetime
+ */
 status_t mkldnn_primitive_desc_iterator_create_v2(
         primitive_desc_iterator_t **iterator, const_c_op_desc_t c_op_desc,
         const primitive_attr_t *attr, engine_t *engine,
@@ -98,6 +106,10 @@ status_t mkldnn_primitive_desc_iterator_create_v2(
     return success;
 }
 
+/** Constructor with default attributes, for backwards compatibility.
+ * - hint may be nullptr or lifetime must exceed iterator scope
+ * - c_op_desc should be non-NULL and lifetime must exceed iterator scope
+ */
 status_t mkldnn_primitive_desc_iterator_create(
         primitive_desc_iterator_t **iterator,
         const_c_op_desc_t c_op_desc, engine_t *engine,

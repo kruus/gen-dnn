@@ -22,7 +22,7 @@
 #if !defined(NDEBUG)
 #define DBG_CONV 1
 #else
-#define DBG_CONV 1
+#define DBG_CONV 0
 #endif
 #endif
 

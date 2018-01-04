@@ -192,7 +192,7 @@ void parse_result(res_t &res, bool &want_perf_report, bool allow_unimpl,
         assert(status == OK);
         print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
         want_perf_report = true;
-        bs.passed++;
+        //bs.passed++;
         break;
     default:
         assert(!"unknown state");

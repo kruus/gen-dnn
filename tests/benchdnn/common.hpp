@@ -25,6 +25,8 @@
 #include <float.h>
 #include <math.h>
 
+//#include "os_common.hpp" // not available -- we use mkldnn public API only.
+#if 1
 #if defined(SXAURORA)
 #define strnlen strnlen_s
 #endif
@@ -44,8 +46,9 @@
 #ifdef __ve
 #define alignas(x) alignas((x) > 16 ? 16 : (x))
 #endif
+#endif
 
-// ENABLE_OPT_PTRAGMAS
+// ENABLE_OPT_PRAGMAS
 //    set to 0 to debug pragma-related incorrect assumptions
 #if !defined(ENABLE_OPT_PRAGMAS)
 #if defined(_SX)

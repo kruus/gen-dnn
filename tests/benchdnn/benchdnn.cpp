@@ -75,7 +75,8 @@ int main(int argc, char **argv) {
 
     int omp_max_thr = omp_get_max_threads();
     printf("benchdnn --%s --mode=%s -v%d ... init omp_max_thr=%d ",
-                (prim==CONV? "conv": prim==IP? "ip" : "huh?"),
+                (prim==CONV? "conv": prim==IP? "ip": prim==SELF? "self"
+                 : prim==REORDER? "reorder": prim==BNORM? "bnorm": "Huh?"),
                 bench_mode2str(bench_mode), verbose, omp_max_thr);
     fflush(stdout);
 
@@ -103,8 +104,7 @@ int main(int argc, char **argv) {
     perf_end(perf_data);
     finalize();
 
-    printf("tests:%d impls:%d %s:%d "
-            "skipped:%d mistrusted:%d unimplemented:%d "
+    printf("tests:%d impls:%d %s:%d skipped:%d mistrusted:%d unimplemented:%d "
             "failed:%d",
             benchdnn_stat.tests, benchdnn_stat.impls,
             (bench_mode&CORR? "correct": "passed"), benchdnn_stat.passed,

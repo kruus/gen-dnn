@@ -148,10 +148,9 @@ INSTANTIATE_TEST_CASE_P(TestSum, test, ::testing::Values( \
     {2, 8, 2, 2}, {2.0f, 3.0f}} \
 ));
 
-#if MKLDNN_JIT_TYPES > 0
 #define INST_TEST_CASE_JIT(test) \
-TEST_P(test, TestsSum) {} \
-INSTANTIATE_TEST_CASE_P(TestSum, test, ::testing::Values( \
+TEST_P(test, TestsSumJit) {} \
+INSTANTIATE_TEST_CASE_P(TestSumJit, test, ::testing::Values( \
     sum_test_params{engine::kind::cpu, \
     {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c, \
     {2, 16, 3, 4}, {1.0f, 1.0f}}, \
@@ -181,7 +180,6 @@ INSTANTIATE_TEST_CASE_P(TestSum, test, ::testing::Values( \
     memory::format::nChw16c, \
     {2, 16, 3, 3}, {2.0f, 3.0f}} \
 ));
-#endif
 
 using sum_test_float = sum_test<float,float>;
 using sum_test_u8 = sum_test<uint8_t,float>;

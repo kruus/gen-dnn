@@ -64,14 +64,7 @@ void reset_parameters() {
 /** return true if we think mkldnn ought to support this problem. */
 bool check_mkldnn_support( const prb_t *p, res_t *res ) {
     char const *errmsg = nullptr;
-#if 0 // v0.11 mkl-dnn now allows dilates for backward convolutions
-    if ((p->dir == BWD_D || p->dir == BWD_W || p->dir == BWD_WB)
-            && (p->dh>0 || p->dw>0)) {
-        printf(" dilation: p->dh=%d, p->dw=%d", p->dh, p->dw);
-        errmsg="mkl-dnn BWD + dilation not possible (yet?)";
-    }
-#endif
-    // others? ...
+    // v0.11 mkl-dnn did not support dilates
     if (errmsg != nullptr){
         printf("\nUNTESTABLE: mkl-dnn probably doesn't handle this case yet\n"
                "          %s\n", errmsg);
@@ -98,51 +91,12 @@ void check_correctness(const desc_t *c) {
     int status = (mkldnn_ok? conv::doit(&p, &res): OK); // <-- run benchmark
     RT_ASSERT( status == OK || status == FAIL );
 
-    bool want_perf_report = false;
+    //bool want_perf_report = false;
+    bool want_perf_report = (bench_mode & PERF);
 
-#if 0
-    auto &bs = benchdnn_stat;
-    // XXX TODO output messages based on bs directly
-    const char *state = state2str(res.state);
-
-    switch (res.state) {
-    case UNTESTED:
-        ++bs.skipped; // ???
-#if 0 // MASTER, UNUSED
-        if (!(bench_mode & CORR)) {
-            want_perf_report = true;
-            break;
-        }
-#endif
-    case SKIPPED:
-        assert(status == OK);
-        print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
-        break;
-    case FAILED:
-        // XXX assert(status == FAIL);
-        print(0, "%d:%s (errors:%lu total:%lu) __REPRO: %11g ops %s %s\n", bs.tests, state,
-                (long unsigned)res.errors, (long unsigned)res.total, p.ops, dir2str(p.dir), pstr);
-        break;
-    case UNIMPLEMENTED:
-        assert(status == FAIL);
-        print(0, "%d:%s __REPRO: %11.2g ops %s %s\n", bs.tests, state, p.ops, dir2str(p.dir), pstr);
-        break;
-    case MISTRUSTED:
-        assert(status == OK);
-        print(0, "%d:%s __REPRO: %11.2g ops %s %s\n", bs.tests, state, p.ops, dir2str(p.dir), pstr);
-        break;
-    case PASSED:
-        assert(status == OK);
-        print(0, "%d:%s __REPRO: %11.2g ops %s %s\n", bs.tests, state, p.ops, dir2str(p.dir), pstr);
-        break;
-    default:
-        RT_ASSERT(!"unknown state");
-    }
-#else
     parse_result(res, want_perf_report, allow_unimpl, status, pstr);
-#endif
 
-    benchdnn_stat.tests++;
+    ++benchdnn_stat.tests;
     if(mkldnn_ok && (bench_mode & TEST) && benchdnn_stat.ts){
         benchdnn_stat.ts->prt();
     }

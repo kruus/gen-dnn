@@ -146,39 +146,6 @@ INSTANTIATE_TEST_CASE_P(TestConcat, concat_test_float, ::testing::Values(
     {{2, 8, 3, 4}, {2, 8, 3, 4}}, {4, 8, 3, 4}}
 ));
 
-#if MKLDNN_JIT_TYPES > 0
-INSTANTIATE_TEST_CASE_P(TestConcat, concat_test_float, ::testing::Values(
-    concat_test_params{engine::kind::cpu, 1,
-    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 32, 1, 1}},
-    concat_test_params{engine::kind::cpu, 1,
-    {memory::format::nchw, memory::format::nchw}, memory::format::nChw8c,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 32, 1, 1}},
-    concat_test_params{engine::kind::cpu, 1,
-    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nchw,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 32, 1, 1}}
-
-    concat_test_params{engine::kind::cpu, 0,
-    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {4, 16, 1, 1}},
-    concat_test_params{engine::kind::cpu, 0,
-    {memory::format::nchw, memory::format::nchw}, memory::format::nChw8c,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {4, 16, 1, 1}},
-    concat_test_params{engine::kind::cpu, 0,
-    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nchw,
-    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {4, 16, 1, 1}}
-
-    concat_test_params{engine::kind::cpu, 1,
-    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c,
-    {{2, 8, 1, 1}, {2, 8, 1, 1}}, {2, 16, 1, 1}}
-
-    concat_test_params{engine::kind::cpu, 1,
-    {memory::format::nChw8c, memory::format::nChw16c}, memory::format::nChw8c,
-    {{2, 8, 1, 1}, {2, 16, 1, 1}}, {2, 24, 1, 1}}
-));
-#endif
-
-
 INSTANTIATE_TEST_CASE_P(TestConcat, concat_test_s8, ::testing::Values(
     concat_test_params{engine::kind::cpu, 1,
     {memory::format::nhwc, memory::format::nhwc}, memory::format::nhwc,
@@ -187,4 +154,40 @@ INSTANTIATE_TEST_CASE_P(TestConcat, concat_test_s8, ::testing::Values(
     {memory::format::nchw, memory::format::nchw}, memory::format::nchw,
     {{2, 8, 3, 4}, {2, 8, 3, 4}}, {2, 16, 3, 4}}
     ));
+
+#if MKLDNN_JIT_TYPES > 0
+using concat_test_float_jit = concat_test<float>;
+TEST_P(concat_test_float_jit, TestsConcat) {}
+
+INSTANTIATE_TEST_CASE_P(TestConcat, concat_test_float_jit, ::testing::Values(
+    concat_test_params{engine::kind::cpu, 1,
+    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c,
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 32, 1, 1}},
+    concat_test_params{engine::kind::cpu, 1,
+    {memory::format::nchw, memory::format::nchw}, memory::format::nChw8c,
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 32, 1, 1}},
+    concat_test_params{engine::kind::cpu, 1,
+    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nchw,
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {2, 32, 1, 1}},
+
+    concat_test_params{engine::kind::cpu, 0,
+    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c,
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {4, 16, 1, 1}},
+    concat_test_params{engine::kind::cpu, 0,
+    {memory::format::nchw, memory::format::nchw}, memory::format::nChw8c,
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {4, 16, 1, 1}},
+    concat_test_params{engine::kind::cpu, 0,
+    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nchw,
+    {{2, 16, 1, 1}, {2, 16, 1, 1}}, {4, 16, 1, 1}},
+
+    concat_test_params{engine::kind::cpu, 1,
+    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c,
+    {{2, 8, 1, 1}, {2, 8, 1, 1}}, {2, 16, 1, 1}},
+
+    concat_test_params{engine::kind::cpu, 1,
+    {memory::format::nChw8c, memory::format::nChw16c}, memory::format::nChw8c,
+    {{2, 8, 1, 1}, {2, 16, 1, 1}}, {2, 24, 1, 1}}
+));
+#endif
+
 }

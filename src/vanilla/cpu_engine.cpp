@@ -128,15 +128,17 @@ static
 mkldnn::impl::status_t verbose_primitive_desc_create(
     mkldnn::impl::primitive_desc_t **pd,
     const mkldnn::impl::op_desc_t *adesc,
+    const mkldnn::impl::primitive_attr_t *attr,
     mkldnn::impl::engine_t *engine,
     const mkldnn::impl::primitive_desc_t *hint_fwd)
 {
     using namespace std;
     typedef typename prim::pd_t pd_t;
-    mkldnn::impl::status_t ret = primitive_desc_t::create<pd_t>( pd, adesc, engine, hint_fwd );
+    mkldnn::impl::status_t ret = primitive_desc_t::create<pd_t>( pd, adesc,
+            attr, engine, hint_fwd );
     if( ret == success )
         printf(" create<%s>::pd_t(pd,adesc,engine,hint_fwd) --> %d\n",
-                    (*pd)->name(), ret );
+                (*pd)->name(), ret );
     return ret;
 }
 #define INSTANCE(...) &verbose_primitive_desc_create<__VA_ARGS__>
@@ -327,4 +329,4 @@ status_t cpu_engine_t::submit(primitive_t *p, event_t *e,
 }
 }
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

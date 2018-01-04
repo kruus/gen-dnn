@@ -138,6 +138,7 @@ int attr_t::post_ops_t::from_str(const char *str, const char **end_s) {
     s = str;
 
     ++s;
+    print(0,"post_ops from_str after opening single-quote=%s\n",s);
     for (;;) {
         if (*s == '\'') { ++s; return OK; }
         if (len == capacity) return FAIL;
@@ -216,9 +217,11 @@ int str2attr(attr_t *attr, const char *str) {
     while (*s != '\0') {
         int rc = FAIL;
         const char *param;
+        print(0,"str2attr parsing %s\n",s);
 
         param = "irmode=";
         if (!strncasecmp(param, s, strlen(param))) {
+            print(0,"irmode=%s\n",s);
             s += strlen(param);
             attr->irmode = (attr_t::round_mode_t)str2rmode(s);
             s += strlen(rmode2str((mkldnn_round_mode_t)attr->irmode));
@@ -227,6 +230,7 @@ int str2attr(attr_t *attr, const char *str) {
 
         param = "oscale=";
         if (!strncasecmp(param, s, strlen(param))) {
+            print(0,"oscale=%s\n",s);
             s += strlen(param);
             rc = attr->oscale.str2scale(s, &s);
             if (rc != OK) return rc;
@@ -235,10 +239,12 @@ int str2attr(attr_t *attr, const char *str) {
         param = "post_ops=";
         if (!strncasecmp(param, s, strlen(param))) {
             s += strlen(param);
+            print(0,"post_ops=%s\n",s);
             rc = attr->post_ops.from_str(s, &s);
             if (rc != OK) return rc;
         }
 
+        print(0,"str2attr parsing done one, leftover=%s\n",s);
         if (rc != OK) return FAIL;
         if (*s == ';') ++s;
     }

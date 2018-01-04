@@ -24,6 +24,7 @@
 #include "cpu_engine.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+#include <iostream> // debug !
 
 namespace mkldnn {
 namespace impl {
@@ -49,6 +50,13 @@ struct _ref_convolution_fwd_t: public cpu_primitive_t {
             using namespace prop_kind;
             using namespace data_type;
             assert(this->engine()->kind() == engine_kind::cpu);
+#if VERBOSE_PRIMITIVE_CREATE
+            char const* last_tested=nullptr;
+#define AND_NEED(...) && ( (last_tested = #__VA_ARGS__), __VA_ARGS__ )
+#else
+#define AND_NEED(...) && __VA_ARGS__
+#endif
+#if 0
             bool ok = true
                 && this->set_default_params() == status::success
                 && utils::one_of(this->cdesc_().prop_kind, forward_training,
@@ -64,6 +72,42 @@ struct _ref_convolution_fwd_t: public cpu_primitive_t {
                                 f32, s32, s8, u8))
                         && utils::implication(src_type == f32,
                             this->cdesc_().bias_desc.data_type == f32));
+#else // debug "why not?"
+            bool ok = true
+                AND_NEED( this->set_default_params() == status::success )
+                AND_NEED( utils::one_of(this->cdesc_().prop_kind, forward_training,
+                        forward_inference) )
+                AND_NEED( this->cdesc_().alg_kind == alg_kind::convolution_direct )
+                AND_NEED( this->cdesc_().src_desc.data_type == src_type )
+                AND_NEED( this->cdesc_().weights_desc.data_type == wei_type )
+                AND_NEED( this->cdesc_().accum_data_type == acc_type )
+                AND_NEED( this->cdesc_().dst_desc.data_type == dst_type )
+                AND_NEED( utils::implication(this->with_bias(), true
+                        && utils::implication(src_type == u8,
+                            utils::one_of(this->cdesc_().bias_desc.data_type,
+                                f32, s32, s8, u8))
+                        && utils::implication(src_type == f32,
+                            this->cdesc_().bias_desc.data_type == f32)) )
+                ;
+#endif
+#if VERBOSE_PRIMITIVE_CREATE
+            std::cout<<" TEMPLATE src_type="<<src_type
+                <<" wei_type="<<wei_type
+                <<" dst_type="<<dst_type
+                <<" acc_type="<<acc_type
+                <<std::endl;
+            std::cout<<"  cdesc  "
+                <<" src_type="<<this->cdesc_().src_desc.data_type
+                <<" wei_type="<<this->cdesc_().weights_desc.data_type
+                <<" dst_type="<<this->cdesc_().accum_data_type
+                <<" acc_type="<<this->cdesc_().dst_desc.data_type
+                <<std::endl;
+            if( !ok && last_tested != nullptr ){
+                printf(" %s %s failed precondition:\n\t%s\n",
+                        __PRETTY_FUNCTION__, this->name(), last_tested);
+            }
+#endif
+#undef AND_NEED
             return ok ? status::success : status::unimplemented;
         }
     };

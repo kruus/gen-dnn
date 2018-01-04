@@ -39,6 +39,9 @@ extern void sxconv_4_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
 void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
     dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m);
 
+extern void refconv_4_bwd_w(const prb_t *p, dnn_mem_t &src_m,
+    dnn_mem_t &diff_wei_m, dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m);
+
 static void chk( bool cond, char const* msg, char const* file, int const lineno ){
     if (!cond){ printf("@@@ error: %s : [%s:%d]\n", msg, file, lineno); exit(1); }
 }
@@ -523,7 +526,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
     ssize_t khash_prv = ~0;
     //ssize_t khash_prv2 = (KH+KW)*4; // impossibly high hash
     ssize_t khkw_begend[4];
-    ssize_t khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW};
+    ssize_t khkw_muls[4] = {1, KH, (1<<16), (1<<16)*p->kw};
     bool kok[KH][KW];
     VREG(khkw_begend) VREG(khkw_muls) VREG(kok)//;
     float src[ICOG*KH*KW];
@@ -776,7 +779,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
     ssize_t khkw_begend[4]; VREG(khkw_begend)//;
     ssize_t kh_beg=0, kh_end=0;
     ssize_t kw_beg=0, kw_end=0;
-    ssize_t khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW}; VREG(khkw_muls)//;
+    ssize_t khkw_muls[4] = {1, KH, (1<<16), (1<<16)*p->kw}; VREG(khkw_muls)//;
     //ssize_t kh_beg_prv=0, kh_end_prv=0, kw_beg_prv=0, kw_end_prv=0, w0_prv=0;
     ssize_t khash, w0, s0, s00;
     ssize_t khash_prv = ~0;
@@ -944,7 +947,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
     ssize_t khash, w0, s0, s00;
     ssize_t khash_prv = ~0;
     ssize_t khkw_begend[4];
-    ssize_t khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW};
+    ssize_t khkw_muls[4] = {1, KH, (1<<16), (1<<16)*p->kw};
     bool kok[KH][KW];
     VREG(khkw_begend) VREG(khkw_muls) VREG(kok)//;
     //ssize_t kh_beg_prv=0, kh_end_prv=0, kw_beg_prv=0, kw_end_prv=0, w0_prv=0;
@@ -1130,7 +1133,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
     bool kok2[KH*KW] alignas(64);
 #endif
     ssize_t khkw_begend[4] alignas(64);
-    ssize_t khkw_muls[4]   alignas(64) = {1, KH, (1<<16), (1<<16)*KW};
+    ssize_t khkw_muls[4]   alignas(64) = {1, KH, (1<<16), (1<<16)*p->kw};
     VREG(khkw_begend) VREG(khkw_muls) VREG(kok)//;
 
     //float src[ICOG*KH*KW]; ALLOC_ON_VREG(src)//;
@@ -1339,7 +1342,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
     float tmp[OCOG] alignas(64);       ALLOC_ON_VREG(tmp,OCOG)//; // roughly double the speed;
 
     ssize_t khkw_begend[4] alignas(64);
-    ssize_t khkw_muls[4]   alignas(64) = {1, KH, (1<<16), (1<<16)*KW};
+    ssize_t khkw_muls[4]   alignas(64) = {1, KH, (1<<16), (1<<16)*p->kw};
     VREG(khkw_begend) VREG(khkw_muls)//;
 
     ssize_t khash, w0, s0, s00;
@@ -1563,7 +1566,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
     float tmp[OCOG] alignas(64);       ALLOC_ON_VREG(tmp,OCOG)//; // roughly double the speed;
 
     int khkw_begend[4] alignas(64);
-    int khkw_muls[4]   alignas(64) = {1, KH, (1<<16), (1<<16)*KW};
+    int khkw_muls[4]   alignas(64) = {1, KH, (1<<16), (1<<16)*p->kw};
     VREG(khkw_begend) VREG(khkw_muls)//;
 
     ssize_t khash, w0, s0, s00;
@@ -1841,7 +1844,7 @@ void sxconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
     float tmp[OCOG] alignas(64);       ALLOC_ON_VREG(tmp,OCOG)//; // roughly double the speed;
 
     int khkw_begend[4] alignas(64);
-    int khkw_muls[4]   alignas(64) = {1, KH, (1<<16), (1<<16)*KW};
+    int khkw_muls[4]   alignas(64) = {1, KH, (1<<16), (1<<16)*p->kw};
     VREG(khkw_begend) VREG(khkw_muls)//;
 
     ssize_t khash, w0, s0, s00;
@@ -2999,6 +3002,9 @@ void sxconv_3_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
  */
 void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     dnn_mem_t &diff_wei_m, dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m) {
+#if 1
+  refconv_4_bwd_w(p, src_m, diff_wei_m, diff_bia_m, diff_dst_m);
+#else
   const ssize_t G = p->g;
   const ssize_t MB = p->mb;
   const ssize_t IC = p->ic;
@@ -3716,6 +3722,7 @@ void sxconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
   }
+#endif
 #endif
 }
 
