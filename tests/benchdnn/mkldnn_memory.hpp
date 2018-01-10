@@ -48,8 +48,7 @@ struct dnn_mem_t {
             mkldnn_memory_format_t fmt = mkldnn_format_undef,
             void *data = NULL)
         : active_(initialize(md.ndims, md.dims, dt,
-                (fmt != mkldnn_format_undef? fmt: md.format),
-                data) == OK)
+                    (fmt != mkldnn_format_undef? fmt: md.format), data) == OK)
     {}
 
     dnn_mem_t(const dnn_mem_t &rhs, mkldnn_data_type_t dt,
@@ -209,11 +208,8 @@ private:
     int initialize(int ndims, const mkldnn_dims_t dims, mkldnn_data_type_t dt,
 		    mkldnn_memory_format_t fmt, void* data) {
         mkldnn_memory_desc_t xmd;
-        auto init = [&](){
-            DNN_SAFE(mkldnn_memory_desc_init(&xmd, ndims, dims, dt, fmt), CRIT);
-            SAFE(initialize(xmd, data), CRIT);
-            return OK;
-        };
+	DNN_SAFE(mkldnn_memory_desc_init(&xmd, ndims, dims, dt, fmt), CRIT);
+	SAFE(initialize(xmd, data), CRIT);
         return init();
     }
 

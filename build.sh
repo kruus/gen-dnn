@@ -1,13 +1,6 @@
 #!/bin/bash
-# vim: et ts=4 sw=4
+# vim: et ts=4 sw=4 ai
 ORIGINAL_CMD="$0 $*"
-if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
-    DOTARGET="s" # s for SX (C/C++ code, cross-compile)
-elif [ -d src/vanilla ]; then
-    DOTARGET="v" # v for vanilla (C/C++ code)
-else
-    DOTARGET="j" # j for JIT (Intel assembler)
-fi
 DOTEST=0
 DODEBUG="n"
 DODOC="y"
@@ -22,6 +15,17 @@ USE_CBLAS=1
 QUICK=0
 DOGCC_VER=0
 NEC_FTRACE=0
+if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
+    DOTARGET="s" # s for SX (C/C++ code, cross-compile)
+elif [ "${CC}" == "ncc" -a "${CXX}" == "nc++" ]; then
+    echo "auto-detected '-a' Aurora compiler (ncc, nc++)"
+    DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
+    if [ `uname -n` = "zoro" ]; then JOBS="-j8"; else JOBS="-j1"; fi
+elif [ -d src/vanilla ]; then
+    DOTARGET="v" # v for vanilla (C/C++ code)
+else
+    DOTARGET="j" # j for JIT (Intel assembler)
+fi
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -35,6 +39,7 @@ usage() {
     echo "     see what cmake is doing, and create build.log"
     echo "         CMAKEOPT='--trace -LAH' ./build.sh -q >&/dev/null"
     echo "Debug: Individual tests can be run like build-sx/tests/gtests/test_relu"
+    echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
 }
 while getopts ":hatvjdDqQpsSTwWbF1567" arg; do
@@ -69,7 +74,7 @@ while getopts ":hatvjdDqQpsSTwWbF1567" arg; do
         D) # [no] Doxygen-only : build documentation and then stop
             DOJUSTDOC="y"
             ;;
-        q) # quick: once, skip doxygen on OK build; twice, rebuild existing
+        q) # quick: once, skip doxygen on OK build; twice, cd BUILDDIR && make
             QUICK=$((QUICK+1))
             ;;
         Q) # really quick: skip build and doxygen docs [JUST run cmake and stop]
@@ -339,6 +344,8 @@ fi
     if [ "$DONEEDMKL" == "y" ]; then
         CMAKEOPT="${CMAKEOPT} -DFAIL_WITHOUT_MKL=ON"
     fi
+    #echo "DONEEDMKL = ${DONEEDMKL}"
+    #echo "CMAKEOPT  = ${CMAKEOPT}"
     # Remove leading whitespace from CMAKEENV (bash magic)
     shopt -s extglob; CMAKEENV=\""${CMAKEENV##*([[:space:]])}"\"; shopt -u extglob
     # Without MKL, unit tests take **forever**
