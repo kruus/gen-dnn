@@ -50,9 +50,15 @@ static conv_impls_t conv_impls_[] = {
     // Always keep this one, to calculate speedup factors
     {"0.12", compute_ref_fwd, compute_ref_bwd_d, compute_ref_bwd_w},
 
-//#if defined(_SX)
-//#elif defined(SXAURORA)
-//#else
+#if defined(SXAURORA)
+    {"ref2", refconv_2_fwd, refconv_2_bwd_d, refconv_2_bwd_w},
+    //{"sx5",  sxconv_5_fwd,  sxconv_5_bwd_d,  sxconv_5_bwd_w},
+    {"NULL", nullptr, nullptr, nullptr},
+    {"NULL", nullptr, nullptr, nullptr},
+    {"NULL", nullptr, nullptr, nullptr},
+    {"NULL", nullptr, nullptr, nullptr}
+//#elif defined(_SX)
+#else
     //{"0.12", compute_ref_fwd, compute_ref_bwd_d, compute_ref_bwd_w},
     {"ref2", refconv_2_fwd, refconv_2_bwd_d, refconv_2_bwd_w},
     {"sx5",  sxconv_5_fwd,  sxconv_5_bwd_d,  sxconv_5_bwd_w},
@@ -61,7 +67,7 @@ static conv_impls_t conv_impls_[] = {
     //{"ref2", refconv_2_fwd, refconv_2_bwd_d, refconv_2_bwd_w},
     {"sx3",  sxconv_3_fwd,  sxconv_3_bwd_d,  sxconv_3_bwd_w},
     {"ref3", refconv_3_fwd, refconv_3_bwd_d, refconv_3_bwd_w},
-    {"ref4", refconv_4_fwd, refconv_4_bwd_d, refconv_4_bwd_w},
+    {"ref4", refconv_4_fwd, refconv_4_bwd_d, refconv_4_bwd_w}
     //{"NULL", nullptr, nullptr, nullptr},
     //{"NULL", nullptr, nullptr, nullptr},
     //{"NULL", nullptr, nullptr, nullptr},
@@ -69,7 +75,7 @@ static conv_impls_t conv_impls_[] = {
     //{"NULL", nullptr, nullptr, nullptr}
     //{"rf99", refconv_99_fwd,         refconv_99_bwd_d,            refconv_99_bwd_w}
     //{"NULL", nullptr, nullptr, nullptr}
-//#endif
+#endif
 };
 
 #define TESTN (sizeof(conv_impls_) / sizeof(conv_impls_t))

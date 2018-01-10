@@ -14,8 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 /** \file
- * ref_conv3.cpp --[SX-ACE]--> sx_conv3.cpp --[post_ops]--> sx_conv5.cpp */
-#if !defined(__ve)
+ * ref_conv3.cpp ---[SX-ACE]--> sx_conv3.cpp --[post_ops]--> sx_conv5.cpp */
 #include "conv/conv.hpp"
 #include "idiv.hpp"
 
@@ -1465,94 +1464,5 @@ void sxconv_5_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 #endif
 }
 
-#if 0
-#elif 0
-              for (int ic = 0; ic < IC/G; ++ic) { // B
-                //size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw); // WRITTEN
-                //float &dw = ((float*)diff_wei_m)[wei_off];
-                //dw = 0.f; // 2.2x --> 2.0x
-                float tmp = 0.f;
-#if 1 // a1/a3 1.50,1.15
-                for (int oh = oh_beg; oh < oh_end; ++oh) {
-                  const int ih = oh * SH - PH + kh * (p->dh + 1);
-                  for (int ow = ow_beg; ow < ow_end; ++ow) {
-                    size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
-                    const int iw = ow * SW - PW + kw * (p->dw + 1);
-                    size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
-                    tmp += pdiff_dst[dst_off] * psrc[src_off];
-                  }
-                }
-#elif 0
-                for (size_t oh = oh_beg; oh < oh_end; ++oh) {
-                  const size_t ih = oh * SH - PH + kh * (p->dh + 1);
-                  for (size_t ow = ow_beg; ow < ow_end; ++ow) {
-                    size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
-                    const size_t iw = ow * SW - PW + kw * (p->dw + 1);
-                    size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
-                    tmp += pdiff_dst[dst_off] * psrc[src_off];
-                  }
-                }
-#elif 1
-                for (size_t oh = oh_beg, ih=ih_beg; oh < oh_end; ih+=SH, ++oh) {
-                  //const size_t ih = oh * SH - PH + kh * (p->dh + 1);
-                  for (size_t ow = ow_beg, iw=iw_beg; ow < ow_end; iw+=SW, ++ow) {
-                    size_t dst_off = dst_off_f2(p, mb, g, oc, oh, ow);
-                    size_t src_off = src_off_f2(p, mb, g, ic, ih, iw);
-                    tmp += pdiff_dst[dst_off] * psrc[src_off];
-                  }
-                }
-#endif
-                size_t wei_off = wei_off_f2(p, g, oc, ic, kh, kw); // WRITTEN
-                pdiff_wei[wei_off] = tmp;
-              }
-#elif 0 // a1,a3 1.4,1.1
-              for (int ic = 0; ic < IC/G; ++ic) { // B
-                size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw); // WRITTEN
-                float &dw = ((float*)diff_wei_m)[wei_off];
-                //dw = 0.f; // 2.2x --> 2.0x
-                for (int oh = oh_beg; oh < oh_end; ++oh) {
-                  const int ih = oh * SH - PH + kh * (p->dh + 1);
-                  for (int ow = ow_beg; ow < ow_end; ++ow) {
-                    size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
-                    const int iw = ow * SW - PW + kw * (p->dw + 1);
-                    size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
-                    dw += ((float*)diff_dst_m)[dst_off]
-                      * ((float*)src_m)[src_off];
-                  }
-                }
-              }
-#elif 0 // 1.3,3.3
-              for (int ic = 0; ic < ICOG; ++ic) { // B
-                tmp[ic] = 0.f;
-                for (int oh = oh_beg; oh < oh_end; ++oh) {
-                  const int ih = oh * SH - PH + kh * DH;
-                  for (int ow = ow_beg; ow < ow_end; ++ow) {
-                    size_t dst_off = dst_off_f2(p, mb, g, oc, oh, ow);
-                    const int iw = ow * SW - PW + kw * DW;
-                    size_t src_off = src_off_f2(p, mb, g, ic, ih, iw);
-                    //dw += ((float*)diff_dst_m)[dst_off] * ((float*)src_m)[src_off];
-                    tmp[ic] += pdiff_dst[dst_off] * psrc[src_off];
-                  }
-                }
-              }
-              size_t wei_off = wei_off_f2(p, g, oc, 0, kh, kw); // WRITTEN
-              for (int ic = 0; ic < ICOG; ++ic) { // B
-                pdiff_wei[wei_off + ic] = tmp[ic];
-              }
-#elif 0 // 1.3,3.3
-              float tmp[ICOG];
-              for (int ic = 0; ic < ICOG; ++ic) { // B
-                tmp[ic] = 0.f;
-                for (int oh = oh_beg, ih=ih_beg; oh < oh_end; ih+=SH, ++oh) {
-                  for (int ow = ow_beg, iw=iw_beg; ow < ow_end; iw+=SW, ++ow) {
-                    size_t dst_off = dst_off_f2(p, mb, g, oc, oh, ow);
-                    size_t src_off = src_off_f2(p, mb, g, ic, ih, iw);
-                    //dw += ((float*)diff_dst_m)[dst_off] * ((float*)src_m)[src_off];
-                    tmp[ic] += pdiff_dst[dst_off] * psrc[src_off];
-                  }
-                }
-              }
-#endif
 }
-#endif // defined(__ve)
 // vim: et ts=2 sw=2 cindent nopaste ai cino=^=l0\:0N-s
