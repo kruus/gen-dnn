@@ -446,6 +446,7 @@ echo "INSTALLDIR ${INSTALLDIR}"
 echo "DOTARGET=${DOTARGET}, DOJIT=${DOJIT}, DODEBUG=${DODEBUG}, DOTEST=${DOTEST}, DODOC=${DODOC}, DONEEDMKL=${DONEEDMKL}"
 LOGDIR="log-${DOTARGET}${DOJIT}${DODEBUG}${DOTEST}${DODOC}${DONEEDMKL}"
 if [ "$BUILDOK" == "y" ]; then
+    set -x
     echo "BUILDOK !    QUICK=$QUICK"
     if [ $QUICK -lt 2 ]; then # make install ?
         (
@@ -477,6 +478,7 @@ if [ "$BUILDOK" == "y" ]; then
     if [ ! $DOTEST -eq 0 -a "$DOTARGET" == "s" ]; then
         echo 'SX testing should be done manually (ex. ~/tosx script to log in to SX)'
     fi
+    set +x
 else
     echo "Build NOT OK..."
 fi
