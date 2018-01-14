@@ -241,7 +241,7 @@ void refconv_5_fwd(const prb_t *p, dnn_mem_t &src_m,
 
 #if 0 // ref_conv3 starting point
 #ifndef __ve
-#   pragma omp parallel for collapse(5)
+  OMP(parallel for collapse(5))//;
 #endif
   for (int g = 0; g < G; ++g) {
     for (int mb = 0; mb < MB; ++mb) {
@@ -298,9 +298,7 @@ void refconv_5_fwd(const prb_t *p, dnn_mem_t &src_m,
   //        /*iw in   */ 0, IW);
   int const OHs_EgeK = IH+PH+p->dh - p->kh*(p->dh+1); // fully const!
   int const OWs_EgeK = IW+PW+p->dw - KW*(p->dw+1); // fully const!
-#ifndef __ve
-#   pragma omp parallel for collapse(5)
-#endif
+  OMP(parallel for collapse(5))//;
   for (int g = 0; g < G; ++g) {
     for (int mb = 0; mb < MB; ++mb) {
       for (int oc = 0; oc < OC/G; ++oc) {
@@ -531,9 +529,7 @@ static void refconv_5_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
   const int jww = DW / gcd_w;      // = lcm_w / SW
 
 #if 0 // shorten, do same for kw,ow loop. tweaks to kh calc
-#ifndef __ve
-  # pragma omp parallel for collapse(5)
-#endif
+  OMP(omp parallel for collapse(5))//;
   for (int g = 0; g < G; ++g) {
     for (int mb = 0; mb < MB; ++mb) {
       for (int ic = 0; ic < IC/G; ++ic) {
@@ -642,9 +638,7 @@ static void refconv_5_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
     }
   }
 #elif 1 // clean up
-#ifndef __ve
-  # pragma omp parallel for collapse(5)
-#endif
+  OMP(omp parallel for collapse(5))//;
   for (int g = 0; g < G; ++g) {
     for (int mb = 0; mb < MB; ++mb) {
       for (int ic = 0; ic < IC/G; ++ic) {
@@ -773,9 +767,7 @@ void refconv_5_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m,
   }
 
     for (int mb = 0; mb < MB; ++mb) { // 1: move here, cf ref_conv3
-#ifndef __ve
-#   pragma omp parallel for collapse(3)
-#endif
+      OMP(parallel for collapse(3))//;
   for (int g = 0; g < G; ++g) {
       for (int ic = 0; ic < IC/G; ++ic) {
         for (int ih = 0; ih < IH; ++ih) {
@@ -839,13 +831,9 @@ void refconv_5_bwd_w(const prb_t *p, dnn_mem_t &src_m,
 #elif 1 // same, but tidy code
   // regr.sh-BWD_W 2.51x,2.51x
   // TRY : nog offset?
-#ifndef __ve
-# pragma omp parallel
-#endif
+  OMP(parallel)//;
   {
-#ifndef __ve
-#   pragma omp for collapse(5)
-#endif
+    OMP(for collapse(5))//;
     for (int g = 0; g < G; ++g) {
       for (int oc = 0; oc < OC/G; ++oc) {
         for (int ic = 0; ic < IC/G; ++ic) {
@@ -860,9 +848,7 @@ void refconv_5_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
     // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
-#ifndef __ve
-#   pragma omp for collapse(4)
-#endif
+    OMP(for collapse(4))//;
     for (int g = 0; g < G; ++g) {
       for (int oc = 0; oc < OC/G; ++oc) {
         //for (int ic = 0; ic < IC/G; ++ic)
@@ -903,9 +889,7 @@ void refconv_5_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     }
 
     if ((p->dir & FLAG_BIA)) {
-#ifndef __ve
-#   pragma omp for collapse(2) nowait
-#endif
+      OMP(for collapse(2) nowait)//;
       for (int g = 0; g < G; ++g) {
         for (int oc = 0; oc < OC/G; ++oc) {
           size_t bia_off = bia_off_f(p, g, oc);
@@ -925,13 +909,9 @@ void refconv_5_bwd_w(const prb_t *p, dnn_mem_t &src_m,
   }
 #elif 0 // experiment
   // regr.sh-BWD_W 2.48x
-#ifndef __ve
-# pragma omp parallel
-#endif
+  OMP(parallel)//;
   {
-#ifndef __ve
-#   pragma omp for collapse(5)
-#endif
+    OMP(for collapse(5))//;
     for (int g = 0; g < G; ++g) {
       for (int oc = 0; oc < OC/G; ++oc) {
         for (int ic = 0; ic < IC/G; ++ic) {
@@ -946,9 +926,7 @@ void refconv_5_bwd_w(const prb_t *p, dnn_mem_t &src_m,
       }
     }
     // writing to dw at wei_off_f(p, g, oc, ic, kh, kw);
-#ifndef __ve
-#   pragma omp for collapse(3)
-#endif
+    OMP(for collapse(3))//;
     for (int g = 0; g < G; ++g) {
       for (int oc = 0; oc < OC/G; ++oc) {
         //for (int ic = 0; ic < IC/G; ++ic)
@@ -998,9 +976,7 @@ void refconv_5_bwd_w(const prb_t *p, dnn_mem_t &src_m,
     }
 
     if ((p->dir & FLAG_BIA)) {
-#ifndef __ve
-#   pragma omp for collapse(2) nowait
-#endif
+      OMP(for collapse(2) nowait)//;
       for (int g = 0; g < G; ++g) {
         for (int oc = 0; oc < OC/G; ++oc) {
           size_t bia_off = bia_off_f(p, g, oc);

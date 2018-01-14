@@ -61,7 +61,7 @@ void check_pool_fwd(const pool_test_params &p, const memory &src,
 
     auto pd = p.test_pd;
 
-#pragma omp parallel for collapse(4) schedule(static)
+    OMP(parallel for collapse(4) schedule(static))//;
     for (int n = 0; n < pd.mb; n++) {
         for (int c = 0; c < pd.c; c++) {
             for (int oh = 0; oh < pd.oh; oh++) {

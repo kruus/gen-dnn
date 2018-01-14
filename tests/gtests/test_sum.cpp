@@ -40,7 +40,7 @@ class sum_test: public ::testing::TestWithParam<sum_test_params> {
         const auto &dst_d = dst.get_primitive_desc().desc();
         const auto dst_dims = dst_d.data.dims;
 
-#       pragma omp parallel for collapse(4) schedule(static)
+	OMP(parallel for collapse(4) schedule(static))//;
         for (auto n = 0; n < dst_dims[0]; n++)
         for (auto c = 0; c < dst_dims[1]; c++)
         for (auto h = 0; h < dst_dims[2]; h++)
@@ -112,7 +112,7 @@ protected:
         const size_t sz =
             dst.get_primitive_desc().get_size() / sizeof(data_t);
         // overwriting dst to prevent false positives for test cases.
-# pragma omp parallel for
+	OMP(parallel for)//;
         for (size_t i = 0; i < sz; i++) {
             dst_data[i] = -32;
         }

@@ -38,7 +38,7 @@ void compute_ref_fwd(const prb_t *p, const dnn_mem_t &src, dnn_mem_t &mean,
         }
     };
 
-#   pragma omp parallel for
+    OMP(parallel for)//;
     for (int c = 0; c < p->ic; ++c) {
         float smean = ((float *)mean)[c];
         float svar = ((float *)var)[c];
@@ -64,7 +64,7 @@ void compute_ref_bwd(const prb_t *p, const dnn_mem_t &src,
         const dnn_mem_t &ss, dnn_mem_t &d_src, dnn_mem_t &d_ss) {
     const float NHW = p->mb * p->ih * p->iw;
 
-#   pragma omp parallel for
+    OMP(parallel for)//;
     for (int c = 0; c < p->ic; ++c) {
         float smean = ((float *)mean)[c];
         float svar = ((float *)var)[c];

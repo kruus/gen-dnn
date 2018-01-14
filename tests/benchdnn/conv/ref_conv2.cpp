@@ -179,7 +179,7 @@ void precompute_ok2(int i, int O, int K, int S, int P, int D,
   VREG(oo) VREG(ooS) VREG(ooi) VREG(gather) VREG(kk) VREG(ix)
 #if 0
   for (int k = 0; k < precompute_size; ++k) kk[k] = k;
-  OMPSIMD(omp simd)//;
+  OMPSIMD()//;
   IVDEP()
   for (int k = 0; k < 16; ++k) { // gcc vectorizes this nicely
       oo[k] = (P + i) - k * (D+1);
@@ -199,7 +199,7 @@ void precompute_ok2(int i, int O, int K, int S, int P, int D,
   }
   num = cnt; // do not know how to force gather with gcc.
   if (cnt) {
-      OMPSIMD(omp simd aligned(_o:16))//;
+      OMPSIMD(aligned(_o:16))//;
       IVDEP()//;
       for (size_t k = 0; k < 16; ++k) {
           _o[k] = (gather[k]? ooi[ix[k]]: 0);
@@ -210,7 +210,7 @@ void precompute_ok2(int i, int O, int K, int S, int P, int D,
           //if (gather[k]) _o[k] = ooi[ix[k]]; // gcc:NO
           //_o[k] = (ooS[k]? ooi[ix[k]]: 0);
       }
-      OMPSIMD(omp simd aligned(_k:16))//;
+      OMPSIMD(aligned(_k:16))//;
       for (int k = 0; k < 16; ++k) {
           _k[k] = (gather[k]? kk[ix[k]]: 0);
           //if (gather[k]) _k[k] = kk[ix[k]]; // gcc:NO
@@ -218,7 +218,7 @@ void precompute_ok2(int i, int O, int K, int S, int P, int D,
   }
 #else
   int cnt = 0;
-  OMPSIMD(omp simd)//;
+  OMPSIMD()//;
   IVDEP()//;
   for (int k = 0; k < 16; ++k) { // gcc vectorizes this nicely
     kk[k] = k;
@@ -230,7 +230,7 @@ void precompute_ok2(int i, int O, int K, int S, int P, int D,
     gather[k] = (ooi[k] >= 0 && ooi[k] < O && ooS[k] == ooi[k]);
   }
 #if 0
-  OMPSIMD(omp simd)//;
+  OMPSIMD()//;
   IVDEP()//;
   for (int k = 0; k < 16; ++k) { // gcc vectorizes this nicely
     if (gather[k]) _o[cnt] = ooi[k];
@@ -242,7 +242,7 @@ void precompute_ok2(int i, int O, int K, int S, int P, int D,
     if (gather[k])
       ix[cnt++] = k;
   }
-  OMPSIMD(omp simd aligned(_o:16))//;
+  OMPSIMD(aligned(_o:16))//;
   IVDEP()//;
   ShortLoop() for (size_t i = 0; i < cnt; ++i) { // nc++ still no gather ?
     const int ii = ix[i];

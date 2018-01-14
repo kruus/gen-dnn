@@ -74,8 +74,7 @@ void _gemm_convolution_fwd_t<with_relu, run_jit, isa>::execute_forward() {
         ? omp_get_max_threads()
         : 1;
     MAYBE_UNUSED(num_thr);
-#pragma omp parallel num_threads(num_thr)
-    {
+    OMP(parallel num_threads(num_thr)) {
         const int ithr = omp_get_thread_num();
         const int nthr = omp_get_num_threads();
 
@@ -166,8 +165,7 @@ void _gemm_convolution_bwd_data_t<run_jit, isa>::execute_backward_data() {
 
     const size_t work_amount = jcp.ngroups * jcp.mb;
     int num_thr = (jcp.mb != 1) ? omp_get_max_threads() : 1;
-#pragma omp parallel num_threads(num_thr)
-    {
+    OMP(parallel num_threads(num_thr)) {
         const int ithr = omp_get_thread_num();
         const int nthr = omp_get_num_threads();
 
@@ -222,7 +220,7 @@ void _gemm_convolution_bwd_weights_t<run_jit, isa>::execute_backward_weights() {
     const data_t zero = 0.0, one = 1.0;
 
     int num_thr = (jcp.mb != 1) ? omp_get_max_threads() : 1;
-#pragma omp parallel num_threads(num_thr)
+    OMP(parallel num_threads(num_thr))
     {
         const int ithr = omp_get_thread_num();
         const int nthr = omp_get_num_threads();
@@ -271,22 +269,20 @@ void _gemm_convolution_bwd_weights_t<run_jit, isa>::execute_backward_weights() {
                 }
             }
             if (need_reduction) {
-                #pragma omp barrier
+                OMP(barrier)//;
                 data_t *weights_base = diff_weights + g_start * weights_g_size;
                 jit_gemm_convolution_utils::bwd_weights_reduction_par(
                     ithr_mb, nthr_mb, jcp, weights_reduce_base, weights_base);
             }
-        } else
-            if (need_reduction) {
-                #pragma omp barrier
-            }
+        } else if (need_reduction) {
+                OMP(barrier)//;
+        }
     }
     if (jcp.with_bias) {
         const memory_desc_wrapper diff_dst_d(this->conf_.diff_dst_pd());
         const memory_desc_wrapper diff_bias_d(this->conf_.diff_weights_pd(1));
         const size_t work_amount = jcp.ngroups * jcp.oc;
-    #pragma omp parallel
-        {
+        OMP(parallel) {
             const int ithr = omp_get_thread_num();
             const int nthr = omp_get_num_threads();
             int g{0}, oc{0};
@@ -297,7 +293,7 @@ void _gemm_convolution_bwd_weights_t<run_jit, isa>::execute_backward_weights() {
                 data_t db = 0;
                 for (int mb = 0; mb < jcp.mb; ++mb)
                     for (int oh = 0; oh < jcp.oh; ++oh)
-#                       pragma omp simd reduction(+:db)
+                        OMPSIMD(reduction(+:db))
                         for (int ow = 0; ow < jcp.ow; ++ow)
                             db += diff_dst[diff_dst_d.off(mb,g*jcp.oc+oc,oh,ow)];
                 diff_bias[diff_bias_d.off(g*jcp.oc+oc)] = db;

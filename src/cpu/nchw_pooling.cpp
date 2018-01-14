@@ -107,7 +107,7 @@ void nchw_pooling_fwd_t<data_type>::execute_forward() {
 
 
     if (conf_.desc()->alg_kind == pooling_max) {
-#       pragma omp parallel for collapse(4) schedule(static)
+        OMP(parallel for collapse(4) schedule(static))//;
         for (int mb = 0; mb < MB; ++mb) {
             for (int c = 0; c < C; ++c) {
                 for (int oh = 0; oh < OH; ++oh) {
@@ -125,7 +125,7 @@ void nchw_pooling_fwd_t<data_type>::execute_forward() {
             }
         }
     } else {
-#       pragma omp parallel for collapse(4) schedule(static)
+        OMP(parallel for collapse(4) schedule(static))//;
         for (int mb = 0; mb < MB; ++mb) {
             for (int c = 0; c < C; ++c) {
                 for (int oh = 0; oh < OH; ++oh) {
@@ -212,7 +212,7 @@ void nchw_pooling_bwd_t<data_type>::execute_backward() {
     };
 
     if (conf_.desc()->alg_kind == pooling_max) {
-#       pragma omp parallel for collapse(2) schedule(static)
+        OMP(parallel for collapse(2) schedule(static))//;
         for (int mb = 0; mb < MB; ++mb) {
             for (int c = 0; c < C; ++c) {
                 auto diff_dst_offset = mb*C*OH*OW + c*OH*OW;
@@ -226,7 +226,7 @@ void nchw_pooling_bwd_t<data_type>::execute_backward() {
             }
         }
     } else {
-#       pragma omp parallel for collapse(2) schedule(static)
+        OMP(parallel for collapse(2) schedule(static))//;
         for (int mb = 0; mb < MB; ++mb) {
             for (int c = 0; c < C; ++c) {
                 auto diff_dst_offset = mb*C*OH*OW + c*OH*OW;
@@ -248,5 +248,4 @@ template struct nchw_pooling_bwd_t<data_type::f32>;
 }
 }
 }
-
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

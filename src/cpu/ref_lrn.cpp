@@ -76,7 +76,7 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
     };
 
     const int MB = conf_.MB();
-#   pragma omp parallel for collapse(4) schedule(static)
+    OMP(parallel for collapse(4) schedule(static))//;
     for (int mb = 0; mb < MB; ++mb) {
         for (int c = 0; c < C; ++c) {
             for (int h = 0; h < H; ++h) {
@@ -149,7 +149,7 @@ void ref_lrn_bwd_t<data_type>::execute_backward() {
         *d = static_cast<data_t>(A - B); // final cast down to data_t
     };
 
-#   pragma omp parallel for collapse(4) schedule(static)
+    OMP(parallel for collapse(4) schedule(static))//;
     for (int mb = 0; mb < MB; ++mb) {
         for (int c = 0; c < C; ++c) {
             for (int h = 0; h < H; ++h) {
@@ -168,5 +168,4 @@ template struct ref_lrn_bwd_t<data_type::f32>;
 }
 }
 }
-
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

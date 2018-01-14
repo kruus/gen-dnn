@@ -17,6 +17,8 @@
 #ifndef MKLDNN_TYPES_H
 #define MKLDNN_TYPES_H
 
+#include "mkldnn_os.h" // compiler/OS compatibility macros
+
 #ifdef __cplusplus
 extern "C" {
 #endif

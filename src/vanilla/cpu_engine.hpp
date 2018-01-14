@@ -46,7 +46,7 @@
 #define VERBOSE_PRIMITIVE_CREATE 0
 #endif
 
-#ifdef TARGET_VANILLA
+#if defined(TARGET_VANILLA) && !defined(JITFUNCS)
 /** In principle could have multiple TARGETS.
  * For example: VANILLA, and later perhaps SSE42, AVX2, AVX512.
  * Default is "compile everything".

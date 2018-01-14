@@ -75,7 +75,7 @@ static int prepare_fwd(const prb_t *p, dnn_mem_t &src, dnn_mem_t &mean,
     print(6, "check_alg: %s, density = %g, flex_bits = %d\n",
             check_alg2str(ALG_0), density, flex_bits);
 
-#   pragma omp parallel for
+    OMP(parallel for)//;
     for (int c = 0; c < p->ic; ++c) {
         const float m = ((float *)mean)[c] =
             alg == ALG_0 ? 0.f : 0.25f * (1 << (c % 7));
@@ -169,7 +169,7 @@ static int prepare_bwd(const prb_t *p, dnn_mem_t &src, dnn_mem_t &d_dst,
 
     print(5, "prep_bwd: k:%d, P:%d log2P:%d\n", k, P, log2P);
 
-#   pragma omp parallel for
+    OMP(parallel for)//;
     for (int c = 0; c < p->ic; ++c) {
         const float m = ((float *)mean)[c] = c % 2;
 
@@ -528,3 +528,4 @@ int doit(const prb_t *p, res_t *r) {
 }
 
 }
+// vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s

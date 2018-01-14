@@ -65,7 +65,7 @@ void ref_inner_product_fwd_t<src_type, wei_type, dst_type, acc_type>
         }
     };
 
-#   pragma omp parallel for collapse(2) schedule(static)
+    OMP(parallel for collapse(2) schedule(static))//;
     for (int mb = 0; mb < MB; ++mb) {
         for (int oc = 0; oc < OC; ++oc) {
             acc_data_t a = bias ? bias[bias_d.off(oc)] : (dst_data_t)0;
@@ -102,7 +102,7 @@ void ref_inner_product_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
 
     const bool diff_src_has_spatial = diff_src_d.ndims() == 4;
 
-#   pragma omp parallel for collapse(2) schedule(static)
+    OMP(parallel for collapse(2) schedule(static))//;
     for (int mb = 0; mb < MB; ++mb) {
         for (int ic = 0; ic < IC; ++ic) {
             if (diff_src_has_spatial) {
@@ -155,7 +155,7 @@ void ref_inner_product_bwd_weights_t<data_type>::execute_backward_weights() {
 
     const bool src_has_spatial = src_d.ndims() == 4;
 
-#   pragma omp parallel for collapse(2) schedule(static)
+    OMP(parallel for collapse(2) schedule(static))//;
     for (int oc = 0; oc < OC; ++oc) {
         for (int ic = 0; ic < IC; ++ic) {
             if (src_has_spatial) {
@@ -188,7 +188,7 @@ void ref_inner_product_bwd_weights_t<data_type>::execute_backward_weights() {
         constexpr int blksize = 8;
         int OC_blocks = OC / blksize;
         int rem_OC = OC % blksize;
-#       pragma omp parallel
+        OMP(parallel)//;
         {
             const int ithr = omp_get_thread_num();
             const int nthr = omp_get_num_threads();
@@ -197,13 +197,13 @@ void ref_inner_product_bwd_weights_t<data_type>::execute_backward_weights() {
             oc_st = oc_st * blksize;
             oc_e = oc_e * blksize;
 
-#           pragma omp simd
+            OMPSIMD()//;
             for (int oc = oc_st; oc < oc_e; ++oc) {
                 diff_bias[oc] = diff_dst[oc];
             }
 
             for (int mb = 1; mb < MB; ++mb) {
-#               pragma omp simd
+                OMPSIMD()//;
                 for (int oc = oc_st; oc < oc_e; ++oc) {
                     diff_bias[oc] += diff_dst[mb * OC + oc];
                 }
@@ -227,5 +227,4 @@ template struct ref_inner_product_bwd_weights_t<data_type::f32>;
 }
 }
 }
-
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

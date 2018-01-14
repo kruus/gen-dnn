@@ -79,7 +79,7 @@ private:
     static char *scratchpad_;
     static size_t size_;
     static unsigned int reference_count_;
-#pragma omp threadprivate(scratchpad_, size_, reference_count_)
+    OMP(threadprivate(scratchpad_, size_, reference_count_))//;
 };
 
 char *global_scratchpad_t::scratchpad_ = nullptr;
@@ -100,3 +100,4 @@ scratchpad_t *create_scratchpad(size_t size) {
 
 }
 }
+// vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s

@@ -38,7 +38,7 @@ void im2col(
 
     auto im2col_1st = [&](const float *im, float *col) {
         const size_t work_amount = jcp.oh * jcp.kh;
-        #pragma omp parallel
+        OMP(omp parallel)//;
         {
             const int ithr = omp_get_thread_num();
             const int nthr = omp_get_num_threads();
@@ -72,7 +72,7 @@ void im2col(
 
     auto im2col_common = [&](const float *im, float *col) {
         const size_t work_amount = jcp.ic;
-        #pragma omp parallel
+        OMP(omp parallel)//;
         {
             const int ithr = omp_get_thread_num();
             const int nthr = omp_get_num_threads();
@@ -124,7 +124,7 @@ void im2col_u8(
     jit_gemm_conv_conf_t &jcp, const uint8_t *im, uint8_t *col) {
     int num_thr = (jcp.mb != 1) ? omp_get_max_threads() : 1;
     MAYBE_UNUSED(num_thr);
-#   pragma omp parallel for collapse(2) num_threads(num_thr)
+    OMP(parallel for collapse(2) num_threads(num_thr))//;
     for (int oh = 0; oh < jcp.oh; ++oh) {
         for (int ow = 0; ow < jcp.ow; ++ow) {
             for (int kh = 0; kh < jcp.kh; ++kh) {
@@ -142,7 +142,7 @@ void im2col_u8(
                     const size_t im_idx
                         = (ih * jcp.iw + iw) * jcp.ngroups * jcp.ic;
 
-#                   pragma omp simd
+                    OMPSIMD()//;
                     for (int ic = 0; ic < jcp.ic; ++ic) {
                         col[col_idx + ic] = im[im_idx + ic];
                     }
@@ -160,7 +160,7 @@ void col2im(
 
     int num_thr = (jcp.mb != 1) ? omp_get_max_threads() : 1;
     MAYBE_UNUSED(num_thr);
-#pragma omp parallel for  num_threads(num_thr)
+    OMP(parallel for  num_threads(num_thr))//;
     for (int ic = 0; ic < jcp.ic; ++ic) {
         for (int is = 0; is < iS; ++is) im[is] = 0.;
 
@@ -244,7 +244,7 @@ status_t prepare_ws_col(jit_gemm_conv_conf_t &jcp, src_t **col) {
     *col = (src_t *)malloc(im2col_sz * sizeof(src_t), 64);
     if (*col == nullptr) return status::out_of_memory;
 
-#   pragma omp parallel for
+    OMP(parallel for)//;
     for (size_t i = 0; i < im2col_sz; ++i) (*col)[i] = (src_t)0;
 
     return status::success;
@@ -313,3 +313,4 @@ void bwd_weights_reduction_par(int ithr, int nthr, const jit_gemm_conv_conf_t &j
 }
 }
 }
+// vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s

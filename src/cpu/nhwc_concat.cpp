@@ -42,7 +42,7 @@ void nhwc_concat_t<data_type>::execute() {
     const int h = dst_d.dims()[2];
     const int w = dst_d.dims()[3];
 
-#   pragma omp parallel for schedule(static) collapse(2)
+    OMP(parallel for schedule(static) collapse(2))//;
     for (int iter_n = 0; iter_n < n; ++iter_n) {
         for (int iter_h = 0; iter_h < h; ++iter_h) {
             for (int iter_w = 0; iter_w < w; ++iter_w) {

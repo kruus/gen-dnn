@@ -387,9 +387,7 @@ inline int fill_wei(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
     const auto &c = p->cfg[WEI];
     const int range = c.f_max - c.f_min + 1;
 
-#ifndef __ve
-#   pragma omp parallel for collapse(5)
-#endif
+    OMP(parallel for collapse(5))//;
     for (int g = 0; g < p->g; ++g)
     for (int oc = 0; oc < p->oc / p->g; ++oc)
     for (int ic = 0; ic < p->ic / p->g; ++ic)

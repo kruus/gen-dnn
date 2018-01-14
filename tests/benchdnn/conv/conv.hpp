@@ -192,9 +192,7 @@ inline void zero_wei( const prb_t *p, dnn_mem_t const& wei_m ){
     // weight_off_f_nog is dense in oc,ic,kh,kw so all loops collapse into one!
     memset( (float*)wei_m, 0, wei_m.size() );
 #else
-#ifndef __ve
-# pragma omp parallel for collapse(4)
-#endif
+    OMP(parallel for collapse(4))//;
     for (int ic = 0; ic < p->ic; ++ic) { // dw = 0
         for (int oc=0; oc < p->oc; ++oc) {
             for (int kh = 0; kh < p->kh; ++kh) {

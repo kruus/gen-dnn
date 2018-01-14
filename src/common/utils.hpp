@@ -24,6 +24,8 @@
 #include <malloc.h>
 #endif
 
+#include "mkldnn_os.h"
+
 namespace mkldnn {
 namespace impl {
 

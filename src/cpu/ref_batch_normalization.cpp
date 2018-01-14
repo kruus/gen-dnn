@@ -64,7 +64,7 @@ void ref_batch_normalization_fwd_t<data_type>::execute_forward() {
         return (with_relu && res < 0) ? 0 : res;
     };
 
-#   pragma omp parallel for schedule(static)
+    OMP(parallel for schedule(static))//;
     for (int c = 0; c < C; ++c) {
         data_t v_mean = calculate_stats ? 0 : mean[c];
         data_t v_variance = calculate_stats ? 0 : variance[c];
@@ -136,7 +136,7 @@ void ref_batch_normalization_bwd_t<data_type>::execute_backward() {
     const bool calculate_diff_stats = !conf_.omit_stats();
 
 
-#   pragma omp parallel for schedule(static)
+    OMP(parallel for schedule(static))//;
     for (int c = 0; c < C; ++c) {
         data_t v_mean = mean[mean_d.off(c)];
         data_t v_variance = variance[variance_d.off(c)];
@@ -181,5 +181,4 @@ template struct ref_batch_normalization_bwd_t<data_type::f32>;
 }
 }
 }
-
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

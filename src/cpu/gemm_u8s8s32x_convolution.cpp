@@ -104,7 +104,7 @@ void _gemm_u8s8s32x_convolution_fwd_t<with_relu, dst_type>::execute_forward() {
         ? omp_get_max_threads() : 1;
     MAYBE_UNUSED(num_thr);
 
-#   pragma omp parallel num_threads(num_thr)
+    OMP(parallel num_threads(num_thr))//;
     {
         const int ithr = omp_get_thread_num();
         const int nthr = omp_get_num_threads();
@@ -139,9 +139,9 @@ void _gemm_u8s8s32x_convolution_fwd_t<with_relu, dst_type>::execute_forward() {
 
             if (use_fast_path) {
 #               if _OPENMP >= 201307
-#               pragma omp parallel for simd
+                OMP(parallel for simd)//;
 #               else
-#               pragma omp parallel for
+                OMP(parallel for)//;
 #               endif
                 for (int o = 0; o < jcp.os * jcp.oc; ++o) {
                     float d = fast_path_alpha * acc[o] + sum_scale * dst[o];
@@ -149,7 +149,7 @@ void _gemm_u8s8s32x_convolution_fwd_t<with_relu, dst_type>::execute_forward() {
                     dst[o] = qz_a1b0<float, dst_data_t>()(d, rmode);
                 }
             } else {
-#               pragma omp parallel for collapse(2)
+                OMP(parallel for collapse(2))//;
                 for (int os = 0; os < jcp.os; ++os) {
                 for (int oc = 0; oc < jcp.oc; ++oc) {
                     size_t acc_off = os * jcp.oc + oc;
@@ -187,3 +187,4 @@ template struct _gemm_u8s8s32x_convolution_fwd_t<false, u8>;
 }
 }
 }
+// vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s

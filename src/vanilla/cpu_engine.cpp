@@ -13,6 +13,8 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_engine.hpp"
+
 #ifndef JITFUNCS
 #ifdef DOXYGEN_SHOULD_SKIP_THIS
 /** 100: do everything. 0 makes testing VERY VERY slow */
@@ -26,7 +28,6 @@
 
 #include <assert.h>
 
-#include "cpu_engine.hpp"
 #include "cpu_memory.hpp"
 #include "type_helpers.hpp"
 

@@ -152,7 +152,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             }
         };
 
-#       pragma omp parallel for collapse(3) schedule(static)
+        OMP(parallel for collapse(3) schedule(static))//;
         for (int n = 0; n < dims[0]; ++n) {
             for (int C = 0; C < dims[1] / blksize; ++C) {
                 for (int h = 0; h < dims[2]; ++h) {
@@ -195,7 +195,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 if (alpha == 1.0 && beta == 0.0) {
 #                   pragma unroll
                     for (int C = 0; C < dims[1] / blksize; ++C) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < blksize; ++c) {
                             o[C * os[1] + c] = qz_a1b0<data_t<type_i>,
                                 data_t<type_o>>()(i[C * blksize + c], rmode);
@@ -204,7 +204,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 } else if (alpha == 1.0) {
 #                   pragma unroll
                     for (int C = 0; C < dims[1] / blksize; ++C) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < blksize; ++c) {
                             o[C * os[1] + c] = qz_a1<data_t<type_i>,
                                 data_t<type_o>>()(i[C * blksize + c],
@@ -214,7 +214,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 } else if (beta == 0.0) {
 #                   pragma unroll
                     for (int C = 0; C < dims[1] / blksize; ++C) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < blksize; ++c) {
                             o[C * os[1] + c] = qz_b0<data_t<type_i>,
                                 data_t<type_o>>()(i[C * blksize + c], alpha, rmode);
@@ -223,7 +223,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 } else {
 #                   pragma unroll
                     for (int C = 0; C < dims[1] / blksize; ++C) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < blksize; ++c) {
                             o[C * os[1] + c] = qz<data_t<type_i>,
                                 data_t<type_o>>()(i[C * blksize + c],
@@ -235,7 +235,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 if (alpha == 1.0 && beta == 0.0) {
 #                   pragma unroll
                     for (int C = 0; C < dims[1] / blksize; ++C) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < blksize; ++c) {
                             o[C * blksize + c] = qz_a1b0<data_t<type_i>,
                                 data_t<type_o>>()(i[C * is[1] + c], rmode);
@@ -244,7 +244,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 } else if (alpha == 1.0) {
 #                   pragma unroll
                     for (int C = 0; C < dims[1] / blksize; ++C) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < blksize; ++c) {
                             o[C * blksize + c] = qz_a1<data_t<type_i>,
                                 data_t<type_o>>()(i[C * is[1] + c],
@@ -254,7 +254,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 } else if (beta == 0.0) {
 #                   pragma unroll
                     for (int C = 0; C < dims[1] / blksize; ++C) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < blksize; ++c) {
                             o[C * blksize + c] = qz_b0<data_t<type_i>,
                                 data_t<type_o>>()(i[C * is[1] + c], alpha, rmode);
@@ -263,7 +263,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 } else {
 #                   pragma unroll
                     for (int C = 0; C < dims[1] / blksize; ++C) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < blksize; ++c) {
                             o[C * blksize + c] = qz<data_t<type_i>,
                                 data_t<type_o>>()(i[C * is[1] + c],
@@ -274,7 +274,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             }
         };
 
-#       pragma omp parallel for collapse(3) schedule(static)
+        OMP(parallel for collapse(3) schedule(static))//;
         for (int n = 0; n < dims[0]; ++n) {
             for (int h = 0; h < dims[2]; ++h) {
                 for (int w = 0; w < dims[3]; ++w) {
@@ -318,7 +318,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o,
                 const int nsize) {
             if (alpha == 1.0 && beta == 0) {
-#               pragma omp simd collapse(2)
+                OMPSIMD(collapse(2))//;
                 for (int n = 0; n < nsize; n++) {
                     for (int c = 0; c < blksize; ++c) {
                         o[n * o_st[0] + c * co_mult] =
@@ -326,7 +326,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                     }
                 }
             } else {
-#               pragma omp simd collapse(2)
+                OMPSIMD(collapse(2))//;
                 for (int n = 0; n < nsize; n++) {
                     for (int c = 0; c < blksize; ++c) {
                         o[n * o_st[0] + c * co_mult] = data_t<type_o>(
@@ -337,7 +337,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             }
         };
 
-#       pragma omp parallel for collapse(4) schedule(static)
+        OMPSIMD(for collapse(4) schedule(static))//;
         for (int C = 0; C < dims[1] / blksize; ++C) {
             for (int h = 0; h < dims[2]; ++h) {
                 for (int n = 0; n < dims[0]; n += tsize) {
@@ -406,7 +406,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             }
         };
 
-#       pragma omp parallel for collapse(4) schedule(static)
+        OMP(parallel for collapse(4) schedule(static))//;
         for (int n = 0; n < dims[0]; ++n) {
             for (int C = 0; C < dims[1] / blksize_16c; ++C) {
                 for (int h = 0; h < dims[2]; ++h) {
@@ -445,7 +445,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 if (alpha == 1.0 && beta == 0.0) {
 #                   pragma unroll
                     for (int w = 0; w < dims[3]; ++w) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < dims[1]; ++c) {
                             o[w * os[3] + c] = qz_a1b0<data_t<type_i>,
                                 data_t<type_o>>()(i[c * is[1] + w], rmode);
@@ -454,7 +454,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 } else if (alpha == 1.0) {
 #                   pragma unroll
                     for (int w = 0; w < dims[3]; ++w) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < dims[1]; ++c) {
                             o[w * os[3] + c] = qz_a1<data_t<type_i>,
                                 data_t<type_o>>()(i[c * is[1] + w],
@@ -464,7 +464,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 } else if (beta == 0.0) {
 #                   pragma unroll
                     for (int w = 0; w < dims[3]; ++w) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < dims[1]; ++c) {
                             o[w * os[3] + c] = qz_b0<data_t<type_i>,
                                 data_t<type_o>>()(i[c * is[1] + w], alpha, rmode);
@@ -473,7 +473,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 } else {
 #                   pragma unroll
                     for (int w = 0; w < dims[3]; ++w) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < dims[1]; ++c) {
                             o[w * os[3] + c] = qz<data_t<type_i>,
                                 data_t<type_o>>()(i[c * is[1] + w],
@@ -485,7 +485,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 if (alpha == 1.0 && beta == 0.0) {
 #                   pragma unroll
                     for (int w = 0; w < dims[3]; ++w) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < dims[1]; ++c) {
                             o[c * os[1] + w] = qz_a1b0<data_t<type_i>,
                                 data_t<type_o>>()(i[w * is[3] + c], rmode);
@@ -494,7 +494,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 } else if (alpha == 1.0) {
 #                   pragma unroll
                     for (int w = 0; w < dims[3]; ++w) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < dims[1]; ++c) {
                             o[c * os[1] + w] = qz_a1<data_t<type_i>,
                                 data_t<type_o>>()(i[w * is[3] + c],
@@ -504,7 +504,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 } else if (beta == 0.0) {
 #                   pragma unroll
                     for (int w = 0; w < dims[3]; ++w) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < dims[1]; ++c) {
                             o[c * os[1] + w] = qz_b0<data_t<type_i>,
                                 data_t<type_o>>()(i[w * is[3] + c], alpha, rmode);
@@ -513,7 +513,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 } else {
 #                   pragma unroll
                     for (int w = 0; w < dims[3]; ++w) {
-#                       pragma omp simd
+                        OMPSIMD()//;
                         for (int c = 0; c < dims[1]; ++c) {
                             o[c * os[1] + w] = qz<data_t<type_i>,
                                 data_t<type_o>>()(i[w * is[3] + c],
@@ -524,7 +524,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             }
         };
 
-#       pragma omp parallel for collapse(2) schedule(static)
+        OMP(parallel for collapse(2) schedule(static))//;
         for (int n = 0; n < dims[0]; ++n) {
             for (int h = 0; h < dims[2]; ++h) {
                 auto i = &input[input_d.blk_off(n, 0, h)];
@@ -576,7 +576,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             }
         };
 
-#       pragma omp parallel for collapse(2) schedule(static)
+        OMP(parallel for collapse(2) schedule(static))//;
         for (int ic = 0; ic < dims[1]; ++ic) {
             for (int kh = 0; kh < dims[2]; ++kh) {
                 auto i = &input[input_d.blk_off(0, ic, kh)];
@@ -610,7 +610,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o,
                 const int nrows, const int ncols) {
             if (alpha == 1.0 && beta == 0) {
-#               pragma omp simd collapse(2)
+                OMPSIMD(collapse(2))//;
                 for (int row = 0; row < nrows; ++row) {
                     for (int col = 0; col < ncols; ++col) {
                         const auto o_idx = row * ostrides[0]
@@ -621,7 +621,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                     }
                 }
             } else {
-#               pragma omp simd collapse(2)
+                OMPSIMD(collapse(2))//;
                 for (int row = 0; row < nrows; ++row) {
                     for (int col = 0; col < ncols; ++col) {
                         const auto o_idx = row * ostrides[0]
@@ -635,7 +635,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             }
         };
 
-#       pragma omp parallel for collapse(2) schedule(static)
+        OMP(parallel for collapse(2) schedule(static))//;
         for (int r = 0; r < dims[0]; r += tsize) {
             for (int c = 0; c < CHW; c += tsize) {
                 const int nrows =
@@ -671,7 +671,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o) {
             if (alpha == 1.0 && beta == 0) {
-#               pragma omp simd collapse(2)
+                OMPSIMD(collapse(2))//;
                 for (int O = 0; O < dims[0] / blksize; ++O) {
                     for (int oc = 0; oc < blksize; ++oc) {
                         if (order_keep) {
@@ -684,7 +684,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                     }
                 }
             } else {
-#               pragma omp simd collapse(2)
+                OMPSIMD(collapse(2))//;
                 for (int O = 0; O < dims[0] / blksize; ++O) {
                     for (int oc = 0; oc < blksize; ++oc) {
                         const auto dst_off = order_keep ? O * os[0] + oc :
@@ -698,7 +698,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             }
         };
 
-#       pragma omp parallel for collapse(3) schedule(static)
+        OMP(parallel for collapse(3) schedule(static))//;
         for (int h = 0; h < dims[2]; ++h) {
             for (int w = 0; w < dims[3]; ++w) {
                 for (int ic = 0; ic < dims[1]; ++ic) {
@@ -774,7 +774,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         const int _G = w_groups ? dims[0] : 1;
 
-#       pragma omp parallel for collapse(5) schedule(static)
+        OMP(parallel for collapse(5) schedule(static))//;
         for (int g = 0; g < _G; ++g) {
             for (int O = 0; O < dims[w_groups + 0] / blksize; ++O) {
                 for (int I = 0; I < dims[w_groups + 1] / blksize; ++I) {
@@ -859,7 +859,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         const int _G = w_groups ? dims[0] : 1;
 
-#       pragma omp parallel for collapse(5) schedule(static)
+        OMP(parallel for collapse(5) schedule(static))//;
         for (int g = 0; g < _G; ++g) {
             for (int O = 0; O < dims[w_groups + 0] / blksize; ++O) {
                 for (int I = 0; I < dims[w_groups + 1] / blksize; ++I) {
@@ -908,7 +908,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         constexpr int i_mult = order_keep ? blksize : 1;
         constexpr int o_mult = order_keep ? 1 : blksize;
 
-#       pragma omp parallel for collapse(5) schedule(static)
+        OMP(parallel for collapse(5) schedule(static))//;
         for (int g = 0; g < _G; ++g) {
             for (int O = 0; O < dims[w_groups + 0] / blksize; ++O) {
                 for (int i = 0; i < dims[w_groups + 1]; ++i) {
@@ -972,7 +972,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o) {
             if (alpha == 1.0 && beta == 0.0) {
-#               pragma omp simd collapse(2)
+                OMPSIMD(collapse(2))//;
                 for (int ic = 0; ic < blksize; ++ic) {
                     for (int oc = 0; oc < blksize; ++oc) {
                         if (order_keep) {
@@ -985,7 +985,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                     }
                 }
             } else {
-#               pragma omp simd collapse(2)
+                OMPSIMD(collapse(2))//;
                 for (int ic = 0; ic < blksize; ++ic) {
                     for (int oc = 0; oc < blksize; ++oc) {
                         const auto dst_off = order_keep ? ic * blksize + oc :
@@ -999,7 +999,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             }
         };
 
-#       pragma omp parallel for collapse(4) schedule(static)
+        OMP(parallel for collapse(4) schedule(static))//;
         for (int h = 0; h < dims[2]; ++h) {
             for (int w = 0; w < dims[3]; ++w) {
                 for (int O = 0; O < dims[0] / blksize; ++O) {
@@ -1083,7 +1083,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         const int _G = w_groups ? dims[0] : 1;
 
-#       pragma omp parallel for collapse(5) schedule(static)
+        OMP(parallel for collapse(5) schedule(static))//;
         for (int g = 0; g < _G; ++g) {
             for (int O = 0; O < dims[w_groups + 0] / blksize; ++O) {
                 for (int I = 0; I < dims[w_groups + 1] / blksize; ++I) {
@@ -1152,7 +1152,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         const int _G = w_groups ? dims[0] : 1;
 
-#       pragma omp parallel for collapse(5) schedule(static)
+        OMP(parallel for collapse(5) schedule(static))//;
         for (int g = 0; g < _G; ++g) {
             for (int o = 0; o < dims[w_groups + 0] / blksize; ++o) {
                 for (int i = 0; i < dims[w_groups + 1] / blksize; ++i) {
@@ -1213,7 +1213,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         const int _G = w_groups ? dims[0] : 1;
 
-#       pragma omp parallel for collapse(5) schedule(static)
+        OMP(parallel for collapse(5) schedule(static))//;
         for (int g = 0; g < _G; ++g) {
             for (int o = 0; o < dims[w_groups + 0] / blksize; ++o) {
                 for (int i = 0; i < dims[w_groups + 1] / blksize; ++i) {
@@ -1256,7 +1256,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         const int _G = w_groups ? dims[0] : 1;
 
-#       pragma omp parallel for collapse(5) schedule(static)
+        OMP(parallel for collapse(5) schedule(static))//;
         for (int g = 0; g < _G; ++g) {
             for (int o = 0; o < dims[w_groups + 0] / blksize; ++o) {
                 for (int i = 0; i < dims[w_groups + 1]; ++i) {
@@ -1312,7 +1312,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         const auto num_blocks = nelems / block_size;
         const auto rem_elems = nelems % block_size;
 
-#       pragma omp parallel
+        OMP(parallel)//;
         {
             const int ithr = omp_get_thread_num();
             const int nthr = omp_get_num_threads();
@@ -1323,25 +1323,25 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             round_mode_t rmode = pd->attr()->round_mode_;
 
             if (alpha == 1.0 && beta == 0.0) {
-#               pragma omp simd
+                OMPSIMD()//;
                 for (size_t e = start; e < end; ++e) {
                     output[e] = qz_a1b0<data_t<type_i>, data_t<type_o>>()
                                 (input[e], rmode);
                 }
             } else if (alpha == 1.0) {
-#               pragma omp simd
+                OMPSIMD()//;
                 for (size_t e = start; e < end; ++e) {
                     output[e] = qz_a1<data_t<type_i>, data_t<type_o>>()
                                 (input[e], output[e], beta, rmode);
                 }
             } else if (beta == 0.0) {
-#               pragma omp simd
+                OMPSIMD()//;
                 for (size_t e = start; e < end; ++e) {
                     output[e] = qz_b0<data_t<type_i>, data_t<type_o>>()
                                 (input[e], alpha, rmode);
                 }
             } else {
-#               pragma omp simd
+                OMPSIMD()//;
                 for (size_t e = start; e < end; ++e) {
                     output[e] = qz<data_t<type_i>, data_t<type_o>>()
                                 (input[e], output[e], alpha, beta, rmode);
@@ -1350,25 +1350,25 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
             if (rem_elems != 0 && ithr == nthr - 1){
                 if (alpha == 1.0 && beta == 0.0) {
-#                   pragma omp simd
+                    OMPSIMD()//;
                     for (size_t e = nelems - rem_elems; e < nelems; ++e) {
                         output[e] = qz_a1b0<data_t<type_i>,
                             data_t<type_o>>()(input[e], rmode);
                     }
                 } else if (alpha == 1.0) {
-#                   pragma omp simd
+                    OMPSIMD()//;
                     for (size_t e = nelems - rem_elems; e < nelems; ++e) {
                         output[e] = qz_a1<data_t<type_i>,
                             data_t<type_o>>()(input[e], output[e], beta, rmode);
                     }
                 } else if (beta == 0.0) {
-#                   pragma omp simd
+                    OMPSIMD()//;
                     for (size_t e = nelems - rem_elems; e < nelems; ++e) {
                         output[e] = qz_b0<data_t<type_i>,
                             data_t<type_o>>()(input[e], alpha, rmode);
                     }
                 } else {
-#                   pragma omp simd
+                    OMPSIMD()//;
                     for (size_t e = nelems - rem_elems; e < nelems; ++e) {
                         output[e] = qz<data_t<type_i>, data_t<type_o>>()
                                     (input[e], output[e], alpha, beta, rmode);
@@ -1411,7 +1411,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         const size_t work_amount = N * nelems_no_d0;
 
         if (alpha == 1.0 && beta == 0.0) {
-#           pragma omp parallel
+            OMP(parallel)//;
             {
                 const int ithr = omp_get_thread_num();
                 const int nthr = omp_get_num_threads();
@@ -1424,7 +1424,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                     size_t dim1_e =
                         dim1_s + work_rem > nelems_no_d0 ? nelems_no_d0
                         : dim1_s + work_rem;
-#                   pragma omp simd
+                    OMPSIMD()//;
                     for (size_t e = dim1_s; e < dim1_e; ++e){
                         output[os * n + e] = data_t<type_o>(input[is * n + e]);
                     }
@@ -1432,7 +1432,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 }
             }
         } else {
-#           pragma omp parallel
+            OMP(parallel)//;
             {
                 const int ithr = omp_get_thread_num();
                 const int nthr = omp_get_num_threads();
@@ -1445,7 +1445,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                     size_t dim1_e =
                         dim1_s + work_rem > nelems_no_d0 ? nelems_no_d0
                         : dim1_s + work_rem;
-#                   pragma omp simd
+                    OMPSIMD()//;
                     for (size_t e = dim1_s; e < dim1_e; ++e){
                         output[os * n + e] = data_t<type_o>(
                                 alpha * input[is * n + e]
@@ -1508,7 +1508,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         const float *scales = pd->attr()->output_scales_.scales_;
 
-#       pragma omp parallel for collapse(2)
+        OMP(parallel for collapse(2))//;
         for (size_t dm = 0; dm < D_mask; ++dm)
         for (size_t dr = 0; dr < D_rest; ++dr) {
             const float scale = scales[dm];
@@ -1587,7 +1587,5 @@ private:
 }
 }
 }
-
 #endif
-
 // vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

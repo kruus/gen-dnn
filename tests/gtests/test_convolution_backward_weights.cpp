@@ -31,7 +31,7 @@ void compute_ref_conv_bwd_bias(const test_convolution_sizes_t &c,
     const memory::desc bias_d = diff_bias.get_primitive_desc().desc();
     const memory::desc dst_d = diff_dst.get_primitive_desc().desc();
 
-#   pragma omp parallel for collapse(2) schedule(static)
+    OMP(parallel for collapse(2) schedule(static))//;
     for (int g = 0; g < c.ng; ++g) {
         for (int oc = 0; oc < c.oc / c.ng; ++oc) {
             int bidx = g * c.oc / c.ng + oc;
@@ -63,7 +63,7 @@ void compute_ref_conv_bwd_weights(const test_convolution_sizes_t &c,
     const memory::desc weights_d = diff_weights.get_primitive_desc().desc();
     const memory::desc dst_d = diff_dst.get_primitive_desc().desc();
 
-#   pragma omp parallel for collapse(5) schedule(static)
+    OMP(parallel for collapse(5) schedule(static))//;
     for (int g = 0; g < c.ng; ++g) {
         for (int oc = 0; oc < c.oc / c.ng; oc++) {
             for (int ic = 0; ic < c.ic / c.ng; ++ic) {

@@ -46,7 +46,7 @@ void simple_concat_t<data_type>::execute() {
     const int N = o_d.dims()[0];
     const size_t os = size_t(o_d.blocking_desc().strides[0][0]);
 
-#   pragma omp parallel for collapse(2) schedule(static)
+    OMP(parallel for collapse(2) schedule(static))//;
     for (int n = 0; n < N; ++n) {
         for (int a = 0; a < num_arrs; ++a) {
             /* do coping */
@@ -65,3 +65,4 @@ template struct simple_concat_t<data_type::s32>;
 }
 }
 }
+// vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s

@@ -17,7 +17,7 @@
 #ifndef CPU_JIT_AVX2_GENERATOR_HPP
 #define CPU_JIT_AVX2_GENERATOR_HPP
 #if defined(TARGET_VANILLA)
-#error "jit_generator.hpp should not be included for TARGET_VANILLA compile"
+#warning "jit_generator.hpp should not be included for TARGET_VANILLA compile"
 #endif
 
 #include <type_traits>

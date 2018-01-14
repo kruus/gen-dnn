@@ -36,7 +36,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_dense() {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto dst = reinterpret_cast<data_t *>(this->memory(0));
 
-#   pragma omp parallel for schedule(static)
+    OMP(parallel for schedule(static))//;
     for (int ou = 0; ou < outer_size_; ou++) {
         const data_t *src_data = src + ou * channels_;
         data_t *dst_data = dst + ou * channels_;
@@ -109,7 +109,7 @@ void ref_softmax_fwd_t<data_type>::_exp(int n, const data_t *a, data_t *r) {
         return;
     }
 #endif
-#   pragma omp parallel for
+    OMP(parallel for)//;
     for (int c = 0; c < n; ++c)
         r[c] = expf(a[c]);
 }
@@ -130,7 +130,7 @@ void ref_softmax_fwd_t<data_type>::_scal(int n, data_t alpha, data_t *x) {
         return;
     }
 #endif
-#   pragma omp parallel for
+    OMP(parallel for)//;
     for (int c = 0; c < n; ++c)
         x[c] *= alpha;
 }
@@ -140,5 +140,4 @@ template struct ref_softmax_fwd_t<data_type::f32>;
 }
 }
 }
-
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

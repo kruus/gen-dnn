@@ -54,7 +54,7 @@ void check_pool_fwd(const pool_bwd_test_params &p, const memory &src,
         return (index > offset) ? index - offset : 0;
     };
 
-#pragma omp parallel for collapse(4) schedule(static)
+    OMP(parallel for collapse(4) schedule(static))//;
     for (int n = 0; n < pd.mb; n++) {
         for (int c = 0; c < pd.c; c++) {
             for (int oh = 0; oh < pd.oh; oh++) {
@@ -134,7 +134,7 @@ void check_pool_bwd(const pool_bwd_test_params &p, const memory &diff_src,
         return (index > offset) ? index - offset : 0;
     };
 
-#pragma omp parallel for collapse(4) schedule(static)
+    OMP(parallel for collapse(4) schedule(static))//;
     for (int n = 0; n < pd.mb; n++) {
         for (int c = 0; c < pd.c; c++) {
             for (int ih = 0; ih < pd.ih; ih++) {
@@ -147,7 +147,7 @@ void check_pool_bwd(const pool_bwd_test_params &p, const memory &diff_src,
         }
     }
 
-#pragma omp parallel for collapse(2) schedule(static)
+    OMP(parallel for collapse(2) schedule(static))//;
     for (int n = 0; n < pd.mb; n++) {
         for (int c = 0; c < pd.c; c++) {
             for (int oh = 0; oh < pd.oh; oh++) {
@@ -196,7 +196,7 @@ void check_pool_bwd(const pool_bwd_test_params &p, const memory &diff_src,
         }
     }
 
-#pragma omp parallel for collapse(4) schedule(static)
+    OMP(parallel for collapse(4) schedule(static))//;
     for (auto n = 0; n < pd.mb; n++)
         for (auto c = 0; c < pd.c; c++)
             for (auto ih = 0; ih < pd.ih; ih++)

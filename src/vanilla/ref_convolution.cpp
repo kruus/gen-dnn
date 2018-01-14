@@ -172,7 +172,7 @@ void _ref_convolution_fwd_t<with_relu, src_type, wei_type, dst_type, acc_type>
         return 0;
     };
 
-#   pragma omp parallel for collapse(5) schedule(static)
+    OMP(parallel for collapse(5) schedule(static))
     for (int g = 0; g < G; ++g) {
         for (int mb = 0; mb < MB; ++mb) {
             for (int oc = 0; oc < OC; ++oc) {
@@ -254,7 +254,7 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
         }
     };
 
-#   pragma omp parallel for collapse(5) schedule(static)
+    OMP(parallel for collapse(5) schedule(static))
     for (int g = 0; g < G; ++g) {
         for (int mb = 0; mb < MB; ++mb) {
             for (int ic = 0; ic < IC; ++ic) {
@@ -340,7 +340,7 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
         }
     };
 
-#   pragma omp parallel for collapse(2) schedule(static)
+    OMP(parallel for collapse(2) schedule(static))
     for (int g = 0; g < G; ++g) {
         for (int oc = 0; oc < OC; ++oc) {
             if (diff_bias) {
