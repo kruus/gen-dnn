@@ -82,8 +82,7 @@ struct cpu_simple_sum_t: public c_compatible {
         const size_t blocks_number = nelems / block_size;
         const size_t tail = nelems % block_size;
 
-#pragma omp parallel
-        {
+        OMP(parallel) {
             const int ithr = omp_get_thread_num();
             const int nthr = omp_get_num_threads();
             size_t start{0}, end{0};
@@ -92,13 +91,11 @@ struct cpu_simple_sum_t: public c_compatible {
             for (size_t nb = start; nb < end; ++nb) {
                 size_t start_e = nb * block_size;
                 size_t end_e = start_e + block_size;
-#               pragma omp simd
-                for (size_t e = start_e; e < end_e; e++) {
+                OMPSIMD() for (size_t e = start_e; e < end_e; e++) {
                     output[e] = data_t(scale_[0] * input_ptrs[0][e]);
                 }
                 for (int a = 1; a < num_arrs; a++) {
-#                   pragma omp simd
-                    for (size_t e = start_e; e < end_e; e++) {
+                    OMPSIMD() for (size_t e = start_e; e < end_e; e++) {
                         output[e] += data_t(scale_[a] * input_ptrs[a][e]);
                     }
                 }
@@ -107,13 +104,11 @@ struct cpu_simple_sum_t: public c_compatible {
             if (tail != 0 && ithr == nthr - 1) {
                 size_t start_e = nelems - tail;
                 size_t end_e = nelems;
-#               pragma omp simd
-                for (size_t e = start_e; e < end_e; e++) {
+                OMPSIMD() for (size_t e = start_e; e < end_e; e++) {
                     output[e] = data_t(scale_[0] * input_ptrs[0][e]);
                 }
                 for (int a = 1; a < num_arrs; a++) {
-#                   pragma omp simd
-                    for (size_t e = start_e; e < end_e; e++) {
+                    OMPSIMD() for (size_t e = start_e; e < end_e; e++) {
                         output[e] += data_t(scale_[a] * input_ptrs[a][e]);
                     }
                 }

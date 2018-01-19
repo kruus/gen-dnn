@@ -38,7 +38,7 @@ void compute_ref_inner_product_bwd_bias(const test_inner_product_descr_t &ipd,
     const memory::desc diff_bias_d = diff_bias.get_primitive_desc().desc();
     const memory::desc diff_dst_d = diff_dst.get_primitive_desc().desc();
 
-#   pragma omp parallel for schedule(static)
+    OMP(parallel for schedule(static))//;
     for (int oc = 0; oc < ipd.oc; ++oc) {
         data_t *db = &diff_bias_data[map_index(diff_bias_d, oc)];
         *db = data_t(0);
@@ -62,7 +62,7 @@ void compute_ref_inner_product_bwd_weights(const test_inner_product_descr_t &ipd
 
     bool has_spatial = ipd.kh > 1 && ipd.kw > 1;
 
-#   pragma omp parallel for collapse(2) schedule(static)
+    OMP(parallel for collapse(2) schedule(static))//;
     for (int oc = 0; oc < ipd.oc; ++oc) {
         for (int ic = 0; ic < ipd.ic; ++ic) {
             if (has_spatial) {

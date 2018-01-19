@@ -17,7 +17,7 @@
 #ifndef CPU_JIT_AVX2_GENERATOR_HPP
 #define CPU_JIT_AVX2_GENERATOR_HPP
 #if defined(TARGET_VANILLA)
-#error "jit_generator.hpp should not be included for TARGET_VANILLA compile"
+#warning "jit_generator.hpp should not be included for TARGET_VANILLA compile"
 #endif
 
 #include <type_traits>
@@ -28,6 +28,13 @@
 /* in order to make selinux happy memory that would be marked with X-bit should
  * be obtained with mmap */
 #define XBYAK_USE_MMAP_ALLOCATOR
+#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
+/* turn off `size_t to other-type implicit casting` warning
+ * currently we have a lot of jit-generated instructions that
+ * take uint32_t, but we pass size_t (e.g. due to using sizeof).
+ * FIXME: replace size_t parameters with the appropriate ones */
+#pragma warning (disable: 4267)
+#endif
 #include "xbyak/xbyak.h"
 #include "xbyak/xbyak_util.h"
 
@@ -71,6 +78,11 @@ template <> struct cpu_isa_traits<avx512_mic_4ops>:
 // TODO: move this to jit_generator class?
 namespace {
 
+typedef enum {
+    PAGE_4K = 4096,
+    PAGE_2M = 2097152,
+} cpu_page_size_t;
+
 // TODO: move this somewhere else? Although this is only used by jit kernels
 // (Roma)
 static inline int float2int(float x) {
@@ -100,16 +112,13 @@ static inline int float2int(float x) {
 // (Roma)
 
 #ifdef XBYAK64
-constexpr Xbyak::Operand::Code abi_save_regs[] = {
-    Xbyak::Operand::RBX, Xbyak::Operand::RSP, Xbyak::Operand::RBP,
-    Xbyak::Operand::R12, Xbyak::Operand::R13, Xbyak::Operand::R14,
-    Xbyak::Operand::R15,
+constexpr Xbyak::Operand::Code abi_save_gpr_regs[] = {
+    Xbyak::Operand::RBX, Xbyak::Operand::RBP, Xbyak::Operand::R12,
+    Xbyak::Operand::R13, Xbyak::Operand::R14, Xbyak::Operand::R15,
 #ifdef _WIN
     Xbyak::Operand::RDI, Xbyak::Operand::RSI,
 #endif
 };
-constexpr size_t num_abi_save_regs
-    = sizeof(abi_save_regs) / sizeof(abi_save_regs[0]);
 
 #ifdef _WIN
 static const Xbyak::Reg64 abi_param1(Xbyak::Operand::RCX),
@@ -160,14 +169,30 @@ static inline bool mayiuse(const cpu_isa_t cpu_isa) {
     return false;
 }
 
+inline unsigned int get_num_physical_cores() {
+    unsigned int data[4];
+
+    cpu.getCpuidEx(0xB, 0, data); // CPUID for SMT Level
+    unsigned int number_logical_proc_smt = (data[1] & 0x7FFF);
+
+    cpu.getCpuidEx(0xB, 1, data); // CPUID for CORE Level
+    unsigned int number_logical_proc_core = (data[1] & 0x7FFF);
+
+    return number_logical_proc_core / number_logical_proc_smt;
+}
+
 inline unsigned int get_cache_size(int level, bool per_core = true){
     unsigned int l = level - 1;
     if (cpu.data_cache_levels == 0)
         throw Xbyak::Error(Xbyak::ERR_INTERNAL);
-    if (l < cpu.data_cache_levels)
-        return cpu.data_cache_size[l] /
-            (per_core ? cpu.cores_sharing_data_cache[l] : 1);
-    else
+    if (l < cpu.data_cache_levels) {
+        if (mayiuse(avx512_core) && level == 3)
+            return cpu.data_cache_size[l]
+                    / (per_core ? get_num_physical_cores() : 1);
+        else
+            return cpu.data_cache_size[l]
+                    / (per_core ? cpu.cores_sharing_data_cache[l] : 1);
+    } else
         return 0;
 }
 
@@ -218,28 +243,39 @@ typedef jit_tagged_label_base<> jit_tagged_label;
 class jit_generator : public Xbyak::CodeGenerator
 {
 private:
-    const int xmm_len = 16;
+    const size_t xmm_len = 16;
 #ifdef _WIN
-    const int xmm_to_preserve_start = 6;
-    const int xmm_to_preserve = 10;
+    const size_t xmm_to_preserve_start = 6;
+    const size_t xmm_to_preserve = 10;
 #else
-    const int xmm_to_preserve_start = 0;
-    const int xmm_to_preserve = 0;
+    const size_t xmm_to_preserve_start = 0;
+    const size_t xmm_to_preserve = 0;
 #endif
+
+    const size_t num_abi_save_gpr_regs
+        = sizeof(abi_save_gpr_regs) / sizeof(abi_save_gpr_regs[0]);
+
+    const size_t size_of_abi_save_regs
+        = num_abi_save_gpr_regs * rax.getBit() / 8
+        + xmm_to_preserve * xmm_len;
 
 public:
     Xbyak::Reg64 param1 = abi_param1;
     const int EVEX_max_8b_offt = 0x200;
     const Xbyak::Reg64 reg_EVEX_max_8b_offt = rbp;
 
+    inline size_t get_size_of_abi_save_regs() {
+        return size_of_abi_save_regs;
+    }
+
     void preamble() {
         if (xmm_to_preserve) {
             sub(rsp, xmm_to_preserve * xmm_len);
-            for (int i = 0; i < xmm_to_preserve; ++i)
+            for (size_t i = 0; i < xmm_to_preserve; ++i)
                 movdqu(ptr[rsp + i * xmm_len], Xbyak::Xmm(xmm_to_preserve_start + i));
         }
-        for (size_t i = 0; i < num_abi_save_regs; ++i)
-            push(Xbyak::Reg64(abi_save_regs[i]));
+        for (size_t i = 0; i < num_abi_save_gpr_regs; ++i)
+            push(Xbyak::Reg64(abi_save_gpr_regs[i]));
         if (mayiuse(avx512_common)) {
             mov(reg_EVEX_max_8b_offt, 2 * EVEX_max_8b_offt);
         }
@@ -261,10 +297,10 @@ public:
     }
 
     void postamble() {
-        for (size_t i = 0; i < num_abi_save_regs; ++i)
-            pop(Xbyak::Reg64(abi_save_regs[num_abi_save_regs - 1 - i]));
+        for (size_t i = 0; i < num_abi_save_gpr_regs; ++i)
+            pop(Xbyak::Reg64(abi_save_gpr_regs[num_abi_save_gpr_regs - 1 - i]));
         if (xmm_to_preserve) {
-            for (int i = 0; i < xmm_to_preserve; ++i)
+            for (size_t i = 0; i < xmm_to_preserve; ++i)
                 movdqu(Xbyak::Xmm(xmm_to_preserve_start + i), ptr[rsp + i * xmm_len]);
             add(rsp, xmm_to_preserve * xmm_len);
         }

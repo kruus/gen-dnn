@@ -28,7 +28,7 @@ file(GLOB SOURCES
     )
 include_directories( ${CMAKE_CURRENT_SOURCE_DIR} )
 # benchdnn subtests
-foreach(subdir conv ip self self/conv)
+foreach(subdir bnorm conv ip reorder self)
     file(GLOB subfiles
         ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/*.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/*.hpp
@@ -45,6 +45,14 @@ option(BENCHDNN_USE_RDPMC
     OFF) # disabled by default
 if(BENCHDNN_USE_RDPMC)
     add_definitions(-DBENCHDNN_USE_RDPMC)
+endif()
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+    if(WIN32)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Qprec-div")
+    elseif(UNIX OR APPLE)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -prec-div")
+    endif()
 endif()
 
 add_executable(benchdnn ${SOURCES})
@@ -64,10 +72,10 @@ else()
     if(UNIX AND NOT APPLE AND "${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
         # gcc-X optimization reporting ...
         # -finfo-vec- ... many things  (missed, all, note, vec, omp, inl, ...)
-        set(BENCHDNN_EXTRA "${BENCHDNN_EXTRA} -ftree-vectorizer-verbose=7 -fopt-info-all-loop-vec")
-        if(CMAKE_C_COMPILER_VERSION VERSION_GREATER "5.9.9")
-            set(BENCHDNN_EXTRA "${BENCHDNN_EXTRA} -fopt-info-all-omp")
-        endif()
+        #set(BENCHDNN_EXTRA "${BENCHDNN_EXTRA} -ftree-vectorizer-verbose=7 -fopt-info-all-loop-vec")
+        #if(CMAKE_C_COMPILER_VERSION VERSION_GREATER "5.9.9")
+        #    set(BENCHDNN_EXTRA "${BENCHDNN_EXTRA} -fopt-info-all-omp")
+        #endif()
     endif()
 endif()
 set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} ${BENCHDNN_EXTRA}")
@@ -130,6 +138,16 @@ if(WIN32)
     configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
         test_conv.vcxproj.user @ONLY)
     set_property(TARGET test_conv PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
+endif()
+add_custom_target(test_benchdnn_other
+    COMMAND benchdnn --reorder
+    DEPENDS benchdnn
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+if(WIN32)
+    configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
+        test_benchdnn_other.vcxproj.user @ONLY)
+    set_property(TARGET test_benchdnn_other PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
 endif()
 add_custom_target(test_conv_regression
     COMMAND benchdnn --conv --batch=inputs/test_conv_regression

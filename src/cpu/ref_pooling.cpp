@@ -19,6 +19,7 @@
 
 #include "c_types_map.hpp"
 #include "type_helpers.hpp"
+#include "math_utils.hpp"
 #include "nstl.hpp"
 
 #include "ref_pooling.hpp"
@@ -99,8 +100,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward() {
             }
         }
 
-        dst /= num_summands;
-        d[0] = (data_t)dst;
+        d[0] = math::out_round<data_t>((float)dst / num_summands);
     };
 
     const int MB = conf_.MB();
@@ -109,7 +109,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward() {
     const int OW = conf_.OW();
 
     if (alg == pooling_max) {
-#       pragma omp parallel for collapse(4) schedule(static)
+        OMP(parallel for collapse(4) schedule(static))//;
         for (int mb = 0; mb < MB; ++mb) {
             for (int oc = 0; oc < OC; ++oc) {
                 for (int oh = 0; oh < OH; ++oh) {
@@ -125,7 +125,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward() {
             }
         }
     } else {
-#       pragma omp parallel for collapse(4) schedule(static)
+        OMP(parallel for collapse(4) schedule(static))//;
         for (int mb = 0; mb < MB; ++mb) {
             for (int oc = 0; oc < OC; ++oc) {
                 for (int oh = 0; oh < OH; ++oh) {
@@ -210,7 +210,7 @@ void ref_pooling_bwd_t<data_type, acc_type>::execute_backward() {
     const int OW = conf_.OW();
 
     if (conf_.desc()->alg_kind == alg_kind::pooling_max) {
-#       pragma omp parallel for collapse(2) schedule(static)
+        OMP(parallel for collapse(2) schedule(static))//;
         for (int mb = 0; mb < MB; ++mb) {
             for (int oc = 0; oc < OC; ++oc) {
                 ker_zero(mb, oc);
@@ -224,7 +224,7 @@ void ref_pooling_bwd_t<data_type, acc_type>::execute_backward() {
             }
         }
     } else {
-#       pragma omp parallel for collapse(2) schedule(static)
+        OMP(parallel for collapse(2) schedule(static))//;
         for (int mb = 0; mb < MB; ++mb) {
             for (int oc = 0; oc < OC; ++oc) {
                 ker_zero(mb, oc);
@@ -253,5 +253,4 @@ template struct ref_pooling_bwd_t<data_type::s16, data_type::s32>;
 }
 }
 }
-
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

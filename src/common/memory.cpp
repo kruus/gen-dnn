@@ -109,6 +109,7 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     case OhIw16o4i:
 #endif
     case goihw:
+    case hwigo:
 #if MKLDNN_JIT_TYPES > 0
     case gOIhw8i8o:
     case gOIhw16i16o:
@@ -254,8 +255,14 @@ status_t mkldnn_concat_primitive_desc_create_v2(primitive_desc_t **concat_pd,
         output_d = &dummy_output_d;
     }
 
-    return i_mpds[0]->engine()->concat_primitive_desc_create(
-            (concat_pd_t**)concat_pd, output_d, n, concat_dim, i_mpds, attr);
+
+    auto c_pd = reinterpret_cast<concat_pd_t **>(concat_pd);
+
+    for (auto c = engine->get_concat_implementation_list(); *c; ++c) {
+        if ((*c)(c_pd, output_d, n, concat_dim, i_mpds, attr) == success)
+            return success;
+    }
+    return unimplemented;
 }
 
 status_t mkldnn_concat_primitive_desc_create(primitive_desc_t **concat_pd,
@@ -309,8 +316,13 @@ status_t mkldnn_sum_primitive_desc_create_v2(primitive_desc_t **sum_pd,
         output_d = &dummy_output_d;
     }
 
-    return i_mpds[0]->engine()->sum_primitive_desc_create(
-            (sum_pd_t**)sum_pd, output_d, n, scales, i_mpds, attr);
+    auto s_pd = reinterpret_cast<sum_pd_t **>(sum_pd);
+
+    for (auto s = engine->get_sum_implementation_list(); *s; ++s) {
+        if ((*s)(s_pd, output_d, n, scales, i_mpds, attr) == success)
+            return success;
+    }
+    return unimplemented;
 }
 
 status_t mkldnn_sum_primitive_desc_create(primitive_desc_t **sum_pd,

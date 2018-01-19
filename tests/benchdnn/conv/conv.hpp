@@ -21,9 +21,8 @@
 #include <limits.h>
 #include <assert.h>
 
-#include "mkldnn.h"
-
 #include "common.hpp"
+#include "dnn_types.hpp"
 #include "mkldnn_common.hpp"
 #include "mkldnn_memory.hpp"
 
@@ -41,40 +40,6 @@ const char *alg2str(alg_t alg);
 enum merge_t { NONE, RELU, };
 merge_t str2merge(const char *str);
 const char *merge2str(merge_t merge);
-
-struct attr_t {
-    enum round_mode_t {
-        NEAREST = (int)mkldnn_round_nearest,
-        DOWN = (int)mkldnn_round_down,
-    };
-    static round_mode_t str2rmode(const char *str);
-    static const char *rmode2str(round_mode_t rmode);
-
-    struct scale_t {
-        enum policy_t { NONE = 0, COMMON, PER_OC, POLICY_TOTAL };
-        static policy_t str2policy(const char *str);
-        static const char *policy2str(policy_t policy);
-
-        policy_t policy = NONE;
-        float scale = 1.;
-
-        int str2scale(const char *str, const char **end_s);
-        void scale2str(char *buffer, char **end_b) const;
-
-        bool is_def() const { return this->policy == NONE; }
-    };
-
-    round_mode_t irmode = round_mode_t::NEAREST;
-    scale_t oscale;
-    mkldnn_primitive_attr_t mkldnn_attr = NULL;
-
-    bool is_def() const;
-    int mkldnn_attr_recreate();
-};
-
-const size_t max_attr_len = 128;
-int str2attr(attr_t *attr, const char *str);
-void attr2str(const attr_t *attr, char *buffer);
 
 struct desc_t {
     int g, mb;
@@ -133,11 +98,12 @@ struct prb_t: public desc_t {
     prb_t(const desc_t &desc, dir_t dir, const dt_conf_t *cfg, alg_t alg,
             merge_t merge, const attr_t &attr, int mb = 0)
         : desc_t(desc), dir(dir), cfg(cfg), alg(alg), merge(merge), attr(attr)
-        , ops(0)
-    {
+        , ops(0), scales(NULL) {
         if (mb) this->mb = mb;
         count_ops();
+        generate_oscales();
     }
+    ~prb_t() { if (scales) zfree(scales); }
 
     dir_t dir;
     const dt_conf_t *cfg;
@@ -146,8 +112,14 @@ struct prb_t: public desc_t {
     attr_t attr;
 
     double ops;
+    float *scales;
 
     void count_ops();
+    void generate_oscales();
+
+private:
+    prb_t(const prb_t &) = delete;
+    prb_t &operator=(const prb_t &) = delete;
 };
 const size_t max_prb_len = max_attr_len + max_desc_len + 196;
 void prb2str(const prb_t *p, char *buffer, bool canonical = false);
@@ -220,9 +192,7 @@ inline void zero_wei( const prb_t *p, dnn_mem_t const& wei_m ){
     // weight_off_f_nog is dense in oc,ic,kh,kw so all loops collapse into one!
     memset( (float*)wei_m, 0, wei_m.size() );
 #else
-#ifndef __ve
-# pragma omp parallel for collapse(4)
-#endif
+    OMP(parallel for collapse(4))//;
     for (int ic = 0; ic < p->ic; ++ic) { // dw = 0
         for (int oc=0; oc < p->oc; ++oc) {
             for (int kh = 0; kh < p->kh; ++kh) {
@@ -335,6 +305,8 @@ inline void inv_dst_off_f(const prb_t *p, size_t off, int &mb, int &g, int &oc,
     assert(off == 0);
 }
 
+float oscale(const prb_t *p, int oc);
+
 typedef void (*conv_fwd_fn)   (const prb_t *p, dnn_mem_t &src_m,
         dnn_mem_t &wei_m, dnn_mem_t &bia_m, dnn_mem_t &dst_m);
 typedef void (*conv_bwd_d_fn) (const prb_t *p, dnn_mem_t &diff_src_m,
@@ -350,15 +322,17 @@ extern void PFX##_bwd_d (const prb_t *p, dnn_mem_t &diff_src_m, dnn_mem_t &wei_m
 extern void PFX##_bwd_w (const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &diff_wei_m, \
                          dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m);
 COMPUTE_REF_DECL( compute_ref ) /* ref_conv.cpp */
+COMPUTE_REF_DECL( compute_ref1 ) /* ref_conv_012.cpp NEW in version 0.12*/
 COMPUTE_REF_DECL( refconv_2 )   /* ref_conv2.cpp */
 COMPUTE_REF_DECL( refconv_3 )   /* ref_conv3.cpp */
 COMPUTE_REF_DECL( refconv_4 )   /* ref_conv4.cpp */
 COMPUTE_REF_DECL( refconv_5 )   /* ref_conv4.cpp */
 COMPUTE_REF_DECL( refconv_99 )   /* ref_conv99.cpp */
 #if 1 || defined(_SX)
-COMPUTE_REF_DECL( sxconv_2 )   /* sx_conv3.cpp */
+COMPUTE_REF_DECL( sxconv_2 )   /* sx_conv2.cpp */ // +post_opts
 COMPUTE_REF_DECL( sxconv_3 )   /* sx_conv3.cpp */
-COMPUTE_REF_DECL( sxconv_4 )   /* sx_conv3.cpp */
+COMPUTE_REF_DECL( sxconv_4 )   /* sx_conv4.cpp */
+COMPUTE_REF_DECL( sxconv_5 )   /* sx_conv5.cpp */ // +post_ops
 #endif
 
 typedef struct {
@@ -376,11 +350,10 @@ typedef struct {
  * \sa bench_mode.
  */
 conv_impls_t * get_ref_impls();
-size_t constexpr get_nref_impls() { return 5U; }
+size_t constexpr get_nref_impls() { return 6U; }
 
 void perf_report(const prb_t *p, const res_t *r, const char *pstr, const char *impl=nullptr);
 
-bool maybe_skip(const char *impl_str);
 int doit(const prb_t *p, res_t *res);
 int bench(int argc, char **argv, bool main_bench = true);
 

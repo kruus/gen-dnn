@@ -146,7 +146,7 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_generic() {
     const float alpha = conf_.desc()->alpha;
     const float beta = conf_.desc()->beta;
 
-#   pragma omp parallel for collapse(4) schedule(static)
+    OMP(parallel for collapse(4) schedule(static))//;
     for (int n = 0; n < MB; ++n) {
         for (int c = 0; c < C; ++c) {
             for (int h = 0; h < H; ++h) {
@@ -189,7 +189,7 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_dense() {
     src += data_d.blocking_desc().offset_padding;
     dst += data_d.blocking_desc().offset_padding;
 
-#   pragma omp parallel for schedule(static)
+    OMP(parallel for schedule(static))//;
     for (size_t e = 0; e < nelems; ++e) {
         const data_t s = src[e];
         data_t &d = dst[e];
@@ -227,7 +227,7 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_generic() {
     const float alpha = conf_.desc()->alpha;
     const float beta = conf_.desc()->beta;
 
-#   pragma omp parallel for collapse(4) schedule(static)
+    OMP(parallel for collapse(4) schedule(static))//;
     for (int n = 0; n < MB; ++n) {
         for (int c = 0; c < C; ++c) {
             for (int h = 0; h < H; ++h) {
@@ -276,7 +276,7 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_dense() {
     diff_dst += diff_data_d.blocking_desc().offset_padding;
     diff_src += diff_data_d.blocking_desc().offset_padding;
 
-#   pragma omp parallel for schedule(static)
+    OMP(parallel for schedule(static))//;
     for (size_t e = 0; e < nelems; ++e) {
         const data_t dd = diff_dst[e];
         const data_t s = src[e];
@@ -311,5 +311,4 @@ template struct ref_eltwise_bwd_t<data_type::s16>;
 }
 }
 }
-
 // vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

@@ -30,6 +30,7 @@ namespace cpu {
 namespace jit_gemm_convolution_utils {
 
     void im2col (jit_gemm_conv_conf_t &jcp, const float *im, float *col);
+    void im2col_u8(jit_gemm_conv_conf_t &jcp, const uint8_t *im, uint8_t *col);
     void col2im (jit_gemm_conv_conf_t &jcp, const float *col, float *im);
 
     void init_conf(jit_gemm_conv_conf_t &jcp,
@@ -37,8 +38,12 @@ namespace jit_gemm_convolution_utils {
         const memory_desc_wrapper &weights_d, const memory_desc_wrapper &dst_d,
         bool with_relu = false, float relu_negative_slope = -1.0);
 
-    status_t prepare_workspace(jit_gemm_conv_conf_t &jcp, float **ws,
-        bool is_bwd_filt, const size_t weights_size);
+    template <typename src_t>
+    status_t prepare_ws_col(jit_gemm_conv_conf_t &jcp, src_t **col);
+    status_t prepare_ws_wei_reduction(jit_gemm_conv_conf_t &jcp,
+            float **wei_reduction, size_t wei_sz);
+    template <typename acc_t>
+    status_t prepare_ws_acc(jit_gemm_conv_conf_t &jcp, acc_t **acc);
 
     void bwd_weights_balance(int ithr, int nthr,
         int ngroups, int mb, int &ithr_g, int &nthr_g, int &ithr_mb,

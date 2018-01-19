@@ -13,6 +13,8 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_engine.hpp"
+
 #ifndef JITFUNCS
 #ifdef DOXYGEN_SHOULD_SKIP_THIS
 /** 100: do everything. 0 makes testing VERY VERY slow */
@@ -26,7 +28,6 @@
 
 #include <assert.h>
 
-#include "cpu_engine.hpp"
 #include "cpu_memory.hpp"
 #include "type_helpers.hpp"
 
@@ -44,6 +45,7 @@
 #include "cpu/jit_sse42_convolution.hpp"
 #endif
 #include "gemm_convolution.hpp"
+#include "gemm_u8s8s32x_convolution.hpp"
 #include "ref_convolution.hpp"
 #if JITFUNCS > 99
 #include "cpu/jit_uni_eltwise.hpp"
@@ -93,6 +95,7 @@ status_t cpu_engine_t::view_primitive_desc_create(view_pd_t **view_pd,
             new cpu_view_t::pd_t(this, mpd, dims, offsets));
 }
 
+#if 0
 status_t cpu_engine_t::concat_primitive_desc_create(concat_pd_t **concat_pd,
         const memory_desc_t *output_d, int n, int concat_dim,
         const memory_pd_t **input_pds, const primitive_attr_t *attr) {
@@ -110,6 +113,7 @@ status_t cpu_engine_t::sum_primitive_desc_create(sum_pd_t **sum_pd,
     return safe_ptr_assign<sum_pd_t>(*sum_pd,
             new cpu_sum_t::pd_t(this, output_d, n, scales, i_pds, attr));
 }
+#endif
 
 using pd_create_f = mkldnn::impl::engine_t::primitive_desc_create_f;
 
@@ -125,15 +129,17 @@ static
 mkldnn::impl::status_t verbose_primitive_desc_create(
     mkldnn::impl::primitive_desc_t **pd,
     const mkldnn::impl::op_desc_t *adesc,
+    const mkldnn::impl::primitive_attr_t *attr,
     mkldnn::impl::engine_t *engine,
     const mkldnn::impl::primitive_desc_t *hint_fwd)
 {
     using namespace std;
     typedef typename prim::pd_t pd_t;
-    mkldnn::impl::status_t ret = primitive_desc_t::create<pd_t>( pd, adesc, engine, hint_fwd );
+    mkldnn::impl::status_t ret = primitive_desc_t::create<pd_t>( pd, adesc,
+            attr, engine, hint_fwd );
     if( ret == success )
         printf(" create<%s>::pd_t(pd,adesc,engine,hint_fwd) --> %d\n",
-                    (*pd)->name(), ret );
+                (*pd)->name(), ret );
     return ret;
 }
 #define INSTANCE(...) &verbose_primitive_desc_create<__VA_ARGS__>
@@ -324,4 +330,4 @@ status_t cpu_engine_t::submit(primitive_t *p, event_t *e,
 }
 }
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

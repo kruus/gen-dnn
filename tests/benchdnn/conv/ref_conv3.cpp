@@ -300,42 +300,49 @@ void refconv_3_fwd(const prb_t *p, dnn_mem_t &src_m,
   // writes go to  dst_off_f(p, mb, g, oc, oh, ow);
   // on alexnet, this got me about 15x speedup
   // regr.sh-FWD 2.42x,2.38x
-  int khb[OH], khe[OH], kwb[OW], kwe[OW];
+  int khb[OH] alignas(64);
+  int khe[OH] alignas(64);
+  int kwb[OW] alignas(64);
+  int kwe[OW] alignas(64);
+  const int ICOG = IC / G;
+  const int OCOG = OC / G;
+  const int DH   = p->dh + 1;
+  const int DW   = p->dw + 1;
   for (int oh = 0; oh < OH; ++oh) {
     // trick to easy calc of kh, kw loop limits is that division must
     // round more consistently.  'C' round-to-zero is not so useful!
-    khb[oh] = div_floor( 0  - (oh * SH - PH) + p->dh, (p->dh+1) );
-    khe[oh] = div_floor( IH - (oh * SH - PH) + p->dh, (p->dh+1) );
-    if( khb[oh] < 0     ) khb[oh] = 0;
-    if( khe[oh] > p->kh ) khe[oh] = p->kh;
+    khb[oh] = div_floor( 0  - (oh * SH - PH) + p->dh, DH );
+    khe[oh] = div_floor( IH - (oh * SH - PH) + p->dh, DH );
+    if( khb[oh] < 0  ) khb[oh] = 0;
+    if( khe[oh] > KH ) khe[oh] = KH;
   }
   for (int ow = 0; ow < OW; ++ow) {
-    kwb[ow] = div_floor( 0  - (ow * SW - PW) + p->dw, (p->dw+1) );
-    kwe[ow] = div_floor( IW - (ow * SW - PW) + p->dw, (p->dw+1) );
+    kwb[ow] = div_floor( 0  - (ow * SW - PW) + p->dw, DW );
+    kwe[ow] = div_floor( IW - (ow * SW - PW) + p->dw, DW );
     if( kwb[ow] < 0  ) kwb[ow] = 0;
     if( kwe[ow] > KW ) kwe[ow] = KW;
   }
   OMP(parallel for collapse(5))//;
   for (int g = 0; g < G; ++g) {
     for (int mb = 0; mb < MB; ++mb) {
-      for (int oc = 0; oc < OC/G; ++oc) {
+      for (int oc = 0; oc < OCOG; ++oc) {
         for (int oh = 0; oh < OH; ++oh) {
           for (int ow = 0; ow < OW; ++ow) {
             size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
             size_t bia_off = bia_off_f(p, g, oc);
             float &d = ((float*)dst_m)[dst_off];
             d = (p->dir & FLAG_BIA)? ((float*)bia_m)[bia_off] : 0.f;
-            int const kh_beg=khb[oh];
-            int const kh_end=khe[oh];
-            int const kw_beg=kwb[ow];
-            int const kw_end=kwe[ow];
-            if( kw_beg < kw_end && kh_beg < kh_end ) {
+            if( kwb[ow] < kwe[ow] && khb[oh] < khe[oh] ) {
+              int ih0 = oh * SH - PH;
+              int iw0 = ow * SW - PW;
 
-              for (int ic = 0; ic < IC/G; ++ic) {
-                for (int kh = kh_beg; kh < kh_end; ++kh) {
-                  const int ih = oh * SH - PH + kh * (p->dh + 1);
-                  for (int kw = kw_beg; kw < kw_end; ++kw) {
-                    const int iw = ow * SW - PW + kw * (p->dw + 1);
+              for (int ic = 0; ic < ICOG; ++ic) {
+                for (int kh = khb[oh]; kh < khe[oh]; ++kh) {
+                  //const int ih = oh * SH - PH + kh * DH;
+                  const int ih = ih0 + kh * DH;
+                  for (int kw = kwb[ow]; kw < kwe[ow]; ++kw) {
+                    //const int iw = ow * SW - PW + kw * DW;
+                    const int iw = iw0 + kw * DW;
                     size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
                     size_t wei_off = wei_off_f(p, g, oc, ic, kh, kw);
                     d += ((float*)src_m)[src_off] * ((float*)wei_m)[wei_off];
@@ -411,7 +418,8 @@ kh_beg = k;
  * Discovering such formulas <em>by guesswork</em> did not work out
  * well for me at all !
  */
-static void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
+//static
+void refconv_3_bwd_d_generic(const prb_t *p, dnn_mem_t &diff_src_m,
         dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m)
 {
 #if 0 // shorten, do same for kw,ow loop. tweaks to kh calc
@@ -934,11 +942,11 @@ void refconv_3_bwd_w(const prb_t *p, dnn_mem_t &src_m,
                 float &dw = ((float*)diff_wei_m)[wei_off];
                 for (int mb = 0; mb < MB; ++mb) {
                   for (int oh = oh_beg; oh < oh_end; ++oh) {
+                    const int ih = oh * SH - PH + kh * DH;
                     for (int ow = ow_beg; ow < ow_end; ++ow) {
-                      const int ih = oh * SH - PH + kh * DH;
+                      size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
                       const int iw = ow * SW - PW + kw * DW;
                       size_t src_off = src_off_f(p, mb, g, ic, ih, iw);
-                      size_t dst_off = dst_off_f(p, mb, g, oc, oh, ow);
                       dw += ((float*)diff_dst_m)[dst_off]
                         * ((float*)src_m)[src_off];
                     }

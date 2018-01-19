@@ -27,6 +27,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
 #file(GLOB API_TEST_CASES_SRC api_tests/*.cpp)
 #file(GLOB PRIM_TEST_CASES_SRC test_*.cpp)
 file(GLOB PRIM_TEST_CASES_SRC
+                              test_iface_pd_iter.cpp
                               test_iface_attr.cpp
                               test_sum.cpp
                               test_reorder.cpp
@@ -45,6 +46,8 @@ file(GLOB PRIM_TEST_CASES_SRC
                               test_convolution_format_any.cpp
                               test_convolution_forward_f32.cpp
                               test_convolution_forward_s16s16s32.cpp
+                              test_convolution_forward_u8s8s32.cpp
+                              test_convolution_forward_u8s8fp.cpp
                               test_convolution_relu_forward_f32.cpp
                               test_convolution_relu_forward_s16s16s32.cpp
                               test_convolution_backward_data_f32.cpp

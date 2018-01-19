@@ -182,6 +182,7 @@ NAMEENUM_T(memory_format){
     case(mkldnn_OhIw16o4i): ret = "memory_format:OhIw16o4i"; break;
 #endif
     case(mkldnn_goihw): ret = "memory_format:goihw"; break;
+    case(mkldnn_hwigo): ret = "memory_format:hwigo"; break;
 #if MKLDNN_JIT_TYPES > 0
     case(mkldnn_gOIhw8i8o): ret = "memory_format:gOIhw8i8o"; break;
     case(mkldnn_gOIhw16i16o): ret = "memory_format:gOIhw16i16o"; break;

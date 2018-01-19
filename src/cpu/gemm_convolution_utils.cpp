@@ -38,7 +38,7 @@ void im2col(
 
     auto im2col_1st = [&](const float *im, float *col) {
         const size_t work_amount = jcp.oh * jcp.kh;
-        #pragma omp parallel
+        OMP(omp parallel)//;
         {
             const int ithr = omp_get_thread_num();
             const int nthr = omp_get_num_threads();
@@ -72,7 +72,7 @@ void im2col(
 
     auto im2col_common = [&](const float *im, float *col) {
         const size_t work_amount = jcp.ic;
-        #pragma omp parallel
+        OMP(omp parallel)//;
         {
             const int ithr = omp_get_thread_num();
             const int nthr = omp_get_num_threads();
@@ -119,6 +119,39 @@ void im2col(
     }
 }
 
+/* col[oh][ow][kh][kw][ic] <-- im2col_u8(im[ih][iw][ic]) */
+void im2col_u8(
+    jit_gemm_conv_conf_t &jcp, const uint8_t *im, uint8_t *col) {
+    int num_thr = (jcp.mb != 1) ? omp_get_max_threads() : 1;
+    MAYBE_UNUSED(num_thr);
+    OMP(parallel for collapse(2) num_threads(num_thr))//;
+    for (int oh = 0; oh < jcp.oh; ++oh) {
+        for (int ow = 0; ow < jcp.ow; ++ow) {
+            for (int kh = 0; kh < jcp.kh; ++kh) {
+                const int ih = oh * jcp.stride_h
+                    - jcp.t_pad + kh * (1 + jcp.dilate_h);
+                if (ih < 0 || ih >= jcp.ih) continue;
+
+                for (int kw = 0; kw < jcp.kw; ++kw) {
+                    const int iw = ow * jcp.stride_w
+                        - jcp.l_pad + kw * (1 + jcp.dilate_w);
+                    if (iw < 0 || iw >= jcp.iw) continue;
+
+                    const size_t col_idx = (((oh * jcp.ow + ow) * jcp.kh + kh)
+                            * jcp.kw + kw) * jcp.ic;
+                    const size_t im_idx
+                        = (ih * jcp.iw + iw) * jcp.ngroups * jcp.ic;
+
+                    OMPSIMD()//;
+                    for (int ic = 0; ic < jcp.ic; ++ic) {
+                        col[col_idx + ic] = im[im_idx + ic];
+                    }
+                }
+            }
+        }
+    }
+}
+
 void col2im(
     jit_gemm_conv_conf_t &jcp, const float *col, float *im) {
     const size_t col_step = jcp.ks * jcp.os;
@@ -127,7 +160,7 @@ void col2im(
 
     int num_thr = (jcp.mb != 1) ? omp_get_max_threads() : 1;
     MAYBE_UNUSED(num_thr);
-#pragma omp parallel for  num_threads(num_thr)
+    OMP(parallel for  num_threads(num_thr))//;
     for (int ic = 0; ic < jcp.ic; ++ic) {
         for (int is = 0; is < iS; ++is) im[is] = 0.;
 
@@ -197,30 +230,57 @@ void init_conf(
     jcp.need_im2col = !(jcp.oh == jcp.ih && jcp.ow == jcp.iw && jcp.ks == 1);
 }
 
-status_t prepare_workspace(
-        jit_gemm_conv_conf_t &jcp, float **ws, bool is_bwd_weights,
-        const size_t weights_size) {
+template <typename src_t>
+status_t prepare_ws_col(jit_gemm_conv_conf_t &jcp, src_t **col) {
+    if (!jcp.need_im2col) {
+        *col = nullptr;
+        return status::success;
+    }
+
     const size_t nthr = omp_get_max_threads();
-    if (jcp.need_im2col) {
-        const size_t sz_per_thread = jcp.ic*jcp.ks*jcp.os;
-        jcp.im2col_size = utils::rnd_up(nthr*sz_per_thread, 16);
-    } else {
-        jcp.im2col_size = 0;
-    }
-    size_t weights_reduce_size = 0;
-    if (is_bwd_weights && jcp.mb != 1 && nthr != 1) {
-        const size_t sz_per_thread = jcp.ngroups * weights_size;
-        weights_reduce_size = nthr * sz_per_thread;
-    }
-    *ws = 0;
-    const size_t ws_size = sizeof(float)*jcp.im2col_size + weights_reduce_size;
-    if (ws_size != 0) {
-        *ws = (float*)malloc(ws_size, 64);
-        if (*ws == NULL) return status::out_of_memory;
-        for (size_t i = 0; i < jcp.im2col_size; ++i) (*ws)[i] = 0.;
-    }
+    const size_t im2col_sz_per_thr = jcp.os * jcp.ks * jcp.ic;
+    const size_t im2col_sz = nthr * im2col_sz_per_thr;
+
+    *col = (src_t *)malloc(im2col_sz * sizeof(src_t), 64);
+    if (*col == nullptr) return status::out_of_memory;
+
+    OMP(parallel for)//;
+    for (size_t i = 0; i < im2col_sz; ++i) (*col)[i] = (src_t)0;
+
     return status::success;
 }
+
+template status_t prepare_ws_col<float>(jit_gemm_conv_conf_t &jcp,
+        float **col);
+template status_t prepare_ws_col<uint8_t>(jit_gemm_conv_conf_t &jcp,
+        uint8_t **col);
+
+status_t prepare_ws_wei_reduction(jit_gemm_conv_conf_t &jcp,
+        float **wei_reduction, size_t wei_sz) {
+    const size_t nthr = omp_get_max_threads();
+    if (jcp.mb == 1 || nthr == 1)
+        return status::success;
+
+    const size_t sz_per_thr = jcp.ngroups * wei_sz; // XXX: why groups?
+    *wei_reduction = (float *)malloc(nthr * sz_per_thr, 64);
+    if (*wei_reduction == nullptr) return status::out_of_memory;
+
+    return status::success;
+}
+
+template <typename acc_t>
+status_t prepare_ws_acc(jit_gemm_conv_conf_t &jcp, acc_t **acc) {
+    const size_t nthr = omp_get_max_threads();
+    const size_t acc_sz_per_thr = jcp.os * jcp.oc;
+    const size_t acc_sz = nthr * acc_sz_per_thr;
+
+    *acc = (int32_t *)malloc(acc_sz * sizeof(acc_t), 64);
+    if (*acc == nullptr) return status::out_of_memory;
+    return status::success;
+}
+
+template status_t prepare_ws_acc<int32_t>(jit_gemm_conv_conf_t &jcp,
+        int32_t **acc);
 
 void bwd_weights_balance(int ithr, int nthr, int ngroups, int mb, int &ithr_g,
         int &nthr_g, int &ithr_mb, int &nthr_mb) {
@@ -253,3 +313,4 @@ void bwd_weights_reduction_par(int ithr, int nthr, const jit_gemm_conv_conf_t &j
 }
 }
 }
+// vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s

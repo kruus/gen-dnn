@@ -52,7 +52,8 @@ struct ref_pooling_fwd_t: public cpu_primitive_t {
                         pooling_avg_exclude_padding)
                 && utils::everyone_is(data_type, src_pd()->desc()->data_type,
                         dst_pd()->desc()->data_type)
-                && desc()->accum_data_type == acc_type;
+                && desc()->accum_data_type == acc_type
+                && attr()->has_default_values();
             if (!ok) return status::unimplemented;
 
             bool is_training = desc_.prop_kind == forward_training;
@@ -108,7 +109,8 @@ struct ref_pooling_bwd_t: public cpu_primitive_t {
                 && utils::implication(desc()->alg_kind == pooling_max,
                         hint_fwd_pd_ && hint_fwd_pd_->workspace_pd()
                         && hint_fwd_pd_->workspace_pd()->engine()->kind()
-                                == engine_kind::cpu);
+                                == engine_kind::cpu)
+                && attr()->has_default_values();
             if (!ok) return status::unimplemented;
 
             if (desc()->alg_kind == pooling_max)

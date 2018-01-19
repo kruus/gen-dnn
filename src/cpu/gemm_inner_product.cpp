@@ -99,7 +99,7 @@ void gemm_inner_product_fwd_t<data_type>::execute_forward() {
     cblas_gemm<data_type>(CblasColMajor, CblasTrans, CblasNoTrans, OC, MB, IC,
             1.0, weights, IC, src, IC, 0.0, dst, OC);
     if (bias)
-#       pragma omp parallel for schedule(static)
+        OMP(parallel for schedule(static))//;
         for (cblas_int mb = 0; mb < MB; mb++)
             cblas_axpy<data_type>(OC, 1.0, bias, 1, dst + dst_d.blk_off(mb), 1);
 #endif
@@ -148,7 +148,7 @@ void gemm_inner_product_bwd_weights_t<data_type>::execute_backward_weights() {
         constexpr int blksize = 8;
         cblas_int OC_blocks = OC / blksize;
         int rem_OC = OC % blksize;
-#       pragma omp parallel
+        OMP(parallel)//;
         {
             const int ithr = omp_get_thread_num();
             const int nthr = omp_get_num_threads();
@@ -157,13 +157,13 @@ void gemm_inner_product_bwd_weights_t<data_type>::execute_backward_weights() {
             oc_st = oc_st * blksize;
             oc_e = oc_e * blksize;
 
-#           pragma omp simd
+            OMPSIMD()//;
             for (cblas_int oc = oc_st; oc < oc_e; ++oc) {
                 diff_bias[oc] = diff_dst[oc];
             }
 
             for (cblas_int mb = 1; mb < MB; ++mb) {
-#               pragma omp simd
+                OMPSIMD()//;
                 for (cblas_int oc = oc_st; oc < oc_e; ++oc) {
                     diff_bias[oc] += diff_dst[mb * OC + oc];
                 }
@@ -190,5 +190,4 @@ template struct gemm_inner_product_bwd_weights_t<data_type::f32>;
 }
 }
 }
-
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

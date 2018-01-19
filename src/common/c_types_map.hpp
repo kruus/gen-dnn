@@ -130,6 +130,7 @@ namespace memory_format {
     const memory_format_t OhIw16o4i = mkldnn_OhIw16o4i;
 #endif
     const memory_format_t goihw = mkldnn_goihw;
+    const memory_format_t hwigo = mkldnn_hwigo;
 #if MKLDNN_JIT_TYPES > 0
     const memory_format_t gOIhw8i8o = mkldnn_gOIhw8i8o;
     const memory_format_t gOIhw16i16o = mkldnn_gOIhw16i16o;
@@ -270,6 +271,7 @@ using engine_t = mkldnn_engine;
 using primitive_desc_iterator_t = mkldnn_primitive_desc_iterator;
 using primitive_desc_t = mkldnn_primitive_desc;
 using primitive_attr_t = mkldnn_primitive_attr;
+using post_ops_t = mkldnn_post_ops;
 using primitive_t = mkldnn_primitive;
 using primitive_at_t = mkldnn_primitive_at_t;
 

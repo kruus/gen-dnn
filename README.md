@@ -72,7 +72,7 @@ This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
 
 ## Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)
 [![Apache License Version 2.0](https://img.shields.io/badge/license-Apache_2.0-green.svg)](LICENSE)
-![v0.11 beta](https://img.shields.io/badge/v0.11-beta-orange.svg)
+![v0.12 beta](https://img.shields.io/badge/v0.12-beta-orange.svg)
 
 Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN) is an
 open source performance library for Deep Learning (DL) applications intended
@@ -82,16 +82,17 @@ convolutional neural networks (CNN) with C and C++ interfaces. We created this
 project to enable the DL community to innovate on Intel(R) processors.
 
 Intel MKL-DNN includes functionality similar to [Intel(R) Math Kernel
-Library (Intel(R) MKL) 2017](https://software.intel.com/en-us/intel-mkl), but is not
-API compatible. We are investigating how to unify the APIs in future Intel MKL releases.
+Library (Intel(R) MKL) 2017](https://software.intel.com/en-us/intel-mkl), 
+but is not API compatible. We are investigating how to unify the APIs in 
+future Intel MKL releases.
 
 This release contains a range of performance critical functions used in modern
-image recognition topologies including Cifar\*, AlexNet\*, VGG\*, 
-GoogleNet\* and ResNet\* optimized for wide range of Intel processors.
+image recognition (AlexNet, VGG, GoogleNet\*, ResNet), semantic
+segmentation (FCNs, SegNet), and object detection topologies (SSD,
+Fast/Faster R-CNN) optimized for wide range of Intel processors.
 
-Functionality related to integer data types `s16s16s32` and `u8s8u8` included
-in this release is experimental and might change without prior notification in
-future releases.
+**WARNING** Functionality related to `s16` data type is experimental 
+and might change without prior notification in future releases.
 
 ## License
 Intel MKL-DNN is licensed under
@@ -105,9 +106,8 @@ explained in the tutorial
 * [Intel MKL-DNN: Part 2--Code Build and Walkthrough](https://software.intel.com/en-us/articles/intel-mkl-dnn-part-2-sample-code-build-and-walkthrough)
 
 ## Support
-Please report issues and suggestions via
-[GitHub issues](https://github.com/01org/mkl-dnn/issues) or start a topic on
-[Intel MKL forum](https://software.intel.com/en-us/forums/intel-math-kernel-library).
+Please submit your questions, feature requests and bug reports on
+[GitHub issues](https://github.com/01org/mkl-dnn/issues) page.
 
 ## How to Contribute
 We welcome community contributions to Intel MKL-DNN. If you have an idea how to improve the library:
@@ -123,17 +123,19 @@ We welcome community contributions to Intel MKL-DNN. If you have an idea how to 
 
 We will review your contribution and, if any additional fixes or modifications
 are necessary, may provide feedback to guide you. When accepted, your pull
-request will be merged into our internal and GitHub repositories.
+request will be merged the repository.
 
 ## System Requirements
-Intel MKL-DNN supports Intel(R) 64 architecture processors and is optimized for
+Intel MKL-DNN supports Intel(R) 64 architecture and compatible architectures.
+The library is optimized for the systems based on
 * Intel Atom(R) processor with Intel(R) SSE4.1 support
 * 4th, 5th, 6th and 7th generation Intel(R) Core processor
-* Intel(R) Xeon(R) processor E5 v3 family (code named Haswell)
-* Intel(R) Xeon(R) processor E5 v4 family (code named Broadwell)
-* Intel(R) Xeon(R) Platinum processor family (code name Skylake)
-* Intel(R) Xeon Phi(TM) product family x200 (code named Knights Landing)
-* Future Intel(R) Xeon Phi(TM) processor (code named Knights Mill)
+* Intel(R) Xeon(R) processor E5 v3 family (formerly Haswell)
+* Intel Xeon processor E5 v4 family (formerly Broadwell)
+* Intel Xeon Platinum processor family (formerly Skylake)
+* Intel(R) Xeon Phi(TM) processor x200 product family (formerly Knights Landing)
+* Intel Xeon Phi processor x205 product family (formerly Knights Mill)
+and compatible processors.
 
 The software dependencies are:
 * [Cmake](https://cmake.org/download/) 2.8.0 or later
@@ -141,19 +143,15 @@ The software dependencies are:
 * C++ compiler with C++11 standard support
 
 The software was validated on RedHat\* Enterprise Linux 7 with
-* GNU\* Compiler Collection 4.8
-* GNU Compiler Collection 6.1
-* GNU Compiler Collection 7.2
+* GNU\* Compiler Collection 4.8, 5.2, 6.1 and 7.2
 * Clang\* 3.8.0
 * [Intel(R) C/C++ Compiler](https://software.intel.com/en-us/intel-parallel-studio-xe)
-  17.0
-* [Intel C/C++ Compiler](https://software.intel.com/en-us/intel-parallel-studio-xe)
-  18.0
+  17.0 and 18.0
 
 on Windows Server\* 2012 R2 with
 * Microsoft\* Visual C++ 14.0 (Visual Studio 2015)
 * [Intel(R) C/C++ Compiler](https://software.intel.com/en-us/intel-parallel-studio-xe)
-  17.0
+  17.0 and 18.0
 
 on macOS\* 10.13 (High Sierra) with
 * Apple LLVM version 9.0.0 (XCode 9.0.0)
@@ -172,7 +170,7 @@ or clone the repository to your system
 ```
 
 Ensure that all software dependencies are in place and have at least minimal
-supported version. 
+supported version.
 
 Intel MKL-DNN can take advantage of optimized
 matrix-matrix multiplication (GEMM) function from Intel MKL. The dynamic
@@ -242,17 +240,18 @@ undefined behavior resulting in incorrect results or crashes.
 
 Intel MKL-DNN library built with binary dependency will link against Intel OpenMP
 runtime included with Intel MKL small libraries package. Intel OpenMP runtime
-is binary compatible with GNU OpenMP and CLANG OpenMP runtimes and should
-be used in the final application. Here are example linklines for GNU C++ compiler
-and Intel C++ compiler.
+is binary compatible with GNU OpenMP and CLANG OpenMP runtimes and is 
+recommended for the best performance results. Here are example linklines for 
+GNU C++ compiler and Intel C++ compiler.
 ```
-	g++ -std=c++11 -fopenmp -Wl,--as-needed -I${MKLDNNROOT}/include -L${MKLDNNROOT}/lib simple_net.cpp -lmkldnn -lmklml_intel -liomp5
+	g++ -std=c++11 -I${MKLDNNROOT}/include -L${MKLDNNROOT}/lib simple_net.cpp -lmkldnn -lmklml_intel -liomp5
 ```
 ```
 	icpc -std=c++11 -qopenmp -I${MKLDNNROOT}/include -L${MKLDNNROOT}/lib simple_net.cpp -lmkldnn -lmklml_intel
 ```
-In `g++` example option `-Wl,--as-needed` forces linker to resolve OpenMP symbols
-in Intel OpenMP runtime library.
+Using GNU compiler with `-fopenmp` and `-liomp5` options will link the 
+application with both Intel and GNU OpenMP runtime libraries. This will lead
+to undefined behavior of the application.
 
 Intel MKL-DNN library built standalone will use OpenMP runtime supplied by
 the compiler, so as long as both the library and the application use the

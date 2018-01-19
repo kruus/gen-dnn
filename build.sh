@@ -1,13 +1,6 @@
 #!/bin/bash
-# vim: et ts=4 sw=4
+# vim: et ts=4 sw=4 ai
 ORIGINAL_CMD="$0 $*"
-if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
-    DOTARGET="s" # s for SX (C/C++ code, cross-compile)
-elif [ -d src/vanilla ]; then
-    DOTARGET="v" # v for vanilla (C/C++ code)
-else
-    DOTARGET="j" # j for JIT (Intel assembler)
-fi
 DOTEST=0
 DODEBUG="n"
 DODOC="y"
@@ -22,6 +15,17 @@ USE_CBLAS=1
 QUICK=0
 DOGCC_VER=0
 NEC_FTRACE=0
+if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
+    DOTARGET="s" # s for SX (C/C++ code, cross-compile)
+elif [ "${CC}" == "ncc" -a "${CXX}" == "nc++" ]; then
+    echo "auto-detected '-a' Aurora compiler (ncc, nc++)"
+    DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
+    if [ `uname -n` = "zoro" ]; then JOBS="-j8"; else JOBS="-j1"; fi
+elif [ -d src/vanilla ]; then
+    DOTARGET="v" # v for vanilla (C/C++ code)
+else
+    DOTARGET="j" # j for JIT (Intel assembler)
+fi
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -35,9 +39,10 @@ usage() {
     echo "     see what cmake is doing, and create build.log"
     echo "         CMAKEOPT='--trace -LAH' ./build.sh -q >&/dev/null"
     echo "Debug: Individual tests can be run like build-sx/tests/gtests/test_relu"
+    echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
 }
-while getopts ":hatvjdDqQpsSTwWbF567" arg; do
+while getopts ":hatvjdDqQpsSTwWbF1567" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
@@ -69,7 +74,7 @@ while getopts ":hatvjdDqQpsSTwWbF567" arg; do
         D) # [no] Doxygen-only : build documentation and then stop
             DOJUSTDOC="y"
             ;;
-        q) # quick: once, skip doxygen on OK build; twice, rebuild existing
+        q) # quick: once, skip doxygen on OK build; twice, cd BUILDDIR && make
             QUICK=$((QUICK+1))
             ;;
         Q) # really quick: skip build and doxygen docs [JUST run cmake and stop]
@@ -99,6 +104,9 @@ while getopts ":hatvjdDqQpsSTwWbF567" arg; do
             ;;
         T) # cmake --trace
             CMAKETRACE="--trace"
+            ;;
+        1) # make -j1
+            JOBS="-j1"
             ;;
         5) # gcc-5, if found
             DOGCC_VER=5
@@ -251,6 +259,10 @@ fi
         mkdir "${BUILDDIR}"
     fi
     cd "${BUILDDIR}"
+    # iterator debug code ?
+    #export CFLAGS="${CFLAGS} -DVERBOSE_PRIMITIVE_CREATE=1"
+    #export CXXFLAGS="${CXXFLAGS} -DVERBOSE_PRIMITIVE_CREATE=1"
+
     #
     # CMAKEOPT="" # allow user to pass flag, ex. CMAKEOPT='--trace -LAH' ./build.sh
     CMAKEOPT="${CMAKEOPT} -DCMAKE_CCXX_FLAGS=-DJITFUNCS=${DOJIT}"
@@ -332,6 +344,8 @@ fi
     if [ "$DONEEDMKL" == "y" ]; then
         CMAKEOPT="${CMAKEOPT} -DFAIL_WITHOUT_MKL=ON"
     fi
+    #echo "DONEEDMKL = ${DONEEDMKL}"
+    #echo "CMAKEOPT  = ${CMAKEOPT}"
     # Remove leading whitespace from CMAKEENV (bash magic)
     shopt -s extglob; CMAKEENV=\""${CMAKEENV##*([[:space:]])}"\"; shopt -u extglob
     # Without MKL, unit tests take **forever**
@@ -407,19 +421,20 @@ fi
     set +x
 ) 2>&1 | tee "${BUILDDIR}".log
 ls -l "${BUILDDIR}"
-BUILDOK="n"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="y"; fi
+BUILDOK="n"; sync "${BUILDDIR}/stamp-BUILDOK"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="y"; fi
 
 set +x
 # after cmake we might have a better idea about ve_exec (esp. if PATH is not set properly)
 if [ -f "${BUILDDIR}/bash_help.inc" ]; then
     # snarf some CMAKE variables
     source "${BUILDDIR}/bash_help.inc"
-    if [ "${CMAKE_CROSSCOMPILING_EMULATOR}" ]; then VE_EXEC="${CMAKE_CROSSCOMPILING_EMULATOR}"; fi
-    if [ ! -x "${VE_EXEC}" ]; then
-        TESTRUNNER="echo Not-Running "
-        echo "cmake crosscompiling emulator, such as ve_exec, not available?"
-    else
-        TESTRUNNER=''
+    TESTRUNNER=''
+    if [ "${CMAKE_CROSSCOMPILING_EMULATOR}" ]; then
+        VE_EXEC="${CMAKE_CROSSCOMPILING_EMULATOR}"
+        if [ ! -x "${VE_EXEC}" ]; then
+            TESTRUNNER="echo Not-Running "
+            echo "cmake crosscompiling emulator, such as ve_exec, not available?"
+        fi
     fi
 fi
 set -x
@@ -431,6 +446,7 @@ echo "INSTALLDIR ${INSTALLDIR}"
 echo "DOTARGET=${DOTARGET}, DOJIT=${DOJIT}, DODEBUG=${DODEBUG}, DOTEST=${DOTEST}, DODOC=${DODOC}, DONEEDMKL=${DONEEDMKL}"
 LOGDIR="log-${DOTARGET}${DOJIT}${DODEBUG}${DOTEST}${DODOC}${DONEEDMKL}"
 if [ "$BUILDOK" == "y" ]; then
+    set -x
     echo "BUILDOK !    QUICK=$QUICK"
     if [ $QUICK -lt 2 ]; then # make install ?
         (
@@ -462,6 +478,7 @@ if [ "$BUILDOK" == "y" ]; then
     if [ ! $DOTEST -eq 0 -a "$DOTARGET" == "s" ]; then
         echo 'SX testing should be done manually (ex. ~/tosx script to log in to SX)'
     fi
+    set +x
 else
     echo "Build NOT OK..."
 fi
@@ -478,7 +495,7 @@ if [ "${BUILDOK}" == "y" ]; then
         if [ -d "${LOGDIR}" ]; then rm -rf "${LOGDIR}.bak"; mv -v "${LOGDIR}" "${LOGDIR}.bak"; fi
         mkdir ${LOGDIR}
         pwd -P
-        ls "${BUILDDIR}/*log"
+        ls "${BUILDDIR}/"*log
         for f in "${BUILDDIR}/"*log doxygen.log; do
             cp -av "${f}" "${LOGDIR}/" || true
         done

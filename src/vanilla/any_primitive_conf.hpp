@@ -26,10 +26,11 @@ namespace impl {
 namespace cpu {
 
 /* convolution */
-//enum conv_version_t {ver_unused, ver_fma, ver_4fma, ver_4vnni};
+//enum conv_version_t {ver_unused, ver_fma, ver_avx512_core, ver_4fma, ver_4vnni};
 //enum conv_loop_order_t {loop_cgn, loop_gnc, loop_ngc};
 //enum conv_1x1_loop_order_t {loop_rbl, loop_rlb, loop_lbr, loop_lrb, loop_blr,
 //                            loop_brl};
+//enum conv_kernel_kind_t {embd_bcast, expl_bcast};
 //
 //enum {
 //    FLAG_MB_FIRST = 1 << 0, FLAG_MB_LAST = 1 << 1,
@@ -65,6 +66,8 @@ struct any_conv_conf_t {
     int ur_h, ur_w;
     int ur_w_tail;
     bool is_1stconv;
+    // /* fma avx512_core */
+    // conv_kernel_kind_t kernel_kind;
     // /* 4fma */
     // int tr_iw;
     // int tr_src_num_guard_elems;
@@ -72,8 +75,8 @@ struct any_conv_conf_t {
     // int tr_ld;
     // int kh_step;
     // /* 4vnni */
-    // size_t typesize_in;
-    // size_t typesize_out;
+    // int typesize_in;
+    // int typesize_out;
     // /* avx512_u8s8u8 */
     // int ic_nb1, ic_nb2;
     // int oc_nb1;
@@ -81,16 +84,56 @@ struct any_conv_conf_t {
     // int ur_ow_nsteps;
     // data_type_t bia_dt;
     // data_type_t dst_dt;
+    // /* avx512: max possible value is nregs(32) - aux_regs(4) */
+    // int src_offsets[28];
+    // int src_count;
+    // bool expl_bcast;
+    // bool large_spatial;
 };
 
 /** \todo is there even a vanilla winograd ? */
+/*
+   Winograd sched policy:
+
+   Computation Unit:
+   W: weights transform
+   S: src transform
+   D: dst transform
+   G: gemm
+
+   Thread grouping by:
+   i: nb_ic
+   o: nb_oc
+   t: tile_block
+   e: element in tile
+
+   Note: 'i' and 'o' are omited if
+   i. not comblined with t or
+   ii. with discrete transforms
+
+   Current policies supported:
+*/
+enum winograd_sched_t {
+    WSCHED_INVALID = 0,
+
+    /* Forward & backward-data */
+    /* W_S_G_D implements discrete transforms */
+    WSCHED_DATA_W_S_G_D,
+    /* W_SGD implements tiled transforms s.t. GEMM could reuse data in L2*/
+    WSCHED_DATA_W_SGD,
+
+    /* Backward-weights */
+    WSCHED_WEI_S_D_G_W,
+    WSCHED_WEI_S_D_Giot_W,
+    WSCHED_WEI_SDGtWo,
+    WSCHED_WEI_SDGt_W,
+};
+
 struct any_conv_winograd_conf_t : public any_conv_conf_t {
-    //Winograd specific attributes
     //alpha determines the tile size
     static const int alpha = 6;
-    int itiles; //number of tiles in x dimension
-    int jtiles; //number of tiles in y dimension
-    // which of the following would be needed?
+    int itiles;
+    int jtiles;
     int ntiles;
     int ic_simd_block;
     int tile_4fma_padding;
@@ -119,6 +162,8 @@ struct any_conv_winograd_conf_t : public any_conv_conf_t {
     int dimN_reg_block;
     int dimN_block;
     int dimN_nb_block;
+
+    winograd_sched_t sched_policy;
 };
 
 /* needed for any??? */
@@ -137,7 +182,7 @@ struct any_conv_winograd_conf_t : public any_conv_conf_t {
 //    size_t channel;
 //    size_t channel_prf;
 //    size_t oc_blocks;
-//    int ic_flag;
+//    int flags;
 //};
 
 struct any_1x1_conv_conf_t {
@@ -202,7 +247,7 @@ struct any_gemm_conv_conf_t {
     int is, os, ks;
     int ic_block, oc_block;
     bool need_im2col;
-    size_t im2col_size;
+    //size_t im2col_size;
 };
 
 //struct any_1x1_conv_call_s {

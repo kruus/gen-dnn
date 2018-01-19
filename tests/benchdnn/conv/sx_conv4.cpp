@@ -23,10 +23,6 @@
 #include "conv/conv.hpp"
 #include "idiv.hpp"
 
-#ifdef __ve
-#define alignas(x) alignas((x) > 16 ? 16 : (x))
-#endif
-
 namespace conv {
 
 // BWD + dilate is not fast for these loops (and mkl-dnn doesn't allow it yet)
@@ -396,7 +392,7 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
   float       * restrict const pdst = (float*)dst_m;
   OMP(parallel)//;
   {
-    ssize_t alignas(4*sizeof(ssize_t)) khkw_begend[4];
+    ssize_t khkw_begend[4] alignas(4*sizeof(ssize_t));
     ssize_t kh_beg=0, kh_end=0;
     ssize_t kw_beg=0, kw_end=0;
 #ifdef __ve
@@ -404,7 +400,7 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
 #else
         VREG(khkw_begend)
 #endif
-    ssize_t alignas(4*sizeof(ssize_t)) khkw_muls[4] = {1, KH, (1<<16), (1<<16)*KW};
+    ssize_t khkw_muls[4] alignas(4*sizeof(ssize_t)) = {1, KH, (1<<16), (1<<16)*KW};
 #ifdef __ve
     VREG(khkw_muls)
 #else
@@ -476,7 +472,7 @@ void sxconv_4_fwd(const prb_t *p, dnn_mem_t &src_m,
             if (khash != khash_prv){
               khash_prv = khash;
               ShortLoop() for (ssize_t kh = 0; kh < KH; ++kh) {
-                ShortLoop() for (ssize_t kw = 0; kw < KH; ++kw) {
+                ShortLoop() for (ssize_t kw = 0; kw < KW; ++kw) {
                   kok[kh][kw] = (kh>=kh_beg && kw>=kw_beg) && (kh<kh_end && kw<kw_end);
                 }
               }

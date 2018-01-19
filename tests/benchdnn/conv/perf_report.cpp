@@ -139,7 +139,7 @@ void perf_report(const prb_t *p, const res_t *r, const char *pstr, const char *i
     assert(rem_len >= 0);
 
 #   undef DPRINT
-    print(0, "%s\n", buffer);
+    print(0, "%s", buffer);
 }
 
 }

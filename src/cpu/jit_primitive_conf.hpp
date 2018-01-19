@@ -24,10 +24,11 @@ namespace impl {
 namespace cpu {
 
 /* convolution */
-enum conv_version_t {ver_unused, ver_fma, ver_4fma, ver_4vnni};
+enum conv_version_t {ver_unused, ver_fma, ver_avx512_core, ver_4fma, ver_4vnni};
 enum conv_loop_order_t {loop_cgn, loop_gnc, loop_ngc};
 enum conv_1x1_loop_order_t {loop_rbl, loop_rlb, loop_lbr, loop_lrb, loop_blr,
                             loop_brl};
+enum conv_kernel_kind_t {embd_bcast, expl_bcast};
 
 enum {
     FLAG_MB_FIRST = 1 << 0, FLAG_MB_LAST = 1 << 1,
@@ -53,6 +54,7 @@ struct jit_conv_conf_t {
     memory_format_t src_fmt;
     bool with_bias, with_relu;
     float relu_negative_slope;
+    bool with_sum;
 
     int ihp, iwp, ohp, owp;
     int nb_ic, ic_block;
@@ -64,6 +66,8 @@ struct jit_conv_conf_t {
     int ur_h, ur_w;
     int ur_w_tail;
     bool is_1stconv;
+    /* fma avx512_core */
+    conv_kernel_kind_t kernel_kind;
     /* 4fma */
     int tr_iw;
     int tr_src_num_guard_elems;
@@ -80,9 +84,49 @@ struct jit_conv_conf_t {
     int ur_ow_nsteps;
     data_type_t bia_dt;
     data_type_t dst_dt;
-    round_mode_t rmode;
+    /* avx512: max possible value is nregs(32) - aux_regs(4) */
+    int src_offsets[28];
+    int src_count;
+    bool expl_bcast;
+    bool large_spatial;
 };
 
+/*
+   Winograd sched policy:
+
+   Computation Unit:
+   W: weights transform
+   S: src transform
+   D: dst transform
+   G: gemm
+
+   Thread grouping by:
+   i: nb_ic
+   o: nb_oc
+   t: tile_block
+   e: element in tile
+
+   Note: 'i' and 'o' are omited if
+   i. not comblined with t or
+   ii. with discrete transforms
+
+   Current policies supported:
+*/
+enum winograd_sched_t {
+    WSCHED_INVALID = 0,
+
+    /* Forward & backward-data */
+    /* W_S_G_D implements discrete transforms */
+    WSCHED_DATA_W_S_G_D,
+    /* W_SGD implements tiled transforms s.t. GEMM could reuse data in L2*/
+    WSCHED_DATA_W_SGD,
+
+    /* Backward-weights */
+    WSCHED_WEI_S_D_G_W,
+    WSCHED_WEI_S_D_Giot_W,
+    WSCHED_WEI_SDGtWo,
+    WSCHED_WEI_SDGt_W,
+};
 
 struct jit_conv_winograd_conf_t : public jit_conv_conf_t {
     //alpha determines the tile size
@@ -117,6 +161,8 @@ struct jit_conv_winograd_conf_t : public jit_conv_conf_t {
     int dimN_reg_block;
     int dimN_block;
     int dimN_nb_block;
+
+    winograd_sched_t sched_policy;
 };
 
 struct jit_conv_call_s {
@@ -150,6 +196,7 @@ struct jit_1x1_conv_conf_t {
     memory_format_t src_fmt;
     bool with_bias, with_relu;
     float relu_negative_slope;
+    bool with_sum;
 
     int is, os;
     int ic_block, oc_block;
@@ -171,6 +218,8 @@ struct jit_1x1_conv_conf_t {
     int load_grp_count;
     conv_1x1_loop_order_t loop_order;
     bool use_vmovntps;
+    /* avx512 core */
+    bool expl_bcast;
     /* 4vnni */
     int typesize_in;
     int typesize_out;
@@ -178,7 +227,7 @@ struct jit_1x1_conv_conf_t {
     /* 4fma */
     bool transpose_src;
     int tr_is;
-    int nthr_, nthr_mb_, nthr_g_, nthr_oc_b_, nthr_ic_b_;
+    int nthr, nthr_mb, nthr_g, nthr_oc_b, nthr_ic_b;
 };
 
 struct jit_gemm_conv_conf_t {
@@ -198,7 +247,6 @@ struct jit_gemm_conv_conf_t {
     int is, os, ks;
     int ic_block, oc_block;
     bool need_im2col;
-    size_t im2col_size;
 };
 
 struct jit_1x1_conv_call_s {

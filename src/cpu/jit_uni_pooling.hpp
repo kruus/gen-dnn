@@ -59,7 +59,8 @@ struct jit_uni_pooling_fwd_t: public cpu_primitive_t {
                 && everyone_is(data_type::f32, src_pd()->desc()->data_type,
                         dst_pd()->desc()->data_type)
                 && everyone_is(desired_fmt, src_pd()->desc()->format,
-                        dst_pd()->desc()->format);
+                        dst_pd()->desc()->format)
+                && attr()->has_default_values();
             if (!ok) return status::unimplemented;
 
             bool is_training = desc_.prop_kind == forward_training;
@@ -140,7 +141,8 @@ struct jit_uni_pooling_bwd_t: public cpu_primitive_t {
                 && utils::implication(desc()->alg_kind == pooling_max,
                         hint_fwd_pd_ && hint_fwd_pd_->workspace_pd()
                         && hint_fwd_pd_->workspace_pd()->desc()->format
-                                == desired_fmt);
+                                == desired_fmt)
+                && attr()->has_default_values();
             if (!ok) return status::unimplemented;
 
             if (desc()->alg_kind == pooling_max)

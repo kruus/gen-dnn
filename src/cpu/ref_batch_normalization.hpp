@@ -47,7 +47,8 @@ struct ref_batch_normalization_fwd_t: public cpu_primitive_t {
                 && utils::one_of(desc()->prop_kind, forward_training,
                         forward_inference)
                 && utils::everyone_is(data_type, desc()->data_desc.data_type,
-                        desc()->data_scaleshift_desc.data_type);
+                        desc()->data_scaleshift_desc.data_type)
+                && (attr()->has_default_values() || this->with_relu_post_op());
             if (!ok) return status::unimplemented;
 
             if (stats_is_src() || is_training()) {
@@ -97,7 +98,8 @@ struct ref_batch_normalization_bwd_t: public cpu_primitive_t {
                 && utils::everyone_is(data_type, desc()->data_desc.data_type,
                         desc()->diff_data_desc.data_type,
                         desc()->data_desc.data_type,
-                        desc()->data_scaleshift_desc.data_type);
+                        desc()->data_scaleshift_desc.data_type)
+                && attr()->has_default_values();
             if (!ok) return status::unimplemented;
 
 

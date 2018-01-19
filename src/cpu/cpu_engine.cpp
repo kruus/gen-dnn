@@ -43,6 +43,7 @@
 #include "cpu/jit_avx512_core_u8s8s32x_convolution.hpp"
 #include "cpu/jit_sse42_convolution.hpp"
 #include "cpu/gemm_convolution.hpp"
+#include "cpu/gemm_u8s8s32x_convolution.hpp"
 #include "cpu/ref_convolution.hpp"
 #include "cpu/jit_uni_eltwise.hpp"
 #include "cpu/ref_eltwise.hpp"
@@ -82,30 +83,38 @@ status_t cpu_engine_t::view_primitive_desc_create(view_pd_t **view_pd,
             new cpu_view_t::pd_t(this, mpd, dims, offsets));
 }
 
-status_t cpu_engine_t::concat_primitive_desc_create(concat_pd_t **concat_pd,
-        const memory_desc_t *output_d, int n, int concat_dim,
-        const memory_pd_t **input_pds, const primitive_attr_t *attr) {
-    assert(input_pds[0]->engine() == this);
-    auto i_pds = (const cpu_memory_t::pd_t **)input_pds;
-    return safe_ptr_assign<concat_pd_t>(*concat_pd,
-            new cpu_concat_t::pd_t(this, output_d, n, concat_dim, i_pds, attr));
-}
-
-status_t cpu_engine_t::sum_primitive_desc_create(sum_pd_t **sum_pd,
-        const memory_desc_t *output_d, int n, const float *scales,
-        const memory_pd_t **input_pds, const primitive_attr_t *attr) {
-    assert(input_pds[0]->engine() == this);
-    auto i_pds = (const cpu_memory_t::pd_t **)input_pds;
-    return safe_ptr_assign<sum_pd_t>(*sum_pd,
-            new cpu_sum_t::pd_t(this, output_d, n, scales, i_pds, attr));
-}
-
 using pd_create_f = mkldnn::impl::engine_t::primitive_desc_create_f;
 
 namespace {
 using namespace mkldnn::impl::data_type;
 
+#if VERBOSE_PRIMITIVE_CREATE
+/** A verbose version of primitive_desc_t::create<pd_t>. \sa primitive_desc.hpp */
+template<typename prim>
+#if !defined(_SX)
+static
+#endif
+mkldnn::impl::status_t verbose_primitive_desc_create(
+    mkldnn::impl::primitive_desc_t **pd,
+    const mkldnn::impl::op_desc_t *adesc,
+    const mkldnn::impl::primitive_attr_t *attr,
+    mkldnn::impl::engine_t *engine,
+    const mkldnn::impl::primitive_desc_t *hint_fwd)
+{
+    using namespace std;
+    typedef typename prim::pd_t pd_t;
+    mkldnn::impl::status_t ret = primitive_desc_t::create<pd_t>( pd, adesc,
+            attr, engine, hint_fwd );
+    if( ret == success )
+        printf(" create<%s>::pd_t(pd,adesc,engine,hint_fwd) --> %d\n",
+                (*pd)->name(), ret );
+    return ret;
+}
+#define INSTANCE(...) &verbose_primitive_desc_create<__VA_ARGS__>
+#else // original
 #define INSTANCE(...) &primitive_desc_t::create<__VA_ARGS__::pd_t>
+#endif
+
 static const pd_create_f cpu_impl_list[] = {
     /* conv */
 #if JITFUNCS > 99
@@ -153,6 +162,10 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, u8>),
     INSTANCE(jit_avx512_common_convolution_bwd_data_t<s16, s16, s32>),
 #endif
+    INSTANCE(_gemm_u8s8s32x_convolution_fwd_t<false, s32>),
+    INSTANCE(_gemm_u8s8s32x_convolution_fwd_t<false, u8>),
+    INSTANCE(_gemm_u8s8s32x_convolution_fwd_t<false, s8>),
+    INSTANCE(_gemm_u8s8s32x_convolution_fwd_t<false, f32>),
     INSTANCE(ref_convolution_fwd_t<s16,s16, s32, s32>),
     INSTANCE(ref_convolution_fwd_t<u8, s8, s32, s32>),
     INSTANCE(ref_convolution_fwd_t<u8, s8, s8, s32>),
@@ -267,6 +280,10 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, u8>),
     INSTANCE(jit_avx512_common_convolution_relu_t<s16, s16, s32>),
 #endif
+    INSTANCE(_gemm_u8s8s32x_convolution_fwd_t<true, s32>),
+    INSTANCE(_gemm_u8s8s32x_convolution_fwd_t<true, u8>),
+    INSTANCE(_gemm_u8s8s32x_convolution_fwd_t<true, s8>),
+    INSTANCE(_gemm_u8s8s32x_convolution_fwd_t<true, f32>),
     INSTANCE(ref_convolution_relu_t<s16, s16, s32, s32>),
     INSTANCE(ref_convolution_relu_t<u8, s8, s32, s32>),
     INSTANCE(ref_convolution_relu_t<u8, s8, s8, s32>),
@@ -293,4 +310,4 @@ status_t cpu_engine_t::submit(primitive_t *p, event_t *e,
 }
 }
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

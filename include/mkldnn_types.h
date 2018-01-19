@@ -17,6 +17,8 @@
 #ifndef MKLDNN_TYPES_H
 #define MKLDNN_TYPES_H
 
+#include "mkldnn_os.h" // compiler/OS compatibility macros
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -202,6 +204,9 @@ typedef enum {
     /** 5D weights tensor in the @c oihw format with extra outer dimension for
      * groups. */
     mkldnn_goihw,
+    /** 5D weights tensor in the @c hwio format with extra dimension for
+     * groups that comes after the output channels. */
+    mkldnn_hwigo,
 #if MKLDNN_JIT_TYPES > 0
     /** 5D weights tensor in the blocked version of @c goihw format with both
      * input and output channels data laid out in memory in 8-element blocks.
@@ -780,6 +785,33 @@ typedef struct mkldnn_primitive_attr *mkldnn_primitive_attr_t;
 /** @brief A constant primitive descriptor attributes handle. */
 typedef const struct mkldnn_primitive_attr *const_mkldnn_primitive_attr_t;
 
+/** @struct mkldnn_post_ops
+ * @brief An opaque structure for a chain of post operations.
+ *
+ * mkldnn_post_ops can be used to perform some (trivial) operations like
+ * accumulation or eltwise after certain primitives like convolution.
+ *
+ * Post operations might be combined together, making a chain of post
+ * operations. For instance one can configure convolution followed by
+ * accumulation followed by eltwise (relu). This might be especially beneficial
+ * for residual learning blocks.
+ *
+ * @warning
+ *      Of course not all the combinations are supported, so user should handle
+ *      error accordingly.
+ *
+ * Supported post operations:
+ *  - accumulation (base primitive: convolution)
+ *  - eltwise (base primitive: convolution)
+ */
+struct mkldnn_post_ops;
+
+/** @brief A post operation chain handle. */
+typedef struct mkldnn_post_ops *mkldnn_post_ops_t;
+
+/** @brief A constant post operation chain handle. */
+typedef const struct mkldnn_post_ops *const_mkldnn_post_ops_t;
+
 /** @} */
 
 /** @addtogroup c_api_types_primitive Primitive
@@ -922,5 +954,5 @@ typedef const struct mkldnn_stream *const_mkldnn_stream_t;
 }
 #endif
 
-/* vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s */
+/* vim: set et ts=8 sw=8 cino=^=l0,\:0,N-s: */
 #endif

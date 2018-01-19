@@ -93,7 +93,7 @@ void check_lrn_fwd(const lrn_test_params &p, const memory &src, const memory &ds
     };
 
     const int N = p.test_ld.mb;
-#   pragma omp parallel for collapse(4) schedule(static)
+    OMP(parallel for collapse(4) schedule(static))//;
     for (int n = 0; n < N; ++n) {
         for (int c = 0; c < C; ++c) {
             for (int h = 0; h < H; ++h) {
@@ -174,7 +174,7 @@ void check_lrn_bwd(const lrn_test_params &p, const memory &src,
         *d = A - B;
     };
 
-#   pragma omp parallel for collapse(4) schedule(static)
+    OMP(parallel for collapse(4) schedule(static))//;
     for (int mb = 0; mb < MB; ++mb) {
         for (int c = 0; c < C; ++c) {
             for (int h = 0; h < H; ++h) {

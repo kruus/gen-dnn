@@ -19,8 +19,9 @@
 
 #include "mkldnn.h"
 
-#include "utils.hpp"
 #include "c_types_map.hpp"
+#include "nstl.hpp"
+#include "utils.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -41,6 +42,13 @@ struct scales_t: public c_compatible {
         assert(status == status::success);
         (void)status;
         return *this;
+    }
+
+    bool has_default_values() const {
+        for (int c = 0; c < count_; ++c) {
+            if(scales_[c] != 1.) return false;
+        }
+        return true;
     }
 
     status_t set(int count, int mask, const float *scales);
@@ -72,6 +80,53 @@ private:
 }
 }
 
+struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
+    struct entry_t {
+        mkldnn::impl::primitive_kind_t kind;
+        union {
+            struct { float scale; } sum;
+            struct {
+                mkldnn::impl::alg_kind_t alg;
+                float scale, alpha, beta;
+            } eltwise;
+        };
+
+        bool is_relu(bool require_scale_one = true,
+                bool require_nslope_zero = true) const {
+            using namespace mkldnn::impl;
+            return kind == primitive_kind::eltwise
+                && utils::implication(require_scale_one, eltwise.scale == 1.f)
+                && eltwise.alg == alg_kind::eltwise_relu
+                && utils::implication(require_nslope_zero, eltwise.alpha == 0.);
+        }
+    };
+
+    mkldnn_post_ops(): len_(0) {}
+
+    mkldnn::impl::status_t append_sum(float scale);
+    mkldnn::impl::status_t append_eltwise(float scale,
+            mkldnn::impl::alg_kind_t alg, float alpha, float beta);
+
+    int find(mkldnn::impl::primitive_kind_t kind, int start = 0,
+            int stop = -1) const {
+        if (stop == -1) stop = len_;
+        stop = mkldnn::impl::nstl::min(stop, len_);
+        for (int idx = start; idx < stop; ++idx)
+            if (entry_[idx].kind == kind) return idx;
+        return -1;
+    }
+
+    bool has_default_values() const { return len_ == 0; }
+
+    bool contain(mkldnn::impl::primitive_kind_t kind, int index) const
+    { return find(kind, index, index + 1) == index; }
+
+    enum { capacity = 4 };
+
+    int len_;
+    entry_t entry_[capacity];
+};
+
 struct mkldnn_primitive_attr: public mkldnn::impl::c_compatible {
     mkldnn_primitive_attr()
         : round_mode_(mkldnn::impl::round_mode::nearest) {}
@@ -79,11 +134,21 @@ struct mkldnn_primitive_attr: public mkldnn::impl::c_compatible {
     mkldnn_primitive_attr *clone() const
     { return new mkldnn_primitive_attr(*this); }
 
+    bool has_default_values() const {
+       return true
+            && round_mode_ == mkldnn::impl::round_mode::nearest
+            && output_scales_.has_default_values()
+            && post_ops_.has_default_values() ;
+    }
+
     mkldnn::impl::status_t set_round_mode(
             mkldnn::impl::round_mode_t round_mode);
+    mkldnn::impl::status_t set_post_ops(
+            const mkldnn::impl::post_ops_t &post_ops);
 
     mkldnn::impl::round_mode_t round_mode_;
     mkldnn::impl::scales_t output_scales_;
+    mkldnn::impl::post_ops_t post_ops_;
 };
 
 #endif

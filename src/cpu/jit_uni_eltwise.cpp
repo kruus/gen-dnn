@@ -955,7 +955,8 @@ status_t jit_uni_eltwise_fwd_t<isa>::pd_t::init() {
                     eltwise_square, eltwise_abs, eltwise_sqrt, eltwise_linear,
                     eltwise_bounded_relu, eltwise_soft_relu, eltwise_logistic))
         && utils::everyone_is(data_type::f32, desc()->data_desc.data_type)
-        && memory_desc_wrapper(src_pd()).is_dense();
+        && memory_desc_wrapper(src_pd()).is_dense()
+        && attr()->has_default_values();
 
     return ok ? status::success : status::unimplemented;
 }
@@ -1023,7 +1024,8 @@ status_t jit_uni_eltwise_bwd_t<isa>::pd_t::init() {
         && utils::one_of(desc()->alg_kind, alg_kind::eltwise_relu)
         && src_pd()->desc()->data_type == data_type::f32
         && memory_desc_wrapper(src_pd()).is_dense()
-        && memory_desc_wrapper(diff_dst_pd()) == memory_desc_wrapper(src_pd());
+        && memory_desc_wrapper(diff_dst_pd()) == memory_desc_wrapper(src_pd())
+        && attr()->has_default_values();
 
     return ok ? status::success : status::unimplemented;
 }

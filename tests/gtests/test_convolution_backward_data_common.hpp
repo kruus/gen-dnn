@@ -36,7 +36,7 @@ void compute_ref_conv_bwd_data(const test_convolution_sizes_t &c,
     const memory::desc weights_d = weights.get_primitive_desc().desc();
     const memory::desc diff_dst_d = diff_dst.get_primitive_desc().desc();
 
-#   pragma omp parallel for collapse(5) schedule(static)
+    OMP(parallel for collapse(5) schedule(static))//;
     for (int mb = 0; mb < c.mb; ++mb) {
         for (int g = 0; g < c.ng; ++g) {
             for (int ic = 0; ic < c.ic / c.ng; ++ic) {
