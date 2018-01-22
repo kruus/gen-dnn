@@ -24,12 +24,13 @@
 #define strnlen strnlen_s
 #endif
 
-// How is the restrict keyword handled?
+// How is the restrict keyword handled? (disallow it as you encounter errors, please)
 #if !defined(restrict)
 #if defined(_SX)
 #elif defined(__ve)
 #elif defined(__INTEL_COMPILER)
 #elif defined(__GNUC__)
+#define restrict
 #elif defined(WIN32)
 #else
 #endif
