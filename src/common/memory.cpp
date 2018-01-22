@@ -157,10 +157,18 @@ status_t mkldnn_view_primitive_desc_create(primitive_desc_t **view_pd,
     const memory_pd_t *mpd =
         (const memory_pd_t*)memory_pd;
     memory_desc_wrapper md(*mpd->desc());
+#if !defined(__ve)
     for (int d = 0; d < md.ndims(); ++d) {
         if (offsets[d] < 0 || (offsets[d] + dims[d] > md.dims()[d]))
             return invalid_arguments;
     }
+    if (!args_ok) return invalid_arguments;
+#else
+    for (int d = 0; d < md.ndims(); ++d) {
+        if (offsets[d] < 0 || (offsets[d] + dims[d] > md.dims()[d]))
+        { args_ok = false; break; }
+    }
+#endif
     return memory_pd->engine()->view_primitive_desc_create(
             (view_pd_t**)view_pd, mpd, dims, offsets);
 }

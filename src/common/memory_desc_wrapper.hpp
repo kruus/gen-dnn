@@ -308,6 +308,7 @@ inline bool memory_desc_wrapper::similar_to(const memory_desc_wrapper &rhs,
 
 inline bool memory_desc_wrapper::consistent_with(
         const memory_desc_wrapper &rhs) const {
+#if !defined(__ve)
     if (ndims() == rhs.ndims()) {
         for (int d = 0; d < ndims(); ++d) {
             if (dims()[d] != rhs.dims()[d]) return false;
@@ -321,6 +322,16 @@ inline bool memory_desc_wrapper::consistent_with(
          * not, at least for now */
         return false;
     }
+#else
+    bool ret=false;
+    if (ndims() == rhs.ndims()) {
+        ret = true;
+        for (int d = 0; d < ndims(); ++d) {
+            if (dims()[d] != rhs.dims()[d]) {ret = false; break;}
+        }
+    }
+    return ret;
+#endif
 }
 
 }

@@ -117,8 +117,14 @@ inline void array_copy(T *dst, const T *src, size_t size) {
 }
 template<typename T>
 inline bool array_cmp(const T *a1, const T *a2, size_t size) {
+#if defined(__ve)
+    bool ret=true;
+    for (size_t i = 0; i < size; ++i) if (a1[i] != a2[i]) {ret=false; break; }
+    return ret;
+#else
     for (size_t i = 0; i < size; ++i) if (a1[i] != a2[i]) return false;
     return true;
+#endif
 }
 template<typename T, typename U>
 inline void array_set(T *arr, const U& val, size_t size) {
