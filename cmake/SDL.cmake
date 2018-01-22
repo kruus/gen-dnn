@@ -21,6 +21,7 @@ if(SDL_cmake_included)
 endif()
 set(SDL_cmake_included true)
 
+set(CMAKE_CCXX_FLAGS)
 message(STATUS "CXX_FLAGS begin SDL.cmake : ${CMAKE_CXX_FLAGS}")
 if(NECSX)
     message(STATUS "more SX stuff can go here")

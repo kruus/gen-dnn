@@ -90,7 +90,7 @@ elseif(UNIX OR APPLE)
 
     if(NECVE)
         add_definitions(-DSXAURORA -D_GNU_SOURCE)
-        set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -O3 -finline -finline-functions")
+        set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -finline -finline-functions")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")
         #set(CMAKE_C_FLAGS_RELEASE "-O3 -finline -ftrace")
         #set(CMAKE_CXX_FLAGS_RELEASE "-O3 -finline -ftrace")

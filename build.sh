@@ -279,7 +279,7 @@ fi
         TOOLCHAIN=../cmake/ve.cmake
         if [ ! -f "${TOOLCHAIN}" ]; then echo "Ohoh. ${TOOLCHAIN} not found?"; BUILDOK="n"; fi
         CMAKEOPT="${CMAKEOPT} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}"
-        CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=OFF -DUSE_SHAREDLIBS=OFF"
+        CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=OFF -DUSE_SHAREDLIB=OFF"
         # -proginf  : Run with 'export VE_PROGINF=YES' to get some stats output
         export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
         export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
