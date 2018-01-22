@@ -17,7 +17,7 @@
 
 if(CMAKE_TOOLCHAIN_FILE)
     # 3.8 makes it easier to construct Platform/SX-* files
-    cmake_minimum_required(VERSION 3.8)
+    cmake_minimum_required(VERSION 3.6)
 else()
     cmake_minimum_required(VERSION 2.8)
 endif()
