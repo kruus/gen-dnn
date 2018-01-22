@@ -28,8 +28,9 @@ if(NECVE)
     #
     #set(NLCINC $ENV{NLC_BASE}/include)
     find_path(NLCINC cblas.h NO_DEFAULT_PATH PATHS
+        /opt/nec/ve/nlc/1.0.0/include # latest version
+        /opt/nec/ve/nlc/0.9.0/include # older version from beta program
         /usr/uhome/aurora/bm/nlc/0.9.0/include # ok for cross-compile on zoro
-        /opt/nec/ve/nlc/0.9.0 # I found this on aurora host
         $ENV{NLC_BASE}
         )
 
