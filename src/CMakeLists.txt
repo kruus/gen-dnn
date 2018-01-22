@@ -35,8 +35,13 @@ file(GLOB_RECURSE SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/${CPU_DIR}/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/${CPU_DIR}/*.hpp
     )
-# prefix any directories in CPU_INCLUDE_SUBDIRS with ${CMAKE_CURRENT_SOURCE_DIR}
+
 set(CPU_INCLUDE_DIRS)
+set(CPU_INCLUDE_SRC_SUBDIRS) # this can be a list of subdirectories of src/
+if(TARGET_JIT)
+    set(CPU_INCLUDE_SRC_SUBDIRS cpu/xbyak) # this can be a list of subdirectories of src/
+endif()
+# prefix any directories in CPU_INCLUDE_SRC_SUBDIRS with ${CMAKE_CURRENT_SOURCE_DIR}
 string(REGEX REPLACE "([^;]+)" "${CMAKE_CURRENT_SOURCE_DIR}/\\1" CPU_INCLUDE_DIRS "${CPU_INCLUDE_SRC_SUBDIRS}")
 message(STATUS " original CPU_INCLUDE_SRC_SUBDIRS : ${CPU_INCLUDE_SRC_SUBDIRS}")
 message(STATUS " extra CPU include directories    : ${CPU_INCLUDE_DIRS}")
@@ -45,10 +50,6 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/common
     ${CPU_INCLUDE_DIRS}
-    #   upstream version ...
-    #${CMAKE_CURRENT_SOURCE_DIR}
-    #${CMAKE_CURRENT_SOURCE_DIR}/common
-    #${CMAKE_CURRENT_SOURCE_DIR}/cpu/xbyak
     )
 
 if(WIN32)
@@ -64,10 +65,10 @@ if(NECSX)
     add_library(${TARGET_NAME}        ${HEADERS} ${SOURCES})
     message(STATUS "${TARGET_NAME}_LINKER_LIBS = ${${TARGET_NAME}_LINKER_LIBS}")
 else()
-    if(NECVE)
-        add_library(${TARGET_NAME} STATIC ${HEADERS} ${SOURCES})
-    else()
+    if(USE_SHAREDLIBS)
         add_library(${TARGET_NAME} SHARED ${HEADERS} ${SOURCES})
+    else()
+        add_library(${TARGET_NAME} STATIC ${HEADERS} ${SOURCES})
     endif()
 endif()
 #Add mkldnn.dll to execution PATH

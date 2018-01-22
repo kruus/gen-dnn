@@ -19,7 +19,7 @@
 #include "conv/conv.hpp"
 #include "idiv.hpp"
 
-#if !defined(_SX)
+#if !defined(_SX) && !defined(__ve)
 #define restrict __restrict__
 #endif
 

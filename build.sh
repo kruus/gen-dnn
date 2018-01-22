@@ -279,6 +279,7 @@ fi
         TOOLCHAIN=../cmake/ve.cmake
         if [ ! -f "${TOOLCHAIN}" ]; then echo "Ohoh. ${TOOLCHAIN} not found?"; BUILDOK="n"; fi
         CMAKEOPT="${CMAKEOPT} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}"
+        CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=OFF -DUSE_SHAREDLIBS=OFF"
         # -proginf  : Run with 'export VE_PROGINF=YES' to get some stats output
         export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
         export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
@@ -303,7 +304,8 @@ fi
         #  ... ohoh no easy way to include the spaces and expand variable properly ...
         #      Solution: do these changes within CMakeLists.txt
         #CMAKEOPT="${CMAKEOPT} -DCMAKE_C_FLAGS=-g\ -ftrace\ -Cdebug" # override Cvopt
-        SXOPT="-DTARGET_VANILLA -D__STDC_LIMIT_MACROS"
+        #SXOPT="${SXOPT} -DTARGET_VANILLA"
+        SXOPT="${SXOPT} -D__STDC_LIMIT_MACROS"
         # __STDC_LIMIT_MACROS is a way to force definitions like INT8_MIN in stdint.h (cstdint)
         #    (it **should** be autmatic in C++11, imho)
         SXOPT="${SXOPT} -woff=1097 -woff=4038" # turn off warnings about not using attributes

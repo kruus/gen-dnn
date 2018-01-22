@@ -68,9 +68,10 @@ else
     shift                                 # gobble the threads arg
 fi
 # Hack : NECVE does not support omp yet
-if [ "${NECVE}" ]; then
-    THREADS=1
-fi
+# NEW [2108] NECVE support openmp ... (supposedly)
+#if [ "${NECVE}" ]; then
+#    THREADS=1
+#fi
 if [ "$#" -lt 1 ]; then usage; exit; fi
 ARGS=($*)
 BASE=''

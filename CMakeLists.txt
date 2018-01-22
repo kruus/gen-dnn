@@ -71,34 +71,40 @@ endif()
 
 ####################################
 # [ejk] support a TARGET_VANILLA **alternative** to src/cpu/ 
-option(TARGET_VANILLA "Use only pure C/C++ source_code, no JIT assembler" OFF)
+include(CMakeDependentOption)
+CMAKE_DEPENDENT_OPTION(TARGET_VANILLA "Use only pure C/C++ source_code, no JIT assembler" OFF
+    "NECVE;NECSX" ON)
 set(TARGET_JIT OFF)
 if(TARGET_VANILLA)
     set(TARGET_DEFS "-DTARGET_VANILLA")
     set(TARGET_JIT OFF)
-else()
-    set(TARGET_DEFS "-DTARGET_XXJIT") # I removed this because too many tests involve the JIT formats
 endif()
 MESSAGE(STATUS "src/ TARGET_VANILLA: " ${TARGET_VANILLA})
 if(TARGET_VANILLA)
     set(CPU_DIR vanilla)
-    #set(CPU_INCLUDE_SRC_SUBDIRS)
 else()
     set(CPU_DIR cpu)
-    set(CPU_INCLUDE_SRC_SUBDIRS cpu/xbyak) # this can be a list of subdirectories of src/
 endif()
-####################################
-
+# NECVE: OpenMP support is rumored to be here, but experience suggests otherwise :0
+CMAKE_DEPENDENT_OPTION(USE_OPENMP "Use OpenMP?" ON
+                                        "NECVE" OFF)
+CMAKE_DEPENDENT_OPTION(USE_SHAREDLIBS "Use shared libs?" ON
+                                                 "NECVE" OFF)
+# These options can be overridden from the cmake command line
+message(STATUS, "cmake options: -DTARGET_VANILLA=${TARGET_VANILLA} -DUSE_OPENMP=${USE_OPENMP} -DUSE_SHAREDLIB=${USE_SHAREDLIB}")                                                 
 #if(NECVE)
 #    show_cmake_stuff("Initial setup completed ...")
 #endif()
+####################################
+
 include("cmake/platform.cmake")
 include("cmake/asm.cmake")
 if(TRUE AND NECVE)
     set(CMAKE_THREAD_PREFER_PTHREAD 1)
     set(THREADS_PREFER_PTHREAD_FLAG 1)
     find_package(Threads REQUIRED)
-else()
+endif()
+if(USE_OPENMP)
     include("cmake/OpenMP.cmake")
 endif()
 include("cmake/SDL.cmake")

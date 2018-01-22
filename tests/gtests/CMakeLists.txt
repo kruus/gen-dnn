@@ -32,6 +32,7 @@ file(GLOB PRIM_TEST_CASES_SRC
                               test_sum.cpp
                               test_reorder.cpp
                               test_concat.cpp
+                              test_ve_bwd_d_nans.cpp
                               test_softmax_forward.cpp
                               test_eltwise.cpp
                               test_relu.cpp
