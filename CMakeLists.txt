@@ -88,10 +88,10 @@ endif()
 # NECVE: OpenMP support is rumored to be here, but experience suggests otherwise :0
 CMAKE_DEPENDENT_OPTION(USE_OPENMP "Use OpenMP?" ON
                                         "NECVE" OFF)
-CMAKE_DEPENDENT_OPTION(USE_SHAREDLIBS "Use shared libs?" ON
-                                                 "NECVE" OFF)
+CMAKE_DEPENDENT_OPTION(USE_SHAREDLIB "Use shared libs?" ON   # libmkldnn.so
+                                                "NECVE" OFF) # libmkldnn.a
 # These options can be overridden from the cmake command line
-message(STATUS, "cmake options: -DTARGET_VANILLA=${TARGET_VANILLA} -DUSE_OPENMP=${USE_OPENMP} -DUSE_SHAREDLIB=${USE_SHAREDLIB}")                                                 
+message(STATUS, "cmake options: -DTARGET_VANILLA=${TARGET_VANILLA} -DUSE_OPENMP=${USE_OPENMP} -DUSE_SHAREDLIB=${USE_SHAREDLIB}")
 #if(NECVE)
 #    show_cmake_stuff("Initial setup completed ...")
 #endif()
@@ -104,11 +104,9 @@ if(TRUE AND NECVE)
     set(THREADS_PREFER_PTHREAD_FLAG 1)
     find_package(Threads REQUIRED)
 endif()
-if(USE_OPENMP)
-    include("cmake/OpenMP.cmake")
-endif()
-include("cmake/SDL.cmake")
 include("cmake/MKL.cmake")
+include("cmake/OpenMP.cmake")
+include("cmake/SDL.cmake")
 include("cmake/NLC.cmake")
 include("cmake/Doxygen.cmake")
 
