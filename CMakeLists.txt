@@ -16,7 +16,6 @@
 #===============================================================================
 
 if(CMAKE_TOOLCHAIN_FILE)
-    # 3.8 makes it easier to construct Platform/SX-* files
     cmake_minimum_required(VERSION 3.6)
 else()
     cmake_minimum_required(VERSION 2.8)
@@ -54,15 +53,16 @@ set(PROJECT_VERSION "0.12")
 set(LIB_NAME mkldnn)
 
 project(${PROJECT_NAME} C CXX) # This runs any CMAKE_TOOLCHAIN_FILE (twice)
+if(NECSX)
+    cmake_minimum_required(VERSION 3.8) # allow nicer Platform/SX-* files
+    # Want -lcblas *after* -lmkldnn ... How?
+    #set(LINK_LIBRARIES "${LINK_LIBRARIES} ${SX_LINK_LIBRARIES}" CACHE STRING "will this go after -lmkldnn?")
+endif()
 # If enabled, generate a compile_commands.json file of the exact compiler
 # commands (for Makefile and Ninja generators)
 add_definitions(-DCMAKE_EXPORT_COMPILE_COMMANDS=1)
 
-# Want -lcblas *after* -lmkldnn ... How?
-#set(LINK_LIBRARIES "${LINK_LIBRARIES} ${SX_LINK_LIBRARIES}" CACHE STRING "will this go after -lmkldnn?")
-
 message(STATUS "CMAKE_TOOLCHAIN_PREFIX = ${CMAKE_TOOLCHAIN_PREFIX}")
-
 if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     message(STATUS "CMAKE_BUILD_TYPE is unset, defaulting to RelWithDebInfo")
     set(CMAKE_BUILD_TYPE "RelWithDebInfo")
