@@ -107,6 +107,7 @@
 #define ShortLoop() _Pragma("cdir shortloop")
 #define ShortLoopTest() /*?*/
 #define IVDEP() _Pragma("cdir nodep")
+#define UNROLL(x)
 
 #elif ENABLE_OPT_PRAGMAS && defined(__ve)
 #warning "__ve optimization pragmas IN EFFECT"
@@ -118,6 +119,7 @@
 #define ShortLoop() _Pragma("_NEC shortloop")
 #define ShortLoopTest() _Pragma("_NEC shortloop_reduction")
 #define IVDEP() _Pragma("_NEC ivdep")
+#define UNROLL(x) PragmaQuote(_NEC unroll(x))
 
 // TODO
 //#elif ENABLE_OPT_PRAGMAS && defined(__INTEL_COMPILER)
@@ -131,6 +133,7 @@
 #define ShortLoop()
 #define ShortLoopTest()
 #define IVDEP() _Pragma("GCC ivdep")
+#define UNROLL(x)
 
 #else /* A new system might begin by ignoring the optimization pragmas */
 #warning "Please check if _Pragma macros can be defined for this platorm"
@@ -141,6 +144,7 @@
 #define ShortLoop()
 #define ShortLoopTest()
 #define IVDEP()
+#define UNROLL(x)
 
 #endif
 
