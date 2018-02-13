@@ -135,7 +135,7 @@ UNROLL(UNROLL_IM2COL)
                         if (ih < 0 || ih >= jcp.ih) continue;
     
                         for (int kw = 0; kw < jcp.kw; ++kw) {
-#pragma _NEC ivdep
+IVDEP()
                         for (int ow = 0; ow < jcp.ow; ++ow) {
                             const int iw = ow * jcp.stride_w
                                            - jcp.l_pad + kw * (1 + jcp.dilate_w);
@@ -157,13 +157,13 @@ UNROLL(UNROLL_IM2COL)
                         if (ih < 0 || ih >= jcp.ih) continue;
     
                         for (int kw = 0; kw < jcp.kw; ++kw) {
-#pragma _NEC ivdep
+IVDEP()
                         for (int ow = 0; ow < jcp.ow; ++ow) {
                             const int iw = ow * jcp.stride_w
                                            - jcp.l_pad + kw * (1 + jcp.dilate_w);
                             if (iw < 0 || iw >= jcp.iw) continue;
     
-#pragma _NEC unroll(2)
+UNROLL(2)
                             for(int i = 0; i < 2; ++i) {
                                 const size_t col_idx =  i*col_step +
                                                        ((kh * jcp.kw + kw) * jcp.oh+oh)
@@ -183,13 +183,13 @@ UNROLL(UNROLL_IM2COL)
                         if (ih < 0 || ih >= jcp.ih) continue;
     
                         for (int kw = 0; kw < jcp.kw; ++kw) {
-#pragma _NEC ivdep
+IVDEP()
                         for (int ow = 0; ow < jcp.ow; ++ow) {
                             const int iw = ow * jcp.stride_w
                                            - jcp.l_pad + kw * (1 + jcp.dilate_w);
                             if (iw < 0 || iw >= jcp.iw) continue;
     
-#pragma _NEC unroll(3)
+UNROLL(3)
                             for(int i = 0; i < 3; ++i) {
                                 const size_t col_idx =  i*col_step +
                                                        ((kh * jcp.kw + kw) * jcp.oh+oh)
@@ -209,13 +209,13 @@ UNROLL(UNROLL_IM2COL)
                         if (ih < 0 || ih >= jcp.ih) continue;
     
                         for (int kw = 0; kw < jcp.kw; ++kw) {
-#pragma _NEC ivdep
+IVDEP()
                         for (int ow = 0; ow < jcp.ow; ++ow) {
                             const int iw = ow * jcp.stride_w
                                            - jcp.l_pad + kw * (1 + jcp.dilate_w);
                             if (iw < 0 || iw >= jcp.iw) continue;
     
-#pragma _NEC unroll(4)
+UNROLL(4)
                             for(int i = 0; i < 4; ++i) {
                                 const size_t col_idx =  i*col_step +
                                                        ((kh * jcp.kw + kw) * jcp.oh+oh)
@@ -235,13 +235,13 @@ UNROLL(UNROLL_IM2COL)
                         if (ih < 0 || ih >= jcp.ih) continue;
     
                         for (int kw = 0; kw < jcp.kw; ++kw) {
-#pragma _NEC ivdep
+IVDEP()
                         for (int ow = 0; ow < jcp.ow; ++ow) {
                             const int iw = ow * jcp.stride_w
                                            - jcp.l_pad + kw * (1 + jcp.dilate_w);
                             if (iw < 0 || iw >= jcp.iw) continue;
     
-#pragma _NEC unroll(5)
+UNROLL(5)
                             for(int i = 0; i < 5; ++i) {
                                 const size_t col_idx =  i*col_step +
                                                        ((kh * jcp.kw + kw) * jcp.oh+oh)
@@ -261,13 +261,13 @@ UNROLL(UNROLL_IM2COL)
                         if (ih < 0 || ih >= jcp.ih) continue;
     
                         for (int kw = 0; kw < jcp.kw; ++kw) {
-#pragma _NEC ivdep
+IVDEP()
                         for (int ow = 0; ow < jcp.ow; ++ow) {
                             const int iw = ow * jcp.stride_w
                                            - jcp.l_pad + kw * (1 + jcp.dilate_w);
                             if (iw < 0 || iw >= jcp.iw) continue;
     
-#pragma _NEC unroll(6)
+UNROLL(6)
                             for(int i = 0; i < 6; ++i) {
                                 const size_t col_idx =  i*col_step +
                                                        ((kh * jcp.kw + kw) * jcp.oh+oh)
@@ -287,13 +287,13 @@ UNROLL(UNROLL_IM2COL)
                         if (ih < 0 || ih >= jcp.ih) continue;
     
                         for (int kw = 0; kw < jcp.kw; ++kw) {
-#pragma _NEC ivdep
+IVDEP()
                         for (int ow = 0; ow < jcp.ow; ++ow) {
                             const int iw = ow * jcp.stride_w
                                            - jcp.l_pad + kw * (1 + jcp.dilate_w);
                             if (iw < 0 || iw >= jcp.iw) continue;
     
-#pragma _NEC unroll(7)
+UNROLL(7)
                             for(int i = 0; i < 7; ++i) {
                                 const size_t col_idx =  i*col_step +
                                                        ((kh * jcp.kw + kw) * jcp.oh+oh)
