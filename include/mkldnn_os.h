@@ -133,7 +133,7 @@
 #define ShortLoop()
 #define ShortLoopTest()
 #define IVDEP() _Pragma("GCC ivdep")
-#define UNROLL(x)
+#define UNROLL(x) PragmaQuote(GCC unroll x)
 
 #else /* A new system might begin by ignoring the optimization pragmas */
 #warning "Please check if _Pragma macros can be defined for this platorm"
