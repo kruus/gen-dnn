@@ -253,21 +253,21 @@ void _gemm_convolution_bwd_weights_t<run_jit, isa>::execute_backward_weights() {
                 }
             }
             if (need_reduction) {
-                OMP(omp barrier)//;
+                OMP(barrier)//;
                 data_t *weights_base = diff_weights + g_start * weights_g_size;
                 jit_gemm_convolution_utils::bwd_weights_reduction_par(
                     ithr_mb, nthr_mb, jcp, weights_reduce_base, weights_base);
             }
         } else
             if (need_reduction) {
-                OMP(omp barrier)//;
+                OMP(barrier)//;
             }
     }
     if (jcp.with_bias) {
         const memory_desc_wrapper diff_dst_d(this->conf_.diff_dst_pd());
         const memory_desc_wrapper diff_bias_d(this->conf_.diff_weights_pd(1));
         const size_t work_amount = jcp.ngroups * jcp.oc;
-        OMP(omp parallel)//;
+        OMP(parallel)//;
         {
             const int ithr = omp_get_thread_num();
             const int nthr = omp_get_num_threads();

@@ -76,6 +76,8 @@ void im2col(
         size_t ic;
         const float *im_;
         float *col_;
+
+        if(work_amount > 0) {
         OMP(omp parallel)//;
         {
             const int ithr = omp_get_thread_num();
@@ -119,7 +121,7 @@ UNROLL(UNROLL_IM2COL)
 
                 nd_iterator_step(ichunk, work_amount);
             }
-        }
+        }}
 
         ic = UNROLL_IM2COL * work_amount;
         if(ic < jcp.ic) {

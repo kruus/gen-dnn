@@ -121,8 +121,18 @@
 #define IVDEP() _Pragma("_NEC ivdep")
 #define UNROLL(x) PragmaQuote(_NEC unroll(x))
 
-// TODO
-//#elif ENABLE_OPT_PRAGMAS && defined(__INTEL_COMPILER)
+#elif ENABLE_OPT_PRAGMAS && defined(__INTEL_COMPILER)
+// restrict keyword requires the "-restrict" CFLAG; __restrict__ works anyway
+#define restrict __restrict__
+#define IVDEP() _Pragma("ivdep")
+#define UNROLL(x) PragmaQuote(unroll(x))
+// TODO:
+#define VREG(...)
+#define ALLOC_ON_VREG(...)
+#define ALLOC_ON_ADB(...)
+#define RETAIN(...)
+#define ShortLoop()
+#define ShortLoopTest()
 
 #elif ENABLE_OPT_PRAGMAS && defined(__GNUC__)
 //#warning "__GNUC optimization pragmas IN EFFECT"
