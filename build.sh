@@ -42,7 +42,7 @@ usage() {
     echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
 }
-while getopts ":hatvjdDqQpsSTwWbF1567" arg; do
+while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
@@ -117,6 +117,9 @@ while getopts ":hatvjdDqQpsSTwWbF1567" arg; do
         7) # gcc-7, if found
             DOGCC_VER=7
             ;;
+        i) # try using icc
+            DOGCC_VER=icc
+            ;;
     h | *) # help
             usage
             ;;
@@ -131,7 +134,7 @@ BUILDDIR=build
 #fi
 #
 # I have not yet tried icc.
-# For gcc, we will avoid the full MKL (omp issues)
+# we MUST avoid the full MKL (omp issues) (mkldnn uses the mkl subset in external/)
 #
 if [ "${MKLROOT}" != "" ]; then
 	module unload icc >& /dev/null || echo "module icc unloaded"
@@ -145,13 +148,48 @@ fi
 #
 #
 #
-if [ "$DOTARGET" == "j" ]; then DOJIT=100; INSTALLDIR='install-jit'; BUILDDIR='build-jit'; fi
 if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx';
-elif [ "$DOTARGET" != "a" -a "$DOGCC_VER" -gt 0 ]; then
-    if $(gcc-${DOGCC_VER} -v); then export CXX=g++-${DOGCC_VER}; export CC=gcc-${DOGCC_VER}; fi
+elif [ "$DOTARGET" != "a" ]; then
+    if [ "$DOGCC_VER" == "icc" ]; then
+        echo "LOOKING for icc ... which icc = `which icc`"
+        set -x
+        if [ "x`which icc`" == "x" ]; then
+            if true; then
+                module load icc
+                MKLROOT=""
+                LD_LIBRARY_PATH=""
+            else
+                for d in \
+                    /opt/intel/composer_xe_2015/bin \
+                    /opt/intel/composer_xe_2015.3.187/bin \
+                    /opt/intel/compilers_and_libraries/linux/bin/intel64/ \
+                    ; \
+                do
+                    if [ -x "${d}/icc" ]; then
+                        export PATH="${d}:${PATH}"
+                        break;
+                    fi
+                done
+            fi
+        fi
+        set +x
+        export CXX=icpc; export CC=icc; export FC=ifort;
+        BUILDDIR="${BUILDDIR}-icc"; INSTALLDIR="${INSTALLDIR}-icc"
+    elif [ "$DOGCC_VER" -gt 0 ]; then
+        if $(gcc-${DOGCC_VER} -v); then export CXX=g++-${DOGCC_VER}; export CC=gcc-${DOGCC_VER}; fi
+    fi
+    if [ "$DOTARGET" == "j" ]; then
+        DOJIT=100; INSTALLDIR="${INSTALLDIR}-jit"; BUILDDIR="${BUILDDIR}-jit";
+    fi
 fi
+if [ ! "x${CC}" == "x" -a ! "`which ${CC}`" ]; then
+    echo "./build.sh: CC=${CC} , but did not find that compiler."
+    exit -1
+fi
+
 #if [ "$DOTARGET" == "v" ]; then ; fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; BUILDDIR="${BUILDDIR}d"; fi
+
 if [ "$DOJUSTDOC" == "y" ]; then
     (
         if [ ! -d build ]; then mkdir build; fi
@@ -245,6 +283,8 @@ echo "VE_EXEC    ${VE_EXEC}"
 #read asdf
 fi
 
+export PATH
+echo "PATH $PATH"
 (
     echo "# vim: set ro ft=log:"
     echo "DOTARGET   $DOTARGET"
@@ -362,7 +402,7 @@ fi
             rm -f ./stamp-BUILDOK ./CMakeCache.txt
             echo "${CMAKEENV}; cmake ${CMAKEOPT} ${CMAKETRACE} .."
             set -x
-            { if [ x"${CMAKEENV}" == x"" ]; then ${CMAKEENV}; fi; \
+            { if [ -nz "${CMAKEENV}" ]; then ${CMAKEENV}; fi; \
                 cmake ${CMAKEOPT} ${CMAKETRACE} .. \
                 && { make VERBOSE=1 ${JOBS} || make VERBOSE=1; } \
                 && BUILDOK="y" || echo "build failed: ret code $?"; }
@@ -379,8 +419,12 @@ fi
         echo "CMAKEENV   <${CMAKEENV}>"
         echo "CMAKEOPT   <${CMAKEOPT}>"
         echo "CMAKETRACE <${CMAKETRACE}>"
+        echo "pwd        `pwd`"
+        echo "PATH       $PATH"
+        echo "CC         $CC"
+        if [ ! "x${CC}" == "x" ]; then ${CC} -V; fi
         set -x
-        { if [ x"${CMAKEENV}" == x"" ]; then ${CMAKEENV}; fi; \
+        { if [ ! "${CMAKEENV}" == '""' ]; then ${CMAKEENV}; fi; \
             cmake ${CMAKEOPT} ${CMAKETRACE} .. ; }
         set +x
     fi

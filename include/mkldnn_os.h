@@ -28,10 +28,11 @@
 #if !defined(restrict)
 #if defined(_SX)
 #elif defined(__ve)
-#elif defined(__INTEL_COMPILER)
-#elif defined(__GNUC__)
-#define restrict
+// restrict is allowed
+#elif defined(__INTEL_COMPILER) || defined(__GNUC__)
+#define restrict /*no-restrict*/
 #elif defined(WIN32)
+// ???
 #else
 #endif
 #endif
