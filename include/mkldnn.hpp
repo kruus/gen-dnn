@@ -67,9 +67,11 @@ protected:
     /// Constructs a C handle wrapper.
     /// @param t The C handle to wrap.
     /// @param weak A flag to specify whether to construct a weak wrapper.
+public:
     handle(T t = 0, bool weak = false): _data(0) {
         reset(t, weak);
     }
+protected:
 
     bool operator==(const T other) const { return other == _data.get(); }
     bool operator!=(const T other) const { return !(*this == other); }
