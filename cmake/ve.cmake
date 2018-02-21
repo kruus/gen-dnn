@@ -155,9 +155,9 @@ if(_compiler)
     set(VE_CXX_SYSINC ${VE_CXX_SYSINC} CACHE INTERNAL "nc++ sys-include directory[ies]")
     message(STATUS "ve.cmake [test]:  C pre-inc dirs  : ${VE_CXX_PREINC}")
     message(STATUS "ve.cmake [test]:  C sys-inc dirs  : ${VE_CXX_SYSINC}")
-    set(CMAKE_C_COMPILER   ${_compiler})
+    set(CMAKE_CXX_COMPILER   ${_compiler})
 else()
-    set(CMAKE_C_COMPILER   ncc)
+    set(CMAKE_CXX_COMPILER   ncc)
 endif()
 unset(_compiler)
 
@@ -466,5 +466,7 @@ macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS _compiler _flags _incVar _preincVar)
         message(STATUS "  sys-includes : ${${_incVar}}")
     endif()
 endmacro()
+
+show_cmake_stuff("End of ve.cmake")
 
 # vim: et ts=4 sw=4 ai

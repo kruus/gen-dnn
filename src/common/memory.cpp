@@ -176,7 +176,7 @@ status_t mkldnn_view_primitive_desc_create(primitive_desc_t **view_pd,
     }
     // above seemed very suspicious. Why would I want to pretend things are OK?
     if (!args_ok) {
-        cout<<" NEC VE returning error [CHECKME: this looks like some debug code?" __FILE__ ":" __LINE__<<endl;
+        cout<<" NEC VE returning error [CHECKME: this looks like some debug code?" << __FILE__ << ":" << __LINE__<<endl;
         return invalid_arguments;
     }
 #endif

@@ -405,7 +405,8 @@ echo "PATH $PATH"
             echo "CMAKETRACE: ${CMAKETRACE}"
             echo "${CMAKEENV}; cmake ${CMAKEOPT} ${CMAKETRACE} .."
             set -x
-            { if [ -nz "${CMAKEENV}" ]; then ${CMAKEENV}; fi; \
+            # { if [ -nz "${CMAKEENV}" ]; then ${CMAKEENV}; fi; \
+            { if [[ -n "${CMAKEENV}" && "${CMAKEENV}" != "\"\"" ]]; then ${CMAKEENV}; fi; \
                 cmake ${CMAKEOPT} ${CMAKETRACE} .. \
                 && { make VERBOSE=1 ${JOBS} || make VERBOSE=1; } \
                 && BUILDOK="y" || echo "build failed: ret code $?"; }
