@@ -400,6 +400,9 @@ echo "PATH $PATH"
                 && BUILDOK="y" || echo "build failed: ret code $?"; }
         else
             rm -f ./stamp-BUILDOK ./CMakeCache.txt
+            echo "CMAKEENV: ${CMAKEENV}"
+            echo "CMAKEOPT: ${CMAKEOPT}"
+            echo "CMAKETRACE: ${CMAKETRACE}"
             echo "${CMAKEENV}; cmake ${CMAKEOPT} ${CMAKETRACE} .."
             set -x
             { if [ -nz "${CMAKEENV}" ]; then ${CMAKEENV}; fi; \
@@ -459,6 +462,7 @@ echo "PATH $PATH"
     fi
     if [ "$BUILDOK" == "y" ]; then
         touch ./stamp-BUILDOK
+        sync ./stamp-BUILDOK
         if [ "$DODOC" == "y" ]; then
             echo "Build OK... Doxygen (please be patient)"
             make VERBOSE=1 doc >& ../doxygen.log
@@ -467,7 +471,7 @@ echo "PATH $PATH"
     set +x
 ) 2>&1 | tee "${BUILDDIR}".log
 ls -l "${BUILDDIR}"
-BUILDOK="n"; sync "${BUILDDIR}/stamp-BUILDOK"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="y"; fi
+BUILDOK="n"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="y"; fi
 
 set +x
 # after cmake we might have a better idea about ve_exec (esp. if PATH is not set properly)

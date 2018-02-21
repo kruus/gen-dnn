@@ -218,8 +218,8 @@ void precompute_ok2(int i, int O, int K, int S, int P, int D,
   }
 #else
   int cnt = 0;
+  //IVDEP()//;
   OMPSIMD()//;
-  IVDEP()//;
   for (int k = 0; k < 16; ++k) { // gcc vectorizes this nicely
     kk[k] = k;
     ooi[k] = (P + i) - k * (D+1);
@@ -243,7 +243,7 @@ void precompute_ok2(int i, int O, int K, int S, int P, int D,
       ix[cnt++] = k;
   }
   OMPSIMD(aligned(_o:16))//;
-  IVDEP()//;
+  //IVDEP()//;
   ShortLoop() for (size_t i = 0; i < cnt; ++i) { // nc++ still no gather ?
     const int ii = ix[i];
     _o[i] = (gather[ii]? ooi[ii]: 0);

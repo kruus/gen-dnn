@@ -337,7 +337,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             }
         };
 
-        OMPSIMD(for collapse(4) schedule(static))//;
+        OMP(parallel for collapse(4) schedule(static))//;
         for (int C = 0; C < dims[1] / blksize; ++C) {
             for (int h = 0; h < dims[2]; ++h) {
                 for (int n = 0; n < dims[0]; n += tsize) {
