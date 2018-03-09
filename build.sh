@@ -281,8 +281,10 @@ fi
         CMAKEOPT="${CMAKEOPT} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}"
         CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=OFF -DUSE_SHAREDLIB=OFF"
         # -proginf  : Run with 'export VE_PROGINF=YES' to get some stats output
-        export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
-        export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
+        # export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
+        # export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
+        export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
+        export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
         if [ "$NEC_FTRACE" -eq 1 ]; then
             export CFLAGS="${CFLAGS} -ftrace"
             export CXXFLAGS="${CXXFLAGS} -ftrace"
