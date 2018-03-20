@@ -15,17 +15,7 @@ USE_CBLAS=1
 QUICK=0
 DOGCC_VER=0
 NEC_FTRACE=0
-if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
-    DOTARGET="s" # s for SX (C/C++ code, cross-compile)
-elif [ "${CC}" == "ncc" -a "${CXX}" == "nc++" ]; then
-    echo "auto-detected '-a' Aurora compiler (ncc, nc++)"
-    DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
-    if [ `uname -n` = "zoro" ]; then JOBS="-j8"; else JOBS="-j1"; fi
-elif [ -d src/vanilla ]; then
-    DOTARGET="v" # v for vanilla (C/C++ code)
-else
-    DOTARGET="j" # j for JIT (Intel assembler)
-fi
+DOTARGET="x"
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -46,6 +36,7 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
+            if [ ! "${DOTARGET}" == "x" ]; then echo "-a no good: already have -${DOTARGET}"; usage; fi
             DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
             JOBS="-j1" # -j1 to avoid SIGSEGV in ccom
             if [ `uname -n` = "zoro" ]; then JOBS="-j8"; fi
@@ -63,10 +54,12 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
             DOTEST=$(( DOTEST + 1 ))
             ;;
         v) # [yes] (vanilla C/C++ only: no src/cpu/ JIT assembler)
+            if [ ! "${DOTARGET}" == "x" ]; then echo "-v no good: already have -${DOTARGET}"; usage; fi
             if [ -d src/vanilla ]; then DOTARGET="v"; fi
             ;;
         j) # force Intel JIT (src/cpu/ JIT assembly code)
             DOTARGET="j"; DOJIT=100 # 100 means all JIT funcs enabled
+            if [ ! "${DOTARGET}" == "x" ]; then echo "-j no good: already have -${DOTARGET}"; usage; fi
             ;;
         d) # [no] debug release
             DODEBUG="y"
@@ -84,9 +77,11 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
             DONEEDMKL="n"
             ;;
         S) # SX cross-compile (size_t=64, built in build-sx/, NEW: default if $CC==sxcc)
+            if [ ! "${DOTARGET}" == "x" ]; then echo "-S no good: already have -${DOTARGET}"; usage; fi
             DOTARGET="s"; DOJIT=0; SIZE_T=64; JOBS="-j4"
             ;;
         s) # SX cross-compile (size_t=32, built in build-sx/) DISCOURAGED
+            if [ ! "${DOTARGET}" == "x" ]; then echo "-s no good: already have -${DOTARGET}"; usage; fi
             # -s is NOT GOOD: sizeof(ptrdiff_t) is still 8 bytes!
             DOTARGET="s"; DOJIT=0; SIZE_T=32; JOBS="-j4"
             echo "*** WARNING ***"
@@ -125,6 +120,23 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
             ;;
     esac
 done
+# if unspecified, autodetect target via $CC compiler variable
+if [ "${DOTARGET}" == "x" ]; then
+    if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
+        DOTARGET="s" # s for SX (C/C++ code, cross-compile)
+    elif [ "${CC}" == "ncc" -a "${CXX}" == "nc++" ]; then
+        echo "auto-detected '-a' Aurora compiler (ncc, nc++)"
+        DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
+        if [ `uname -n` = "zoro" ]; then JOBS="-j8"; else JOBS="-j1"; fi
+    elif [ -d src/vanilla ]; then
+        DOTARGET="v" # v for vanilla (C/C++ code)
+    else
+        DOTARGET="j" # j for JIT (Intel assembler)
+    fi
+fi
+if [ "${DOTARGET}" == "x" ;]; then
+    usage
+fi
 DOJIT=0
 INSTALLDIR=install
 BUILDDIR=build

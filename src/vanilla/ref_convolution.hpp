@@ -83,13 +83,13 @@ struct _ref_convolution_fwd_t: public cpu_primitive_t {
                 AND_NEED( this->cdesc_().weights_desc.data_type == wei_type )
                 AND_NEED( this->cdesc_().accum_data_type == acc_type )
                 AND_NEED( this->cdesc_().dst_desc.data_type == dst_type )
-                AND_NEED( utils::implication(this->with_bias(), true)
+                AND_NEED( utils::implication(this->with_bias(), true
                         && utils::implication(src_type == u8,
                             utils::one_of(this->cdesc_().bias_desc.data_type,
                                 f32, s32, s8, u8))
                         && utils::implication(src_type == f32,
-                            this->cdesc_().bias_desc.data_type == f32))
-                AND_NEED( this->attr()->has_default_values())
+                            this->cdesc_().bias_desc.data_type == f32)) )
+                AND_NEED( this->attr()->has_default_values() )
                 ;
 #endif
 #if VERBOSE_PRIMITIVE_CREATE
