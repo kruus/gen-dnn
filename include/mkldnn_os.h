@@ -177,6 +177,7 @@
 
 #ifndef OMP
 #define OMP(...)
+#warning "not enabling #pragma omp"
 #endif
 #ifndef OMPSIMD
 #define OMPSIMD(...)
