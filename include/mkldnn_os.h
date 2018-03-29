@@ -28,10 +28,11 @@
 #if !defined(restrict)
 #if defined(_SX)
 #elif defined(__ve)
-#elif defined(__INTEL_COMPILER)
-#elif defined(__GNUC__)
-#define restrict
+// restrict is allowed
+#elif defined(__INTEL_COMPILER) || defined(__GNUC__)
+#define restrict /*no-restrict*/
 #elif defined(WIN32)
+// ???
 #else
 #endif
 #endif
@@ -107,6 +108,7 @@
 #define ShortLoop() _Pragma("cdir shortloop")
 #define ShortLoopTest() /*?*/
 #define IVDEP() _Pragma("cdir nodep")
+#define UNROLL(x)
 
 #elif ENABLE_OPT_PRAGMAS && defined(__ve)
 #warning "__ve optimization pragmas IN EFFECT"
@@ -118,9 +120,20 @@
 #define ShortLoop() _Pragma("_NEC shortloop")
 #define ShortLoopTest() _Pragma("_NEC shortloop_reduction")
 #define IVDEP() _Pragma("_NEC ivdep")
+#define UNROLL(x) PragmaQuote(_NEC unroll(x))
 
-// TODO
-//#elif ENABLE_OPT_PRAGMAS && defined(__INTEL_COMPILER)
+#elif ENABLE_OPT_PRAGMAS && defined(__INTEL_COMPILER)
+// restrict keyword requires the "-restrict" CFLAG; __restrict__ works anyway
+#define restrict __restrict__
+#define IVDEP() _Pragma("ivdep")
+#define UNROLL(x) PragmaQuote(unroll(x))
+// TODO:
+#define VREG(...)
+#define ALLOC_ON_VREG(...)
+#define ALLOC_ON_ADB(...)
+#define RETAIN(...)
+#define ShortLoop()
+#define ShortLoopTest()
 
 #elif ENABLE_OPT_PRAGMAS && defined(__GNUC__)
 //#warning "__GNUC optimization pragmas IN EFFECT"
@@ -131,6 +144,7 @@
 #define ShortLoop()
 #define ShortLoopTest()
 #define IVDEP() _Pragma("GCC ivdep")
+#define UNROLL(x) PragmaQuote(GCC unroll x)
 
 #else /* A new system might begin by ignoring the optimization pragmas */
 #warning "Please check if _Pragma macros can be defined for this platorm"
@@ -141,6 +155,7 @@
 #define ShortLoop()
 #define ShortLoopTest()
 #define IVDEP()
+#define UNROLL(x)
 
 #endif
 
@@ -162,6 +177,7 @@
 
 #ifndef OMP
 #define OMP(...)
+#warning "not enabling #pragma omp"
 #endif
 #ifndef OMPSIMD
 #define OMPSIMD(...)

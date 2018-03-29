@@ -32,6 +32,12 @@ using namespace mkldnn::impl::status;
 using namespace mkldnn::impl::memory_format;
 using namespace mkldnn::impl::data_type;
 
+#if defined(__ve) // there might be some debug code here, that should get cleaned up XXX
+#include <iostream>
+using std::cout;
+using std::endl;
+#endif
+
 status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
         const dims_t dims, data_type_t data_type, memory_format_t format) {
     if (any_null(memory_desc)) return invalid_arguments;
@@ -167,6 +173,11 @@ status_t mkldnn_view_primitive_desc_create(primitive_desc_t **view_pd,
     for (int d = 0; d < md.ndims(); ++d) {
         if (offsets[d] < 0 || (offsets[d] + dims[d] > md.dims()[d]))
         { args_ok = false; break; }
+    }
+    // above seemed very suspicious. Why would I want to pretend things are OK?
+    if (!args_ok) {
+        cout<<" NEC VE returning error [CHECKME: this looks like some debug code?" << __FILE__ << ":" << __LINE__<<endl;
+        return invalid_arguments;
     }
 #endif
     return memory_pd->engine()->view_primitive_desc_create(

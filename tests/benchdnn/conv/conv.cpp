@@ -1193,11 +1193,21 @@ int doit(const prb_t *p, res_t *r) {
             std::function<int(void)> test_fn,
             std::function<void(void)> prep_fn = refill_none ) -> void
     {
+        print(0,"%s","iterate_over_impls...\n");
         for (conv_iter_v2_t pit(p, cd, engine, NULL); (bool)pit; ++pit) {
             res_state_t pitst = test_dt( pit, inputs, outputs, test_fn, prep_fn );
-            if (pitst == SKIPPED) continue;
-            if (pitst == UNTESTED) break; // unknown error?
-            if (!(bench_mode & ALL)) break; // no iteration desired (run only "best" mkldnn conv)
+            if (pitst == SKIPPED) {
+                print(0,"%s","(impl skipped)");
+                continue;
+            }
+            if (pitst == UNTESTED) {
+                print(0,"%s","status UNTESTED ?unknown error? -- stopping now");
+                break; // unknown error?
+            }
+            if (!(bench_mode & ALL)) {
+                print(0,"%s","bench_mode NOT 'ALL' -- stopping now");
+                break; // no iteration desired (run only "best" mkldnn conv)
+            }
         }
         if (r->state == UNTESTED){ // paranoia
             r->state = UNIMPLEMENTED;

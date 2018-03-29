@@ -71,7 +71,8 @@ struct _ref_convolution_fwd_t: public cpu_primitive_t {
                             utils::one_of(this->cdesc_().bias_desc.data_type,
                                 f32, s32, s8, u8))
                         && utils::implication(src_type == f32,
-                            this->cdesc_().bias_desc.data_type == f32));
+                            this->cdesc_().bias_desc.data_type == f32))
+                && this->attr()->has_default_values();
 #else // debug "why not?"
             bool ok = true
                 AND_NEED( this->set_default_params() == status::success )
@@ -88,6 +89,7 @@ struct _ref_convolution_fwd_t: public cpu_primitive_t {
                                 f32, s32, s8, u8))
                         && utils::implication(src_type == f32,
                             this->cdesc_().bias_desc.data_type == f32)) )
+                AND_NEED( this->attr()->has_default_values() )
                 ;
 #endif
 #if VERBOSE_PRIMITIVE_CREATE

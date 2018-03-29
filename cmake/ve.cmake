@@ -971,4 +971,95 @@ function(show_cmake_stuff MSG)
     message(STATUS "    -------------------------------")
 endfunction()
 
+macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS _compiler _flags _incVar _preincVar)
+    # Input:
+    #           _compiler  : ncc or nc++ [or nfort?]
+    #           _flags     : compiler flags
+    # Output:
+    #           _incVar    : list of compiler include paths (-isystem)
+    #           _preincVar : list of compiler pre-include paths
+    #
+    #    ncc -v -E -x c++ dummy 1>/dev/null
+    #       /opt/nec/ve/ncc/0.0.28/libexec/ccom -cpp -v -E -dD
+    #         -isystem /opt/nec/ve/ncc/0.0.28/include
+    #         -isystem /opt/nec/ve/musl/include
+    #         --preinclude-path /opt/nec/ve/ncc/0.0.28/include
+    #         -x c++ dummy
+    # or [TODO] nfort -v -E dummy 1>/dev/null
+    #       /opt/nec/ve/nfort/0.0.28/libexec/fpp -I. -p
+    #         -I/opt/nec/ve/nfort/0.0.28/include
+    #         -I/opt/nec/ve/musl/include
+    #         dummy
+    set(_verbose 1)
+    if(_verbose GREATER 0)
+        message(STATUS "  CMAKE_C_COMPILER_ID           : ${CMAKE_C_COMPILER_ID}")
+        message(STATUS "  CMAKE_CXX_COMPILER_ID           : ${CMAKE_CXX_COMPILER_ID}")
+    endif()
+    if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
+        message(WARNING "CXX compiler not GNU, so may not be able to determine CXX sys includes")
+    endif()
+    file(WRITE "${CMAKE_BINARY_DIR}/CMakeFiles/dummy" "\n")
+    separate_arguments(_buildFlags UNIX_COMMAND "${_flags}")
+    #execute_process(COMMAND ${_compiler} ${_buildFlags} -v -E dummy
+    set(_cmd ${CMAKE_C_COMPILER} -v -E dummy)
+    execute_process(COMMAND ${_cmd}
+        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/CMakeFiles"
+        OUTPUT_QUIET
+        #OUTPUT_VARIABLE _compOut0 # could be useful if use -dM
+        ERROR_VARIABLE _compOut)
+    file(REMOVE "${CMAKE_BINARY_DIR}/CMakeFiles/dummy")
+    separate_arguments(_compArgs UNIX_COMMAND "${_compOut}")
+    if(_verbose GREATER 1)
+        message(STATUS "_compiler   : ${_compiler}")
+        message(STATUS "_flags      : ${_flags}")
+        message(STATUS "_buildflags : ${_buildflags}")
+        #message(STATUS "_compOut0   : ${_compOut0}")
+        message(STATUS "_compOut    : ${_compOut}")
+        message(STATUS "_compArgs   : ${_compArgs}")
+    endif()
+    set(_nextType "boring")
+    list(GET _compArgs 0 _ccom) # e.g. /opt/nec/ve/ncc/0.0.28/libexec/ccom
+    message(STATUS "_ccom ${_ccom}")
+    get_filename_component(_compRoot ${_ccom} DIRECTORY)
+    get_filename_component(_compRoot ${_compRoot} DIRECTORY)
+    message(STATUS "_compRoot ${_compRoot}")
+    if(_verbose GREATER 0)
+        if(EXISTS ${_compRoot}/etc/ncc.conf)
+            file(READ ${_compRoot}/etc/ncc.conf _etc_ncc_conf)
+            message(STATUS "${_compRoot}/etc/ncc.conf\n${_etc_ncc_conf}")
+        endif()
+    endif()
+    foreach(_compArg ${_compArgs})
+        if(_verbose GREATER 2)
+            message(STATUS "_nextType=${nextType}, _compArg=${_compArg}")
+        endif()
+        if(${_nextType} STREQUAL "-isystem")
+            list(APPEND ${_incVar} ${_compArg})
+            set(_nextType "boring")
+        elseif(${_compArg} STREQUAL "-isystem")
+            set(_nextType ${_compArg})
+        endif()
+    endforeach()
+    foreach(_compArg ${_compArgs})
+        if(_verbose GREATER 2)
+            message(STATUS "_nextType=${nextType}, _compArg=${_compArg}")
+        endif()
+        if(${_nextType} STREQUAL "--preinclude-path")
+            list(REMOVE_ITEM ${_incVar} ${_compArg})
+            list(APPEND ${_preincVar} ${_compArg})
+            set(_nextType "boring")
+        elseif(${_compArg} STREQUAL "--preinclude-path")
+            set(_nextType ${_compArg})
+        endif()
+    endforeach()
+    if(_verbose GREATER 0)
+        message(STATUS "Compiler       : ${_compiler}")
+        message(STATUS "  Flags        : ${_compiler}")
+        message(STATUS "  pre-includes : ${${_preincVar}}")
+        message(STATUS "  sys-includes : ${${_incVar}}")
+    endif()
+endmacro()
+
+show_cmake_stuff("End of ve.cmake")
+
 # vim: et ts=4 sw=4 ai

@@ -15,17 +15,7 @@ USE_CBLAS=1
 QUICK=0
 DOGCC_VER=0
 NEC_FTRACE=0
-if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
-    DOTARGET="s" # s for SX (C/C++ code, cross-compile)
-elif [ "${CC}" == "ncc" -a "${CXX}" == "nc++" ]; then
-    echo "auto-detected '-a' Aurora compiler (ncc, nc++)"
-    DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
-    if [ `uname -n` = "zoro" ]; then JOBS="-j8"; else JOBS="-j1"; fi
-elif [ -d src/vanilla ]; then
-    DOTARGET="v" # v for vanilla (C/C++ code)
-else
-    DOTARGET="j" # j for JIT (Intel assembler)
-fi
+DOTARGET="x"
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -42,10 +32,11 @@ usage() {
     echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
 }
-while getopts ":hatvjdDqQpsSTwWbF1567" arg; do
+while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
+            if [ ! "${DOTARGET}" == "x" ]; then echo "-a no good: already have -${DOTARGET}"; usage; fi
             DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
             JOBS="-j1" # -j1 to avoid SIGSEGV in ccom
             if [ `uname -n` = "zoro" ]; then JOBS="-j8"; fi
@@ -63,10 +54,12 @@ while getopts ":hatvjdDqQpsSTwWbF1567" arg; do
             DOTEST=$(( DOTEST + 1 ))
             ;;
         v) # [yes] (vanilla C/C++ only: no src/cpu/ JIT assembler)
+            if [ ! "${DOTARGET}" == "x" ]; then echo "-v no good: already have -${DOTARGET}"; usage; fi
             if [ -d src/vanilla ]; then DOTARGET="v"; fi
             ;;
         j) # force Intel JIT (src/cpu/ JIT assembly code)
             DOTARGET="j"; DOJIT=100 # 100 means all JIT funcs enabled
+            if [ ! "${DOTARGET}" == "x" ]; then echo "-j no good: already have -${DOTARGET}"; usage; fi
             ;;
         d) # [no] debug release
             DODEBUG="y"
@@ -84,9 +77,11 @@ while getopts ":hatvjdDqQpsSTwWbF1567" arg; do
             DONEEDMKL="n"
             ;;
         S) # SX cross-compile (size_t=64, built in build-sx/, NEW: default if $CC==sxcc)
+            if [ ! "${DOTARGET}" == "x" ]; then echo "-S no good: already have -${DOTARGET}"; usage; fi
             DOTARGET="s"; DOJIT=0; SIZE_T=64; JOBS="-j4"
             ;;
         s) # SX cross-compile (size_t=32, built in build-sx/) DISCOURAGED
+            if [ ! "${DOTARGET}" == "x" ]; then echo "-s no good: already have -${DOTARGET}"; usage; fi
             # -s is NOT GOOD: sizeof(ptrdiff_t) is still 8 bytes!
             DOTARGET="s"; DOJIT=0; SIZE_T=32; JOBS="-j4"
             echo "*** WARNING ***"
@@ -117,11 +112,31 @@ while getopts ":hatvjdDqQpsSTwWbF1567" arg; do
         7) # gcc-7, if found
             DOGCC_VER=7
             ;;
+        i) # try using icc
+            DOGCC_VER=icc
+            ;;
     h | *) # help
             usage
             ;;
     esac
 done
+# if unspecified, autodetect target via $CC compiler variable
+if [ "${DOTARGET}" == "x" ]; then
+    if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
+        DOTARGET="s" # s for SX (C/C++ code, cross-compile)
+    elif [ "${CC}" == "ncc" -a "${CXX}" == "nc++" ]; then
+        echo "auto-detected '-a' Aurora compiler (ncc, nc++)"
+        DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
+        if [ `uname -n` = "zoro" ]; then JOBS="-j8"; else JOBS="-j1"; fi
+    elif [ -d src/vanilla ]; then
+        DOTARGET="v" # v for vanilla (C/C++ code)
+    else
+        DOTARGET="j" # j for JIT (Intel assembler)
+    fi
+fi
+if [ "${DOTARGET}" == "x" ;]; then
+    usage
+fi
 DOJIT=0
 INSTALLDIR=install
 BUILDDIR=build
@@ -131,7 +146,7 @@ BUILDDIR=build
 #fi
 #
 # I have not yet tried icc.
-# For gcc, we will avoid the full MKL (omp issues)
+# we MUST avoid the full MKL (omp issues) (mkldnn uses the mkl subset in external/)
 #
 if [ "${MKLROOT}" != "" ]; then
 	module unload icc >& /dev/null || echo "module icc unloaded"
@@ -145,13 +160,48 @@ fi
 #
 #
 #
-if [ "$DOTARGET" == "j" ]; then DOJIT=100; INSTALLDIR='install-jit'; BUILDDIR='build-jit'; fi
 if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx';
-elif [ "$DOTARGET" != "a" -a "$DOGCC_VER" -gt 0 ]; then
-    if $(gcc-${DOGCC_VER} -v); then export CXX=g++-${DOGCC_VER}; export CC=gcc-${DOGCC_VER}; fi
+elif [ "$DOTARGET" != "a" ]; then
+    if [ "$DOGCC_VER" == "icc" ]; then
+        echo "LOOKING for icc ... which icc = `which icc`"
+        set -x
+        if [ "x`which icc`" == "x" ]; then
+            if true; then
+                module load icc
+                MKLROOT=""
+                LD_LIBRARY_PATH=""
+            else
+                for d in \
+                    /opt/intel/composer_xe_2015/bin \
+                    /opt/intel/composer_xe_2015.3.187/bin \
+                    /opt/intel/compilers_and_libraries/linux/bin/intel64/ \
+                    ; \
+                do
+                    if [ -x "${d}/icc" ]; then
+                        export PATH="${d}:${PATH}"
+                        break;
+                    fi
+                done
+            fi
+        fi
+        set +x
+        export CXX=icpc; export CC=icc; export FC=ifort;
+        BUILDDIR="${BUILDDIR}-icc"; INSTALLDIR="${INSTALLDIR}-icc"
+    elif [ "$DOGCC_VER" -gt 0 ]; then
+        if $(gcc-${DOGCC_VER} -v); then export CXX=g++-${DOGCC_VER}; export CC=gcc-${DOGCC_VER}; fi
+    fi
+    if [ "$DOTARGET" == "j" ]; then
+        DOJIT=100; INSTALLDIR="${INSTALLDIR}-jit"; BUILDDIR="${BUILDDIR}-jit";
+    fi
 fi
+if [ ! "x${CC}" == "x" -a ! "`which ${CC}`" ]; then
+    echo "./build.sh: CC=${CC} , but did not find that compiler."
+    exit -1
+fi
+
 #if [ "$DOTARGET" == "v" ]; then ; fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; BUILDDIR="${BUILDDIR}d"; fi
+
 if [ "$DOJUSTDOC" == "y" ]; then
     (
         if [ ! -d build ]; then mkdir build; fi
@@ -245,6 +295,8 @@ echo "VE_EXEC    ${VE_EXEC}"
 #read asdf
 fi
 
+export PATH
+echo "PATH $PATH"
 (
     echo "# vim: set ro ft=log:"
     echo "DOTARGET   $DOTARGET"
@@ -281,8 +333,10 @@ fi
         CMAKEOPT="${CMAKEOPT} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}"
         CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=OFF -DUSE_SHAREDLIB=OFF"
         # -proginf  : Run with 'export VE_PROGINF=YES' to get some stats output
-        export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
-        export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
+        # export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
+        # export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
+        export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
+        export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
         if [ "$NEC_FTRACE" -eq 1 ]; then
             export CFLAGS="${CFLAGS} -ftrace"
             export CXXFLAGS="${CXXFLAGS} -ftrace"
@@ -360,9 +414,13 @@ fi
                 && BUILDOK="y" || echo "build failed: ret code $?"; }
         else
             rm -f ./stamp-BUILDOK ./CMakeCache.txt
+            echo "CMAKEENV: ${CMAKEENV}"
+            echo "CMAKEOPT: ${CMAKEOPT}"
+            echo "CMAKETRACE: ${CMAKETRACE}"
             echo "${CMAKEENV}; cmake ${CMAKEOPT} ${CMAKETRACE} .."
             set -x
-            { if [ x"${CMAKEENV}" == x"" ]; then ${CMAKEENV}; fi; \
+            # { if [ -nz "${CMAKEENV}" ]; then ${CMAKEENV}; fi; \
+            { if [[ -n "${CMAKEENV}" && "${CMAKEENV}" != "\"\"" ]]; then ${CMAKEENV}; fi; \
                 cmake ${CMAKEOPT} ${CMAKETRACE} .. \
                 && { make VERBOSE=1 ${JOBS} || make VERBOSE=1; } \
                 && BUILDOK="y" || echo "build failed: ret code $?"; }
@@ -379,8 +437,12 @@ fi
         echo "CMAKEENV   <${CMAKEENV}>"
         echo "CMAKEOPT   <${CMAKEOPT}>"
         echo "CMAKETRACE <${CMAKETRACE}>"
+        echo "pwd        `pwd`"
+        echo "PATH       $PATH"
+        echo "CC         $CC"
+        if [ ! "x${CC}" == "x" ]; then ${CC} -V; fi
         set -x
-        { if [ x"${CMAKEENV}" == x"" ]; then ${CMAKEENV}; fi; \
+        { if [ ! "${CMAKEENV}" == '""' ]; then ${CMAKEENV}; fi; \
             cmake ${CMAKEOPT} ${CMAKETRACE} .. ; }
         set +x
     fi
@@ -415,6 +477,7 @@ fi
     fi
     if [ "$BUILDOK" == "y" ]; then
         touch ./stamp-BUILDOK
+        sync ./stamp-BUILDOK
         if [ "$DODOC" == "y" ]; then
             echo "Build OK... Doxygen (please be patient)"
             make VERBOSE=1 doc >& ../doxygen.log
@@ -423,7 +486,7 @@ fi
     set +x
 ) 2>&1 | tee "${BUILDDIR}".log
 ls -l "${BUILDDIR}"
-BUILDOK="n"; sync "${BUILDDIR}/stamp-BUILDOK"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="y"; fi
+BUILDOK="n"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="y"; fi
 
 set +x
 # after cmake we might have a better idea about ve_exec (esp. if PATH is not set properly)

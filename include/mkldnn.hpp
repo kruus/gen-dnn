@@ -67,9 +67,11 @@ protected:
     /// Constructs a C handle wrapper.
     /// @param t The C handle to wrap.
     /// @param weak A flag to specify whether to construct a weak wrapper.
+public:
     handle(T t = 0, bool weak = false): _data(0) {
         reset(t, weak);
     }
+protected:
 
     bool operator==(const T other) const { return other == _data.get(); }
     bool operator!=(const T other) const { return !(*this == other); }
@@ -109,7 +111,7 @@ class primitive: public handle<mkldnn_primitive_t> {
     friend struct error;
     friend struct stream;
     friend class primitive_at;
-    using handle::handle;
+    using handle::handle; // issues with icc 15.03.187?
 public:
     /// A proxy to C primitive kind enum
     enum class kind {
