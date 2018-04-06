@@ -58,8 +58,8 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
             if [ -d src/vanilla ]; then DOTARGET="v"; fi
             ;;
         j) # force Intel JIT (src/cpu/ JIT assembly code)
-            DOTARGET="j"; DOJIT=100 # 100 means all JIT funcs enabled
             if [ ! "${DOTARGET}" == "x" ]; then echo "-j no good: already have -${DOTARGET}"; usage; fi
+            DOTARGET="j"; DOJIT=100 # 100 means all JIT funcs enabled
             ;;
         d) # [no] debug release
             DODEBUG="y"
