@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -40,6 +40,8 @@ struct jit_uni_pool_kernel_f32: public jit_generator {
     }
 
     jit_pool_conf_t jpp;
+
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_uni_pool_kernel_f32)
 
     void operator()(jit_pool_call_s *arg) { jit_ker(arg); }
     static status_t init_conf(jit_pool_conf_t &jbp,

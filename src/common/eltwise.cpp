@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -56,6 +56,7 @@ status_t eltwise_desc_init(eltwise_desc_t *eltwise_desc, prop_kind_t prop_kind,
     ed.negative_slope = ed.alpha;
 
     bool consistency = true
+        && memory_desc_wrapper(ed.data_desc).nelems()
         && implication(ed.prop_kind == backward_data,
                 array_cmp(ed.diff_data_desc.dims, ed.data_desc.dims,
                     ed.diff_data_desc.ndims));

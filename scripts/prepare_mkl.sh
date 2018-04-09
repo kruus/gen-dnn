@@ -1,6 +1,6 @@
 #!/bin/sh
 #===============================================================================
-# Copyright 2016-2017 Intel Corporation
+# Copyright 2016-2018 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
 # limitations under the License.
 #===============================================================================
 
-MKLURLROOT="https://github.com/01org/mkl-dnn/releases/download/v0.12/"
-MKLVERSION="2018.0.1.20171227"
+MKLURLROOT="https://github.com/intel/mkl-dnn/releases/download/v0.13/"
+MKLVERSION="2018.0.2.20180127"
 
 os=`uname`
 if [ "$os" = "Linux" ]; then
@@ -33,7 +33,15 @@ DST=`dirname $0`/../external
 mkdir -p $DST
 DST=`cd $DST;pwd`
 
-curl -L -o "${DST}/${MKLPACKAGE}" "$MKLURL"
+if [ -x "$(command -v curl)" ]; then
+  curl -L -o "${DST}/${MKLPACKAGE}" "$MKLURL"
+elif [ -x "$(command -v wget)" ]; then
+  wget -O "${DST}/${MKLPACKAGE}" "$MKLURL"
+else
+  echo "curl or wget not available"
+  exit 1
+fi
+
 if [ \! $? ]; then
   echo "Download from $MKLURL to $DST failed"
   exit 1

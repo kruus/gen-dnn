@@ -1,5 +1,5 @@
 #===============================================================================
-# Copyright 2017 Intel Corporation
+# Copyright 2017-2018 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ file(GLOB SOURCES
     )
 include_directories( ${CMAKE_CURRENT_SOURCE_DIR} )
 # benchdnn subtests
-foreach(subdir bnorm conv ip reorder self)
+foreach(subdir bnorm conv ip reorder rnn self)
     file(GLOB subfiles
         ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/*.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/*.hpp
@@ -87,11 +87,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${BENCHDNN_EXTRA}")
 # Just for fun, take a look at assembler output for any conv/*.cxx files.
 # These outputs are left in the cmake binary directory ~ build/tests/benchdnn.
 file(GLOB ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/*.cxx)
-list(APPEND ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/sx_conv3.cpp)
-list(APPEND ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/sx_conv3_ve.cpp)
-list(APPEND ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/sx_conv2.cpp)
-list(APPEND ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/ref_conv3.cpp)
-# hack: get the .o and .s rules into Makefiles, but skip the link step
+#list(APPEND ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/sx_conv3.cpp)
+#list(APPEND ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/sx_conv3_ve.cpp)
+#list(APPEND ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/sx_conv2.cpp)
+#list(APPEND ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/ref_conv3.cpp)
+# hack: get the .o and .s **rules** into Makefiles, but skip the link step
 add_library(unused STATIC ${ASM_SOURCES})
 set_target_properties(unused PROPERTIES
     EXCLUDE_FROM_ALL 1)

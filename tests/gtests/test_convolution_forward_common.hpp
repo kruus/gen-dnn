@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+
 #ifndef TEST_CONVOLUTION_FORWARD_COMMON_H
 #define TEST_CONVOLUTION_FORWARD_COMMON_H
 
@@ -151,33 +152,22 @@ protected:
                 create_md({ cd.oc }, data_type_dst, p.formats.bias_format) :
                 create_md({}, data_type_dst, p.formats.bias_format);
 
-        auto src_primitive_desc = memory::primitive_desc(c_src_desc, eng);
-        auto weights_primitive_desc = memory::primitive_desc(
-                c_weights_desc, eng);
-        auto bias_primitive_desc = memory::primitive_desc(c_bias_desc, eng);
-        auto dst_primitive_desc = memory::primitive_desc(c_dst_desc, eng);
+        auto c_src = test_memory(c_src_desc, eng);
+        auto c_weights = test_memory(c_weights_desc, eng);
+        auto c_bias = test_memory(c_bias_desc, eng);
+        auto c_dst = test_memory(c_dst_desc, eng);
 
-        auto dst_size = dst_primitive_desc.get_size();
-
-        // TODO: free
-        auto ref_dst_data = new data_t_dst[dst_size];
-
-        auto c_src = memory(src_primitive_desc);
-        auto c_weights = memory(weights_primitive_desc);
-        auto c_bias = memory(bias_primitive_desc);
-        auto c_dst = memory(dst_primitive_desc);
+        std::shared_ptr<data_t_dst>
+            ref_dst_data(new data_t_dst[c_dst.get_size()]);
 
         // Only true for dense format
-        fill_data<data_t_src>(
-                c_src.get_primitive_desc().get_size() / sizeof(data_t_src),
-                (data_t_src *)c_src.get_data_handle());
-        fill_data<data_t_wei>(
-                c_weights.get_primitive_desc().get_size() / sizeof(data_t_wei),
-                (data_t_wei *)c_weights.get_data_handle());
+        fill_data<data_t_src>(c_src.get_size() / sizeof(data_t_src),
+                (data_t_src *)c_src.get().get_data_handle());
+        fill_data<data_t_wei>(c_weights.get_size() / sizeof(data_t_wei),
+                (data_t_wei *)c_weights.get().get_data_handle());
         if (with_bias) {
-            fill_data<data_t_dst>(
-                    c_bias.get_primitive_desc().get_size() / sizeof(data_t_dst),
-                    (data_t_dst *)c_bias.get_data_handle());
+            fill_data<data_t_dst>(c_bias.get_size() / sizeof(data_t_dst),
+                    (data_t_dst *)c_bias.get().get_data_handle());
         }
 
         std::vector<int> padR = { cd.padh, cd.padw };
@@ -190,26 +180,25 @@ protected:
                 ++padR[1];
         }
 
-        auto conv_desc = with_bias ?
-            convolution_forward::desc(aprop_kind, p.aalgorithm,
-                c_src_desc, c_weights_desc, c_bias_desc, c_dst_desc,
-                { cd.strh, cd.strw }, { cd.dilh, cd.dilw },
-                { cd.padh, cd.padw }, padR, padding_kind::zero) :
-            convolution_forward::desc(aprop_kind, p.aalgorithm,
-                c_src_desc, c_weights_desc, c_dst_desc,
-                { cd.strh, cd.strw }, { cd.dilh, cd.dilw },
-                { cd.padh, cd.padw }, padR, padding_kind::zero);
+        auto test = [&]() {
+            auto conv_desc = with_bias ?
+                convolution_forward::desc(aprop_kind, p.aalgorithm,
+                    c_src_desc, c_weights_desc, c_bias_desc, c_dst_desc,
+                    { cd.strh, cd.strw }, { cd.dilh, cd.dilw },
+                    { cd.padh, cd.padw }, padR, padding_kind::zero) :
+                convolution_forward::desc(aprop_kind, p.aalgorithm,
+                    c_src_desc, c_weights_desc, c_dst_desc,
+                    { cd.strh, cd.strw }, { cd.dilh, cd.dilw },
+                    { cd.padh, cd.padw }, padR, padding_kind::zero);
 
-        try{
-            /* NOTE: this try-catch block is ugly... */
             auto conv_primitive_desc = convolution_forward::primitive_desc(
                     conv_desc, attr.mkl_attr, eng);
 
             auto conv = with_bias ?
-                convolution_forward(conv_primitive_desc,
-                        c_src, c_weights, c_bias, c_dst) :
-                convolution_forward(conv_primitive_desc,
-                        c_src, c_weights, c_dst);
+                convolution_forward(conv_primitive_desc, c_src.get(),
+                        c_weights.get(), c_bias.get(), c_dst.get()) :
+                convolution_forward(conv_primitive_desc, c_src.get(),
+                        c_weights.get(), c_dst.get());
 
             std::vector<primitive> pipeline;
             pipeline.push_back(conv);
@@ -217,14 +206,15 @@ protected:
             s.submit(pipeline).wait();
 
             auto ref_memory = memory(memory::primitive_desc(c_dst_desc, eng),
-                    ref_dst_data);
+                    ref_dst_data.get());
             compute_ref_conv_fwd<data_t_src,data_t_wei,data_t_acc,data_t_dst>(
                 cd, attr, c_src_desc, c_weights_desc, c_bias_desc, c_dst_desc,
-                c_src, c_weights, c_bias, ref_memory);
-            compare_data<data_t_dst>(ref_memory, c_dst);
-        } catch (...) {
-            /* Convolution is unimplemented */
-        }
+                c_src.get(), c_weights.get(), c_bias.get(), ref_memory);
+            compare_data<data_t_dst>(ref_memory, c_dst.get());
+        };
+
+        if (catch_expected_failures(test, p.expect_to_fail, p.expected_status))
+            return;
     }
 };
 

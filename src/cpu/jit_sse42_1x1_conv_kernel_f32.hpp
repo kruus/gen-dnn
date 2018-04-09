@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -52,6 +52,8 @@ struct jit_sse42_1x1_conv_kernel_f32: public jit_generator {
     {
         return init_conf(jcp, cd, src_d, weights_d, dst_d, attr, false, 0.0);
     }
+
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_sse42_1x1_conv_kernel_f32)
 
     jit_1x1_conv_conf_t jcp;
     const primitive_attr_t &attr_;

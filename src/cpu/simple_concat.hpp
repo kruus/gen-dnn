@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ struct simple_concat_t: public cpu_primitive_t {
         {}
         pd_t(const pd_t &rhs) : cpu_concat_pd_t(rhs) {}
 
-        DECLARE_CPU_CONCAT_PD_T(simple_concat_t);
+        DECLARE_CPU_CONCAT_PD_T("simple:any", simple_concat_t);
 
         virtual status_t init() override {
             auto is_dense_no_0 = [](const memory_desc_wrapper &data_d) {

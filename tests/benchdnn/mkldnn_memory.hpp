@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -37,8 +37,7 @@ struct dnn_mem_t {
 
     dnn_mem_t(int ndims, const mkldnn_dims_t dims, mkldnn_data_type_t dt,
             mkldnn_memory_format_t fmt, void *data = NULL)
-        : active_(initialize(ndims, dims, dt, fmt, data) == OK)
-    {}
+        : active_(initialize(ndims, dims, dt, fmt, data) == OK) {}
 
     /** get dims from \c md but force data type \c dt.
      * - optionally override layout \c fmt.
@@ -47,10 +46,15 @@ struct dnn_mem_t {
     dnn_mem_t(const mkldnn_memory_desc_t &md, mkldnn_data_type_t dt,
             mkldnn_memory_format_t fmt = mkldnn_format_undef,
             void *data = NULL)
+#if 1 //mine
         : active_(initialize(md.ndims, md.dims, dt,
                     (fmt != mkldnn_format_undef? fmt: md.format), data) == OK)
     {}
+#else
+        : active_(initialize(md, dt, fmt, data) == OK) {}
+#endif
 
+#if 0 // mine
     dnn_mem_t(const dnn_mem_t &rhs, mkldnn_data_type_t dt,
             mkldnn_memory_format_t fmt = mkldnn_format_undef,
             void *data = NULL)
@@ -58,6 +62,12 @@ struct dnn_mem_t {
     {
         if(active_) reorder(rhs);
     }
+#else // theirs (identical)
+    dnn_mem_t(const dnn_mem_t &rhs, mkldnn_data_type_t dt,
+            mkldnn_memory_format_t fmt = mkldnn_format_undef,
+            void *data = NULL): dnn_mem_t(rhs.md_, dt, fmt, data)
+    { if (active_) reorder(rhs); }
+#endif
 
 #if 1
     /** Construct an optionally active dnn_mem_t.
@@ -181,12 +191,25 @@ struct dnn_mem_t {
     bool is_data_owner_, active_;
 
 private:
-    int initialize(const mkldnn_memory_desc_t &md, void *data) {
+    int initialize(const mkldnn_memory_desc_t &md, mkldnn_data_type_t dt,
+            mkldnn_memory_format_t fmt, void *data) {
+#if 0 // old
         // [ejk] avoid mkldnn_primitive_create fp exception (or assertion)
         //if (md.primitive_kind == mkldnn_undefined_primitive)
         if (md.primitive_kind != mkldnn_memory)
             return FAIL;
         md_ = md;
+#endif
+        if (md.primitive_kind != mkldnn_memory)
+            return FAIL;
+        if (fmt == mkldnn_format_undef || fmt == mkldnn_blocked) {
+            md_ = md;
+            md_.data_type = dt;
+        } else {
+            DNN_SAFE(mkldnn_memory_desc_init(&md_, md.ndims, md.dims, dt, fmt),
+                    CRIT);
+        }
+        //---------------------
         DNN_SAFE(mkldnn_memory_primitive_desc_create(&mpd_, &md_, engine),
                 CRIT);
         DNN_SAFE(mkldnn_primitive_create(&p_, mpd_, NULL, NULL), CRIT);
@@ -205,12 +228,17 @@ private:
         return OK;
     }
 
+    int initialize(const mkldnn_memory_desc_t &md, void *data) {
+        return initialize(md, md.data_type, mkldnn_format_undef, data);
+    }
+
     int initialize(int ndims, const mkldnn_dims_t dims, mkldnn_data_type_t dt,
 		    mkldnn_memory_format_t fmt, void* data) {
         mkldnn_memory_desc_t xmd;
 	DNN_SAFE(mkldnn_memory_desc_init(&xmd, ndims, dims, dt, fmt), CRIT);
 	SAFE(initialize(xmd, data), CRIT);
-        return init();
+        //return init(); // old ???
+        return OK;
     }
 
     int cleanup() {

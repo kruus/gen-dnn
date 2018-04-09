@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -76,10 +76,10 @@ void _gemm_convolution_fwd_t<with_relu, run_jit, isa>::execute_forward() {
     }
     const bool do_relu = jcp.with_relu || entry_idx >= 0;
 
-    const data_t zero = 0.0, one = 1.0;
-    const data_t beta = post_ops.find(primitive_kind::sum) >= 0 ? one : zero;
+    const data_t one = 1.0;
 
     const size_t work_amount = jcp.ngroups * jcp.mb;
+#if 0 // old
     //Check: Can we use GEMM parallelism or do parallelization by minibatch?
     int num_thr =
         (jcp.oh * jcp.ow) / omp_get_max_threads() < 256 && jcp.mb != 1
@@ -87,6 +87,9 @@ void _gemm_convolution_fwd_t<with_relu, run_jit, isa>::execute_forward() {
     MAYBE_UNUSED(num_thr);
 
     OMP(parallel num_threads(num_thr))//;
+#else
+    OMP(parallel num_threads(this->nthr_))//;
+#endif
     {
         const int ithr = omp_get_thread_num();
         const int nthr = omp_get_num_threads();
@@ -110,11 +113,11 @@ void _gemm_convolution_fwd_t<with_relu, run_jit, isa>::execute_forward() {
             if (run_jit) {
                 sgemm_->sgemm("N", "N", &M, &N, &K, &one,
                         jcp.need_im2col ? _col : _src, &M, _weights, &K,
-                        &beta, _dst, &M);
+                        &this->beta_, _dst, &M);
             } else {
                 cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, M, N, K,
-                    one, jcp.need_im2col ? _col : _src, M, _weights, K, beta,
-                    _dst, M);
+                    one, jcp.need_im2col ? _col : _src, M, _weights, K,
+                    this->beta_, _dst, M);
             }
 
             if (jcp.with_bias || do_relu) {
@@ -152,9 +155,7 @@ void _gemm_convolution_bwd_data_t<run_jit, isa>::execute_backward_data() {
     const data_t zero = 0.0, one = 1.0;
 
     const size_t work_amount = jcp.ngroups * jcp.mb;
-    int num_thr = (jcp.mb != 1) ? omp_get_max_threads() : 1;
-    MAYBE_UNUSED(num_thr);
-    OMP(parallel num_threads(num_thr))//;
+    OMP(parallel num_threads(this->nthr_))//;
     {
         const int ithr = omp_get_thread_num();
         const int nthr = omp_get_num_threads();
@@ -204,9 +205,7 @@ void _gemm_convolution_bwd_weights_t<run_jit, isa>::execute_backward_weights() {
     const int M = jcp.ic * jcp.ks;
     const data_t zero = 0.0, one = 1.0;
 
-    int num_thr = (jcp.mb != 1) ? omp_get_max_threads() : 1;
-    MAYBE_UNUSED(num_thr);
-    OMP(parallel num_threads(num_thr))//;
+    OMP(parallel num_threads(this->nthr_))//;
     {
         const int ithr = omp_get_thread_num();
         const int nthr = omp_get_num_threads();

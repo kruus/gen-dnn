@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+
 #include "c_types_map.hpp"
 #include "nstl.hpp"
 #include "utils.hpp"
@@ -172,8 +173,6 @@ inline void jit_uni_pool_kernel_f32<isa>::avg_step(int ur_w, int pad_l,
 template <cpu_isa_t isa>
 inline void jit_uni_pool_kernel_f32<isa>::max_step_fwd(int ur_w, int pad_l,
         int pad_r, const char *kh_label) {
-    unsigned char _cmp_lt_os = 1;
-
     int iw = jpp.iw;
     int kw = jpp.kw;
     int stride_w = jpp.stride_w;

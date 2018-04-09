@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -1701,6 +1701,8 @@ struct jit_avx512_common_gemm_f32::xbyak_gemm : public jit_generator {
         ker_ = reinterpret_cast<decltype(ker_)>(
                 const_cast<uint8_t *>(this->getCode()));
     }
+
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_common_gemm_f32_xbyak_gemm)
 
     void operator()(long long int m, long long int n, long long int k,
             const float *alpha, const float *a, long long int lda,

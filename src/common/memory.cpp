@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -38,6 +38,12 @@ using std::cout;
 using std::endl;
 #endif
 
+#ifndef NDEBUG
+void mkldnn_breakpoint_empty_memory() { // breakpt for gdb
+    fflush(stdout);
+}
+#endif
+
 status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
         const dims_t dims, data_type_t data_type, memory_format_t format) {
     if (any_null(memory_desc)) return invalid_arguments;
@@ -52,27 +58,38 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
         && one_of(data_type, f32, s32, s16, s8, u8);
 #ifndef NDEBUG
     if (!args_ok){ printf("Oops [%s:%d] !args_ok\n", __FILE__, __LINE__); fflush(stdout);}
-#endif
-    if (!args_ok) return invalid_arguments;
-
-    /* for now, mkl-dnn is written NOT to support large tensors (>2G) */
-    uint64_t elements=1U;
-    uint64_t const max_elements=2147483648U;
-    for(int i=0U; i<ndims; ++i){
-        elements *= dims[i];
-        if (dims[i] <= 0 || elements > max_elements){
-            args_ok = false;
-            break;
+    if (any_null(memory_desc)){ printf(" any_null(memory_desc)"); fflush(stdout);}
+    if (! one_of(data_type, f32, s32, s16, s8, u8)){ printf(" bad data_type"); fflush(stdout);}
+    if (! (0 < ndims && ndims <= TENSOR_MAX_DIMS)){
+        printf(" bad ndims=%lu",(long unsigned)ndims); fflush(stdout);
+    }
+    if(args_ok){
+        /* for now, mkl-dnn is written NOT to support large tensors (>2G) */
+        uint64_t elements=1U;
+        uint64_t const max_elements=2147483648U;
+        for(int i=0U; i<ndims; ++i){
+            elements *= dims[i];
+            if (elements > max_elements){ // note: elements==0 DOES occur
+                args_ok = false;
+                break;
+            }
+        }
+        // perhaps also limited to total memory size?
+        // i.e. elements * types::data_type_size(data_type) < 2G or 4G?
+        if (!args_ok)
+            printf("OOPS too large a tensor? elements=%lu ??\n",
+                    (long unsigned)elements);
+#if 1 /* Note: some gtests may create zero-length memory descriptors on purpose */
+        if(elements == 0U){
+            printf("Warning in mkldnn_memory_desc_init: 0 elements, dims=", __FUNCTION__);
+            for(int i=0U; i<ndims; ++i){ printf("%s%lu",
+                    (i==0?"{":","), (long unsigned)elements); }
+            printf("}\n");
+            mkldnn_breakpoint_empty_memory();
         }
     }
-    // perhaps also limited to total memory size?
-    // i.e. elements * types::data_type_size(data_type) < 2G or 4G?
-    if (!args_ok){
-#ifndef NDEBUG
-        printf("OOPS too large a tensor? elements=%lu ??\n",(long unsigned)elements);
 #endif
-        return invalid_arguments;
-    }
+    if (!args_ok) return invalid_arguments;
 
     memory_desc_t md;
     md.ndims = ndims;
@@ -103,6 +120,7 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
 #if MKLDNN_JIT_TYPES > 0
     case OIhw8i8o:
     case OIhw16i16o:
+    case OIhw4i16o4i:
     case OIhw8i16o2i:
     case OIhw8o16i2o:
     case OIhw8o8i:
@@ -119,6 +137,7 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
 #if MKLDNN_JIT_TYPES > 0
     case gOIhw8i8o:
     case gOIhw16i16o:
+    case gOIhw4i16o4i:
     case gOIhw8i16o2i:
     case gOIhw8o16i2o:
     case gOIhw8o8i:
@@ -128,8 +147,19 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     case gOihw16o:
     case gOhwi8o:
     case gOhwi16o:
+    case Goihw8g:
+    case Goihw16g:
     case gOhIw16o4i:
 #endif
+    case ncdhw:
+    case goidhw:
+    case oidhw:
+    case ntc:
+    case tnc:
+    case ldsnc:
+    case ldigo:
+    case ldgoi:
+    case ldgo:
         status = memory_desc_wrapper::compute_blocking(md);
         break;
     /* not enough information */
@@ -163,23 +193,10 @@ status_t mkldnn_view_primitive_desc_create(primitive_desc_t **view_pd,
     const memory_pd_t *mpd =
         (const memory_pd_t*)memory_pd;
     memory_desc_wrapper md(*mpd->desc());
-#if !defined(__ve)
     for (int d = 0; d < md.ndims(); ++d) {
         if (offsets[d] < 0 || (offsets[d] + dims[d] > md.dims()[d]))
             return invalid_arguments;
     }
-    if (!args_ok) return invalid_arguments;
-#else
-    for (int d = 0; d < md.ndims(); ++d) {
-        if (offsets[d] < 0 || (offsets[d] + dims[d] > md.dims()[d]))
-        { args_ok = false; break; }
-    }
-    // above seemed very suspicious. Why would I want to pretend things are OK?
-    if (!args_ok) {
-        cout<<" NEC VE returning error [CHECKME: this looks like some debug code?" << __FILE__ << ":" << __LINE__<<endl;
-        return invalid_arguments;
-    }
-#endif
     return memory_pd->engine()->view_primitive_desc_create(
             (view_pd_t**)view_pd, mpd, dims, offsets);
 }
@@ -220,7 +237,7 @@ status_t mkldnn_memory_get_data_handle(const primitive_t *memory,
 }
 
 status_t mkldnn_memory_set_data_handle(primitive_t *memory, void *handle) {
-    if (any_null(memory, handle) || memory->kind() != primitive_kind::memory)
+    if (any_null(memory) || memory->kind() != primitive_kind::memory)
         return invalid_arguments;
     return memory->set_data_handle(handle);
 }
@@ -278,8 +295,10 @@ status_t mkldnn_concat_primitive_desc_create_v2(primitive_desc_t **concat_pd,
     auto c_pd = reinterpret_cast<concat_pd_t **>(concat_pd);
 
     for (auto c = engine->get_concat_implementation_list(); *c; ++c) {
-        if ((*c)(c_pd, output_d, n, concat_dim, i_mpds, attr) == success)
+        if ((*c)(c_pd, output_d, n, concat_dim, i_mpds, attr) == success) {
+            (*c_pd)->init_info();
             return success;
+        }
     }
     return unimplemented;
 }
@@ -299,6 +318,9 @@ status_t mkldnn_sum_primitive_desc_create_v2(primitive_desc_t **sum_pd,
     for (int i = 0; i < n; ++i) {
         if (input_pds[i] == nullptr ||
                 input_pds[i]->kind() != primitive_kind::memory)
+            return invalid_arguments;
+        auto input_mpd_i = reinterpret_cast<const memory_pd_t *>(input_pds[i]);
+        if (memory_desc_wrapper(input_mpd_i).nelems() == 0)
             return invalid_arguments;
     }
 
@@ -338,8 +360,10 @@ status_t mkldnn_sum_primitive_desc_create_v2(primitive_desc_t **sum_pd,
     auto s_pd = reinterpret_cast<sum_pd_t **>(sum_pd);
 
     for (auto s = engine->get_sum_implementation_list(); *s; ++s) {
-        if ((*s)(s_pd, output_d, n, scales, i_mpds, attr) == success)
+        if ((*s)(s_pd, output_d, n, scales, i_mpds, attr) == success) {
+            (*s_pd)->init_info();
             return success;
+        }
     }
     return unimplemented;
 }
@@ -351,4 +375,4 @@ status_t mkldnn_sum_primitive_desc_create(primitive_desc_t **sum_pd,
             input_pds, nullptr);
 }
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

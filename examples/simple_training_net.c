@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -27,6 +27,12 @@
 #endif
 
 #define BATCH 32
+
+#if defined(_SX)
+#define STRUCT_INIT_BUG 1
+#else
+#define STRUCT_INIT_BUG 0
+#endif
 
 #define CHECK(f)                                                               \
     do {                                                                       \
@@ -144,14 +150,22 @@ prepare_reorder(mkldnn_primitive_t *user_memory,               /** in */
              * already appeared in in- and out- memory primitive descriptors */
             CHECK(mkldnn_reorder_primitive_desc_create(
                     &reorder_pd, user_memory_pd, *prim_memory_pd));
+#if STRUCT_INIT_BUG
             mkldnn_primitive_at_t inputs = { *user_memory, 0 };
+#else
+            mkldnn_primitive_at_t inputs = { *user_memory };
+#endif
             const_mkldnn_primitive_t outputs[] = { *prim_memory };
             CHECK(mkldnn_primitive_create(reorder, reorder_pd, &inputs,
                                           outputs));
         } else {
             CHECK(mkldnn_reorder_primitive_desc_create(
                     &reorder_pd, *prim_memory_pd, user_memory_pd));
+#if STRUCT_INIT_BUG
             mkldnn_primitive_at_t inputs = { *prim_memory, 0 };
+#else
+            mkldnn_primitive_at_t inputs = { *prim_memory };
+#endif
             const_mkldnn_primitive_t outputs[] = { *user_memory };
             CHECK(mkldnn_primitive_create(reorder, reorder_pd, &inputs,
                                           outputs));
@@ -302,7 +316,11 @@ mkldnn_status_t simple_net()
                 mkldnn_primitive_at(conv_weights_memory, 0),
                 mkldnn_primitive_at(conv_user_bias_memory, 0) };
 
+#if STRUCT_INIT_BUG
     const_mkldnn_primitive_t conv_dsts[] = { conv_internal_dst_memory, 0 };
+#else
+    const_mkldnn_primitive_t conv_dsts[] = { conv_internal_dst_memory };
+#endif
 
     /* finally create a convolution primitive */
     mkldnn_primitive_t conv;
@@ -344,7 +362,11 @@ mkldnn_status_t simple_net()
 
     /* finally create a relu primitive */
     mkldnn_primitive_t relu;
+#if STRUCT_INIT_BUG
     mkldnn_primitive_at_t relu_srcs = { conv_internal_dst_memory, 0 };
+#else
+    mkldnn_primitive_at_t relu_srcs = { conv_internal_dst_memory };
+#endif
     const_mkldnn_primitive_t relu_dsts[] = { relu_dst_memory };
 
     CHECK(mkldnn_primitive_create(&relu, relu_pd, &relu_srcs, relu_dsts));
@@ -404,7 +426,11 @@ mkldnn_status_t simple_net()
     CHECK(mkldnn_memory_set_data_handle(lrn_workspace_memory,
                                         lrn_workspace_buffer));
 
+#if STRUCT_INIT_BUG
     mkldnn_primitive_at_t lrn_srcs = { relu_dst_memory, 0 };
+#else
+    mkldnn_primitive_at_t lrn_srcs = { relu_dst_memory };
+#endif
 
     const_mkldnn_primitive_t lrn_dsts[]
             = { lrn_dst_memory, lrn_workspace_memory };
@@ -479,7 +505,11 @@ mkldnn_status_t simple_net()
                           &pool_internal_dst_memory, &pool_reorder_dst,
                           pool_dst_buffer));
 
+#if STRUCT_INIT_BUG
     mkldnn_primitive_at_t pool_srcs = { lrn_dst_memory, 0 };
+#else
+    mkldnn_primitive_at_t pool_srcs = { lrn_dst_memory };
+#endif
 
     pool_dst_memory = pool_internal_dst_memory ? pool_internal_dst_memory
                                                : pool_user_dst_memory;
@@ -627,7 +657,11 @@ mkldnn_status_t simple_net()
                 mkldnn_primitive_at(pool_diff_src_memory, 0),
                 mkldnn_primitive_at(lrn_workspace_memory, 0) };
 
+#if STRUCT_INIT_BUG
     const_mkldnn_primitive_t lrn_diff_srcs[] = { lrn_diff_src_memory, 0 };
+#else
+    const_mkldnn_primitive_t lrn_diff_srcs[] = { lrn_diff_src_memory };
+#endif
 
     /* finally create backward lrn primitive */
     mkldnn_primitive_t lrn_bwd;

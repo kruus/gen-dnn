@@ -2,6 +2,9 @@
 
 ## BRANCH for non-jit version of MKL-DNN, to ease porting API to non-Intel platforms
 
+* NEC SX,            sxcc compiler
+* NEC "Aurora" chip, ncc compiler
+
 ### Quickstart:
 
 ```
@@ -70,56 +73,78 @@ This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
 
 ## Original README.md ...
 
-## Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)
-[![Apache License Version 2.0](https://img.shields.io/badge/license-Apache_2.0-green.svg)](LICENSE)
-![v0.12 beta](https://img.shields.io/badge/v0.12-beta-orange.svg)
+> Intel MKL-DNN repository migrated to [https://github.com/intel/mkl-dnn](https://github.com/intel/mkl-dnn).
+> The old address will continue to be available and will redirect to the new repo.
+> Please update your links.
 
-Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN) is an
-open source performance library for Deep Learning (DL) applications intended
-for acceleration of DL frameworks on Intel(R) architecture. Intel(R) MKL-DNN
-includes highly vectorized and threaded building blocks for implementation of
-convolutional neural networks (CNN) with C and C++ interfaces. We created this
-project to enable the DL community to innovate on Intel(R) processors.
+# Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)
+![v0.13 beta](https://img.shields.io/badge/v0.13-beta-orange.svg)
 
-Intel MKL-DNN includes functionality similar to [Intel(R) Math Kernel
-Library (Intel(R) MKL) 2017](https://software.intel.com/en-us/intel-mkl), 
-but is not API compatible. We are investigating how to unify the APIs in 
-future Intel MKL releases.
+Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN) is
+an open source performance library for deep learning applications. The library
+accelerates deep learning applications and framework on Intel(R) architecture. 
+Intel(R) MKL-DNN contains vectorized and threaded building blocks which you can
+use to implement deep neural networks (DNN) with C and C++ interfaces.
 
-This release contains a range of performance critical functions used in modern
-image recognition (AlexNet, VGG, GoogleNet\*, ResNet), semantic
-segmentation (FCNs, SegNet), and object detection topologies (SSD,
-Fast/Faster R-CNN) optimized for wide range of Intel processors.
+DNN functionality optimized for Intel architecture is also included in 
+[Intel(R) Math Kernel Library (Intel(R) MKL)](https://software.intel.com/en-us/mkl/features/deep-neural-networks).
+API in this implementation is not compatible with Intel MKL-DNN and does not
+include certain new and experimental features.
 
-**WARNING** Functionality related to `s16` data type is experimental 
-and might change without prior notification in future releases.
+This release contains performance critical functions that improve performance of
+the following deep learning topologies and their variations
+
+|Application                   | Topology
+|:---                          |:---
+|Image recognition             | AlexNet, VGG, GoogleNet, ResNet
+|Semantic segmenation          | FCN, SegNet
+|Object detection              | SSD, Faster R-CNN
+
+Intel MKL-DNN is used in the the following software products:
+* [Caffe\* Optimized for Intel Architecture](https://github.com/intel/caffe)
+* [DeepBench](https://github.com/baidu-research/DeepBench)
+* [PaddlePaddle\*](http://www.paddlepaddle.org)
+* [Tensorflow\*](https://www.tensorflow.org)
+* [Microsoft\* Cognitive Toolkit (CNTK)](https://www.microsoft.com/en-us/cognitive-toolkit/)
+* [Apache\* MXNet](https://mxnet.apache.org/)
+* [Intel(R) Computer Vision SDK](https://software.intel.com/en-us/computer-vision-sdk)
+* [Intel(R) Nervana(TM) Graph](https://github.com/NervanaSystems/ngraph)
 
 ## License
 Intel MKL-DNN is licensed under
-[Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
+[Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0). This
+software includes the following third party components:
+* [Xbyak](https://github.com/herumi/xbyak) distributed under [3-clause BSD licence](src/cpu/xbyak/COPYRIGHT)
+* [gtest](https://github.com/google/googletest) distributed under [3-clause BSD license](tests/gtests/gtest/LICENSE)
 
 ## Documentation
-The latest version of Intel MKL-DNN reference manual is available 
-[GitHub pages](http://01org.github.io/mkl-dnn/). Basic concepts are also
-explained in the tutorial
-* [Intel MKL-DNN: Part 1--Overview and Installation](https://software.intel.com/en-us/articles/intel-mkl-dnn-part-1-library-overview-and-installation)
-* [Intel MKL-DNN: Part 2--Code Build and Walkthrough](https://software.intel.com/en-us/articles/intel-mkl-dnn-part-2-sample-code-build-and-walkthrough)
+* [Introduction](https://intel.github.io/mkl-dnn) explains programming model
+and basic concepts
+* [Reference manual](https://intel.github.io/mkl-dnn/modules.html) provides
+detailed functionality description
+* [Examples](https://github.com/intel/mkl-dnn/tree/master/examples) 
+demonstrate use of C and C++ APIs in simple topologies
+* [Tutorial](https://software.intel.com/en-us/articles/intel-mkl-dnn-part-1-library-overview-and-installation) 
+provides step by step installation instructions and an example walkthrough
 
 ## Support
 Please submit your questions, feature requests and bug reports on
-[GitHub issues](https://github.com/01org/mkl-dnn/issues) page.
+[GitHub issues](https://github.com/intel/mkl-dnn/issues) page.
+
+**WARNING** The following functionality has preview status and might change
+without prior notification in future releases:
+* Convolutions with `s16` data type in source, weights or destination
+* Convolutions and auxillary primitives for 3D spatial data
+* RNN, LSTM and GRU primitives
 
 ## How to Contribute
 We welcome community contributions to Intel MKL-DNN. If you have an idea how to improve the library:
 
 * Share your proposal via
- [GitHub issues](https://github.com/01org/mkl-dnn/issues).
-
+ [GitHub issues](https://github.com/intel/mkl-dnn/issues).
 * Ensure you can build the product and run all the examples with your patch
-
 * In the case of a larger feature, create a test
-
-* Submit a [pull request](https://github.com/01org/mkl-dnn/pulls)
+* Submit a [pull request](https://github.com/intel/mkl-dnn/pulls)
 
 We will review your contribution and, if any additional fixes or modifications
 are necessary, may provide feedback to guide you. When accepted, your pull
@@ -135,6 +160,7 @@ The library is optimized for the systems based on
 * Intel Xeon Platinum processor family (formerly Skylake)
 * Intel(R) Xeon Phi(TM) processor x200 product family (formerly Knights Landing)
 * Intel Xeon Phi processor x205 product family (formerly Knights Mill)
+
 and compatible processors.
 
 The software dependencies are:
@@ -162,11 +188,11 @@ The implementation uses OpenMP\* 4.0 SIMD extensions. We recommend using
 Intel(R) Compiler for the best performance results.
 
 ## Installation
-Download [Intel MKL-DNN source code](https://github.com/01org/mkl-dnn/archive/master.zip)
+Download [Intel MKL-DNN source code](https://github.com/intel/mkl-dnn/archive/master.zip)
 or clone the repository to your system
 
 ```
-	git clone https://github.com/01org/mkl-dnn.git
+	git clone https://github.com/intel/mkl-dnn.git
 ```
 
 Ensure that all software dependencies are in place and have at least minimal
@@ -178,11 +204,17 @@ library with this functionality is included in the repository. If you choose
 to build Intel MKL-DNN with the binary dependency download Intel MKL small
 libraries using provided script
 
+###### Linux/macOS
 ```
 	cd scripts && ./prepare_mkl.sh && cd ..
 ```
 
-or manually from [GitHub release section](https://github.com/01org/mkl-dnn/releases)
+###### Windows
+```
+	cd scripts && call prepare_mkl.bat && cd ..
+```
+
+or manually from [GitHub release section](https://github.com/intel/mkl-dnn/releases)
 and unpack it to the `external` directory in the repository root. 
 
 You can choose to build Intel MKL-DNN without binary dependency. The resulting

@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -74,6 +74,7 @@ template <> struct pkind_traits<primitive_kind::op> { \
 }
 PKIND_TRAITS_INST(memory);
 PKIND_TRAITS_INST(convolution);
+PKIND_TRAITS_INST(deconvolution);
 PKIND_TRAITS_INST(eltwise);
 PKIND_TRAITS_INST(softmax);
 PKIND_TRAITS_INST(pooling);
@@ -81,6 +82,7 @@ PKIND_TRAITS_INST(lrn);
 PKIND_TRAITS_INST(batch_normalization);
 PKIND_TRAITS_INST(inner_product);
 PKIND_TRAITS_INST(convolution_relu);
+PKIND_TRAITS_INST(rnn);
 #undef PKIND_TRAITS_INST
 
 }

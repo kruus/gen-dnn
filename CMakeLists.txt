@@ -1,6 +1,6 @@
 # vim: et ts=4 sw=4
 #===============================================================================
-# Copyright 2016-2017 Intel Corporation
+# Copyright 2016-2018 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,14 +26,17 @@ if(POLICY CMP0048)
     cmake_policy(SET CMP0048 OLD)
     cmake_policy(SET CMP0054 OLD)
 endif()
+
 # Enable RPATH on MacOS/OSX
 if(POLICY CMP0042)
     cmake_policy(SET CMP0042 NEW)
 endif()
+
 # Do not export symbols from executables
 if(POLICY CMP0065)
     cmake_policy(SET CMP0065 NEW)
 endif()
+
 # Pass all flags to try_compile
 if(POLICY CMP0056)
     cmake_policy(SET CMP0056 NEW)
@@ -41,6 +44,7 @@ endif()
 if(POLICY CMP0066)
     cmake_policy(SET CMP0066 NEW)
 endif()
+
 # use full pathnames on libs (now auto-discovered from compiler frontends)
 if(POLICY CMP0060)
     cmake_policy(SET CMP0060 NEW)
@@ -48,7 +52,7 @@ endif()
 
 set(PROJECT_NAME "GEN-DNN generic MKL-DNN)")
 set(PROJECT_FULL_NAME "Generic (Intel(R) MKL-DNN)")
-set(PROJECT_VERSION "0.12")
+set(PROJECT_VERSION "0.13")
 
 set(LIB_NAME mkldnn)
 
@@ -126,6 +130,7 @@ include("cmake/OpenMP.cmake")
 include("cmake/SDL.cmake")
 include("cmake/NLC.cmake")
 include("cmake/Doxygen.cmake")
+include("cmake/profiling.cmake")
 
 # XXX hack
 include("Platform/SX-util.cmake")

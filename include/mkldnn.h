@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -54,12 +54,12 @@
 #include "mkldnn_types.h"
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 
-/** @addtogroup c_api C API
- *  @{ */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/** @addtogroup c_api C API
+ * @{ */
 
 /** @addtogroup c_api_primitive Primitive operations
  * @{ */
@@ -235,12 +235,12 @@ mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_clone(
 mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_destroy(
         mkldnn_primitive_attr_t attr);
 
-/* Returns integer output rounding mode @p round_mode for a given @p attr,
+/** Returns integer output rounding mode @p round_mode for a given @p attr,
  * previously set by mkldnn_primitive_attr_set_int_output_round_mode. */
 mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_get_int_output_round_mode(
         const_mkldnn_primitive_attr_t attr, mkldnn_round_mode_t *round_mode);
 
-/* Sets output rounding mode @p round_mode for integer operations for a given
+/** Sets output rounding mode @p round_mode for integer operations for a given
  * @p attr.
  *
  * The default value is #mkldnn_round_nearest.
@@ -248,13 +248,13 @@ mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_get_int_output_round_mode(
 mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_set_int_output_round_mode(
         mkldnn_primitive_attr_t attr, mkldnn_round_mode_t round_mode);
 
-/* Returns @p count, correspondence scale @p mask, and pointer to a constant
+/** Returns @p count, correspondence scale @p mask, and pointer to a constant
  * floating point array of output @p scales for given @p attr, previously set
  * by mkldnn_primitive_attr_set_output_scales.
  *
  * @warning
- *      @scales array points to the internal @p attr field, so user should not
- *      modify/destroy @p scales.
+ *      @p scales array points to the internal @p attr field, so user should
+ *      not modify/destroy @p scales.
  *
  * @warning
  *      The lifetime of @p scales is same as @p attr it belongs to, so it is
@@ -264,7 +264,7 @@ mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_get_output_scales(
         const_mkldnn_primitive_attr_t attr, int *count, int *mask,
         const float **scales);
 
-/* Sets output @p scales for primitive operations. The number of elements @p
+/** Sets output @p scales for primitive operations. The number of elements @p
  * count and correspondence scale @p mask are stored for future use.
  *
  * The @p mask argument defines correspondence between output tensor dimensions
@@ -300,13 +300,13 @@ mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_get_output_scales(
  *      actual primitive descriptor is created, so it is user's responsibility
  *      to set proper values. The following formula must be hold:
  *
- *      count == \prod_{d \in mask} output.dims[d]
+ *      \f[count = \prod\limits_{d \in mask} output.dims[d]\f]
  */
 mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_set_output_scales(
         mkldnn_primitive_attr_t attr, int count, int mask,
         const float *scales);
 
-/* Returns @p post_ops for given attr.
+/** Returns @p post_ops for given attr.
  *
  * @warning
  *      @p post_ops points to the internal @p attr field, so user should not
@@ -317,7 +317,7 @@ mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_set_output_scales(
 mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_get_post_ops(
         const_mkldnn_primitive_attr_t attr, const_mkldnn_post_ops_t *post_ops);
 
-/* Sets configured @p post_ops to an attribute @attr for future use (when
+/** Sets configured @p post_ops to an attribute @p attr for future use (when
  * primitive descriptor is being created.
  *
  * @note
@@ -381,7 +381,7 @@ mkldnn_status_t MKLDNN_API mkldnn_post_ops_get_params_sum(
         const_mkldnn_post_ops_t post_ops, int index, float *scale);
 
 /** Appends eltwise post operation to the @p post_ops with given parameters
- * @p kind, @p alpha and @p beta (@se also mkldnn_eltwise_forward_desc_init and
+ * @p kind, @p alpha and @p beta (@sa mkldnn_eltwise_forward_desc_init and
  * mkldnn_eltwise_desc_t).
  *
  * The kind of this post operation is #mkldnn_eltwise.
@@ -665,6 +665,62 @@ mkldnn_dilated_convolution_backward_weights_desc_init(
 
 /** @} */
 
+/** @addtogroup c_api_deconvolution Deconvolution
+ * A primitive to compute deconvolution using different algorithms.
+ * something goes here.
+ *  * @{ */
+
+
+/** Initializes a deconvolution descriptor @p deconv_desc for forward propagation
+ * using @p prop_kind (possible values are #mkldnn_forward_training or
+ * #mkldnn_forward_inference), @p alg_kind, memory descriptors, @p strides, @p
+ * padding_l, @p padding_r, and @p padding_kind. In order to create a
+ * deconvolution without bias, @p bias_desc should be either @c NULL or point to
+ * a descriptor with memory format equals to #mkldnn_format_undef.
+ *
+ * @note if @p padding_r is @c NULL, the padding is supposed to be symmetric
+ *
+ * @note memory descriptors are allowed to be initialized with #mkldnn_any
+ * value of @p format_kind. */
+mkldnn_status_t MKLDNN_API mkldnn_deconvolution_forward_desc_init(
+        mkldnn_deconvolution_desc_t *conv_desc, mkldnn_prop_kind_t prop_kind,
+        mkldnn_alg_kind_t alg_kind, const mkldnn_memory_desc_t *src_desc,
+        const mkldnn_memory_desc_t *weights_desc,
+        const mkldnn_memory_desc_t *bias_desc,
+        const mkldnn_memory_desc_t *dst_desc, const mkldnn_dims_t strides,
+        const mkldnn_dims_t padding_l, const mkldnn_dims_t padding_r,
+        mkldnn_padding_kind_t padding_kind);
+
+/** Initializes a deconvolution descriptor @p conv_desc for backward propagation
+ * with respect to data using @p alg_kind, memory descriptors, @p strides, @p
+ * padding_l, @p padding_r, and @p padding_kind.
+ *
+ * @note memory descriptors are allowed to be initialized with #mkldnn_any
+ * value of @p format_kind. */
+mkldnn_status_t MKLDNN_API mkldnn_deconvolution_backward_data_desc_init(
+        mkldnn_deconvolution_desc_t *conv_desc, mkldnn_alg_kind_t alg_kind,
+        const mkldnn_memory_desc_t *diff_src_desc,
+        const mkldnn_memory_desc_t *weights_desc,
+        const mkldnn_memory_desc_t *diff_dst_desc, const mkldnn_dims_t strides,
+        const mkldnn_dims_t padding_l, const mkldnn_dims_t padding_r,
+        mkldnn_padding_kind_t padding_kind);
+
+/** Initializes a deconvolution descriptor @p conv_desc for backward propagation
+ * with respect to weights using @p alg_kind, memory descriptors, @p strides,
+ * @p padding_l, @p padding_r, and @p padding_kind.
+ *
+ * @note memory descriptors are allowed to be initialized with #mkldnn_any
+ * value of @p format_kind. */
+mkldnn_status_t MKLDNN_API mkldnn_deconvolution_backward_weights_desc_init(
+        mkldnn_deconvolution_desc_t *conv_desc, mkldnn_alg_kind_t alg_kind,
+        const mkldnn_memory_desc_t *src_desc,
+        const mkldnn_memory_desc_t *diff_weights_desc,
+        const mkldnn_memory_desc_t *diff_bias_desc,
+        const mkldnn_memory_desc_t *diff_dst_desc, const mkldnn_dims_t strides,
+        const mkldnn_dims_t padding_l, const mkldnn_dims_t padding_r,
+        mkldnn_padding_kind_t padding_kind);
+/** @} */
+
 /** @addtogroup c_api_eltwise Eltwise
  * A primitive to compute element wise operations like parametric rectifier
  * linear unit (ReLU).
@@ -939,6 +995,75 @@ mkldnn_status_t MKLDNN_API mkldnn_convolution_relu_desc_init(
 
 /** @} */
 
+/** @addtogroup c_api_rnn RNN
+ * A primitive to compute common recurrent layer.
+ * @todo add additional description for the group
+ * @{ */
+
+/**
+ * Initializes a recurrent cell descriptor @p rnn_cell_desc
+ * using @p rnn_cell_desc, @p kind (possible values are
+ *  #mkldnn_vanilla_rnn, #mkldnn_vanilla_lstm, #mkldnn_vanilla_gru),
+ *  @p f (possible values are #mkldnn_eltwise_relu,
+ *   #mkldnn_eltwise_tanh), @p flags, @p alpha, and @p clipping.
+ */
+mkldnn_status_t MKLDNN_API mkldnn_rnn_cell_desc_init(
+        mkldnn_rnn_cell_desc_t *rnn_cell_desc,
+        mkldnn_alg_kind_t kind, mkldnn_alg_kind_t f,
+        unsigned int flags, float alpha, float clipping);
+
+/** Returns the number of gates of a particular @p rnn_cell_desc. */
+int MKLDNN_API mkldnn_rnn_cell_get_gates_count(
+        const mkldnn_rnn_cell_desc_t *rnn_cell_desc);
+
+/** Returns the number of states of a particular @p rnn_cell_desc. */
+int MKLDNN_API mkldnn_rnn_cell_get_states_count(
+        const mkldnn_rnn_cell_desc_t *rnn_cell_desc);
+
+/** Initializes a rnn descriptor @p rnn_desc for forward propagation
+ * using @p prop_kind, @p rnn_cell_desc, @p direction, and memory descriptors.
+ * @note if @p prop_kind equals #mkldnn_forward_training, you need to query a
+ * worskpace memory descriptor before creating the primitive.
+ *
+ * @note all memory descriptors except @p src_iter_desc are allowed to be
+ * initialized with #mkldnn_any value of @p format_kind. */
+mkldnn_status_t MKLDNN_API mkldnn_rnn_forward_desc_init(
+        mkldnn_rnn_desc_t *rnn_desc, mkldnn_prop_kind_t prop_kind,
+        const mkldnn_rnn_cell_desc_t *rnn_cell_desc,
+        const mkldnn_rnn_direction_t direction,
+        const mkldnn_memory_desc_t *src_layer_desc,
+        const mkldnn_memory_desc_t *src_iter_desc,
+        const mkldnn_memory_desc_t *weights_layer_desc,
+        const mkldnn_memory_desc_t *weights_iter_desc,
+        const mkldnn_memory_desc_t *bias_desc,
+        const mkldnn_memory_desc_t *dst_layer_desc,
+        const mkldnn_memory_desc_t *dst_iter_desc);
+
+/** Initializes a rnn descriptor @p rnn_desc for backward propagation
+ * using @p prop_kind, @p rnn_cell_desc, @p direction, and memory descriptors.
+ * @note all memory descriptors are allowed to be initialized with
+ * #mkldnn_any value of @p format_kind. */
+mkldnn_status_t MKLDNN_API mkldnn_rnn_backward_desc_init(
+        mkldnn_rnn_desc_t *rnn_desc, mkldnn_prop_kind_t prop_kind,
+        const mkldnn_rnn_cell_desc_t *rnn_cell_desc,
+        const mkldnn_rnn_direction_t direction,
+        const mkldnn_memory_desc_t *src_layer_desc,
+        const mkldnn_memory_desc_t *src_iter_desc,
+        const mkldnn_memory_desc_t *weights_layer_desc,
+        const mkldnn_memory_desc_t *weights_iter_desc,
+        const mkldnn_memory_desc_t *bias_desc,
+        const mkldnn_memory_desc_t *dst_layer_desc,
+        const mkldnn_memory_desc_t *dst_iter_desc,
+        const mkldnn_memory_desc_t *diff_src_layer_desc,
+        const mkldnn_memory_desc_t *diff_src_iter_desc,
+        const mkldnn_memory_desc_t *diff_weights_layer_desc,
+        const mkldnn_memory_desc_t *diff_weights_iter_desc,
+        const mkldnn_memory_desc_t *diff_bias_desc,
+        const mkldnn_memory_desc_t *diff_dst_layer,
+        const mkldnn_memory_desc_t *diff_dst_iter_desc);
+
+/** @} */
+
 /** @} */
 
 /** @addtogroup c_api_engine Engine operations
@@ -990,10 +1115,25 @@ mkldnn_status_t MKLDNN_API mkldnn_stream_destroy(mkldnn_stream_t stream);
 
 /** @} */
 
+/** @addtogroup c_api_service Service functions
+ * @{ */
+
+/** Sets verbosity level (print information to stdout).
+ * Possible levels are:
+ *  - 0 -- no verbose output
+ *  - 1 -- primitive information at execution
+ *  - 2 -- primitive information at creation and execution
+ *
+ * @note
+ *     Dumping information might affect performance */
+mkldnn_status_t MKLDNN_API mkldnn_verbose_set(int level);
+
+/** @} */
+
+/** @} */
+
 #ifdef __cplusplus
 }
 #endif
-
-/** @} */
 
 #endif

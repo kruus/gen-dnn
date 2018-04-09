@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -97,7 +97,12 @@ struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
             return kind == primitive_kind::eltwise
                 && utils::implication(require_scale_one, eltwise.scale == 1.f)
                 && eltwise.alg == alg_kind::eltwise_relu
-                && utils::implication(require_nslope_zero, eltwise.alpha == 0.);
+                && utils::implication(require_nslope_zero, eltwise.alpha == 0.f);
+        }
+        bool is_sum(bool require_scale_one = true) const {
+            using namespace mkldnn::impl;
+            return kind == primitive_kind::sum
+                && utils::implication(require_scale_one, sum.scale == 1.f);
         }
     };
 

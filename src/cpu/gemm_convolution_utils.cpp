@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -36,290 +36,337 @@ void im2col(
     const size_t im_step = jcp.ih * jcp.iw;
     const size_t col_step = jcp.ks * jcp.os;
 
-    auto im2col_1st = [&](const float *im, float *col) {
-        const size_t work_amount = jcp.oh * jcp.kh;
-        OMP(omp parallel)//;
-        {
-            const int ithr = omp_get_thread_num();
-            const int nthr = omp_get_num_threads();
-
-            size_t start = 0, end = 0;
-            int oh = 0, kh = 0;
-            balance211(work_amount, nthr, ithr, start, end);
-            nd_iterator_init(start, kh, jcp.kh, oh, jcp.oh);
-
-            for (size_t iwork = start; iwork < end; ++iwork)
+    if (jcp.ic != 1) {
+        if(1){ // MAKE THIS SELECTABLE FROM jcp
+            //auto im2col_common = [&](const float *im, float *col)
             {
-                const int ih = oh * jcp.stride_h - jcp.t_pad + kh * (1 + jcp.dilate_h);
-                if (ih < 0 || ih >= jcp.ih) {
-                    nd_iterator_step(kh, jcp.kh, oh, jcp.oh);
-                    continue;
+                const size_t work_amount = jcp.ic;
+                OMP(parallel)//;
+                {
+                    const int ithr = omp_get_thread_num();
+                    const int nthr = omp_get_num_threads();
+
+                    size_t start = 0, end = 0, ic = 0;
+                    balance211(work_amount, nthr, ithr, start, end);
+                    nd_iterator_init(start, ic, jcp.ic);
+
+                    const float *im_ = im + ic * im_step;
+                    float *col_ = col + ic * col_step;
+
+                    for (size_t iwork = start; iwork < end; ++iwork)
+                    {
+                        for (int kh = 0; kh < jcp.kh; ++kh) {
+                            for (int oh = 0; oh < jcp.oh; ++oh) {
+                                const int ih = oh * jcp.stride_h
+                                    - jcp.t_pad + kh * (1 + jcp.dilate_h);
+                                if (ih < 0 || ih >= jcp.ih) continue;
+
+                                for (int kw = 0; kw < jcp.kw; ++kw) {
+                                    for (int ow = 0; ow < jcp.ow; ++ow) {
+                                        const int iw = ow * jcp.stride_w
+                                            - jcp.l_pad + kw * (1 + jcp.dilate_w);
+                                        if (iw < 0 || iw >= jcp.iw) continue;
+
+                                        const size_t col_idx = ((kh * jcp.kw + kw) * jcp.oh+oh)
+                                            * jcp.ow + ow;
+                                        const size_t im_idx = ih*jcp.iw + iw;
+                                        col_[col_idx] = im_[im_idx];
+                                    }}
+                            }}
+                        im_ += im_step;
+                        col_ += col_step;
+
+                        nd_iterator_step(ic, jcp.ic);
+                    }
                 }
-
-                for (int kw = 0; kw < jcp.kw; ++kw) {
-                for (int ow = 0; ow < jcp.ow; ++ow) {
-                    const int iw = ow * jcp.stride_w - jcp.l_pad + kw * (1 + jcp.dilate_w);
-                    if (iw < 0 || iw >= jcp.iw) continue;
-
-                    const size_t col_idx = ((kh*jcp.kw + kw)*jcp.oh+oh)*jcp.ow+ow;
-                    const size_t im_idx = ih*jcp.iw + iw;
-                    col[col_idx] = im[im_idx];
-                }}
-                nd_iterator_step(kh, jcp.kh, oh, jcp.oh);
-            }
-        }
-    };
-
+            };
+            //im2col_common(im, col);
+        }else{
 #define UNROLL_IM2COL 8
-    auto im2col_common = [&](const float *im, float *col) {
-        const size_t work_amount = floor(jcp.ic/UNROLL_IM2COL);
-        size_t ic;
-        const float *im_;
-        float *col_;
-
-        if(work_amount > 0) {
-        OMP(omp parallel)//;
-        {
-            const int ithr = omp_get_thread_num();
-            const int nthr = omp_get_num_threads();
-
-            size_t start = 0, end = 0, ichunk = 0;
-            balance211(work_amount, nthr, ithr, start, end);
-            nd_iterator_init(start, ichunk, work_amount);
-
-            ic = ichunk * UNROLL_IM2COL;
-            im_ = im + ic * im_step;
-            col_ = col + ic * col_step;
-
-            for (size_t iwork = start; iwork < end; ++iwork)
+            //auto im2col_common_unroll = [&](const float *im, float *col)
             {
-                /* Where to put #pragma ivdep ? */
-                for (int kh = 0; kh < jcp.kh; ++kh) {
-                for (int oh = 0; oh < jcp.oh; ++oh) {
-                    const int ih = oh * jcp.stride_h
-                                   - jcp.t_pad + kh * (1 + jcp.dilate_h);
-                    if (ih < 0 || ih >= jcp.ih) continue;
+                const size_t work_amount = floor(jcp.ic/UNROLL_IM2COL);
+                int ic;
+                const float *im_;
+                float *col_;
 
-                    for (int kw = 0; kw < jcp.kw; ++kw) {
-IVDEP()
-                    for (int ow = 0; ow < jcp.ow; ++ow) {
-                        const int iw = ow * jcp.stride_w
-                                       - jcp.l_pad + kw * (1 + jcp.dilate_w);
-                        if (iw < 0 || iw >= jcp.iw) continue;
-UNROLL(UNROLL_IM2COL)
-                        for(int i = 0; i < UNROLL_IM2COL; ++i) {
-                            const size_t col_idx =  i*col_step +
-                                                   ((kh * jcp.kw + kw) * jcp.oh+oh)
-                                                   * jcp.ow + ow;
-                            const size_t im_idx = i*im_step + ih*jcp.iw + iw;
-                            col_[col_idx] = im_[im_idx];
+                if(work_amount > 0) {
+                    OMP(omp parallel)//;
+                    {
+                        const int ithr = omp_get_thread_num();
+                        const int nthr = omp_get_num_threads();
+
+                        size_t start = 0, end = 0, ichunk = 0;
+                        balance211(work_amount, nthr, ithr, start, end);
+                        nd_iterator_init(start, ichunk, work_amount);
+
+                        ic = ichunk * UNROLL_IM2COL;
+                        im_ = im + ic * im_step;
+                        col_ = col + ic * col_step;
+
+                        for (size_t iwork = start; iwork < end; ++iwork)
+                        {
+                            /* Where to put #pragma ivdep ? */
+                            for (int kh = 0; kh < jcp.kh; ++kh) {
+                                for (int oh = 0; oh < jcp.oh; ++oh) {
+                                    const int ih = oh * jcp.stride_h
+                                        - jcp.t_pad + kh * (1 + jcp.dilate_h);
+                                    if (ih < 0 || ih >= jcp.ih) continue;
+
+                                    for (int kw = 0; kw < jcp.kw; ++kw) {
+                                        IVDEP()//;
+                                        for (int ow = 0; ow < jcp.ow; ++ow) {
+                                            const int iw = ow * jcp.stride_w
+                                                - jcp.l_pad + kw * (1 + jcp.dilate_w);
+                                            if (iw < 0 || iw >= jcp.iw) continue;
+                                            UNROLL(UNROLL_IM2COL)//;
+                                            for(int i = 0; i < UNROLL_IM2COL; ++i) {
+                                                const size_t col_idx =  i*col_step +
+                                                    ((kh * jcp.kw + kw) * jcp.oh+oh)
+                                                    * jcp.ow + ow;
+                                                const size_t im_idx = i*im_step + ih*jcp.iw + iw;
+                                                col_[col_idx] = im_[im_idx];
+                                            }
+                                        }}
+                                }}
+                            im_ += im_step * UNROLL_IM2COL;
+                            col_ += col_step * UNROLL_IM2COL;
+
+                            nd_iterator_step(ichunk, work_amount);
                         }
                     }}
-                }}
-                im_ += im_step * UNROLL_IM2COL;
-                col_ += col_step * UNROLL_IM2COL;
 
-                nd_iterator_step(ichunk, work_amount);
-            }
-        }}
+                ic = UNROLL_IM2COL * work_amount;
+                if(ic < jcp.ic) {
+                    im_ = im + ic * im_step;
+                    col_ = col + ic * col_step;
 
-        ic = UNROLL_IM2COL * work_amount;
-        if(ic < jcp.ic) {
-            im_ = im + ic * im_step;
-            col_ = col + ic * col_step;
-
-            switch(jcp.ic - ic) {
-                case 1:
+                    switch(jcp.ic - ic) {
+                    case 1:
                     for (int kh = 0; kh < jcp.kh; ++kh) {
-                    for (int oh = 0; oh < jcp.oh; ++oh) {
-                        const int ih = oh * jcp.stride_h
-                                       - jcp.t_pad + kh * (1 + jcp.dilate_h);
-                        if (ih < 0 || ih >= jcp.ih) continue;
-    
-                        for (int kw = 0; kw < jcp.kw; ++kw) {
-IVDEP()
-                        for (int ow = 0; ow < jcp.ow; ++ow) {
-                            const int iw = ow * jcp.stride_w
-                                           - jcp.l_pad + kw * (1 + jcp.dilate_w);
-                            if (iw < 0 || iw >= jcp.iw) continue;
-    
-                            const size_t col_idx = ((kh * jcp.kw + kw) * jcp.oh+oh)
-                                                   * jcp.ow + ow;
-                            const size_t im_idx = ih*jcp.iw + iw;
-                            col_[col_idx] = im_[im_idx];
+                        for (int oh = 0; oh < jcp.oh; ++oh) {
+                            const int ih = oh * jcp.stride_h
+                                - jcp.t_pad + kh * (1 + jcp.dilate_h);
+                            if (ih < 0 || ih >= jcp.ih) continue;
+
+                            for (int kw = 0; kw < jcp.kw; ++kw) {
+                                IVDEP()
+                                    for (int ow = 0; ow < jcp.ow; ++ow) {
+                                        const int iw = ow * jcp.stride_w
+                                            - jcp.l_pad + kw * (1 + jcp.dilate_w);
+                                        if (iw < 0 || iw >= jcp.iw) continue;
+
+                                        const size_t col_idx = ((kh * jcp.kw + kw) * jcp.oh+oh)
+                                            * jcp.ow + ow;
+                                        const size_t im_idx = ih*jcp.iw + iw;
+                                        col_[col_idx] = im_[im_idx];
+                                    }}
                         }}
-                    }}
                     break;
 
-                case 2:
+                    case 2:
                     for (int kh = 0; kh < jcp.kh; ++kh) {
-                    for (int oh = 0; oh < jcp.oh; ++oh) {
-                        const int ih = oh * jcp.stride_h
-                                       - jcp.t_pad + kh * (1 + jcp.dilate_h);
-                        if (ih < 0 || ih >= jcp.ih) continue;
-    
-                        for (int kw = 0; kw < jcp.kw; ++kw) {
-IVDEP()
-                        for (int ow = 0; ow < jcp.ow; ++ow) {
-                            const int iw = ow * jcp.stride_w
-                                           - jcp.l_pad + kw * (1 + jcp.dilate_w);
-                            if (iw < 0 || iw >= jcp.iw) continue;
-    
-UNROLL(2)
-                            for(int i = 0; i < 2; ++i) {
-                                const size_t col_idx =  i*col_step +
-                                                       ((kh * jcp.kw + kw) * jcp.oh+oh)
-                                                       * jcp.ow + ow;
-                                const size_t im_idx = i*im_step + ih*jcp.iw + iw;
-                                col_[col_idx] = im_[im_idx];
-                            }
+                        for (int oh = 0; oh < jcp.oh; ++oh) {
+                            const int ih = oh * jcp.stride_h
+                                - jcp.t_pad + kh * (1 + jcp.dilate_h);
+                            if (ih < 0 || ih >= jcp.ih) continue;
+
+                            for (int kw = 0; kw < jcp.kw; ++kw) {
+                                IVDEP()
+                                    for (int ow = 0; ow < jcp.ow; ++ow) {
+                                        const int iw = ow * jcp.stride_w
+                                            - jcp.l_pad + kw * (1 + jcp.dilate_w);
+                                        if (iw < 0 || iw >= jcp.iw) continue;
+
+                                        UNROLL(2)
+                                            for(int i = 0; i < 2; ++i) {
+                                                const size_t col_idx =  i*col_step +
+                                                    ((kh * jcp.kw + kw) * jcp.oh+oh)
+                                                    * jcp.ow + ow;
+                                                const size_t im_idx = i*im_step + ih*jcp.iw + iw;
+                                                col_[col_idx] = im_[im_idx];
+                                            }
+                                    }}
                         }}
-                    }}
                     break;
 
-                case 3:
+                    case 3:
                     for (int kh = 0; kh < jcp.kh; ++kh) {
-                    for (int oh = 0; oh < jcp.oh; ++oh) {
-                        const int ih = oh * jcp.stride_h
-                                       - jcp.t_pad + kh * (1 + jcp.dilate_h);
-                        if (ih < 0 || ih >= jcp.ih) continue;
-    
-                        for (int kw = 0; kw < jcp.kw; ++kw) {
-IVDEP()
-                        for (int ow = 0; ow < jcp.ow; ++ow) {
-                            const int iw = ow * jcp.stride_w
-                                           - jcp.l_pad + kw * (1 + jcp.dilate_w);
-                            if (iw < 0 || iw >= jcp.iw) continue;
-    
-UNROLL(3)
-                            for(int i = 0; i < 3; ++i) {
-                                const size_t col_idx =  i*col_step +
-                                                       ((kh * jcp.kw + kw) * jcp.oh+oh)
-                                                       * jcp.ow + ow;
-                                const size_t im_idx = i*im_step + ih*jcp.iw + iw;
-                                col_[col_idx] = im_[im_idx];
-                            }
+                        for (int oh = 0; oh < jcp.oh; ++oh) {
+                            const int ih = oh * jcp.stride_h
+                                - jcp.t_pad + kh * (1 + jcp.dilate_h);
+                            if (ih < 0 || ih >= jcp.ih) continue;
+
+                            for (int kw = 0; kw < jcp.kw; ++kw) {
+                                IVDEP()
+                                    for (int ow = 0; ow < jcp.ow; ++ow) {
+                                        const int iw = ow * jcp.stride_w
+                                            - jcp.l_pad + kw * (1 + jcp.dilate_w);
+                                        if (iw < 0 || iw >= jcp.iw) continue;
+
+                                        UNROLL(3)
+                                            for(int i = 0; i < 3; ++i) {
+                                                const size_t col_idx =  i*col_step +
+                                                    ((kh * jcp.kw + kw) * jcp.oh+oh)
+                                                    * jcp.ow + ow;
+                                                const size_t im_idx = i*im_step + ih*jcp.iw + iw;
+                                                col_[col_idx] = im_[im_idx];
+                                            }
+                                    }}
                         }}
-                    }}
                     break;
 
-                case 4:
+                    case 4:
                     for (int kh = 0; kh < jcp.kh; ++kh) {
-                    for (int oh = 0; oh < jcp.oh; ++oh) {
-                        const int ih = oh * jcp.stride_h
-                                       - jcp.t_pad + kh * (1 + jcp.dilate_h);
-                        if (ih < 0 || ih >= jcp.ih) continue;
-    
-                        for (int kw = 0; kw < jcp.kw; ++kw) {
-IVDEP()
-                        for (int ow = 0; ow < jcp.ow; ++ow) {
-                            const int iw = ow * jcp.stride_w
-                                           - jcp.l_pad + kw * (1 + jcp.dilate_w);
-                            if (iw < 0 || iw >= jcp.iw) continue;
-    
-UNROLL(4)
-                            for(int i = 0; i < 4; ++i) {
-                                const size_t col_idx =  i*col_step +
-                                                       ((kh * jcp.kw + kw) * jcp.oh+oh)
-                                                       * jcp.ow + ow;
-                                const size_t im_idx = i*im_step + ih*jcp.iw + iw;
-                                col_[col_idx] = im_[im_idx];
-                            }
+                        for (int oh = 0; oh < jcp.oh; ++oh) {
+                            const int ih = oh * jcp.stride_h
+                                - jcp.t_pad + kh * (1 + jcp.dilate_h);
+                            if (ih < 0 || ih >= jcp.ih) continue;
+
+                            for (int kw = 0; kw < jcp.kw; ++kw) {
+                                IVDEP()
+                                    for (int ow = 0; ow < jcp.ow; ++ow) {
+                                        const int iw = ow * jcp.stride_w
+                                            - jcp.l_pad + kw * (1 + jcp.dilate_w);
+                                        if (iw < 0 || iw >= jcp.iw) continue;
+
+                                        UNROLL(4)
+                                            for(int i = 0; i < 4; ++i) {
+                                                const size_t col_idx =  i*col_step +
+                                                    ((kh * jcp.kw + kw) * jcp.oh+oh)
+                                                    * jcp.ow + ow;
+                                                const size_t im_idx = i*im_step + ih*jcp.iw + iw;
+                                                col_[col_idx] = im_[im_idx];
+                                            }
+                                    }}
                         }}
-                    }}
                     break;
 
-                case 5:
+                    case 5:
                     for (int kh = 0; kh < jcp.kh; ++kh) {
-                    for (int oh = 0; oh < jcp.oh; ++oh) {
-                        const int ih = oh * jcp.stride_h
-                                       - jcp.t_pad + kh * (1 + jcp.dilate_h);
-                        if (ih < 0 || ih >= jcp.ih) continue;
-    
-                        for (int kw = 0; kw < jcp.kw; ++kw) {
-IVDEP()
-                        for (int ow = 0; ow < jcp.ow; ++ow) {
-                            const int iw = ow * jcp.stride_w
-                                           - jcp.l_pad + kw * (1 + jcp.dilate_w);
-                            if (iw < 0 || iw >= jcp.iw) continue;
-    
-UNROLL(5)
-                            for(int i = 0; i < 5; ++i) {
-                                const size_t col_idx =  i*col_step +
-                                                       ((kh * jcp.kw + kw) * jcp.oh+oh)
-                                                       * jcp.ow + ow;
-                                const size_t im_idx = i*im_step + ih*jcp.iw + iw;
-                                col_[col_idx] = im_[im_idx];
-                            }
+                        for (int oh = 0; oh < jcp.oh; ++oh) {
+                            const int ih = oh * jcp.stride_h
+                                - jcp.t_pad + kh * (1 + jcp.dilate_h);
+                            if (ih < 0 || ih >= jcp.ih) continue;
+
+                            for (int kw = 0; kw < jcp.kw; ++kw) {
+                                IVDEP()
+                                    for (int ow = 0; ow < jcp.ow; ++ow) {
+                                        const int iw = ow * jcp.stride_w
+                                            - jcp.l_pad + kw * (1 + jcp.dilate_w);
+                                        if (iw < 0 || iw >= jcp.iw) continue;
+
+                                        UNROLL(5)
+                                            for(int i = 0; i < 5; ++i) {
+                                                const size_t col_idx =  i*col_step +
+                                                    ((kh * jcp.kw + kw) * jcp.oh+oh)
+                                                    * jcp.ow + ow;
+                                                const size_t im_idx = i*im_step + ih*jcp.iw + iw;
+                                                col_[col_idx] = im_[im_idx];
+                                            }
+                                    }}
                         }}
-                    }}
                     break;
 
-                case 6:
+                    case 6:
                     for (int kh = 0; kh < jcp.kh; ++kh) {
-                    for (int oh = 0; oh < jcp.oh; ++oh) {
-                        const int ih = oh * jcp.stride_h
-                                       - jcp.t_pad + kh * (1 + jcp.dilate_h);
-                        if (ih < 0 || ih >= jcp.ih) continue;
-    
-                        for (int kw = 0; kw < jcp.kw; ++kw) {
-IVDEP()
-                        for (int ow = 0; ow < jcp.ow; ++ow) {
-                            const int iw = ow * jcp.stride_w
-                                           - jcp.l_pad + kw * (1 + jcp.dilate_w);
-                            if (iw < 0 || iw >= jcp.iw) continue;
-    
-UNROLL(6)
-                            for(int i = 0; i < 6; ++i) {
-                                const size_t col_idx =  i*col_step +
-                                                       ((kh * jcp.kw + kw) * jcp.oh+oh)
-                                                       * jcp.ow + ow;
-                                const size_t im_idx = i*im_step + ih*jcp.iw + iw;
-                                col_[col_idx] = im_[im_idx];
-                            }
+                        for (int oh = 0; oh < jcp.oh; ++oh) {
+                            const int ih = oh * jcp.stride_h
+                                - jcp.t_pad + kh * (1 + jcp.dilate_h);
+                            if (ih < 0 || ih >= jcp.ih) continue;
+
+                            for (int kw = 0; kw < jcp.kw; ++kw) {
+                                IVDEP()
+                                    for (int ow = 0; ow < jcp.ow; ++ow) {
+                                        const int iw = ow * jcp.stride_w
+                                            - jcp.l_pad + kw * (1 + jcp.dilate_w);
+                                        if (iw < 0 || iw >= jcp.iw) continue;
+
+                                        UNROLL(6)
+                                            for(int i = 0; i < 6; ++i) {
+                                                const size_t col_idx =  i*col_step +
+                                                    ((kh * jcp.kw + kw) * jcp.oh+oh)
+                                                    * jcp.ow + ow;
+                                                const size_t im_idx = i*im_step + ih*jcp.iw + iw;
+                                                col_[col_idx] = im_[im_idx];
+                                            }
+                                    }}
                         }}
-                    }}
                     break;
 
-                case 7:
+                    case 7:
                     for (int kh = 0; kh < jcp.kh; ++kh) {
-                    for (int oh = 0; oh < jcp.oh; ++oh) {
-                        const int ih = oh * jcp.stride_h
-                                       - jcp.t_pad + kh * (1 + jcp.dilate_h);
-                        if (ih < 0 || ih >= jcp.ih) continue;
-    
-                        for (int kw = 0; kw < jcp.kw; ++kw) {
-IVDEP()
-                        for (int ow = 0; ow < jcp.ow; ++ow) {
-                            const int iw = ow * jcp.stride_w
-                                           - jcp.l_pad + kw * (1 + jcp.dilate_w);
-                            if (iw < 0 || iw >= jcp.iw) continue;
-    
-UNROLL(7)
-                            for(int i = 0; i < 7; ++i) {
-                                const size_t col_idx =  i*col_step +
-                                                       ((kh * jcp.kw + kw) * jcp.oh+oh)
-                                                       * jcp.ow + ow;
-                                const size_t im_idx = i*im_step + ih*jcp.iw + iw;
-                                col_[col_idx] = im_[im_idx];
-                            }
+                        for (int oh = 0; oh < jcp.oh; ++oh) {
+                            const int ih = oh * jcp.stride_h
+                                - jcp.t_pad + kh * (1 + jcp.dilate_h);
+                            if (ih < 0 || ih >= jcp.ih) continue;
+
+                            for (int kw = 0; kw < jcp.kw; ++kw) {
+                                IVDEP()
+                                    for (int ow = 0; ow < jcp.ow; ++ow) {
+                                        const int iw = ow * jcp.stride_w
+                                            - jcp.l_pad + kw * (1 + jcp.dilate_w);
+                                        if (iw < 0 || iw >= jcp.iw) continue;
+
+                                        UNROLL(7)
+                                            for(int i = 0; i < 7; ++i) {
+                                                const size_t col_idx =  i*col_step +
+                                                    ((kh * jcp.kw + kw) * jcp.oh+oh)
+                                                    * jcp.ow + ow;
+                                                const size_t im_idx = i*im_step + ih*jcp.iw + iw;
+                                                col_[col_idx] = im_[im_idx];
+                                            }
+                                    }}
                         }}
-                    }}
                     break;
 
-                default:
+                    default:
                     printf("Bug - UNROLL IM2COL reset without changing remainder cases\n");
                     exit(1);
                     break;
-            }
+                    }
+                }
+            };
+            //im2col_common_unrolled(im, col);
         }
-    };
+    } else if (jcp.ic == 1) {
+        //auto im2col_1st = [&](const float *im, float *col)
+        {
+            const size_t work_amount = jcp.oh * jcp.kh;
+            OMP(omp parallel)//;
+            {
+                const int ithr = omp_get_thread_num();
+                const int nthr = omp_get_num_threads();
 
-    if (jcp.ic != 1) {
-        im2col_common(im, col);
-    } else {
-        im2col_1st(im, col);
+                size_t start = 0, end = 0;
+                int oh = 0, kh = 0;
+                balance211(work_amount, nthr, ithr, start, end);
+                nd_iterator_init(start, kh, jcp.kh, oh, jcp.oh);
+
+                for (size_t iwork = start; iwork < end; ++iwork)
+                {
+                    const int ih = oh * jcp.stride_h - jcp.t_pad + kh * (1 + jcp.dilate_h);
+                    if (ih < 0 || ih >= jcp.ih) {
+                        nd_iterator_step(kh, jcp.kh, oh, jcp.oh);
+                        continue;
+                    }
+
+                    for (int kw = 0; kw < jcp.kw; ++kw) {
+                        for (int ow = 0; ow < jcp.ow; ++ow) {
+                            const int iw = ow * jcp.stride_w - jcp.l_pad + kw * (1 + jcp.dilate_w);
+                            if (iw < 0 || iw >= jcp.iw) continue;
+
+                            const size_t col_idx = ((kh*jcp.kw + kw)*jcp.oh+oh)*jcp.ow+ow;
+                            const size_t im_idx = ih*jcp.iw + iw;
+                            col[col_idx] = im[im_idx];
+                        }}
+                    nd_iterator_step(kh, jcp.kh, oh, jcp.oh);
+                }
+            }
+        };
+        //im2col_1st(im, col);
     }
+
 }
 
 /* col[oh][ow][kh][kw][ic] <-- im2col_u8(im[ih][iw][ic]) */
@@ -357,35 +404,35 @@ void im2col_u8(
 
 void col2im(
     jit_gemm_conv_conf_t &jcp, const float *col, float *im) {
+
     const size_t col_step = jcp.ks * jcp.os;
     const size_t im_step = jcp.ih * jcp.iw;
     const int iS = jcp.ih * jcp.iw;
 
-    int num_thr = (jcp.mb != 1) ? omp_get_max_threads() : 1;
-    MAYBE_UNUSED(num_thr);
-    OMP(parallel for  num_threads(num_thr))//;
+    OMP(parallel for)//; no num_thr spec?  (jcp.mb != 1) ? omp_get_max_threads() : 1;
     for (int ic = 0; ic < jcp.ic; ++ic) {
-        for (int is = 0; is < iS; ++is) im[is] = 0.;
+        float *im_ = im + ic * im_step;
+        const float *col_ = col + ic * col_step;
+#       pragma omp simd
+        for (int is = 0; is < iS; ++is) im_[is] = 0.;
 
-        for (int oh = 0; oh < jcp.oh; ++oh) {
         for (int kh = 0; kh < jcp.kh; ++kh) {
+        for (int oh = 0; oh < jcp.oh; ++oh) {
             const int ih = oh * jcp.stride_h - jcp.t_pad + kh * (1 + jcp.dilate_h);
             if (ih < 0 || ih >= jcp.ih) continue;
 
-            for (int ow = 0; ow < jcp.ow; ++ow) {
             for (int kw = 0; kw < jcp.kw; ++kw) {
+            for (int ow = 0; ow < jcp.ow; ++ow) {
                 const int iw = ow * jcp.stride_w - jcp.l_pad + kw * (1 + jcp.dilate_w);
                 if (iw < 0 || iw >= jcp.iw) continue;
 
                 const size_t col_idx = ((kh*jcp.kw + kw)*jcp.oh+oh)*jcp.ow+ow;
                 const size_t im_idx = ih*jcp.iw + iw;
-                im[im_idx] += col[col_idx];
+                im_[im_idx] += col_[col_idx];
             }
             }
         }
         }
-        col += col_step;
-        im += im_step;
     }
 }
 
@@ -434,13 +481,12 @@ void init_conf(
 }
 
 template <typename src_t>
-status_t prepare_ws_col(jit_gemm_conv_conf_t &jcp, src_t **col) {
+status_t prepare_ws_col(jit_gemm_conv_conf_t &jcp, src_t **col, const int nthr) {
     if (!jcp.need_im2col) {
         *col = nullptr;
         return status::success;
     }
 
-    const size_t nthr = omp_get_max_threads();
     const size_t im2col_sz_per_thr = jcp.os * jcp.ks * jcp.ic;
     const size_t im2col_sz = nthr * im2col_sz_per_thr;
 
@@ -454,13 +500,12 @@ status_t prepare_ws_col(jit_gemm_conv_conf_t &jcp, src_t **col) {
 }
 
 template status_t prepare_ws_col<float>(jit_gemm_conv_conf_t &jcp,
-        float **col);
+        float **col, const int nthr);
 template status_t prepare_ws_col<uint8_t>(jit_gemm_conv_conf_t &jcp,
-        uint8_t **col);
+        uint8_t **col, const int nthr);
 
 status_t prepare_ws_wei_reduction(jit_gemm_conv_conf_t &jcp,
-        float **wei_reduction, size_t wei_sz) {
-    const size_t nthr = omp_get_max_threads();
+        float **wei_reduction, size_t wei_sz, const int nthr) {
     if (jcp.mb == 1 || nthr == 1)
         return status::success;
 
@@ -472,8 +517,7 @@ status_t prepare_ws_wei_reduction(jit_gemm_conv_conf_t &jcp,
 }
 
 template <typename acc_t>
-status_t prepare_ws_acc(jit_gemm_conv_conf_t &jcp, acc_t **acc) {
-    const size_t nthr = omp_get_max_threads();
+status_t prepare_ws_acc(jit_gemm_conv_conf_t &jcp, acc_t **acc, const int nthr) {
     const size_t acc_sz_per_thr = jcp.os * jcp.oc;
     const size_t acc_sz = nthr * acc_sz_per_thr;
 
@@ -483,7 +527,7 @@ status_t prepare_ws_acc(jit_gemm_conv_conf_t &jcp, acc_t **acc) {
 }
 
 template status_t prepare_ws_acc<int32_t>(jit_gemm_conv_conf_t &jcp,
-        int32_t **acc);
+        int32_t **acc, const int nthr);
 
 void bwd_weights_balance(int ithr, int nthr, int ngroups, int mb, int &ithr_g,
         int &nthr_g, int &ithr_mb, int &nthr_mb) {

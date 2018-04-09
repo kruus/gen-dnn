@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation, NEC Laboratories America LLC
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -30,12 +30,21 @@
 
 #if defined(USE_MKL)
 
+#include "mkl_version.h"
+
+#define USE_MKL_PACKED_GEMM (INTEL_MKL_VERSION >= 20170000)
+#define USE_MKL_IGEMM \
+    (INTEL_MKL_VERSION >= 20180000 && __INTEL_MKL_BUILD_DATE >= 20170628)
+
 #include "mkl_cblas.h"
 #if !defined(USE_CBLAS)
 #define cblas_sgemm(...) assert(!"CBLAS is unavailable")
 #endif
 
 #else /* defined(USE_MKL) */
+
+#define USE_MKL_PACKED_GEMM 0
+#define USE_MKL_IGEMM 0
 
 #if defined(_SX)
 extern "C" {

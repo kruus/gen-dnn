@@ -27,6 +27,7 @@ typedef enum {
     avx2,
     avx512_common,
     avx512_core,
+    avx512_core_vnni,
     avx512_mic,
     avx512_mic_4ops,
 } cpu_isa_t;

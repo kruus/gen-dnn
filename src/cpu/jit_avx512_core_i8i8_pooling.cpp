@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -38,6 +38,8 @@ using namespace mkldnn::impl::types;
 using namespace alg_kind;
 
 struct jit_avx512_core_i8i8_pool_fwd_ker_t: public jit_generator {
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_core_i8i8_pool_fwd_ker_t)
+
     struct call_params_t {
         const char *src_i8;
         const char *dst_i8;
@@ -260,8 +262,6 @@ void jit_avx512_core_i8i8_pool_fwd_ker_t::store_dst(int jj, int ll,
 
 void jit_avx512_core_i8i8_pool_fwd_ker_t::compute_max_step(int ur_c, int c_tail)
 {
-    unsigned char _cmp_lt_os = 1;
-
     Label l_kw, l_kh;
 
     int iw = jpp.iw;

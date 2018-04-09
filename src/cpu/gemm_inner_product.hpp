@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ struct gemm_inner_product_fwd_t: public cpu_primitive_t {
                 const inner_product_fwd_pd_t *hint_fwd_pd)
             : cpu_inner_product_fwd_pd_t(engine, adesc, attr, hint_fwd_pd) {}
 
-        DECLARE_COMMON_PD_T(gemm_inner_product_fwd_t);
+        DECLARE_COMMON_PD_T("gemm:blas", gemm_inner_product_fwd_t);
 
         virtual status_t init() override {
 #ifdef USE_CBLAS
@@ -60,6 +60,8 @@ struct gemm_inner_product_fwd_t: public cpu_primitive_t {
 #endif
                 && implication(src_pd_.desc()->format == nchw,
                         weights_pd_.desc()->format == oihw)
+                && implication(src_pd_.desc()->format == ncdhw,
+                        weights_pd_.desc()->format == oidhw)
                 && implication(src_pd_.desc()->format == nc,
                         weights_pd_.desc()->format == oi)
                 && dst_pd_.desc()->format == nc
@@ -98,7 +100,7 @@ struct gemm_inner_product_bwd_data_t: public cpu_primitive_t {
             : cpu_inner_product_bwd_data_pd_t(engine, adesc, attr,
                     hint_fwd_pd) {}
 
-        DECLARE_COMMON_PD_T(gemm_inner_product_bwd_data_t);
+        DECLARE_COMMON_PD_T("gemm:blas", gemm_inner_product_bwd_data_t);
 
         virtual status_t init() override {
 #ifdef USE_CBLAS
@@ -118,6 +120,8 @@ struct gemm_inner_product_bwd_data_t: public cpu_primitive_t {
 #endif
                 && implication(diff_src_pd_.desc()->format == nchw,
                         weights_pd_.desc()->format == oihw)
+                && implication(diff_src_pd_.desc()->format == ncdhw,
+                        weights_pd_.desc()->format == oidhw)
                 && implication(diff_src_pd_.desc()->format == nc,
                         weights_pd_.desc()->format == oi)
                 && diff_dst_pd_.desc()->format == nc
@@ -156,7 +160,7 @@ struct gemm_inner_product_bwd_weights_t: public cpu_primitive_t {
             : cpu_inner_product_bwd_weights_pd_t(engine, adesc, attr,
                     hint_fwd_pd) {}
 
-        DECLARE_COMMON_PD_T(gemm_inner_product_bwd_weights_t);
+        DECLARE_COMMON_PD_T("gemm:blas", gemm_inner_product_bwd_weights_t);
 
         virtual status_t init() override {
 #ifdef USE_CBLAS
@@ -176,6 +180,8 @@ struct gemm_inner_product_bwd_weights_t: public cpu_primitive_t {
 #endif
                 && implication(src_pd_.desc()->format == nchw,
                         diff_weights_pd_.desc()->format == oihw)
+                && implication(src_pd_.desc()->format == ncdhw,
+                        diff_weights_pd_.desc()->format == oidhw)
                 && implication(src_pd_.desc()->format == nc,
                         diff_weights_pd_.desc()->format == oi)
                 && diff_dst_pd_.desc()->format == nc

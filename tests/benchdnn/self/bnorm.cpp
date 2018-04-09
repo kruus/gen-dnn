@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -28,12 +28,20 @@ static int check_flags() {
     CHECK_CASE_STR_EQ(flags2str((flags_t)0), "");
     CHECK_CASE_STR_EQ(flags2str(GLOB_STATS), "G");
     CHECK_CASE_STR_EQ(flags2str(USE_SCALESHIFT), "S");
+    CHECK_CASE_STR_EQ(flags2str(FUSE_BN_RELU), "R");
     CHECK_CASE_STR_EQ(flags2str(GLOB_STATS | USE_SCALESHIFT), "GS");
+    CHECK_CASE_STR_EQ(flags2str(GLOB_STATS | FUSE_BN_RELU), "GR");
+    CHECK_CASE_STR_EQ(flags2str(USE_SCALESHIFT | FUSE_BN_RELU), "SR");
+    CHECK_CASE_STR_EQ(flags2str(GLOB_STATS | USE_SCALESHIFT | FUSE_BN_RELU),
+            "GSR");
 
     CHECK_EQ(str2flags(""), 0);
     CHECK_EQ(str2flags("G"), GLOB_STATS);
     CHECK_EQ(str2flags("S"), USE_SCALESHIFT);
+    CHECK_EQ(str2flags("R"), FUSE_BN_RELU);
     CHECK_EQ(str2flags("GS"), GLOB_STATS | USE_SCALESHIFT);
+    CHECK_EQ(str2flags("GR"), GLOB_STATS | FUSE_BN_RELU);
+    CHECK_EQ(str2flags("RSG"), GLOB_STATS | USE_SCALESHIFT | FUSE_BN_RELU);
     return OK;
 }
 

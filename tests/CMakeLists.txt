@@ -1,5 +1,5 @@
 #===============================================================================
-# Copyright 2016-2017 Intel Corporation
+# Copyright 2016-2018 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #===============================================================================
+
+option(WITH_TEST "include tests" ON)
+if (NOT WITH_TEST)
+    return()
+endif()
 
 if(POLICY CMP0065)
     cmake_policy(SET CMP0065 NEW)

@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -88,11 +88,13 @@ const char *fmt2str(mkldnn_memory_format_t fmt) {
     CASE(x);
     CASE(nc);
     CASE(nchw);
+    CASE(ncdhw);
     CASE(nhwc);
 #ifndef TARGET_VANILLA
     CASE(nChw8c);
     CASE(nChw16c);
 #endif
+    CASE(oidhw);
     CASE(oihw);
     CASE(hwio);
 #undef CASE
@@ -109,11 +111,13 @@ mkldnn_memory_format_t str2fmt(const char *str) {
     CASE(x);
     CASE(nc);
     CASE(nchw);
+    CASE(ncdhw);
     CASE(nhwc);
 #ifndef TARGET_VANILLA
     CASE(nChw8c);
     CASE(nChw16c);
 #endif
+    CASE(oidhw);
     CASE(oihw);
     CASE(hwio);
 #undef CASE

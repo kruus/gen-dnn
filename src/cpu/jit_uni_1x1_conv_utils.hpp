@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -19,12 +19,15 @@
 
 #include "mkldnn_thread.hpp"
 #include "utils.hpp"
+#include "nstl.hpp"
 
 #include "jit_generator.hpp"
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
+
+using namespace mkldnn::impl::utils;
 
 /* 1x1-kernel does not support non-unit strides so far, so the idea is:
  *  - for fwd or bwd_weights: to copy src to a scratch memory (with strides
@@ -85,12 +88,11 @@ struct rtus_driver_t: public jit_generator {
 
     void (*ker_)(const call_params_t *p);
 
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(rtus_driver_t)
+
     /* cpu specific part */
-    void uni_vpxor(const Xbyak::Xmm& x1, const Xbyak::Xmm& x2,
-        const Xbyak::Operand& op) {
-        if (isa == avx2 || typesize_ == 2) vpxor(x1, x2, op);
-        else vpxord(x1, x2, op);
-    }
+    using Vmm = typename utils::conditional<isa == avx2, Xbyak::Ymm,
+          Xbyak::Zmm>::type;
 
     Xbyak::Reg64 reg_ws = abi_param1;
     Xbyak::Reg64 reg_src = abi_not_param1;
@@ -106,8 +108,8 @@ struct rtus_driver_t: public jit_generator {
     int src_step_h_, src_step_icb_, ws_step_icb_, vlen_, vlen_shift_;
     bool src_to_ws_;
     size_t typesize_;
-    Xbyak::Ymm reg_zero;
-    Xbyak::Ymm reg_v;
+    Vmm reg_zero;
+    Vmm reg_v;
 
     rtus_driver_t(int iw, int stride_w, int src_step_h,
             int src_step_icb, int ws_step_icb, bool src_to_ws, size_t typesize)
@@ -123,13 +125,9 @@ struct rtus_driver_t: public jit_generator {
             vlen_shift_--;
         }
 
-        if (isa == avx2 || typesize_ == 2) {
-            reg_zero = Ymm(0);
-            reg_v = Ymm(1);
-        } else {
-            reg_zero = Zmm(0);
-            reg_v = Zmm(1);
-        }
+        reg_zero = Vmm(0);
+        reg_v = Vmm(1);
+
         generate();
     }
 
@@ -278,6 +276,29 @@ inline void init_rtus_driver(conv_t *self) {
     const bool src_to_ws = !is_bwd_data;
     self->rtus_driver_ = new rtus_driver_t<isa>(iw, stride_w, src_step_h,
             src_step_icb, ws_step_icb, src_to_ws, typesize);
+}
+
+inline float loss_ratio(int amount, int divider)
+{
+    return float(rnd_up(amount, divider) - amount) / rnd_up(amount, divider);
+}
+
+inline int best_divider(int value, int min_divider, int max_divider,
+                        bool find_max, int step = 1)
+{
+    max_divider = nstl::max(1, nstl::min(max_divider, value));
+    min_divider = nstl::max(1, nstl::min(min_divider, max_divider));
+
+    float min_loss = FLT_MAX;
+    int x_divider = max_divider;
+    for (int divider = max_divider; divider >= min_divider; divider -= step) {
+        const float loss = loss_ratio(value, divider);
+        if ((find_max && loss < min_loss) || (!find_max && loss <= min_loss)) {
+            min_loss = loss;
+            x_divider = divider;
+        }
+    }
+    return x_divider;
 }
 
 }

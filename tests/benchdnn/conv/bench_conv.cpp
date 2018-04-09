@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -30,8 +30,7 @@
 
 #include "conv/conv.hpp"
 #include "conv/conv_test_data.hpp"
-
-#include "conv/input_conv.hpp"
+// removed in v0.13 #include "conv/input_conv.hpp"          /* default_list of conv tests */
 
 namespace conv {
 
@@ -45,7 +44,6 @@ merge_t merge = NONE;
 attr_t attr;
 const char *skip_impl = "";
 bool allow_unimpl = false;
-// old: const char *perf_template = "perf,%n,%d,%GO,%GF,%-t,%-Gp,%0t,%0Gp";
 const char *perf_template = "perf,%n,%d,%GO,%GF,%-t,%-Gp,%0t,%0Gp,%i";
 
 void reset_parameters() {
@@ -62,7 +60,7 @@ void reset_parameters() {
 }
 
 /** return true if we think mkldnn ought to support this problem. */
-bool check_mkldnn_support( const prb_t *p, res_t *res ) {
+static bool check_mkldnn_support( const prb_t *p, res_t *res ) {
     char const *errmsg = nullptr;
     // v0.11 mkl-dnn did not support dilates
     if (errmsg != nullptr){
@@ -78,20 +76,17 @@ void check_correctness(const desc_t *c) {
     const prb_t p(*c, dir, cfg, alg, merge, attr, mb);
     char pstr[max_prb_len];
     prb2str(&p, pstr);
-    //RT_ASSERT( p.oh > 0 && p.ow > 0 );
 
     if (pattern && !match_regex(pstr, pattern))
         return;
     print(1, "run: %s", pstr);
 
-    //res_t res{ .state=UNTESTED };
     res_t res{};
     // Nicely avoid unsupported things:
     const bool mkldnn_ok = check_mkldnn_support(&p, &res);
     int status = (mkldnn_ok? conv::doit(&p, &res): OK); // <-- run benchmark
     RT_ASSERT( status == OK || status == FAIL );
 
-    //bool want_perf_report = false;
     bool want_perf_report = (bench_mode & PERF);
 
     parse_result(res, want_perf_report, allow_unimpl, status, pstr);
@@ -150,7 +145,8 @@ int bench(int argc, char **argv, bool main_bench) {
             verbose = atoi(argv[arg] + 10);
         else {
             desc_t c;
-            if (str2desc(&c, argv[arg]) == FAIL) {
+            bool is_deconv = 0;
+            if (str2desc(&c, argv[arg], is_deconv) == FAIL) {
                 fprintf(stderr, "driver: unknown option: `%s`, exiting...\n",
                         argv[arg]);
                 exit(2);
@@ -159,12 +155,15 @@ int bench(int argc, char **argv, bool main_bench) {
         }
     }
 
+#if 0
+    /* input_conv.hpp has been removed for v 0.13 */
     if (main_bench && benchdnn_stat.tests == 0) {
         const int N = sizeof(default_list) / sizeof(default_list[0]);
         print(0,"/* using default list of %d problems */", N);
         for (int n = 0; n < N; ++n)
             check_correctness(&default_list[n]);
     }
+#endif
 
     --recurse;
     print(dbg_alloc, "%s recurse=%u\n", "*END* conv/bench_conv.cpp *****", recurse);

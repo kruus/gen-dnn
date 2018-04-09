@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -43,6 +43,12 @@ inline const T& max(const T& a, const T& b) {
 template<typename T>
 inline const T& min(const T& a, const T& b) {
     return a < b ? a : b;
+}
+
+template<typename T> void swap(T& t1, T& t2) {
+    T tmp(t1);
+    t1=t2;
+    t2=tmp;
 }
 
 // Rationale: MKL-DNN needs numeric limits implementation that does not

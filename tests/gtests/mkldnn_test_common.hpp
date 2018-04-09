@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -57,13 +57,42 @@ template <> inline float out_round<float>(float x, mkldnn_round_mode_t rmode)
 inline size_t map_index(const mkldnn::memory::desc &md, size_t index) {
 #if MKLDNN_JIT_TYPES > 0
     using fmt = mkldnn::memory::format;
-    const fmt fwd_weights_g = fmt::gOIhw8i16o2i;
-    const fmt fwd_weights = fmt::OIhw8i16o2i;
-    const fmt bwd_weights_g = fmt::gOIhw8o16i2o;
-    const fmt bwd_weights = fmt::OIhw8o16i2o;
 
-    const bool with_groups = (md.data.format == fwd_weights_g)
-                          || (md.data.format == bwd_weights_g);
+    const fmt fwd_weights_g_qvnni = fmt::gOIhw8i16o2i;
+    const fmt fwd_weights_qvnni = fmt::OIhw8i16o2i;
+    const fmt bwd_weights_g_qvnni = fmt::gOIhw8o16i2o;
+    const fmt bwd_weights_qvnni = fmt::OIhw8o16i2o;
+
+    const fmt fwd_weights_g_vnni = fmt::gOIhw4i16o4i;
+    const fmt fwd_weights_vnni = fmt::OIhw4i16o4i;
+
+    const bool with_groups = (md.data.format == fwd_weights_g_qvnni)
+                          || (md.data.format == bwd_weights_g_qvnni)
+                          || (md.data.format == fwd_weights_g_vnni);
+
+    const bool qvnni = (md.data.format == fwd_weights_g_qvnni)
+                    || (md.data.format == bwd_weights_g_qvnni)
+                    || (md.data.format == fwd_weights_qvnni)
+                    || (md.data.format == bwd_weights_qvnni);
+
+    const bool vnni = (md.data.format == fwd_weights_g_vnni)
+                   || (md.data.format == fwd_weights_vnni);
+
+    const bool fwd_wei = (md.data.format == fwd_weights_g_qvnni)
+                      || (md.data.format == fwd_weights_qvnni)
+                      || (md.data.format == fwd_weights_g_vnni)
+                      || (md.data.format == fwd_weights_vnni);
+
+    const bool bwd_wei = (md.data.format == bwd_weights_g_qvnni)
+                      || (md.data.format == bwd_weights_qvnni);
+#else
+    //const bool with_groups = (md.data.format == fwd_weights_g)
+    //                      || (md.data.format == bwd_weights_g);
+    const bool with_groups = false;
+    const bool qvnni = false;
+    const bool vnni = false;
+    const bool fwd_wei = false;
+    const bool bwd_wei = false;
 #endif
 
     const int ndims = md.data.ndims;
@@ -75,10 +104,8 @@ inline size_t map_index(const mkldnn::memory::desc &md, size_t index) {
     auto *strides_within_block = md.data.layout_desc.blocking.strides[1];
 
     size_t ph_index = 0;
-#if MKLDNN_JIT_TYPES > 0
-    size_t oc_16 = 0, ic_2 = 0,
-        oc_2 = 0, ic_16 = 0;
-#endif
+    size_t oc_lb = 0, ic_sb = 0,
+        oc_sb = 0, ic_lb = 0;
 
     for (int rd = 0; rd < ndims; ++rd) {
         int d = ndims - rd - 1;
@@ -97,29 +124,37 @@ inline size_t map_index(const mkldnn::memory::desc &md, size_t index) {
         size_t cur_pos_within_block = cur_pos % cur_block;
 
 #if MKLDNN_JIT_TYPES > 0
-        if (d == (with_groups + 0)) { oc_16 = pos_d % 16; oc_2 = pos_d % 2; }
-        if (d == (with_groups + 1)) { ic_2 = pos_d % 2; ic_16 = pos_d % 16; }
+        if (d == (with_groups + 0)) {
+            if (qvnni) { oc_lb = pos_d % 16;  oc_sb = pos_d % 2; }
+            else  if (vnni) { oc_lb = pos_d % 16; }
+        }
+        if (d == (with_groups + 1)) {
+            if (qvnni) { ic_sb = pos_d % 2; ic_lb = pos_d % 16; }
+            else if (vnni) { ic_sb = pos_d % 4; }
+        }
 #endif
-
         ph_index += cur_pos_block*strides_block[d];
         ph_index += cur_pos_within_block*strides_within_block[d];
 
         index /= cur_dim;
     }
+    int scale = 1;
 #if MKLDNN_JIT_TYPES > 0
-    if (md.data.format == fwd_weights_g || md.data.format == fwd_weights) {
-        //ph_index += -16 * ic_2 + oc_16 + ic_2;
-        ph_index += oc_16 + ic_2;
-        EXPECT_GE(ph_index, 16*ic_2);
-        ph_index -= 16*ic_2;
-    } else
-        if (md.data.format == bwd_weights_g || md.data.format == bwd_weights) {
-            //ph_index += -16 * oc_2 + ic_16 + oc_2;
-            ph_index += ic_16 + oc_2;
-            EXPECT_GE(ph_index, 16 * oc_2);
-            ph_index -= 16 * oc_2;
-        }
+    //int scale = (vnni) ? 3 : 1;
+    if (vnni) scale = 3;
 #endif
+    if (fwd_wei) {
+        //ph_index += -16 * ic_2 + oc_16 + ic_2;
+        ph_index += scale * oc_lb + ic_sb;
+        EXPECT_GE(ph_index, 16 * ic_sb);
+        ph_index -= 16 * ic_sb;
+    } else
+        if (bwd_wei) {
+            //ph_index += -16 * oc_2 + ic_16 + oc_2;
+            ph_index += ic_lb + oc_sb;
+            EXPECT_GE(ph_index, 16 * oc_sb);
+            ph_index -= 16 * oc_sb;
+        }
     ph_index += md.data.layout_desc.blocking.offset_padding;
 
     return ph_index;
@@ -150,6 +185,7 @@ inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
     case f::OIhw16i16o:
     case f::OIhw8i16o2i:
     case f::OIhw8o16i2o:
+    case f::OIhw4i16o4i:
     case f::OIhw8o8i:
     case f::OIhw16o16i:
     case f::IOhw16o16i:
@@ -158,19 +194,27 @@ inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
     case f::OhIw16o4i:
 #endif
         ndims = 4; break;
+    case f::ncdhw:
+    case f::oidhw:
     case f::goihw:
     case f::hwigo:
 #if MKLDNN_JIT_TYPES > 0
+    case f::gOhwi8o:
+    case f::Goihw8g:
+    case f::Goihw16g:
     case f::gOIhw8i8o:
     case f::gOIhw16i16o:
     case f::gOIhw8i16o2i:
     case f::gOIhw8o16i2o:
+    case f::gOIhw4i16o4i:
     case f::gOIhw8o8i:
     case f::gOIhw16o16i:
     case f::gIOhw16o16i:
     case f::gOhIw16o4i:
 #endif
         ndims = 5; break;
+    case f::goidhw:
+        ndims = 6; break;
     case f::format_undef:
         ndims = 0; break;
     case f::any:
@@ -368,6 +412,76 @@ struct test_convolution_params_t {
     test_convolution_formats_t formats;
     test_convolution_attr_t attr;
     test_convolution_sizes_t sizes;
+    bool expect_to_fail;
+    mkldnn_status_t expected_status;
+};
+
+template<typename F> bool catch_expected_failures(const F &f,
+        bool expect_to_fail, mkldnn_status_t expected_status)
+{
+    try {
+        f();
+    } catch (const mkldnn::error &e) {
+        // Rethrow the exception if it is not expected or the error status did
+        // not match.
+        if (!(expect_to_fail) || e.status != (expected_status)) {
+            // Ignore unimplemented
+            if (e.status == mkldnn_unimplemented)
+                return true;
+            else
+                throw e;
+        }
+        // Return normally if the failure is expected
+        if (expect_to_fail)
+            return true;
+    }
+
+    // Throw an exception if the failure is expected but did not happen
+    if (expect_to_fail)
+        throw std::exception();
+
+    return false;
+}
+
+#define TEST_MALLOC_OFFSET 8
+char *test_malloc(size_t size) {
+    void *ptr;
+    const size_t align = 64;
+    const size_t padded_size = TEST_MALLOC_OFFSET + size;
+#ifdef _WIN32
+    ptr = _aligned_malloc(padded_size, align);
+    int rc = ((ptr) ? 0 : errno);
+#else
+    int rc = ::posix_memalign(&ptr, align, padded_size);
+#endif /* _WIN32 */
+    return rc == 0 ? (char*)ptr + TEST_MALLOC_OFFSET: 0;
+}
+
+void test_free(char *ptr) {
+    char *base_ptr = ptr - TEST_MALLOC_OFFSET;
+#ifdef _WIN32
+    _aligned_free(base_ptr);
+#else
+    return ::free(base_ptr);
+#endif /* _WIN32 */
+}
+#undef TEST_MALLOC_OFFSET
+
+class test_memory {
+public:
+    test_memory(const mkldnn::memory::desc &d, const mkldnn::engine &e) {
+        auto pd = mkldnn::memory::primitive_desc(d, e);
+        pd_size_ = pd.get_size();
+        data_.reset(test_malloc(pd_size_), test_free);
+        mem_.reset(new mkldnn::memory(pd, data_.get()));
+    }
+    size_t get_size() const { return pd_size_; }
+    mkldnn::memory &get() { return *mem_; }
+
+private:
+    std::shared_ptr<mkldnn::memory> mem_;
+    std::shared_ptr<char> data_;
+    size_t pd_size_;
 };
 
 #endif

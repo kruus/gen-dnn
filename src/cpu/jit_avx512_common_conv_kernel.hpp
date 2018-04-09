@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -35,6 +35,9 @@ struct jit_avx512_common_conv_fwd_kernel : public jit_generator {
         generate();
         jit_ker = (void (*)(jit_conv_call_s *))getCode();
     }
+
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_common_conv_fwd_kernel)
+
     static bool post_ops_ok(jit_conv_conf_t &jcp,
             const primitive_attr_t &attr);
     static status_t init_conf(jit_conv_conf_t &jcp,
@@ -122,15 +125,23 @@ private:
     inline void store_output(int ur_w);
     inline void compute_loop_fma(int ur_w, int pad_l, int pad_r);
     inline void compute_loop_fma_core(int ur_w, int pad_l, int pad_r);
-    inline void compute_loop_4vnni(int ur_w, int pad_l, int pad_r);
+    inline void compute_loop_vnni(int ur_w, int pad_l, int pad_r);
     inline void compute_loop_4fma(int ur_w, int pad_l, int pad_r);
     inline void compute_loop_4fma_1st(int ur_w, int pad_l, int pad_r);
     inline void compute_loop(int ur_w, int pad_l, int pad_r);
 
     void generate();
 
-    inline void vadd(Xbyak::Zmm zmm, reg64_t reg, int offset)   {
+    inline void vpXdpwssd(Xbyak::Zmm zmm1, Xbyak::Zmm zmm2, reg64_t reg,
+        int offset) {
         if (jcp.ver == ver_4vnni)
+            vp4dpwssd(zmm1, zmm2, EVEX_compress_addr(reg, offset, false));
+        else
+            vpdpwssd(zmm1, zmm2, EVEX_compress_addr(reg, offset, true));
+    }
+
+    inline void vadd(Xbyak::Zmm zmm, reg64_t reg, int offset)   {
+        if (jcp.ver == ver_4vnni || jcp.ver == ver_vnni)
             vpaddd(zmm, zmm, EVEX_compress_addr(reg, offset));
         else
             vaddps(zmm, zmm, EVEX_compress_addr(reg, offset));
@@ -138,7 +149,7 @@ private:
 
     inline void vcmp(Xbyak::Opmask kmask,
         Xbyak::Zmm zmm_src1, Xbyak::Zmm zmm_src2, const unsigned char cmp) {
-        if (jcp.ver == ver_4vnni)
+        if (jcp.ver == ver_4vnni || jcp.ver == ver_vnni)
             vpcmpd(kmask, zmm_src1, zmm_src2, cmp);
         else
             vcmpps(kmask, zmm_src1, zmm_src2, cmp);
@@ -146,7 +157,7 @@ private:
 
     inline void vmul(Xbyak::Zmm zmm_dst, Xbyak::Opmask kmask,
                      Xbyak::Zmm zmm_src1, Xbyak::Zmm zmm_src2) {
-        if (jcp.ver == ver_4vnni)
+        if (jcp.ver == ver_4vnni || jcp.ver == ver_vnni)
             vpmulld(zmm_dst | kmask, zmm_src1, zmm_src2);
         else
             vmulps(zmm_dst | kmask, zmm_src1, zmm_src2);
@@ -158,7 +169,7 @@ private:
     }
 
     inline int get_input_offset(int ki, int ic, int oi, int pad_l) {
-        int scale = (jcp.ver == ver_4vnni) ? 2 : 1;
+        int scale = (jcp.ver == ver_4vnni || jcp.ver == ver_vnni) ? 2 : 1;
         int iw_str = !jcp.is_1stconv ? jcp.ic_block : 1;
         int ic_str = !jcp.is_1stconv ? 1 : jcp.iw * jcp.ih;
         return jcp.typesize_in
@@ -166,7 +177,7 @@ private:
     }
 
     inline int get_kernel_offset(int ki,int ic,int n_oc_block,int ker_number) {
-        int scale = (jcp.ver == ver_4vnni) ? 2 : 1;
+        int scale = (jcp.ver == ver_4vnni || jcp.ver == ver_vnni) ? 2 : 1;
         return jcp.typesize_in * jcp.oc_block
             * (n_oc_block * jcp.nb_ic * jcp.ic_block * jcp.kh * jcp.kw
                     + (ic + ker_number) * scale + ki * jcp.ic_block);
@@ -189,6 +200,8 @@ struct jit_avx512_common_conv_bwd_data_kernel_f32: public jit_generator {
         generate();
         jit_ker = (void (*)(jit_conv_call_s *))getCode();
     }
+
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_common_conv_bwd_data_kernel_f32)
 
     static status_t init_conf(jit_conv_conf_t &jcp,
             const convolution_desc_t &cd,
@@ -243,8 +256,15 @@ private:
         assert(idx < ker_reg_base_idx);
         return Xbyak::Zmm(idx);
     }
-    inline void vadd(Xbyak::Zmm zmm, reg64_t reg, int offset) {
+    inline void vpXdpwssd(Xbyak::Zmm zmm1, Xbyak::Zmm zmm2, reg64_t reg,
+        int offset) {
         if (jcp.ver == ver_4vnni)
+            vp4dpwssd(zmm1, zmm2, EVEX_compress_addr(reg, offset, false));
+        else
+            vpdpwssd(zmm1, zmm2, EVEX_compress_addr(reg, offset, true));
+    }
+    inline void vadd(Xbyak::Zmm zmm, reg64_t reg, int offset) {
+        if (jcp.ver == ver_4vnni || jcp.ver == ver_vnni)
             vpaddd(zmm, zmm, EVEX_compress_addr(reg, offset));
         else
             vaddps(zmm, zmm, EVEX_compress_addr(reg, offset));
@@ -255,7 +275,7 @@ private:
     inline void prepare_output(int ur_w);
     inline void store_output(int ur_w);
     inline void compute_loop_4fma(int ur_w, int l_overflow, int r_overflow);
-    inline void compute_loop_4vnni(int ur_w, int l_overflow, int r_overflow);
+    inline void compute_loop_vnni(int ur_w, int l_overflow, int r_overflow);
     inline void compute_loop_fma(int ur_w, int l_overflow, int r_overflow);
     inline void compute_loop_fma_core(int ur_w, int l_overflow, int r_overflow);
     inline void compute_loop(int ur_w, int l_overflow, int r_overflow);
@@ -300,6 +320,8 @@ struct jit_avx512_common_conv_bwd_weights_kernel_f32 : public jit_generator {
         jit_ker = (void (*)(jit_conv_call_s *))getCode();
     }
 
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_common_conv_bwd_weights_kernel_f32)
+
     static status_t init_conf(jit_conv_conf_t &jcp,
             const convolution_desc_t &cd, cpu_memory_t::pd_t &src_pd,
             cpu_memory_t::pd_t &diff_weights_pd,
@@ -339,6 +361,10 @@ private:
             int input_offset, int kernel_offset, int output_offset,
             bool input_wraparound);
     inline void compute_ic_block_step_4fma(int ur_w,
+            int pad_l, int pad_r, int ic_block_step,
+            int input_offset, int kernel_offset, int output_offset,
+            bool input_wraparound);
+    inline void compute_ic_block_step_vnni(int ur_w,
             int pad_l, int pad_r, int ic_block_step,
             int input_offset, int kernel_offset, int output_offset,
             bool input_wraparound);

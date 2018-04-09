@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -17,16 +17,12 @@
 #include <assert.h>
 
 #include "mkldnn.h"
+#include "primitive_iterator.hpp"
 
-#include "c_types_map.hpp"
-#include "engine.hpp"
-#include "primitive_desc.hpp"
-#include "type_helpers.hpp"
-
-//#include <iostream>
 using namespace mkldnn::impl;
 using namespace mkldnn::impl::status;
 
+#if 0 // moved to .hpp
 struct mkldnn_primitive_desc_iterator: public c_compatible {
     using pd_create_f = engine_t::primitive_desc_create_f;
 
@@ -81,6 +77,7 @@ private:
         , op_desc_(nullptr), hint_fwd_pd_(nullptr)
         , impl_list_(nullptr), last_idx_(last_idx) {}
 };
+#endif // moved to .hpp
 
 /** Constructor with attributes.
  * - op_desc lifetime must exceed iterator lifetime

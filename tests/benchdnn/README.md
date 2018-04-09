@@ -1,7 +1,7 @@
 # benchdnn
 
 **benchdnn** is a standalone correctness and performance benchmark for
-[Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)](https://raw.githubusercontent.com/01org/mkl-dnn) library.
+[Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)](http://github.com/intel/mkl-dnn) library.
 The purpose of the benchmark is extended and robust correctness verification of
 the primitives provided by MKL-DNN. So far **benchdnn** supports convolutions
 and inner products of different data types. It also implicitly tests reorders.
@@ -23,7 +23,7 @@ The usage:
 ```
 where:
 
- - `HARNESS` is either `conv` [default], `ip`, `reorder`, `bnorm`, or `self`
+ - `HARNESS` is either `conv` [default], `ip`, `reorder`, `bnorm`, `rnn` or `self`
 
  - `MODE` -- string that contains flags for benchmark mode.
    - Use `C` or `c` for correctness (used by default), and `P` or `p` for performance.
@@ -161,7 +161,7 @@ table of modifiers below.
 | M         | Mega (1e6)
 | G         | Giga (1e9)
 
-[\*] not currently useful, (time stamp counter code currently disabled)
+[\*] (time stamp counter code may be disabled on some platforms)
 
 The definition of expanded problem descriptor is:
 `g,mb,ic,ih,iw,oc,oh,ow,kh,kw,sh,sw,ph,pw`.
@@ -184,38 +184,38 @@ convolution implementation name
 
 ## Examples
 
-Run the default set of f32 forwad convolutions w/ bias and default minibatch:
+Run the set of f32 forward convolutions from inputs/conv_all file w/ bias and default minibatch:
 ```ShellSession
     $ ./benchdnn --conv \
-        --cfg=f32 --dir=FWD_B
+        --cfg=f32 --dir=FWD_B --batch=inputs/conv_all
 ```
 
 Run the same but with merged ReLU:
 ```ShellSession
     $ ./benchdnn --conv \
-        --cfg=f32 --dir=FWD_B --merge=RELU
+        --cfg=f32 --dir=FWD_B --merge=RELU --batch=inputs/conv_all
 ```
 
 Run the same as previous but also measure performance:
 ```ShellSession
     $ ./benchdnn --conv --mode=CORRnPERF \
-        --cfg=f32 --dir=FWD_B --merge=RELU
+        --cfg=f32 --dir=FWD_B --merge=RELU --batch=inputs/conv_all
 ```
 
 > **note**: instead of `CORRnPERF` one can use `CP`, `PC`, `cp`, or `pc`
 
-Run the default set of f32 backward convolutions wrt weights with kh=3 and
+Run a set of f32 backward convolutions wrt weights with kh=3 and
 verbose level set to 2:
 ```ShellSession
     $ ./benchdnn --conv -v2 \
-        --cfg=f32 --dir=BWD_W --match='.*kh3[^0-9].*'
+        --cfg=f32 --dir=BWD_W --match='.*kh3[^0-9].*' --batch=inputs/conv_all
 ```
 
-Run the default set of u8s8u8s32 backward convolutions wrt data but skip all
+Run a set of u8s8u8s32 backward convolutions wrt data but skip all
 the convolutions that will use reference or gemm-based implementation:
 ```ShellSession
     $ ./benchdnn --conv \
-        --cfg=u8s8u8s32 --dir=BWD_B --skip-impl='ref:gemm'
+        --cfg=u8s8u8s32 --dir=BWD_B --skip-impl='ref:gemm' --batch=inputs/conv_all
 ```
 
 Run explicitly specified 1st forward convolution (including bias) from Alexnet
@@ -265,22 +265,23 @@ Winograd:
         --alg=WINO   --batch=convs.in
 ```
 
-Run the default set of u8s8u8s32 forward convolutions w/o bias, default
-minibatch, and one common output scale set to 0.5 with rounding mode set to
-down (via attributes):
+Run a set of u8s8u8s32 forward convolutions w/o bias, skipping
+reference implementations and not triggering unimplemented as an error, with
+one common output scale set to 0.5 with rounding mode set to down
+(via attributes):
 ```ShellSession
     $ ./benchdnn --conv \
         --cfg=u8s8u8s32 --dir=FWD_D --skip-impl="ref" --allow-unimpl=true \
-        --attr="irmode=down;oscale=common:.5"
+        --attr="irmode=down;oscale=common:.5" --batch=inputs/conv_all
 ```
 
 Almost the same as above (with minor changes), but also add post operation
 sequence **(relu, then sum with scale .3, then relu)** using
 attributes/mkldnn_post_ops_t:
-```
+```ShellSession
     $ ./benchdnn --conv \
         --cfg=u8s8s32s32 --dir=FWD_B \
-        --attr="oscale=common:.5;post_ops='relu;sum:.3;relu'"
+        --attr="oscale=common:.5;post_ops='relu;sum:.3;relu'" --batch=inputs/conv_all
 ```
 
 
@@ -294,12 +295,12 @@ attributes/mkldnn_post_ops_t:
 | dst           | Destination image (output image for forward convolution)
 | acc           | Accumulation (typically in terms of data type)
 | ic, oc        | Input/Output channels (aka feature maps)
-| ih, iw        | Input height and width
-| oh, ow        | Output height and width
-| kh, kw        | Kernel (filter, weights) height and width
-| sh, sw        | Convolution stride over height and width (stride&gt;=1)
-| ph, pw        | Convolution top and left padding (0=none)
-| dh, dw        | Dilation of image region covered by kernel (0 =&gt; x1)
+| id, ih, iw    | Input depth[1], height, width
+| od, oh, ow    | Output depth[1]height, width
+| kd, kh, kw    | Kernel (filter, weights) depth[1], height, width
+| sd, sh, sw    | Convolution stride over depth[1], height, width (stride&gt;=1)
+| pd, ph, pw	| Convolution top, left, near padding (0=none)
+| dd, dh, dw    | Dilation of image region covered by kernel (0 =&gt; x1)
 | mb            | Minibatch (amount of images processed at once)
 | g             | Groups (a way to reduce the amount of computations, see Alexnet topology)
 | FWD\_{D,B}     | forward w/o and w/ bias
@@ -352,9 +353,10 @@ The usage:
 where *harness-knobs* are:
 
  - `--mb=N` override minibatch that is specified in batch normalization description, default `0` (use mb specified in bnorm-desc)
- - `--dir={FWD_D (forward data /training), FWD_I (forward data /inference), BWD_D (backward data), BWD_DW (backward data + weights)` direction, default `FWD_D`
+ - `--dir={FWD_D (forward data /training), FWD_I (forward data /inference), BWD_D (backward data), BWD_DW (backward data + weights)}` direction, default `FWD_D`
  - `--dt={f32, s32, ...}` base data type, default `f32`
  - `--fmt={nchw, nChw16c, ...}` data layout, default `nchw`
+ - `--flags=[|G|S|R]` batch normalization flags, default `none` (G -- global stats, S -- use scale shift, R -- fuse with ReLU)
  - `--attr="attr_str"` attributes (see in the convolution section above), default `""` (no attributes set)
  - `--match=regex` check only convolutions that match with regex, default is `".*"`. Notice: Windows may only interpret string arguments surrounded by double quotation marks.
  - `--skip-impl="str1[:str2]..."` skip implementation (see mkldnn_query_impl_info_str), default `""`

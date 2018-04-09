@@ -20,6 +20,8 @@ usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
     awk '/getopts/{flag=1;next} /^done/{flag=0} flag&&/^[^#]+) #/; flag&&/^ *# /' $0
+    echo ""
+    echo "Platform/Compiler: -v (vanilla) -j (x86 jit) -a (Aurora,ncc) -S (SX,sxcc)"
     echo "Example: time a full test run for a debug compilation --- time $0 -dtt"
     echo "         SX debug compile, quick (no doxygen)         --- time $0 -Sdq"
     echo "         *just* run cmake, for SX debug compile       ---      $0 -SdQ"

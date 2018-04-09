@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 #include "mkldnn.h"
 #include "mkldnn_memory.hpp"
 
-#include "conv/conv.hpp"
+#include "conv/conv_common.hpp"
 
 namespace conv {
 
@@ -45,6 +45,7 @@ table of modifiers below.
 | \%z           | direction
 | \%O           | number of ops required (padding is not taken into account)
 | \%@t          | time in ms
+| %@c           | time in clocks [opt?]
 | \%@p          | ops per second
 | \%i           | convolution implementation string
 

@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -72,6 +72,7 @@ struct ref_sum_t: public cpu_primitive_t {
                      new ref_sum_t(this, ins, outs, reorders));
         }
         virtual pd_t *clone() const override { return nullptr; /* FIXME */ }
+       virtual const char *name() const override { return "ref:any"; }
 
         virtual status_t init() override {
             bool ok = cpu_sum_pd_t::init() == success;

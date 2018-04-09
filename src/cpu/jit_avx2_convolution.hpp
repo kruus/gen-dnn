@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -40,7 +40,9 @@ struct _jit_avx2_convolution_fwd_t: public cpu_primitive_t {
                     hint_fwd_pd)
             , jcp_({}) {}
 
-        DECLARE_COMMON_PD_T(_jit_avx2_convolution_fwd_t<with_relu>);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("jit:", avx2, ""),
+                _jit_avx2_convolution_fwd_t<with_relu>);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -117,7 +119,9 @@ struct jit_avx2_convolution_bwd_data_t: public cpu_primitive_t {
             , jcp_({})
         {}
 
-        DECLARE_COMMON_PD_T(jit_avx2_convolution_bwd_data_t);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("jit:", avx2, ""),
+                jit_avx2_convolution_bwd_data_t);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -187,7 +191,9 @@ struct jit_avx2_convolution_bwd_weights_t: public cpu_primitive_t {
             : cpu_convolution_bwd_weights_pd_t(engine, adesc, attr, hint_fwd_pd)
             , jcp_({}) {}
 
-        DECLARE_COMMON_PD_T(jit_avx2_convolution_bwd_weights_t);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("jit:", avx2, ""),
+                jit_avx2_convolution_bwd_weights_t);
 
         virtual status_t init() override {
             assert(this->engine()->kind() == engine_kind::cpu);

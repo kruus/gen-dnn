@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -23,12 +23,7 @@
 #include "jit_primitive_conf.hpp"
 #include "gemm_convolution_utils.hpp"
 
-#ifdef USE_MKL
-#include "mkl_version.h"
-#if (INTEL_MKL_VERSION >= 20180000 && __INTEL_MKL_BUILD_DATE >= 20170628)
-#define USE_IGEMM
-#endif
-#endif
+#include "os_blas.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -43,8 +38,8 @@ struct _gemm_u8s8s32x_convolution_fwd_t: public cpu_primitive_t {
             : _cpu_convolution_fwd_pd_t<with_relu>(engine, adesc, attr,
                     hint_fwd_pd), jcp_({}) {}
 
-        DECLARE_COMMON_PD_T(_gemm_u8s8s32x_convolution_fwd_t<with_relu,
-                dst_type>);
+        DECLARE_COMMON_PD_T("gemm:blas",
+                _gemm_u8s8s32x_convolution_fwd_t<with_relu, dst_type>);
 
         virtual status_t init() override {
             using namespace data_type;
@@ -53,7 +48,7 @@ struct _gemm_u8s8s32x_convolution_fwd_t: public cpu_primitive_t {
             assert(this->engine()->kind() == engine_kind::cpu);
 
             bool ok = true
-#if !defined(USE_IGEMM)
+#if !USE_MKL_IGEMM
                 && false
 #endif
                 && this->set_default_params() == status::success
@@ -120,10 +115,14 @@ struct _gemm_u8s8s32x_convolution_fwd_t: public cpu_primitive_t {
         jit_gemm_convolution_utils::init_conf(conf_.jcp_,
             *(conf_.cdesc()), conf_.src_pd(), conf_.weights_pd(0),
             conf_.dst_pd(), with_relu, conf_.negative_slope());
+
+        nthr_ = this->conf_.jcp_.os / omp_get_max_threads() < 64 &&
+                this->conf_.jcp_.mb != 1 ? omp_get_max_threads() : 1;
+
         jit_gemm_convolution_utils::prepare_ws_col<src_data_t>(
-                this->conf_.jcp_, &this->col_);
+                this->conf_.jcp_, &this->col_, nthr_);
         jit_gemm_convolution_utils::prepare_ws_acc<acc_data_t>(
-                this->conf_.jcp_, &this->acc_);
+                this->conf_.jcp_, &this->acc_, nthr_);
     }
 
     ~_gemm_u8s8s32x_convolution_fwd_t() {
@@ -146,6 +145,7 @@ private:
     pd_t conf_;
     src_data_t *col_;
     acc_data_t *acc_;
+    int nthr_;
 };
 
 }

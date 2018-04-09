@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -24,7 +24,8 @@ namespace impl {
 namespace cpu {
 
 /* convolution */
-enum conv_version_t {ver_unused, ver_fma, ver_avx512_core, ver_4fma, ver_4vnni};
+enum conv_version_t {ver_unused, ver_fma, ver_avx512_core, ver_4fma, ver_4vnni,
+                     ver_vnni};
 enum conv_loop_order_t {loop_cgn, loop_gnc, loop_ngc};
 enum conv_1x1_loop_order_t {loop_rbl, loop_rlb, loop_lbr, loop_lrb, loop_blr,
                             loop_brl};
@@ -77,6 +78,9 @@ struct jit_conv_conf_t {
     /* 4vnni */
     int typesize_in;
     int typesize_out;
+    int typesize_bia;
+    int typesize_acc;
+    int tr_ow;
     /* avx512_u8s8u8 */
     int ic_nb1, ic_nb2;
     int oc_nb1;
@@ -89,6 +93,9 @@ struct jit_conv_conf_t {
     int src_count;
     bool expl_bcast;
     bool large_spatial;
+    int is_oc_scale;
+    // dw conv
+    int nb_ch, ch_block, nb_ch_blocking;
 };
 
 /*
@@ -129,8 +136,6 @@ enum winograd_sched_t {
 };
 
 struct jit_conv_winograd_conf_t : public jit_conv_conf_t {
-    //alpha determines the tile size
-    static const int alpha = 6;
     int itiles;
     int jtiles;
     int ntiles;
@@ -174,12 +179,17 @@ struct jit_conv_call_s {
     const void *dst_prf;
     const void *filt_prf;
     const void *bias_prf;
+    const void *scales;
+    const void *acc_s32;
     size_t kh_padding;
     size_t kh_padding_prf;
     size_t kw_padding;
     size_t channel;
     size_t channel_prf;
     size_t oc_blocks;
+    size_t ur_w;
+    size_t ur_str_w;
+    size_t ch_blocks;
     int flags;
 };
 
@@ -223,11 +233,15 @@ struct jit_1x1_conv_conf_t {
     /* 4vnni */
     int typesize_in;
     int typesize_out;
-
+    int typesize_bia;
+    int typesize_acc;
     /* 4fma */
     bool transpose_src;
     int tr_is;
     int nthr, nthr_mb, nthr_g, nthr_oc_b, nthr_ic_b;
+    int is_oc_scale;
+    data_type_t bia_dt;
+    data_type_t dst_dt;
 };
 
 struct jit_gemm_conv_conf_t {
@@ -254,6 +268,8 @@ struct jit_1x1_conv_call_s {
     const void *load_data;
     const void *output_data;
     const void *bias_data; // used in forward and backward_weights only
+    const void *acc_s32;
+    const void *scales;
 
     size_t load_dim;
     size_t bcast_dim;

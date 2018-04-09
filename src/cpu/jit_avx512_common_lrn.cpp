@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -109,6 +109,8 @@ struct jit_avx512_common_lrn_fwd_t::jit_avx512_common_lrn_kernel_f32:
     int use_h_parallelism;
 
     float alpha, k;
+
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_common_lrn_kernel_f32)
 
     void (*ker)(jit_args_fwd_t *);
     void operator()(jit_args_fwd_t *arg) { ker(arg); }
@@ -500,6 +502,8 @@ struct jit_avx512_common_lrn_bwd_t::jit_avx512_common_lrn_kernel_f32:
 
     int use_h_parallelism;
 
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_common_lrn_kernel_f32)
+
     void (*ker)(jit_args_bwd_t *);
     void operator()(jit_args_bwd_t *arg) { ker(arg); }
 
@@ -629,9 +633,18 @@ struct jit_avx512_common_lrn_bwd_t::jit_avx512_common_lrn_kernel_f32:
                  zreg(irb, zws0)));
         IRB_LOOP(vfmadd213ps(zreg(irb, zdiffsrc), zreg(irb, zsrc),
                  zreg(irb, zdiffdst)));
-        IRB_LOOP(vmovntps(EVEX_compress_addr(diffsrc, irb*vlen),
-                 zreg(irb, zdiffsrc)));
 
+        Label unaligned_store, end_store;
+        test(diffsrc, vlen - 1);
+        jnz(unaligned_store, T_NEAR);
+        IRB_LOOP(uni_vmovntps(EVEX_compress_addr(diffsrc, irb*vlen),
+                 zreg(irb, zdiffsrc)));
+        jmp(end_store, T_NEAR);
+        L(unaligned_store); {
+            IRB_LOOP(uni_vmovups(EVEX_compress_addr(diffsrc, irb*vlen),
+                     zreg(irb, zdiffsrc)));
+        }
+        L(end_store);
     }
 
     jit_avx512_common_lrn_kernel_f32(

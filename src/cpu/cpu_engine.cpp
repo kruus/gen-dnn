@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -29,22 +29,28 @@
 #include "cpu_engine.hpp"
 #include "cpu_memory.hpp"
 #include "type_helpers.hpp"
+#include "verbose.hpp"
 
 #include "cpu_concat.hpp"
 #include "cpu_sum.hpp"
 
 // JITFUNCS removed -- frequent updates here make merges difficult
+#include "cpu/ref_rnn.hpp"
+
+#include "cpu/jit_avx512_core_u8s8s32x_1x1_convolution.hpp"
 #include "cpu/jit_avx512_common_1x1_convolution.hpp"
 #include "cpu/jit_avx512_common_convolution_winograd.hpp"
+#include "cpu/jit_avx512_core_u8s8s32x_convolution.hpp"
 #include "cpu/jit_avx512_common_convolution.hpp"
 #include "cpu/jit_avx2_1x1_convolution.hpp"
 #include "cpu/jit_sse42_1x1_convolution.hpp"
 #include "cpu/jit_avx2_convolution.hpp"
-#include "cpu/jit_avx512_core_u8s8s32x_convolution.hpp"
 #include "cpu/jit_sse42_convolution.hpp"
 #include "cpu/gemm_convolution.hpp"
 #include "cpu/gemm_u8s8s32x_convolution.hpp"
+#include "cpu/ref_convolution_3d.hpp"
 #include "cpu/ref_convolution.hpp"
+#include "cpu/ref_deconvolution.hpp"
 #include "cpu/jit_uni_eltwise.hpp"
 #include "cpu/ref_eltwise.hpp"
 #include "cpu/ref_softmax.hpp"
@@ -60,6 +66,7 @@
 #include "cpu/ref_inner_product.hpp"
 #include "cpu/gemm_inner_product.hpp"
 #include "cpu/jit_uni_inner_product.hpp"
+#include "cpu/jit_uni_dw_convolution.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -116,8 +123,23 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
 #endif
 
 static const pd_create_f cpu_impl_list[] = {
+    /* RNN */
+    INSTANCE(ref_rnn_fwd_t),
+    INSTANCE(ref_rnn_bwd_t),
+    /* conv 3d */
+    INSTANCE(ref_convolution_3d_fwd_t<f32>),
+    INSTANCE(ref_convolution_3d_fwd_t<s16,s16, s32, s32>),
+    INSTANCE(ref_convolution_3d_fwd_t<u8, s8, s32, s32>),
+    INSTANCE(ref_convolution_3d_fwd_t<u8, s8, s8, s32>),
+    INSTANCE(ref_convolution_3d_fwd_t<u8, s8, u8, s32>),
+    INSTANCE(ref_convolution_3d_bwd_data_t<f32, f32, f32, f32>),
+    INSTANCE(ref_convolution_3d_bwd_data_t<s32, s16, s16, s32>),
+    INSTANCE(ref_convolution_3d_bwd_weights_t<f32, f32, f32, f32>),
+    INSTANCE(ref_convolution_3d_bwd_weights_t<s16, s32, s16, s32>),
     /* conv */
 #if JITFUNCS > 99
+    INSTANCE(jit_avx512_common_dw_convolution_fwd_t),
+    INSTANCE(jit_avx512_common_dw_convolution_bwd_data_t),
     INSTANCE(jit_avx512_common_1x1_convolution_fwd_f32_t),
     INSTANCE(jit_avx512_common_1x1_convolution_bwd_data_f32_t),
     INSTANCE(jit_avx512_common_1x1_convolution_bwd_weights_t),
@@ -127,12 +149,16 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_avx512_common_convolution_winograd_bwd_data_t),
     INSTANCE(jit_avx512_common_convolution_winograd_bwd_weights_t),
     INSTANCE(jit_avx512_common_convolution_fwd_t<f32>),
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, f32>),
+    //INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, f32>),
     INSTANCE(jit_avx512_common_convolution_bwd_data_t<f32>),
-    INSTANCE(jit_avx512_common_convolution_bwd_weights_t),
+    INSTANCE(jit_avx512_common_convolution_bwd_weights_t<f32>),
+    INSTANCE(jit_avx2_dw_convolution_fwd_t),
+    INSTANCE(jit_avx2_dw_convolution_bwd_data_t),
     INSTANCE(jit_avx2_1x1_convolution_fwd_t),
     INSTANCE(jit_avx2_1x1_convolution_bwd_data_t),
     INSTANCE(jit_avx2_1x1_convolution_bwd_weights_t),
+    INSTANCE(jit_sse42_dw_convolution_fwd_t),
+    INSTANCE(jit_sse42_dw_convolution_bwd_data_t),
     INSTANCE(jit_sse42_1x1_convolution_fwd_t),
     INSTANCE(jit_avx2_convolution_fwd_t),
     INSTANCE(jit_avx2_convolution_bwd_data_t),
@@ -156,11 +182,16 @@ static const pd_create_f cpu_impl_list[] = {
     /* conv (int) */
 #if JITFUNCS > 99
     INSTANCE(jit_avx512_common_convolution_fwd_t<s16, s16, s32>),
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, f32>),
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, s32>),
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, s8>),
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, u8>),
+    INSTANCE(jit_avx512_core_u8s8s32x_1x1_convolution_fwd_t<f32>),
+    INSTANCE(jit_avx512_core_u8s8s32x_1x1_convolution_fwd_t<s32>),
+    INSTANCE(jit_avx512_core_u8s8s32x_1x1_convolution_fwd_t<u8>),
+    INSTANCE(jit_avx512_core_u8s8s32x_1x1_convolution_fwd_t<s8>),
+    INSTANCE(jit_avx512_core_u8s8s32x_convolution_fwd_t<f32>),
+    INSTANCE(jit_avx512_core_u8s8s32x_convolution_fwd_t<s32>),
+    INSTANCE(jit_avx512_core_u8s8s32x_convolution_fwd_t<u8>),
+    INSTANCE(jit_avx512_core_u8s8s32x_convolution_fwd_t<s8>),
     INSTANCE(jit_avx512_common_convolution_bwd_data_t<s16, s16, s32>),
+    INSTANCE(jit_avx512_common_convolution_bwd_weights_t<s16, s16, s32>),
 #endif
     INSTANCE(_gemm_u8s8s32x_convolution_fwd_t<false, s32>),
     INSTANCE(_gemm_u8s8s32x_convolution_fwd_t<false, u8>),
@@ -172,6 +203,10 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(ref_convolution_fwd_t<u8, s8, u8, s32>),
     INSTANCE(ref_convolution_bwd_data_t<s32, s16, s16, s32>),
     INSTANCE(ref_convolution_bwd_weights_t<s16, s32, s16, s32>),
+    /* deconv */
+    INSTANCE(ref_deconvolution_bwd_weights_t),
+    INSTANCE(ref_deconvolution_bwd_data_t),
+    INSTANCE(ref_deconvolution_fwd_t),
     /* eltwise */
 #if JITFUNCS > 99
     INSTANCE(jit_uni_eltwise_fwd_t<avx512_common>),
@@ -256,11 +291,13 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(ref_inner_product_fwd_t<u8, s8, u8, s32>),
     /* conv_eltwise */
 #if JITFUNCS > 99
+    INSTANCE(jit_avx512_common_dw_convolution_relu_t),
     INSTANCE(jit_avx512_common_convolution_winograd_relu_t),
     INSTANCE(jit_avx512_common_1x1_convolution_relu_f32_t),
-    INSTANCE(jit_avx512_common_1x1_convolution_relu_s16s16s32_t),
     INSTANCE(jit_avx512_common_convolution_relu_t<f32>),
+    INSTANCE(jit_avx2_dw_convolution_relu_t),
     INSTANCE(jit_avx2_1x1_convolution_relu_t),
+    INSTANCE(jit_sse42_dw_convolution_relu_t),
     INSTANCE(jit_sse42_1x1_convolution_relu_t),
     INSTANCE(jit_avx2_convolution_relu_t),
     INSTANCE(jit_sse42_convolution_relu_t),
@@ -273,12 +310,16 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(ref_convolution_relu_t<f32>),
     /* conv_eltwise (int) */
 #if JITFUNCS > 99
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, f32>),
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, f32>),
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, s32>),
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, s8>),
-    INSTANCE(_jit_avx512_core_u8s8s32x_convolution_fwd_t<true, u8>),
+    INSTANCE(jit_avx512_common_1x1_convolution_relu_s16s16s32_t),
     INSTANCE(jit_avx512_common_convolution_relu_t<s16, s16, s32>),
+    INSTANCE(jit_avx512_core_u8s8s32x_1x1_convolution_relu_t<f32>),
+    INSTANCE(jit_avx512_core_u8s8s32x_1x1_convolution_relu_t<s32>),
+    INSTANCE(jit_avx512_core_u8s8s32x_1x1_convolution_relu_t<s8>),
+    INSTANCE(jit_avx512_core_u8s8s32x_1x1_convolution_relu_t<u8>),
+    INSTANCE(jit_avx512_core_u8s8s32x_convolution_relu_t<f32>),
+    INSTANCE(jit_avx512_core_u8s8s32x_convolution_relu_t<s32>),
+    INSTANCE(jit_avx512_core_u8s8s32x_convolution_relu_t<u8>),
+    INSTANCE(jit_avx512_core_u8s8s32x_convolution_relu_t<s8>),
 #endif
     INSTANCE(_gemm_u8s8s32x_convolution_fwd_t<true, s32>),
     INSTANCE(_gemm_u8s8s32x_convolution_fwd_t<true, u8>),
@@ -302,7 +343,16 @@ cpu_engine_factory_t engine_factory;
 
 status_t cpu_engine_t::submit(primitive_t *p, event_t *e,
         event_vector &prerequisites) {
-    p->execute(e);
+    /* FIXME: this should live in primitive execute function... */
+    if (mkldnn_verbose()->level) {
+        double ms = get_msec();
+        p->execute(e);
+        ms = get_msec() - ms;
+        printf("mkldnn_verbose,exec,%s,%g\n", p->pd()->info(), ms);
+        fflush(0);
+    } else {
+        p->execute(e);
+    }
     return success;
 }
 

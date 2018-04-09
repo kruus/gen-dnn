@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -63,21 +63,22 @@ status_t bnrm_desc_init(batch_normalization_desc_t *bnrm_desc,
     mkldnn_memory_desc_init(&bd.variance_desc, 1, stats_dims,
             data_desc->data_type, mkldnn_x);
 
-
     bd.batch_norm_epsilon = epsilon;
 
     unsigned bnorm_flags =
-        mkldnn_use_global_stats | mkldnn_omit_stats | mkldnn_use_scaleshift;
+        mkldnn_use_global_stats | mkldnn_use_scaleshift | mkldnn_fuse_bn_relu;
     if ((~bnorm_flags & flags) != 0) return invalid_arguments;
 
     bd.flags = flags;
 
     bool consistency = true
-        && bd.data_desc.ndims == 4;
+        && memory_desc_wrapper(bd.data_desc).nelems()
+        && utils::one_of(bd.data_desc.ndims, 4, 5);
     if (bd.prop_kind == backward_data)
         consistency = consistency
-            && bd.diff_data_desc.ndims == 4
-            && array_cmp(bd.diff_data_desc.dims, bd.data_desc.dims, 4);
+            && utils::one_of(bd.diff_data_desc.ndims, 4, 5)
+            && array_cmp(bd.diff_data_desc.dims, bd.data_desc.dims,
+                    bd.diff_data_desc.ndims);
     if (!consistency) return invalid_arguments;
 
     *bnrm_desc = bd;

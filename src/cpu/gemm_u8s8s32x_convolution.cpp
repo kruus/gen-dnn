@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@
 #include "mkldnn_thread.hpp"
 #include "math_utils.hpp"
 
-#include "os_blas.hpp"
 #include "simple_q10n.hpp"
 
 #include "gemm_u8s8s32x_convolution.hpp"
@@ -36,7 +35,7 @@ using namespace mkldnn::impl::math;
 
 template <bool with_relu, data_type_t dst_type>
 void _gemm_u8s8s32x_convolution_fwd_t<with_relu, dst_type>::execute_forward() {
-#if defined(USE_IGEMM)
+#if USE_MKL_IGEMM
     auto src_base = reinterpret_cast<const src_data_t *>(this->input_memory(0));
     auto wei_base = reinterpret_cast<const wei_data_t *>(this->input_memory(1));
     auto bia_base = reinterpret_cast<const char *>(this->input_memory(2));
@@ -99,12 +98,7 @@ void _gemm_u8s8s32x_convolution_fwd_t<with_relu, dst_type>::execute_forward() {
     const bool do_relu = jcp.with_relu || (entry_idx >= 0);
 
     const size_t work_amount = jcp.ngroups * jcp.mb;
-    int num_thr =
-        (jcp.oh * jcp.ow) / omp_get_max_threads() < 64 && jcp.mb != 1
-        ? omp_get_max_threads() : 1;
-    MAYBE_UNUSED(num_thr);
-
-    OMP(parallel num_threads(num_thr))//;
+    OMP(parallel num_threads(this->nthr_))//;
     {
         const int ithr = omp_get_thread_num();
         const int nthr = omp_get_num_threads();

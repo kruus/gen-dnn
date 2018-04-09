@@ -1,5 +1,5 @@
 #===============================================================================
-# Copyright 2016-2017 Intel Corporation
+# Copyright 2016-2018 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #===============================================================================
+
+option(WITH_EXAMPLE "include examples" ON)
+if (NOT WITH_EXAMPLE)
+    return()
+endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
@@ -66,4 +71,26 @@ if(WIN32)
     configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
         simple-training-net-cpp.vcxproj.user @ONLY)
     set_property(TEST simple-training-net-cpp PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
+endif()
+
+add_executable(simple-net-int8-cpp simple_net_int8.cpp)
+set_property(TARGET simple-net-int8-cpp PROPERTY CXX_STANDARD 11)
+target_link_libraries(simple-net-int8-cpp ${LIB_NAME})
+add_test(simple-net-int8-cpp simple-net-int8-cpp)
+if(WIN32)
+    configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
+        simple-net-int8-cpp.vcxproj.user @ONLY)
+    set_property(TEST simple-net-int8-cpp PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
+endif()
+
+if (HAVE_MKL)
+    add_executable(simple-rnn-cpp simple_rnn.cpp)
+    set_property(TARGET simple-rnn-cpp PROPERTY CXX_STANDARD 11)
+    target_link_libraries(simple-rnn-cpp ${LIB_NAME})
+    add_test(simple-rnn-cpp simple-rnn-cpp)
+    if(WIN32)
+        configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
+            simple-rnn-cpp.vcxproj.user @ONLY)
+        set_property(TEST simple-rnn-cpp PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
+    endif()
 endif()

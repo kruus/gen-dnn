@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -32,6 +32,8 @@ struct jit_avx2_conv_fwd_kernel_f32: public jit_generator {
         this->generate();
         jit_ker = (void (*)(jit_conv_call_s *))this->getCode();
     }
+
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx2_conv_fwd_kernel_f32)
 
     static bool post_ops_ok(jit_conv_conf_t &jcp,
             const primitive_attr_t &attr);
@@ -82,6 +84,8 @@ private:
 };
 
 struct jit_avx2_conv_bwd_data_kernel_f32: public jit_generator {
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx2_conv_bwd_data_kernel_f32)
+
     jit_avx2_conv_bwd_data_kernel_f32(jit_conv_conf_t ajcp): jcp(ajcp)
     {
         this->generate();
@@ -123,6 +127,8 @@ private:
 };
 
 struct jit_avx2_conv_bwd_weights_kernel_f32: public jit_generator {
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx2_conv_bwd_weights_kernel_f32)
+
     jit_avx2_conv_bwd_weights_kernel_f32(jit_conv_conf_t ajcp): jcp(ajcp)
     {
         this->generate();

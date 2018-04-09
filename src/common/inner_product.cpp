@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -59,7 +59,10 @@ status_t ip_desc_init(inner_product_desc_t *ip_desc, prop_kind_t prop_kind,
 
     /* FIXME: fill-in! */
     bool consistency = true
-        && one_of(src_desc->ndims, 2, 4)
+        && memory_desc_wrapper(src_desc).nelems()
+        && memory_desc_wrapper(dst_desc).nelems()
+        && memory_desc_wrapper(weights_desc).nelems()
+        && one_of(src_desc->ndims, 2, 4, 5)
         && dst_desc->ndims == 2
         && weights_desc->ndims == src_desc->ndims
         && (with_bias ? bias_desc->ndims == 1 : true)

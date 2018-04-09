@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@
 namespace mkldnn {
 namespace impl {
 
-struct memory_pd_t; // fwd declaration
+//struct memory_pd_t; // fwd declaration
 
 // What effect on vanilla runtimes ...
 //  fast_memory_desc_wrapper< memory_format_t >
@@ -53,7 +53,7 @@ struct memory_desc_wrapper: public c_compatible {
      * descriptor \param md */
     memory_desc_wrapper(const memory_desc_t &md) : _md(&md) {}
     memory_desc_wrapper(const memory_desc_t *md) : _md(md) {}
-    /** do not depend on \c memory_pd.hpp */
+    // /** do not depend on \c memory_pd.hpp */
     memory_desc_wrapper(const memory_pd_t *m_pd);
 
     /* implementing attributes */
@@ -87,17 +87,20 @@ struct memory_desc_wrapper: public c_compatible {
     size_t size() const {
         using namespace mkldnn::impl::memory_format;
         if (is_zero() || format() == memory_format::any) return 0;
+
         assert(utils::one_of(format(), blocked, x, nc, nchw, nhwc, chwn,
                     oi, io, oihw, ihwo, hwio, goihw, hwigo
 #if MKLDNN_JIT_TYPES > 0
-                    , nChw8c, nChw16c, oIhw8i, oIhw16i,
-                    OIhw8i8o, OIhw16i16o, OIhw8i16o2i, OIhw8o16i2o, OIhw8o8i,
-                    OIhw16o16i, Oihw8o, Oihw16o, Ohwi8o, Ohwi16o, OhIw16o4i,
-                    gOIhw8i8o, gOIhw16i16o, gOIhw8i16o2i,
-                    gOIhw8o16i2o, gOIhw8o8i, gOIhw16o16i, gOihw8o, gOihw16o,
-                    gOhwi8o, gOhwi16o, gOhIw16o4i, IOhw16o16i, gIOhw16o16i
+                    , nChw8c, nChw16c, oIhw8i,
+                    oIhw16i, OIhw8i8o, OIhw16i16o, OIhw8i16o2i, OIhw8o16i2o,
+                    OIhw8o8i, OIhw16o16i, Oihw8o, Oihw16o, Ohwi8o, Ohwi16o,
+                    OhIw16o4i, OIhw4i16o4i, goihw, gOIhw8i8o, gOIhw16i16o,
+                    gOIhw8i16o2i, gOIhw8o16i2o, gOIhw8o8i, gOIhw16o16i, gOihw8o,
+                    gOihw16o, gOhwi8o, gOhwi16o, gOhIw16o4i, IOhw16o16i,
+                    gIOhw16o16i, gOIhw4i16o4i, Goihw8g, Goihw16g, ncdhw, oidhw, goidhw,
+                    ntc, tnc, ldsnc, ldigo, ldgoi, ldgo
 #endif
-                        ));
+                    ));
 
         if (blocking_desc().offset_padding != 0) return 0;
 
@@ -339,5 +342,5 @@ inline bool memory_desc_wrapper::consistent_with(
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
 

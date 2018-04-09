@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -18,11 +18,9 @@
 #define UTILS_HPP
 
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#ifdef WIN32
-#include <malloc.h>
-#endif
 
 #include "mkldnn_os.h"
 
@@ -231,21 +229,49 @@ inline bool nd_iterator_jump(U &cur, const U end, W &x, const Y &X,
     return false;
 }
 
+template <typename Telem, size_t Tdims>
+struct array_offset_calculator {
+    template <typename... Targs>
+    array_offset_calculator(Telem *base, Targs... Fargs) : _dims{ Fargs... }
+    {
+        _base_ptr = base;
+    }
+    template <typename... Targs>
+    inline Telem &operator()(Targs... Fargs)
+    {
+        return *(_base_ptr + _offset(1, Fargs...));
+    }
+
+private:
+    template <typename... Targs>
+    inline size_t _offset(size_t const dimension, size_t element)
+    {
+        return element;
+    }
+
+    template <typename... Targs>
+    inline size_t _offset(size_t const dimension, size_t theta, size_t element)
+    {
+        return element + (_dims[dimension] * theta);
+    }
+
+    template <typename... Targs>
+    inline size_t _offset(size_t const dimension, size_t theta, size_t element,
+            Targs... Fargs)
+    {
+        size_t t_prime = element + (_dims[dimension] * theta);
+        return _offset(dimension + 1, t_prime, Fargs...);
+    }
+
+    Telem *_base_ptr;
+    const int _dims[Tdims];
+};
+
 }
 
 #if !defined(_SX)
-inline void* malloc(size_t size, int alignment) {
-    void *ptr;
-
-#ifdef _WIN32
-    ptr = _aligned_malloc(size, alignment);
-    int rc = ptr ? 0 : -1;
-#else
-    int rc = ::posix_memalign(&ptr, alignment, size);
-#endif
-
-    return (rc == 0) ? ptr : 0;
-}
+void *malloc(size_t size, int alignment);
+void free(void *p);
 #else
 /** SX -> std malloc and free, instead of aligning pointers.
  * Until I am sure that we do not use these pointers in mkldnn.hpp
@@ -256,15 +282,8 @@ inline void* malloc(size_t size, int alignment) {
  * \p alignment arg ignored.
  */
 inline void* malloc(size_t size, int /*alignment*/) { return ::malloc(size); }
+inline void free(void *p) { ::free(p); }
 #endif
-
-inline void free(void *p) {
-#ifdef _WIN32
-    _aligned_free(p);
-#else
-    ::free(p);
-#endif
-}
 
 struct c_compatible {
     enum { default_alignment = 64 };
@@ -280,6 +299,10 @@ struct c_compatible {
 };
 
 inline void yield_thread() { }
+
+int mkldnn_getenv(char *value, const char *name, int len);
+bool mkldnn_jit_dump();
+FILE *mkldnn_fopen(const char *filename, const char *mode);
 
 }
 }

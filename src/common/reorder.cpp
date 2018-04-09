@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 #include "engine.hpp"
 #include "memory_pd.hpp"
 #include "primitive_desc.hpp"
+#include "reorder_pd.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
@@ -47,7 +48,13 @@ status_t mkldnn_reorder_primitive_desc_create_v2(
     auto i_mpd = reinterpret_cast<const memory_pd_t*>(input);
     auto o_mpd = reinterpret_cast<const memory_pd_t*>(output);
 
-    if (!memory_desc_wrapper(i_mpd).consistent_with(o_mpd))
+    auto i_mdw = memory_desc_wrapper(i_mpd);
+    auto o_mdw = memory_desc_wrapper(o_mpd);
+
+    if (i_mdw.nelems() == 0 || o_mdw.nelems() == 0)
+        return invalid_arguments;
+
+    if (!i_mdw.consistent_with(o_mdw))
         return invalid_arguments;
 
     auto e = (i_ek != engine_kind::cpu) ? input->engine() : output->engine();
@@ -57,7 +64,10 @@ status_t mkldnn_reorder_primitive_desc_create_v2(
         attr = &dummy_attr;
 
     for (auto r = e->get_reorder_implementation_list(); *r; ++r) {
-        if ((*r)(r_pd, i_mpd, o_mpd, attr) == success) return success;
+        if ((*r)(r_pd, i_mpd, o_mpd, attr) == success) {
+            (*r_pd)->init_info();
+            return success;
+        }
     }
     return unimplemented;
 }

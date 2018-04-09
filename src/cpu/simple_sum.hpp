@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ struct simple_sum_t: public cpu_primitive_t {
                 const cpu_memory_pd_t **input_pds, const primitive_attr_t *attr)
             : cpu_sum_pd_t(output_d, n, scales, input_pds, attr) {}
 
-        DECLARE_CPU_SUM_PD_T(simple_sum_t);
+        DECLARE_CPU_SUM_PD_T("simple:any", simple_sum_t);
 
         virtual status_t init() override {
             bool ok = true

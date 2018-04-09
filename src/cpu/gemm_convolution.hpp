@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -54,7 +54,9 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
                     hint_fwd_pd)
             , jcp_({}) {}
 
-        DECLARE_COMMON_PD_T(_gemm_convolution_fwd_t<with_relu, run_jit, isa>);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("gemm:", isa, "blas"),
+                _gemm_convolution_fwd_t<with_relu, run_jit, isa>);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -107,11 +109,11 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
                 break;
             case 1:
                 ok = ok && // sum OR relu
-                        (po.entry_[0].is_relu() || po.contain(sum, 0));
+                        (po.entry_[0].is_relu() || po.entry_[0].is_sum());
                 break;
             case 2:
                 ok = ok && // sum->relu
-                        (po.contain(sum, 0) && po.entry_[1].is_relu());
+                        (po.entry_[0].is_sum() && po.entry_[1].is_relu());
                 break;
             default: ok = false;
             }
@@ -126,15 +128,23 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
     {
         using namespace prop_kind;
 
-        const float any_nonzero_value = 1.f;
+        const auto &post_ops = conf_.attr()->post_ops_;
+        const data_t one = 1.0, zero = 0.0;
+        beta_ = post_ops.find(primitive_kind::sum) >= 0 ? one : zero;
+
         if (run_jit)
-            sgemm_ = new jit_uni_gemm_f32('N', 'N', any_nonzero_value, false);
+            sgemm_ = new jit_uni_gemm_f32('N', 'N', beta_, false);
 
         jit_gemm_convolution_utils::init_conf(conf_.jcp_,
             *(conf_.cdesc()), conf_.src_pd(), conf_.weights_pd(0),
             conf_.dst_pd(), with_relu, conf_.negative_slope());
+
+        nthr_ = this->conf_.jcp_.os / omp_get_max_threads() < 512 &&
+                (this->conf_.jcp_.mb != 1 || this->conf_.jcp_.ngroups > 2) ?
+                omp_get_max_threads() : 1;
+
         jit_gemm_convolution_utils::prepare_ws_col<data_t>(this->conf_.jcp_,
-                &this->col_);
+                &this->col_, nthr_);
     }
 
     ~_gemm_convolution_fwd_t() {
@@ -156,6 +166,8 @@ private:
           <isa == avx2, jit_avx2_gemm_f32, jit_avx512_common_gemm_f32>::type;
     jit_uni_gemm_f32 *sgemm_;
     data_t *col_;
+    data_t beta_;
+    int nthr_;
 };
 
 using jit_avx512_common_gemm_convolution_fwd_t =
@@ -182,7 +194,9 @@ struct _gemm_convolution_bwd_data_t: public cpu_primitive_t {
             , jcp_({})
         {}
 
-        DECLARE_COMMON_PD_T(_gemm_convolution_bwd_data_t<run_jit, isa>);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("gemm:", isa, "blas"),
+                _gemm_convolution_bwd_data_t<run_jit, isa>);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -236,8 +250,12 @@ struct _gemm_convolution_bwd_data_t: public cpu_primitive_t {
         jit_gemm_convolution_utils::init_conf(conf_.jcp_,
             *(conf_.desc()), conf_.diff_src_pd(), conf_.weights_pd(0),
             conf_.diff_dst_pd());
+
+        nthr_ = this->conf_.jcp_.mb != 1 || this->conf_.jcp_.ngroups > 2 ?
+                omp_get_max_threads() : 1;
+
         jit_gemm_convolution_utils::prepare_ws_col<data_t>(this->conf_.jcp_,
-                &this->col_);
+                &this->col_, nthr_);
     }
 
     ~_gemm_convolution_bwd_data_t() {
@@ -266,6 +284,7 @@ private:
           <isa == avx2, jit_avx2_gemm_f32, jit_avx512_common_gemm_f32>::type;
     jit_uni_gemm_f32 *sgemm_;
     data_t *col_;
+    int nthr_;
 };
 
 using jit_avx512_common_gemm_convolution_bwd_data_t =
@@ -286,7 +305,9 @@ struct _gemm_convolution_bwd_weights_t: public cpu_primitive_t {
             , jcp_({})
         {}
 
-        DECLARE_COMMON_PD_T(_gemm_convolution_bwd_weights_t<run_jit, isa>);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("gemm:", isa, "blas"),
+                _gemm_convolution_bwd_weights_t<run_jit, isa>);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -347,10 +368,15 @@ struct _gemm_convolution_bwd_weights_t: public cpu_primitive_t {
             *(conf_.desc()), conf_.src_pd(), conf_.diff_weights_pd(0),
             conf_.diff_dst_pd());
         const memory_desc_wrapper weights_d(conf_.diff_weights_pd(0));
+
+        nthr_ = this->conf_.jcp_.os / omp_get_max_threads() < 256 &&
+                (this->conf_.jcp_.mb != 1 || this->conf_.jcp_.ngroups > 2) ?
+                omp_get_max_threads() : 1;
+
         jit_gemm_convolution_utils::prepare_ws_col<data_t>(this->conf_.jcp_,
-                &this->col_);
+                &this->col_, nthr_);
         jit_gemm_convolution_utils::prepare_ws_wei_reduction(this->conf_.jcp_,
-                &this->wei_reduction_, weights_d.size());
+                &this->wei_reduction_, weights_d.size(), nthr_);
     }
 
     ~_gemm_convolution_bwd_weights_t() {
@@ -383,6 +409,7 @@ private:
           <isa == avx2, jit_avx2_gemm_f32, jit_avx512_common_gemm_f32>::type;
     jit_uni_gemm_f32 *sgemm_0, *sgemm_1;
     data_t *col_, *wei_reduction_;
+    int nthr_;
 };
 
 using jit_avx512_common_gemm_convolution_bwd_weights_t =

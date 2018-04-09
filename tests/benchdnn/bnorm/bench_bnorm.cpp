@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ attr_t attr;
 const char *pattern = NULL;
 const char *skip_impl = "";
 bool allow_unimpl = false;
-const char *perf_template = "perf,%n,%z,%q,%f,%D,%-t,%0t";
+const char *perf_template = "perf,%n,%z,%f,%q,%f,%D,%-t,%0t";
 
 void reset_parameters() {
     check_alg = ALG_AUTO;

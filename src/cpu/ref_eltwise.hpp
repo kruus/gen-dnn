@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ struct ref_eltwise_fwd_t: public cpu_primitive_t {
             : cpu_eltwise_fwd_pd_t(engine, adesc, attr, hint_fwd_pd)
             , is_dense(false) {}
 
-        DECLARE_COMMON_PD_T(ref_eltwise_fwd_t);
+        DECLARE_COMMON_PD_T("ref:any", ref_eltwise_fwd_t);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -85,7 +85,7 @@ struct ref_eltwise_bwd_t: public cpu_primitive_t {
             : cpu_eltwise_bwd_pd_t(engine, adesc, attr, hint_fwd_pd)
             , is_dense_(false) {}
 
-        DECLARE_COMMON_PD_T(ref_eltwise_bwd_t);
+        DECLARE_COMMON_PD_T("ref:any", ref_eltwise_bwd_t);
 
         virtual status_t init() override {
             using namespace prop_kind;

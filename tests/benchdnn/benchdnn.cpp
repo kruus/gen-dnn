@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -30,9 +30,11 @@
 
 #include "self/self.hpp"
 #include "conv/conv.hpp"
+#include "conv/deconv.hpp"
 #include "ip/ip.hpp"
 #include "reorder/reorder.hpp"
 #include "bnorm/bnorm.hpp"
+#include "rnn/rnn.hpp"
 
 #if defined(_OPENMP)
 #include <omp.h>
@@ -58,9 +60,11 @@ int main(int argc, char **argv) {
     while (argc > 0) {
         if (!strcmp("--self", argv[0])) prim = SELF;
         else if (!strcmp("--conv", argv[0])) prim = CONV;
+        else if (!strcmp("--deconv", argv[0])) prim = DECONV;
         else if (!strcmp("--ip", argv[0])) prim = IP;
         else if (!strcmp("--reorder", argv[0])) prim = REORDER;
         else if (!strcmp("--bnorm", argv[0])) prim = BNORM;
+        else if (!strcmp("--rnn", argv[0])) prim = RNN;
         else if (!strncmp("--mode=", argv[0], 7))
             bench_mode = str2bench_mode(argv[0] + 7);
         else if (!strncmp("-v", argv[0], 2))
@@ -95,9 +99,11 @@ int main(int argc, char **argv) {
     switch (prim) {
     case SELF: self::bench(argc, argv); break;
     case CONV: conv::bench(argc, argv); break;
+    case DECONV: deconv::bench(argc, argv); break;
     case IP: ip::bench(argc, argv); break;
     case REORDER: reorder::bench(argc, argv); break;
     case BNORM: bnorm::bench(argc, argv); break;
+    case RNN: rnn::bench(argc, argv); break;
     default: fprintf(stderr, "err: unknown driver\n");
     }
 

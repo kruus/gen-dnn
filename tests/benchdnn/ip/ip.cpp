@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -199,16 +199,18 @@ int doit(prb_t *p, res_t *r) {
     dnn_mem_t src_dt(src_dt_d, p->src_dt);
     dnn_mem_t wei_dt(wei_dt_d, p->wei_dt);
     dnn_mem_t dst_dt(dst_dt_d, p->dst_dt);
+    dnn_mem_t bia_dt = use_bia? dnn_mem_t(bia_dt_d, p->dst_dt) : dnn_mem_t();
     //dnn_mem_t bia_dt = p->dir & FLAG_BIA
     //        ? dnn_mem_t(bia_dt_d, p->dst_dt) : dnn_mem_t();
-    dnn_mem_t bia_dt = dnn_mem_t::optional(use_bia, bia_dt_d, p->dst_dt);
+    //dnn_mem_t bia_dt = dnn_mem_t::optional(use_bia, bia_dt_d, p->dst_dt);
 
     dnn_mem_t src_fp(src_dt_d, fp, mkldnn_nchw);
     dnn_mem_t wei_fp(wei_dt_d, fp, mkldnn_oihw);
     dnn_mem_t dst_fp(dst_dt_d, fp, mkldnn_nc);
+    dnn_mem_t bia_fp = use_bia? dnn_mem_t(bia_dt_d, fp, mkldnn_x) : dnn_mem_t();
     //dnn_mem_t bia_fp = p->dir & FLAG_BIA
     //        ? dnn_mem_t(bia_dt_d, fp, mkldnn_x) : dnn_mem_t();
-    dnn_mem_t bia_fp = dnn_mem_t::optional(use_bia, bia_dt_d, fp, mkldnn_x);
+    //dnn_mem_t bia_fp = dnn_mem_t::optional(use_bia, bia_dt_d, fp, mkldnn_x);
 
     fill_src(src_dt, src_fp, r);
     fill_wei(wei_dt, wei_fp, r);
@@ -219,7 +221,7 @@ int doit(prb_t *p, res_t *r) {
     if (p->dir & FLAG_FWD) {
         compute_ref_fwd(p, src_fp, wei_fp, bia_fp, dst_fp);
         mkldnn_primitive_at_t inputs[3] = { {src_dt.p_, 0}, {wei_dt.p_, 0},
-            {use_bia ? bia_dt.p_ : NULL, 0}
+            {use_bia? bia_dt.p_ : NULL, 0}
         };
         const_mkldnn_primitive_t outputs[] = { dst_dt.p_ };
         DNN_SAFE(mkldnn_primitive_create(&ip, ippd, inputs, outputs), WARN);

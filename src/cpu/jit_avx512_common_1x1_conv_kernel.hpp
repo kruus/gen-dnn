@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -32,6 +32,8 @@ struct jit_avx512_common_1x1_conv_kernel : public jit_generator {
         this->generate();
         jit_ker = (void (*)(jit_1x1_conv_call_s *)) this->getCode();
     }
+
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_common_1x1_conv_kernel)
 
     static bool post_ops_ok(jit_1x1_conv_conf_t &jcp,
                                 const primitive_attr_t &attr);

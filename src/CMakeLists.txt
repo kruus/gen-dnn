@@ -1,6 +1,5 @@
 #===============================================================================
-# vim: set ts=4 sw=4 et ftype=cmake
-# Copyright 2016-2017 Intel Corporation
+# Copyright 2016-2018 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,6 +51,11 @@ include_directories(
     ${CPU_INCLUDE_DIRS}
     )
 
+if(VTUNEROOT)
+    include_directories(${VTUNEROOT}/include)
+    add_definitions(-DJIT_PROFILING_VTUNE)
+endif()
+
 if(WIN32)
     add_definitions(-D_WIN)
     add_definitions(-DNOMINMAX)
@@ -83,5 +87,6 @@ set_property(TARGET ${TARGET_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 set_property(TARGET ${TARGET_NAME} PROPERTY VERSION "${PROJECT_VERSION}.0")
 set_property(TARGET ${TARGET_NAME} PROPERTY SOVERSION "0")
 
-install(TARGETS ${TARGET_NAME} DESTINATION lib COMPONENT bin)
+install(TARGETS ${TARGET_NAME} DESTINATION lib${LIB_SUFFIX} COMPONENT bin)
 install(FILES ${HEADERS} DESTINATION include COMPONENT dev)
+# vim: set ts=4 sw=4 et ftype=cmake

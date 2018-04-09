@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -72,21 +72,16 @@ inline size_t data_type_size(data_type_t data_type) {
 
 inline memory_format_t format_normalize(const memory_format_t fmt) {
     using namespace memory_format;
-    if (utils::one_of(fmt, x, nc, nchw, nhwc, chwn, 
+    if (utils::one_of(fmt, x, nc, nchw, nhwc, chwn, oi, io,
+                oihw, ihwo, hwio, goihw, hwigo 
 #if MKLDNN_JIT_TYPES > 0
-                      nChw8c, nChw16c,
-#endif
-                      oi, io, oihw, ihwo, hwio, 
-#if MKLDNN_JIT_TYPES > 0
+                , nChw8c, nChw16c,
                 oIhw8i, oIhw16i, OIhw8i8o, OIhw16i16o,
                 OIhw8i16o2i, OIhw8o16i2o, OIhw8o8i, OIhw16o16i, Oihw8o,
-                Oihw16o, Ohwi8o, Ohwi16o, OhIw16o4i, 
-#endif
-                goihw, hwigo 
-#if MKLDNN_JIT_TYPES > 0
-                , gOIhw8i8o, gOIhw16i16o, gOIhw8i16o2i, gOIhw8o16i2o, gOIhw8o8i,
+                Oihw16o, Ohwi8o, Ohwi16o, OhIw16o4i, OIhw4i16o4i,
+                gOIhw8i8o, gOIhw16i16o, gOIhw8i16o2i, gOIhw8o16i2o, gOIhw8o8i,
                 gOIhw16o16i, gOihw8o, gOihw16o, gOhwi8o, gOhwi16o, gOhIw16o4i,
-                IOhw16o16i, gIOhw16o16i
+                IOhw16o16i, gIOhw16o16i, gOIhw4i16o4i, ncdhw, oidhw, goidhw
 #endif
                 ))
         return blocked;
@@ -128,6 +123,10 @@ inline memory_desc_t zero_md() {
     memory_desc_t zero{};
     zero.primitive_kind = primitive_kind::memory;
     return zero;
+}
+
+inline bool is_zero_md(const memory_desc_t *md) {
+    return md == nullptr || *md == zero_md();
 }
 
 inline status_t set_default_format(memory_desc_t &md, memory_format_t fmt) {
@@ -184,4 +183,4 @@ inline data_type_t default_accum_data_type(data_type_t src_dt,
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

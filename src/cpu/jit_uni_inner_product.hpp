@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -41,7 +41,9 @@ struct jit_uni_inner_product_fwd_t : public cpu_primitive_t {
         {
         }
 
-        DECLARE_COMMON_PD_T(jit_uni_inner_product_fwd_t<isa>);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("gemm:", isa, ""),
+                jit_uni_inner_product_fwd_t<isa>);
 
         virtual status_t init() override
         {
@@ -70,6 +72,8 @@ struct jit_uni_inner_product_fwd_t : public cpu_primitive_t {
                                weights_pd_.desc()->format == desired_weight_fmt)
                     && implication(src_pd_.desc()->format == nchw,
                                weights_pd_.desc()->format == oihw)
+                    && implication(src_pd_.desc()->format == ncdhw,
+                               weights_pd_.desc()->format == oidhw)
                     && implication(src_pd_.desc()->format == nc,
                                weights_pd_.desc()->format == oi)
                     && dst_pd_.desc()->format == nc
@@ -112,7 +116,9 @@ struct jit_uni_inner_product_bwd_weights_t : public cpu_primitive_t {
         {
         }
 
-        DECLARE_COMMON_PD_T(jit_uni_inner_product_bwd_weights_t<isa>);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("gemm:", isa, ""),
+                jit_uni_inner_product_bwd_weights_t<isa>);
 
         virtual status_t init() override
         {
@@ -139,6 +145,8 @@ struct jit_uni_inner_product_bwd_weights_t : public cpu_primitive_t {
                                        == desired_weight_fmt)
                     && implication(src_pd_.desc()->format == nchw,
                                diff_weights_pd_.desc()->format == oihw)
+                    && implication(src_pd_.desc()->format == ncdhw,
+                               diff_weights_pd_.desc()->format == oidhw)
                     && implication(src_pd_.desc()->format == nc,
                                diff_weights_pd_.desc()->format == oi)
                     && diff_dst_pd_.desc()->format == nc
@@ -180,7 +188,9 @@ struct jit_uni_inner_product_bwd_data_t : public cpu_primitive_t {
         {
         }
 
-        DECLARE_COMMON_PD_T(jit_uni_inner_product_bwd_data_t<isa>);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("gemm:", isa, ""),
+                jit_uni_inner_product_bwd_data_t<isa>);
 
         virtual status_t init() override
         {
@@ -209,6 +219,8 @@ struct jit_uni_inner_product_bwd_data_t : public cpu_primitive_t {
                                weights_pd_.desc()->format == desired_weight_fmt)
                     && implication(diff_src_pd_.desc()->format == nchw,
                                weights_pd_.desc()->format == oihw)
+                    && implication(diff_src_pd_.desc()->format == ncdhw,
+                               weights_pd_.desc()->format == oidhw)
                     && implication(diff_src_pd_.desc()->format == nc,
                                weights_pd_.desc()->format == oi)
                     && diff_dst_pd_.desc()->format == nc

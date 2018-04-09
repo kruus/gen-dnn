@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -94,6 +94,8 @@ struct jit_t: public jit_generator {
         barrier = reinterpret_cast<decltype(barrier)>(const_cast<uint8_t*>(
                     this->getCode()));
     }
+
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_t)
 };
 
 void barrier(ctx_t *ctx, int nthr) {

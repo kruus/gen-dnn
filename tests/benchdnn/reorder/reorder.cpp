@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -273,12 +273,8 @@ int reorder(const prb_t *p, dnn_mem_t &dst, const dnn_mem_t &src,
         /* parse round mode and round value*/
         if (dst_dt != mkldnn_f32) {
             switch (p->attr.irmode) {
-                case mkldnn_round_nearest:
-                    dst_ = rint(dst_);
-                    break;
-                case mkldnn_round_down:
-                    dst_ = floorf(dst_);
-                    break;
+                case attr_t::NEAREST: dst_ = rint(dst_); break;
+                case attr_t::DOWN: dst_ = floorf(dst_); break;
                 default: assert(!"bad int round_mode");
             }
             dst_ = saturate(dst_, dst_min, dst_max);

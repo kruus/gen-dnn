@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -38,7 +38,9 @@ struct jit_uni_pooling_fwd_t: public cpu_primitive_t {
                 const pooling_fwd_pd_t *hint_fwd_pd)
             : cpu_pooling_fwd_pd_t(engine, adesc, attr, hint_fwd_pd) {}
 
-        DECLARE_COMMON_PD_T(jit_uni_pooling_fwd_t<isa>);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("jit:", isa, ""),
+                jit_uni_pooling_fwd_t<isa>);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -49,6 +51,7 @@ struct jit_uni_pooling_fwd_t: public cpu_primitive_t {
                 : memory_format::nChw8c;
             assert(engine()->kind() == engine_kind::cpu);
             bool ok = true
+                && desc()->src_desc.ndims == 4
                 && mayiuse(isa)
                 && set_default_params() == status::success
                 && one_of(desc()->prop_kind, forward_training,
@@ -115,7 +118,9 @@ struct jit_uni_pooling_bwd_t: public cpu_primitive_t {
                 const pooling_fwd_pd_t *hint_fwd_pd)
             : cpu_pooling_bwd_pd_t(engine, adesc, attr, hint_fwd_pd) {}
 
-        DECLARE_COMMON_PD_T(jit_uni_pooling_bwd_t<isa>);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("jit:", isa, ""),
+                jit_uni_pooling_bwd_t<isa>);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -128,6 +133,7 @@ struct jit_uni_pooling_bwd_t: public cpu_primitive_t {
 
             assert(engine()->kind() == engine_kind::cpu);
             bool ok = true
+                && desc()->diff_src_desc.ndims == 4
                 && mayiuse(isa)
                 && set_default_params() == status::success
                 && one_of(desc()->prop_kind, backward, backward_data)

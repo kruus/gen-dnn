@@ -1,6 +1,6 @@
 #if 0
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -35,8 +35,8 @@
 #define FMT_WEIGHTS_BLOCKED16 OIhw8i16o2i
 #define FMT_WEIGHTS_BLOCKED16_G gOIhw8i16o2i
 #elif defined(U8S8)
-#define FMT_WEIGHTS_BLOCKED16 OhIw16o4i
-#define FMT_WEIGHTS_BLOCKED16_G gOhIw16o4i
+#define FMT_WEIGHTS_BLOCKED16 OIhw4i16o4i
+#define FMT_WEIGHTS_BLOCKED16_G gOIhw4i16o4i
 #endif
 #define TEST_CASE_NAME_PREFIX Forward
 #elif defined DIRECTION_BACKWARD_DATA
@@ -86,6 +86,11 @@
     test_convolution_params_t { ENGINE, ALGORITHM, NEGATIVE_SLOPE, \
     EXPAND_FORMATS(src, weights, bias, dst), /* empty attributes */ {}, \
     {__VA_ARGS__} }
+
+#define PARAMS_EXPECT_FAIL(src, weights, bias, dst, code, ...) \
+    test_convolution_params_t { ENGINE, ALGORITHM, NEGATIVE_SLOPE, \
+    EXPAND_FORMATS(src, weights, bias, dst), /* empty attributes */ {}, \
+    {__VA_ARGS__}, true, code }
 
 #define PARAMS_ATTR(src, weights, bias, dst, round_mode, scale, policy, ...) \
     test_convolution_params_t { ENGINE, ALGORITHM, NEGATIVE_SLOPE, \

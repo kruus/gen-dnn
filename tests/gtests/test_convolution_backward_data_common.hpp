@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+
 #ifndef TEST_CONVOLUTION_BACKWARD_DATA_COMMON_H
 #define TEST_CONVOLUTION_BACKWARD_DATA_COMMON_H
 
@@ -92,34 +93,35 @@ class convolution_backward_data_test
 protected:
     virtual void SetUp()
     {
-        test_convolution_params_t p = ::testing::TestWithParam<test_convolution_params_t>::GetParam();
+        test_convolution_params_t p
+            = ::testing::TestWithParam<test_convolution_params_t>::GetParam();
 
         ASSERT_TRUE(p.engine_kind == engine::kind::cpu);
         ASSERT_EQ(p.aalgorithm, convolution_direct);
         auto eng =  engine(p.engine_kind, 0);
-        memory::data_type data_type_diff_src = data_traits<data_t_diff_src>::data_type;
-        memory::data_type data_type_diff_dst = data_traits<data_t_diff_dst>::data_type;
-        memory::data_type data_type_wei = data_traits<data_t_wei>::data_type;
+        auto data_type_diff_src = data_traits<data_t_diff_src>::data_type;
+        auto data_type_diff_dst = data_traits<data_t_diff_dst>::data_type;
+        auto data_type_wei = data_traits<data_t_wei>::data_type;
 
         test_convolution_sizes_t cd = p.sizes;
 
-        auto c_src_desc = create_md({ cd.mb, cd.ic, cd.ih, cd.iw }, data_type_diff_src, p.formats.src_format);
-        auto c_weights_desc = cd.ng > 1 ? create_md({ cd.ng, cd.oc / cd.ng, cd.ic / cd.ng, cd.kh, cd.kw }, data_type_wei, p.formats.weights_format) : create_md({ cd.oc, cd.ic, cd.kh, cd.kw }, data_type_wei, p.formats.weights_format);
-        auto c_dst_desc = create_md({ cd.mb, cd.oc, cd.oh, cd.ow }, data_type_diff_dst, p.formats.dst_format);
+        auto c_src_desc = create_md({ cd.mb, cd.ic, cd.ih, cd.iw },
+                data_type_diff_src, p.formats.src_format);
+        auto c_weights_desc = cd.ng > 1
+            ? create_md({ cd.ng, cd.oc / cd.ng, cd.ic / cd.ng, cd.kh, cd.kw },
+                    data_type_wei, p.formats.weights_format)
+            : create_md({ cd.oc, cd.ic, cd.kh, cd.kw },
+                    data_type_wei, p.formats.weights_format);
+        auto c_dst_desc = create_md({ cd.mb, cd.oc, cd.oh, cd.ow },
+                data_type_diff_dst, p.formats.dst_format);
+        auto c_src_desc_f = create_md({ cd.mb, cd.ic, cd.ih, cd.iw },
+                data_type_diff_dst, p.formats.src_format);
+        auto c_dst_desc_f = create_md({ cd.mb, cd.oc, cd.oh, cd.ow },
+                data_type_diff_src, p.formats.dst_format);
 
-        auto c_src_desc_f = create_md({ cd.mb, cd.ic, cd.ih, cd.iw }, data_type_diff_dst, p.formats.src_format);
-        auto c_dst_desc_f = create_md({ cd.mb, cd.oc, cd.oh, cd.ow }, data_type_diff_src, p.formats.dst_format);
-
-        auto src_primitive_desc = memory::primitive_desc(c_src_desc, eng);
-        auto weights_primitive_desc = memory::primitive_desc(c_weights_desc, eng);
-        auto dst_primitive_desc = memory::primitive_desc(c_dst_desc, eng);
-
-        auto src_primitive_desc_f = memory::primitive_desc(c_src_desc_f, eng);
-        auto dst_primitive_desc_f = memory::primitive_desc(c_dst_desc_f, eng);
-
-        auto c_diff_src = memory(src_primitive_desc);
-        auto c_weights = memory(weights_primitive_desc);
-        auto c_diff_dst = memory(dst_primitive_desc);
+        auto c_diff_src = test_memory(c_src_desc, eng);
+        auto c_weights = test_memory(c_weights_desc, eng);
+        auto c_diff_dst = test_memory(c_dst_desc, eng);
 
         std::vector<int> padR = { cd.padh, cd.padw };
         for (int i = 0; i < 2; ++i) {
@@ -131,26 +133,46 @@ protected:
                 ++padR[1];
         }
 
-        auto conv_desc = convolution_forward::desc(prop_kind::forward_training, p.aalgorithm, c_src_desc_f, c_weights_desc, c_dst_desc_f, { cd.strh, cd.strw }, { cd.dilh, cd.dilw }, { cd.padh, cd.padw }, padR, padding_kind::zero);
-        auto conv_primitive_desc = convolution_forward::primitive_desc(conv_desc, eng);
-                                                                                /*diff_src*/                /*diff_dst*/
-        auto conv_bwd_data_desc = convolution_backward_data::desc(p.aalgorithm, c_src_desc, c_weights_desc, c_dst_desc, { cd.strh, cd.strw }, { cd.dilh, cd.dilw }, { cd.padh, cd.padw }, padR, padding_kind::zero);
-        auto conv_bwd_data_primitive_desc = convolution_backward_data::primitive_desc(conv_bwd_data_desc, eng, conv_primitive_desc);
-
         // Only true for dense format
-        fill_data<data_t_wei>(c_weights.get_primitive_desc().get_size() / sizeof(data_t_wei), (data_t_wei *)c_weights.get_data_handle());
-        fill_data<data_t_diff_dst>(c_diff_dst.get_primitive_desc().get_size() / sizeof(data_t_diff_dst),(data_t_diff_dst *)c_diff_dst.get_data_handle());
-                                                                                    /*diff_dst*/           /*diff_src*/
+        fill_data<data_t_wei>(c_weights.get_size() / sizeof(data_t_wei),
+                (data_t_wei *)c_weights.get().get_data_handle());
+        fill_data<data_t_diff_dst>(
+                c_diff_dst.get_size() / sizeof(data_t_diff_dst),
+                (data_t_diff_dst *)c_diff_dst.get().get_data_handle());
 
-        auto conv_bwd_data = convolution_backward_data(conv_bwd_data_primitive_desc, c_diff_dst, c_weights, c_diff_src);
+        auto test = [&]() {
+            auto conv_desc = convolution_forward::desc(
+                    prop_kind::forward_training, p.aalgorithm, c_src_desc_f,
+                    c_weights_desc, c_dst_desc_f,
+                    { cd.strh, cd.strw }, { cd.dilh, cd.dilw },
+                    { cd.padh, cd.padw }, padR, padding_kind::zero);
+            auto conv_primitive_desc = convolution_forward::primitive_desc(
+                    conv_desc, eng);
 
-        std::vector<primitive> pipeline;
-        pipeline.push_back(conv_bwd_data);
-        stream(stream::kind::lazy).submit(pipeline).wait();
+            auto conv_bwd_data_desc = convolution_backward_data::desc(
+                    p.aalgorithm, c_src_desc, c_weights_desc, c_dst_desc,
+                    { cd.strh, cd.strw }, { cd.dilh, cd.dilw },
+                    { cd.padh, cd.padw }, padR, padding_kind::zero);
+            auto conv_bwd_data_primitive_desc
+                = convolution_backward_data::primitive_desc(
+                        conv_bwd_data_desc, eng, conv_primitive_desc);
+            auto conv_bwd_data = convolution_backward_data(
+                    conv_bwd_data_primitive_desc,
+                    c_diff_dst.get(), c_weights.get(), c_diff_src.get());
 
-        auto ref_memory = memory(memory::primitive_desc(c_src_desc, eng));
-        compute_ref_conv_bwd_data<data_t_diff_dst, data_t_wei, data_t_acc, data_t_diff_src>(cd, ref_memory, c_weights, c_diff_dst);
-        compare_data<data_t_diff_src>(ref_memory, c_diff_src);
+            std::vector<primitive> pipeline;
+            pipeline.push_back(conv_bwd_data);
+            stream(stream::kind::lazy).submit(pipeline).wait();
+
+            auto ref_memory = memory(memory::primitive_desc(c_src_desc, eng));
+            compute_ref_conv_bwd_data
+                <data_t_diff_dst, data_t_wei, data_t_acc, data_t_diff_src>(
+                        cd, ref_memory, c_weights.get(), c_diff_dst.get());
+            compare_data<data_t_diff_src>(ref_memory, c_diff_src.get());
+        };
+
+        if (catch_expected_failures(test, p.expect_to_fail, p.expected_status))
+            return;
     }
 };
 

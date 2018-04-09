@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -58,6 +58,7 @@ status_t lrn_desc_init(lrn_desc_t *lrn_desc,
     ld.lrn_k = k;
 
     bool consistency = true
+        && memory_desc_wrapper(ld.data_desc).nelems()
         && ld.data_desc.ndims == 4;
     if (ld.prop_kind == backward_data)
         consistency = consistency

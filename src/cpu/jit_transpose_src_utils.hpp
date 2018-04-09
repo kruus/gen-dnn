@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -56,6 +56,38 @@ struct jit_src_transpose_s {
     const void *tr_src_prf;
 };
 
+struct jit_trans_dst_t {
+    struct ctx_t {
+        const void *src;
+        const void *tr_src;
+        const void *src_prf;
+        const void *tr_src_prf;
+
+        /* 1st conv 4fma: backward by weights */
+        int nthr_oc_b; /* number of threads process given src image */
+        int tr_src_ih_start, tr_src_ih_end; /* thread's transposition bounds */
+        simple_barrier::ctx_t *tr_src_bctx; /* transposition synchronization */
+    };
+
+    jit_trans_dst_t(const jit_conv_conf_t *conf)
+        : conf_(conf), ker_(nullptr) {}
+    virtual ~jit_trans_dst_t() {}
+
+    void operator()(const ctx_t *ctx)
+    { assert(ker_); ker_(ctx); }
+
+    const jit_conv_conf_t *conf_;
+    void (*ker_)(const ctx_t *);
+};
+
+struct jit_dst_transpose_s {
+    int size;
+    const void *src;
+    const void *tr_src;
+    const void *src_prf;
+    const void *tr_src_prf;
+};
+
 struct jit_transpose4x16_src_t {
     int src_pf0_distance;
     int tr_src_pf0_distance;
@@ -64,6 +96,8 @@ struct jit_transpose4x16_src_t {
 };
 
 struct jit_transpose4x16_src : public jit_generator {
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_transpose4x16_src)
+
     jit_transpose4x16_src(const jit_1x1_conv_conf_t *aparams,
             jit_transpose4x16_src_t *tparams_)
         : params(aparams), tparams(tparams_)
@@ -110,6 +144,7 @@ private:
 };
 
 jit_trans_src_t *create_trans_src(const jit_conv_conf_t *conf);
+jit_trans_dst_t *create_trans_dst(const jit_conv_conf_t *conf);
 
 }
 }
