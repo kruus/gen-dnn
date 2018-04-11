@@ -86,11 +86,9 @@ inline size_t map_index(const mkldnn::memory::desc &md, size_t index) {
     const bool bwd_wei = (md.data.format == bwd_weights_g_qvnni)
                       || (md.data.format == bwd_weights_qvnni);
 #else
-    //const bool with_groups = (md.data.format == fwd_weights_g)
-    //                      || (md.data.format == bwd_weights_g);
-    const bool with_groups = false;
-    const bool qvnni = false;
-    const bool vnni = false;
+    //const bool with_groups = false; // unused
+    //const bool qvnni = false;
+    //const bool vnni = false;
     const bool fwd_wei = false;
     const bool bwd_wei = false;
 #endif

@@ -111,7 +111,7 @@ namespace memory_format {
     const memory_format_t nchw = mkldnn_nchw;
     const memory_format_t nhwc = mkldnn_nhwc;
     const memory_format_t chwn = mkldnn_chwn;
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
     const memory_format_t nChw8c = mkldnn_nChw8c;
     const memory_format_t nChw16c = mkldnn_nChw16c;
 #endif
@@ -120,7 +120,7 @@ namespace memory_format {
     const memory_format_t oihw = mkldnn_oihw;
     const memory_format_t ihwo = mkldnn_ihwo;
     const memory_format_t hwio = mkldnn_hwio;
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
     const memory_format_t oIhw8i = mkldnn_oIhw8i;
     const memory_format_t oIhw16i = mkldnn_oIhw16i;
     const memory_format_t OIhw8i8o = mkldnn_OIhw8i8o;
@@ -139,7 +139,7 @@ namespace memory_format {
 #endif
     const memory_format_t goihw = mkldnn_goihw;
     const memory_format_t hwigo = mkldnn_hwigo;
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
     const memory_format_t gOIhw8i8o = mkldnn_gOIhw8i8o;
     const memory_format_t gOIhw16i16o = mkldnn_gOIhw16i16o;
     const memory_format_t gOIhw4i16o4i = mkldnn_gOIhw4i16o4i;
@@ -155,7 +155,7 @@ namespace memory_format {
     const memory_format_t Goihw8g = mkldnn_Goihw8g;
     const memory_format_t Goihw16g = mkldnn_Goihw16g;
     const memory_format_t gOhIw16o4i = mkldnn_gOhIw16o4i;
-    // new... don't know if needed for vanilla
+#endif
     const memory_format_t ncdhw = mkldnn_ncdhw;
     const memory_format_t oidhw = mkldnn_oidhw;
     const memory_format_t goidhw = mkldnn_goidhw;
@@ -167,7 +167,6 @@ namespace memory_format {
     const memory_format_t ldgoi = mkldnn_ldgoi;
     const memory_format_t ldgoi_p = mkldnn_ldgoi_p;
     const memory_format_t ldgo = mkldnn_ldgo;
-#endif
 }
 
 using padding_kind_t = mkldnn_padding_kind_t;

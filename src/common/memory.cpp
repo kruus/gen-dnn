@@ -81,12 +81,13 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
                     (long unsigned)elements);
 #if 1 /* Note: some gtests may create zero-length memory descriptors on purpose */
         if(elements == 0U){
-            printf("Warning in mkldnn_memory_desc_init: 0 elements, dims=", __FUNCTION__);
+            printf("Warning in %s: 0 elements, dims=", __FUNCTION__);
             for(int i=0U; i<ndims; ++i){ printf("%s%lu",
                     (i==0?"{":","), (long unsigned)elements); }
             printf("}\n");
             mkldnn_breakpoint_empty_memory();
         }
+#endif
     }
 #endif
     if (!args_ok) return invalid_arguments;

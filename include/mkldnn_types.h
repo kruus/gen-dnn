@@ -76,15 +76,29 @@ typedef enum {
     mkldnn_u8 = 6,
 } mkldnn_data_type_t;
 
+//@{
 /** Some platforms do not need all memory layouts.
+ *
+ * Testing without a full spectrum of JIT support can be quite slow.
+ * In such cases, it can be useful to cut down tests to a subset of layouts,
+ * especially since many of the interleaved formats cater to specific
+ * simd lengths important for JIT impls.
+ *
  * - 0 : no blocked (8,16) or interleaved data layouts for mkldnn_memory_format_t
- * - 1 : full spectrum of data layouts (jit expects this)
+ * - 1 : (TBD) add nChw8c and nChw16c
+ * - ...
+ * - 100 : full spectrum of data layouts (jit expects this)
+ *
+ * Now we test for "not one of", so all data layouts need to be defined.
+ * We can still check MKLDNN_JIT_TYPES to enable testing subsets of memory layouts
+ * This will speed up the already-slow testing for -DTARGET_VANILLA.
  */
-#if defined(TARGET_VANILLA) || defined(_SX)
+#ifdef TARGET_VANILLA
 #define MKLDNN_JIT_TYPES 0
 #else
 #define MKLDNN_JIT_TYPES 1
 #endif
+//@}
 
 /** Rounding mode */
 typedef enum {
@@ -136,14 +150,12 @@ typedef enum {
     mkldnn_nhwc,
     /** 4D data tensor in the @c chwn format typically used in Neon. */
     mkldnn_chwn,
-#if MKLDNN_JIT_TYPES > 0
     /** 4D data tensor in the @c nchw format with channels data laid out in
      * memory in 8-element blocks. */
     mkldnn_nChw8c,
     /** 4D data tensor in the @c nchw format with channels data laid out in
      * memory in 16-element blocks. */
     mkldnn_nChw16c,
-#endif
     /** 2D weights tensor in the format (input channels, output channels). */
     mkldnn_oi,
     /** 2D weights tensor in the format (input channels, output channels). */
@@ -157,7 +169,6 @@ typedef enum {
     /** 4D weights tensor in the format (height, width, input channels,
      * output channels). */
     mkldnn_hwio,
-#if MKLDNN_JIT_TYPES > 0
     /** 4D weights tensor in the @c oihw format with both input and output
      * channels data laid out in memory in 8-element blocks. */
     mkldnn_OIhw8i8o,
@@ -204,14 +215,12 @@ typedef enum {
     /** 4D weights tensor in the @c oihw format with both input and output
      * channels data laid out in memory in 16-element and 4-element blocks. */
     mkldnn_OhIw16o4i,
-#endif
     /** 5D weights tensor in the @c oihw format with extra outer dimension for
      * groups. */
     mkldnn_goihw,
     /** 5D weights tensor in the @c hwio format with extra dimension for
      * groups that comes after the output channels. */
     mkldnn_hwigo,
-#if MKLDNN_JIT_TYPES > 0
     /** 5D weights tensor in the blocked version of @c goihw format with both
      * input and output channels data laid out in memory in 8-element blocks.
      */
@@ -301,11 +310,6 @@ typedef enum {
     /** 4D weights tensor in the oihw format with input channels data laid out
      * in memory in 16-element blocks. */
     mkldnn_oIhw16i = mkldnn_nChw16c,
-#else
-    /** Just a sentinel, not real memory format. Must be changed after new
-     * format is added. */
-    mkldnn_format_last,
-#endif
 } mkldnn_memory_format_t;
 
 /** Kinds of padding. Define how to interpret the data in padding regions. */

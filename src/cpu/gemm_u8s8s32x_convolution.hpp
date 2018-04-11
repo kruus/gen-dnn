@@ -20,7 +20,9 @@
 #include "c_types_map.hpp"
 #include "cpu_convolution_pd.hpp"
 #include "cpu_engine.hpp"
+#ifndef TARGET_VANILLA
 #include "jit_primitive_conf.hpp"
+#endif
 #include "gemm_convolution_utils.hpp"
 
 #include "os_blas.hpp"

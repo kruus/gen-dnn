@@ -593,7 +593,7 @@ struct memory: public primitive  {
         nchw = mkldnn_nchw,
         nhwc = mkldnn_nhwc,
         chwn = mkldnn_chwn,
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
         nChw8c = mkldnn_nChw8c,
         nChw16c = mkldnn_nChw16c,
 #endif
@@ -602,7 +602,7 @@ struct memory: public primitive  {
         oihw = mkldnn_oihw,
         ihwo = mkldnn_ihwo,
         hwio = mkldnn_hwio,
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
         oIhw8i = mkldnn_oIhw8i,
         oIhw16i = mkldnn_oIhw16i,
         OIhw8i8o = mkldnn_OIhw8i8o,
@@ -621,7 +621,7 @@ struct memory: public primitive  {
 #endif
         goihw = mkldnn_goihw,
         hwigo = mkldnn_hwigo,
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
         gOIhw8i8o = mkldnn_gOIhw8i8o,
         gOIhw16i16o = mkldnn_gOIhw16i16o,
         gOIhw8i16o2i = mkldnn_gOIhw8i16o2i,

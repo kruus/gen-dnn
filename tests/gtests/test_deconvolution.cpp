@@ -435,10 +435,6 @@ TEST_P(deconvolution_test_float, TestDeconvolution)
 #define INST_TEST_CASE(str, ...) INSTANTIATE_TEST_CASE_P( \
         str, deconvolution_test_float, ::testing::Values(__VA_ARGS__))
 
-#define FMT_BIAS x
-#define FMT_DATA_BLOCKED nChw8c
-#define FMT_WEIGHTS_BLOCKED Ohwi8o
-
 INST_TEST_CASE(SimpleSmall_NCHW,
     PARAMS(nchw, oihw, x, nchw,
         2, 1, 6, 4, 4, 4, 4, 4, 3, 3, 1, 1, 1, 1),
@@ -457,6 +453,11 @@ INST_TEST_CASE(SimpleSmall_NCHW,
 
 );
 
+#if MKLDNN_JIT_TYPES > 0
+#define FMT_BIAS x
+#define FMT_DATA_BLOCKED nChw8c
+#define FMT_WEIGHTS_BLOCKED Ohwi8o
+
 INST_TEST_CASE(SimpleSmall_Blocked,
     PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED, FMT_BIAS, FMT_DATA_BLOCKED,
         2, 1, 32, 12, 12, 32, 13, 13, 3, 3, 0, 0, 1, 1),
@@ -473,6 +474,7 @@ INST_TEST_CASE(SimpleSmall_Blocked,
     PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED, FMT_BIAS, FMT_DATA_BLOCKED,
         2, 1, 48, 11, 11, 32, 13, 13, 3, 3, 0, 0, 1, 1)
 );
+#endif
 
 
 }

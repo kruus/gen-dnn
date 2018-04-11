@@ -149,6 +149,8 @@ NAMEENUM_T(data_type){
 }
 NAMEENUM_T(memory_format){
     char const * ret = "Huh?";
+    // NEW: now all memory formats must always be **defined**, so we enable
+    //      printing all of them (no MKLDNN_JIT_TYPES checking here)
     switch(e){
     case(mkldnn_format_undef): ret = "memory_format:format_undef"; break;
     case(mkldnn_any): ret = "memory_format:any"; break;
@@ -158,16 +160,13 @@ NAMEENUM_T(memory_format){
     case(mkldnn_nchw): ret = "memory_format:nchw"; break;
     case(mkldnn_nhwc): ret = "memory_format:nhwc"; break;
     case(mkldnn_chwn): ret = "memory_format:chwn"; break;
-#if MKLDNN_JIT_TYPES > 0
     case(mkldnn_nChw8c): ret = "memory_format:nChw8c"; break;
     case(mkldnn_nChw16c): ret = "memory_format:nChw16c"; break;
-#endif
     case(mkldnn_oi): ret = "memory_format:oi"; break;
     case(mkldnn_io): ret = "memory_format:io"; break;
     case(mkldnn_oihw): ret = "memory_format:oihw"; break;
     case(mkldnn_ihwo): ret = "memory_format:ihwo"; break;
     case(mkldnn_hwio): ret = "memory_format:hwio"; break;
-#if MKLDNN_JIT_TYPES > 0
     case(mkldnn_OIhw8i8o): ret = "memory_format:OIhw8i8o"; break;
     case(mkldnn_OIhw16i16o): ret = "memory_format:OIhw16i16o"; break;
     case(mkldnn_OIhw4i16o4i): ret = "memory_format:OIhw4i16o4i"; break;
@@ -181,10 +180,8 @@ NAMEENUM_T(memory_format){
     case(mkldnn_Ohwi8o): ret = "memory_format:Ohwi8o"; break;
     case(mkldnn_Ohwi16o): ret = "memory_format:Ohwi16o"; break;
     case(mkldnn_OhIw16o4i): ret = "memory_format:OhIw16o4i"; break;
-#endif
     case(mkldnn_goihw): ret = "memory_format:goihw"; break;
     case(mkldnn_hwigo): ret = "memory_format:hwigo"; break;
-#if MKLDNN_JIT_TYPES > 0
     case(mkldnn_gOIhw8i8o): ret = "memory_format:gOIhw8i8o"; break;
     case(mkldnn_gOIhw16i16o): ret = "memory_format:gOIhw16i16o"; break;
     case(mkldnn_gOIhw4i16o4i): ret = "memory_format:gOIhw4i16o4i"; break;
@@ -211,7 +208,6 @@ NAMEENUM_T(memory_format){
     case(mkldnn_ldgoi): ret = "memory_format:mkldnn_ldgoi"; break;
     case(mkldnn_ldgoi_p): ret = "memory_format:mkldnn_ldgoi_p"; break;
     case(mkldnn_ldgo): ret = "memory_format:mkldnn_ldgo"; break;
-#endif
     case(mkldnn_format_last): ret = "memory_format:last"; break;
     // dup case(mkldnn_oIhw8i): ret = "memory_format:oIhw8i"; break; // alias for nChw8c
     // dup case(mkldnn_oIhw16i): ret = "memory_format:oIhw16i"; break; // alias for nChw16c
@@ -401,10 +397,26 @@ NAMEENUM_T(stream_kind){
         errno=0; printf("zeros-case"); fflush(stdout); int const n = snprintf(b,len, "ZEROS" ); CHKBUF; \
     }else{ \
         for(int i=0; i<=lastnz; ++i){ \
-            printf("\nfmt=%s ARR[%d]=" FMTSPEC, "%c" FMTSPEC, i, ARR[i]); \
+            printf("\nfmt=%s ARR[%d]=" FMTSPEC "%c", \
+                   FMTSPEC, i, ARR[i]); \
             {errno=0; int const n = snprintf(b,len, "%c" FMTSPEC,(i==0?'{':','),ARR[i]); CHKBUF;} \
         } \
-        printf(" fmt=%s", "}"); \
+        printf(" end=%s", "}"); \
+        {errno=0; int const n = snprintf(b,len,"}"); CHKBUF;} \
+    } \
+}while(0)
+#define ARR_SZ( ARR, SZ, FMTSPEC ) do{ \
+    ssize_t const sz=(ssize_t)(SZ); \
+    if(sz <= 0){ \
+        errno=0; printf("sz=%td",sz); fflush(stdout); int const n = snprintf(b,len, "{}" ); CHKBUF; \
+    }else{ \
+        for(ssize_t i=0; i<=sz; ++i){ \
+            printf("\nfmt=%s ARR[%td]=" FMTSPEC "%c", \
+                   FMTSPEC, i, ARR[i]); \
+            {errno=0; int const n = snprintf(b,len, "%c" FMTSPEC, \
+                                             (i==0?'{':','), ARR[i] ); CHKBUF;} \
+        } \
+        printf(" end=%s", "}"); \
         {errno=0; int const n = snprintf(b,len,"}"); CHKBUF;} \
     } \
 }while(0)
@@ -425,6 +437,18 @@ NAMEENUM_T(stream_kind){
             {int const n = snprintf(b,len, "%c" FMTSPEC,(i==0?'{':','),ARR[i]); CHKBUF;} \
         } \
         {int const n = snprintf(b,len,"}"); CHKBUF;} \
+    } \
+}while(0)
+#define ARR_SZ( ARR, SZ, FMTSPEC ) do{ \
+    ssize_t const sz=(ssize_t)(SZ); \
+    if(sz <= 0){ \
+        errno=0; int const n = snprintf(b,len, (sz<0? "{err:sz<0}":"{}")); CHKBUF; \
+    }else{ \
+        for(ssize_t i=0; i<=sz; ++i){ \
+            errno=0; int const n = snprintf(b,len, "%c" FMTSPEC, \
+                                             (i==0?'{':','), ARR[i] ); CHKBUF; \
+        } \
+        {errno=0; int const n = snprintf(b,len,"}"); CHKBUF;} \
     } \
 }while(0)
 #endif
@@ -552,10 +576,32 @@ int mkldnn_name_blocking_desc( mkldnn_blocking_desc_t const *bd, char *const buf
     }
     return ret;
 }
+int mkldnn_name_blocking_desc_sz( mkldnn_blocking_desc_t const *bd, size_t sz, char *const buf, int len){
+    int ret=0;
+    char * b = buf;
+    if( sz > TENSOR_MAX_DIMS ){
+        assert(sz <= TENSOR_MAX_DIMS);
+        sz = TENSOR_MAX_DIMS;
+    }
+    {int n = snprintf(b,len, "blocking_desc:"); CHKBUF;}
+    if(bd == nullptr){
+        {int n = snprintf(b,len,"NULL"); CHKBUF;}
+    }else{
+        {int n = snprintf(b,len, "block_dims"); CHKBUF;}
+        ARR_SZ( bd->block_dims, sz, "%d" );
+        {int n = snprintf(b,len, ",strides[0]"); CHKBUF;}
+        ARR_SZ( bd->strides[0], sz, "%td" );
+        {int n = snprintf(b,len, ",strides[1]"); CHKBUF;}
+        ARR_SZ( bd->strides[1], sz, "%td" );
+        {int n = snprintf(b,len, ",padding_dims"); CHKBUF;}
+        ARR_SZ( bd->padding_dims, sz, "%d" );
+    }
+    return ret;
+}
 int mkldnn_name_memory_desc( mkldnn_memory_desc_t const *md, char * const buf, int len){
     int ret=0;
     char * b = buf;
-    {int n = snprintf(b,len, "memory_desc:"); CHKBUF;}
+    {int n = snprintf(b,len, "memory_desc="); CHKBUF;}
     if(md == nullptr){
         {int n = snprintf(b,len,"NULL"); CHKBUF;}
     }else{
@@ -577,9 +623,9 @@ int mkldnn_name_memory_desc( mkldnn_memory_desc_t const *md, char * const buf, i
         }
         {int n = snprintf(b,len, "}"); CHKBUF;}
 #endif
-        /* TODO: There is a REAL FUNCTION to do this correctly ! */
         if(md->format == mkldnn_blocked){ /* md->blocking  (optional: for memory formats that use them) */
-            {int n = mkldnn_name_blocking_desc( &md->layout_desc.blocking, b, len ); CHKBUF; }
+            //{int n = mkldnn_name_blocking_desc( &md->layout_desc.blocking, b, len ); CHKBUF; }
+            {int n = mkldnn_name_blocking_desc_sz( &md->layout_desc.blocking, md->ndims, b, len ); CHKBUF; }
         }
     }
     return ret;

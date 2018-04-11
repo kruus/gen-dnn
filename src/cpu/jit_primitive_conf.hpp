@@ -23,6 +23,7 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
+#ifndef TARGET_VANILLA
 /* convolution */
 enum conv_version_t {ver_unused, ver_fma, ver_avx512_core, ver_4fma, ver_4vnni,
                      ver_vnni};
@@ -38,11 +39,14 @@ enum {
     FLAG_SP_FIRST = 1 << 6, FLAG_SP_LAST = 1 << 7,
     FLAG_REDUCE_FIRST = 1<<8, FLAG_REDUCE_LAST = 1<<9,
 };
+#endif
 
 struct jit_conv_conf_t {
     prop_kind_t prop_kind;
+#ifndef TARGET_VANILLA
     conv_version_t ver;
     conv_loop_order_t loop_order;
+#endif
 
     int mb;
     int ngroups, ic, oc;
@@ -67,6 +71,7 @@ struct jit_conv_conf_t {
     int ur_h, ur_w;
     int ur_w_tail;
     bool is_1stconv;
+#ifndef TARGET_VANILLA
     /* fma avx512_core */
     conv_kernel_kind_t kernel_kind;
     /* 4fma */
@@ -96,6 +101,7 @@ struct jit_conv_conf_t {
     int is_oc_scale;
     // dw conv
     int nb_ch, ch_block, nb_ch_blocking;
+#endif
 };
 
 /*
@@ -170,6 +176,7 @@ struct jit_conv_winograd_conf_t : public jit_conv_conf_t {
     winograd_sched_t sched_policy;
 };
 
+#ifndef TARGET_VANILLA /* is there a vanilla (non-jit) Winograd */
 struct jit_conv_call_s {
     const void *src; /* hack, non-const for backward_data */
     const void *dst; /* hack, non-const for forward */
@@ -192,7 +199,9 @@ struct jit_conv_call_s {
     size_t ch_blocks;
     int flags;
 };
+#endif
 
+#ifndef TARGET_VANILLA
 struct jit_1x1_conv_conf_t {
     prop_kind_t prop_kind;
     conv_version_t ver;
@@ -243,7 +252,9 @@ struct jit_1x1_conv_conf_t {
     data_type_t bia_dt;
     data_type_t dst_dt;
 };
+#endif
 
+#if 1
 struct jit_gemm_conv_conf_t {
     prop_kind_t prop_kind;
 
@@ -262,7 +273,9 @@ struct jit_gemm_conv_conf_t {
     int ic_block, oc_block;
     bool need_im2col;
 };
+#endif
 
+#ifndef TARGET_VANILLA
 struct jit_1x1_conv_call_s {
     const void *bcast_data;
     const void *load_data;
@@ -279,7 +292,9 @@ struct jit_1x1_conv_call_s {
 
     size_t reduce_pos_flag;
 };
+#endif
 
+#ifndef TARGET_VANILLA
 /* pooling */
 struct jit_pool_conf_t {
     int mb, c;
@@ -301,7 +316,9 @@ struct jit_pool_conf_t {
     data_type_t src_dt;
     data_type_t dst_dt;
 };
+#endif
 
+#ifndef TARGET_VANILLA
 struct jit_pool_call_s {
     const float *src;
     const float *dst;
@@ -316,6 +333,7 @@ struct jit_pool_call_s {
     const float* init_value;
     float ker_area_h;
 };
+#endif
 
 
 }

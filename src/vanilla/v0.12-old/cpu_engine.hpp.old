@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2017 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -20,15 +20,9 @@
 #include <assert.h>
 
 #include "mkldnn.h"
-#include "cpu_isa.hpp"
 
 #include "c_types_map.hpp"
 #include "../common/engine.hpp"
-
-// oops SX VERBOSE_PRIMITIVE_CREATE uses unsupported c++1 features???
-#if defined(_SX)
-#define VERBOSE_PRIMITIVE_CREATE 0
-#endif
 
 #ifndef VERBOSE_PRIMITIVE_CREATE
 #if defined(NDEBUG)
@@ -38,12 +32,39 @@
  * In particularly, with mods to various init() functions, you can use
  * this flag to also print out precisely why an impl was skipped.
  */
-#define VERBOSE_PRIMITIVE_CREATE 0/*release mode compile*/
+#define VERBOSE_PRIMITIVE_CREATE 0
 #else
-#define VERBOSE_PRIMITIVE_CREATE 0/*debug output here can be lengthy*/
+#define VERBOSE_PRIMITIVE_CREATE 0
 #endif
 #endif
 
+// oops SX VERBOSE_PRIMITIVE_CREATE uses unsupported c++1 features???
+#if defined(_SX)
+#if defined(VERBOSE_PRIMITIVE_CREATE)
+#undef VERBOSE_PRIMITIVE_CREATE
+#endif
+#define VERBOSE_PRIMITIVE_CREATE 0
+#endif
+
+#if defined(TARGET_VANILLA) && !defined(JITFUNCS)
+/** In principle could have multiple TARGETS.
+ * For example: VANILLA, and later perhaps SSE42, AVX2, AVX512.
+ * Default is "compile everything".
+ * These TARGETS can be set in cmake to generate reduced-functionality libmkldnn.
+ * Which jit impls get included in the engine is capped by a single value.
+ *
+ *
+ * For example, TARGET_VANILLA includes NO Intel JIT code at all, and is suitable
+ * for [cross-]compiling for other platforms.
+ *
+ * \note TARGET_VANILLA impls are not *yet* optimized for speed! */
+#define JITFUNCS 0
+#endif
+
+#ifndef JITFUNCS
+/* default mkl-dnn compile works as usual, 100 means include all impls */
+#define JITFUNCS 0
+#endif
 
 namespace mkldnn {
 namespace impl {
@@ -92,4 +113,4 @@ extern cpu_engine_factory_t engine_factory;
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

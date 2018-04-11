@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2017 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -13,33 +13,31 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+/** \file
+ * run_jit template parameter coerced to true (alway)
+ */
 
-#ifndef CPU_JIT_GEMM_CONVOLUTION_HPP
-#define CPU_JIT_GEMM_CONVOLUTION_HPP
+#ifndef CPU_GEMM_CONVOLUTION_HPP
+#define CPU_GEMM_CONVOLUTION_HPP
 
 #include "c_types_map.hpp"
 #include "cpu_convolution_pd.hpp"
 #include "cpu_engine.hpp"
-#include "cpu_isa.hpp"
 #ifndef TARGET_VANILLA
 #include "jit_avx2_gemm_f32.hpp"
 #include "jit_avx512_common_gemm_f32.hpp"
 #include "jit_primitive_conf.hpp"
+#else
+#include "cpu_isa.hpp"
 #endif
 #include "gemm_convolution_utils.hpp"
-
-#if defined(TARGET_VANILLA) // remove jit types, and run_jit template parm must be false
-/** Remove all code for the jit 'sgemm_' pointer (type is not available) */
-#define MKLDNN_ONLY_IF(VAR,...) if (VAR) /*nothing*/
-#else
-#define MKLDNN_ONLY_IF(VAR,...) if (VAR) __VA_ARGS__
-#endif
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
 namespace {
+
 /** Can be more complicated to support other OSes
  * (e.g. without JIT support, no mayiuse available).
  * Some compilers (gcc) still insist on one-liner returns here :( */
@@ -80,7 +78,23 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
 
             assert(this->engine()->kind() == engine_kind::cpu);
 
-            bool ok = true && _gemm_convolution_implemented<run_jit, isa>()
+#if VERBOSE_PRIMITIVE_CREATE // debug? show a reason why this impl could not be used
+#define VERBOSE_PRIMITIVE_INIT char const* last_tested=nullptr
+#define AND_NEED(...) && ( (last_tested = #__VA_ARGS__), __VA_ARGS__ )
+#define VERBOSE_PRIMITIVE_SHOWFAIL \
+            if( !ok && last_tested != nullptr ){ \
+                printf(" %s failed precondition:\n\t%s\n", \
+                            this->name(), last_tested); \
+            }
+#else
+#define VERBOSE_PRIMITIVE_INIT do{}while(0)
+#define AND_NEED(...) && __VA_ARGS__
+#define VERBOSE_PRIMITIVE_SHOWFAIL do{}while(0)
+#endif
+            VERBOSE_PRIMITIVE_INIT;
+            bool ok = true
+#if !VERBOSE_PRIMITIVE_CREATE
+                    && _gemm_convolution_implemented<run_jit, isa>()
                     && this->set_default_params() == status::success
                     && utils::one_of(this->cdesc_().prop_kind, forward_training,
                                forward_inference)
@@ -95,7 +109,30 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
                     && this->dst_pd_.desc()->format == nchw
                     && this->weights_pd_.desc()->format
                             == (this->with_groups() ? goihw : oihw)
-                    && this->is_gemm_conv_format();
+                    && this->is_gemm_conv_format()
+#else // print "why not?"
+                    AND_NEED( _gemm_convolution_implemented<run_jit, isa>() )
+                    AND_NEED( this->set_default_params() == status::success )
+                    AND_NEED( utils::one_of(this->cdesc_().prop_kind, forward_training,
+                                forward_inference)
+                    AND_NEED( this->cdesc_().alg_kind == alg_kind::convolution_direct )
+                    AND_NEED( utils::everyone_is(data_type::f32,
+                            this->cdesc_().src_desc.data_type,
+                            this->cdesc_().weights_desc.data_type,
+                            this->cdesc_().dst_desc.data_type) )
+                    AND_NEED( utils::implication(this->with_bias(), data_type::f32
+                            == this->cdesc_().bias_desc.data_type) )
+                    AND_NEED( this->src_pd_.desc()->format == nchw )
+                    AND_NEED( this->dst_pd_.desc()->format == nchw )
+                    AND_NEED( this->weights_pd_.desc()->format
+                            == (this->with_groups() ? goihw : oihw) )
+                    AND_NEED( this->is_gemm_conv_format() )
+#endif
+                    ;
+            VERBOSE_PRIMITIVE_WHYFAILED;
+#undef VERBOSE_PRIMITIVE_SHOWFAIL
+#undef AND_NEED
+#undef VERBOSE_PRIMITIVE_INIT
             return ok ? status::success : status::unimplemented;
         }
 
@@ -139,8 +176,7 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
 
     _gemm_convolution_fwd_t(const pd_t *pd, const input_vector &inputs,
            const output_vector &outputs)
-        : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd), sgemm_(nullptr)
-        , col_(nullptr)
+        : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
     {
         using namespace prop_kind;
 
@@ -148,8 +184,10 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
         const data_t one = 1.0, zero = 0.0;
         beta_ = post_ops.find(primitive_kind::sum) >= 0 ? one : zero;
 
-        MKLDNN_ONLY_IF (run_jit,
-            sgemm_ = new jit_uni_gemm_f32('N', 'N', beta_, false));
+#ifndef TARGET_VANILLA
+        if (run_jit)
+            sgemm_ = new jit_uni_gemm_f32('N', 'N', beta_, false);
+#endif
 
         jit_gemm_convolution_utils::init_conf(conf_.jcp_,
             *(conf_.cdesc()), conf_.src_pd(), conf_.weights_pd(0),
@@ -162,10 +200,11 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
         jit_gemm_convolution_utils::prepare_ws_col<data_t>(this->conf_.jcp_,
                 &this->col_, nthr_);
     }
-
     ~_gemm_convolution_fwd_t() {
-        MKLDNN_ONLY_IF (run_jit, delete sgemm_);
-        free(this->col_);
+#ifndef TARGET_VANILLA
+        if (run_jit) delete sgemm_;
+#endif //TARGET_VANILLA
+        if (this->col_) free(this->col_);
     };
 
     typedef typename prec_traits<data_type::f32>::type data_t;
@@ -181,15 +220,12 @@ private:
 #ifndef TARGET_VANILLA
     using jit_uni_gemm_f32 = typename utils::conditional
           <isa == avx2, jit_avx2_gemm_f32, jit_avx512_common_gemm_f32>::type;
-#else
-    using jit_uni_gemm_f32 = void; // sgemm_ unused (jit type may not be defined)
-#endif
     jit_uni_gemm_f32 *sgemm_;
+#endif
     data_t *col_;
-    data_t beta_;
-    int nthr_;
 };
 
+#ifndef TARGET_VANILLA
 using jit_avx512_common_gemm_convolution_fwd_t =
                          _gemm_convolution_fwd_t<false, true, avx512_common>;
 using jit_avx512_common_gemm_convolution_relu_t =
@@ -198,6 +234,7 @@ using jit_avx2_gemm_convolution_fwd_t =
                          _gemm_convolution_fwd_t<false, true, avx2>;
 using jit_avx2_gemm_convolution_relu_t =
                          _gemm_convolution_fwd_t<true, true, avx2>;
+#endif //TARGET_VANILLA
 using mkl_gemm_convolution_fwd_t =
                          _gemm_convolution_fwd_t<false, false, isa_any>;
 using mkl_gemm_convolution_relu_t =
@@ -205,6 +242,9 @@ using mkl_gemm_convolution_relu_t =
 
 template <bool run_jit, cpu_isa_t isa>
 struct _gemm_convolution_bwd_data_t: public cpu_primitive_t {
+#ifdef TARGET_VANILLA
+    static_assert( run_jit == false, "TARGET_VANILLA does not support run_jit" );
+#endif //TARGET_VANILLA
     struct pd_t: public cpu_convolution_bwd_data_pd_t {
         pd_t(engine_t *engine,
                 const convolution_desc_t *adesc,
@@ -237,7 +277,7 @@ struct _gemm_convolution_bwd_data_t: public cpu_primitive_t {
                 && this->diff_src_pd_.desc()->format == nchw
                 && this->diff_dst_pd_.desc()->format == nchw
                 && this->weights_pd_.desc()->format == (this->with_groups()
-                        ? goihw : oihw);
+                     ? goihw : oihw);
             return ok ? status::success : status::unimplemented;
         }
 
@@ -260,27 +300,25 @@ struct _gemm_convolution_bwd_data_t: public cpu_primitive_t {
     _gemm_convolution_bwd_data_t(const pd_t *pd, const input_vector &inputs,
               const output_vector &outputs)
         : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
-        , sgemm_(nullptr), col_(nullptr)
     {
         using namespace prop_kind;
 
-        MKLDNN_ONLY_IF (run_jit,
-            sgemm_ = new jit_uni_gemm_f32('N', 'T', 0.0, false));
+#ifndef TARGET_VANILLA
+        if (run_jit)
+            sgemm_ = new jit_uni_gemm_f32('N', 'T', 0.0, false);
+#endif //TARGET_VANILLA
 
         jit_gemm_convolution_utils::init_conf(conf_.jcp_,
             *(conf_.desc()), conf_.diff_src_pd(), conf_.weights_pd(0),
             conf_.diff_dst_pd());
-
-        nthr_ = this->conf_.jcp_.mb != 1 || this->conf_.jcp_.ngroups > 2 ?
-                omp_get_max_threads() : 1;
-
         jit_gemm_convolution_utils::prepare_ws_col<data_t>(this->conf_.jcp_,
-                &this->col_, nthr_);
+                &this->col_);
     }
-
     ~_gemm_convolution_bwd_data_t() {
-        MKLDNN_ONLY_IF (run_jit, delete sgemm_);
-        free(this->col_);
+#ifndef TARGET_VANILLA
+        if (run_jit) delete sgemm_;
+#endif
+        if (this->col_) free(this->col_);
     };
 
     typedef typename prec_traits<data_type::f32>::type data_t;
@@ -303,30 +341,34 @@ private:
 #ifndef TARGET_VANILLA
     using jit_uni_gemm_f32 = typename utils::conditional
           <isa == avx2, jit_avx2_gemm_f32, jit_avx512_common_gemm_f32>::type;
-#else
-    using jit_uni_gemm_f32 = void; // sgemm_ unused (jit type may not be defined)
-#endif
     jit_uni_gemm_f32 *sgemm_;
+#endif
     data_t *col_;
-    int nthr_;
 };
 
+#ifndef TARGET_VANILLA
 using jit_avx512_common_gemm_convolution_bwd_data_t =
                          _gemm_convolution_bwd_data_t<true, avx512_common>;
 using jit_avx2_gemm_convolution_bwd_data_t =
                          _gemm_convolution_bwd_data_t<true, avx2>;
+#endif //TARGET_VANILLA
 using mkl_gemm_convolution_bwd_data_t =
                          _gemm_convolution_bwd_data_t<false, isa_any>;
 
 template <bool run_jit, cpu_isa_t isa>
 struct _gemm_convolution_bwd_weights_t: public cpu_primitive_t {
+#ifdef TARGET_VANILLA
+    static_assert( run_jit == false, "TARGET_VANILLA does not support run_jit" );
+#endif //TARGET_VANILLA
     struct pd_t: public cpu_convolution_bwd_weights_pd_t {
         pd_t(engine_t *engine,
                 const convolution_desc_t *adesc,
                 const primitive_attr_t *attr,
                 const convolution_fwd_pd_t *hint_fwd_pd)
             : cpu_convolution_bwd_weights_pd_t(engine, adesc, attr, hint_fwd_pd)
+#ifndef TARGET_VANILLA
             , jcp_({})
+#endif
         {}
 
         DECLARE_COMMON_PD_T(
@@ -354,7 +396,7 @@ struct _gemm_convolution_bwd_weights_t: public cpu_primitive_t {
             && this->src_pd_.desc()->format == nchw
             && this->diff_dst_pd_.desc()->format == nchw
             && this->diff_weights_pd_.desc()->format == (this->with_groups()
-                    ? goihw : oihw);
+                 ? goihw : oihw);
             return ok ? status::success : status::unimplemented;
         }
 
@@ -379,35 +421,36 @@ struct _gemm_convolution_bwd_weights_t: public cpu_primitive_t {
     _gemm_convolution_bwd_weights_t(const pd_t *pd, const input_vector &inputs,
               const output_vector &outputs)
         : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
-        , sgemm_0(nullptr), sgemm_1(nullptr), col_(nullptr)
+#ifndef TARGET_VANILLA
+        , sgemm_0(nullptr), sgemm_1(nullptr)
+#endif
+        , col_(nullptr)
         , wei_reduction_(nullptr)
     {
         using namespace prop_kind;
-        MKLDNN_ONLY_IF (run_jit, {
+#ifndef TARGET_VANILLA
+        if (run_jit) {
             sgemm_0 = new jit_uni_gemm_f32('T', 'N', 0.0, false);
             sgemm_1 = new jit_uni_gemm_f32('T', 'N', 1.0, false);
-        });
+        }
+#endif //TARGET_VANILLA
 
         jit_gemm_convolution_utils::init_conf(conf_.jcp_,
             *(conf_.desc()), conf_.src_pd(), conf_.diff_weights_pd(0),
             conf_.diff_dst_pd());
         const memory_desc_wrapper weights_d(conf_.diff_weights_pd(0));
-
-        nthr_ = this->conf_.jcp_.os / omp_get_max_threads() < 256 &&
-                (this->conf_.jcp_.mb != 1 || this->conf_.jcp_.ngroups > 2) ?
-                omp_get_max_threads() : 1;
-
         jit_gemm_convolution_utils::prepare_ws_col<data_t>(this->conf_.jcp_,
-                &this->col_, nthr_);
+                &this->col_);
         jit_gemm_convolution_utils::prepare_ws_wei_reduction(this->conf_.jcp_,
-                &this->wei_reduction_, weights_d.size(), nthr_);
+                &this->wei_reduction_, weights_d.size());
     }
-
     ~_gemm_convolution_bwd_weights_t() {
-        MKLDNN_ONLY_IF (run_jit, {
+#ifndef TARGET_VANILLA
+        if (run_jit) {
             delete sgemm_0;
             delete sgemm_1;
-        });
+        }
+#endif //TARGET_VANILLA
         free(this->col_);
         free(this->wei_reduction_);
      };
@@ -432,18 +475,17 @@ private:
 #ifndef TARGET_VANILLA
     using jit_uni_gemm_f32 = typename utils::conditional
           <isa == avx2, jit_avx2_gemm_f32, jit_avx512_common_gemm_f32>::type;
-#else
-    using jit_uni_gemm_f32 = void; // sgemm_ unused (jit type may not be defined)
-#endif
     jit_uni_gemm_f32 *sgemm_0, *sgemm_1;
+#endif //TARGET_VANILLA
     data_t *col_, *wei_reduction_;
-    int nthr_;
 };
 
+#ifndef TARGET_VANILLA
 using jit_avx512_common_gemm_convolution_bwd_weights_t =
                          _gemm_convolution_bwd_weights_t<true, avx512_common>;
 using jit_avx2_gemm_convolution_bwd_weights_t =
                          _gemm_convolution_bwd_weights_t<true, avx2>;
+#endif
 using mkl_gemm_convolution_bwd_weights_t =
                          _gemm_convolution_bwd_weights_t<false, isa_any>;
 
@@ -451,5 +493,5 @@ using mkl_gemm_convolution_bwd_weights_t =
 }
 }
 
-// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
 #endif
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

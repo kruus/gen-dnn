@@ -135,8 +135,9 @@ TEST_P(reorder_simple_expected_fail_f32_f32, TestsReorder) { }
 INSTANTIATE_TEST_CASE_P(TestReorder, reorder_simple_expected_fail_f32_f32,
         ::testing::Values(
             cfg_f32{eng::cpu, fmt::nchw, fmt::nchw, {0, 16, 8, 8},
-                true, mkldnn_invalid_arguments},
-            cfg_f32{eng::cpu, fmt::nchw, fmt::nChw8c, {0, 16, 8, 8},
+                true, mkldnn_invalid_arguments}
+#ifndef MKLDNN_JIT_TYPES > 0
+            , cfg_f32{eng::cpu, fmt::nchw, fmt::nChw8c, {0, 16, 8, 8},
                 true, mkldnn_invalid_arguments},
             cfg_f32{eng::cpu, fmt::nchw, fmt::nChw16c, {0, 16, 8, 8},
                 true, mkldnn_invalid_arguments},
@@ -148,6 +149,7 @@ INSTANTIATE_TEST_CASE_P(TestReorder, reorder_simple_expected_fail_f32_f32,
                 true, mkldnn_invalid_arguments},
             cfg_f32{eng::cpu, fmt::OIhw16i16o, fmt::OIhw16o16i, {32, 32, 3, 0},
                 true, mkldnn_invalid_arguments}
+#endif // TARGET_VANILLA
             )
         );
 

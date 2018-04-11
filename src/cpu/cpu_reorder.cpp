@@ -269,6 +269,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     simple_reorder_t<s32, any, s8, any, fmt_order::any, spec::direct_copy_except_dim_0>::pd_t::create,
     simple_reorder_t<s32, any, s32, any, fmt_order::any, spec::direct_copy>::pd_t::create,
     simple_reorder_t<s32, any, s32, any, fmt_order::any, spec::direct_copy_except_dim_0>::pd_t::create,
+#if MKLDNN_JIT_TYPES > 0
     simple_reorder_t<s8, oihw, s8, OIhw4i16o4i, fmt_order::keep>::pd_t::create,
     simple_reorder_t<s8, oihw, s8, OIhw4i16o4i, fmt_order::reverse>::pd_t::create,
     simple_reorder_t<s8, goihw, s8, gOIhw4i16o4i, fmt_order::keep>::pd_t::create,
@@ -305,6 +306,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     simple_reorder_t<s32, oihw, s32, OIhw4i16o4i, fmt_order::reverse>::pd_t::create,
     simple_reorder_t<s32, goihw, s32, gOIhw4i16o4i, fmt_order::keep>::pd_t::create,
     simple_reorder_t<s32, goihw, s32, gOIhw4i16o4i, fmt_order::reverse>::pd_t::create,
+#endif
     simple_reorder_t<u8, any, s8, any, fmt_order::any, spec::reference>::pd_t::create,
     simple_reorder_t<s8, any, u8, any, fmt_order::any, spec::reference>::pd_t::create,
     simple_reorder_t<u8, any, s32, any, fmt_order::any, spec::reference>::pd_t::create,

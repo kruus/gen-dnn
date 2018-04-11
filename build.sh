@@ -136,7 +136,7 @@ if [ "${DOTARGET}" == "x" ]; then
         DOTARGET="j" # j for JIT (Intel assembler)
     fi
 fi
-if [ "${DOTARGET}" == "x" ;]; then
+if [ "${DOTARGET}" == "x" ]; then
     usage
 fi
 DOJIT=0

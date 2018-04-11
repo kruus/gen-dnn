@@ -22,7 +22,7 @@
 #if !defined(NDEBUG)
 #define DBG_CONV 0
 #else
-#define DBG_CONV 1
+#define DBG_CONV 0
 #endif
 #endif
 
@@ -39,16 +39,16 @@ namespace cpu {
 using math::saturate;
 
 #if DBG_CONV
-// There are mkldnn_format_last^3 possible combinations, of which only
+// There are mkldnn_memory_format_max^3 possible combinations, of which only
 // a small percentage commonly occur.  We can restrict register optimized cases
 // into a lookup table XXX eventually.
 template<mkldnn_memory_format_t s, mkldnn_memory_format_t wb, mkldnn_memory_format_t d>
 inline int constexpr cmem_fmt_tag() {
-    mkldnn_memory_format_t const m=mkldnn_format_last;
+    mkldnn_memory_format_t const m=mkldnn_memory_format_max;
     return ((s)*m + wb)*m + d;
 }
 inline int mem_fmt_tag(mkldnn_memory_format_t s, mkldnn_memory_format_t wb, mkldnn_memory_format_t d){
-    mkldnn_memory_format_t const m=mkldnn_format_last;
+    mkldnn_memory_format_t const m=mkldnn_memory_format_max;
     return ((s)*m + wb)*m + d;
 }
 // maintain a registry, and avoid outputting duplicates
@@ -115,22 +115,21 @@ static inline char const* after_last_colon(const char* msg) {
 
 #endif // DBG_CONV
 
-#if TARGET_VANILLA // uglify constructor with optional debug code
 template <bool with_relu, impl::data_type_t src_type,
-         impl::data_type_t wei_type,
-         impl::data_type_t dst_type,
-         impl::data_type_t acc_type>
+         impl::data_type_t wei_type = src_type,
+         impl::data_type_t dst_type = src_type,
+         impl::data_type_t acc_type = dst_type>
 _ref_convolution_fwd_t<with_relu, src_type, wei_type, dst_type, acc_type>
 ::_ref_convolution_fwd_t (const pd_t *pd, const input_vector &inputs,
                           const output_vector &outputs)
-    : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {
+: cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {
 #if DBG_CONV
-    /* print "name" of impl if first time constructed */
     mkldnn_memory_format_t const sfmt = conf_.src_pd()->desc()->format;
     mkldnn_memory_format_t const wbfmt = conf_.weights_pd()->desc()->format;
     mkldnn_memory_format_t const dfmt = conf_.dst_pd()->desc()->format;
     int tag = mem_fmt_tag(sfmt,wbfmt,dfmt);
     auto ins = seen.insert( tag );
+#define LEN 500
     if(ins.second){ // a one-line message
         printf("\n *** NEW FMTS for %s *** src %s,  wei|bia %s,  dst %s\n",
                     short_impl(conf_.name()),
@@ -139,21 +138,20 @@ _ref_convolution_fwd_t<with_relu, src_type, wei_type, dst_type, acc_type>
                     after_last_colon(mkldnn_name_memory_format( dfmt )));
     }
     if(ins.second){ // extra detail
-#define LEN 500
         char sbuf[LEN], wbuf[LEN], dbuf[LEN]; // bias layout same as weights
         mkldnn_name_memory_desc( conf_.src_pd()->desc(),     sbuf, LEN );
         mkldnn_name_memory_desc( conf_.weights_pd()->desc(), wbuf, LEN );
         mkldnn_name_memory_desc( conf_.dst_pd()->desc(),     dbuf, LEN );
-        printf(" _ref_conv( src         %s\n"
-               "          , weight/bias %s\n"
-               "          , dst         %s\n",
+        printf(" _ref_conv( src        :fmt=%s\n"
+               "          , weight/bias:fmt=%s\n"
+               "          , dst        :fmt=%s\n",
                &sbuf[0], &wbuf[0], &dbuf[0]);
-#undef LEN
     }
+#undef LEN
 #endif /* DBG_CONV */
 }
 
-#endif // TARGET_VANILLA (constructor)
+
 template <bool with_relu, data_type_t src_type, data_type_t wei_type,
          data_type_t dst_type, data_type_t acc_type>
 void _ref_convolution_fwd_t<with_relu, src_type, wei_type, dst_type, acc_type>
@@ -199,6 +197,11 @@ void _ref_convolution_fwd_t<with_relu, src_type, wei_type, dst_type, acc_type>
                 for (int kw = 0; kw < KW; ++kw) {
                     const int ih = oh * KSH - padT + kh * (1 + KDH);
                     const int iw = ow * KSW - padL + kw * (1 + KDW);
+                    // Note: kh = (**ih** - oh*KSH + padT ) / (1+KDH)
+                    //   So lims of 'kh' loop are
+                    //   ih==0 --> kh = max(0,  (   - oh*KSH + padT) / (1+KDH)) )
+                    //   ih==IH -> kh = min(IH, (IH - oh*KSH + padT) / (1+KDH) )
+                    //   [see benchdnn ref_conv3.cpp (?)]
 
                     if (ih < 0 || ih >= IH) continue;
                     if (iw < 0 || iw >= IW) continue;

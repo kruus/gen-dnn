@@ -211,20 +211,20 @@ INSTANTIATE_TEST_CASE_P(
                         memory::format::nchw, memory::format::oihw,
                         memory::format::nc,
                         EXPAND_SIZES_2D( 2, 32, 48, 6, 6 ) },
+#if MKLDNN_JIT_TYPES > 0
                 inprod_test_params_float{ engine::kind::cpu,
                         memory::format::nChw8c, memory::format::oIhw8i,
                         memory::format::nc,
                         EXPAND_SIZES_2D( 2, 32, 48, 6, 6 ) },
-#if MKLDNN_JIT_TYPES > 0
                 inprod_test_params_float{ engine::kind::cpu,
                         memory::format::nChw16c, memory::format::oIhw16i,
                         memory::format::nc,
                         EXPAND_SIZES_2D( 2, 32, 48, 6, 6 ) },
+#endif
                 inprod_test_params_float{ engine::kind::cpu,
                         memory::format::nc, memory::format::oi,
                         memory::format::nc,
                         EXPAND_SIZES_2D( 2, 32, 1152, 1, 1 ) },
-#endif
                 inprod_test_params_float{ engine::kind::cpu,
                         memory::format::nc, memory::format::oi,
                         memory::format::nc,

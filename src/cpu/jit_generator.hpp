@@ -62,44 +62,6 @@ namespace impl {
 namespace cpu {
 
 //typedef enum { ... } cpu_isa_t; // moved to alt header, cpu_isa.hpp
-
-template <cpu_isa_t> struct cpu_isa_traits {}; /* ::vlen -> 32 (for avx2) */
-
-template <> struct cpu_isa_traits<sse42> {
-    static constexpr int vlen_shift = 4;
-    static constexpr int vlen = 16;
-    static constexpr int n_vregs = 16;
-};
-template <> struct cpu_isa_traits<avx2> {
-    static constexpr int vlen_shift = 5;
-    static constexpr int vlen = 32;
-    static constexpr int n_vregs = 16;
-};
-template <> struct cpu_isa_traits<avx512_common> {
-    static constexpr int vlen_shift = 6;
-    static constexpr int vlen = 64;
-    static constexpr int n_vregs = 32;
-};
-template <> struct cpu_isa_traits<avx512_core>:
-    public cpu_isa_traits<avx512_common> {};
-
-template <> struct cpu_isa_traits<avx512_mic>:
-    public cpu_isa_traits<avx512_common> {};
-
-template <> struct cpu_isa_traits<avx512_mic_4ops>:
-    public cpu_isa_traits<avx512_common> {};
-
-/* whatever is required to generate string literals... */
-#include "z_magic.hpp"
-#define JIT_IMPL_NAME_HELPER(prefix, isa, suffix_if_any) \
-    (isa == sse42 ? prefix STRINGIFY(sse42) : \
-    (isa == avx2 ? prefix STRINGIFY(avx2) : \
-    (isa == avx512_common ? prefix STRINGIFY(avx512_common) : \
-    (isa == avx512_core ? prefix STRINGIFY(avx512_core) : \
-    (isa == avx512_mic ? prefix STRINGIFY(avx512_mic) : \
-    (isa == avx512_mic_4ops ? prefix STRINGIFY(avx512_mic_4ops) : \
-    prefix suffix_if_any))))))
-
 // TODO: move this to jit_generator class?
 namespace {
 
