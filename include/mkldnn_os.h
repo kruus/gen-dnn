@@ -20,22 +20,27 @@
 
 //#include "os_common.hpp" // not available -- we use mkldnn public API only.
 #if 1
-#if defined(SXAURORA)
+#if defined(__ve)
 #define strnlen strnlen_s
 #endif
 
 // How is the restrict keyword handled? (disallow it as you encounter errors, please)
-#if !defined(restrict)
 #if defined(_SX)
+
 #elif defined(__ve)
 // restrict is allowed
+#ifndef __restrict
+#define __restrict restrict /* ve/musl/include/stdlib.h uses __restrict !!! */
+#endif
+
 #elif defined(__INTEL_COMPILER) || defined(__GNUC__)
 #define restrict /*no-restrict*/
+
 #elif defined(WIN32)
 // ???
 #else
-#endif
-#endif
+// ???
+#endif // restrict keyword handling
 
 // Any restrictions on the alignas attribute?
 #ifdef __ve
