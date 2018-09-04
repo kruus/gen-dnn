@@ -21,7 +21,7 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
-#include "mkldnn_io.hpp" // SX debug
+#include "mkldnn_io.hpp" // ve debug (uninitialized structs compiler bug)
 using namespace mkldnn::impl;
 using namespace mkldnn::impl::utils;
 using namespace mkldnn::impl::status;
@@ -52,28 +52,30 @@ status_t eltwise_desc_init(eltwise_desc_t *eltwise_desc, prop_kind_t prop_kind,
     ed.diff_data_desc =
         (ed.prop_kind == backward_data) ? *diff_data_desc : zero_md();
 
-    if(1){ // SX debug
-        if( ed.prop_kind != backward_data ){
-            for(int i=0; i<sizeof(mkldnn_memory_desc_t); ++i){
-                if( ((const char *)&ed.diff_data_desc) [i] != '\0' ){
-                    printf(" WARNING: zero_md had a nonzero byte [i=%d]\n",i);
-                }
+#if defined(__ve) // ve debug
+    if( ed.prop_kind != backward_data ){
+        for(int i=0; i<sizeof(mkldnn_memory_desc_t); ++i){
+            if( ((const char *)&ed.diff_data_desc) [i] != '\0' ){
+                printf(" WARNING: zero_md had a nonzero byte [i=%d]\n",i);
             }
         }
     }
+#endif
 
     ed.alpha = alpha;
     ed.beta = beta;
     ed.negative_slope = ed.alpha;
     // Good. all struct values initialized
 
-    if(1){ // SX debug
-	using namespace std;
+#if defined(__ve) // ve debug
+    {
+        using namespace std;
         using mkldnn::operator<<(std::ostream& os, mkldnn_memory_desc_t const& md);
-	cout<<" %s:%u memory_desc_wrapper(ed.data_desc).nelems() = %lu\n",__FILE__, __LINE__, memory_desc_wrapper(ed.data_desc).nelems()<<endl;
+        cout<<" %s:%u memory_desc_wrapper(ed.data_desc).nelems() = %lu\n",__FILE__, __LINE__, memory_desc_wrapper(ed.data_desc).nelems()<<endl;
         cout<<" eltwise data_desc = "<<ed.data_desc<<endl;
         cout<<" eltwise diff_data_desc = "<<ed.diff_data_desc<<endl;
     }
+#endif
 
     bool consistency = true
         && memory_desc_wrapper(ed.data_desc).nelems()
