@@ -19,6 +19,7 @@
 #include <assert.h>
 
 #include "common.hpp"
+#include "mkldnn.h"
 
 static const char *modes[] = { "CORR", "PERF", "TEST", "ALL" };
 static int const lenmax = sizeof "CORR+PERF+TEST+ALL"; // max-length result
@@ -314,7 +315,7 @@ bool maybe_skip(const char *skip_impl, const char *impl_str) {
     return false;
 }
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__GNUC__)
 #include <windows.h>
 #define PATH_MAX MAX_PATH
 static char *dirname(char *path) {
@@ -329,7 +330,7 @@ static char *dirname(char *path) {
 }
 #else
 #include <libgen.h>
-#endif /* WIN32 */
+#endif /* _WIN32 */
 
 FILE *open_batch_file(const char *fname) {
     const int max_paths = 4;
@@ -340,7 +341,8 @@ FILE *open_batch_file(const char *fname) {
     char *fdir = NULL;
     {
         char fname_copy[PATH_MAX];
-        strncpy(fname_copy, fname, PATH_MAX);
+        strncpy(fname_copy, fname, PATH_MAX - 1);
+        fname_copy[PATH_MAX - 1] = '\0';
         fdir = dirname(fname_copy);
     }
 
@@ -350,15 +352,17 @@ FILE *open_batch_file(const char *fname) {
             dir_found = true;
             break;
         }
-    if (!dir_found)
+    if (!dir_found) {
+        SAFE_V(n_paths < max_paths ? OK : FAIL);
         strcpy(search_paths[n_paths++], fdir);
+    }
 
     FILE *fp = fopen(fname, "r");
     if (fp) return fp;
 
     for (int n = 0; n < n_paths; ++n) {
-        char fullname[PATH_MAX];
-        snprintf(fullname, PATH_MAX, "%s/%s", search_paths[n], fname);
+        char fullname[PATH_MAX + 2];
+        snprintf(fullname, PATH_MAX + 2, "%s/%s", search_paths[n], fname);
         fp = fopen(fullname, "r");
         print(50, "batch file used: %s\n", fullname);
         if (fp) break;
@@ -399,4 +403,34 @@ int batch(const char *fname, bench_f bench) {
     fclose(fp);
 
     return OK;
+}
+
+int flip_coin(ptrdiff_t seed, float probability) {
+    const ptrdiff_t big_prime = 1000003;
+    const ptrdiff_t prime = 753737;
+    seed *= prime;
+    return (seed % big_prime) < (probability * big_prime);
+}
+
+int div_up(const int a, const int b){
+    SAFE_V(b != 0 ? OK : FAIL);
+    return (a + b - 1) / b;
+}
+
+void array_set(char *arr, size_t size) {
+    for (size_t i = 0; i < size; ++i)
+        arr[i] = 0;
+}
+
+void gemm(const char *layout, const char *transa, const char *transb,
+        int m, int n, int k, const float alpha, const float *a, const int lda,
+        const float *b, const int ldb, const float beta, float *c,
+        const int ldc ) {
+    if (*layout == 'F') {
+        mkldnn_sgemm(transa, transb, &m, &n, &k, &alpha, a, &lda, b, &ldb,
+                &beta, c, &ldc);
+    } else {
+        mkldnn_sgemm(transb, transa, &n, &m, &k, &alpha, b, &ldb, a, &lda,
+                &beta, c, &ldc);
+    }
 }

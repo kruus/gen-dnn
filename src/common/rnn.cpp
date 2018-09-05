@@ -31,7 +31,7 @@ memory_desc_t copy_maybe_null(const memory_desc_t *md) {
 }
 
 rnn_desc_t zero_rnn_desc() {
-    rnn_desc_t rd = {};
+    auto rd = rnn_desc_t();
     rd.src_layer_desc = zero_md();
     rd.src_iter_desc = zero_md();
     rd.weights_layer_desc = zero_md();
@@ -58,13 +58,14 @@ status_t mkldnn_rnn_cell_desc_init(rnn_cell_desc_t *rnn_cell_desc,
     using namespace mkldnn::impl::alg_kind;
 
     bool args_ok = true
-            && one_of(cell_kind, vanilla_rnn, vanilla_lstm, vanilla_gru)
+            && one_of(cell_kind, vanilla_rnn, vanilla_lstm, vanilla_gru,
+                    gru_linear_before_reset)
             && implication(cell_kind == vanilla_rnn,
                        one_of(act_f, eltwise_relu, eltwise_tanh));
     if (!args_ok)
         return status::invalid_arguments;
 
-    mkldnn_rnn_cell_desc_t rcd = {};
+    auto rcd = mkldnn_rnn_cell_desc_t();
 
     rcd.cell_kind = cell_kind;
     rcd.activation_kind = act_f;
@@ -81,6 +82,7 @@ int mkldnn_rnn_cell_get_gates_count(const rnn_cell_desc_t *rnn_cell_desc) {
     switch (rnn_cell_desc->cell_kind) {
     case mkldnn::impl::alg_kind::vanilla_rnn: return 1;
     case mkldnn::impl::alg_kind::vanilla_gru: return 3;
+    case mkldnn::impl::alg_kind::gru_linear_before_reset: return 3;
     case mkldnn::impl::alg_kind::vanilla_lstm: return 4;
     default: assert(!"unknown cell kind"); return 0;
     }
@@ -91,6 +93,7 @@ int mkldnn_rnn_cell_get_states_count(const rnn_cell_desc_t *rnn_cell_desc) {
     switch (rnn_cell_desc->cell_kind) {
     case mkldnn::impl::alg_kind::vanilla_rnn: return 1;
     case mkldnn::impl::alg_kind::vanilla_gru: return 1;
+    case mkldnn::impl::alg_kind::gru_linear_before_reset: return 1;
     case mkldnn::impl::alg_kind::vanilla_lstm: return 2;
     default: assert(!"unknown cell kind"); return 0;
     }
@@ -139,7 +142,9 @@ status_t MKLDNN_API mkldnn_rnn_forward_desc_init(mkldnn_rnn_desc_t *rnn_desc,
                                && L == dst_iter_desc->dims[0])
             && implication(!is_zero_md(bias_desc), L == bias_desc->dims[0])
             && implication(
-                       !is_zero_md(src_iter_desc), L == src_iter_desc->dims[0]);
+                       !is_zero_md(src_iter_desc), L == src_iter_desc->dims[0])
+            && implication(rnn_cell_desc->cell_kind == alg_kind::vanilla_gru,
+                       DIC == weights_iter_desc->dims[2]);
     if (!args_ok)
         return invalid_arguments;
 
@@ -222,7 +227,9 @@ status_t MKLDNN_API mkldnn_rnn_backward_desc_init(mkldnn_rnn_desc_t *rnn_desc,
                                && L == dst_iter_desc->dims[0])
             && implication(!is_zero_md(bias_desc), L == bias_desc->dims[0])
             && implication(
-                       !is_zero_md(src_iter_desc), L == src_iter_desc->dims[0]);
+                       !is_zero_md(src_iter_desc), L == src_iter_desc->dims[0])
+            && implication(rnn_cell_desc->cell_kind == alg_kind::vanilla_gru,
+                       DIC == weights_iter_desc->dims[2]);
     if (!args_ok)
         return invalid_arguments;
 

@@ -61,8 +61,21 @@ struct memory_desc_wrapper: public c_compatible {
     const dims_t &dims() const { return _md->dims; }
     data_type_t data_type() const { return _md->data_type; }
     memory_format_t format() const { return _md->format; }
+    bool is_blocking_desc() const {
+        return (format() != memory_format::wino_fmt
+                && format() != memory_format::any
+                && format() != memory_format::undef);
+    }
+    bool is_wino_desc() const {
+        return (format() == memory_format::wino_fmt);
+    }
     const blocking_desc_t &blocking_desc() const {
+        assert(is_blocking_desc());
         return _md->layout_desc.blocking;
+    }
+    const wino_data_t &wino_desc() const {
+        assert(is_wino_desc());
+        return _md->layout_desc.wino_desc;
     }
 
     /* some useful function */
@@ -71,12 +84,15 @@ struct memory_desc_wrapper: public c_compatible {
      * is true, and the number of data elements otherwise */
     size_t nelems(bool with_padding = false) const {
         if (is_zero()) return 0;
-        return utils::array_product(with_padding
+    return utils::array_product<int, size_t>(with_padding
                 ? blocking_desc().padding_dims : dims(), ndims());
     }
 
     /** returns true if memory descriptor is zero */
     bool is_zero() const { return ndims() == 0; }
+
+    /** returns true if memory descriptor contains zero as one of its dim */
+    bool has_zero_dim() const { return nelems() == 0; }
 
     /** return the size of data type (a shortcut) */
     size_t data_type_size() const
@@ -86,37 +102,35 @@ struct memory_desc_wrapper: public c_compatible {
      * note: if offset_padding != 0 returns 0 (need to specify the behavior) */
     size_t size() const {
         using namespace mkldnn::impl::memory_format;
-        if (is_zero() || format() == memory_format::any) return 0;
+        if (is_zero() || has_zero_dim() || format() == memory_format::any)
+            return 0;
 
-        assert(utils::one_of(format(), blocked, x, nc, nchw, nhwc, chwn,
-                    oi, io, oihw, ihwo, hwio, goihw, hwigo
-#if MKLDNN_JIT_TYPES > 0
-                    , nChw8c, nChw16c, oIhw8i,
-                    oIhw16i, OIhw8i8o, OIhw16i16o, OIhw8i16o2i, OIhw8o16i2o,
-                    OIhw8o8i, OIhw16o16i, Oihw8o, Oihw16o, Ohwi8o, Ohwi16o,
-                    OhIw16o4i, OIhw4i16o4i, goihw, gOIhw8i8o, gOIhw16i16o,
-                    gOIhw8i16o2i, gOIhw8o16i2o, gOIhw8o8i, gOIhw16o16i, gOihw8o,
-                    gOihw16o, gOhwi8o, gOhwi16o, gOhIw16o4i, IOhw16o16i,
-                    gIOhw16o16i, gOIhw4i16o4i, Goihw8g, Goihw16g, ncdhw, oidhw, goidhw,
-                    ntc, tnc, ldsnc, ldigo, ldgoi, ldgo
-#endif
-                    ));
+        assert((false
+                    || types::format_normalize(format()) == blocked
+                    || types::is_format_double_blocked(format())
+                    || format() == wino_fmt)
+                && "unknown format");
 
-        if (blocking_desc().offset_padding != 0) return 0;
+        if (format() == wino_fmt) {
+            return wino_desc().size;
+        } else {
+            if (blocking_desc().offset_padding != 0) return 0;
 
-        const auto &block_dims = blocking_desc().block_dims;
-        const auto &strides = blocking_desc().strides;
-        const auto &padding_dims = blocking_desc().padding_dims;
+            const auto &block_dims = blocking_desc().block_dims;
+            const auto &strides = blocking_desc().strides;
+            const auto &padding_dims = blocking_desc().padding_dims;
 
-        size_t max_size = 0;
-        for (int d = 0; d < ndims(); ++d) {
-            auto block = block_dims[d];
-            max_size = nstl::max(max_size, // strides are ptrdiff_t
-                    static_cast<size_t>((padding_dims[d]/block)*strides[0][d]));
-            if (block > 1)
-                max_size = nstl::max(max_size, static_cast<size_t>(block*strides[1][d]));
+            size_t max_size = 0;
+            for (int d = 0; d < ndims(); ++d) {
+                auto block = block_dims[d];
+                max_size = nstl::max(max_size, // strides are ptrdiff_t
+                    static_cast<size_t>(padding_dims[d] / block) * strides[0][d]);
+                if (block > 1)
+                    max_size = nstl::max(max_size,
+                            static_cast<size_t>(block * strides[1][d]));
+            }
+            return max_size * data_type_size();
         }
-        return max_size * data_type_size();
     }
 
     /** returns true if data is dense in memory */
@@ -124,6 +138,16 @@ struct memory_desc_wrapper: public c_compatible {
 
     /** returns true if memory desc is fully defined */
     bool is_defined() const { return format() != memory_format::any; }
+
+    /** returns true if the only (potentially) padded dim is \param dim */
+    bool only_padded_dim(int dim) const {
+        assert(is_blocking_desc());
+        const auto pdims = blocking_desc().padding_dims;
+        for (int d = 0; d < ndims(); ++d)
+            if (d != dim && dims()[d] != pdims[d])
+                return false;
+        return true;
+    }
 
     /* comparison section */
 
@@ -158,6 +182,7 @@ struct memory_desc_wrapper: public c_compatible {
     inline size_t off_v(const dims_t pos, bool is_pos_padded = false) const {
         using namespace mkldnn::impl::memory_format;
         assert(format() != memory_format::any);
+        assert(is_blocking_desc());
         const blocking_desc_t &blk = blocking_desc();
         const dims_t &optd = blk.offset_padding_to_data;
 
@@ -174,9 +199,23 @@ struct memory_desc_wrapper: public c_compatible {
             phys_offset += pos_within_block * blk.strides[1][d];
         }
 #if MKLDNN_JIT_TYPES > 0
+        if (format() == gOIhw4i16o4i || format() == OIhw4i16o4i) {
+            // TODO: Fix temporary workaround for formats with double blocking
+            const bool with_groups = format() == gOIhw4i16o4i;
+            const int oc_16 = pos[with_groups + 0] % 16;
+            const int ic_4  = pos[with_groups + 1] % 4;
+            phys_offset += 4 * oc_16 + ic_4 - (oc_16 + 16 * ic_4);
+        }
         if (format() == gOIhw8i16o2i || format() == OIhw8i16o2i) {
             // TODO: Fix temporary workaround for formats with double blocking
             const bool with_groups = format() == gOIhw8i16o2i;
+            const int oc_16 = pos[with_groups + 0] % 16;
+            const int ic_2  = pos[with_groups + 1] % 2;
+            phys_offset += -16 * ic_2 + oc_16 + ic_2;
+        }
+        if (format() == gOIdhw8i16o2i || format() == OIdhw8i16o2i) {
+            // TODO: Fix temporary workaround for formats with double blocking
+            const bool with_groups = format() == gOIdhw8i16o2i;
             const int oc_16 = pos[with_groups + 0] % 16;
             const int ic_2  = pos[with_groups + 1] % 2;
             phys_offset += -16 * ic_2 + oc_16 + ic_2;
@@ -196,6 +235,7 @@ struct memory_desc_wrapper: public c_compatible {
      * a scalar \param l_offset. if \param is_pos_padded is true, \param
      * l_offset represents logical offset in already padded area */
     inline size_t off_l(size_t l_offset, bool is_pos_padded = false) const {
+        assert(is_blocking_desc());
         const dims_t &padding_dims = blocking_desc().padding_dims;
         dims_t pos;
         for (int rd = 0; rd < ndims(); ++rd) {
@@ -255,10 +295,14 @@ private:
     }
 
     template<int ORIG_LEN, typename ...Void>
-    inline size_t _blk_off() const { return blocking_desc().offset_padding; }
+    inline size_t _blk_off() const {
+        assert(is_blocking_desc());
+        return blocking_desc().offset_padding;
+    }
 
     template<int ORIG_LEN, typename T, typename ...Args>
     inline size_t _blk_off(T xc, Args ...args) const {
+        assert(is_blocking_desc());
         constexpr int dc = ORIG_LEN - sizeof...(args) - 1;
         return size_t(xc) * blocking_desc().strides[0][dc]
             + _blk_off<ORIG_LEN, Args...>(args...);
@@ -276,11 +320,16 @@ inline bool memory_desc_wrapper::operator==(const memory_desc_wrapper &rhs)
 {
     using namespace impl::types;
     return ndims() == rhs.ndims()
-        && utils::array_cmp(dims(), rhs.dims(), ndims())
-        && data_type() == rhs.data_type()
-        && utils::implication(!utils::one_of(format(), memory_format::any,
-                    memory_format::undef), blocking_desc_is_equal(
-                        blocking_desc(), rhs.blocking_desc(), ndims()));
+            && utils::array_cmp(dims(), rhs.dims(), ndims())
+            && data_type() == rhs.data_type()
+            && ((is_blocking_desc() && rhs.is_blocking_desc())
+                       || (is_wino_desc() && rhs.is_wino_desc()))
+            && (is_blocking_desc() ? blocking_desc_is_equal(blocking_desc(),
+                                             rhs.blocking_desc(), ndims()) :
+                                     true)
+            && (is_wino_desc() ? wino_desc_is_equal(
+                                         wino_desc(), rhs.wino_desc()) :
+                                 true);
 }
 
 inline bool memory_desc_wrapper::similar_to(const memory_desc_wrapper &rhs,
@@ -288,6 +337,8 @@ inline bool memory_desc_wrapper::similar_to(const memory_desc_wrapper &rhs,
     using namespace impl::types;
     using namespace utils;
     if (utils::one_of(format(), memory_format::undef, memory_format::any))
+        return false;
+    if (is_wino_desc() || rhs.is_wino_desc())
         return false;
 
     const int ds = dim_start;

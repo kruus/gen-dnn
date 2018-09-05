@@ -84,6 +84,13 @@ protected:
     virtual void SetUp() {
         sum_test_params p
             = ::testing::TestWithParam<sum_test_params>::GetParam();
+        catch_expected_failures([=](){Test();}, p.expect_to_fail,
+                    p.expected_status);
+    }
+
+    void Test() {
+        sum_test_params p
+            = ::testing::TestWithParam<sum_test_params>::GetParam();
 
         ASSERT_EQ(p.srcs_format.size(), p.scale.size());
         const auto num_srcs = p.srcs_format.size();
@@ -94,6 +101,7 @@ protected:
 
         std::vector<memory::primitive_desc> srcs_pd;
         std::vector<memory> srcs;
+
         for (size_t i = 0; i < num_srcs; i++) {
             auto desc =
                 memory::desc(p.dims, data_type, p.srcs_format[i]);
@@ -108,6 +116,7 @@ protected:
 
         std::shared_ptr<memory> dst;
 
+#if 0 //old
 #if 0 // old
         data_t *dst_data = (data_t *)dst.get_data_handle();
         const size_t sz =
@@ -141,30 +150,66 @@ protected:
             for (size_t i = 0; i < num_srcs; i++) {
                 inputs.push_back(srcs[i]);
             }
+        }
+#endif
+        auto dst_desc = memory::desc(p.dims, data_type, p.dst_format);
+        auto sum_pd = sum::primitive_desc(dst_desc, p.scale, srcs_pd);
+        dst.reset(new memory(sum_pd.dst_primitive_desc()));
 
-            auto c = sum(sum_pd, inputs, *dst);
-            std::vector<primitive> pipeline;
-            pipeline.push_back(c);
-            auto s = stream(stream::kind::eager);
-            s.submit(pipeline).wait();
-        };
+        ASSERT_EQ(sum_pd.dst_primitive_desc().desc().data.format,
+                dst_desc.data.format);
+        ASSERT_EQ(sum_pd.dst_primitive_desc().desc().data.ndims,
+                dst_desc.data.ndims);
 
-        if (catch_expected_failures(test, p.expect_to_fail, p.expected_status))
-            return;
+        data_t *dst_data = (data_t *)dst->get_data_handle();
+        const size_t sz =
+            dst->get_primitive_desc().get_size() / sizeof(data_t);
+        // overwriting dst to prevent false positives for test cases.
+        OMP(parallel for)//;
+        for (ptrdiff_t i = 0; i < (ptrdiff_t)sz; i++) {
+            dst_data[i] = -32;
+        }
+
+        std::vector<primitive::at> inputs;
+        for (size_t i = 0; i < num_srcs; i++) {
+            inputs.push_back(srcs[i]);
+        }
+
+        auto c = sum(sum_pd, inputs, *dst);
+        std::vector<primitive> pipeline;
+        pipeline.push_back(c);
+        auto s = stream(stream::kind::eager);
+        s.submit(pipeline).wait();
 
         check_data(srcs, p.scale, *dst);
     }
 };
 
+/* corner cases */
+#define CASE_CC(ifmt0, ifmt1, ofmt, dims_, ef, st) \
+    sum_test_params{engine::kind::cpu, \
+        {memory::format::ifmt0, memory::format::ifmt1}, memory::format::ofmt, \
+        memory::dims dims_, {1.0f, 1.0f}, ef, st}
+
 #define INST_TEST_CASE(test) \
 TEST_P(test, TestsSum) {} \
 INSTANTIATE_TEST_CASE_P(TestSum, test, ::testing::Values( \
     sum_test_params{engine::kind::cpu, \
-    {memory::format::nchw, memory::format::nchw}, memory::format::nchw, \
-    {0, 8, 2, 2}, {1.0f, 1.0f}, true, mkldnn_invalid_arguments}, \
+    {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw, \
+    {0, 7, 4, 4}, {1.0f, 1.0f}}, \
     sum_test_params{engine::kind::cpu, \
-    {memory::format::nchw, memory::format::nchw}, memory::format::nchw, \
-    {1, 0, 2, 2}, {1.0f, 1.0f}, true, mkldnn_invalid_arguments}, \
+    {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw, \
+    {1, 0, 4, 4}, {1.0f, 1.0f}}, \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw, \
+    {1, 8, 0, 4}, {1.0f, 1.0f}}, \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw, \
+    {-1, 8, 4, 4}, {1.0f, 1.0f}, true, mkldnn_invalid_arguments}, \
+    \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw, \
+    {1, 1024, 38, 50}, {1.0f, 1.0f}}, \
     sum_test_params{engine::kind::cpu, \
     {memory::format::nchw, memory::format::nchw}, memory::format::nchw, \
     {2, 8, 2, 2}, {1.0f, 1.0f}}, \
@@ -209,6 +254,16 @@ INSTANTIATE_TEST_CASE_P(TestSumJit, test, ::testing::Values( \
 using sum_test_float = sum_test<float,float>;
 using sum_test_u8 = sum_test<uint8_t,float>;
 using sum_test_s32 = sum_test<int32_t,float>;
+
+using sum_cc_f32 = sum_test<float,float>;
+TEST_P(sum_cc_f32, TestSumCornerCases) {}
+INSTANTIATE_TEST_CASE_P(TestSumCornerCases, sum_cc_f32, ::testing::Values(
+    CASE_CC(nchw, nChw8c, nchw, ({0, 7, 4, 4}), false, mkldnn_success),
+    CASE_CC(nchw, nChw8c, nchw, ({1, 0, 4, 4}), false, mkldnn_success),
+    CASE_CC(nchw, nChw8c, nchw, ({1, 8, 0, 4}), false, mkldnn_success),
+    CASE_CC(nchw, nChw8c, nchw, ({-1, 8, 4, 4}), true, mkldnn_invalid_arguments)
+    ));
+#undef CASE_CC
 
 INST_TEST_CASE(sum_test_float)
 INST_TEST_CASE(sum_test_u8)

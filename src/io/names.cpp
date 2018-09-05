@@ -4,6 +4,7 @@
 #define MKLDNN_IO 1 // allow it, just here
 #include "mkldnn_io.h"
 #include "mkldnn_io.hpp"
+#include "mkldnn_debug.h"       // use the "official" functions when appropriate
 
 #include <cstdio> // snprintf
 #include <cstring>
@@ -121,6 +122,7 @@ char const* mkldnn_primitive_desc_shorten(char const* impl_str)
 #define NAMEENUM_T( TYPENAME ) char const* mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const e )
 /*NAMEENUM_T(status){*/
 char const* mkldnn_name_status( mkldnn_status_t const e ){
+#if 0
     char const * ret = "Huh?";
     switch(e){
       case(mkldnn_success): ret = "status:success"; break;
@@ -134,8 +136,12 @@ char const* mkldnn_name_status( mkldnn_status_t const e ){
       case(mkldnn_not_required): ret = "status:not_required"; break;
     }
     return ret;
+#else
+    return mkldnn_status2str(e);
+#endif
 }
 NAMEENUM_T(data_type){
+#if 0
     char const * ret = "Huh?";
     switch(e){
       case(mkldnn_data_type_undef): ret = "data_type:undef"; break;
@@ -146,8 +152,12 @@ NAMEENUM_T(data_type){
       case(mkldnn_u8): ret = "data_type:u8"; break;
     }
     return ret;
+#else
+    return mkldnn_dt2str(e);
+#endif
 }
 NAMEENUM_T(memory_format){
+#if 0
     char const * ret = "Huh?";
     // NEW: now all memory formats must always be **defined**, so we enable
     //      printing all of them (no MKLDNN_JIT_TYPES checking here)
@@ -213,6 +223,9 @@ NAMEENUM_T(memory_format){
     // dup case(mkldnn_oIhw16i): ret = "memory_format:oIhw16i"; break; // alias for nChw16c
     }
     return ret;
+#else
+    return mkldnn_fmt2str(e);
+#endif
 }
 NAMEENUM_T(padding_kind){
     char const * ret = "Huh?";
@@ -222,6 +235,7 @@ NAMEENUM_T(padding_kind){
     return ret;
 }
 NAMEENUM_T(prop_kind){
+#if 0
     char const * ret = "Huh?";
     switch(e){
       case(mkldnn_prop_kind_undef): ret = "prop_kind:prop_kind_undef"; break;
@@ -235,8 +249,12 @@ NAMEENUM_T(prop_kind){
       case(mkldnn_backward_bias): ret = "prop_kind:backward_bias"; break;
     }
     return ret;
+#else
+    return mkldnn_prop_kind2str(e);
+#endif
 }
 NAMEENUM_T(primitive_kind){
+#if 0
     char const * ret = "Huh?";
     switch(e){
       case(mkldnn_undefined_primitive): ret = "primitive_kind:undefined_primitive"; break;
@@ -258,8 +276,12 @@ NAMEENUM_T(primitive_kind){
       case(mkldnn_rnn): ret = "primitive_kind:rnn"; break;
     }
     return ret;
+#else
+    return mkldnn_prim_kind2str(e);
+#endif
 }
 NAMEENUM_T(alg_kind){
+#if 0
     char const * ret = "Huh?";
     switch(e){
       case(mkldnn_alg_kind_undef): ret = "alg_kind:undef"; break;
@@ -287,6 +309,9 @@ NAMEENUM_T(alg_kind){
       case(mkldnn_vanilla_gru): ret = "alg_kind:vanilla_gru"; break;
     }
     return ret;
+#else
+    return mkldnn_alg_kind2str(e);
+#endif
 }
 NAMEENUM_T(batch_normalization_flag){
     char const * ret = "Huh?";
@@ -440,11 +465,11 @@ NAMEENUM_T(stream_kind){
     } \
 }while(0)
 #define ARR_SZ( ARR, SZ, FMTSPEC ) do{ \
-    ssize_t const sz=(ssize_t)(SZ); \
-    if(sz <= 0){ \
-        errno=0; int const n = snprintf(b,len, (sz<0? "{err:sz<0}":"{}")); CHKBUF; \
+    ssize_t const arr_sz=(ssize_t)(SZ); \
+    if(arr_sz <= 0){ \
+        errno=0; int const n = snprintf(b,len, (arr_sz<0? "{err:sz<0}":"{}")); CHKBUF; \
     }else{ \
-        for(ssize_t i=0; i<=sz; ++i){ \
+        for(ssize_t i=0; i<=arr_sz; ++i){ \
             errno=0; int const n = snprintf(b,len, "%c" FMTSPEC, \
                                              (i==0?'{':','), ARR[i] ); CHKBUF; \
         } \

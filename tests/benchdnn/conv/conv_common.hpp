@@ -70,7 +70,7 @@ void desc2str(const desc_t *d, char *buffer, bool canonical = false);
  */
 typedef struct dt_conf_t {
     mkldnn_data_type_t dt;
-    int min, max; /* representative */
+    double min, max; /* representative */
     int f_min, f_max; /* fill range */
     int f_base; /* fill base, use 0 */
     int f_step; /* fill step, use 1 */
@@ -87,6 +87,10 @@ extern const _dt_conf_t conf_s16s32s16s32;
 extern const _dt_conf_t conf_u8s8s32s32;
 extern const _dt_conf_t conf_u8s8s8s32;
 extern const _dt_conf_t conf_u8s8u8s32;
+extern const _dt_conf_t conf_u8s8f32s32_wino;
+extern const _dt_conf_t conf_u8s8s32s32_wino;
+extern const _dt_conf_t conf_u8s8s8s32_wino;
+extern const _dt_conf_t conf_u8s8u8s32_wino;
 
 const dt_conf_t *str2cfg(const char *str);
 const char *cfg2str(const dt_conf_t *cfg);
@@ -331,25 +335,26 @@ float oscale(const prb_t *p, int oc);
 void compute_ref_fwd(const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &wei_m,
         dnn_mem_t &bia_m, dnn_mem_t &dst_m);
 void compute_ref_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m, dnn_mem_t &wei_m,
-        dnn_mem_t &diff_dst_m);
+        dnn_mem_t &bia_m, dnn_mem_t &diff_dst_m);
 void compute_ref_bwd_w(const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &diff_wei_m,
         dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m);
 
 #if 1   // additional "ref impls", catering to specific compilers
         // (none of these pure-C++ codes match im2col gemm,
         //  some compilers never get fast, some do.)
-typedef void (*conv_fwd_fn)   (const prb_t *p, dnn_mem_t &src_m,
-        dnn_mem_t &wei_m, dnn_mem_t &bia_m, dnn_mem_t &dst_m);
-typedef void (*conv_bwd_d_fn) (const prb_t *p, dnn_mem_t &diff_src_m,
-        dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m);
-typedef void (*conv_bwd_w_fn )(const prb_t *p, dnn_mem_t &src_m,
-        dnn_mem_t &diff_wei_m, dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m);
+/** now all args are in order: problem, memory for src/wei/bia/dst */
+typedef void (*conv_fwd_fn)   (const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &wei_m,
+        dnn_mem_t &bia_m, dnn_mem_t &dst_m);
+typedef void (*conv_bwd_d_fn) (const prb_t *p, dnn_mem_t &diff_src_m, dnn_mem_t &wei_m,
+        dnn_mem_t &bia_m, dnn_mem_t &diff_dst_m);
+typedef void (*conv_bwd_w_fn )(const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &diff_wei_m,
+        dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m);
 
 #define COMPUTE_REF_DECL( PFX ) \
 extern void PFX##_fwd   (const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &wei_m, \
                          dnn_mem_t &bia_m, dnn_mem_t &dst_m); \
 extern void PFX##_bwd_d (const prb_t *p, dnn_mem_t &diff_src_m, dnn_mem_t &wei_m, \
-                         dnn_mem_t &diff_dst_m); \
+                         dnn_mem_t &bia_m, dnn_mem_t &diff_dst_m); \
 extern void PFX##_bwd_w (const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &diff_wei_m, \
                          dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m);
 
@@ -390,6 +395,20 @@ size_t constexpr get_nref_impls() { return 6U; }
 
 #endif // additions
 
+void compute_ref_direct_fwd(const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &wei_m,
+        dnn_mem_t &bia_m, dnn_mem_t &dst_m);
+void compute_ref_direct_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m, dnn_mem_t &wei_m,
+        dnn_mem_t &bia_m, dnn_mem_t &diff_dst_m);
+void compute_ref_direct_bwd_w(const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &diff_wei_m,
+        dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m);
+
+void compute_wino_ref_fwd(const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &wei_m,
+        dnn_mem_t &bia_m, dnn_mem_t &dst_m);
+void compute_wino_ref_bwd_d(const prb_t *p, dnn_mem_t &idiff_src_m,
+        dnn_mem_t &wei_m, dnn_mem_t &bia_m, dnn_mem_t &diff_dst_m);
+void compute_wino_ref_bwd_w(const prb_t *p, dnn_mem_t &src_m,
+        dnn_mem_t &diff_wei_m, dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m);
+//void perf_report(const prb_t *p, const res_t *r, const char *pstr);
 void perf_report(const prb_t *p, const res_t *r, const char *pstr, const char* impl);
 
 int compare_src(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,

@@ -33,6 +33,7 @@ alg_t str2alg(const char *str) {
     CASE(VANILLA_RNN);
     CASE(VANILLA_LSTM);
     CASE(VANILLA_GRU);
+    CASE(GRU_LINEAR_BEFORE_RESET);
 #undef CASE
     assert(!"unknown algorithm");
     return VANILLA_RNN;
@@ -45,6 +46,8 @@ const char *alg2str(alg_t alg) {
         return "VANILLA_LSTM";
     if (alg == VANILLA_GRU)
         return "VANILLA_GRU";
+    if (alg == GRU_LINEAR_BEFORE_RESET)
+        return "GRU_LINEAR_BEFORE_RESET";
     assert(!"unknown algorithm");
     return "unknown algorithm";
 }
@@ -56,6 +59,8 @@ mkldnn_alg_kind_t alg2kind(alg_t alg) {
         return mkldnn_vanilla_lstm;
     if (alg == VANILLA_GRU)
         return mkldnn_vanilla_gru;
+    if (alg == GRU_LINEAR_BEFORE_RESET)
+        return mkldnn_gru_linear_before_reset;
     assert(!"unknown algorithm");
     return mkldnn_alg_kind_undef;
 }
@@ -119,52 +124,21 @@ const char *direction2str(mkldnn_rnn_direction_t direction) {
 void prb2str(const rnn_prb_t *p, const res_t *res, char *buffer) {
     int rem_len = max_prb_len;
 
-    DPRINT("RNN:");
-    DPRINT("alg:%s;", alg2str(p->alg));
-    DPRINT("activation:%s;", activation2str(p->activation));
-    DPRINT("direction:%s;", direction2str(p->direction));
-    DPRINT("h_size:%d;", p->h_size);
-    DPRINT("x_size:%d;", p->x_size);
-    DPRINT("batch:%d;", p->mb);
-    DPRINT("n_layer:%d;", p->n_layer);
-    DPRINT("n_iter:%d;", p->n_iter);
-
-    DPRINT("name:\"%s;\"", p->name);
+    DPRINT("%s(%s,%s)", alg2str(p->alg), activation2str(p->activation),
+            direction2str(p->direction));
+    DPRINT("l%d", p->n_layer);
+    DPRINT("t%d", p->n_iter);
+    DPRINT("m%d", p->mb);
+    DPRINT("sic%d", p->sic);
+    DPRINT("slc%d", p->slc);
+    DPRINT("dic%d", p->dic);
+    DPRINT("dlc%d", p->dlc);
+    DPRINT("n\"%s\"", p->name);
 }
 
 void init_buffer(float *buf, int size, float value) {
     for (int i = 0; i < size; i++)
         buf[i] = value;
-}
-
-void gemm(const char *transa, const char *transb, int m, int n, int k,
-        //    float a[m][k], float b[k][n], float c[m][n],
-        const float *a, int lda, const float *b, int ldb, float *c, int ldc,
-        float beta) {
-
-    const bool tr_a = transa && (*transa == 'T' || *transa == 't');
-    const bool tr_b = transb && (*transb == 'T' || *transb == 't');
-
-    array_offset_calculator<const float> pa(a, tr_a ? k : m, lda);
-    array_offset_calculator<const float> pb(b, tr_b ? n : k, ldb);
-    array_offset_calculator<float> pc(c, m, ldc);
-
-    print(30, "gemm(m:%d, n:%d, k:%d, lda:%d, ldb:%d, ldc:%d beta:%f)\n", m, n,
-            k, lda, ldb, ldc, beta);
-#pragma omp parallel for collapse(2)
-    for (int im = 0; im < m; im++) {
-        for (int in = 0; in < n; in++) {
-            // if beta == 0 the initialize pc by 0. Multiplication of
-            // uninitialized value even by zero can lead to nan
-            float c_elem = (beta == 0.) ? 0. : pc(im, in) * beta;
-            for (int ik = 0; ik < k; ik++) {
-                const float a_elem = tr_a ? pa(ik, im) : pa(im, ik);
-                const float b_elem = tr_b ? pb(in, ik) : pb(ik, in);
-                c_elem += a_elem * b_elem;
-            }
-            pc(im, in) = c_elem;
-        }
-    }
 }
 
 float logistic(float x) {
@@ -292,20 +266,53 @@ int compare_dat(const rnn_prb_t *p, rnn_data_kind_t kind, dnn_mem_t &mem_dt,
             }
         }
 
-#if 0
+#if 1
         /* for debug purposes only: dump the output */
-        if (final_compare && verbose >= 50 && i < 30) {
-            int mb_or_g = 0, g_or_oc = 0, c = 0, h = 0, w = 0;
-            switch (kind) {
-            case SRC: inv_src_off_f(p, i, mb_or_g, g_or_oc, c, h, w); break;
-            case WEI: inv_wei_off_f(p, i, mb_or_g, g_or_oc, c, h, w); break;
-            case BIA: inv_bia_off_f(p, i, mb_or_g, g_or_oc); break;
-            case DST: inv_dst_off_f(p, i, mb_or_g, g_or_oc, c, h, w); break;
-            }
+        if (final_compare && verbose >= 50) {
+            int n = 0, t = 0, c = 0, s = 0, l = 0, d = 0, w = 0, ic = 0, oc = 0,
+                b = 0;
 
-            print(0, "[%4lu][%s][%d,%d,%d,%d,%d] fp:%8g fp0:%8g dt:%8g\n",
-                    (unsigned long)i, skind, mb_or_g, g_or_oc, c, h, w, fp, fp0,
-                    dt);
+            switch (kind) {
+            case input:
+                inv_ntc_off_f(p, i, n, t, c);
+                print(0, "[%4lu][%s][%d,%d,%d] fp:%8g fp0:%8g dt:%8g\n",
+                        (unsigned long)i, skind, n, t, c, fp, fp0, dt);
+                break;
+            case states:
+                inv_ldsnc_off_f(p, i, l, d, s, n, c);
+                print(0, "[%4lu][%s][%d,%d,%d,%d,%d] fp:%8g fp0:%8g dt:%8g\n",
+                        (unsigned long)i, skind, l, d, s, n, c, fp, fp0, dt);
+                break;
+            case weights_input:
+                inv_ldigo_off_f(p, i, l, d, w, ic, oc);
+                print(0, "[%4lu][%s][%d,%d,%d,%d,%d] fp:%8g fp0:%8g dt:%8g\n",
+                        (unsigned long)i, skind, l, d, w, ic, oc, fp, fp0, dt);
+                break;
+            case weights_states:
+                inv_ldigo_off_f(p, i, l, d, w, ic, oc);
+                break;
+                print(0, "[%4lu][%s][%d,%d,%d,%d,%d] fp:%8g fp0:%8g dt:%8g\n",
+                        (unsigned long)i, skind, l, d, w, ic, oc, fp, fp0, dt);
+            case bias:
+                inv_ldgo_off_f(p, i, l, d, b, c);
+                break;
+                print(0, "[%4lu][%s][%d,%d,%d,%d] fp:%8g fp0:%8g dt:%8g\n",
+                        (unsigned long)i, skind, l, d, b, c, fp, fp0, dt);
+            case dst_last_layer:
+                inv_tnc_off_f(p, i, s, t, n, c);
+                print(0, "[%4lu][%s][%d,%d,%d] fp:%8g fp0:%8g dt:%8g\n",
+                        (unsigned long)i, skind, n, t, c, fp, fp0, dt);
+                break;
+            case dst_last_iteration:
+                inv_ldsnc_off_f(p, i, l, d, s, n, c);
+                print(0, "[%4lu][%s][%d,%d,%d,%d,%d] fp:%8g fp0:%8g dt:%8g\n",
+                        (unsigned long)i, skind, l, d, s, n, c, fp, fp0, dt);
+                break;
+            default:
+                print(0, "[%4lu][unknown] fp:%8g fp0:%8g dt:%8g\n",
+                        (unsigned long)i, fp, fp0, dt);
+                break;
+            }
         }
 #endif
 

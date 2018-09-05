@@ -28,14 +28,8 @@ add_definitions(-DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS)
 # C++ standard (see C99 standard 7.18.2 and 7.18.4)
 add_definitions(-D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS)
 
-option(MKLDNN_VERBOSE
-    "allows Intel(R) MKL-DNN be verbose whenever MKLDNN_VERBOSE
-    environment variable set to 1" ON) # enabled by default
-if(NOT MKLDNN_VERBOSE)
-    add_definitions(-DDISABLE_VERBOSE)
-endif()
-
 set(CMAKE_CCXX_FLAGS)
+set(CMAKE_CCXX_NOWARN_FLAGS)
 set(DEF_ARCH_OPT_FLAGS)
 
 function(error_if_SX)
@@ -49,23 +43,36 @@ message(STATUS " NECSX : ${NECSX}")
 message(STATUS " APPLE : ${APPLE}")
 message(STATUS " UNIX  : ${UNIX}")
 message(STATUS " begin platform.cmake with CMAKE_CXX_FLAGS =${CMAKE_CXX_FLAGS}")
-if(WIN32)
-    message(STATUS "cmake/platform.cmake WIN32 branch")
+if(MSVC)
+    message(STATUS "cmake/platform.cmake MSVC branch")
     set(USERCONFIG_PLATFORM "x64")
-    set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} /MP")
-    if(MSVC)
-        set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} /wd4800") # int -> bool
-        set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} /wd4068") # unknown pragma
-        set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} /wd4305") # double -> float
-        set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} /wd4551") # UNUSED(func)
+    if(${CMAKE_CXX_COMPILER_ID} STREQUAL MSVC)
+        set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} /MP")
+        # int -> bool
+        set(CMAKE_CCXX_NOWARN_FLAGS "${CMAKE_CCXX_NOWARN_FLAGS} /wd4800")
+        # unknown pragma
+        set(CMAKE_CCXX_NOWARN_FLAGS "${CMAKE_CCXX_NOWARN_FLAGS} /wd4068")
+        # double -> float
+        set(CMAKE_CCXX_NOWARN_FLAGS "${CMAKE_CCXX_NOWARN_FLAGS} /wd4305")
+        # UNUSED(func)
+        set(CMAKE_CCXX_NOWARN_FLAGS "${CMAKE_CCXX_NOWARN_FLAGS} /wd4551")
     endif()
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+        set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} /MP")
         set(DEF_ARCH_OPT_FLAGS "-QxHOST")
         # disable: loop was not vectorized with "simd"
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Qdiag-disable:15552")
+        set(CMAKE_CCXX_NOWARN_FLAGS
+            "${CMAKE_CCXX_NOWARN_FLAGS} -Qdiag-disable:15552")
     endif()
-    set(CTESTCONFIG_PATH "$ENV{PATH}")
-    string(REPLACE ";" "\;" CTESTCONFIG_PATH "${CTESTCONFIG_PATH}")
+    #set(CTESTCONFIG_PATH "$ENV{PATH}")
+    #string(REPLACE ";" "\;" CTESTCONFIG_PATH "${CTESTCONFIG_PATH}")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        # Clang cannot vectorize some loops with #pragma omp simd and gets
+        # very upset. Tell it that it's okay and that we love it
+        # unconditionnaly.
+        set(CMAKE_CCXX_NOWARN_FLAGS
+            "${CMAKE_CCXX_NOWARN_FLAGS} -Wno-pass-failed")
+    endif()
 elseif(NECSX)
     message(STATUS "cmake/platform.cmake NECSX branch")
     #show_cmake_stuff("NECSX, after project(... C CXX)")
@@ -92,7 +99,9 @@ elseif(NECSX)
     #  include("cmake/MKL.cmake")
     #  set(CMAKE_C_FLAGS_DEBUG "-g -O0")
     #  set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
-elseif(UNIX OR APPLE)
+elseif(UNIX OR APPLE OR MINGW)
+    set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Wall -Werror -Wno-unknown-pragmas")
+    set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -fvisibility=internal")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
     #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Wall")
     #set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Wall -Werror")
@@ -121,18 +130,19 @@ elseif(UNIX OR APPLE)
         # Clang cannot vectorize some loops with #pragma omp simd and gets
         # very upset. Tell it that it's okay and that we love it
         # unconditionnaly.
-        set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Wno-pass-failed")
+        set(CMAKE_CCXX_NOWARN_FLAGS
+            "${CMAKE_CCXX_NOWARN_FLAGS} -Wno-pass-failed")
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         if(NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0)
             set(DEF_ARCH_OPT_FLAGS "-march=native -mtune=native")
         endif()
         if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 6.0)
             # suppress warning on assumptions made regarding overflow (#146)
-            set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Wno-strict-overflow")
+            set(CMAKE_CCXX_NOWARN_FLAGS
+                "${CMAKE_CCXX_NOWARN_FLAGS} -Wno-strict-overflow")
 	    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -ffast-math")
 	    # maybe also -ffinite-math or -funsafe-math-optimizations ?
 	else()
-            set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Wno-strict-overflow")
 	    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -ffast-math -fbuiltin")
         endif()
     elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
@@ -140,16 +150,20 @@ elseif(UNIX OR APPLE)
         # workaround for Intel Compiler 16.0 that produces error caused
         # by pragma omp simd collapse(..)
         if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "17.0")
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -diag-disable:13379")
+            set(CMAKE_CCXX_NOWARN_FLAGS
+                "${CMAKE_CCXX_NOWARN_FLAGS} -diag-disable:13379")
         endif()
-        if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "16.0")
-	    message(FATAL_ERROR "icc version <= 15 does not seem to work. icc >= 18 is recommended")
-        endif()
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -diag-disable:15552")
+        set(CMAKE_CCXX_NOWARN_FLAGS
+            "${CMAKE_CCXX_NOWARN_FLAGS} -diag-disable:15552")
     endif()
 endif()
 
-if(UNIX OR APPLE)
+if(WIN32)
+    set(CTESTCONFIG_PATH "$ENV{PATH}")
+    string(REPLACE ";" "\;" CTESTCONFIG_PATH "${CTESTCONFIG_PATH}")
+endif()
+
+if(UNIX OR APPLE OR MINGW)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
         # Link Intel libraries statically (except for iomp5)
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -liomp5 -static-intel")
@@ -158,7 +172,7 @@ if(UNIX OR APPLE)
     endif()
 endif()
 
-if(NOT DEFINED ARCH_OPT_FLAGS)
+if(ARCH_OPT_FLAGS STREQUAL "HostOpts")
     set(ARCH_OPT_FLAGS "${DEF_ARCH_OPT_FLAGS}")
 endif()
 

@@ -43,10 +43,17 @@ namespace cpu {
     virtual status_t create_primitive(primitive_t **primitive, \
             const primitive_at_t *inputs, \
             const primitive_t **outputs) const override { \
+        double ms = get_msec(); \
         primitive_t::input_vector ins(inputs, inputs + n_); \
         primitive_t::output_vector outs(outputs, outputs + 1); \
-        return safe_ptr_assign<primitive_t>(*primitive, \
+        auto ret = safe_ptr_assign<primitive_t>(*primitive, \
                 new (__VA_ARGS__)(this, ins, outs)); \
+        ms = get_msec() - ms; \
+        if (mkldnn_verbose()->level >= 2) { \
+            printf("mkldnn_verbose,create,%s,%g\n", this->info(), ms); \
+            fflush(0); \
+        } \
+        return ret; \
     } \
     virtual pd_t *clone() const override { return nullptr; } \
     virtual const char *name() const override { return impl_name; }
@@ -90,6 +97,12 @@ protected:
             && attr()->has_default_values();
         if (!ok) return unimplemented;
 
+        for (int i = 0; i < n_; ++i) {
+            const memory_desc_wrapper i_d(&src_pds_[i]);
+            if (i_d.is_wino_desc())
+                return unimplemented;
+        }
+
         const int ndims = dst_pd_.desc()->ndims;
         int current_concat_dim_offset = 0;
         for (int i = 0; i < n_; ++i) {
@@ -99,8 +112,9 @@ protected:
             dims[concat_dim_] = dim;
             offsets[concat_dim_] = current_concat_dim_offset;
 
-            cpu_view_t::pd_t v_pd(src_pds_[i].engine(), &dst_pd_, dims,
-                    offsets);
+            cpu_view_t::pd_t v_pd(src_pds_[i].engine());
+            status_t status = v_pd.init(&dst_pd_, dims, offsets);
+            if (status != success) return status;
             src_image_pds_.push_back(*v_pd.dst_pd());
             current_concat_dim_offset += dim;
         }
@@ -109,16 +123,49 @@ protected:
     }
 
     virtual status_t set_default_params() {
-        if (dst_pd_.desc()->format == memory_format::any) {
-            /* the stupidest ever heuristics */
-            memory_format_t out_fmt = dst_pd_.desc()->format;
-            for (int i = 0; i < n_; ++i) {
-                out_fmt = nstl::max(out_fmt, src_pds_[i].desc()->format);
-            }
-            CHECK(dst_pd_.set_format(out_fmt));
+        if (dst_pd_.desc()->format != memory_format::any)
+            return status::success;
+
+        const int ndims = dst_pd_.desc()->ndims;
+        const auto fallback_dst_fmt = types::flat_memory_format(ndims);
+
+        /* the stupidest ever heuristics */
+        memory_format_t desired_dst_fmt = dst_pd_.desc()->format;
+        for (int i = 0; i < n_; ++i)
+            desired_dst_fmt = nstl::max(desired_dst_fmt,
+                    src_pds_[i].desc()->format);
+
+        /* try to create dst with the desired format */
+        status_t status = dst_pd_.set_format(desired_dst_fmt);
+        if (status != status::success) {
+            /* if fail use fallback flat layout */
+            return dst_pd_.set_format(fallback_dst_fmt);
         }
 
-        return success;
+        /* check if we can create view for the dst with the desired format */
+        bool desired_format_ok = true;
+        int current_concat_dim_offset = 0;
+        for (int i = 0; i < n_; ++i) {
+            const int dim = src_pds_[i].desc()->dims[concat_dim_];
+            dims_t dims, offsets = {};
+            utils::array_copy(dims, dst_pd_.desc()->dims, ndims);
+            dims[concat_dim_] = dim;
+            offsets[concat_dim_] = current_concat_dim_offset;
+
+            cpu_view_t::pd_t v_pd(src_pds_[i].engine());
+            if (v_pd.init(&dst_pd_, dims, offsets) != success) {
+                desired_format_ok = false;
+                break;
+            }
+            current_concat_dim_offset += dim;
+        }
+
+        if (!desired_format_ok) {
+            /* if fail use fallback flat layout */
+            return dst_pd_.set_format(fallback_dst_fmt);
+        }
+
+        return status::success;
     }
 };
 

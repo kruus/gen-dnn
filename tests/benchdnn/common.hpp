@@ -41,7 +41,7 @@
 #define CONCAt2(a,b) a ## b
 #define CONCAT2(a,b) CONCAt2(a,b)
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__GNUC__)
 #define strncasecmp _strnicmp
 #define strcasecmp _stricmp
 #define __PRETTY_FUNCTION__ __FUNCSIG__
@@ -51,13 +51,18 @@
 #define USE_RDPMC 0
 #define USE_RDTSC 0
 
+// next stuff moved up into mkldnn_os.h
+//#if defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+//#define collapse(x)
+//#endif
+
 #define OK 0
 #define FAIL 1
 
 enum { CRIT = 1, WARN = 2 };
 
 #define SAFE(f, s) do { \
-    int status = f; \
+    int status = (f); \
     if (status != OK) { \
         if (s == CRIT || s == WARN) { \
             fprintf(stderr, "@@@ error [%s:%d]: '%s' -> %d\n", \
@@ -70,7 +75,7 @@ enum { CRIT = 1, WARN = 2 };
 } while(0)
 
 #define SAFE_V(f) do { \
-    int status = f; \
+    int status = (f); \
     if (status != OK) { \
         fprintf(stderr, "@@@ error [%s:%d]: '%s' -> %d\n", \
                 __PRETTY_FUNCTION__, __LINE__, STRINGIFY(f), status); \
@@ -192,7 +197,33 @@ const char *bool2str(bool value);
 bool match_regex(const char *str, const char *pattern);
 bool maybe_skip(const char *skip_impl, const char *impl_str);
 
+template <typename B, typename F>
+void read_csv(const char *csv, B b, F f, const char *delim = ",") {
+    char csv_copy[128];
+    strncpy(csv_copy, csv, sizeof(csv_copy) - 1);
+    csv_copy[sizeof(csv_copy) - 1] = '\0';
+
+    b();
+    const char *s = strtok(csv_copy, delim);
+    for (; s && *s; s = strtok(NULL, delim)) f(s);
+}
+
 typedef int (*bench_f)(int argc, char **argv, bool main_bench);
 int batch(const char *fname, bench_f bench);
 
+/* returns 1 with given probability */
+int flip_coin(ptrdiff_t seed, float probability);
+
+int div_up(const int a, const int b);
+
+/* set '0' across *arr:+size */
+void array_set(char *arr, size_t size);
+
+/* wrapper to mkldnn_sgemm
+ * layout = 'F' - column major
+ * layout = 'C' - row major*/
+void gemm(const char *layout, const char *transa, const char *transb,
+        int m, int n, int k, const float alpha, const float *a, const int lda,
+        const float *b, const int ldb, const float beta, float *c,
+        const int ldc );
 #endif

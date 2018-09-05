@@ -20,7 +20,7 @@
 #include <assert.h>
 
 #include "mkldnn.h"
-#include "cpu_isa.hpp"
+#include "cpu_isa_traits.hpp" // set JITFUNCS preprocessor symbol
 
 #include "c_types_map.hpp"
 #include "../common/engine.hpp"

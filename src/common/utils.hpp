@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include "c_types_map.hpp"
 #include "mkldnn_os.h"
 
 namespace mkldnn {
@@ -38,6 +39,13 @@ namespace impl {
 
 #ifdef _WIN32
 #define __PRETTY_FUNCTION__ __FUNCSIG__
+#endif
+
+#ifdef __APPLE__
+// older XCode doesn't support thread_local
+#define THREAD_LOCAL __thread
+#else
+#define THREAD_LOCAL thread_local
 #endif
 
 namespace utils {
@@ -145,9 +153,9 @@ inline T array_product(const T *arr) {
     return product_impl::product_impl(arr, product_impl::int2type<num-1>());
 }
 
-template<typename T>
-inline T array_product(const T *arr, size_t size) {
-    T prod = 1;
+template<typename T, typename R = T>
+inline R array_product(const T *arr, size_t size) {
+    R prod = 1;
     for (size_t i = 0; i < size; ++i) prod *= arr[i];
     return prod;
 }
@@ -303,6 +311,9 @@ inline void yield_thread() { }
 int mkldnn_getenv(char *value, const char *name, int len);
 bool mkldnn_jit_dump();
 FILE *mkldnn_fopen(const char *filename, const char *mode);
+
+void set_rnd_mode(round_mode_t rnd_mode);
+void restore_rnd_mode();
 
 }
 }

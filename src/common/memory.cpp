@@ -44,8 +44,53 @@ void mkldnn_breakpoint_empty_memory() { // breakpt for gdb
 }
 #endif
 
+namespace {
+bool memory_desc_sanity_check(int ndims,const dims_t dims,
+        data_type_t data_type, memory_format_t format) {
+    if (ndims == 0) return true;
+
+    bool ok = true
+        && dims != nullptr
+        && 0 < ndims && ndims <= TENSOR_MAX_DIMS
+        && one_of(data_type, f32, s32, s16, s8, u8)
+        && format != memory_format::undef;
+#ifndef NDEBUG
+    if (!ok){
+        if (dims == nullptr) {printf(" dims==nullptr"); fflush(stdout);}
+        if (0 < ndims && ndims <= TENSOR_MAX_DIMS) {printf(" ndims not in [0,TENSOR_MAX_DIMS]"); fflush(stdout);}
+        if (!one_of(data_type, f32, s32, s16, s8, u8)){ printf(" bad data_type"); fflush(stdout);}
+        if (format != memory_format::undef) {printf(" format!=undef"); fflush(stdout);}
+    }
+#endif
+    if (ok) {
+        for (int d = 0; d < ndims; ++d)
+            if (dims[d] < 0) {
+                ok=false;
+#ifndef NDEBUG
+                if (!ok){ printf(" dims[%d] < 0"); fflush(stdout); }
+#endif
+                break;
+            }
+    }
+
+#ifndef NDEBUG
+    if (!ok){ printf(" ** memory_desc_sanity_check_failed **\n"); fflush(stdout); }
+#endif
+    return ok;
+}
+
+bool memory_desc_sanity_check(const memory_desc_t *md) {
+    if (md == nullptr) return false;
+    return memory_desc_sanity_check(md->ndims, md->dims, md->data_type,
+            md->format);
+}
+}
+
 status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
         const dims_t dims, data_type_t data_type, memory_format_t format) {
+#ifndef NDEBUG
+    if (any_null(memory_desc)){ printf(" Oops: any_null(memory_desc)!\n"); fflush(stdout);}
+#endif
     if (any_null(memory_desc)) return invalid_arguments;
     if (ndims == 0 || format == memory_format::undef) {
         *memory_desc = types::zero_md();
@@ -54,15 +99,8 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
 
     /* memory_desc != 0 */
     bool args_ok = !any_null(memory_desc)
-        && 0 < ndims && ndims <= TENSOR_MAX_DIMS
-        && one_of(data_type, f32, s32, s16, s8, u8);
-#ifndef NDEBUG
-    if (!args_ok){ printf("Oops [%s:%d] !args_ok\n", __FILE__, __LINE__); fflush(stdout);}
-    if (any_null(memory_desc)){ printf(" any_null(memory_desc)"); fflush(stdout);}
-    if (! one_of(data_type, f32, s32, s16, s8, u8)){ printf(" bad data_type"); fflush(stdout);}
-    if (! (0 < ndims && ndims <= TENSOR_MAX_DIMS)){
-        printf(" bad ndims=%lu",(long unsigned)ndims); fflush(stdout);
-    }
+        && memory_desc_sanity_check(ndims, dims, data_type, format);
+#ifndef NDEBUG // some additional checks on total size
     if(args_ok){
         /* for now, mkl-dnn is written NOT to support large tensors (>2G) */
         uint64_t elements=1U;
@@ -100,85 +138,28 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     md.format = format;
 
     status_t status = success;
-    switch (format) {
-    case any:
-        break;
-    /* semidefined blocked format */
-    case x:
-    case nc:
-    case nchw:
-    case nhwc:
-    case chwn:
-#if MKLDNN_JIT_TYPES > 0
-    case nChw8c:
-    case nChw16c:
-#endif
-    case oi:
-    case io:
-    case oihw:
-    case ihwo:
-    case hwio:
-#if MKLDNN_JIT_TYPES > 0
-    case OIhw8i8o:
-    case OIhw16i16o:
-    case OIhw4i16o4i:
-    case OIhw8i16o2i:
-    case OIhw8o16i2o:
-    case OIhw8o8i:
-    case OIhw16o16i:
-    case IOhw16o16i:
-    case Oihw8o:
-    case Oihw16o:
-    case Ohwi8o:
-    case Ohwi16o:
-    case OhIw16o4i:
-#endif
-    case goihw:
-    case hwigo:
-#if MKLDNN_JIT_TYPES > 0
-    case gOIhw8i8o:
-    case gOIhw16i16o:
-    case gOIhw4i16o4i:
-    case gOIhw8i16o2i:
-    case gOIhw8o16i2o:
-    case gOIhw8o8i:
-    case gOIhw16o16i:
-    case gIOhw16o16i:
-    case gOihw8o:
-    case gOihw16o:
-    case gOhwi8o:
-    case gOhwi16o:
-    case Goihw8g:
-    case Goihw16g:
-    case gOhIw16o4i:
-#endif
-    case ncdhw:
-    case goidhw:
-    case oidhw:
-    case ntc:
-    case tnc:
-    case ldsnc:
-    case ldigo:
-    case ldgoi:
-    case ldgo:
+    if (one_of(format, memory_format::undef, blocked, ldigo_p, ldgoi_p,
+                wino_fmt)) {
+        status = invalid_arguments;
+    } else if (format == any) {
+        // nop
+    } else if (types::format_normalize(format) == blocked) {
         status = memory_desc_wrapper::compute_blocking(md);
-        break;
-    /* not enough information */
-    case memory_format::undef:
-    case blocked:
-    default:
-        printf(" ??? memory_desc_init not enough information\n");
-        return invalid_arguments;
+    } else {
+        assert(!"unreachable");
+        status = invalid_arguments;
     }
 
     if (status == success)
         *memory_desc = md;
+
     return status;
 }
 
 status_t mkldnn_memory_primitive_desc_create(primitive_desc_t **memory_pd,
         const memory_desc_t *memory_desc, engine_t *engine) {
     bool args_ok = !any_null(memory_pd, memory_desc, engine)
+        && memory_desc_sanity_check(memory_desc)
         && memory_desc_wrapper(*memory_desc).is_defined();
     if (!args_ok) return invalid_arguments;
     return engine->memory_primitive_desc_create(
@@ -188,14 +169,18 @@ status_t mkldnn_memory_primitive_desc_create(primitive_desc_t **memory_pd,
 status_t mkldnn_view_primitive_desc_create(primitive_desc_t **view_pd,
         const primitive_desc_t *memory_pd, const dims_t dims,
         const dims_t offsets) {
-    bool args_ok = !any_null(view_pd, memory_pd, dims, offsets)
-        && memory_pd->kind() == primitive_kind::memory;
-    if (!args_ok) return invalid_arguments;
     const memory_pd_t *mpd =
         (const memory_pd_t*)memory_pd;
+
+    bool args_ok = !any_null(view_pd, memory_pd, dims, offsets)
+        && memory_pd->kind() == primitive_kind::memory
+        && memory_desc_sanity_check(mpd->desc());
+    if (!args_ok) return invalid_arguments;
+
     memory_desc_wrapper md(*mpd->desc());
     for (int d = 0; d < md.ndims(); ++d) {
-        if (offsets[d] < 0 || (offsets[d] + dims[d] > md.dims()[d]))
+        if (dims[d] < 0 || offsets[d] < 0
+                || (offsets[d] + dims[d] > md.dims()[d]))
             return invalid_arguments;
     }
     return memory_pd->engine()->view_primitive_desc_create(
@@ -292,7 +277,6 @@ status_t mkldnn_concat_primitive_desc_create_v2(primitive_desc_t **concat_pd,
         output_d = &dummy_output_d;
     }
 
-
     auto c_pd = reinterpret_cast<concat_pd_t **>(concat_pd);
 
     for (auto c = engine->get_concat_implementation_list(); *c; ++c) {
@@ -319,9 +303,6 @@ status_t mkldnn_sum_primitive_desc_create_v2(primitive_desc_t **sum_pd,
     for (int i = 0; i < n; ++i) {
         if (input_pds[i] == nullptr ||
                 input_pds[i]->kind() != primitive_kind::memory)
-            return invalid_arguments;
-        auto input_mpd_i = reinterpret_cast<const memory_pd_t *>(input_pds[i]);
-        if (memory_desc_wrapper(input_mpd_i).nelems() == 0)
             return invalid_arguments;
     }
 

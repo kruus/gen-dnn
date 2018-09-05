@@ -16,10 +16,24 @@
 
 #include "mkldnn_test_common.hpp"
 #include "gtest/gtest.h"
+#include "cpu_isa_traits.hpp"
 
 #include "mkldnn.hpp"
 
+#define FMT_DEBUG 0
+#if FMT_DEBUG
+#include "mkldnn_debug.h"
+#include "mkldnn_io.hpp"
+#include <iostream>
+using std::cout;
+using std::endl;
+#define SHOW(msg,what) std::cout<<msg<<what<<std::endl;
+#else
+#define SHOW(msg,what)
+#endif
+
 namespace mkldnn {
+
 using fmt = memory::format;
 
 #define EXP_VALS_NUM 3
@@ -50,6 +64,12 @@ protected:
     }
     virtual void SetUp()
     {
+        // Skip this test if the library cannot select blocked format a priori.
+        // Currently blocking is supported only for sse42 and later CPUs.
+        bool implementation_supports_blocking
+            = impl::cpu::mayiuse(impl::cpu::sse42);
+        if (!implementation_supports_blocking) return;
+
         conv_any_fmt_test_params p = ::testing::
                 TestWithParam<conv_any_fmt_test_params>::GetParam();
 
@@ -101,18 +121,25 @@ protected:
                         { cd.padh, cd.padw }, padding_kind::zero);
 
         auto conv_prim_desc = convolution_forward::primitive_desc(conv_desc, eng);
-
+        SHOW(" src   : fmt -->",conv_prim_desc.src_primitive_desc().desc().data.format);
+        SHOW("         desc-->",conv_prim_desc.src_primitive_desc().desc().data);
         ASSERT_TRUE(
                 FmtIsExp(conv_prim_desc.src_primitive_desc().desc().data.format,
                         p.src_fmt.exp));
+        SHOW("weights: fmt -->",conv_prim_desc.weights_primitive_desc().desc().data.format);
+        SHOW("         desc-->",conv_prim_desc.weights_primitive_desc().desc().data);
         ASSERT_TRUE(FmtIsExp(
                 conv_prim_desc.weights_primitive_desc().desc().data.format,
                 p.weights_fmt.exp));
         if (with_bias) {
+            SHOW("  bias : fmt -->",conv_prim_desc.bias_primitive_desc().desc().data.format);
+            SHOW("         desc-->",conv_prim_desc.bias_primitive_desc().desc().data);
             ASSERT_TRUE(FmtIsExp(
                     conv_prim_desc.bias_primitive_desc().desc().data.format,
                     p.bias_fmt.exp));
         }
+        SHOW("  dst  : fmt -->",conv_prim_desc.dst_primitive_desc().desc().data.format);
+        SHOW("         desc-->",conv_prim_desc.dst_primitive_desc().desc().data);
         ASSERT_TRUE(
                 FmtIsExp(conv_prim_desc.dst_primitive_desc().desc().data.format,
                         p.dst_fmt.exp));
@@ -133,8 +160,14 @@ TEST_P(conv_any_fmt_test_float, TestsConvolutionAnyFmt)
               { fmt::x, fmt::format_undef, fmt::format_undef } }
 #define ANY_NCHW { fmt::any, \
               { fmt::nchw, fmt::format_undef, fmt::format_undef } }
-#define ANY_OIHW { fmt::any, \
-                 { fmt::oihw, fmt::format_undef, fmt::format_undef } }
+//#define ANY_OIHW { fmt::any, { fmt::oihw, fmt::format_undef, fmt::format_undef } }
+#define ANY_OIHWxO { fmt::any, { fmt::Ohwi8o, fmt::format_undef, fmt::format_undef } }
+#define ANY_OIHWxI { fmt::any, { fmt::oIhw8i, fmt::format_undef, fmt::format_undef } }
+INSTANTIATE_TEST_CASE_P(TestConvolutionAnyFmtForward, conv_any_fmt_test_float,
+    ::testing::Values(conv_any_fmt_test_params_float{ PROP_KIND, ENGINE, ALG,
+    ANY_NCHW, ANY_OIHWxO, ANY_X, ANY_OIHWxI,
+    /* src     weights  bias    dst    */
+    { 2, 1, 4, 4, 4, 6, 4, 4, 3, 3, 1, 1, 1, 1 }/* conv sizes */ }));
 
 #if !defined(TARGET_VANILLA)
 // Typically jit-related to Intel SIMD register lengths
@@ -148,12 +181,6 @@ TEST_P(conv_any_fmt_test_float, TestsConvolutionAnyFmt)
 #define ANY_GOIHWxIxO { fmt::any,\
                       { fmt::gOIhw8i8o, fmt::gOIhw16i16o, fmt::format_undef } }
 #endif
-
-INSTANTIATE_TEST_CASE_P(TestConvolutionAnyFmtForward, conv_any_fmt_test_float,
-    ::testing::Values(conv_any_fmt_test_params_float{ PROP_KIND, ENGINE, ALG,
-    ANY_NCHW, ANY_OIHW, ANY_X, ANY_NCHW,
-    /* src     weights  bias    dst    */
-    { 2, 1, 4, 4, 4, 6, 4, 4, 3, 3, 1, 1, 1, 1 }/* conv sizes */ }));
 
 #if !defined(TARGET_VANILLA)
 /* For now, these formats all require JIT (cpu/) code */

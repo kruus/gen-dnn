@@ -37,19 +37,22 @@ void compute_ref_conv_relu_fwd(const test_convolution_sizes_t &c,
     const memory::desc weights_d = weights.get_primitive_desc().desc();
     const memory::desc dst_d = dst.get_primitive_desc().desc();
 
+    size_t padded_ic = src_d.data.layout_desc.blocking.padding_dims[1];
+    size_t padded_oc = dst_d.data.layout_desc.blocking.padding_dims[1];
+
     OMP(parallel for collapse(5) schedule(static))//;
     for (int n = 0; n < c.mb; n++) {
         for (int g = 0; g < c.ng; g++) {
             for (int oc = 0; oc < c.oc / c.ng; oc++) {
                 for (int oh = 0; oh < c.oh; oh++) {
                     for (int ow = 0; ow < c.ow; ow++) {
-                        int oidx = n * c.oc * c.oh * c.ow
-                                + g * c.oc / c.ng * c.oh * c.ow
+                        size_t oidx = n * padded_oc * c.oh * c.ow
+                                + g * padded_oc / c.ng * c.oh * c.ow
                                 + oc * c.oh * c.ow + oh * c.ow + ow;
                         dst_data[map_index(dst_d, oidx)] = bias_data ?
                                 bias_data[map_index(
                                         bias.get_primitive_desc().desc(),
-                                        g * c.oc / c.ng + oc)] :
+                                        g * padded_oc / c.ng + oc)] :
                                 data_t_dst{0};
                         for (int ic = 0; ic < c.ic / c.ng; ic++) {
                             for (int kh = 0; kh < c.kh; kh++) {
@@ -60,13 +63,13 @@ void compute_ref_conv_relu_fwd(const test_convolution_sizes_t &c,
                                           - c.padh + kh * (1 + c.dilh);
                                     if (iw < 0 || iw >= c.iw) continue;
                                     if (ih < 0 || ih >= c.ih) continue;
-                                    int iidx = n * c.ic * c.ih * c.iw
-                                            + g * c.ic / c.ng * c.ih * c.iw
+                                    size_t iidx = n * padded_ic * c.ih * c.iw
+                                            + g * padded_ic / c.ng * c.ih * c.iw
                                             + ic * c.ih * c.iw + ih * c.iw + iw;
-                                    int widx = g * c.oc / c.ng * c.ic
+                                    size_t widx = g * padded_oc / c.ng * padded_ic
                                                     / c.ng * c.kh * c.kw
-                                            + oc * c.ic / c.ng * c.kh * c.kw
-                                            + ic * c.kh * c.kw + kh * c.kw + kw;
+                                        + oc * padded_ic / c.ng * c.kh * c.kw
+                                        + ic * c.kh * c.kw + kh * c.kw + kw;
 
                                     dst_data[map_index(dst_d, oidx)]
                                             += src_data[map_index(src_d, iidx)]
@@ -94,12 +97,14 @@ template <typename data_t_src, typename data_t_wei,
 class convolution_relu_test
     : public ::testing::TestWithParam<test_convolution_params_t> {
 protected:
-    virtual void SetUp()
-    {
-        test_convolution_params_t p
-                = ::testing::TestWithParam<
-                test_convolution_params_t>::GetParam();
+    virtual void SetUp() {
+        auto p = ::testing::TestWithParam<test_convolution_params_t>::GetParam();
+        catch_expected_failures([=](){Test();}, p.expect_to_fail,
+                    p.expected_status);
+    }
 
+    void Test() {
+        auto p = ::testing::TestWithParam<test_convolution_params_t>::GetParam();
         ASSERT_TRUE(p.engine_kind == engine::kind::cpu);
         ASSERT_EQ(p.aalgorithm, convolution_direct);
         auto eng = engine(p.engine_kind, 0);
@@ -143,6 +148,9 @@ protected:
         fill_data<data_t_wei>(
                 c_weights.get_primitive_desc().get_size()
                 / sizeof(data_t_wei),(data_t_wei *)c_weights.get_data_handle());
+        fill_data<data_t_dst>(
+                c_dst.get_primitive_desc().get_size()
+                / sizeof(data_t_dst),(data_t_dst *)c_dst.get_data_handle());
 
         bool with_bias = p.formats.bias_format != memory::format::format_undef;
         auto c_bias_desc = with_bias ?
@@ -154,52 +162,46 @@ protected:
                     c_bias.get_primitive_desc().get_size() / sizeof(data_t_dst),
                     (data_t_dst *)c_bias.get_data_handle(), 1., true);
         }
+        check_zero_tail<data_t_src>(1, c_src);
+        check_zero_tail<data_t_wei>(1, c_weights);
+        check_zero_tail<data_t_dst>(1, c_dst);
 
-        std::vector<int> padR = { cd.padh, cd.padw };
-        for (int i = 0; i < 2; ++i) {
-            if ((cd.ih - ((cd.kh - 1) * (cd.dilh + 1) + 1) + cd.padh + padR[0])
-                / cd.strh + 1 != cd.oh)
-                ++padR[0];
-            if ((cd.iw - ((cd.kw - 1) * (cd.dilw + 1) + 1) + cd.padw + padR[1])
-                / cd.strw + 1 != cd.ow)
-                ++padR[1];
-        }
-
-        auto test = [&]() {
-            auto conv_desc = with_bias
-                ? convolution_forward::desc(prop_kind::forward_scoring,
-                        p.aalgorithm, c_src_desc, c_weights_desc, c_bias_desc,
-                        c_dst_desc, { cd.strh, cd.strw }, { cd.dilh, cd.dilw },
-                        { cd.padh, cd.padw }, padR, padding_kind::zero)
-                : convolution_forward::desc(prop_kind::forward_scoring,
-                        p.aalgorithm, c_src_desc, c_weights_desc, c_dst_desc,
-                        { cd.strh, cd.strw }, { cd.dilh, cd.dilw },
-                        { cd.padh, cd.padw }, padR, padding_kind::zero);
-
-            auto conv_relu_desc =
-                convolution_relu_forward::desc(conv_desc, negative_slope);
-            auto conv_primitive_desc =
-                convolution_relu_forward::primitive_desc(conv_relu_desc, eng);
-
-            auto conv = with_bias
-                ? convolution_relu_forward(conv_primitive_desc,
-                        c_src, c_weights, c_bias, c_dst)
-                : convolution_relu_forward(conv_primitive_desc,
-                        c_src, c_weights, c_dst);
-            std::vector<primitive> pipeline;
-            pipeline.push_back(conv);
-
-            stream(stream::kind::lazy).submit(pipeline).wait();
+        std::vector<int> padR = {
+            right_padding(cd.ih, cd.oh, cd.kh, cd.padh, cd.strh, cd.dilh),
+            right_padding(cd.iw, cd.ow, cd.kw, cd.padw, cd.strw, cd.dilw)
         };
 
-        if (catch_expected_failures(test, p.expect_to_fail, p.expected_status))
-            return;
+        auto conv_desc = with_bias
+            ? convolution_forward::desc(prop_kind::forward_scoring,
+                    p.aalgorithm, c_src_desc, c_weights_desc, c_bias_desc,
+                    c_dst_desc, { cd.strh, cd.strw }, { cd.dilh, cd.dilw },
+                    { cd.padh, cd.padw }, padR, padding_kind::zero)
+        : convolution_forward::desc(prop_kind::forward_scoring,
+                p.aalgorithm, c_src_desc, c_weights_desc, c_dst_desc,
+                { cd.strh, cd.strw }, { cd.dilh, cd.dilw },
+                { cd.padh, cd.padw }, padR, padding_kind::zero);
+
+        auto conv_relu_desc =
+            convolution_relu_forward::desc(conv_desc, negative_slope);
+        auto conv_primitive_desc =
+            convolution_relu_forward::primitive_desc(conv_relu_desc, eng);
+
+        auto conv = with_bias
+            ? convolution_relu_forward(conv_primitive_desc,
+                    c_src, c_weights, c_bias, c_dst)
+            : convolution_relu_forward(conv_primitive_desc,
+                    c_src, c_weights, c_dst);
+        std::vector<primitive> pipeline;
+        pipeline.push_back(conv);
+
+        stream(stream::kind::lazy).submit(pipeline).wait();
 
         compute_ref_conv_relu_fwd<data_t_src, data_t_wei, data_t_wei,
             data_t_dst>(cd, c_src, c_weights, c_bias, dst_ref, with_bias,
                     negative_slope);
+        check_zero_tail<data_t_dst>(1, dst_ref);
         compare_data<data_t_dst>(dst_ref, c_dst);
-
+        check_zero_tail<data_t_dst>(0, c_dst);
 
     }
 };

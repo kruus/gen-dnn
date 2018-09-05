@@ -39,7 +39,7 @@ status_t bnrm_desc_init(batch_normalization_desc_t *bnrm_desc,
         && implication(prop_kind & backward, diff_data_desc != nullptr);
     if (!args_ok) return invalid_arguments;
 
-    batch_normalization_desc_t bd = {};
+    auto bd = batch_normalization_desc_t();
     bd.primitive_kind = primitive_kind::batch_normalization;
     bd.prop_kind = prop_kind;
 
@@ -72,11 +72,10 @@ status_t bnrm_desc_init(batch_normalization_desc_t *bnrm_desc,
     bd.flags = flags;
 
     bool consistency = true
-        && memory_desc_wrapper(bd.data_desc).nelems()
-        && utils::one_of(bd.data_desc.ndims, 4, 5);
+        && utils::one_of(bd.data_desc.ndims, 2, 4, 5);
     if (bd.prop_kind == backward_data)
         consistency = consistency
-            && utils::one_of(bd.diff_data_desc.ndims, 4, 5)
+            && utils::one_of(bd.diff_data_desc.ndims, 2, 4, 5)
             && array_cmp(bd.diff_data_desc.dims, bd.data_desc.dims,
                     bd.diff_data_desc.ndims);
     if (!consistency) return invalid_arguments;

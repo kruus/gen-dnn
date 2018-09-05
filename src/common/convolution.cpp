@@ -53,7 +53,7 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
 
     if (padding_r == nullptr) padding_r = padding_l;
 
-    convolution_desc_t cd = {};
+    auto cd = convolution_desc_t();
     cd.primitive_kind = primitive_kind::convolution;
     cd.prop_kind = prop_kind;
     cd.alg_kind = alg_kind;
@@ -89,17 +89,19 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
             weights_desc->data_type, dst_desc->data_type, prop_kind);
 
     const int g = with_groups ? weights_desc->dims[0] : 1;
+    const int bias_dim = prop_kind == backward_data
+        ? src_desc->dims[1]
+        : dst_desc->dims[1];
 
 #ifdef NDEBUG
     bool consistency = true
-        && memory_desc_wrapper(src_desc).nelems()
-        && memory_desc_wrapper(dst_desc).nelems()
         && memory_desc_wrapper(weights_desc).nelems()
+        && src_desc->ndims == dst_desc->ndims
         && utils::one_of(src_desc->ndims, 4, 5)
-        && utils::one_of(dst_desc->ndims, 4, 5)
-        && utils::one_of(weights_desc->ndims, 4, 5, 6)
+        && utils::one_of(weights_desc->ndims, src_desc->ndims,
+                src_desc->ndims + 1)
         && (with_bias ? bias_desc->ndims == 1 : true)
-        && (with_bias ? bias_desc->dims[0] == dst_desc->dims[1] : true)
+        && (with_bias ? bias_desc->dims[0] == bias_dim : true)
         && src_desc->dims[0] == dst_desc->dims[0]
         && src_desc->dims[1] == g * weights_desc->dims[with_groups + 1]
         && dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0];
@@ -139,10 +141,14 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
         int src = src_desc->dims[i];
         int ker = weights_desc->dims[with_groups + i];
         int dil = cd.dilates[i - 2];
-        int pad = padding_l[i - 2] + padding_r[i - 2];
+        int pad_l = padding_l[i - 2];
+        int pad_r = padding_r[i - 2];
         int str = strides[i - 2];
         int dst = dst_desc->dims[i];
+        int ker_range = 1 + (ker - 1) * (dil + 1);
 
+        if (str < 1) return invalid_arguments;
+#if 0 // old
 #ifdef NDEBUG
         consistency = consistency &&
             (src - ((ker - 1) * (dil + 1) + 1) + pad) / str + 1 == dst;
@@ -150,6 +156,19 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
         AND_WANT((src - ((ker - 1) * (dil + 1) + 1) + pad) / str + 1 == dst);
         if( !consistency ){ DPRINT("(src-((ker-1)+(dil+1)+1) + pad)/str+1 = (%d-(%d*%d+1)+%d)/%d+1 = %d/%d+1 = %d, but dst = %d\n",
                 src,ker-1,dil+1,pad,str, (src - ((ker - 1) * (dil + 1) + 1) + pad), str,  (src - ((ker - 1) * (dil + 1) + 1) + pad) / str + 1, dst);}
+#endif
+#endif
+#ifdef NDEBUG
+        consistency = consistency
+            && dil >= 0
+            && pad_l >= 0
+            && pad_r + str > 0
+            && (src - ker_range + pad_l + pad_r) / str + 1 == dst;
+#else
+        AND_WANT( dil >= 0 );
+        AND_WANT( pad_l >= 0 );
+        AND_WANT( pad_r + str > 0 );
+        AND_WANT( (src - ker_range + pad_l + pad_r) / str + 1 == dst );
 #endif
     }
 #ifndef NDEBUG

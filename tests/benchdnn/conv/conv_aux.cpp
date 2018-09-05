@@ -76,6 +76,7 @@ const char *merge2str(merge_t merge) {
     return "unknown merge";
 }
 
+#if 0 // old
 static inline int compute_out(int i, int k, int s, int p, int d) {
     const int A = i - ((k-1) * (d+1) + 1);
     return (A + 2 * p) / s + 1;
@@ -102,6 +103,7 @@ static int compute_pad(int o, int i, int k, int s, int d) {
 #endif
     return ret;
 };
+#endif
 
 void dbg_out(int i, int k, int s, int p, int d, int o){
     print(0, " o = ([i=%d] - [k-1,d+1](%d*%d+1) + (2p=%d) / %d + 1\n"
@@ -178,8 +180,24 @@ int str2desc(desc_t *desc, const char *str, bool is_deconv) {
 #   undef CASE_N
 
     if (d.ic < 1 || d.oc < 1) return fail(" need ic, oc > 0");
-    if (d.sh < 1 || d.sw < 1) return fail(" need sh, sw > 0");
+    if (d.sd < 1 || d.sh < 1 || d.sw < 1) return fail(" need sh, sw > 0");
     if (d.oc % d.g != 0) return fail(" oc must be a multiple of g");
+    // [ejk] is <0 possible for d.ic or d.oc?
+    //if (d.ic == 0 || d.oc == 0) return FAIL;
+    //if (d.sd <= 0 || d.sh <= 0 || d.sw <= 0) return FAIL;
+
+    auto compute_out = [](bool is_deconv, int i, int k, int s, int p, int d) {
+        if (is_deconv)
+            return (i - 1) * s + (k - 1) * (d + 1) + 2 * p + 1;
+        else
+            return (i - ((k - 1) * (d + 1) + 1) + 2 * p) / s + 1;
+    };
+    auto compute_pad = [](bool is_deconv, int o, int i, int k, int s, int d) {
+        if (is_deconv)
+            return ((i - 1) * s - o + ((k - 1) * (d + 1) + 1)) / 2;
+        else
+            return ((o - 1) * s - i + ((k - 1) * (d + 1) + 1)) / 2;
+    };
 
     const bool no_d = (d.id | d.kd | d.od | d.pd | d.dd) == 0 && d.sd == 1;
     const bool no_h = (d.ih | d.kh | d.oh | d.ph | d.dh) == 0 && d.sh == 1;
@@ -187,74 +205,60 @@ int str2desc(desc_t *desc, const char *str, bool is_deconv) {
 
     bool strange = false;
 
-#if 1 // mine
     //print(0, "INIT:  i,k,s,p,d %d,%d,%d,%d,%d, oh=%d\n", d.ih, d.kh, d.sh, d.ph, d.dh, d.oh );
+    // Force user to fix nonsense spec strings
     if (!no_h) {
-        // Force user to fix nonsense spec strings
-        if (!d.ih || !d.kh ) return FAIL;                      // required!
+        if (!d.ih || !d.kh ) return FAIL;
+#if 1 // mine
         if ( d.sh<1 || d.ih<0 || d.oh<0 || d.ph<0 )
             return fail(" range! sh%d_ih%d_oh%d_ph%d\n", d.sh,d.ih,d.oh,d.ph);
         if (d.oh<=0) // illegal/unset
-            d.oh = compute_out(d.ih, d.kh, d.sh, d.ph, d.dh);
+            d.oh = compute_out(is_deconv, d.ih, d.kh, d.sh, d.ph, d.dh);
         if (d.oh<=0){ // illegal/unset (may be -ve because of too-low pad?)
             int tgt_out = (d.oh > 0? d.oh: 1);
-            int tgt_pad = is_deconv
-                ? compute_pad(d.ih, tgt_out, d.kh, d.sh, d.dh)
-                : compute_pad(tgt_out, d.ih, d.kh, d.sh, d.dh);
+            int tgt_pad = compute_pad(is_deconv, tgt_out, d.ih, d.kh, d.sh, d.dh);
             if (d.ph < tgt_pad) { // oh-oh.  ++padding to get to tgt_oh
                 d.oh = tgt_out;
                 d.ph = tgt_pad;
             }
         }
-        if (!d.ph && d.oh < compute_out(d.ih, d.kh, d.sh, d.ph, d.dh)){
-            d.ph = compute_pad(d.oh, d.ih, d.kh, d.sh, d.dh);
-        }
+        if (!d.ph && d.oh < compute_out(is_deconv, d.ih, d.kh, d.sh, d.ph, d.dh))
+            d.ph = compute_pad(is_deconv, d.oh, d.ih, d.kh, d.sh, d.dh);
 #else // theirs
-        if (!d.oh) d.oh = compute_out(d.ih, d.kh, d.sh, d.ph, d.dh);
-        else if (!d.ph && d.oh != compute_out(d.ih, d.kh, d.sh, d.ph, d.dh))
-            d.ph = is_deconv
-                ? compute_pad(d.ih, d.oh, d.kh, d.sh, d.dh)
-                : compute_pad(d.oh, d.ih, d.kh, d.sh, d.dh);
+        if (!d.oh) d.oh = compute_out(is_deconv, d.ih, d.kh, d.sh, d.ph, d.dh);
+        else if (!d.ph && d.oh != compute_out(is_deconv, d.ih, d.kh, d.sh, d.ph, d.dh))
+            d.ph = compute_pad(is_deconv, d.oh, d.ih, d.kh, d.sh, d.dh);
 #endif
     }
 
     if (!no_w) {
         if (!d.iw || !d.kw) return FAIL;
 #if 1 // mine
-        if ( d.sh<1 || d.ih<0 || d.oh<0 || d.ph<0 ){
+        if ( d.sh<1 || d.ih<0 || d.oh<0 || d.ph<0 )
             return fail(" range! sw%d_iw%d_ow%d_pw%d\n", d.sw,d.iw,d.ow,d.pw);
-        }
         if (d.ow<=0) // illegal/unset
-            d.ow = compute_out(d.iw, d.kw, d.sw, d.pw, d.dw);
-
-            int tgt_out = (d.ow > 0? d.ow: 1);
-            int tgt_pad = is_deconv
-                ? compute_pad(d.iw, tgt_out, d.kw, d.sw, d.dw)
-                : compute_pad(tgt_out, d.iw, d.kw, d.sw, d.dw);
-            if (d.pw < tgt_pad) { // oh-oh.  ++padding to get to tgt_ow
-                d.ow = tgt_out;
-                d.pw = tgt_pad;
-            }
-        if (!d.pw && d.ow != compute_out(d.iw, d.kw, d.sw, d.pw, d.dw))
-            d.pw = is_deconv
-                ? compute_pad(d.ow, d.iw, d.kw, d.sw, d.dw)
-                : compute_pad(d.ow, d.iw, d.kw, d.sw, d.dw);
+            d.ow = compute_out(is_deconv, d.iw, d.kw, d.sw, d.pw, d.dw);
+        int tgt_out = (d.ow > 0? d.ow: 1);
+        int tgt_pad = compute_pad(is_deconv, tgt_out, d.iw, d.kw, d.sw, d.dw);
+        if (d.pw < tgt_pad) { // oh-oh.  ++padding to get to tgt_ow
+            d.ow = tgt_out;
+            d.pw = tgt_pad;
+        }
+        if (!d.pw && d.ow != compute_out(is_deconv, d.iw, d.kw, d.sw, d.pw, d.dw))
+            d.pw = compute_pad(is_deconv, d.ow, d.iw, d.kw, d.sw, d.dw);
 #else // theirs
-        if (!d.ow) d.ow = compute_out(d.iw, d.kw, d.sw, d.pw, d.dw);
-        else if (!d.pw && d.ow != compute_out(d.iw, d.kw, d.sw, d.pw, d.dw))
-            d.pw = is_deconv ? compute_pad(d.iw, d.ow, d.kw, d.pw, d.dw) :
-                compute_pad(d.ow, d.iw, d.kw, d.pw, d.dw);
+        if (!d.ow) d.ow = compute_out(is_deconv, d.iw, d.kw, d.sw, d.pw, d.dw);
+        else if (!d.pw && d.ow != compute_out(is_deconv, d.iw, d.kw, d.sw, d.pw, d.dw))
+            d.pw = compute_pad(is_deconv, d.ow, d.iw, d.kw, d.sw, d.dw);
 #endif
     }
 
     if (!no_d && d.id) {
         if (!d.id || !d.kd) return FAIL;
 
-        if (!d.od) d.od = compute_out(d.id, d.kd, d.sd, d.pd, d.dd);
-        else if (!d.pd && d.od != compute_out(d.id, d.kd, d.sd, d.pd, d.dd))
-            d.pd = is_deconv
-                ? compute_pad(d.id, d.od, d.kd, d.pd, d.dd)
-                : compute_pad(d.od, d.id, d.kd, d.pd, d.dd);
+        if (!d.od) d.od = compute_out(is_deconv, d.id, d.kd, d.sd, d.pd, d.dd);
+        else if (!d.pd && d.od != compute_out(is_deconv, d.id, d.kd, d.sd, d.pd, d.dd))
+            d.pd = compute_pad(is_deconv, d.od, d.id, d.kd, d.sd, d.dd);
     }
 
     if (no_w && no_h && d.id) {
@@ -282,8 +286,8 @@ int str2desc(desc_t *desc, const char *str, bool is_deconv) {
     if (d.id<1) {d.id = 1; d.kd = 1; d.od = 1; d.sd = 1; d.pd = 0; d.dd = 0;}
 
     // patch things to consistency a bit more
-    int ddow = compute_out(d.iw, d.kw, d.sw, d.pw, d.dw);
-    int ddoh = compute_out(d.ih, d.kh, d.sh, d.ph, d.dh);
+    int ddow = compute_out(is_deconv, d.iw, d.kw, d.sw, d.pw, d.dw);
+    int ddoh = compute_out(is_deconv, d.ih, d.kh, d.sh, d.ph, d.dh);
     if( d.ow < ddow ) d.ow = ddow; // allow making output bigger
     if( d.oh < ddoh ) d.oh = ddoh;
     if( d.ow < 1 ) d.ow = 1;
@@ -428,6 +432,7 @@ void prb2str(const prb_t *p, char *buffer, bool canonical) {
     bool is_attr_def = p->attr.is_def();
     if (!is_attr_def) {
         int len = snprintf(attr_buf, max_attr_len, "--attr=\"");
+        SAFE_V(len >= 0 ? OK : FAIL);
         attr2str(&p->attr, attr_buf + len);
         len = (int)strnlen(attr_buf, max_attr_len);
         snprintf(attr_buf + len, max_attr_len - len, "\" ");

@@ -388,7 +388,7 @@ void jit_sse42_1x1_conv_kernel_f32::generate()
     mov(reg_load_loop_work, ptr[param1 + GET_OFF(load_dim)]);
     mov(reg_bcast_loop_work, ptr[param1 + GET_OFF(bcast_dim)]);
     mov(reg_reduce_loop_work, ptr[param1 + GET_OFF(reduce_dim)]);
-    mov(reg_reduce_pos_flag, ptr[param1 + GET_OFF(reduce_pos_flag)]);
+    mov(reg_reduce_pos_flag, ptr[param1 + GET_OFF(first_last_flag)]);
     if (jcp.prop_kind == backward_weights)
         mov(reg_output_stride, ptr[param1 + GET_OFF(output_stride)]);
 
@@ -553,15 +553,15 @@ status_t jit_sse42_1x1_conv_kernel_f32::init_conf(jit_1x1_conv_conf_t &jcp,
     if (!args_ok) return status::unimplemented;
 
     const int simd_w = 4;
+    jcp.ic_block = jcp.oc_block = simd_w*2;
 
     args_ok = true
-        && jcp.oc % simd_w == 0 && jcp.ic % simd_w == 0
+        && jcp.oc % jcp.oc_block == 0
+        && jcp.ic % jcp.ic_block == 0
         && jcp.t_pad == 0 && jcp.l_pad == 0
         && jcp.stride_w == 1 && jcp.stride_h == 1 // TODO: support some strides
         && jcp.kh == 1 && jcp.kw == 1;
     if (!args_ok) return status::unimplemented;
-
-    jcp.ic_block = jcp.oc_block = simd_w*2;
 
     jcp.ur = 1;
 

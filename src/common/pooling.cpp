@@ -44,7 +44,7 @@ status_t pooling_desc_init(pooling_desc_t *pool_desc,
 
     if (padding_r == nullptr) padding_r = padding_l;
 
-    pooling_desc_t pd = {};
+    auto pd = pooling_desc_t();
     pd.primitive_kind = primitive_kind::pooling;
     pd.prop_kind = prop_kind;
     pd.alg_kind = alg_kind;
@@ -74,8 +74,6 @@ status_t pooling_desc_init(pooling_desc_t *pool_desc,
     }
 
     bool consistency = true
-        && memory_desc_wrapper(src_desc).nelems()
-        && memory_desc_wrapper(dst_desc).nelems()
         && utils::one_of(src_desc->ndims, 4, 5)
         && utils::one_of(dst_desc->ndims, 4, 5)
         && src_desc->dims[0] == dst_desc->dims[0]

@@ -79,6 +79,14 @@ function(detect_mkl LIBNAME)
         endif()
     endif()
 
+    if(UNIX AND LIBNAME MATCHES "mklml.*")
+        # Although MKL-ML depends on shared object functions such as dlopen and
+        # dladdr it is not linked against libdl. This causes link failures when
+        # MKL-DNN is build with the gold linker (e.g. -fuse-ld=gold).
+        list(APPEND EXTRA_LIBS dl)
+        set(EXTRA_LIBS "${EXTRA_LIBS}" PARENT_SCOPE)
+    endif()
+
     if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
         get_filename_component(MKLLIBPATH ${MKLLIB} PATH)
         find_library(MKLIOMP5LIB
@@ -108,13 +116,23 @@ function(detect_mkl LIBNAME)
     string(FIND "${MKLLIBPATH}" ${CMAKE_CURRENT_SOURCE_DIR}/external __idx)
     if(${__idx} EQUAL 0)
         if(WIN32)
-            install(PROGRAMS ${MKLDLL} DESTINATION lib)
+            if(MINGW)
+                # We need to install *.dll into bin/ instead of lib/.
+                install(PROGRAMS ${MKLDLL} DESTINATION bin)
+            else()
+                install(PROGRAMS ${MKLDLL} DESTINATION lib)
+            endif()
         else()
             install(PROGRAMS ${MKLLIB} DESTINATION lib)
         endif()
         if(MKLIOMP5LIB)
             if(WIN32)
-                install(PROGRAMS ${MKLIOMP5DLL} DESTINATION lib)
+                if(MINGW)
+                    # We need to install *.dll into bin/ instead of lib/.
+                    install(PROGRAMS ${MKLIOMP5DLL} DESTINATION bin)
+                else()
+                    install(PROGRAMS ${MKLIOMP5DLL} DESTINATION lib)
+                endif()
             else()
                 install(PROGRAMS ${MKLIOMP5LIB} DESTINATION lib)
             endif()

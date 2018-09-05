@@ -49,7 +49,11 @@ namespace conv {
 
 static conv_impls_t conv_impls_[] = {
     // Always keep this one, to calculate speedup factors
-    {"0.12", compute_ref_fwd, compute_ref_bwd_d, compute_ref_bwd_w},
+    {"0.12",
+        compute_ref_fwd,
+        compute_ref_bwd_d, // XXX
+        //nullptr,
+        compute_ref_bwd_w},
 
 #if 0
 #if defined(SXAURORA)
@@ -246,14 +250,24 @@ inline int compare_dat(const prb_t *p, data_kind_t kind, dnn_mem_t &mem_dt,
 
     const bool dump = verbose >= 20
         || (verbose >= 10 && (trust_rg < 1. || trust_nz < 1.));
+
     if (dump) {
         print(0, "@@@ [%s] %strust range:%.2f nz:%.2f "
                 "(level range:%.2f nz:%.2f). "
                 "in:%d (ok:%d) below:%d (ok:%d) above:%d (ok:%d) nz:%d "
-                "total:%lu\n", skind, final_compare ? "final: " : "",
-                trust_rg, trust_nz, trust_rg_level, trust_nz_level, in, in_ok,
-                below, below_ok, above, above_ok, non_zero,
-                (unsigned long)r->total);
+                "total:%lu\n",
+                skind,
+                (final_compare ? "final: " : ""),
+                trust_rg,
+                trust_nz,
+                trust_rg_level,
+                trust_nz_level,
+                in,
+                in_ok,
+                below, below_ok,
+                above, above_ok, non_zero,
+                (unsigned long)(r->total)
+                );
     }
 
     if (no_trust) {
@@ -300,13 +314,10 @@ static int fill_src_f32(const prb_t *p, dnn_mem_t &mem_fp)
     for (int ih = 0; ih < p->ih; ++ih)
     for (int iw = 0; iw < p->iw; ++iw)
     {
-        const int gen = 17 * ih + 13 * iw + 13 * mb + 19 * ic + 1637;
-        const bool non_base = true
-            && gen % (p->kd * p->kh * p->kw) <= c.f_sparsity * (p->kd * p->kh * p->kw);
-//            && (17 * ih + 13 * mb) % p->kh == 0
-//            && (13 * iw + 19 * ic) % p->kw == 0;
-        const float value = static_cast<float>(
-            non_base ? c.f_min + gen * c.f_step % range : c.f_base);
+        const int gen = 5 * id + 17 * ih + 13 * iw + 13 * mb + 19 * ic + 1637;
+        const bool non_base = flip_coin(gen, c.f_sparsity);
+        const float value =
+            non_base ? c.f_min + gen * c.f_step % range : c.f_base;
 
         ((float*)mem_fp)[src_off_f(p, mb, 0, ic, id, ih, iw)] = value;
     }
@@ -343,7 +354,10 @@ int fill_src(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
 
 int fill_wei(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
     res_t *r) {
-    const bool extra_mem = mem_dt.dt() != mem_fp.dt();
+    const bool wino_s8 = p->alg == WINO && p->cfg[WEI].dt == mkldnn_s8;
+    const bool diff_data_type = mem_dt.dt() != mem_fp.dt();
+    const bool extra_mem = diff_data_type && !wino_s8;
+
     dnn_mem_t *p_mem_00 = extra_mem
         ? new dnn_mem_t(mem_dt.md_, mkldnn_f32,
             is_conv_3d(p) ? mkldnn_goidhw : mkldnn_goihw)
@@ -361,13 +375,10 @@ int fill_wei(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
     for (int kh = 0; kh < p->kh; ++kh)
     for (int kw = 0; kw < p->kw; ++kw)
     {
-        const int gen = 29 * kd + 17 * kh + 13 * kw + 13 * oc + 19 * ic + 38;
-        const bool non_base = true
-            && gen % (p->kd * p->kh * p->kw) <= c.f_sparsity * (p->kd * p->kh * p->kw);
-//            && (17 * kh + 13 * oc) % p->kh == 0
-//            && (13 * kw + 19 * ic) % p->kw == 0;
-        const float value = static_cast<float>(
-            non_base ? c.f_min + gen * c.f_step % range : c.f_base);
+        const int gen = 5 * kd + 17 * kh + 13 * kw + 13 * oc + 19 * ic + 38;
+        const bool non_base = flip_coin(gen, c.f_sparsity);
+        const float value =
+            non_base ? c.f_min + gen * c.f_step % range : c.f_base;
 
         ((float*)mem_00)[wei_off_f(p, g, oc, ic, kd, kh, kw)] = value;
     }
@@ -396,8 +407,7 @@ int fill_bia(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
     const size_t sz = mem_00.nelems();
     for (size_t i = 0; i < sz; ++i) {
         const int gen = (int)(19 * i);
-        const bool non_base = true
-            && gen % (p->kd * p->kh * p->kw) <= c.f_sparsity * (p->kd * p->kh * p->kw);
+        const bool non_base = flip_coin(gen, c.f_sparsity);
         const float value =
             non_base ? c.f_min + gen * c.f_step % range : c.f_base;
 
@@ -433,13 +443,10 @@ int fill_dst(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
     for (int oh = 0; oh < p->oh; ++oh)
     for (int ow = 0; ow < p->ow; ++ow)
     {
-        const int gen = 31 * od + 19 * oh + 17 * ow + 13 * mb + 13 * oc + 223;
-        const bool non_base = true
-            && gen % (p->kd * p->kh * p->kw) <= c.f_sparsity * (p->kd * p->kh * p->kw);
-//            && (19 * oh + 13 * mb) % p->kh == 0
-//            && (17 * ow + 13 * oc) % p->kw == 0;
-        const float value = static_cast<float>(
-            non_base ? c.f_min + gen * c.f_step % range : c.f_base);
+        const int gen = 7 * od + 19 * oh + 17 * ow + 13 * mb + 13 * oc + 223;
+        const bool non_base = flip_coin(gen, c.f_sparsity);
+        const float value =
+            non_base ? c.f_min + gen * c.f_step % range : c.f_base;
 
         ((float*)mem_00)[dst_off_f(p, mb, 0, oc, od, oh, ow)] = value;
     }
@@ -509,10 +516,13 @@ int init_conv_desc(mkldnn_convolution_desc_t &cd, const prb_t *p )
     if (p->alg == WINO) alg = mkldnn_convolution_winograd;
 
     switch (p->dir) {
-    case FWD_D: case FWD_B:
+    case FWD_D: case FWD_B: case FWD_I:
         DNN_SAFE(mkldnn_dilated_convolution_forward_desc_init(&cd,
-                    mkldnn_forward_inference, alg, &src_d, &wei_d,
-                    p->dir == FWD_D ? NULL : &bia_d, &dst_d,
+                    p->dir == FWD_I
+                        ? mkldnn_forward_inference
+                        : mkldnn_forward_training,
+                    alg, &src_d, &wei_d,
+                    p->dir == FWD_B ? &bia_d : NULL, &dst_d,
                     strides, dilates, padding, padding_r,
                     mkldnn_padding_zero), WARN);
         break;
@@ -1279,21 +1289,21 @@ int doit(const prb_t *p, res_t *r) {
     } else if (p->dir == BWD_D) {
 #if 1 // mine
         if (bench_mode & CORR || bench_mode & TEST )
-            compute_ref_bwd_d(p, src_fp, wei_fp, dst_fp);
+            compute_ref_bwd_d(p, src_fp, wei_fp, bia_fp, dst_fp);
         if ((bench_mode & TEST) && nimp > imp0){
             for(size_t imp=imp0; imp<nimp; ++imp){
                 auto impl_fn = get_ref_impls()[imp].bwd_d;
                 if (impl_fn == nullptr) continue;
                 dnn_mem_t src_tt(src_fp.md_); // ZEROED, init in prep_fn
                 dnn_mem_t wei_tt(wei_fp, fp); // const, can re-use
-                //dnn_mem_t bia_tt(bia_fp, fp); /* not needed */
+                dnn_mem_t bia_tt(bia_fp, fp); // needed in 0.16 XXX ?
                 dnn_mem_t dst_tt(dst_fp, fp); // const, can re-use
                 auto prep_fn = [&]()->void{
                     // post_ops do not affect BWD_D
                     //SAFE_V(fill_src(p, src_dt, src_tt, r));
                 };
                 auto run_fn = [&]()->void{
-                    (*impl_fn)(p, src_tt, wei_tt, dst_tt);
+                    (*impl_fn)(p, src_tt, wei_tt, bia_tt, dst_tt);
                 };
                 auto compare_fn = [&]()->int{ // like bwd_d_test, but float
                     SAFE(compare_src(p, src_tt, src_fp, r), WARN);
@@ -1328,6 +1338,7 @@ int doit(const prb_t *p, res_t *r) {
         DNN_SAFE(mkldnn_primitive_create(&c, cpd, inputs, outputs), WARN);
         SAFE(execute(c), WARN);
         if (bench_mode & CORR) {
+            compute_ref_bwd_d(p, src_fp, wei_fp, bia_fp, dst_fp);
             dnn_mem_t src(src_dt, fp, src_format);
             SAFE(src.reorder(src_dt), WARN);
             SAFE(compare_src(p, src, src_fp, r, true), WARN);
@@ -1356,8 +1367,8 @@ int doit(const prb_t *p, res_t *r) {
                 dnn_mem_t src_tt(src_fp, fp); /* copied (should reuse) */
                 dnn_mem_t dst_tt(dst_fp, fp); /* copied (should reuse) */
                 // outputs [ejk] dnn_mem_t handles bia_fp.md_ inactive
-                dnn_mem_t wei_tt(wei_fp.md_); /* ZEROED */
                 dnn_mem_t bia_tt(bia_fp.md_); // ZEROED, set in prep_fn
+                dnn_mem_t wei_tt(wei_fp.md_); /* ZEROED */
                 // XXX post_ops have no effect on bwd ref calc
                 //     so is prep_fn may not be needed at all
                 auto run_fn = [&]()->void{
