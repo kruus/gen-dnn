@@ -17,6 +17,9 @@
 #include <assert.h>
 
 #include "cpu_barrier.hpp"
+//#if defined(TARGET_VANILLA)
+//#include "ia32intrin.h"         // gcc:  __builtin_ia32_pause()
+//#endif
 
 namespace mkldnn {
 namespace impl {
@@ -24,6 +27,42 @@ namespace cpu {
 
 namespace simple_barrier {
 
+#if defined(TARGET_VANILLA)
+void barrier(ctx_t *ctx, int nthr) {
+    // assume ctx_init zeroes out ctx
+    if (nthr > 1){
+        size_t sense_sav;
+
+        /* take and save current sense */
+        register size_t tmp = ctx->sense;
+        *&sense_sav = tmp; // "push"
+
+        tmp = 1U;
+        //__sync_fetch_and_add( &ctx->ctr, tmp );
+        //tmp += 1U;
+        __sync_add_and_fetch( &ctx->ctr, tmp);
+
+        bool last_thread = (tmp == static_cast<size_t>(nthr));
+        tmp = *&sense_sav; // "pop"
+        if (last_thread){
+            ctx->ctr = 0U;      // reset thread counter
+            // notify waiting threads
+            tmp = !tmp;
+            ctx->sense = tmp;
+            //goto barrier_exit_restore_label;
+        }else{
+            //spin_label:
+            while (ctx->sense == tmp){
+                __builtin_ia32_pause(); // gcc perhaps has this
+            }
+        }
+        //barrier_exit_restore_label:
+        // (nothing to do)
+        //barrier_exit_label:
+    }
+}
+
+#else
 void generate(jit_generator &code, Xbyak::Reg64 reg_ctx,
             Xbyak::Reg64 reg_nthr) {
 #   define BAR_CTR_OFF offsetof(ctx_t, ctr)
@@ -102,11 +141,12 @@ void barrier(ctx_t *ctx, int nthr) {
     static jit_t j; /* XXX: constructed on load ... */
     j.barrier(ctx, nthr);
 }
+#endif // !TARGET_VANILLA
 
-}
+}//simple_barrier::
 
-}
-}
-}
+}//cpu::
+}//impl::
+}//mkldnn::
 
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

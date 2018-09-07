@@ -16,7 +16,9 @@
 #include "gemm_utils.hpp"
 #include "utils.hpp"
 #include "nstl.hpp"
-#include "../jit_generator.hpp"
+//#include "../jit_generator.hpp" // do not require any jit-specific stuff
+#include "mkldnn_thread.hpp"
+#include "../cpu_isa_traits.hpp"
 
 namespace mkldnn {
 namespace impl {

@@ -1,5 +1,15 @@
 external
+a.out
+a.c
+asdf
+foo
 log
+[r-z]*.log
+b[jv]*.log
+jq*.log
+*.logg
+cmk*.log
+snake10
 build
 build.bak
 buildd*
@@ -14,6 +24,7 @@ install-dbg*
 .*.sw?
 *.nm
 *.ii
+*.i
 *.o
 *.vg
 build*.log

@@ -23,6 +23,8 @@
 
 #include "cpu_reducer.hpp"
 
+// [ejk] XXX Is this really only available for jit impls?
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -86,8 +88,6 @@ void reduce_balancer_t::balance() {
 
 /* reducer jit-ted driver */
 
-using namespace Xbyak;
-
 template <impl::data_type_t data_type>
 struct reducer_2d_driver_t: public c_compatible {
     typedef typename prec_traits<data_type>::type data_t;
@@ -106,6 +106,9 @@ protected:
     bool nullify_dst_;
     void (*ker_)(data_t *dst, const data_t *srcs, size_t ny, size_t nx);
 };
+
+#if !defined(TARGET_VANILLA)
+using namespace Xbyak;
 
 template <impl::data_type_t data_type, cpu_isa_t isa>
 struct reducer_2d_driver_f_s_32_t: public reducer_2d_driver_t<data_type>,
@@ -260,16 +263,19 @@ struct reducer_2d_driver_f_s_32_t: public reducer_2d_driver_t<data_type>,
             const_cast<uint8_t*>(this->getCode()));
     }
 };
+#endif
 
 template <impl::data_type_t data_type>
 inline reducer_2d_driver_t<data_type> *create_reduce_2d_drv(int n_src,
         size_t src_ld, size_t src_step, size_t dst_step, bool nullify_dst) {
+#if !defined(TARGET_VANILLA)
     if (mayiuse(avx512_common))
         return new reducer_2d_driver_f_s_32_t<data_type, avx512_common>(n_src,
             src_ld, src_step, dst_step, nullify_dst);
     else if (mayiuse(avx2))
         return new reducer_2d_driver_f_s_32_t<data_type, avx2>(n_src, src_ld,
             src_step, dst_step, nullify_dst);
+#endif
     assert(!"unimplemented");
     return nullptr;
 }

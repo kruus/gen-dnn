@@ -19,9 +19,10 @@
 
 #include "cpu_batch_normalization_utils.hpp"
 #include "c_types_map.hpp"
-#include "jit_generator.hpp"
 #include "ncsp_batch_normalization.hpp"
 #include "type_helpers.hpp"
+//#include "jit_generator.hpp"
+#include "mkldnn_thread.hpp"
 
 // clang6 generates incorrect code with OMP_SIMD in some particular cases
 #if (defined __clang_major__) && (__clang_major__ == 6)

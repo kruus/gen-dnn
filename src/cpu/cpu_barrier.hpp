@@ -18,8 +18,8 @@
 #define CPU_BARRIER_HPP
 
 #include <assert.h>
-
-#include "jit_generator.hpp"
+//#include "jit_generator.hpp"
+#include "cpu_isa_traits.hpp"    // poor man's version is all that is needed for generic header
 #include "utils.hpp"
 
 namespace mkldnn {
@@ -40,6 +40,7 @@ struct ctx_t {
 inline void ctx_init(ctx_t *ctx) { *ctx = utils::zero<ctx_t>(); }
 void barrier(ctx_t *ctx, int nthr);
 
+#if !defined(TARGET_VANILLA)
 /** injects actual barrier implementation into another jitted code
  * @params:
  *   code      -- jit_generator object where the barrier is to be injected
@@ -48,8 +49,9 @@ void barrier(ctx_t *ctx, int nthr);
  */
 void generate(jit_generator &code, Xbyak::Reg64 reg_ctx,
         Xbyak::Reg64 reg_nthr);
+#endif
 
-}
+}//simple_barrier::
 
 }
 }

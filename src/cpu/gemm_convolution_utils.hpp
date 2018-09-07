@@ -20,6 +20,7 @@
 #include "c_types_map.hpp"
 #include "cpu_convolution_pd.hpp"
 #include "cpu_engine.hpp"
+// This jit_*.hpp file is also used for vanilla, with heavily pruned conf_t structures
 #include "jit_primitive_conf.hpp"
 #include "mkldnn_thread.hpp"
 #include "scratchpad.hpp"

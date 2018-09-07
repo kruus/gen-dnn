@@ -30,12 +30,6 @@
 #include "jitprofiling.h"
 #endif
 
-#if defined(_WIN32) && !defined(__GNUC__)
-#   define STRUCT_ALIGN(al, ...) __declspec(align(al)) __VA_ARGS__
-#else
-#   define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__(al)))
-#endif
-
 #if defined(_WIN32)
 #   define OFFSET_SHADOWSPACE 0x28
 #endif
@@ -52,10 +46,12 @@ namespace cpu {
 // TODO: move this to jit_generator class?
 namespace {
 
+#if 0 // moved to cpu_isa_traits (also used for non-jit malloc size)    
 typedef enum {
     PAGE_4K = 4096,
     PAGE_2M = 2097152,
 } cpu_page_size_t;
+#endif
 
 // TODO: move this somewhere else? Although this is only used by jit kernels
 // (Roma)
@@ -109,6 +105,8 @@ static const Xbyak::Reg64 abi_param1(Xbyak::Operand::RDI),
 #endif
 #endif
 
+#if 0 // --> cpu_isa_traits.hpp (maybe not right place for it)
+// XXX sometimes called from non-jit code!!!
 inline unsigned int get_cache_size(int level, bool per_core = true){
     unsigned int l = level - 1;
     // Currently, if XByak is not able to fetch the cache topology
@@ -131,6 +129,7 @@ inline unsigned int get_cache_size(int level, bool per_core = true){
     } else
         return 0;
 }
+#endif
 
 }
 

@@ -109,7 +109,9 @@ struct jit_conv_conf_t {
 };
 
 struct jit_conv_conf_2x3_wino_t {
+#ifndef TARGET_VANILLA
     conv_version_t ver;
+#endif
 
     int m;
     int r;

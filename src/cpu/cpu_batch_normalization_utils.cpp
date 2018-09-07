@@ -18,8 +18,9 @@
 
 #include "c_types_map.hpp"
 #include "utils.hpp"
-#include "jit_generator.hpp"
 #include "cpu_batch_normalization_pd.hpp"
+//#include "jit_generator.hpp"
+#include "mkldnn_thread.hpp"
 
 namespace mkldnn {
 namespace impl {

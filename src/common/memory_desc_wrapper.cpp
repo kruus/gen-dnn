@@ -183,7 +183,6 @@ status_t fill_nChw16c(memory_desc_t &md) {
         4, 5, 6, 7};
     return fill_contiguous_blocked(md, block_dims, perm);
 }
-#endif
 
 status_t fill_nCdhw16c(memory_desc_t &md) {
     if (md.ndims != 5) return invalid_arguments;
@@ -204,6 +203,7 @@ status_t fill_nCdhw8c(memory_desc_t &md) {
         5, 6, 7, 8, 9};
     return fill_contiguous_blocked(md, block_dims, perm);
 }
+#endif
 
 status_t fill_oi(memory_desc_t &md) {
     if (md.ndims != 2) return invalid_arguments;

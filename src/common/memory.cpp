@@ -67,7 +67,7 @@ bool memory_desc_sanity_check(int ndims,const dims_t dims,
             if (dims[d] < 0) {
                 ok=false;
 #ifndef NDEBUG
-                if (!ok){ printf(" dims[%d] < 0"); fflush(stdout); }
+                if (!ok){ printf(" dims[%d] < 0",d); fflush(stdout); }
 #endif
                 break;
             }

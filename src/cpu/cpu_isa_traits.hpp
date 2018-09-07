@@ -16,8 +16,19 @@
 
 #ifndef CPU_ISA_TRAITS_HPP
 #define CPU_ISA_TRAITS_HPP
+/** \file
+ * This file has been branched off of jit_generator.hpp to provide those "jit"
+ * utilities/macros that are also useful to non-jit programs.
+ */
 
 #include <type_traits>
+#include "mkldnn_thread.hpp" // for crude cache size guesses, use omp_get_max_threads
+
+#if defined(_WIN32) && !defined(__GNUC__)
+#   define STRUCT_ALIGN(al, ...) __declspec(align(al)) __VA_ARGS__
+#else
+#   define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__(al)))
+#endif
 
 #if defined(TARGET_VANILLA) && !defined(JITFUNCS)
 /** In principle could have multiple TARGETS.
@@ -90,6 +101,7 @@ namespace cpu {
  */
 #define JITFUNCS_ANY 0
 #define JITFUNCS_SSE42 1
+#define JITFUNCS_AVX 1
 #define JITFUNCS_AVX2 2
 #define JITFUNCS_AVX512 3
 //@}
@@ -106,8 +118,14 @@ typedef enum {
     avx512_mic_4ops,
 } cpu_isa_t;
 
-template <cpu_isa_t> struct cpu_isa_traits {}; /* ::vlen -> 32 (for avx2) */
+// generic, from jit_generator.hpp
+typedef enum {
+    PAGE_4K = 4096,
+    PAGE_2M = 2097152,
+} cpu_page_size_t;
 
+template <cpu_isa_t> struct cpu_isa_traits {}; /* ::vlen -> 32 (for avx2) */
+#if !defined(TARGET_VANILLA)
 template <> struct cpu_isa_traits<sse42> {
     typedef Xbyak::Xmm Vmm;
     static constexpr int vlen_shift = 4;
@@ -137,6 +155,7 @@ template <> struct cpu_isa_traits<avx512_mic>:
 
 template <> struct cpu_isa_traits<avx512_mic_4ops>:
     public cpu_isa_traits<avx512_common> {};
+#endif // cpu_isa_traits (vector register defaults)
 
 #if defined(TARGET_VANILLA)
 // should not include jit_generator.hpp (or any other jit stuff)
@@ -144,8 +163,8 @@ static inline constexpr bool mayiuse(const cpu_isa_t /*cpu_isa*/) {
     return true;
 }
 #else
-namespace {
 
+namespace {
 static Xbyak::util::Cpu cpu;
 static inline bool mayiuse(const cpu_isa_t cpu_isa) {
     using namespace Xbyak::util;
@@ -188,8 +207,44 @@ static inline bool mayiuse(const cpu_isa_t cpu_isa) {
     }
     return false;
 }
-}
+}//anon::
 #endif // mayiuse
+
+namespace {
+/** To avoid pulling in Xbyak, we \em guess the cache sizes for TARGET_VANILLA.
+ * \sa jit_generator.hpp for a more informed version.
+ * TODO: think about whether this can be done better, or maybe
+ *       disconnected from Xbyak a bit more.
+ * For now, the only non-jit files using cache info are the
+ * batch normalization routines in {cpu,ncsp}_batch_normalization.cpp
+ */
+inline unsigned int get_cache_size(int level, bool per_core = true){
+    unsigned int l = level - 1;
+#if !defined(TARGET_VANILLA)
+    // Currently, if XByak is not able to fetch the cache topology
+    // we default to 32KB of L1, 512KB of L2 and 1MB of L3 per core.
+    if (cpu.data_cache_levels == 0){
+#endif
+        const int L1_cache_per_core = 32000;
+        const int L2_cache_per_core = 512000;
+        const int L3_cache_per_core = 1024000;
+        int num_cores = per_core ? 1 : omp_get_max_threads();
+        switch(l){
+        case(0): return L1_cache_per_core * num_cores;
+        case(1): return L2_cache_per_core * num_cores;
+        case(2): return L3_cache_per_core * num_cores;
+        default: return 0;
+        }
+#if !defined(TARGET_VANILLA)
+    }
+    if (l < cpu.data_cache_levels) {
+        return cpu.data_cache_size[l]
+            / (per_core ? cpu.cores_sharing_data_cache[l] : 1);
+    } else
+        return 0;
+#endif
+}
+}//anon::
 
 /* whatever is required to generate string literals... */
 #include "z_magic.hpp"

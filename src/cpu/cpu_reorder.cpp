@@ -72,9 +72,12 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     REG_SR_DIRECT_COPY(u8, u8),
 #endif
 
+#if !defined(TARGET_VANILLA)
     /* jit */
     jit_uni_reorder_create,
+#endif
 
+#if MKLDNN_JIT_TYPES > 0
     /* fp32: flat <-> blocked with tail */
     REG_SR_BIDIR(f32, any, f32, nChw16c),
     REG_SR_BIDIR(f32, any, f32, nCdhw16c),
@@ -130,6 +133,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     REG_SR_BIDIR(s16, goihw, s16, gOIhw8i16o2i),
     REG_SR_BIDIR(s16, OIhw8i16o2i, s16, OIhw8o16i2o),
     REG_SR_BIDIR(s16, gOIhw8i16o2i, s16, gOIhw8o16i2o),
+#endif
 
     /* reference: the last line of defence */
     REG_SR(f32, any, f32, any, fmt_order::any, spec::reference),

@@ -504,6 +504,7 @@ INST_TEST_CASE(SimpleExpectedFails,
     PARAMS_EF(4, 20, -12, 12, EPS, true, mkldnn_invalid_arguments)
 );
 
+#if MKLDNN_JIT_TYPES > 0
 INST_TEST_CASE(Simple_nChw16c_padded,
     PARAMS_B16(1, 27, 9, 10, EPS),
     PARAMS_B16(1, 12, 10, 9, EPS),
@@ -547,6 +548,7 @@ INST_TEST_CASE(Simple_nCdhw8c,
     PARAMS_B8_3D(2, 32, 10, 8, 4, EPS),
     PARAMS_B8_3D(2, 32, 10, 8, 4, EPS)
 );
+#endif
 
 INST_TEST_CASE(Simple_NC,
     PARAMS_NC(2, 8, 1, 1, EPS),

@@ -106,35 +106,56 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
         && src_desc->dims[1] == g * weights_desc->dims[with_groups + 1]
         && dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0];
 #else
-    int const lenmax = 1024;
-    static char buffer[lenmax];
-    char *buf = &buffer[0];
-    int rem_len = lenmax;
+    struct Consistency {
+        bool &var
+        Consistency(bool &var) : var(var), buf(&buffer[0]), rem_len(lenmax) {}
+        ~Consistency() {}
+        and_want(bool const cond, char const* file, int const line, char const* desc){
+            var &&= cond;
+            if (!cond){
+                consistency = false;
+                int n = snprintf(buf, rem_len, "Inconsistent: [%s:%d] %s\n",
+                        file, line, desc);
+                if (n <= rm_len){
+                    buf += n;
+                    rem_len -= n;
+                }else{
+                    rem_len = 0;
+                }
+            }
+        }
+        operator bool(){ return var; }
+        private:
+        int const lenmax = 1024;
+        char buffer[lenmax];
+        char *buf;
+        int rem_len;
+    };
 #define DPRINT(...) do \
     { \
         int n = snprintf(buf, rem_len, __VA_ARGS__); \
         if( n > rem_len ){ rem_len = 0; } \
         else { buf+=n; rem_len-=n; } \
     } while(0)
-#define AND_WANT( COND ) do { \
+#define AND_WANt(COND) do { \
     bool cond; \
-    if (!(cond=(COND))){ \
+    if (!(cond=(__VA_ARGS__))){ \
         DPRINT("Oops [%s:%d] %s\n", __FILE__, __LINE__, #COND); \
         consistency = false; \
     } \
 }while(0)
+#define AND_WANT(...) AND_WANt( (__VA_ARGS__) )
     bool consistency = true;
-        AND_WANT((memory_desc_wrapper(src_desc).nelems()));
-        AND_WANT((memory_desc_wrapper(dst_desc).nelems()));
-        AND_WANT((memory_desc_wrapper(weights_desc).nelems()));
-        AND_WANT((utils::one_of(src_desc->ndims, 4, 5)));
-        AND_WANT((utils::one_of(dst_desc->ndims, 4, 5)));
-        AND_WANT((utils::one_of(weights_desc->ndims, 4, 5, 6)));
-        AND_WANT(((with_bias ? bias_desc->ndims == 1 : true)));
-        AND_WANT(((with_bias ? bias_desc->dims[0] == dst_desc->dims[1] : true)));
-        AND_WANT((src_desc->dims[0] == dst_desc->dims[0]));
-        AND_WANT((src_desc->dims[1] == g * weights_desc->dims[with_groups + 1]));
-        AND_WANT((dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0]));
+        AND_WANT(memory_desc_wrapper(weights_desc).nelems())
+        AND_WANT(src_desc->ndims == dst_desc->ndims)
+        AND_WANT(utils::one_of(src_desc->ndims, 4, 5))
+        AND_WANT(utils::one_of(weights_desc->ndims, src_desc->ndims,
+                src_desc->ndims + 1))
+        AND_WANT((with_bias ? bias_desc->ndims == 1 : true))
+        AND_WANT((with_bias ? bias_desc->dims[0] == bias_dim : true))
+        AND_WANT(src_desc->dims[0] == dst_desc->dims[0])
+        AND_WANT(src_desc->dims[1] == g * weights_desc->dims[with_groups + 1])
+        AND_WANT(dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0])
 #endif
     for (int i = 2; i < src_desc->ndims; ++i)
     {

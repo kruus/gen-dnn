@@ -9,7 +9,7 @@ DOJUSTDOC="n"
 DOWARN="y"
 BUILDOK="y"
 SIZE_T=32 # or 64, for -s or -S SX compile
-JOBS="-j4"
+JOBS="-j8"
 CMAKETRACE=""
 USE_CBLAS=1
 QUICK=0
@@ -75,6 +75,9 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
         Q) # really quick: skip build and doxygen docs [JUST run cmake and stop]
             BUILDOK="n"; DODOC="n"
             ;;
+        T) # cmake --trace
+            CMAKETRACE="--trace"
+            ;;
         p) # permissive: disable the FAIL_WITHOUT_MKL switch
             DONEEDMKL="n"
             ;;
@@ -98,9 +101,6 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
             ;;
         W) # lots of compiler warnings (default)
             DOWARN=1
-            ;;
-        T) # cmake --trace
-            CMAKETRACE="--trace"
             ;;
         1) # make -j1
             JOBS="-j1"
