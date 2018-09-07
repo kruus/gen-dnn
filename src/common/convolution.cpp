@@ -106,31 +106,6 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
         && src_desc->dims[1] == g * weights_desc->dims[with_groups + 1]
         && dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0];
 #else
-    struct Consistency {
-        bool &var
-        Consistency(bool &var) : var(var), buf(&buffer[0]), rem_len(lenmax) {}
-        ~Consistency() {}
-        and_want(bool const cond, char const* file, int const line, char const* desc){
-            var &&= cond;
-            if (!cond){
-                consistency = false;
-                int n = snprintf(buf, rem_len, "Inconsistent: [%s:%d] %s\n",
-                        file, line, desc);
-                if (n <= rm_len){
-                    buf += n;
-                    rem_len -= n;
-                }else{
-                    rem_len = 0;
-                }
-            }
-        }
-        operator bool(){ return var; }
-        private:
-        int const lenmax = 1024;
-        char buffer[lenmax];
-        char *buf;
-        int rem_len;
-    };
 #define DPRINT(...) do \
     { \
         int n = snprintf(buf, rem_len, __VA_ARGS__); \
