@@ -40,15 +40,15 @@ struct CondLocVV { // CondLoc with "verbose always" hint (even in optimized -DND
 
 /** \group Condition_Location macros */
 //@{
-#define COND_LOC(...) CondLoc{bool{(__VA_ARGS__)}}
+#define COND_LOC(...) CondLoc{bool{!!(__VA_ARGS__)}}
 
 #if CONSPRINT
-#define COND_LOCV(...) CondLocV{bool{(__VA_ARGS__)}, __FILE__, __LINE__, #__VA_ARGS__}
+#define COND_LOCV(...) CondLocV{bool{!!(__VA_ARGS__)}, __FILE__, __LINE__, #__VA_ARGS__}
 #else
-#define COND_LOCV(...) CondLocV{bool{(__VA_ARGS__)}}
+#define COND_LOCV(...) CondLocV{bool{!!(__VA_ARGS__)}}
 #endif
 
-#define COND_LOCVV(...) CondLocVV{bool{(__VA_ARGS__)}, __FILE__, __LINE__, #__VA_ARGS__}
+#define COND_LOCVV(...) CondLocVV{bool{!!(__VA_ARGS__)}, __FILE__, __LINE__, #__VA_ARGS__}
 //@}
 
 namespace {
@@ -153,9 +153,9 @@ struct Consistency {
 //#define SCHK(CONSISTENCY,...) do{ if(CONSISTENCY) { CONSISTENCY && COND_LOC(__VA_ARGS__); }}while(0)
 //#define SCHKV(CONSISTENCY,...) do{ if(CONSISTENCY) { CONSISTENCY && COND_LOCV(__VA_ARGS__); }}while(0)
 // ... or the ternary operator (for slightly more usage freedom) ...
-#define SCHK(CONSISTENCY,...) (bool)((!CONSISTENCY)? CONSISTENCY: CONSISTENCY && COND_LOC(__VA_ARGS__))
-#define SCHKV(CONSISTENCY,...) (bool)((!CONSISTENCY)? CONSISTENCY: CONSISTENCY && COND_LOCV(__VA_ARGS__))
-#define SCHKVV(CONSISTENCY,...) (bool)((!CONSISTENCY)? CONSISTENCY: CONSISTENCY && COND_LOCVV(__VA_ARGS__))
+#define SCHK(OK,...) (bool)((!OK)? OK: OK && COND_LOC(__VA_ARGS__))
+#define SCHKV(OK,...) (bool)((!OK)? OK: OK && COND_LOCV(__VA_ARGS__))
+#define SCHKVV(OK,...) (bool)((!OK)? OK: OK && COND_LOCVV(__VA_ARGS__))
 ///@}
 
 //----------------------------- normal end of header ----------------------------------------

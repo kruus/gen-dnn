@@ -20,6 +20,7 @@
 #include "c_types_map.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+#include "consistency.hpp" // debug: print reason for consistency failures
 
 using namespace mkldnn::impl;
 using namespace mkldnn::impl::utils;
@@ -106,31 +107,20 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
         && src_desc->dims[1] == g * weights_desc->dims[with_groups + 1]
         && dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0];
 #else
-#define DPRINT(...) do \
-    { \
-        int n = snprintf(buf, rem_len, __VA_ARGS__); \
-        if( n > rem_len ){ rem_len = 0; } \
-        else { buf+=n; rem_len-=n; } \
-    } while(0)
-#define AND_WANt(COND) do { \
-    bool cond; \
-    if (!(cond=(__VA_ARGS__))){ \
-        DPRINT("Oops [%s:%d] %s\n", __FILE__, __LINE__, #COND); \
-        consistency = false; \
-    } \
-}while(0)
-#define AND_WANT(...) AND_WANt( (__VA_ARGS__) )
-    bool consistency = true;
-        AND_WANT(memory_desc_wrapper(weights_desc).nelems())
-        AND_WANT(src_desc->ndims == dst_desc->ndims)
-        AND_WANT(utils::one_of(src_desc->ndims, 4, 5))
-        AND_WANT(utils::one_of(weights_desc->ndims, src_desc->ndims,
-                src_desc->ndims + 1))
-        AND_WANT((with_bias ? bias_desc->ndims == 1 : true))
-        AND_WANT((with_bias ? bias_desc->dims[0] == bias_dim : true))
-        AND_WANT(src_desc->dims[0] == dst_desc->dims[0])
-        AND_WANT(src_desc->dims[1] == g * weights_desc->dims[with_groups + 1])
-        AND_WANT(dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0])
+    // SCHK is silent, SCHKV prints failures in debug mode: consistency.hpp
+    // SCHK* macros short-circuit evaluation, ACHK* macros do not.
+#define AND_(...) SCHKV(consistency,__VA_ARGS__)
+    Consistency consistency("convolution issue:");
+    AND_(memory_desc_wrapper(weights_desc).nelems());
+    AND_(src_desc->ndims == dst_desc->ndims);
+    AND_(utils::one_of(src_desc->ndims, 4, 5));
+    AND_(utils::one_of(weights_desc->ndims, src_desc->ndims,
+            src_desc->ndims + 1));
+    AND_(with_bias ? bias_desc->ndims == 1 : true);
+    AND_(with_bias ? bias_desc->dims[0] == bias_dim : true);
+    AND_(src_desc->dims[0] == dst_desc->dims[0]);
+    AND_(src_desc->dims[1] == g * weights_desc->dims[with_groups + 1]);
+    AND_(dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0]);
 #endif
     for (int i = 2; i < src_desc->ndims; ++i)
     {
@@ -145,14 +135,8 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
 
         if (str < 1) return invalid_arguments;
 #if 0 // old
-#ifdef NDEBUG
         consistency = consistency &&
             (src - ((ker - 1) * (dil + 1) + 1) + pad) / str + 1 == dst;
-#else
-        AND_WANT((src - ((ker - 1) * (dil + 1) + 1) + pad) / str + 1 == dst);
-        if( !consistency ){ DPRINT("(src-((ker-1)+(dil+1)+1) + pad)/str+1 = (%d-(%d*%d+1)+%d)/%d+1 = %d/%d+1 = %d, but dst = %d\n",
-                src,ker-1,dil+1,pad,str, (src - ((ker - 1) * (dil + 1) + 1) + pad), str,  (src - ((ker - 1) * (dil + 1) + 1) + pad) / str + 1, dst);}
-#endif
 #endif
 #ifdef NDEBUG
         consistency = consistency
@@ -161,20 +145,15 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
             && pad_r + str > 0
             && (src - ker_range + pad_l + pad_r) / str + 1 == dst;
 #else
-        AND_WANT( dil >= 0 );
-        AND_WANT( pad_l >= 0 );
-        AND_WANT( pad_r + str > 0 );
-        AND_WANT( (src - ker_range + pad_l + pad_r) / str + 1 == dst );
+        //consistency:
+        AND_(dil >= 0);
+        AND_(pad_l >= 0);
+        AND_(pad_r + str > 0);
+        AND_((src - ker_range + pad_l + pad_r) / str + 1 == dst);
 #endif
     }
 #ifndef NDEBUG
-    //printf("consistency = %s\n", (consistency?"true":"false"));
-    if (!consistency){
-        printf("Msg %s\n", &buffer[0]);
-        fflush(stdout);
-    }
-#undef AND_WANT
-#undef DPRINT
+#undef AND_
 #endif
     if (!consistency) return invalid_arguments;
 
