@@ -93,7 +93,13 @@ status_t mkldnn_primitive_desc_create_v2(primitive_desc_t **primitive_desc,
 
     mkldnn_primitive_desc_iterator it(engine, op_desc, attr, hint_fwd_pd);
     ++it;
-    if (it == it.end()) return unimplemented;
+    if (it == it.end()){
+//#ifndef NDEBUG
+//        printf("no more implementations for %s primitive!\n",
+//               mkldnn_prim_kind2str(reinterpret_cast<const op_desc_t*>(c_op_desc)->kind));
+//#endif
+        return unimplemented;
+    }
 
     return safe_ptr_assign<primitive_desc_t>(*primitive_desc, *it);
 }

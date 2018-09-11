@@ -28,22 +28,6 @@
 namespace mkldnn {
 namespace impl {
 
-//struct memory_pd_t; // fwd declaration
-
-// What effect on vanilla runtimes ...
-//  fast_memory_desc_wrapper< memory_format_t >
-//  - with size and off_v and off_l specialized.
-// Use in kernels as switch over all possible memory formats
-//  - Ex. switch(src_pd._md.format())
-//          case(nchw): fast_memory_desc_wrapper<nchw> src_xx(src_pd._md);
-//                      KERNEL( ..src_data[ src_xx.off(a,b,...) ] );
-//                      // and now src_xx.off is known at COMPILE-time.
-//                      break
-//          // ... repeat KERNEL code for ALL possible _md.format()s
-//        }
-//  - with multiple src/wei/out formats could get template explosion, so
-//    include a default case invoking the un-templated memory_desc_wrapper
-//    
 /** thin wrapper class over \struct memory_desc_t which allows easy
  * manipulatings with underlying C structure, which is taken by refernce */
 struct memory_desc_wrapper: public c_compatible {
@@ -53,7 +37,6 @@ struct memory_desc_wrapper: public c_compatible {
      * descriptor \param md */
     memory_desc_wrapper(const memory_desc_t &md) : _md(&md) {}
     memory_desc_wrapper(const memory_desc_t *md) : _md(md) {}
-    // /** do not depend on \c memory_pd.hpp */
     memory_desc_wrapper(const memory_pd_t *m_pd);
 
     /* implementing attributes */
@@ -198,7 +181,6 @@ struct memory_desc_wrapper: public c_compatible {
             phys_offset += pos_block * blk.strides[0][d];
             phys_offset += pos_within_block * blk.strides[1][d];
         }
-#if MKLDNN_JIT_TYPES > 0
         if (format() == gOIhw4i16o4i || format() == OIhw4i16o4i) {
             // TODO: Fix temporary workaround for formats with double blocking
             const bool with_groups = format() == gOIhw4i16o4i;
@@ -227,7 +209,6 @@ struct memory_desc_wrapper: public c_compatible {
             const int oc_2  = pos[with_groups + 0] % 2;
             phys_offset += -16 * oc_2 + ic_16 + oc_2;
         }
-#endif
         return phys_offset;
     }
 
@@ -362,7 +343,7 @@ inline bool memory_desc_wrapper::similar_to(const memory_desc_wrapper &rhs,
 
 inline bool memory_desc_wrapper::consistent_with(
         const memory_desc_wrapper &rhs) const {
-#if !defined(__ve)
+#if 1 || !defined(__ve)
     if (ndims() == rhs.ndims()) {
         for (int d = 0; d < ndims(); ++d) {
             if (dims()[d] != rhs.dims()[d]) return false;

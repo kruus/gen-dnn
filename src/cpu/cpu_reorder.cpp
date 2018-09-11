@@ -77,7 +77,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     jit_uni_reorder_create,
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
     /* fp32: flat <-> blocked with tail */
     REG_SR_BIDIR(f32, any, f32, nChw16c),
     REG_SR_BIDIR(f32, any, f32, nCdhw16c),

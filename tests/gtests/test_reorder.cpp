@@ -140,7 +140,7 @@ INSTANTIATE_TEST_CASE_P(TestReorder, reorder_simple_corner_cases_f32_f32,
         ::testing::Values(
             cfg_f32{eng::cpu, fmt::nchw, fmt::nc, {2, 16, 8, 8}, true, mkldnn_invalid_arguments},
             cfg_f32{eng::cpu, fmt::nchw, fmt::nchw, {0, 16, 8, 8}}
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
             , cfg_f32{eng::cpu, fmt::nchw, fmt::nChw8c, {0, 5, 8, 8}},
             cfg_f32{eng::cpu, fmt::nchw, fmt::nChw16c, {0, 5, 8, 8}},
             cfg_f32{eng::cpu, fmt::OIhw8i8o, fmt::OIhw8o8i, {0, 32, 3, 3}},
@@ -258,7 +258,7 @@ INSTANTIATE_TEST_CASE_P(TestReorder, reorder_simple_test_data_f32_f32,
             cfg_f32{eng::cpu, fmt::nchw, fmt::chwn, {28, 3, 10, 10}},
             cfg_f32{eng::cpu, fmt::chwn, fmt::nchw, {28, 3, 10, 10}},
             cfg_f32{eng::cpu, fmt::nhwc, fmt::nhwc, {10, 10, 13, 13}}
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
             , cfg_f32{eng::cpu, fmt::nchw, fmt::nChw8c, {2, 32, 4, 4}},
             cfg_f32{eng::cpu, fmt::nChw8c, fmt::nchw, {2, 32, 4, 4}},
             cfg_f32{eng::cpu, fmt::chwn, fmt::nChw8c, {28, 96, 10, 10}},
@@ -282,7 +282,7 @@ INSTANTIATE_TEST_CASE_P(TestReorder, reorder_simple_test_weights_f32_f32_0,
         ::testing::Values(
             cfg_f32{eng::cpu, fmt::hwio, fmt::oihw, {32, 32, 3, 3}},
             cfg_f32{eng::cpu, fmt::oihw, fmt::hwio, {32, 32, 3, 3}}
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
             , cfg_f32{eng::cpu, fmt::hwio, fmt::Ohwi8o, {32, 32, 3, 3}},
             cfg_f32{eng::cpu, fmt::Ohwi8o, fmt::hwio, {32, 32, 3, 3}},
             cfg_f32{eng::cpu, fmt::hwio, fmt::Ohwi16o, {64, 64, 3, 3}},
@@ -335,7 +335,7 @@ INSTANTIATE_TEST_CASE_P(TestReorder, reorder_simple_test_weights_f32_f32_0,
             )
         );
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 TEST_P(reorder_simple_test_weights_f32_f32_1, TestsReorder) { }
 INSTANTIATE_TEST_CASE_P(TestReorder, reorder_simple_test_weights_f32_f32_1,
         ::testing::Values(
@@ -345,7 +345,7 @@ INSTANTIATE_TEST_CASE_P(TestReorder, reorder_simple_test_weights_f32_f32_1,
         );
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 TEST_P(reorder_simple_test_weights_f32_f32_IOhw16o16i, TestsReorder) { }
 INSTANTIATE_TEST_CASE_P(TestReorder, reorder_simple_test_weights_f32_f32_IOhw16o16i,
         ::testing::Values(
@@ -361,7 +361,7 @@ INSTANTIATE_TEST_CASE_P(TestReorder, reorder_simple_test_weights_f32_f32_IOhw16o
         );
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 TEST_P(reorder_simple_test_s32_s32, TestsReorder) { }
 INSTANTIATE_TEST_CASE_P(TestReorder, reorder_simple_test_s32_s32,
         ::testing::Values(
@@ -371,7 +371,7 @@ INSTANTIATE_TEST_CASE_P(TestReorder, reorder_simple_test_s32_s32,
         );
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 TEST_P(reorder_simple_test_s16_s16, TestsReorder) { }
 INSTANTIATE_TEST_CASE_P(TestReorder, reorder_simple_test_s16_s16,
         ::testing::Values(
@@ -387,7 +387,7 @@ INSTANTIATE_TEST_CASE_P(TestReorder, reorder_simple_test_s16_s16,
         );
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 TEST_P(reorder_simple_test_s8_s8, TestsReorder) { }
 INSTANTIATE_TEST_CASE_P(TestReorder, reorder_simple_test_s8_s8,
         ::testing::Values(

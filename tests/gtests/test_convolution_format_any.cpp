@@ -28,8 +28,15 @@
 using std::cout;
 using std::endl;
 #define SHOW(msg,what) std::cout<<msg<<what<<std::endl;
+inline std::ostream& operator<<(std::ostream& os, fmt const& f){
+    return os << mkldnn_fmt2str((mkldnn_memory_format_t)f);
+}
+// SHOX should agree with EXP_VALS_NUM ...
+#define SHOX(msg,what) std::cout<<msg<<what[0]<<" / "<<what[1]<<" / "<<what[2]<<std::endl;
+
 #else
 #define SHOW(msg,what)
+#define SHOX(msg,what)
 #endif
 
 namespace mkldnn {
@@ -123,23 +130,28 @@ protected:
         auto conv_prim_desc = convolution_forward::primitive_desc(conv_desc, eng);
         SHOW(" src   : fmt -->",conv_prim_desc.src_primitive_desc().desc().data.format);
         SHOW("         desc-->",conv_prim_desc.src_primitive_desc().desc().data);
+        SHOW("          in -->",mkldnn_fmt2str((mkldnn_memory_format_t)p.src_fmt.in));
+        SHOX("         exp -->",p.src_fmt.exp);
         ASSERT_TRUE(
                 FmtIsExp(conv_prim_desc.src_primitive_desc().desc().data.format,
                         p.src_fmt.exp));
         SHOW("weights: fmt -->",conv_prim_desc.weights_primitive_desc().desc().data.format);
         SHOW("         desc-->",conv_prim_desc.weights_primitive_desc().desc().data);
+        SHOX("         exp -->",p.weights_fmt.exp);
         ASSERT_TRUE(FmtIsExp(
                 conv_prim_desc.weights_primitive_desc().desc().data.format,
                 p.weights_fmt.exp));
         if (with_bias) {
             SHOW("  bias : fmt -->",conv_prim_desc.bias_primitive_desc().desc().data.format);
             SHOW("         desc-->",conv_prim_desc.bias_primitive_desc().desc().data);
+            SHOX("         exp -->",p.bias_fmt.exp);
             ASSERT_TRUE(FmtIsExp(
                     conv_prim_desc.bias_primitive_desc().desc().data.format,
                     p.bias_fmt.exp));
         }
         SHOW("  dst  : fmt -->",conv_prim_desc.dst_primitive_desc().desc().data.format);
         SHOW("         desc-->",conv_prim_desc.dst_primitive_desc().desc().data);
+        SHOX("         exp -->",p.dst_fmt.exp);
         ASSERT_TRUE(
                 FmtIsExp(conv_prim_desc.dst_primitive_desc().desc().data.format,
                         p.dst_fmt.exp));
@@ -156,39 +168,35 @@ TEST_P(conv_any_fmt_test_float, TestsConvolutionAnyFmt)
 #define ALG algorithm::convolution_direct
 #define PROP_KIND prop_kind::forward
 
-#define ANY_X { fmt::any,    \
-              { fmt::x, fmt::format_undef, fmt::format_undef } }
-#define ANY_NCHW { fmt::any, \
-              { fmt::nchw, fmt::format_undef, fmt::format_undef } }
-//#define ANY_OIHW { fmt::any, { fmt::oihw, fmt::format_undef, fmt::format_undef } }
-#define ANY_OIHWxO { fmt::any, { fmt::Ohwi8o, fmt::format_undef, fmt::format_undef } }
-#define ANY_OIHWxI { fmt::any, { fmt::oIhw8i, fmt::format_undef, fmt::format_undef } }
+#define UNDEF fmt::format_undef
+#define ANY_X      { fmt::any, { fmt::x, UNDEF, UNDEF } }
+#define ANY_NCHW   { fmt::any, { fmt::nchw, UNDEF, UNDEF } }
+#define ANY_OIHWxO { fmt::any, { fmt::oihw, fmt::Ohwi8o, UNDEF } }
+#define ANY_OIHWxI { fmt::any, { fmt::nchw, fmt::oIhw8i, UNDEF } }
+// added formats so gemm/ref impls also pass...
 INSTANTIATE_TEST_CASE_P(TestConvolutionAnyFmtForward, conv_any_fmt_test_float,
     ::testing::Values(conv_any_fmt_test_params_float{ PROP_KIND, ENGINE, ALG,
     ANY_NCHW, ANY_OIHWxO, ANY_X, ANY_OIHWxI,
-    /* src     weights  bias    dst    */
+    /* src    weights     bias   dst    */
     { 2, 1, 4, 4, 4, 6, 4, 4, 3, 3, 1, 1, 1, 1 }/* conv sizes */ }));
 
 #if !defined(TARGET_VANILLA)
 // Typically jit-related to Intel SIMD register lengths
-// These tests compile in VANILLA mode, but 'make test' fails them.
 #define ANY_OHWIxO { fmt::any,   \
                    { fmt::Ohwi8o, fmt::Ohwi16o, fmt::Oihw16o } }
 #define ANY_NCHWxC { fmt::any,   \
-                   { fmt::nChw8c, fmt::nChw16c, fmt::format_undef } }
+                   { fmt::nChw8c, fmt::nChw16c, UNDEF } }
 #define ANY_OIHWxIxO { fmt::any, \
-                     { fmt::OIhw8i8o, fmt::OIhw16i16o, fmt::format_undef } }
+                     { fmt::oihw, fmt::OIhw8i8o, fmt::OIhw16i16o } }
 #define ANY_GOIHWxIxO { fmt::any,\
-                      { fmt::gOIhw8i8o, fmt::gOIhw16i16o, fmt::format_undef } }
-#endif
+                      { fmt::gOIhw8i8o, fmt::gOIhw16i16o, UNDEF } }
 
-#if !defined(TARGET_VANILLA)
 /* For now, these formats all require JIT (cpu/) code */
 INSTANTIATE_TEST_CASE_P(
         TestConvolutionAlexnetAnyFmtForwardxlocked, conv_any_fmt_test_float,
         ::testing::Values(
                 conv_any_fmt_test_params_float{ PROP_KIND, ENGINE, ALG,
-                        ANY_NCHW, ANY_OHWIxO, ANY_X, ANY_NCHWxC,
+                        ANY_NCHW, ANY_OHWIxO, ANY_X, ANY_NCHW,
                         { 2, 1, 3, 227, 227, 96, 55, 55, 11, 11, 0, 0, 4, 4 } },
                 conv_any_fmt_test_params_float{ PROP_KIND, ENGINE, ALG,
                         ANY_NCHWxC, ANY_GOIHWxIxO, ANY_X, ANY_NCHWxC,

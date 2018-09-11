@@ -94,16 +94,12 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
             nchw,
             nhwc,
             chwn,
-#if MKLDNN_JIT_TYPES > 0
             nChw8c,
             nChw16c,
-#endif
             ncdhw,
             ndhwc,
-#if MKLDNN_JIT_TYPES > 0
             nCdhw8c,
             nCdhw16c,
-#endif
             oi,
             io,
             oihw,
@@ -111,7 +107,6 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
             hwio,
             dhwio,
             oidhw,
-#if MKLDNN_JIT_TYPES > 0
             OIdhw8i8o,
             OIdhw8o8i,
             Odhwi8o,
@@ -135,10 +130,8 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
             Oihw16o,
             Ohwi8o,
             Ohwi16o,
-#endif
             goihw,
             hwigo,
-#if MKLDNN_JIT_TYPES > 0
             gOIhw8i8o,
             gOIhw16i16o,
             gOIhw4i16o4i,
@@ -153,9 +146,7 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
             gOhwi16o,
             Goihw8g,
             Goihw16g,
-#endif
             goidhw,
-#if MKLDNN_JIT_TYPES > 0
             gOIdhw8i8o,
             gOIdhw8o8i,
             gOdhwi8o,
@@ -163,7 +154,6 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
             gOIdhw16o16i,
             gOidhw16o,
             gOdhwi16o,
-#endif
             ntc,
             tnc,
             ldsnc,

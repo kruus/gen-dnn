@@ -49,22 +49,24 @@ struct _ref_convolution_fwd_t: public cpu_primitive_t {
             using namespace prop_kind;
             using namespace data_type;
             assert(this->engine()->kind() == engine_kind::cpu);
-            bool ok = true
-                && this->set_default_params() == status::success
-                && utils::one_of(this->cdesc_().prop_kind, forward_training,
-                        forward_inference)
-                && this->cdesc_().alg_kind == alg_kind::convolution_direct
-                && this->cdesc_().src_desc.data_type == src_type
-                && this->cdesc_().weights_desc.data_type == wei_type
-                && this->cdesc_().accum_data_type == acc_type
-                && this->cdesc_().dst_desc.data_type == dst_type
-                && utils::implication(this->with_bias(), true
+            Consistency ok("ref_conv init"); // default here is never-verbose, SCHK
+#define AND_(...) SCHKV(ok,__VA_ARGS__)
+            AND_(this->set_default_params() == status::success);
+            AND_(utils::one_of(this->cdesc_().prop_kind, forward_training,
+                        forward_inference));
+            AND_(this->cdesc_().alg_kind == alg_kind::convolution_direct);
+            AND_(this->cdesc_().src_desc.data_type == src_type);
+            AND_(this->cdesc_().weights_desc.data_type == wei_type);
+            AND_(this->cdesc_().accum_data_type == acc_type);
+            AND_(this->cdesc_().dst_desc.data_type == dst_type);
+            AND_(utils::implication(this->with_bias(), true
                         && utils::implication(src_type == u8,
                             utils::one_of(this->cdesc_().bias_desc.data_type,
                                 f32, s32, s8, u8))
                         && utils::implication(src_type == f32,
-                            this->cdesc_().bias_desc.data_type == f32))
-                && this->attr()->has_default_values();
+                            this->cdesc_().bias_desc.data_type == f32)));
+            AND_(this->attr()->has_default_values());
+#undef AND_
             return ok ? status::success : status::unimplemented;
         }
     };
@@ -128,15 +130,17 @@ struct ref_convolution_bwd_data_t: public cpu_primitive_t {
         virtual status_t init() override {
             using namespace prop_kind;
             assert(this->engine()->kind() == engine_kind::cpu);
-            bool ok = true
-                && this->set_default_params() == status::success
-                && this->desc()->prop_kind == backward_data
-                && this->desc()->alg_kind == alg_kind::convolution_direct
-                && this->desc()->diff_dst_desc.data_type == diff_dst_type
-                && this->desc()->weights_desc.data_type == wei_type
-                && this->desc()->accum_data_type == acc_type
-                && this->desc()->diff_src_desc.data_type == diff_src_type
-                && this->attr()->has_default_values();
+            Consistency ok; // default here is never-verbose
+#define AND_(...) SCHKV(ok,__VA_ARGS__)
+            AND_(this->set_default_params() == status::success);
+            AND_(this->desc()->prop_kind == backward_data);
+            AND_(this->desc()->alg_kind == alg_kind::convolution_direct);
+            AND_(this->desc()->diff_dst_desc.data_type == diff_dst_type);
+            AND_(this->desc()->weights_desc.data_type == wei_type);
+            AND_(this->desc()->accum_data_type == acc_type);
+            AND_(this->desc()->diff_src_desc.data_type == diff_src_type);
+            AND_(this->attr()->has_default_values());
+#undef AND_
             return ok ? status::success : status::unimplemented;
         }
 
@@ -185,18 +189,18 @@ struct ref_convolution_bwd_weights_t: public cpu_primitive_t {
         virtual status_t init() override {
             using namespace prop_kind;
             assert(this->engine()->kind() == engine_kind::cpu);
-            bool ok = true
-                && this->set_default_params() == status::success
-                && this->desc()->prop_kind == backward_weights
-                && this->desc()->alg_kind == alg_kind::convolution_direct
-                && this->desc()->src_desc.data_type == src_type
-                && this->desc()->diff_weights_desc.data_type == diff_wei_type
-                && this->desc()->diff_dst_desc.data_type == diff_dst_type
-                && this->desc()->accum_data_type == acc_type
-                && utils::implication(this->with_bias(),
+            Consistency ok;
+            OK_AND(this->set_default_params() == status::success);
+            OK_AND(this->desc()->prop_kind == backward_weights);
+            OK_AND(this->desc()->alg_kind == alg_kind::convolution_direct);
+            OK_AND(this->desc()->src_desc.data_type == src_type);
+            OK_AND(this->desc()->diff_weights_desc.data_type == diff_wei_type);
+            OK_AND(this->desc()->diff_dst_desc.data_type == diff_dst_type);
+            OK_AND(this->desc()->accum_data_type == acc_type);
+            OK_AND(utils::implication(this->with_bias(),
                         this->desc()->diff_bias_desc.data_type
-                        == diff_wei_type)
-                && this->attr()->has_default_values();
+                        == diff_wei_type));
+            OK_AND(this->attr()->has_default_values());
             return ok ? status::success : status::unimplemented;
         }
     };

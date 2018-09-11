@@ -51,6 +51,9 @@ struct mkldnn_primitive_desc_iterator: public mkldnn::impl::c_compatible {
                     hint_fwd_pd_);
             if (s ==  mkldnn::impl::status::success) break;
         }
+//#ifndef NDEBUG
+//        if( idx_ >= last_idx_ ) printf(" ++:%d>=%dend ",idx_, last_idx_ );
+//#endif
         return *this;
     }
 

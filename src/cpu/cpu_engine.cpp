@@ -106,7 +106,10 @@ using namespace mkldnn::impl::data_type;
  * 2. Set VERBOSE_PRIMITIVE_CREATE to print the names of created primitives.
  */
 #if VERBOSE_PRIMITIVE_CREATE
-/** A verbose version of primitive_desc_t::create<pd_t>. \sa primitive_desc.hpp */
+/** A verbose version of primitive_desc_t::create<pd_t>. \sa primitive_desc.hpp.
+ * Note: now you can also just call mkldnn_verbose_set(2) in cpu_engine constructor (or so),
+ *       and get more detailed info about execution and construction.
+ * So the only real use of this is to track failed/successful creations (and not the executions) */
 template<typename prim>
 #if !defined(_SX)
 static
@@ -122,11 +125,22 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
     typedef typename prim::pd_t pd_t;
     mkldnn::impl::status_t ret = primitive_desc_t::create<pd_t>( pd, adesc,
             attr, engine, hint_fwd );
-    if( ret == success )
-        printf(" create<%s>::pd_t(pd,adesc,engine,hint_fwd) --> %d\n",
-                (*pd)->name(), ret );
+    if( ret == success ) {
+        printf(" created descriptor %s name %s\n",
+                mkldnn_prim_kind2str(adesc->kind), (*pd)->name());
+        char const* result;
+        mkldnn_primitive_desc_query( *pd, mkldnn_query_impl_info_str, 0, &result );
+        printf(" created descriptor %s\n", result);
+        fflush(stdout);
+    }else{
+        printf(" no-%s", mkldnn_prim_kind2str(adesc->kind));
+        fflush(stdout);
+    }
     return ret;
 }
+// unfortunately, a one-liner as follows would create a temporary...
+//#define INSTANCE_CREATOR(...) WrapCreate(verbose_primitive_desc_create<__VA_ARGS__>, #__VA_ARGS__)
+// so we "lose" the asked for name ...
 #define INSTANCE_CREATOR(...) verbose_primitive_desc_create<__VA_ARGS__>
 #else
 #define INSTANCE_CREATOR(...) primitive_desc_t::create<__VA_ARGS__::pd_t>
@@ -243,21 +257,21 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(ref_deconvolution_bwd_data_t)
     INSTANCE(ref_deconvolution_fwd_t)
     /* eltwise */
-    INSTANCE_avx512(jit_uni_eltwise_fwd_t<avx512_common>)
-    INSTANCE_avx512(jit_uni_eltwise_bwd_t<avx512_common>)
-    INSTANCE_avx2(jit_uni_eltwise_fwd_t<avx2>)
-    INSTANCE_avx2(jit_uni_eltwise_bwd_t<avx2>)
-    INSTANCE_sse42(jit_uni_eltwise_fwd_t<sse42>)
-    INSTANCE_sse42(jit_uni_eltwise_bwd_t<sse42>)
+    //INSTANCE_avx512(jit_uni_eltwise_fwd_t<avx512_common>)
+    //INSTANCE_avx512(jit_uni_eltwise_bwd_t<avx512_common>)
+    //INSTANCE_avx2(jit_uni_eltwise_fwd_t<avx2>)
+    //INSTANCE_avx2(jit_uni_eltwise_bwd_t<avx2>)
+    //INSTANCE_sse42(jit_uni_eltwise_fwd_t<sse42>)
+    //INSTANCE_sse42(jit_uni_eltwise_bwd_t<sse42>)
     INSTANCE(ref_eltwise_fwd_t<f32>)
     INSTANCE(ref_eltwise_bwd_t<f32>)
     /* eltwise (int) */
-    INSTANCE(ref_eltwise_fwd_t<s32>)
-    INSTANCE(ref_eltwise_fwd_t<s16>)
-    INSTANCE(ref_eltwise_fwd_t<s8>)
-    INSTANCE(ref_eltwise_fwd_t<u8>)
-    INSTANCE(ref_eltwise_bwd_t<s32>)
-    INSTANCE(ref_eltwise_bwd_t<s16>)
+    //INSTANCE(ref_eltwise_fwd_t<s32>)
+    //INSTANCE(ref_eltwise_fwd_t<s16>)
+    //INSTANCE(ref_eltwise_fwd_t<s8>)
+    //INSTANCE(ref_eltwise_fwd_t<u8>)
+    //INSTANCE(ref_eltwise_bwd_t<s32>)
+    //INSTANCE(ref_eltwise_bwd_t<s16>)
     /* softmax */
     INSTANCE(ref_softmax_fwd_t<f32>)
     INSTANCE(ref_softmax_bwd_t<f32>)

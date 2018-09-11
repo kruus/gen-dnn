@@ -94,7 +94,7 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
         ? src_desc->dims[1]
         : dst_desc->dims[1];
 
-#ifdef NDEBUG
+#if 0 // orig
     bool consistency = true
         && memory_desc_wrapper(weights_desc).nelems()
         && src_desc->ndims == dst_desc->ndims
@@ -110,7 +110,7 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
     // SCHK is silent, SCHKV prints failures in debug mode: consistency.hpp
     // SCHK* macros short-circuit evaluation, ACHK* macros do not.
 #define AND_(...) SCHKV(consistency,__VA_ARGS__)
-    Consistency consistency("convolution issue:");
+    Consistency consistency("convolution consistency:");
     AND_(memory_desc_wrapper(weights_desc).nelems());
     AND_(src_desc->ndims == dst_desc->ndims);
     AND_(utils::one_of(src_desc->ndims, 4, 5));
@@ -133,12 +133,12 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
         int dst = dst_desc->dims[i];
         int ker_range = 1 + (ker - 1) * (dil + 1);
 
-        if (str < 1) return invalid_arguments;
 #if 0 // old
         consistency = consistency &&
             (src - ((ker - 1) * (dil + 1) + 1) + pad) / str + 1 == dst;
 #endif
-#ifdef NDEBUG
+#if 0 // orig
+        if (str < 1) return invalid_arguments; // XXX why special?
         consistency = consistency
             && dil >= 0
             && pad_l >= 0
@@ -146,15 +146,14 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
             && (src - ker_range + pad_l + pad_r) / str + 1 == dst;
 #else
         //consistency:
+        AND_(str >= 1);
         AND_(dil >= 0);
         AND_(pad_l >= 0);
         AND_(pad_r + str > 0);
         AND_((src - ker_range + pad_l + pad_r) / str + 1 == dst);
 #endif
     }
-#ifndef NDEBUG
 #undef AND_
-#endif
     if (!consistency) return invalid_arguments;
 
     *conv_desc = cd;

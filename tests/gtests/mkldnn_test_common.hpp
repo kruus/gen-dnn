@@ -68,7 +68,7 @@ template<> struct acc_t<uint8_t> { typedef int type; };
 
 inline size_t map_index(const mkldnn::memory::desc &md, size_t index,
     bool with_padding = true) {
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
     using fmt = mkldnn::memory::format;
 
     const fmt fwd_weights_g_qvnni = fmt::gOIhw8i16o2i;
@@ -134,7 +134,7 @@ inline size_t map_index(const mkldnn::memory::desc &md, size_t index,
         size_t cur_pos_block = cur_pos / cur_block;
         size_t cur_pos_within_block = cur_pos % cur_block;
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
         if (d == (with_groups + 0)) {
             if (qvnni) { oc_lb = pos_d % 16;  oc_sb = pos_d % 2; }
             else  if (vnni) { oc_lb = pos_d % 16; }
@@ -149,9 +149,9 @@ inline size_t map_index(const mkldnn::memory::desc &md, size_t index,
 
         index /= cur_dim;
     }
-    int scale = 1;
-#if MKLDNN_JIT_TYPES > 0
     //int scale = (vnni) ? 3 : 1;
+    int scale = 1;
+#if 1 || MKLDNN_JIT_TYPES > 0
     if (vnni) scale = 3;
 #endif
     if (fwd_wei) {
@@ -235,13 +235,10 @@ inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
     case f::nchw:
     case f::nhwc:
     case f::chwn:
-#if MKLDNN_JIT_TYPES > 0
     case f::nChw8c:
     case f::nChw16c:
-#endif
     case f::oihw:
     case f::hwio:
-#if MKLDNN_JIT_TYPES > 0
     case f::OIhw8i8o:
     case f::OIhw16i16o:
     case f::OIhw8i16o2i:
@@ -252,20 +249,16 @@ inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
     case f::IOhw16o16i:
     case f::Ohwi8o:
     case f::Ohwi16o:
-#endif
         ndims = 4; break;
         //---------------
     case f::ncdhw:
     case f::ndhwc:
-#if MKLDNN_JIT_TYPES > 0
     case f::nCdhw8c:
     case f::nCdhw16c:
-#endif
     case f::dhwio:
     case f::oidhw:
     case f::goihw:
     case f::hwigo:
-#if MKLDNN_JIT_TYPES > 0
     case f::OIdhw8i8o:
     case f::OIdhw16i16o:
     case f::OIdhw8o8i:
@@ -281,17 +274,14 @@ inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
     case f::gOIhw8o8i:
     case f::gOIhw16o16i:
     case f::gIOhw16o16i:
-#endif
         ndims = 5; break;
         //---------------
-#if MKLDNN_JIT_TYPES > 0
     case f::goidhw:
     case f::gOIdhw8i8o:
     case f::gOIdhw16i16o:
     case f::gOIdhw8o8i:
     case f::gOIdhw16o16i:
     case f::gOdhwi16o:
-#endif
         ndims = 6; break;
         //---------------
     case f::format_undef:

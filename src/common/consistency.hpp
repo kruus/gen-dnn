@@ -23,6 +23,8 @@
 struct CondLoc { // Quiet default: never print, so struct is simpler
     bool cond;
 };
+// Q:: could templating this allow one to store the generic type of the evaluated expression
+//     for futher downstream use?   Ex. evaluate condition *and* store (say) mkldnn_status?
 struct CondLocV { // CondLoc with "verbose in debug compile" hint
     bool cond;
 #if CONSPRINT
@@ -71,9 +73,11 @@ struct Consistency {
     Consistency(char const* pfx="Inconsistent!")
         : pfx(pfx), var(true)
     {}
-    /** printing is done as failures are encountered, if nec. */
+    /** destructor is silent now that messages are printed 'as encountered' */
     ~Consistency() {
     }
+    /** change the failure output pfx */
+    void set_pfx(char const* newpfx) { if(newpfx) this->pfx = newpfx; }
     /** Using '&& COND_LOC(cond)' never prints [default behavior] */
     Consistency& operator &&(CondLoc const& cl){
         var = var && cl.cond;
@@ -156,6 +160,10 @@ struct Consistency {
 #define SCHK(OK,...) (bool)((!OK)? OK: OK && COND_LOC(__VA_ARGS__))
 #define SCHKV(OK,...) (bool)((!OK)? OK: OK && COND_LOCV(__VA_ARGS__))
 #define SCHKVV(OK,...) (bool)((!OK)? OK: OK && COND_LOCVV(__VA_ARGS__))
+
+/** Often \c Consistency variable is named 'ok',
+ * so provide a default macro verbose for debug compilation */
+#define OK_AND(...) SCHKVV(ok,__VA_ARGS__)
 ///@}
 
 //----------------------------- normal end of header ----------------------------------------

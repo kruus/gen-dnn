@@ -24,6 +24,7 @@
 #include "cpu_engine.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+#include "consistency.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -43,14 +44,15 @@ struct nspc_batch_normalization_fwd_t : public cpu_primitive_t {
             using namespace prop_kind;
             using namespace data_type;
             assert(engine()->kind() == engine_kind::cpu);
-            bool ok = true
-                && is_fwd()
-                && !has_zero_dim_memory()
-                && desc()->data_desc.data_type == f32
-                && utils::implication(use_scaleshift(),
-                        desc()->data_scaleshift_desc.data_type == f32)
-                && utils::one_of(data_pd_.desc()->format, memory_format::nhwc)
-                && (attr()->has_default_values() || this->with_relu_post_op());
+            //bool ok = true
+            Consistency ok;
+            OK_AND(is_fwd());
+            OK_AND(!has_zero_dim_memory());
+            OK_AND(desc()->data_desc.data_type == f32);
+            OK_AND(utils::implication(use_scaleshift(),
+                                    desc()->data_scaleshift_desc.data_type == f32));
+            OK_AND(utils::one_of(data_pd_.desc()->format, memory_format::nhwc));
+            OK_AND((attr()->has_default_values() || this->with_relu_post_op()));
             if (!ok)
                 return status::unimplemented;
 
@@ -101,14 +103,15 @@ struct nspc_batch_normalization_bwd_t : public cpu_primitive_t {
             using namespace prop_kind;
             using namespace data_type;
             assert(engine()->kind() == engine_kind::cpu);
-            bool ok = true
-                && is_bwd()
-                && !has_zero_dim_memory()
-                && desc()->data_desc.data_type == f32
-                && utils::implication(use_scaleshift(),
-                        desc()->data_scaleshift_desc.data_type == f32)
-                && utils::one_of(data_pd_.desc()->format, memory_format::nhwc)
-                && (attr()->has_default_values() || this->with_relu_post_op());
+            //bool ok = true
+            Consistency ok;
+            OK_AND(is_bwd());
+            OK_AND(!has_zero_dim_memory());
+            OK_AND(desc()->data_desc.data_type == f32);
+            OK_AND(utils::implication(use_scaleshift(),
+                                      desc()->data_scaleshift_desc.data_type == f32));
+            OK_AND(utils::one_of(data_pd_.desc()->format, memory_format::nhwc));
+            OK_AND((attr()->has_default_values() || this->with_relu_post_op()));
             if (!ok)
                 return status::unimplemented;
 
@@ -117,11 +120,11 @@ struct nspc_batch_normalization_bwd_t : public cpu_primitive_t {
                 const size_t this_ws_sz
                         = memory_desc_wrapper(this->workspace_pd()).size();
 
-                bool ws_ok = true && hint_fwd_pd_->workspace_pd()
-                        && memory_desc_wrapper(hint_fwd_pd_->workspace_pd())
-                                        .size()
-                                == this_ws_sz;
-                if (!ws_ok)
+                ok.set_pfx("ws_ok");
+                OK_AND(hint_fwd_pd_->workspace_pd());
+                OK_AND(memory_desc_wrapper(hint_fwd_pd_->workspace_pd())
+                     .size() == this_ws_sz);
+                if (!ok)
                     return status::unimplemented;
             }
 

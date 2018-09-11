@@ -25,6 +25,7 @@
 #include "memory_pd.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+#include "consistency.hpp"
 
 using namespace mkldnn::impl;
 using namespace mkldnn::impl::utils;
@@ -38,44 +39,22 @@ using std::cout;
 using std::endl;
 #endif
 
-#ifndef NDEBUG
-void mkldnn_breakpoint_empty_memory() { // breakpt for gdb
-    fflush(stdout);
-}
-#endif
-
 namespace {
 bool memory_desc_sanity_check(int ndims,const dims_t dims,
         data_type_t data_type, memory_format_t format) {
     if (ndims == 0) return true;
 
-    bool ok = true
-        && dims != nullptr
-        && 0 < ndims && ndims <= TENSOR_MAX_DIMS
-        && one_of(data_type, f32, s32, s16, s8, u8)
-        && format != memory_format::undef;
-#ifndef NDEBUG
-    if (!ok){
-        if (dims == nullptr) {printf(" dims==nullptr"); fflush(stdout);}
-        if (0 < ndims && ndims <= TENSOR_MAX_DIMS) {printf(" ndims not in [0,TENSOR_MAX_DIMS]"); fflush(stdout);}
-        if (!one_of(data_type, f32, s32, s16, s8, u8)){ printf(" bad data_type"); fflush(stdout);}
-        if (format != memory_format::undef) {printf(" format!=undef"); fflush(stdout);}
-    }
-#endif
-    if (ok) {
-        for (int d = 0; d < ndims; ++d)
-            if (dims[d] < 0) {
-                ok=false;
-#ifndef NDEBUG
-                if (!ok){ printf(" dims[%d] < 0",d); fflush(stdout); }
-#endif
-                break;
-            }
-    }
+    Consistency ok("memory_desc_sanity_check");
+    // SCHKVV-->verbose failures always; SCHKV-->debug compile; SCHK-->never
+#define AND_(...) SCHKVV(ok,__VA_ARGS__)
+    AND_(dims != nullptr);
+    AND_(0 < ndims && ndims <= TENSOR_MAX_DIMS);
+    AND_(one_of(data_type, f32, s32, s16, s8, u8));
+    AND_(format != memory_format::undef);
+    if(ok) for (int d = 0; ok && d < ndims; ++d)
+        AND_(dims[d] >= 0) || printf(" (dims[%d] = %d) < 0", d, dims[d]);
+#undef AND_
 
-#ifndef NDEBUG
-    if (!ok){ printf(" ** memory_desc_sanity_check_failed **\n"); fflush(stdout); }
-#endif
     return ok;
 }
 
@@ -98,17 +77,22 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     }
 
     /* memory_desc != 0 */
-    bool args_ok = !any_null(memory_desc)
-        && memory_desc_sanity_check(ndims, dims, data_type, format);
+    Consistency args_ok("memory_desc_init args:");
+#define AND_(...) SCHKV(args_ok,__VA_ARGS__)
+    AND_(!any_null(memory_desc));
+    AND_(memory_desc_sanity_check(ndims, dims, data_type, format));
 #ifndef NDEBUG // some additional checks on total size
     if(args_ok){
-        /* for now, mkl-dnn is written NOT to support large tensors (>2G) */
+        // For now, mkl-dnn is written NOT to support large tensors (>2G)
         uint64_t elements=1U;
         uint64_t const max_elements=2147483648U;
+        // Sometimes this check can catch compiler bugs for improperly zerod
+        // POD memory descriptors (ex. SX and __ve compilers).
         for(int i=0U; i<ndims; ++i){
             elements *= dims[i];
             if (elements > max_elements){ // note: elements==0 DOES occur
-                args_ok = false;
+                //args_ok = false;
+                AND_(false && "too big");
                 break;
             }
         }
@@ -117,13 +101,12 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
         if (!args_ok)
             printf("OOPS too large a tensor? elements=%lu ??\n",
                     (long unsigned)elements);
-#if 1 /* Note: some gtests may create zero-length memory descriptors on purpose */
+#if 0 // 0 dims now legal. Are there any restrictions?
         if(elements == 0U){
             printf("Warning in %s: 0 elements, dims=", __FUNCTION__);
             for(int i=0U; i<ndims; ++i){ printf("%s%lu",
-                    (i==0?"{":","), (long unsigned)elements); }
+                    (i==0?"{":","), (long unsigned)dims[i]); }
             printf("}\n");
-            mkldnn_breakpoint_empty_memory();
         }
 #endif
     }
@@ -141,12 +124,17 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     if (one_of(format, memory_format::undef, blocked, ldigo_p, ldgoi_p,
                 wino_fmt)) {
         status = invalid_arguments;
+        AND_(status==success && "bad fmt");
     } else if (format == any) {
         // nop
     } else if (types::format_normalize(format) == blocked) {
         status = memory_desc_wrapper::compute_blocking(md);
+        AND_(status==success && "compute_blocking failed" );
     } else {
+#ifndef NDEBUG
+        printf("memory_desc_init: unhandled format %s\n",mkldnn_fmt2str(format));
         assert(!"unreachable");
+#endif
         status = invalid_arguments;
     }
 
@@ -154,6 +142,7 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
         *memory_desc = md;
 
     return status;
+#undef AND_
 }
 
 status_t mkldnn_memory_primitive_desc_create(primitive_desc_t **memory_pd,

@@ -24,41 +24,11 @@
 #include "gemm_convolution_utils.hpp"
 #include "gemm/gemm.hpp"
 #include "scratchpad.hpp"
-
-#if 0 // old
-#if defined(TARGET_VANILLA) // remove jit types, and run_jit template parm must be false
-/** Remove all code for the jit 'sgemm_' pointer (type is not available) */
-#define MKLDNN_ONLY_IF(VAR,...) if (VAR) /*nothing*/
-#else
-#define MKLDNN_ONLY_IF(VAR,...) if (VAR) __VA_ARGS__
-#endif
-#endif
+#include "consistency.hpp"
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
-
-#if 0 // old
-namespace {
-/** Can be more complicated to support other OSes
- * (e.g. without JIT support, no mayiuse available).
- * Some compilers (gcc) still insist on one-liner returns here :( */
-template<bool run_jit, cpu_isa_t isa>
-static inline bool constexpr _gemm_convolution_implemented() {
-#if defined(TARGET_VANILLA)
-    static_assert(run_jit == false, "TARGET_VANILLA does not support run_jit" );
-    static_assert(isa == isa_any,   "TARGET_VANILLA only allows isa_any cpu type");
-    // mayiuse(isa) is a constexpr, but false is not generally a compile-time error.
-#endif
-
-#if defined(USE_MKL) || defined(USE_CBLAS)
-    return run_jit ? mayiuse(isa) : true;
-#else
-    return run_jit ? mayiuse(isa) : false;
-#endif
-}
-}
-#endif
 
 // OLD: template <bool with_relu, bool run_jit, cpu_isa_t isa>
 template <bool with_relu>
@@ -93,22 +63,24 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
 
             assert(this->engine()->kind() == engine_kind::cpu);
 
-            bool ok = true
-                && this->set_default_params() == status::success
-                && utils::one_of(this->cdesc_().prop_kind, forward_training,
-                           forward_inference)
-                && this->cdesc_().alg_kind == alg_kind::convolution_direct
-                && !this->has_zero_dim_memory()
-                && utils::everyone_is(data_type::f32,
-                           this->cdesc_().src_desc.data_type,
-                           this->cdesc_().weights_desc.data_type,
-                           this->cdesc_().dst_desc.data_type)
-                && utils::implication(this->with_bias(), data_type::f32
-                                   == this->cdesc_().bias_desc.data_type)
-                && this->src_pd_.desc()->format == src_format()
-                && this->dst_pd_.desc()->format == src_format()
-                && this->weights_pd_.desc()->format == wei_format()
-                && this->is_gemm_conv_format();
+            Consistency ok; // default never-verbose SCHK
+#define AND_(...) SCHKV(ok,__VA_ARGS__)
+            AND_(this->set_default_params() == status::success);
+            AND_(utils::one_of(this->cdesc_().prop_kind, forward_training,
+                        forward_inference));
+            AND_(this->cdesc_().alg_kind == alg_kind::convolution_direct);
+            AND_(!this->has_zero_dim_memory());
+            AND_(utils::everyone_is(data_type::f32,
+                        this->cdesc_().src_desc.data_type,
+                        this->cdesc_().weights_desc.data_type,
+                        this->cdesc_().dst_desc.data_type));
+            AND_(utils::implication(this->with_bias(), data_type::f32
+                        == this->cdesc_().bias_desc.data_type));
+            AND_(this->src_pd_.desc()->format == src_format());
+            AND_(this->dst_pd_.desc()->format == src_format());
+            AND_(this->weights_pd_.desc()->format == wei_format());
+            AND_(this->is_gemm_conv_format());
+#undef AND_
             return ok ? status::success : status::unimplemented;
         }
 
@@ -160,9 +132,6 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
         const data_t one = 1.0, zero = 0.0;
         beta_ = post_ops.find(primitive_kind::sum) >= 0 ? one : zero;
 
-        //MKLDNN_ONLY_IF (run_jit,
-        //    sgemm_ = new jit_uni_gemm_f32('N', 'N', beta_, false));
-
         jit_gemm_convolution_utils::init_conf(conf_.jcp_,
             *(conf_.cdesc()), conf_.src_pd(), conf_.weights_pd(0),
             conf_.dst_pd(), omp_get_max_threads(), with_relu,
@@ -174,8 +143,6 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
     }
 
     ~_gemm_convolution_fwd_t() {
-        //MKLDNN_ONLY_IF (run_jit, delete sgemm_);
-        //free(this->col_);
         delete this->scratchpad_;
     };
 
@@ -189,16 +156,6 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
 private:
     void execute_forward();
     pd_t conf_;
-#if 0
-#ifndef TARGET_VANILLA
-    using jit_uni_gemm_f32 = typename utils::conditional
-          <isa == avx2, jit_avx2_gemm_f32, jit_avx512_common_gemm_f32>::type;
-#else
-    using jit_uni_gemm_f32 = void; // sgemm_ unused (jit type may not be defined)
-#endif
-    jit_uni_gemm_f32 *sgemm_;
-    data_t *col_;
-#endif
     scratchpad_t *scratchpad_;
     data_t beta_;
 };
@@ -239,18 +196,21 @@ struct gemm_convolution_bwd_data_t: public cpu_primitive_t {
 
             assert(this->engine()->kind() == engine_kind::cpu);
 
-            bool ok = true
-                && this->set_default_params() == status::success
-                && this->desc()->prop_kind == backward_data
-                && this->desc()->alg_kind == alg_kind::convolution_direct
-                && !this->has_zero_dim_memory()
-                && utils::everyone_is(data_type::f32,
+            //bool ok = true
+            Consistency ok; // default here is never-verbose
+#define AND_(...) SCHKV(ok,__VA_ARGS__)
+            AND_(this->set_default_params() == status::success);
+            AND_(this->desc()->prop_kind == backward_data);
+            AND_(this->desc()->alg_kind == alg_kind::convolution_direct);
+            AND_(!this->has_zero_dim_memory());
+            AND_(utils::everyone_is(data_type::f32,
                         this->desc()->diff_src_desc.data_type,
                         this->desc()->weights_desc.data_type,
-                        this->desc()->diff_dst_desc.data_type)
-                && this->diff_src_pd_.desc()->format == src_format()
-                && this->diff_dst_pd_.desc()->format == src_format()
-                && this->weights_pd_.desc()->format == wei_format();
+                        this->desc()->diff_dst_desc.data_type));
+            AND_(this->diff_src_pd_.desc()->format == src_format());
+            AND_(this->diff_dst_pd_.desc()->format == src_format());
+            AND_(this->weights_pd_.desc()->format == wei_format());
+#undef AND_
             return ok ? status::success : status::unimplemented;
         }
 
@@ -276,9 +236,6 @@ struct gemm_convolution_bwd_data_t: public cpu_primitive_t {
     {
         using namespace prop_kind;
 
-        //MKLDNN_ONLY_IF (run_jit,
-        //    sgemm_ = new jit_uni_gemm_f32('N', 'T', 0.0, false));
-
         jit_gemm_convolution_utils::init_conf(conf_.jcp_,
             *(conf_.desc()), conf_.diff_src_pd(), conf_.weights_pd(0),
             conf_.diff_dst_pd(), omp_get_max_threads());
@@ -289,8 +246,6 @@ struct gemm_convolution_bwd_data_t: public cpu_primitive_t {
     }
 
     ~gemm_convolution_bwd_data_t() {
-        //MKLDNN_ONLY_IF (run_jit, delete sgemm_);
-        //free(this->col_);
         delete this->scratchpad_;
     };
 
@@ -310,17 +265,6 @@ struct gemm_convolution_bwd_data_t: public cpu_primitive_t {
 private:
     void execute_backward_data();
     pd_t conf_;
-#if 0
-#ifndef TARGET_VANILLA
-    using jit_uni_gemm_f32 = typename utils::conditional
-          <isa == avx2, jit_avx2_gemm_f32, jit_avx512_common_gemm_f32>::type;
-#else
-    using jit_uni_gemm_f32 = void; // sgemm_ unused (jit type may not be defined)
-#endif
-    jit_uni_gemm_f32 *sgemm_;
-    data_t *col_;
-    int nthr_;
-#endif
     scratchpad_t *scratchpad_;
 };
 
@@ -355,20 +299,22 @@ struct gemm_convolution_bwd_weights_t: public cpu_primitive_t {
 
             assert(this->engine()->kind() == engine_kind::cpu);
 
-            bool ok = true
-            && this->set_default_params() == status::success
-            && this->desc()->prop_kind == backward_weights
-            && this->desc()->alg_kind == alg_kind::convolution_direct
-            && !this->has_zero_dim_memory()
-            && utils::everyone_is(data_type::f32,
-                    this->desc()->src_desc.data_type,
-                    this->desc()->diff_weights_desc.data_type,
-                    this->desc()->diff_dst_desc.data_type)
-            && utils::implication(this->with_bias(),
-                    data_type::f32 == this->desc()->diff_bias_desc.data_type)
-            && this->src_pd_.desc()->format == src_format()
-            && this->diff_dst_pd_.desc()->format == src_format()
-            && this->diff_weights_pd_.desc()->format == wei_format();
+            Consistency ok; // default here is never-verbose
+#define AND_(...) SCHKV(ok,__VA_ARGS__)
+            AND_(this->set_default_params() == status::success);
+            AND_(this->desc()->prop_kind == backward_weights);
+            AND_(this->desc()->alg_kind == alg_kind::convolution_direct);
+            AND_(!this->has_zero_dim_memory());
+            AND_(utils::everyone_is(data_type::f32,
+                        this->desc()->src_desc.data_type,
+                        this->desc()->diff_weights_desc.data_type,
+                        this->desc()->diff_dst_desc.data_type));
+            AND_(utils::implication(this->with_bias(),
+                        data_type::f32 == this->desc()->diff_bias_desc.data_type));
+            AND_(this->src_pd_.desc()->format == src_format());
+            AND_(this->diff_dst_pd_.desc()->format == src_format());
+            AND_(this->diff_weights_pd_.desc()->format == wei_format());
+#undef AND_
             return ok ? status::success : status::unimplemented;
         }
 
@@ -395,10 +341,6 @@ struct gemm_convolution_bwd_weights_t: public cpu_primitive_t {
         , scratchpad_(nullptr)
     {
         using namespace prop_kind;
-        //MKLDNN_ONLY_IF (run_jit, {
-        //    sgemm_0 = new jit_uni_gemm_f32('T', 'N', 0.0, false);
-        //    sgemm_1 = new jit_uni_gemm_f32('T', 'N', 1.0, false);
-        //});
 
         jit_gemm_convolution_utils::init_conf(conf_.jcp_,
             *(conf_.desc()), conf_.src_pd(), conf_.diff_weights_pd(0),
@@ -414,12 +356,6 @@ struct gemm_convolution_bwd_weights_t: public cpu_primitive_t {
     }
 
     ~gemm_convolution_bwd_weights_t() {
-        //MKLDNN_ONLY_IF (run_jit, {
-        //    delete sgemm_0;
-        //    delete sgemm_1;
-        //});
-        //free(this->col_);
-        //free(this->wei_reduction_);
         delete this->scratchpad_;
      };
 
@@ -439,15 +375,6 @@ struct gemm_convolution_bwd_weights_t: public cpu_primitive_t {
 private:
     void execute_backward_weights();
     pd_t conf_;
-//#ifndef TARGET_VANILLA
-//    using jit_uni_gemm_f32 = typename utils::conditional
-//          <isa == avx2, jit_avx2_gemm_f32, jit_avx512_common_gemm_f32>::type;
-//#else
-//    using jit_uni_gemm_f32 = void; // sgemm_ unused (jit type may not be defined)
-//#endif
-//    jit_uni_gemm_f32 *sgemm_0, *sgemm_1;
-//    data_t *col_, *wei_reduction_;
-//    int nthr_;
     scratchpad_t *scratchpad_;
 };
 

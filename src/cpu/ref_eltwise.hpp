@@ -24,6 +24,7 @@
 #include "cpu_engine.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+#include "consistency.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -62,12 +63,12 @@ struct ref_eltwise_fwd_t: public cpu_primitive_t {
 
             const bool use_generic = !use_dense_ && !use_nCspBc_padded_;
 
-            bool ok = true
-                && one_of(desc()->prop_kind, forward_training,
-                        forward_inference)
-                && everyone_is(data_type, desc()->data_desc.data_type)
-                && implication(use_generic, one_of(src_d.ndims(), 4, 5))
-                && attr()->has_default_values();
+            Consistency ok;
+            SCHKV(ok,one_of(desc()->prop_kind, forward_training,
+                            forward_inference)); // fairly common
+            OK_AND(everyone_is(data_type, desc()->data_desc.data_type));
+            OK_AND(implication(use_generic, one_of(src_d.ndims(), 4, 5)));
+            OK_AND(attr()->has_default_values());
             if (!ok) return status::unimplemented;
 
             return status::success;
@@ -112,10 +113,11 @@ struct ref_eltwise_bwd_t: public cpu_primitive_t {
             using namespace prop_kind;
             using namespace utils;
             assert(engine()->kind() == engine_kind::cpu);
-            bool ok = true && desc()->prop_kind == backward_data
-                    && everyone_is(data_type, desc()->data_desc.data_type,
-                            desc()->diff_data_desc.data_type)
-                    && attr()->has_default_values();
+            Consistency ok;
+            SCHKV(ok,desc()->prop_kind == backward_data); // fairly common
+            OK_AND(everyone_is(data_type, desc()->data_desc.data_type,
+                             desc()->diff_data_desc.data_type));
+            OK_AND(attr()->has_default_values());
             if (!ok) return status::unimplemented;
 
             auto diff_dst_d = memory_desc_wrapper(diff_dst_pd());
@@ -128,8 +130,10 @@ struct ref_eltwise_bwd_t: public cpu_primitive_t {
                 && !has_zero_dim_memory();
             const bool use_generic = !use_dense_;
 
-            if (use_generic && !one_of(diff_dst_d.ndims(), 4, 5))
-                return status::unimplemented;
+            // oops: following would FORCE all nondense to be jit impls !
+            //OK_AND(use_generic && !one_of(diff_dst_d.ndims(), 4, 5));
+            OK_AND(implication(use_generic, one_of(diff_dst_d.ndims(), 4, 5)));
+            if (!ok) return status::unimplemented;
 
             return status::success;
         }

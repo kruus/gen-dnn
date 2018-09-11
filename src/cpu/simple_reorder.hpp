@@ -95,7 +95,7 @@ bool simple_attr_check(const primitive_attr_t *attr, bool many_scales_support) {
 
 /* specific reorders: implementation */
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<
@@ -218,7 +218,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 };
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<
@@ -333,7 +333,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 };
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<fmt_i == chwn
@@ -397,7 +397,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 };
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<fmt_i == nChw8c && fmt_o == nChw16c>::type>
@@ -713,7 +713,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     }
 };
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<fmt_i == hwio
@@ -772,7 +772,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 };
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<
@@ -923,7 +923,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 };
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<
@@ -1076,7 +1076,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 };
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<
@@ -1171,7 +1171,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 };
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<
@@ -1289,7 +1289,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 };
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<
@@ -1352,7 +1352,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 };
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<
@@ -1446,7 +1446,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 };
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<
@@ -1505,7 +1505,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 };
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<
@@ -1608,7 +1608,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 };
 #endif
 
-#if MKLDNN_JIT_TYPES > 0
+#if 1 || MKLDNN_JIT_TYPES > 0
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     typename utils::enable_if<

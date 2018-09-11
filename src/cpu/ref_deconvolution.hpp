@@ -146,8 +146,10 @@ struct ref_deconvolution_fwd_t: public cpu_primitive_t {
             convolution_desc_t cd;
             status_t status;
 
-            status = conv_descr_create(this->cdesc(), &cd);
-            if (status != status::success) return status;
+            Consistency ok;
+            OK_AND((status = conv_descr_create(this->cdesc(), &cd))
+                   == status::success);
+            if (!ok) return status;
 
             mkldnn_primitive_desc_iterator it(this->engine_, (op_desc_t *)&cd,
                 &(this->attr_), nullptr);
@@ -176,30 +178,30 @@ struct ref_deconvolution_fwd_t: public cpu_primitive_t {
         virtual status_t init() override {
             using namespace prop_kind;
             assert(this->engine()->kind() == engine_kind::cpu);
-            bool ok = true
-                && utils::one_of(this->desc()->prop_kind, forward_training,
-                        forward_inference)
-                && utils::one_of(this->desc()->alg_kind,
-                        alg_kind::deconvolution_direct,
-                        alg_kind::deconvolution_winograd)
-                && attr()->post_ops_.has_default_values();
+            Consistency ok;
+            OK_AND(utils::one_of(this->desc()->prop_kind, forward_training,
+                                 forward_inference));
+            OK_AND(utils::one_of(this->desc()->alg_kind,
+                                 alg_kind::deconvolution_direct,
+                                 alg_kind::deconvolution_winograd));
+            OK_AND(attr()->post_ops_.has_default_values());
 
             if (ok) {
-                CHECK(init_convolution());
+                OK_CHECK(init_convolution());
                 if (weights_pd_.desc()->format == memory_format::any)
                 {
-                    CHECK(compute_blocked_format(with_groups(),
+                    OK_CHECK(compute_blocked_format(with_groups(),
                         conv_pd_->weights_pd()->desc(),
                         &desc_.weights_desc));
                     cpu_memory_pd_t weights(engine_, &desc_.weights_desc);
                     weights_pd_ = weights;
                 }
                 if (src_pd_.desc()->format == memory_format::any)
-                    CHECK(src_pd_.set_format(conv_pd_->diff_dst_pd()->desc()->format));
+                    OK_CHECK(src_pd_.set_format(conv_pd_->diff_dst_pd()->desc()->format));
                 if (dst_pd_.desc()->format == memory_format::any)
-                    CHECK(dst_pd_.set_format(conv_pd_->diff_src_pd()->desc()->format));
+                    OK_CHECK(dst_pd_.set_format(conv_pd_->diff_src_pd()->desc()->format));
                 if (bias_pd_.desc()->format == memory_format::any)
-                    CHECK(bias_pd_.set_format(memory_format::x));
+                    OK_CHECK(bias_pd_.set_format(memory_format::x));
                 return status::success;
             }
             else return status::unimplemented;

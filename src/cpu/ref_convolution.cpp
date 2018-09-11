@@ -21,7 +21,7 @@
 
 #if !defined(DBG_CONV)
 #if !defined(NDEBUG)
-#define DBG_CONV 0
+#define DBG_CONV 1
 #else
 #define DBG_CONV 1
 #endif
@@ -153,8 +153,8 @@ _ref_convolution_fwd_t<with_relu, src_type, wei_type, dst_type, acc_type>
     }
 #endif /* DBG_CONV */
 }
-
 #endif // TARGET_VANILLA (constructor)
+
 template <bool with_relu, data_type_t src_type, data_type_t wei_type,
          data_type_t dst_type, data_type_t acc_type>
 void _ref_convolution_fwd_t<with_relu, src_type, wei_type, dst_type, acc_type>

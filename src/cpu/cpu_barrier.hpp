@@ -18,9 +18,11 @@
 #define CPU_BARRIER_HPP
 
 #include <assert.h>
-//#include "jit_generator.hpp"
 #include "cpu_isa_traits.hpp"    // poor man's version is all that is needed for generic header
 #include "utils.hpp"
+#if !defined(TARGET_VANILLA)
+#include "jit_generator.hpp"
+#endif
 
 namespace mkldnn {
 namespace impl {
