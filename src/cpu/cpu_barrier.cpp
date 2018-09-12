@@ -21,8 +21,10 @@
 #else // provide a nontrivial barrier impl
 
 #if defined(__ve)
-#include <memory>
 //#include "C++/xatomic.h" // things like std::_Atomic_fetch_add_8, and _Atomic_counter_t
+#include <memory>          // shared pointer support defines memory_order_seq_cst
+#elif defined(TARGET_VANILLA)
+#include <atomic>          // the usual place we expect memory_order_seq_cst
 #endif
 
 namespace mkldnn {
