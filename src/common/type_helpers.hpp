@@ -88,6 +88,8 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
      *        the strides within blocks). Though as long as the code
      *        uses memory_desc_wrapper::off() or explicit offset
      *        calculations everything should be fine. */
+    // [ejk] break this up -- there are more than 64 choices which exceeds the default
+    // recursion depth on some compilers for the adjustment flag is not known
     const bool is_blocked = utils::one_of(fmt, blocked,
             x,
             nc,
@@ -129,7 +131,8 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
             IOhw16o16i,
             Oihw16o,
             Ohwi8o,
-            Ohwi16o,
+            Ohwi16o)
+                || utils::one_of(fmt,
             goihw,
             hwigo,
             gOIhw8i8o,

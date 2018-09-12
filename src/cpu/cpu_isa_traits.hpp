@@ -26,6 +26,8 @@
 
 #if defined(_WIN32) && !defined(__GNUC__)
 #   define STRUCT_ALIGN(al, ...) __declspec(align(al)) __VA_ARGS__
+#elif defined(__ve)
+#   define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__((al)>16? 16: (al))))
 #else
 #   define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__(al)))
 #endif
@@ -123,6 +125,12 @@ typedef enum {
     PAGE_4K = 4096,
     PAGE_2M = 2097152,
 } cpu_page_size_t;
+
+#if defined(__ve)
+    enum { CACHE_LINE_SIZE = 128 }; // is ADB cache line size the relevant quantity?
+#else
+    enum { CACHE_LINE_SIZE = 64 };
+#endif
 
 template <cpu_isa_t> struct cpu_isa_traits {}; /* ::vlen -> 32 (for avx2) */
 #if !defined(TARGET_VANILLA)

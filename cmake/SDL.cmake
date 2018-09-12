@@ -73,6 +73,8 @@ elseif(UNIX OR APPLE)
         # only. To prevent warnings on users' side who use the library and turn
         # this warning on, let's use it too. Applicable for the library sources
         # and interfaces only (tests currently rely on that fact heavily)
+	# [ejk] Good: SX and VE compilers sometimes will set missing POD init
+	#             with garbage values.  These compilers are buggy.
         set(CMAKE_SRC_CCXX_FLAGS "${CMAKE_SRC_CCXX_FLAGS} -Wmissing-field-initializers")
         set(CMAKE_EXAMPLE_CCXX_FLAGS "${CMAKE_EXAMPLE_CCXX_FLAGS} -Wmissing-field-initializers")
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")

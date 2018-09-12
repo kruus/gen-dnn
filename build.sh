@@ -197,8 +197,12 @@ elif [ "$DOTARGET" != "a" ]; then
     fi
 fi
 if [ ! "x${CC}" == "x" -a ! "`which ${CC}`" ]; then
-    echo "./build.sh: CC=${CC} , but did not find that compiler."
-    exit -1
+    if [ -x ${CC} ]; then
+        echo "Using specific compiler version: ${CC}";
+    else
+        echo "./build.sh: CC=${CC} , but did not find that compiler."
+        exit -1
+    fi
 fi
 
 #if [ "$DOTARGET" == "v" ]; then ; fi
@@ -333,7 +337,16 @@ echo "PATH $PATH"
         TOOLCHAIN=../cmake/ve.cmake
         if [ ! -f "${TOOLCHAIN}" ]; then echo "Ohoh. ${TOOLCHAIN} not found?"; BUILDOK="n"; fi
         CMAKEOPT="${CMAKEOPT} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}"
-        CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=OFF -DUSE_SHAREDLIB=OFF"
+        # adjust here for VE shared library and Openmp use
+        CMAKEOPT="${CMAKEOPT} -DUSE_SHAREDLIB=OFF"
+        if [ "a" == "a" ]; then
+            CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=OFF"
+        else
+            CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=ON"
+            # ?? -mparallel and -fopenmp both => -pthread
+            export CFLAGS="${CFLAGS} -fopenmp"
+            export CXXFLAGS="${CFLAGS} -fopenmp"
+        fi
         # -proginf  : Run with 'export VE_PROGINF=YES' to get some stats output
         # export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
         # export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
@@ -526,9 +539,9 @@ if [ "$BUILDOK" == "y" ]; then
     echo "Testing ?"
     if [ ! $DOTEST -eq 0 -a ! "$DOTARGET" == "s" ]; then # non-SX: -t might run some tests
         rm -f test1.log test2.log test3.log
-        echo "Testing ... test1"
+        echo "Testing in ${BUILDDIR} ... test1"
         if [ true ]; then
-            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' ${TESTRUNNER} make test) 2>&1 | tee "${BUILDDIR}/test1.log" || true
+            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' ${TESTRUNNER} make VERBOSE=1 test) 2>&1 | tee "${BUILDDIR}/test1.log" || true
         fi
         if [ $DOTEST -ge 2 ]; then
             echo "Testing ... test2"

@@ -1227,5 +1227,5 @@ typedef const struct mkldnn_stream *const_mkldnn_stream_t;
 }
 #endif
 
-/* vim: set et ts=8 sw=8 cino=^=l0,\:0,N-s: */
+/* vim: set et ts=4 sw=4 cino=^=l0,\:0,N-s: */
 #endif

@@ -20,6 +20,9 @@
 #include <assert.h>
 #include "cpu_isa_traits.hpp"    // poor man's version is all that is needed for generic header
 #include "utils.hpp"
+#if defined(_MULTI_THREAD) && ! MULTI_THREAD
+#include <stdexcept>
+#endif
 #if !defined(TARGET_VANILLA)
 #include "jit_generator.hpp"
 #endif
@@ -30,9 +33,20 @@ namespace cpu {
 
 namespace simple_barrier {
 
-STRUCT_ALIGN(64,
+#if defined(_MULTI_THREAD) && ! MULTI_THREAD
+struct ctx_t {};
+
+// In C++14 can be constexpr, not C++11
+inline void ctx_init( ctx_t *ctx_t ) {}
+inline void barrier(ctx_t *ctx, int nthr){
+    if (nthr > 1)
+        throw std::runtime_error("nthr must be <= 1 (compiled without _MULTI_THREAD)");
+}
+
+#else // assume multiple thread support
+
+STRUCT_ALIGN(CACHE_LINE_SIZE,
 struct ctx_t {
-    enum { CACHE_LINE_SIZE = 64 };
     volatile size_t ctr;
     char pad1[CACHE_LINE_SIZE - 1 * sizeof(size_t)];
     volatile size_t sense;
@@ -41,6 +55,8 @@ struct ctx_t {
 
 inline void ctx_init(ctx_t *ctx) { *ctx = utils::zero<ctx_t>(); }
 void barrier(ctx_t *ctx, int nthr);
+
+#endif // "barrier(ctx,nthr)" support
 
 #if !defined(TARGET_VANILLA)
 /** injects actual barrier implementation into another jitted code

@@ -70,8 +70,9 @@ status_t eltwise_desc_init(eltwise_desc_t *eltwise_desc, prop_kind_t prop_kind,
 #if defined(__ve) // ve debug
     {
         using namespace std;
-        using mkldnn::operator<<(std::ostream& os, mkldnn_memory_desc_t const& md);
-        cout<<" %s:%u memory_desc_wrapper(ed.data_desc).nelems() = %lu\n",__FILE__, __LINE__, memory_desc_wrapper(ed.data_desc).nelems()<<endl;
+        using mkldnn::operator<<; //(std::ostream& os, mkldnn_memory_desc_t const& md);
+        cout<<" "<<__FILE__<<":"<<__LINE__<<" memory_desc_wrapper(ed.data_desc).nelems() = "
+            <<memory_desc_wrapper(ed.data_desc).nelems()<<endl;
         cout<<" eltwise data_desc = "<<ed.data_desc<<endl;
         cout<<" eltwise diff_data_desc = "<<ed.diff_data_desc<<endl;
     }
