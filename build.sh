@@ -263,9 +263,27 @@ if [ -d "$INSTALLDIR}" -a $QUICK -lt 2 ]; then
     rm -rf "$INSTALLDIR}".bak && mv -v "$INSTALLDIR}" "$INSTALLDIR}".bak
 fi
 
-TESTRUNNER='time'
-if { /usr/bin/time -v echo Hello >& /dev/null; } then
-    TESTRUNNER='/usr/bin/time -v'
+# Obtain initial guesses for TESTRUNNER and VE_EXEC
+if [ "" ]; then
+    VE_EXEC=''
+    TESTRUNNER=''
+    if [ "$DOTARGET" = "a" ]; then
+        export OMP_NUM_THREADS=1; # for now XXX
+        if { ve_exec --version 2> /dev/null; } then
+            # oops, this will not work for "${TESTRUNNER} make test"
+            #TESTRUNNER="${TESTRUNNER} ve_exec"
+            #echo "ve_exec! TESTRUNNER ${TESTRUNNER}"
+            VE_EXEC=ve_exec
+        else
+            TESTRUNNER="echo Not-Running "
+            echo "Aurora: ve_exec not found"
+        fi
+    fi
+    if { /usr/bin/time -v echo Hello >& /dev/null; } then
+        TESTRUNNER='/usr/bin/time -v'
+    fi
+    echo "TESTRUNNER ${TESTRUNNER}"
+    echo "VE_EXEC    ${VE_EXEC}"
 fi
 #if [ "$NEC_FTRACE" -gt 0 ]; then
 if [ "$DOTARGET" = "a" -o "$DOTARGET" = "s" ]; then
@@ -279,26 +297,6 @@ fi
 
 if [ "$DOTARGET" = "a" ]; then
     export OMP_NUM_THREADS=1; # for now XXX
-fi
-# Obtain initial guesses for TESTRUNNER and VE_EXEC
-if [ "" ]; then
-VE_EXEC=''
-TESTRUNNER=''
-if [ "$DOTARGET" = "a" ]; then
-    export OMP_NUM_THREADS=1; # for now XXX
-    if { ve_exec --version 2> /dev/null; } then
-        # oops, this will not work for "${TESTRUNNER} make test"
-        #TESTRUNNER="${TESTRUNNER} ve_exec"
-        #echo "ve_exec! TESTRUNNER ${TESTRUNNER}"
-        VE_EXEC=ve_exec
-    else
-        TESTRUNNER="echo Not-Running "
-        echo "Aurora: ve_exec not found"
-    fi
-fi
-echo "TESTRUNNER ${TESTRUNNER}"
-echo "VE_EXEC    ${VE_EXEC}"
-#read asdf
 fi
 
 export PATH
@@ -476,11 +474,11 @@ echo "PATH $PATH"
             # because 'make' tragets already supply VE_EXEC if needed.
         fi
         # Whatever you are currently debugging (and is a quick sanity check) can go here
-        if [ -x tests/api-io-c ]; then
-            { echo "api-io-c                ..."; ${TESTRUNNER} ${VE_EXEC} tests/api-io-c || BUILDOK="n"; }
-        else
+        #if [ -x tests/api-io-c ]; then
+        #    { echo "api-io-c                ..."; ${TESTRUNNER} ${VE_EXEC} tests/api-io-c || BUILDOK="n"; }
+        #else
             { echo "api-c                ..."; ${TESTRUNNER} ${VE_EXEC} tests/api-c || BUILDOK="n"; }
-        fi
+        #fi
         if [ $DOTEST -eq 0 -a $DOJIT -gt 0 ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
             { echo "simple-training-net-cpp ..."; ${TESTRUNNER}  ${VE_EXEC} examples/simple-training-net-cpp || BUILDOK="n"; }
         fi
@@ -517,6 +515,11 @@ if [ -f "${BUILDDIR}/bash_help.inc" ]; then
         fi
     fi
 fi
+if { /usr/bin/time -v echo Hello >& /dev/null; } then
+    TESTRUNNER='/usr/bin/time -v'
+fi
+# next is optional, for verbose primitive creation and run messages
+TESTRUNNER="${TESTRUNNER}"
 set -x
 echo "TESTRUNNER ${TESTRUNNER}"
 echo "VE_EXEC    ${VE_EXEC}"
@@ -541,16 +544,16 @@ if [ "$BUILDOK" == "y" ]; then
         rm -f test1.log test2.log test3.log
         echo "Testing in ${BUILDDIR} ... test1"
         if [ true ]; then
-            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' ${TESTRUNNER} make VERBOSE=1 test) 2>&1 | tee "${BUILDDIR}/test1.log" || true
+            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' MKLDNN_VERBOSE=2 ${TESTRUNNER} make VERBOSE=1 test) 2>&1 | tee "${BUILDDIR}/test1.log" || true
         fi
         if [ $DOTEST -ge 2 ]; then
             echo "Testing ... test2"
             (cd "${BUILDDIR}" && ARGS='-VV -N' ${TESTRUNNER} make test \
-            && ARGS='-VV -R .*test_.*' ${TESTRUNNER}  make test) 2>&1 | tee "${BUILDDIR}/test2.log" || true
+            && ARGS='-VV -R .*test_.*' MKLDNN_VERBOSE=2 ${TESTRUNNER}  make test) 2>&1 | tee "${BUILDDIR}/test2.log" || true
         fi
         if [ $DOTEST -ge 3 ]; then
             if [ -x ./bench.sh ]; then
-                ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
+                MKLDNN_VERBOSE=2 ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
             fi
         fi
         echo "Tests done"

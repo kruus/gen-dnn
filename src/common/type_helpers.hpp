@@ -19,6 +19,7 @@
 
 #include <assert.h>
 #include <math.h>
+#include <string.h> // memset
 
 #include "mkldnn.h"
 
@@ -231,6 +232,9 @@ inline memory_desc_t zero_md() {
 #else
     auto zero = mkldnn_memory_desc_t();
 #endif
+    //static int garbage = -1;
+    //memset(&zero,--garbage,sizeof(memory_desc_t));
+    //memset(&zero,0,sizeof(memory_desc_t));
     zero.primitive_kind = primitive_kind::memory;
     return zero;
 }

@@ -24,9 +24,12 @@
 #include <algorithm>
 #include <iterator>
 #include <string>
+#include <string.h> // memset
 
 #include "mkldnn.h"
 #endif
+
+#include <type_traits>
 
 namespace mkldnn {
 
@@ -855,6 +858,7 @@ inline memory::desc zero_md() {
 #else
     auto zero = mkldnn_memory_desc_t();
 #endif
+    //memset(&zero,0,sizeof(mkldnn_memory_desc_t));
     zero.primitive_kind = mkldnn_memory;
     return memory::desc(zero);
 }
