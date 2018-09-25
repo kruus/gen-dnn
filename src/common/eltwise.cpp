@@ -52,7 +52,7 @@ status_t eltwise_desc_init(eltwise_desc_t *eltwise_desc, prop_kind_t prop_kind,
     ed.diff_data_desc =
         (ed.prop_kind == backward_data) ? *diff_data_desc : zero_md();
 
-#if defined(__ve) // ve debug
+#if 0 && defined(__ve) // ve debug
     if( ed.prop_kind != backward_data ){
         for(int i=0; i<sizeof(mkldnn_memory_desc_t); ++i){
             if( ((const char *)&ed.diff_data_desc) [i] != '\0' ){
@@ -67,7 +67,7 @@ status_t eltwise_desc_init(eltwise_desc_t *eltwise_desc, prop_kind_t prop_kind,
     ed.negative_slope = ed.alpha;
     // Good. all struct values initialized
 
-#if defined(__ve) // ve debug
+#if 0 && defined(__ve) // ve debug
     {
         using namespace std;
         using mkldnn::operator<<; //(std::ostream& os, mkldnn_memory_desc_t const& md);

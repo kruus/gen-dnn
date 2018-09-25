@@ -28,10 +28,14 @@
 
 #define BATCH 32
 
-#if defined(_SX) || defined(__ve)
+#if 0 // mostly this was for primitive_at{foo} vs primitive_at{foo,0}
+#if !defined(STRUCT_INIT_BUG)
+#if defined(_SX) // || defined(__ve)
 #define STRUCT_INIT_BUG 1
 #else
 #define STRUCT_INIT_BUG 0
+#endif
+#endif
 #endif
 
 #define CHECK(f)                                                               \
@@ -308,11 +312,7 @@ mkldnn_status_t simple_net()
                 mkldnn_primitive_at(conv_weights_memory, 0),
                 mkldnn_primitive_at(conv_user_bias_memory, 0) };
 
-#if STRUCT_INIT_BUG
     const_mkldnn_primitive_t conv_dsts[] = { conv_internal_dst_memory, 0 };
-#else
-    const_mkldnn_primitive_t conv_dsts[] = { conv_internal_dst_memory };
-#endif
 
     /* finally create a convolution primitive */
     mkldnn_primitive_t conv;
@@ -638,11 +638,7 @@ mkldnn_status_t simple_net()
                 mkldnn_primitive_at(pool_diff_src_memory, 0),
                 mkldnn_primitive_at(lrn_workspace_memory, 0) };
 
-#if STRUCT_INIT_BUG
     const_mkldnn_primitive_t lrn_diff_srcs[] = { lrn_diff_src_memory, 0 };
-#else
-    const_mkldnn_primitive_t lrn_diff_srcs[] = { lrn_diff_src_memory };
-#endif
 
     /* finally create backward lrn primitive */
     mkldnn_primitive_t lrn_bwd;

@@ -24,7 +24,6 @@
 
 #include "c_types_map.hpp"
 #include "mkldnn_os.h"
-#include "consistency.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -35,15 +34,6 @@ namespace impl {
 #define CHECK(f) do { \
     status_t status = f; \
     if (status != status::success) \
-    return status; \
-} while (0)
-
-// like CHECK, returning error code immediately, but using
-// 'Consistency ok;', to inherit failure printing in debug compiles.
-#define OK_CHECK(f) do { \
-    status_t status; \
-    OK_AND((status = (f)) == status::success); \
-    if (ok) \
     return status; \
 } while (0)
 

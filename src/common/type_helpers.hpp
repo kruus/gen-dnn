@@ -28,6 +28,8 @@
 #include "utils.hpp"
 #include "math_utils.hpp"
 
+#include <type_traits>
+
 namespace mkldnn {
 namespace impl {
 
@@ -88,8 +90,8 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
      *        the strides within blocks). Though as long as the code
      *        uses memory_desc_wrapper::off() or explicit offset
      *        calculations everything should be fine. */
-    // [ejk] break this up -- there are more than 64 choices which exceeds the default
-    // recursion depth on some compilers for the adjustment flag is not known
+    // [ejk] internal option -We,--pending_instantions=100 for __ve compiler
+    //       will increase the allowed recursion depth for functions.
     const bool is_blocked = utils::one_of(fmt, blocked,
             x,
             nc,
@@ -131,8 +133,7 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
             IOhw16o16i,
             Oihw16o,
             Ohwi8o,
-            Ohwi16o)
-                || utils::one_of(fmt,
+            Ohwi16o,
             goihw,
             hwigo,
             gOIhw8i8o,
@@ -220,7 +221,16 @@ inline bool operator!=(const memory_desc_t &lhs, const memory_desc_t &rhs) {
 }
 
 inline memory_desc_t zero_md() {
-    auto zero = memory_desc_t();
+    static_assert(std::is_pod<mkldnn_memory_desc_t>::value,"Failed: is_pod C++ default constructor for mkldnn_memory_desc_t");
+    // no static_assert(std::is_trivially_constructible<mkldnn_memory_desc_t,void>::value,"Failed: is_trivially_constructible mkldnn_memory_desc_t");
+#if defined(__ve) // zero-initialization is garbage-initialization, inside non-main() function!
+    auto zero = mkldnn_memory_desc_t{}; // NB {} forces value-initialization (to zero)
+    //mkldnn_memory_desc_t zero = {mkldnn_memory,0};
+    // also OK, but fails -Werror because mkl-dnn mandates ALL values specified
+    // (should fail to compile with -Werror)
+#else
+    auto zero = mkldnn_memory_desc_t();
+#endif
     zero.primitive_kind = primitive_kind::memory;
     return zero;
 }

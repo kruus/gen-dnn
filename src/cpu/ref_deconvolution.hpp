@@ -27,6 +27,7 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 #include "primitive_iterator.hpp"
+#include "consistency.hpp"
 
 #define DECLARE_DECONVOLUTION_PD_t(impl_name, ...) \
     virtual pd_t *clone() const override { return new pd_t(*this); } \

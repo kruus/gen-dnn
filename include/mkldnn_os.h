@@ -116,7 +116,7 @@
 #   define UNROLL(x)
 
 #elif ENABLE_OPT_PRAGMAS && defined(__ve)
-#   warning "__ve optimization pragmas IN EFFECT"
+//#   warning "__ve optimization pragmas IN EFFECT"
 #   define VREG(...) PragmaQuote(_NEC vreg(__VA_ARGS__))
 #   define ALLOC_ON_VREG(...)
 #   define ALLOC_ON_ADB(...)
@@ -210,7 +210,9 @@
 
 #ifndef OMP
 #   define OMP(...)
-#   warning "not enabling #pragma omp"
+#if defined(REF_LRN_HPP) // mostly ignore: show for cpu_engine compile at least
+#   warning "not enabling #pragma omp (mkldnn_os.h)"
+#endif
 #endif
 
 #endif // _MKLDNN_OS_H_

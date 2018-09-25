@@ -1,24 +1,26 @@
 #ifndef CONSISTENCY_HPP
 #define CONSISTENCY_HPP
-#include <cstdio>
-
-/** We provide macros for consistency checks that are:
+/** \file
+ * We provide macros for consistency checks that are:
  *
- * - quite [default]
- * - verbose [print failure location in debug mode, but not for _DNDEBUG compile]
+ * - quiet [default]
+ * - verbose
+ *   - print failure location in debug mode,
+ *   - for -DNDEBUG compile with -DDISABLE_VERBOSE, never print
+ *   - for -DNDEBUG compile o/w, print if bit 3 is set: `mkldnn_verbose() & 0x04`
+ *     - this is a questionable extension of mkldnn_set_verbose(int level)
  * - very verbose [print failure location even if -DNDEBUG
  *
  * For optimized compile (-DNEBUG) default must be to never print stuff,
  * but for temporary file scope debug you can choose a more verbose macro
  */
-#ifndef NDEBUG
-#   define CONSPRINT 1
-#else
-#   define CONSPRINT 0
-#endif
 
+#include "verbose.hpp"
 #include <cstdio>
 #include <cstdlib>
+
+namespace mkldnn {
+namespace impl {
 
 struct CondLoc { // Quiet default: never print, so struct is simpler
     bool cond;
@@ -27,7 +29,7 @@ struct CondLoc { // Quiet default: never print, so struct is simpler
 //     for futher downstream use?   Ex. evaluate condition *and* store (say) mkldnn_status?
 struct CondLocV { // CondLoc with "verbose in debug compile" hint
     bool cond;
-#if CONSPRINT
+#if !defined(DISABLE_VERBOSE)
     char const* file;
     int line;
     char const* cond_msg;
@@ -44,16 +46,17 @@ struct CondLocVV { // CondLoc with "verbose always" hint (even in optimized -DND
 //@{
 #define COND_LOC(...) CondLoc{bool{!!(__VA_ARGS__)}}
 
-#if CONSPRINT
+#if !defined(DISABLE_VERBOSE)
+/** verbose for debug: always, for opt: use \c (*mkldnn_verbose() & 0x04) flag */
 #define COND_LOCV(...) CondLocV{bool{!!(__VA_ARGS__)}, __FILE__, __LINE__, #__VA_ARGS__}
 #else
 #define COND_LOCV(...) CondLocV{bool{!!(__VA_ARGS__)}}
 #endif
 
+/** CONV_LOCVV is always there, even for optimized compiles,
+ * so use this very rarely, or for very serious failures. */
 #define COND_LOCVV(...) CondLocVV{bool{!!(__VA_ARGS__)}, __FILE__, __LINE__, #__VA_ARGS__}
 //@}
-
-namespace {
 
 /** consistency checking helper.  Used with "AND_WANT(COND)", rather than "&& COND",
  * you can print out nicer failure checks. NDEBUG turns off all printing.
@@ -86,8 +89,16 @@ struct Consistency {
     /** Using '&& COND_LOCV(cond)' prints in debug mode [not if -DNDEBUG] */
     Consistency& operator &&(CondLocV const& cl){
         var = var && cl.cond;
-#ifndef NDEBUG // only print failures in debug compile
-        if (!cl.cond){
+        // 1. always print failures in debug compile.
+        // 2. if -DNDEBUG and not -DDISABLE_VERBOSE,
+        //    then check 3rd LSB of mkldnn runtime verbosity
+#if !defined(DISABLE_VERBOSE)
+        if (!cl.cond
+#if defined(NDEBUG)
+                // optimized compile can still use MKLDNN_VERBOSE=N bit 2 to to print consistency failures
+                && (mkldnn_verbose()->level & 0x04)
+#endif
+           ){
             fprintf(stdout," %s [%s:%d] %s\n",
                     pfx, /*nclause,*/ cl.file, cl.line, cl.cond_msg);
             fflush(stdout);
@@ -110,7 +121,8 @@ struct Consistency {
     char const* pfx;
     bool var;
 };
-}//anon::
+}//impl::
+}//mkldnn::
 /** \group Consistency Check macros
  * {S|A}CHK[V|VV] macros wrap printing behavior of consistency checks
  *        S=Short-circuit [default]
@@ -162,8 +174,20 @@ struct Consistency {
 #define SCHKVV(OK,...) (bool)((!OK)? OK: OK && COND_LOCVV(__VA_ARGS__))
 
 /** Often \c Consistency variable is named 'ok',
- * so provide a default macro verbose for debug compilation */
+ * so provide a default macro verbose for debug compilation.
+ * NOTE: please do not commit with this set to SCHKVV.
+ *       releases should use SCHKV, for fastest optimized code. */
 #define OK_AND(...) SCHKVV(ok,__VA_ARGS__)
+
+/** like CHECK from \ref utils.hpp , returning error code immediately, but using
+ * 'Consistency ok;', to inherit failure printing in debug compiles. */
+#define OK_CHECK(f) do { \
+    status_t status; \
+    OK_AND((status = (f)) == status::success); \
+    if (ok) \
+    return status; \
+} while (0)
+
 ///@}
 
 //----------------------------- normal end of header ----------------------------------------
@@ -171,6 +195,7 @@ struct Consistency {
 
 #include <iostream>
 using namespace std;
+using namespace mkldnn::impl
 
 int main(int,char**){
     cout<<"CONSPRINT="<<CONSPRINT<<endl;
@@ -296,4 +321,5 @@ int main(int,char**){
     }
 }
 #endif
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
 #endif // CONSISTENCY_HPP

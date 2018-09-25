@@ -21,6 +21,16 @@
 #include "mkldnn_debug.h"
 #include "mkldnn_types.h"
 
+/** Issue: if you ask for printing (MKLDNN_VERBOSE, perhaps) and md are filled with
+ * garbage, then you can have the print fail in debug mode:
+ * Ex. 
+ *   If memory_desc_t zero_md() actually only set primitive_kind and may leave
+ *   other values with garbage, then 
+ * Assertion failed: !"unknown dt" in (src/common/mkldnn_debug.cpp: mkldnn_dt2str: 45)
+ */
+#define LASSERT(...)
+//#define LASSERT(...) assert(__VA_ARGS__)
+
 const char *mkldnn_status2str(mkldnn_status_t v) {
     if (v == mkldnn_success) return "success";
     if (v == mkldnn_out_of_memory) return "out_of_memory";
@@ -31,7 +41,7 @@ const char *mkldnn_status2str(mkldnn_status_t v) {
     if (v == mkldnn_iterator_ends) return "iterator_ends";
     if (v == mkldnn_runtime_error) return "runtime_error";
     if (v == mkldnn_not_required) return "not_required";
-    assert(!"unknown status");
+    LASSERT(!"unknown status");
     return "unknown status";
 }
 
@@ -42,14 +52,14 @@ const char *mkldnn_dt2str(mkldnn_data_type_t v) {
     if (v == mkldnn_s16) return "s16";
     if (v == mkldnn_s8) return "s8";
     if (v == mkldnn_u8) return "u8";
-    assert(!"unknown dt");
+    LASSERT(!"unknown dt");
     return "unknown dt";
 }
 
 const char *mkldnn_rmode2str(mkldnn_round_mode_t v) {
     if (v == mkldnn_round_nearest) return "round_nearest";
     if (v == mkldnn_round_down) return "round_down";
-    assert(!"unknown rmode");
+    LASSERT(!"unknown rmode");
     return "unknown rmode";
 }
 
@@ -138,7 +148,7 @@ const char *mkldnn_fmt2str(mkldnn_memory_format_t v) {
     // alias for nChw16c : if (v == mkldnn_oIhw16i) return "oIhw16i";
     if (v == mkldnn_oIhw8i) return "oIhw8i";
     if (v == mkldnn_oIhw16i) return "oIhw16i";
-    assert(!"unknown fmt");
+    LASSERT(!"unknown fmt");
     return "unknown fmt";
 }
 
@@ -152,7 +162,7 @@ const char *mkldnn_prop_kind2str(mkldnn_prop_kind_t v) {
     if (v == mkldnn_backward_data) return "backward_data";
     if (v == mkldnn_backward_weights) return "backward_weights";
     if (v == mkldnn_backward_bias) return "backward_bias";
-    assert(!"unknown prop_kind");
+    LASSERT(!"unknown prop_kind");
     return "unknown prop_kind";
 }
 
@@ -175,7 +185,7 @@ const char *mkldnn_prim_kind2str(mkldnn_primitive_kind_t v) {
     if (v == mkldnn_inner_product) return "inner_product";
     if (v == mkldnn_convolution_relu) return "convolution_relu";
     if (v == mkldnn_rnn) return "rnn";
-    assert(!"unknown prim_kind");
+    LASSERT(!"unknown prim_kind");
     return "unknown prim_kind";
 }
 
@@ -205,7 +215,7 @@ const char *mkldnn_alg_kind2str(mkldnn_alg_kind_t v) {
     if (v == mkldnn_vanilla_lstm) return "vanilla_lstm";
     if (v == mkldnn_vanilla_gru) return "vanilla_gru";
     if (v == mkldnn_gru_linear_before_reset) return "gru_linear_before_reset";
-    assert(!"unknown alg_kind");
+    LASSERT(!"unknown alg_kind");
     return "unknown alg_kind";
 }
 
