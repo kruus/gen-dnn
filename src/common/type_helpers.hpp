@@ -19,6 +19,7 @@
 
 #include <assert.h>
 #include <math.h>
+#include <string.h> // memset
 
 #include "mkldnn.h"
 
@@ -27,6 +28,8 @@
 #include "nstl.hpp"
 #include "utils.hpp"
 #include "math_utils.hpp"
+
+#include <type_traits>
 
 namespace mkldnn {
 namespace impl {
@@ -220,7 +223,16 @@ inline bool operator!=(const memory_desc_t &lhs, const memory_desc_t &rhs) {
 }
 
 inline memory_desc_t zero_md() {
-    auto zero = memory_desc_t();
+#if defined(__ve) // ncc seems to zero-initialize nicely for {}, but sometimes fails for ()
+    auto zero = mkldnn_memory_desc_t{};
+#else
+    auto zero = mkldnn_memory_desc_t();
+#endif
+    static_assert(std::is_pod<memory_desc_t>::value,"Failed: is_pod C++ default constructor for memory_desc_t");
+    // NO! static_assert(std::is_trivially_constructible<memory_desc_t,void>::value,"Failed: is_trivially_constructible memory_desc_t");
+    //static int garbage = -1;
+    //memset(&zero,--garbage,sizeof(memory_desc_t));
+    //memset(&zero,0,sizeof(memory_desc_t));
     zero.primitive_kind = primitive_kind::memory;
     return zero;
 }
