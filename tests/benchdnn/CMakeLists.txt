@@ -36,6 +36,7 @@ foreach(subdir bnorm conv ip reorder rnn self)
         ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/*.h
         )
     list(APPEND SOURCES ${subfiles})
+    message(STATUS "${subdir} : ${subfiles}")
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${subdir})
 endforeach()
 
@@ -83,7 +84,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${BENCHDNN_EXTRA}")
 #          ( cd build/tests/benchdnn && make conv/sx_conv4.cpp.i )
 # Just for fun, take a look at assembler output for any conv/*.cxx files.
 # These outputs are left in the cmake binary directory ~ build/tests/benchdnn.
-file(GLOB ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/*.cxx)
+file(GLOB ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/*.cxx ${CMAKE_CURRENT_SOURCE_DIR}/conv/impls/*.cpp)
 #list(APPEND ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/sx_conv3.cpp)
 #list(APPEND ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/sx_conv3_ve.cpp)
 #list(APPEND ASM_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/conv/sx_conv2.cpp)

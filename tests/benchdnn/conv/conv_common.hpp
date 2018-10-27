@@ -320,7 +320,7 @@ inline size_t dst_off_f_nog(const prb_t *p, int mb, /*int g,*/ int oc,
 }
 /** no group-loop + merge oh- and ow-loops into ohw in p->oh*p->ow */
 inline size_t dst_off_f_nog_ohw(const prb_t *p, int mb, /*int g,*/
-        int od, int oc, int ohw)
+        int oc, int od, int ohw)
 {
     //  ohw runs through all values oh*p->ow + ow
     //return (((mb * p->oc + oc) * p->od + od) * p->oh + oh) * p->ow + ow;
@@ -375,7 +375,7 @@ typedef struct {
 conv_impls_t * get_ref_impls();
 
 //COMPUTE_REF_DECL( compute_ref ) /* ref_conv.cpp */
-#if 1
+#if 0
 size_t constexpr get_nref_impls() { return 2U; }
 #else
 COMPUTE_REF_DECL( compute_ref1 ) /* ref_conv_012.cpp NEW in version 0.12*/
@@ -390,7 +390,7 @@ COMPUTE_REF_DECL( sxconv_3 )   /* sx_conv3.cpp */
 COMPUTE_REF_DECL( sxconv_4 )   /* sx_conv4.cpp */
 COMPUTE_REF_DECL( sxconv_5 )   /* sx_conv5.cpp */ // +post_ops
 #endif
-size_t constexpr get_nref_impls() { return 6U; }
+size_t constexpr get_nref_impls() { return 7U; }
 #endif
 
 #endif // additions

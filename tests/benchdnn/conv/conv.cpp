@@ -55,14 +55,15 @@ static conv_impls_t conv_impls_[] = {
         //nullptr,
         compute_ref_bwd_w},
 
-#if 0
-#if defined(SXAURORA)
-    {"ref2", refconv_2_fwd, refconv_2_bwd_d, refconv_2_bwd_w},
+#if 1
+#if defined(__ve)
+    {"sx3",  sxconv_3_fwd,  compute_ref_bwd_d,  sxconv_3_bwd_w},
     //{"sx5",  sxconv_5_fwd,  sxconv_5_bwd_d,  sxconv_5_bwd_w},
+    //{"ref2", refconv_2_fwd, refconv_2_bwd_d, refconv_2_bwd_w},
     {"NULL", nullptr, nullptr, nullptr},
     {"NULL", nullptr, nullptr, nullptr},
     {"NULL", nullptr, nullptr, nullptr},
-    {"NULL", nullptr, nullptr, nullptr}
+    {"NULL", nullptr, nullptr, nullptr},
 //#elif defined(_SX)
 #else
     //{"0.12", compute_ref_fwd, compute_ref_bwd_d, compute_ref_bwd_w},
@@ -71,9 +72,9 @@ static conv_impls_t conv_impls_[] = {
     //{"ref2", refconv_2_fwd, refconv_2_bwd_d, refconv_2_bwd_w},
     //{"0.12", compute_ref_fwd, compute_ref_bwd_d, compute_ref_bwd_w},
     //{"ref2", refconv_2_fwd, refconv_2_bwd_d, refconv_2_bwd_w},
-    {"sx3",  sxconv_3_fwd,  sxconv_3_bwd_d,  sxconv_3_bwd_w},
+    {"sx4",  sxconv_3_fwd,  sxconv_3_bwd_d,  sxconv_3_bwd_w},
     {"ref3", refconv_3_fwd, refconv_3_bwd_d, refconv_3_bwd_w},
-    {"ref4", refconv_4_fwd, refconv_4_bwd_d, refconv_4_bwd_w}
+    {"ref4", refconv_4_fwd, refconv_4_bwd_d, refconv_4_bwd_w},
     //{"NULL", nullptr, nullptr, nullptr},
     //{"NULL", nullptr, nullptr, nullptr},
     //{"NULL", nullptr, nullptr, nullptr},

@@ -144,6 +144,7 @@ struct MIplusB {
     int ix_ge( int const t ){
         //int ret = (t-b) / m; // only OK if (t-b) is +ve
         int ret = div_floor( t-b, m );
+        return ret;
     }
 };
 // vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s
