@@ -1472,4 +1472,4 @@ int doit(const prb_t *p, res_t *r) {
 }
 
 } 
-// vim: et ts=4 sw=4 cindent ai cino=^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent ai cino=^l0,\:0,N-s
