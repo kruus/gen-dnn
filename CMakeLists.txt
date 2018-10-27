@@ -89,6 +89,7 @@ endif()
 if(NECVE)
     option(USE_OPENMP "Use OpenMP (#pragma omp)?" OFF)
     option(USE_SHAREDLIB "Use shared libs?" OFF)   # libmkldnn.a preferred
+    option(USE_FTRACE "use ftrace?" ON)
 else()
     option(USE_OPENMP "Use OpenMP (#pragma omp)?" ON)
     option(USE_SHAREDLIB "Use shared libs?" ON)   # libmkldnn.so
@@ -120,12 +121,21 @@ if(TRUE AND NECVE)
     set(CMAKE_THREAD_PREFER_PTHREAD 1)
     set(THREADS_PREFER_PTHREAD_FLAG 1)
     find_package(Threads REQUIRED)
+    if(USE_FTRACE)
+        # not quite working yet ...
+        set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} ${VE_VEPERF_INCFLAGS}")
+        set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} ${VE_VEPERF_INCFLAGS}")
+        set(CMAKE_C_LINK_FLAGS "${CMAKE_C_LINK_FLAGS} ${VE_VEPERF_LDFLAGS}")
+        set(CMAKE_CXX_LINK_FLAGS "${CMAKE_C_LINK_FLAGS} ${VE_VEPERF_LDFLAGS}")
+        set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH};${VE_VEPERF_DIR}/lib")
+    endif()
 endif()
 include("cmake/MKL.cmake")
 include("cmake/OpenMP.cmake")
 include("cmake/SDL.cmake")
 include("cmake/NLC.cmake")
 include("cmake/Doxygen.cmake")
+
 
 # XXX hack
 include("Platform/SX-util.cmake")

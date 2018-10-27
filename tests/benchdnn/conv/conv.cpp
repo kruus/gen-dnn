@@ -50,10 +50,10 @@ static conv_impls_t conv_impls_[] = {
     // Always keep this one, to calculate speedup factors
     {"0.12", compute_ref_fwd, compute_ref_bwd_d, compute_ref_bwd_w},
 
-#if defined(SXAURORA)
+#if 0 && defined(SXAURORA)
     {"ref2", refconv_2_fwd, refconv_2_bwd_d, refconv_2_bwd_w},
-    //{"sx5",  sxconv_5_fwd,  sxconv_5_bwd_d,  sxconv_5_bwd_w},
-    {"NULL", nullptr, nullptr, nullptr},
+    {"sx5",  sxconv_5_fwd,  sxconv_5_bwd_d,  sxconv_5_bwd_w},
+    //{"NULL", nullptr, nullptr, nullptr},
     {"NULL", nullptr, nullptr, nullptr},
     {"NULL", nullptr, nullptr, nullptr},
     {"NULL", nullptr, nullptr, nullptr}
@@ -61,21 +61,24 @@ static conv_impls_t conv_impls_[] = {
 #else
     //{"0.12", compute_ref_fwd, compute_ref_bwd_d, compute_ref_bwd_w},
     {"ref2", refconv_2_fwd, refconv_2_bwd_d, refconv_2_bwd_w},
-    {"sx5",  sxconv_5_fwd,  sxconv_5_bwd_d,  sxconv_5_bwd_w},
+    {"ref3", refconv_3_fwd, refconv_3_bwd_d, refconv_3_bwd_w},
+    {"ref4", refconv_4_fwd, refconv_4_bwd_d, refconv_4_bwd_w},
+    {"ref5", refconv_5_fwd, refconv_5_bwd_d, refconv_5_bwd_w},
+    {"sx2",  sxconv_2_fwd,  sxconv_2_bwd_d,  sxconv_2_bwd_w},
+    {"sx3",  sxconv_3_fwd,  sxconv_3_bwd_d,  sxconv_3_bwd_w},
+    {"sx4",  sxconv_4_fwd,  sxconv_4_bwd_d,  sxconv_4_bwd_w},
+    // NO : {"sx5",  sxconv_5_fwd,  sxconv_5_bwd_d,  sxconv_5_bwd_w}
     //{"ref2", refconv_2_fwd, refconv_2_bwd_d, refconv_2_bwd_w},
     //{"0.12", compute_ref_fwd, compute_ref_bwd_d, compute_ref_bwd_w},
     //{"ref2", refconv_2_fwd, refconv_2_bwd_d, refconv_2_bwd_w},
-    {"sx3",  sxconv_3_fwd,  sxconv_3_bwd_d,  sxconv_3_bwd_w},
-    {"ref3", refconv_3_fwd, refconv_3_bwd_d, refconv_3_bwd_w},
-    {"ref4", refconv_4_fwd, refconv_4_bwd_d, refconv_4_bwd_w}
     //{"NULL", nullptr, nullptr, nullptr},
     //{"NULL", nullptr, nullptr, nullptr},
     //{"NULL", nullptr, nullptr, nullptr},
     //{"NULL", nullptr, nullptr, nullptr},
     //{"NULL", nullptr, nullptr, nullptr}
     //{"rf99", refconv_99_fwd,         refconv_99_bwd_d,            refconv_99_bwd_w}
-    //{"NULL", nullptr, nullptr, nullptr}
 #endif
+    {"NULL", nullptr, nullptr, nullptr}
 };
 
 #define TESTN (sizeof(conv_impls_) / sizeof(conv_impls_t))
@@ -1031,13 +1034,14 @@ static void test_impl_compare( const prb_t* p, res_t* r, const size_t imp,
                         && t.times() >= 1/*min_times_per_prb*/ );
             if (stop) break;
         }
-        if(0) {
+        if(1) {
             char impl_str[20];
             snprintf(&impl_str[0], 20, "TEST:%2lu %-8s", imp, impname);
             char pstr[max_prb_len];
             prb2str(p, pstr);
             perf_report(p, r, pstr, &impl_str[0]);
-        } else {
+        }
+        if(1) {
             bs.ts->update_impl(p, r, status, tt, imp);
         }
     }

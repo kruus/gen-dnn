@@ -1,5 +1,5 @@
 #===============================================================================
-# Copyright 2016-2017 Intel Corporation
+# Copyright 2016-2018 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #===============================================================================
+
 # Manage platform-specific quirks
 #===============================================================================
 
@@ -26,6 +27,13 @@ add_definitions(-DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS)
 # UNIT8_MAX-like macros are a part of the C99 standard and not a part of the
 # C++ standard (see C99 standard 7.18.2 and 7.18.4)
 add_definitions(-D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS)
+
+option(MKLDNN_VERBOSE
+    "allows Intel(R) MKL-DNN be verbose whenever MKLDNN_VERBOSE
+    environment variable set to 1" ON) # enabled by default
+if(NOT MKLDNN_VERBOSE)
+    add_definitions(-DDISABLE_VERBOSE)
+endif()
 
 set(CMAKE_CCXX_FLAGS)
 set(DEF_ARCH_OPT_FLAGS)
@@ -49,6 +57,7 @@ if(WIN32)
         set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} /wd4800") # int -> bool
         set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} /wd4068") # unknown pragma
         set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} /wd4305") # double -> float
+        set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} /wd4551") # UNUSED(func)
     endif()
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
         set(DEF_ARCH_OPT_FLAGS "-QxHOST")
@@ -73,8 +82,8 @@ elseif(NECSX)
     #       (should be -gv -ftrace -CVopt ???)
     #
     # Note: do not use -Cdbeug or -Cnoopt (semantics of language changes?)
-    set(CMAKE_C_FLAGS_DEBUG "-g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,fullmsg")
-    set(CMAKE_CXX_FLAGS_DEBUG "-g -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,fullmsg")
+    set(CMAKE_C_FLAGS_DEBUG "-g2 -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,fullmsg")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g2 -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,fullmsg")
     #set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-g") # should NOT conflict (but did!)
     # -----------------------------------------------------------------------
     show_cmake_stuff("NECSX, after project(... C CXX)")
@@ -137,6 +146,15 @@ elseif(UNIX OR APPLE)
 	    message(FATAL_ERROR "icc version <= 15 does not seem to work. icc >= 18 is recommended")
         endif()
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -diag-disable:15552")
+    endif()
+endif()
+
+if(UNIX OR APPLE)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+        # Link Intel libraries statically (except for iomp5)
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -liomp5 -static-intel")
+        # Tell linker to not complain about missing static libraries
+        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -diag-disable:10237")
     endif()
 endif()
 

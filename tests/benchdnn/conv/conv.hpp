@@ -350,7 +350,7 @@ typedef struct {
  * \sa bench_mode.
  */
 conv_impls_t * get_ref_impls();
-size_t constexpr get_nref_impls() { return 6U; }
+size_t constexpr get_nref_impls() { return 9U; }
 
 void perf_report(const prb_t *p, const res_t *r, const char *pstr, const char *impl=nullptr);
 

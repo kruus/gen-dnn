@@ -1,4 +1,7 @@
 external
+*.log
+**.i
+**.L
 log
 build
 build.bak
