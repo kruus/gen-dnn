@@ -1,6 +1,7 @@
 external
 a.out
 a.c
+*.log
 asdf
 foo
 log
@@ -22,11 +23,11 @@ install-sx*
 install-jit*
 install-dbg*
 .*.sw?
-*.nm
-*.ii
-*.i
-*.o
-*.vg
+**.nm
+**.ii
+**.i
+**.o
+**.vg
 build*.log
 mk*.log
 cmk*.log
@@ -34,7 +35,7 @@ doxygen.log
 test*.log
 log-*
 old*
-*.diff
+**.diff
 snprintf*
 *.md~
 dev-cmake*

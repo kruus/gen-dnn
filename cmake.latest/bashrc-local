@@ -1,0 +1,65 @@
+PS1='[\h \W]\$ '
+if [ "`uname`" = "SUPER-UX" ]; then PS1='[SX \W]\$ '; fi
+##################### utilities ###############################
+#  Ex. FOO=a:bb:c:d; ColonVarDel FOO bb; echo $FOO --> a:c:d
+function ColonVarDel() {
+  local ee="echo \"\$$1\""
+  ##echo "ee=$ee"
+  local ss=`eval ${ee}`
+  #echo "ss=$ss"
+  local x=`echo "$ss" | /bin/sed 's!^'"$2"'\(:\|$\)!!;s!:'"$2"'\(:\|$\)!:!;s!::!:!'`
+  eval "$1='$x'"
+}
+# FOO=a:b:dir:c; ColonDirBefore FOO dir
+#   1. remove dir component
+#   2. if dir is a directory, prepends dir
+#      (So echo $FOO ---> a:b:c  or  dir:a:b:c)
+function ColonDirBefore() {
+  ##echo "\$1=$1"
+  eval ColonVarDel $1 $2
+  local ee="echo \"\$$1\""
+  ##echo "ee=$ee"
+  ss=`eval ${ee}`
+  #echo "ss0=$ss"
+  if [ -d "$2" ]; then
+    ss="$2:$ss"
+    #echo "ss1=$ss"
+  fi
+  eval "export $1='$ss'"
+}
+# FOO=a:b:dir:c; ColonDirBefore FOO dir
+#   1. remove dir component
+#   2. if dir is a directory, prepends dir
+#      (So echo $FOO ---> a:b:c  or  dir:a:b:c)
+function ColonDirAfter() {
+  ##echo "\$1=$1"
+  eval ColonVarDel $1 $2
+  local ee="echo \"\$$1\""
+  ##echo "ee=$ee"
+  ss=`eval ${ee}`
+  #echo "ss0=$ss"
+  if [ -d "$2" ]; then
+    ss="$ss:$2"
+    #echo "ss1=$ss"
+  fi
+  eval "export $1='$ss'"
+}
+function pathrm() {
+  export PATH=`echo $PATH | /bin/sed "s!^$1\(:\|$\)!!;s!:$1\(:\|$\)!:!;s!::!:!"`
+}
+function ldpathrm() {
+  export LD_LIBRARY_PATH=`echo $LD_LIBRARY_PATH | /bin/sed "s!^$1\(:\|$\)!!;s!:$1\(:\|$\)!:!;s!::!:!"`
+}
+function pathbefore() { pathrm "$1"; if [ -d "$1" ]; then export PATH="$1:$PATH"; fi }
+function pathafter() { pathrm "$1"; if [ -d "$1" ]; then export PATH="$PATH:$1"; fi }
+function ldpathbefore() { ldpathrm "$1"; if [ -d "$1" ]; then export LD_LIBRARY_PATH="$1:$LD_LIBRARY_PATH"; fi }
+function ldpathafter() { ldpathrm "$1"; if [ -d "$1" ]; then export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$1"; fi }
+function pathfbefore() { pathrm "$1"; export PATH="$1:$PATH"; }
+function pathfafter() { pathrm "$1"; export PATH="$PATH:$1"; }
+export PATH
+export LD_LIBRARY_PATH
+export MANPATH
+
+######################  local cmake-3.0 ################################
+pathrm "${HOME}"/local/cmake3.8/bin
+pathbefore "${HOME}"/local/cmake3.8/bin
