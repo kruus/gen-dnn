@@ -26,6 +26,14 @@
 #include "utils.hpp"
 #include "consistency.hpp"
 
+#if !defined(MKLDNN_REF_CONV_DBG)
+#if !defined(NDEBUG)
+#define MKLDNN_REF_CONV_DBG 1
+#else
+#define MKLDNN_REF_CONV_DBG 1
+#endif
+#endif
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -132,6 +140,14 @@ struct ref_convolution_bwd_data_t: public cpu_primitive_t {
             using namespace prop_kind;
             assert(this->engine()->kind() == engine_kind::cpu);
             Consistency ok; // default here is never-verbose
+#ifdef MKLDNN_REF_CONV_DBG
+            {
+                char const* result;
+                mkldnn_primitive_desc_query( this, mkldnn_query_impl_info_str, 0, &result );
+                printf(" conv-fwd:%s:", result);
+                fflush(stdout);
+            }
+#endif
 #define AND_(...) SCHKV(ok,__VA_ARGS__)
             AND_(this->set_default_params() == status::success);
             AND_(this->desc()->prop_kind == backward_data);
@@ -142,6 +158,9 @@ struct ref_convolution_bwd_data_t: public cpu_primitive_t {
             AND_(this->desc()->diff_src_desc.data_type == diff_src_type);
             AND_(this->attr()->has_default_values());
 #undef AND_
+#ifdef MKLDNN_REF_CONV_DBG
+            if(ok){ printf("init-ok "); fflush(stdout); }
+#endif
             return ok ? status::success : status::unimplemented;
         }
 

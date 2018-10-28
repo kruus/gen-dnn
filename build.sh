@@ -351,8 +351,17 @@ echo "PATH $PATH"
         export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
         export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
         if [ "$NEC_FTRACE" -eq 1 ]; then
-            export CFLAGS="${CFLAGS} -ftrace"
-            export CXXFLAGS="${CXXFLAGS} -ftrace"
+            #export CFLAGS="${CFLAGS} -ftrace"
+            #export CXXFLAGS="${CXXFLAGS} -ftrace"
+            # at some point above was sufficent (ve.cmake) set things
+            # TODO have ve.cmake etc do this NICELY with a cmake option...
+            VEPERF_DIR="/usr/uhome/aurora/mpc/pub/veperf/180218-ELF"
+            VEPERF_INC_DIR="${VEPERF_DIR}/include"
+            VEPERF_LIB_DIR="${VEPERF_DIR}/lib"
+            export CFLAGS="${CFLAGS} -I${VEPERF_INC_DIR} -DFTRACE -ftrace"
+            export CXXFLAGS="${CXXFLAGS} -I${VEPERF_INC_DIR} -DFTRACE -ftrace"
+            export LDFLAGS="${LDFLAGS} -L${VEPERF_LIB_DIR} -lveperf"
+            #export LDFLAGS="${LDLIBS} -Wl,-rpath,${VEPERF_LIB_DIR}"
         fi
         echo "Aurora CMAKEOPT = ${CMAKEOPT}"
     fi
@@ -440,9 +449,9 @@ echo "PATH $PATH"
             set +x
         fi
         # Make some assembly-source translations automatically...
-        cxxfiles=`(cd ../tests/benchdnn && ls -1 conv/*conv?.cpp conv/*.cxx)`
-        echo "cxxfiles = $cxxfiles"
-        (cd tests/benchdnn && { for f in ${cxxfiles}; do make -j1 VERBOSE=1 $f.s; done; }) || true
+        #cxxfiles=`(cd ../tests/benchdnn && ls -1 conv/*conv?.cpp conv/*.cxx)`
+        #echo "cxxfiles = $cxxfiles"
+        (cd tests/benchdnn && { for f in conv/*conv?.cpp conv/*.cxx; do if -f "${f}"; then echo $f.s; make -j1 VERBOSE=1 $f.s; fi; done; }) || true
         pwd
         ls -l asm || true
 

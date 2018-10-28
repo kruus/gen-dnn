@@ -19,15 +19,7 @@
 #include "mkldnn_traits.hpp"
 #include "math_utils.hpp"
 
-#if !defined(DBG_CONV)
-#if !defined(NDEBUG)
-#define DBG_CONV 1
-#else
-#define DBG_CONV 1
-#endif
-#endif
-
-#if DBG_CONV
+#if MKLDNN_REF_CONV_DBG
 #include "mkldnn_io.h"
 #include "string.h"
 #include <unordered_set> // to track new ref_convolutions (potential to optimize?)
@@ -39,7 +31,7 @@ namespace cpu {
 
 using math::saturate;
 
-#if DBG_CONV
+#if MKLDNN_REF_CONV_DBG
 // There are mkldnn_format_last^3 possible combinations, of which only
 // a small percentage commonly occur.  We can restrict register optimized cases
 // into a lookup table XXX eventually.
@@ -114,7 +106,7 @@ static inline char const* after_last_colon(const char* msg) {
     return last_colon? last_colon+1: msg;
 }
 
-#endif // DBG_CONV
+#endif // MKLDNN_REF_CONV_DBG
 
 #if TARGET_VANILLA // uglify constructor with optional debug code
 template <bool with_relu, impl::data_type_t src_type,
@@ -125,7 +117,7 @@ _ref_convolution_fwd_t<with_relu, src_type, wei_type, dst_type, acc_type>
 ::_ref_convolution_fwd_t (const pd_t *pd, const input_vector &inputs,
                           const output_vector &outputs)
     : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {
-#if DBG_CONV
+#if MKLDNN_REF_CONV_DBG
     /* print "name" of impl if first time constructed */
     mkldnn_memory_format_t const sfmt = conf_.src_pd()->desc()->format;
     mkldnn_memory_format_t const wbfmt = conf_.weights_pd()->desc()->format;
@@ -151,7 +143,7 @@ _ref_convolution_fwd_t<with_relu, src_type, wei_type, dst_type, acc_type>
                &sbuf[0], &wbuf[0], &dbuf[0]);
 #undef LEN
     }
-#endif /* DBG_CONV */
+#endif /* MKLDNN_REF_CONV_DBG */
 }
 #endif // TARGET_VANILLA (constructor)
 

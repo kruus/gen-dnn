@@ -26,6 +26,14 @@
 #include "scratchpad.hpp"
 #include "consistency.hpp"
 
+#if !defined(MKLDNN_GEMM_CONV_DBG)
+#if !defined(NDEBUG)
+#define MKLDNN_GEMM_CONV_DBG 1
+#else
+#define MKLDNN_GEMM_CONV_DBG 1
+#endif
+#endif
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -64,6 +72,14 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
             assert(this->engine()->kind() == engine_kind::cpu);
 
             Consistency ok; // default never-verbose SCHK
+#ifdef MKLDNN_GEMM_CONV_DBG
+            {
+                char const* result;
+                mkldnn_primitive_desc_query( this, mkldnn_query_impl_info_str, 0, &result );
+                printf(" conv-fwd:%s:", result);
+                fflush(stdout);
+            }
+#endif
 #define AND_(...) SCHKV(ok,__VA_ARGS__)
             AND_(this->set_default_params() == status::success);
             AND_(utils::one_of(this->cdesc_().prop_kind, forward_training,
@@ -81,6 +97,9 @@ struct _gemm_convolution_fwd_t: public cpu_primitive_t {
             AND_(this->weights_pd_.desc()->format == wei_format());
             AND_(this->is_gemm_conv_format());
 #undef AND_
+#ifdef MKLDNN_REF_CONV_DBG
+            if(ok){ printf("init-ok "); fflush(stdout); }
+#endif
             return ok ? status::success : status::unimplemented;
         }
 
