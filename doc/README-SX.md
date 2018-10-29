@@ -234,13 +234,42 @@ Run part of a gtests test in the SX debugger (using release mode build-sx/)
 - The `-r` (run) allows dbx to pass --gtest_filter= option to the test program, instead of trying interpret it as a dbx option
 - Even this subset takes quite some time to run!
 
+### dbx example of debugging an SX segfault (now fixed)
+
+- examples/simple-net-cpp and simple-net-c were both segfaulting
+- tests/api-io-c does not segfault (linker issue???)
+
+```
+dbx ./simple-net-c
+(dbx) run
+... (absentee space fault) in cpu_engine.is_dense__Q3_6mkldnn4impl19memory_desc_wrapperCFb at 0x4000cc03c
+(dbx) where
+*  0 cpu_engine.is_dense__Q3_6mkldnn4impl19memory_desc_wrapperCFb(this = 0x0000008000022fe0, with_padding = 0) at 0x4000cc03c
+   1 cpu_engine.init__Q5_6mkldnn4impl3cpu50ref_relu_fwd_t__tm__28_XC18mkldnn_data_type_tL_1_14pd_tFv_15mkldnn_status_t(this = 0x00000004049961f0) at 0x4001eb1b4
+   2 __CPR229__create__tm__77_Q5_6mkldnn4impl3cpu50ref_relu_fwd_t__tm__28_XC18mkldnn_data_type_tL_1_14pd_t__21mkldnn_primitive_descSFPPJ93JPCQ3_J18JJ25J9op_desc_tP13mkldnn_enginePCJ93J_15mkldnn_status_t(pd = 0x0000008000022470, adesc = 0x0000008000020cc0, engine = 0x0000000404291940, hint_fwd = (nil)) at 0x4000a22dc
+   3 mkldnn_primitive_desc_iterator::operator++(this = 0x0000008000022460), line 53 in "primitive_iterator.cpp"
+   4 mkldnn_primitive_desc_create(primitive_desc = 0x0000008000021cb8, c_op_desc = 0x0000008000020cc0, engine = 0x0000000404291940, hint_fwd_pd = (nil)), line 131 in "primitive_iterator.cpp"
+   5 simple_net.simple_net(), line 252 in "simple_net.c"
+   6 main(argc = 1, argv = 0x00000080000003f8), line 463 in "simple_net.c"
+   7 _start(0x1, 0x80000003f8, 0x8000000408) at 0x4000005c4
+```
+
+- Resolved by finding some workarounds (eventually!) for SX compiler bugs.
+  - some bugs simple and fixed in next SX compiler versions.
+- One bug I could not reduce to a simple test case:
+  - rare erroneous struct initializations, with workaround to specify
+    tailing zeros:
+  - Buggy: *mystruct={1}* --> OK: *mystruct={1,0}*
+
 ## SX Performance
 
 ### Intel:
 
 - ./build.sh -dq
 - operf ./build/examples/simple-net-c
+  - #This executes a gemm reference convolution
 - opreport -l ./build/tests/simple-net-c ./build/src/libmkldnn.so.0
+
 ```
 Using /local/kruus/sx/sx-dnn/oprofile_data/samples/ for samples directory.
 
@@ -276,30 +305,6 @@ samples  %        image name               symbol name
 1         0.0019  libmkldnn.so.0.9.0       std::vector<mkldnn_primitive_at_t, std::allocator<mkldnn_primitive_at_t> >::size() const
 ```
 
-### SX segfault example
-
-- examples/simple-net-cpp and simple-net-c both segfault
-- tests/api-io-c does not segfault (linker issue???)
-
-```
-dbx ./simple-net-c
-(dbx) run
-... (absentee space fault) in cpu_engine.is_dense__Q3_6mkldnn4impl19memory_desc_wrapperCFb at 0x4000cc03c
-(dbx) where
-*  0 cpu_engine.is_dense__Q3_6mkldnn4impl19memory_desc_wrapperCFb(this = 0x0000008000022fe0, with_padding = 0) at 0x4000cc03c
-   1 cpu_engine.init__Q5_6mkldnn4impl3cpu50ref_relu_fwd_t__tm__28_XC18mkldnn_data_type_tL_1_14pd_tFv_15mkldnn_status_t(this = 0x00000004049961f0) at 0x4001eb1b4
-   2 __CPR229__create__tm__77_Q5_6mkldnn4impl3cpu50ref_relu_fwd_t__tm__28_XC18mkldnn_data_type_tL_1_14pd_t__21mkldnn_primitive_descSFPPJ93JPCQ3_J18JJ25J9op_desc_tP13mkldnn_enginePCJ93J_15mkldnn_status_t(pd = 0x0000008000022470, adesc = 0x0000008000020cc0, engine = 0x0000000404291940, hint_fwd = (nil)) at 0x4000a22dc
-   3 mkldnn_primitive_desc_iterator::operator++(this = 0x0000008000022460), line 53 in "primitive_iterator.cpp"
-   4 mkldnn_primitive_desc_create(primitive_desc = 0x0000008000021cb8, c_op_desc = 0x0000008000020cc0, engine = 0x0000000404291940, hint_fwd_pd = (nil)), line 131 in "primitive_iterator.cpp"
-   5 simple_net.simple_net(), line 252 in "simple_net.c"
-   6 main(argc = 1, argv = 0x00000080000003f8), line 463 in "simple_net.c"
-   7 _start(0x1, 0x80000003f8, 0x8000000408) at 0x4000005c4
-```
-
-- Resolved by finding some workarounds (eventually!) for SX compiler bugs.
-  - some bugs simple and fixed in next SX compiler versions.
-- One bug I could not reduce to a simple test case.
-
 ### SX Convolution with mkl-dnn ref impls is slow (just like on Intel)
 
 - ref impl is slow "as expected" (function call in innermost loop)
@@ -310,10 +315,8 @@ dbx ./simple-net-c
   - alt C loops embedding im2col operations within loop
   - may try: direct convolution, with a layout like nChw128c
   - may try: Winograd (also should be very nice for massively-SIMD machines)
-
-- Status:
-  - currently working on benchdnn improvements to move some faster SX convolutions
-    from last year, in another codebase, to mkl-dnn.
+  - we had some faster SX gemm-based convolutions in another codebase,
+    - for convolutions without dilations.
 
 Here's a sample sxftrace for mkldnn ref convolution 
 
@@ -346,15 +349,16 @@ void mkldnn::impl::cpu::_ref_convolution_fwd_t<false, (mkldnn_data_type_t)1, (mk
 - `build-sx.log` shows the convolution loop is UNVECTORIZED, because src..[...off(..)] is
   doing a slow function call to calculate offsets for "any" generic src format.
 - Why is SX not using the im2col gemm convolution?
-  - OK, time to come back to Intel desktop and gdb the primitive settings (it should be nchw
-    and I need to check if this format is supported for the gemm_convolution)
-- Rationalize compiler flag usage esp. for USE_CBLAS
 
-- NEW:
-  - benchdnn now running on SX
-  - now can use new queries to print algorithm name!
-  - SX is slow because im2col is a *ref* implementation
-    that doesn't allow good loop optimizations
-    - This needs to be special-cased for "nice" layouts.
+### SX status
 
+- benchdnn now running on SX
+- now can use new queries to print algorithm name!
+- SX is slow because im2col is a *ref* implementation
+  that doesn't allow good loop optimizations
+  - This needs to be special-cased for "nice" layouts.
+
+- We have now switched focus to getting the generic mkl-dnn framework ready for
+use on the NEC Aurora chip.
+- See [README-Aurora](README-Aurora.md)
 
