@@ -38,12 +38,27 @@ file(GLOB_RECURSE SOURCES
 set(CPU_INCLUDE_DIRS)
 set(CPU_INCLUDE_SRC_SUBDIRS) # this can be a list of subdirectories of src/
 if(TARGET_JIT)
-    set(CPU_INCLUDE_SRC_SUBDIRS cpu/xbyak) # this can be a list of subdirectories of src/
+	if(NOT TARGET_VANILLA)
+		set(CPU_INCLUDE_SRC_SUBDIRS cpu/xbyak) # this can be a list of subdirectories of src/
+	endif()
 endif()
 # prefix any directories in CPU_INCLUDE_SRC_SUBDIRS with ${CMAKE_CURRENT_SOURCE_DIR}
 string(REGEX REPLACE "([^;]+)" "${CMAKE_CURRENT_SOURCE_DIR}/\\1" CPU_INCLUDE_DIRS "${CPU_INCLUDE_SRC_SUBDIRS}")
+if(NECVE) # AND TARGET_VANILLA?
+    list(APPEND CPU_INCLUDE_DIRS
+        ${PROJECT_SOURCE_DIR}/vejit/include
+        ${PROJECT_SOURCE_DIR}/vednnx/include)
+    file(GLOB VEJIT_LIBS ${PROJECT_SOURCE_DIR}/vejit/bin/*.a)
+    if(USE_OPENMP)
+        file(GLOB VEDNNX_LIBS ${PROJECT_SOURCE_DIR}/vednnx/lib/*openmp.a)
+    else()
+        file(GLOB VEDNNX_LIBS ${PROJECT_SOURCE_DIR}/vednnx/lib/*sequential.a)
+    endif()
+    list(APPEND EXTRA_LIBS ${VEJIT_LIBS} ${VEDNNX_LIBS})
+endif()
 message(STATUS " original CPU_INCLUDE_SRC_SUBDIRS : ${CPU_INCLUDE_SRC_SUBDIRS}")
 message(STATUS " extra CPU include directories    : ${CPU_INCLUDE_DIRS}")
+message(STATUS " extra libs                       : ${EXTRA_LIBS}")
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -138,4 +153,4 @@ else()
     install(TARGETS ${TARGET_NAME} DESTINATION lib${LIB_SUFFIX} COMPONENT bin)
 endif()
 install(FILES ${HEADERS} DESTINATION include COMPONENT dev)
-# vim: set ts=4 sw=4 et ftype=cmake
+# vim: et ts=4 sw=4 ai ft=cmake

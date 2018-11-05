@@ -37,12 +37,14 @@ void simple_net(int times = 100) {
     std::vector<primitive> net_weights;
 
     const int batch = 1;
-#if defined(NDEBUG)
+#if 1 || defined(NDEBUG)
 #define SRC_PIX 227
 #define CNV_WID 11
 #define SRC_STRIDE 4
 #define CNV_OSZ 55
 #define POOL_OSZ 27
+#define POOL_OSZ2 13
+#define POOL_OSZ3 6
 #else
 /** reduce from original 227 for faster debug runs... */
 #define SRC_PIX 67/*227*/
@@ -50,6 +52,9 @@ void simple_net(int times = 100) {
 #define SRC_STRIDE 4
 #define CNV_OSZ ((SRC_PIX - (CNV_WID/2 + 2))/SRC_STRIDE)/*55*/
 #define POOL_OSZ ((CNV_OSZ)/2)/*27*/
+#define POOL_OSZ2 ((POOL_OSZ)/2)/*13*/
+#define POOL_OSZ3 ((POOL_OSZ2)/2)/*6*/
+
 #endif
     TRACE("setting various layer dimension");
     std::vector<float> net_src(batch * 3 * SRC_PIX * SRC_PIX);
@@ -380,7 +385,7 @@ void simple_net(int times = 100) {
     * strides: {2, 2}
     */
 
-    memory::dims pool2_dst_tz = { batch, 256, 13, 13 };
+    memory::dims pool2_dst_tz = { batch, 256, POOL_OSZ2, POOL_OSZ2 };
     memory::dims pool2_kernel = { 3, 3 };
     memory::dims pool2_strides = { 2, 2 };
     auto pool2_padding = { 0, 0 };
@@ -406,10 +411,10 @@ void simple_net(int times = 100) {
     * {batch, 256, 13, 13} (x)  {384, 256, 3, 3}; -> {batch, 384, 13, 13};
     * strides: {1, 1}
     */
-    memory::dims conv3_src_tz = { batch, 256, 13, 13 };
+    memory::dims conv3_src_tz = { batch, 256, POOL_OSZ2, POOL_OSZ2 };
     memory::dims conv3_weights_tz = { 384, 256, 3, 3 };
     memory::dims conv3_bias_tz = { 384 };
-    memory::dims conv3_dst_tz = { batch, 384, 13, 13 };
+    memory::dims conv3_dst_tz = { batch, 384, POOL_OSZ2, POOL_OSZ2 };
     memory::dims conv3_strides = { 1, 1 };
     auto conv3_padding = { 1, 1 };
 
@@ -493,10 +498,10 @@ void simple_net(int times = 100) {
     * 13};
     * strides: {1, 1}
     */
-    memory::dims conv4_src_tz = { batch, 384, 13, 13 };
+    memory::dims conv4_src_tz = { batch, 384, POOL_OSZ2, POOL_OSZ2 };
     memory::dims conv4_weights_tz = { 2, 192, 192, 3, 3 };
     memory::dims conv4_bias_tz = { 384 };
-    memory::dims conv4_dst_tz = { batch, 384, 13, 13 };
+    memory::dims conv4_dst_tz = { batch, 384, POOL_OSZ2, POOL_OSZ2 };
     memory::dims conv4_strides = { 1, 1 };
     auto conv4_padding = { 1, 1 };
 
@@ -582,7 +587,7 @@ void simple_net(int times = 100) {
     */
     memory::dims conv5_weights_tz = { 2, 128, 192, 3, 3 };
     memory::dims conv5_bias_tz = { 256 };
-    memory::dims conv5_dst_tz = { batch, 256, 13, 13 };
+    memory::dims conv5_dst_tz = { batch, 256, POOL_OSZ2, POOL_OSZ2 };
     memory::dims conv5_strides = { 1, 1 };
     auto conv5_padding = { 1, 1 };
 
@@ -666,7 +671,7 @@ void simple_net(int times = 100) {
     * strides: {2, 2}
     */
 
-    memory::dims pool5_dst_tz = { batch, 256, 6, 6 };
+    memory::dims pool5_dst_tz = { batch, 256, POOL_OSZ3, POOL_OSZ3 };
     memory::dims pool5_kernel = { 3, 3 };
     memory::dims pool5_strides = { 2, 2 };
     auto pool5_padding = { 0, 0 };
@@ -695,8 +700,8 @@ void simple_net(int times = 100) {
      * fc6 inner product {batch, 256, 6, 6} (x) {4096, 256, 6, 6}-> {batch,
      * 4096}
      */
-    memory::dims fc6_src_tz = { batch, 256, 6, 6 };
-    memory::dims fc6_weights_tz = { 4096, 256, 6, 6 };
+    memory::dims fc6_src_tz = { batch, 256, POOL_OSZ3, POOL_OSZ3 };
+    memory::dims fc6_weights_tz = { 4096, 256, POOL_OSZ3, POOL_OSZ3 };
     memory::dims fc6_bias_tz = { 4096 };
     memory::dims fc6_dst_tz = { batch, 4096 };
 
@@ -706,6 +711,7 @@ void simple_net(int times = 100) {
             fc6_bias_tz.end(), 1, std::multiplies<uint32_t>()));
 
     /* create memory for user data */
+    TRACE("create memory for user data");
     auto fc6_user_weights_memory
             = memory({ { { fc6_weights_tz }, memory::data_type::f32,
                                memory::format::oihw },
@@ -720,6 +726,7 @@ void simple_net(int times = 100) {
 
     /* create memory descriptors for convolution data w/ no specified format
      */
+    TRACE("create memory descriptors for convolution data w/ no specified format");
     auto fc6_src_md = memory::desc(
             { fc6_src_tz }, memory::data_type::f32, memory::format::any);
     auto fc6_bias_md = memory::desc(
@@ -730,12 +737,15 @@ void simple_net(int times = 100) {
             { fc6_dst_tz }, memory::data_type::f32, memory::format::any);
 
     /* create a inner_product */
+    TRACE("create a inner_product, fc6_desc");
     auto fc6_desc
             = inner_product_forward::desc(prop_kind::forward_inference,
                     fc6_src_md, fc6_weights_md, fc6_bias_md, fc6_dst_md);
+    TRACE("create a inner_product, fc6_prim_desc");
     auto fc6_prim_desc
             = inner_product_forward::primitive_desc(fc6_desc, cpu_engine);
 
+    TRACE("fc6_src_memory...");
     auto fc6_src_memory = pool5_dst_memory;
     if (memory::primitive_desc(fc6_prim_desc.src_primitive_desc())
             != fc6_src_memory.get_primitive_desc()) {
@@ -743,6 +753,7 @@ void simple_net(int times = 100) {
         net.push_back(reorder(pool5_dst_memory, fc6_src_memory));
     }
 
+    TRACE("fc6_weights_memory...");
     auto fc6_weights_memory = fc6_user_weights_memory;
     if (memory::primitive_desc(fc6_prim_desc.weights_primitive_desc())
             != fc6_user_weights_memory.get_primitive_desc()) {
@@ -751,15 +762,18 @@ void simple_net(int times = 100) {
                 reorder(fc6_user_weights_memory, fc6_weights_memory));
     }
 
+    TRACE("fc6_dst_memory...");
     auto fc6_dst_memory = memory(fc6_prim_desc.dst_primitive_desc());
 
     /* create convolution primitive and add it to net */
+    TRACE("create convolution primitive and add it to net");
     net.push_back(inner_product_forward(fc6_prim_desc, fc6_src_memory,
             fc6_weights_memory, fc6_user_bias_memory, fc6_dst_memory));
 
     /**
      * fc7 inner product {batch, 4096} (x) {4096, 4096}-> {batch, 4096}
      */
+    TRACE("fc7 inner product...");
     memory::dims fc7_weights_tz = { 4096, 4096 };
     memory::dims fc7_bias_tz = { 4096 };
     memory::dims fc7_dst_tz = { batch, 4096 };
@@ -770,6 +784,7 @@ void simple_net(int times = 100) {
             fc7_bias_tz.end(), 1, std::multiplies<uint32_t>()));
 
     /* create memory for user data */
+    TRACE("create memory for user data");
     auto fc7_user_weights_memory
             = memory({ { { fc7_weights_tz }, memory::data_type::f32,
                                memory::format::nc },
@@ -784,6 +799,7 @@ void simple_net(int times = 100) {
 
     /* create memory descriptors for convolution data w/ no specified format
      */
+    TRACE("create memory descriptors for convolution data w/ no specified format");
     auto fc7_bias_md = memory::desc(
             { fc7_bias_tz }, memory::data_type::f32, memory::format::any);
     auto fc7_weights_md = memory::desc({ fc7_weights_tz },
@@ -792,6 +808,7 @@ void simple_net(int times = 100) {
             { fc7_dst_tz }, memory::data_type::f32, memory::format::any);
 
     /* create a inner_product */
+    TRACE("create a inner_product, fc7_desc");
     auto fc7_desc
             = inner_product_forward::desc(prop_kind::forward_inference,
                     fc6_dst_memory.get_primitive_desc().desc(),
@@ -808,13 +825,15 @@ void simple_net(int times = 100) {
 
     auto fc7_dst_memory = memory(fc7_prim_desc.dst_primitive_desc());
 
-    /* create convolution primitive and add it to net */
+    /* create inner product primitive and add it to net */
+    TRACE("create inner product primitive and add it to net");
     net.push_back(inner_product_forward(fc7_prim_desc, fc6_dst_memory,
             fc7_weights_memory, fc7_user_bias_memory, fc7_dst_memory));
 
     /**
     * fc8 inner product {batch, 4096} (x) {1000, 4096}-> {batch, 1000}
     */
+    TRACE("fc8 inner product {batch, 4096} (x) {1000, 4096}-> {batch, 1000}");
     memory::dims fc8_weights_tz = { 1000, 4096 };
     memory::dims fc8_bias_tz = { 1000 };
     memory::dims fc8_dst_tz = { batch, 1000 };
@@ -825,6 +844,7 @@ void simple_net(int times = 100) {
             fc8_bias_tz.end(), 1, std::multiplies<uint32_t>()));
 
     /* create memory for user data */
+    TRACE("create memory for user data: fc8");
     auto fc8_user_weights_memory
             = memory({ { { fc8_weights_tz }, memory::data_type::f32,
                                memory::format::nc },
@@ -842,8 +862,9 @@ void simple_net(int times = 100) {
                                          cpu_engine },
             user_dst.data());
 
-    /* create memory descriptors for convolution data w/ no specified format
+    /* create memory descriptors for inner product data w/ no specified format
      */
+    TRACE("create memory descriptors for inner product data w/ no specified format, fc8");
     auto fc8_bias_md = memory::desc(
             { fc8_bias_tz }, memory::data_type::f32, memory::format::any);
     auto fc8_weights_md = memory::desc({ fc8_weights_tz },
@@ -869,7 +890,8 @@ void simple_net(int times = 100) {
 
     auto fc8_dst_memory = memory(fc8_prim_desc.dst_primitive_desc());
 
-    /* create convolution primitive and add it to net */
+    /* create inner product primitive and add it to net */
+    TRACE("create inner product primitive and add it to net, fc8");
     net.push_back(inner_product_forward(fc8_prim_desc, fc7_dst_memory,
             fc8_weights_memory, fc8_user_bias_memory, fc8_dst_memory));
 

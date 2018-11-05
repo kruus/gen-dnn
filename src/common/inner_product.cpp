@@ -20,6 +20,7 @@
 #include "c_types_map.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+#include "consistency.hpp"
 
 using namespace mkldnn::impl;
 using namespace mkldnn::impl::utils;
@@ -32,7 +33,10 @@ status_t ip_desc_init(inner_product_desc_t *ip_desc, prop_kind_t prop_kind,
         const memory_desc_t *src_desc, const memory_desc_t *weights_desc,
         const memory_desc_t *bias_desc, const memory_desc_t *dst_desc) {
     bool args_ok = !any_null(ip_desc, src_desc, weights_desc, dst_desc);
-    if (!args_ok) return invalid_arguments;
+    if (!args_ok){
+        printf(" ip_desc_init: null args!"); fflush(stdout);
+        return invalid_arguments;
+    }
 
     auto id = inner_product_desc_t();
     id.primitive_kind = primitive_kind::inner_product;
@@ -57,18 +61,22 @@ status_t ip_desc_init(inner_product_desc_t *ip_desc, prop_kind_t prop_kind,
     id.accum_data_type = types::default_accum_data_type(src_desc->data_type,
             weights_desc->data_type, dst_desc->data_type, prop_kind);
 
-    bool consistency = true
-        && memory_desc_wrapper(weights_desc).nelems()
-        && one_of(src_desc->ndims, 2, 4, 5)
-        && dst_desc->ndims == 2
-        && weights_desc->ndims == src_desc->ndims
-        && (with_bias ? bias_desc->ndims == 1 : true)
-        && (with_bias ? bias_desc->dims[0] == dst_desc->dims[1] : true)
-        && src_desc->dims[0] == dst_desc->dims[0]
-        && array_cmp(&src_desc->dims[1], &weights_desc->dims[1],
-                src_desc->ndims - 1)
-        && dst_desc->dims[1] == weights_desc->dims[0];
-    if (!consistency) return invalid_arguments;
+    // Note: ncc compiler bug in evaluating logic in original version
+    //       of these checks ...
+    Consistency ok("ip_desc_init"); // default here is never-verbose, SCHK
+#define AND_(...) SCHKV(ok,__VA_ARGS__)
+        AND_(memory_desc_wrapper(weights_desc).nelems());
+        AND_(one_of(src_desc->ndims, 2, 4, 5));
+        AND_(dst_desc->ndims == 2);
+        AND_(weights_desc->ndims == src_desc->ndims);
+        AND_((with_bias ? bias_desc->ndims == 1 : true));
+        AND_((with_bias ? bias_desc->dims[0] == dst_desc->dims[1] : true));
+        AND_(src_desc->dims[0] == dst_desc->dims[0]);
+        AND_(array_cmp(&src_desc->dims[1], &weights_desc->dims[1],
+            src_desc->ndims - 1));
+        AND_(dst_desc->dims[1] == weights_desc->dims[0]);
+#undef AND_
+    if (!ok) return invalid_arguments;
 
     *ip_desc = id;
     return success;
@@ -79,8 +87,10 @@ status_t mkldnn_inner_product_forward_desc_init(inner_product_desc_t *ip_desc,
         prop_kind_t prop_kind, const memory_desc_t *src_desc,
         const memory_desc_t *weights_desc, const memory_desc_t *bias_desc,
         const memory_desc_t *dst_desc) {
-    if (!one_of(prop_kind, forward_training, forward_inference))
+    if (!one_of(prop_kind, forward_training, forward_inference)){
+        printf(" (ip:not fwd) "); fflush(stdout);
         return invalid_arguments;
+    }
     return ip_desc_init(ip_desc, prop_kind, src_desc, weights_desc, bias_desc,
             dst_desc);
 }

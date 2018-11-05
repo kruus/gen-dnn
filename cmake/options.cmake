@@ -58,6 +58,12 @@ if(NECVE OR NECSX)
 else()
     option(TARGET_VANILLA "Use only pure C/C++ source_code, no JIT assembler" OFF)
 endif()
+if(NECVE)
+    set(VEJIT "0" CACHE STRING
+        "Use libvednnx/jit for Aurora?")
+else()
+    set(VEJIT "0")
+endif()
 # NECVE: OpenMP support is rumored to be here, but experience suggests otherwise :0
 #CMAKE_DEPENDENT_OPTION(USE_OPENMP "Use OpenMP?" ON
 #                                        "NECVE" OFF)
@@ -65,7 +71,7 @@ endif()
 #                                                "NECVE" OFF) # libmkldnn.a
 if(NECVE)
     option(USE_OPENMP "Use OpenMP (#pragma omp)?" OFF)
-    option(USE_SHAREDLIB "Use shared libs?" OFF)   # libmkldnn.a preferred
+    option(USE_SHAREDLIB "Use shared libs?" OFF)   # libblas.a preferred
 else()
     option(USE_OPENMP "Use OpenMP (#pragma omp)?" ON)
     option(USE_SHAREDLIB "Use shared libs?" ON)   # libmkldnn.so
@@ -92,6 +98,9 @@ if(TARGET_VANILLA)
     set(CPU_DIR vanilla)
 else()
     set(CPU_DIR cpu)
+endif()
+if(NOT NECVE AND VEJIT)
+    message(WARNING "VEJIT should only be set ECVE compilation")
 endif()
 MESSAGE(STATUS "NECVE: ${NECVE}    NECSX: ${NECSX}   TARGET_JIT: ${TARGET_JIT}")
 message(STATUS "-DTARGET_VANILLA=${TARGET_VANILLA} -DUSE_OPENMP=${USE_OPENMP} -DUSE_SHAREDLIB=${USE_SHAREDLIB}")

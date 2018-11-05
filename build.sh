@@ -16,6 +16,7 @@ QUICK=0
 DOGCC_VER=0
 NEC_FTRACE=0
 DOTARGET="x"
+VEJIT=0
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -30,6 +31,7 @@ usage() {
     echo "         quick, quick: no cmake, just make --- $0 -qqa"
     echo "     see what cmake is doing, and create build.log"
     echo "         CMAKEOPT='--trace -LAH' ./build.sh -q >&/dev/null"
+    echo " NEW: ./build.sh -aj for Aurora + vednn/jit compile (binary Aurora libvednn distro)"
     echo "Debug: Individual tests can be run like build-sx/tests/gtests/test_relu"
     echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
@@ -38,11 +40,13 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
-            if [ ! "${DOTARGET}" == "x" ]; then echo "-a no good: already have -${DOTARGET}"; usage; fi
-            DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
+            if [ "${DOTARGET}" == "j" ]; then VEJIT=100; else
+                if [ ! "${DOTARGET}" == "x" ]; then echo "-a no good: already have -${DOTARGET}"; usage; fi
+                VEJIT=0; use something like #if DOJIT > 0 && defined(__ve) ...
+            fi
+            DOTARGET="a"; SIZE_T=64; DONEEDMKL="n"
             JOBS="-j1" # -j1 to avoid SIGSEGV in ccom
             if [ `uname -n` = "zoro" ]; then JOBS="-j8"; fi
-            #export LDFLAGS="${LDFLAGS} -L/opt/nec/ve/musl/lib"
             ;;
         F) # NEC Aurora VE or SX : add ftrace support (generate ftrace.out)
             NEC_FTRACE=1
@@ -59,9 +63,11 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
             if [ ! "${DOTARGET}" == "x" ]; then echo "-v no good: already have -${DOTARGET}"; usage; fi
             if [ -d src/vanilla ]; then DOTARGET="v"; fi
             ;;
-        j) # force Intel JIT (src/cpu/ JIT assembly code)
-            if [ ! "${DOTARGET}" == "x" ]; then echo "-j no good: already have -${DOTARGET}"; usage; fi
-            DOTARGET="j"; DOJIT=100 # 100 means all JIT funcs enabled
+        j) # force Intel [or Aurora libvednnx] JIT (src/cpu/ JIT assembly code)
+            if [ "${DOTARGET}" == "a" ]; then VEJIT=100; else
+                if [ ! "${DOTARGET}" == "x" ]; then echo "-j no good: already have -${DOTARGET}"; usage; fi
+                DOTARGET="j"; VEJIT=0; #DOJIT=100 # 100 means all JIT funcs enabled
+            fi
             ;;
         d) # [no] debug release
             DODEBUG="y"
@@ -130,6 +136,7 @@ if [ "${DOTARGET}" == "x" ]; then
         echo "auto-detected '-a' Aurora compiler (ncc, nc++)"
         DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
         if [ `uname -n` = "zoro" ]; then JOBS="-j8"; else JOBS="-j1"; fi
+        if [ -f vejit/include/vednn.h ]; then VEJIT=100; echo "auto-detected libvednn"; fi
     elif [ -d src/vanilla ]; then
         DOTARGET="v" # v for vanilla (C/C++ code)
     else
@@ -163,7 +170,11 @@ fi
 #
 #
 if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx';
-elif [ "$DOTARGET" != "a" ]; then
+elif [ "$DOTARGET" == "a" ]; then
+    if [ "$VEJIT" -gt 0 ]; then
+        INSTALLDIR="${INSTALLDIR}-vej"; BUILDDIR="${BUILDDIR}-vej";
+    fi
+else #if [ "$DOTARGET" != "a" ]; then
     if [ "$DOGCC_VER" == "icc" ]; then
         echo "LOOKING for icc ... which icc = `which icc`"
         set -x
@@ -305,6 +316,7 @@ echo "PATH $PATH"
     echo "# vim: set ro ft=log:"
     echo "DOTARGET   $DOTARGET"
     echo "DOJIT      $DOJIT"
+    echo "VEJIT      $VEJIT"
     echo "DOTEST     $DOTEST"
     echo "DODEBUG    $DODEBUG"
     echo "DODOC      $DODOC"
@@ -345,6 +357,7 @@ echo "PATH $PATH"
             export CFLAGS="${CFLAGS} -fopenmp"
             export CXXFLAGS="${CFLAGS} -fopenmp"
         fi
+        # TODO proginf is not working automatically any more?
         # -proginf  : Run with 'export VE_PROGINF=YES' to get some stats output
         # export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
         # export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
@@ -363,6 +376,9 @@ echo "PATH $PATH"
             export LDFLAGS="${LDFLAGS} -L${VEPERF_LIB_DIR} -lveperf"
             #export LDFLAGS="${LDLIBS} -Wl,-rpath,${VEPERF_LIB_DIR}"
         fi
+        CMAKEOPT="${CMAKEOPT} -DVEJIT=${VEJIT}"
+        #export CFLAGS="${CFLAGS} -DVEJIT=${VEJIT}"
+        #export CXXFLAGS="${CXXFLAGS} -DVEJIT=${VEJIT}"
         echo "Aurora CMAKEOPT = ${CMAKEOPT}"
     fi
     if [ ${DOWARN} == 'y' ]; then

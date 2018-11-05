@@ -69,6 +69,10 @@
 #include "cpu/jit_avx512_core_fp32_wino_conv_2x3.hpp"
 #endif
 
+#if VEJIT > 0
+#include "vanilla/vednnx_convolution.hpp"
+#endif
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -173,6 +177,12 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
 #define INSTANCE_sse42(...) /* placeholder "non-null ptr-to-never-impl here?" */
 #endif
 
+#if VEJIT > 0
+#define INSTANCE_ve(...) &INSTANCE_CREATOR(__VA_ARGS__),
+#else
+#define INSTANCE_sse42(...) /* placeholder "non-null ptr-to-never-impl here?" */
+#endif
+
 // JITFUNCS >= JIT_FUNCS_ANY (always include this impl)
 #define INSTANCE(...) &INSTANCE_CREATOR(__VA_ARGS__),
 //@}
@@ -211,6 +221,7 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE_avx2(jit_avx2_convolution_bwd_data_t)
     INSTANCE_avx2(jit_avx2_convolution_bwd_weights_t)
     INSTANCE_sse42(jit_sse42_convolution_fwd_t)
+    INSTANCE_ve(vednnx_convolution_fwd_t)
     INSTANCE(gemm_convolution_fwd_t)
     INSTANCE(gemm_convolution_bwd_data_t)
     INSTANCE(gemm_convolution_bwd_weights_t)
@@ -318,12 +329,15 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(ref_batch_normalization_fwd_t<f32>)
     INSTANCE(ref_batch_normalization_bwd_t<f32>)
     /* inner product */
+#if 1 // debugging...
     INSTANCE(gemm_inner_product_fwd_t<f32>)
     INSTANCE(gemm_inner_product_bwd_data_t<f32>)
     INSTANCE(gemm_inner_product_bwd_weights_t<f32>)
+#endif
     INSTANCE(ref_inner_product_fwd_t<f32>)
     INSTANCE(ref_inner_product_bwd_data_t<f32, f32, f32, f32>)
     INSTANCE(ref_inner_product_bwd_weights_t<f32>)
+#if 1
     /* inner product (int) */
     INSTANCE(gemm_u8s8s32x_inner_product_fwd_t<u8>)
     INSTANCE(gemm_u8s8s32x_inner_product_fwd_t<s8>)
@@ -335,6 +349,7 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(ref_inner_product_fwd_t<u8, s8, f32, s32>)
     INSTANCE(ref_inner_product_fwd_t<s16, s16, s32, s32>)
     INSTANCE(ref_inner_product_bwd_data_t<s32, s16, s16, s32>)
+#endif
     /* conv_eltwise */
     INSTANCE_avx512(jit_avx512_common_dw_convolution_relu_t)
     INSTANCE_avx512(jit_avx512_common_convolution_winograd_relu_t)
