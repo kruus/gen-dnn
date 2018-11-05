@@ -1,29 +1,47 @@
 # Generic MKL-DNN
 
-## BRANCH for non-jit version of MKL-DNN, to ease porting API to non-Intel platforms
+## Fork: mkl-dnn for other compilers (non-jit C/C++ only)
 
-* NEC SX,            sxcc compiler
-* NEC "Aurora" chip, ncc compiler
+* A first step to ease porting the mkl-dnn API to non-Intel platforms
+* *Other* compilers:
+  * NEC SX,            sxcc compiler
+  * NEC "Aurora" chip, ncc compiler
+* This fork: [gen-dnn Github URL](https://github.com/necla-ml/gen-dnn)
+* Upstream: [mkl-dnn Github URL](https://github.com/intel/mkl-dnn)
 
 ### Quickstart:
 
 ```
-./build.sh -h          # help</BR>
-Intel: ./build.sh -tt  # build and run all tests (no jit)</BR>
-           --> build/    and build.log
-Platform XX:
-       ./build.sh -sdttT    # s:other system, d:debug compile, T:trace cmake decisions
-
+./build.sh -h      # help</BR>
+./build.sh -tt     # Intel x86 build and run some tests (w/ jit)
+                   # add 'v' for *vanilla* (no jit)
+                   # --> build/    and build.log
+# Platform Aurora:
+./build.sh -adttT  # a:Aurora platform, d:debug compile, T:trace cmake decisions
+                   # a=NEC Aurora; use S for NEC SX
+```
 This public branch reflects some work done on an internal git repository
 porting mkl-dnn to:
 - non-JIT cpu
-- HPC-style cpu with 32-bit int
+- HPC-style cpu with 32-bit int, and
+  - very long simd registers (128 to 512 floats per floating multiply-add)
+- chip-specific compilers (sxcc,ncc)
 
-I intend also to port some fast C/C++ impls of convolutions suited
-for machines with very long SIMD registers.
+Last merge with upstream was around v0.16 of mkl-dnn (~ Sept 2018)
+
+*Beware*: This port is generic C/C++ code only, removing the x86 jit portions.
+Many layers are not vectorized efficiently by gcc/sxcc/ncc.
+
+Gemm convolutions on SX and Aurora attain about 60-75% of the chips
+theoretical FLOPS/s.  For Aurora, higher efficiencies are available
+for several primitives via a hand-coded VectorDNN library, but this
+library is not integrated into gen-dnn.
+
+We plan to develop some simple jit examples for convolutions on NEC's Aurora
+chip. The jit operations may be slow, invoking the assembler or compiler as
+required!
 
 [Erik Kruus, NEC Labs America]
-```
 
 ### Purpose
 
@@ -32,46 +50,65 @@ This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
 * can remove all Intel Jit stuff
 
 * adds some i/o funcs (because I know I will have to debug sooner or later)
+  * later mkl-dnn versions now provide better i/o (primitive name via query
+    API, for example).
 
 - Various build options added
-  - build.sh -h
+  - build.sh -h #for latest settings
 - defaults are:
   - "vanilla" C/C++, and
-  - builds a RelWithDebug libmkldnn.so
+  - builds a RelWithDebug libmkldnn.so with `-d` option
   - creates an ROOTDIR/install/ directory with extensive doxygen docs.
     - browse at install/share/doc/mkldnn/reference/html/index.html
 - So far, I have added some debug stuff, a build.sh to build original/vanilla
-  - I plan to add some slightly faster C++ impls (because the reference ones
-    seem to be "gold standard" readable impls, rather than trying hard to be
-    fast)
-- I might try some C++ versions of Winograd convolution, if I have time.
-- There are no plans to put low-level impls for other chips into this public repo
+  - Some faster C++ impls were added for SX and Aurora
+    - reference impls are "gold standard" readable impls,
+      that favor code clarity over speed.
+
+##### faster C/C++ ref impls
+
+There are no low-level impls in the github gen-dnn repo.
+
+For the NEC SX chip and sxcc compiler, we could get to ~ 45% chip efficiency
+for some pure-C/C++ impls for the NEC SX chip.  This is still lower than
+*im2col+gemm*.
+
+For Aurora *none* of the reference impls (using ncc <= 0.5.2) was able to
+attain significant chip efficiency, even though some ref impls yielded 100x
+speedups wrt the [extremely slow] "gold standard" impl.  Only the *im2col+gemm*
+was able to be efficient (typically 60-70% chip efficiency over a wide range of
+convolutions).
+
+- these alternate reference impl codes are available in
+  - [github branch Mar072108-working](https://github.com/necla-ml/gen-dnn/tree/Mar072018-working)
+  - Updating these impls to support *depth* would be a lot of work.
+    - some of the loop re-orderings are not so easy to implement
+    - their performance is highly dependent on compiler vectorization ability.
+  - **takeaway**: Even if you try very hard to make vectorization opportunities
+    *really obvious* for the compiler, compilers won't do what you want.
+    - this is really bad for ncc, where I had enormous difficulty in getting
+      the compiler to use the masked instructions of the chipset.
+    - ... which is why we switched to llvm + intrinsics for Aurora to make
+      a separate VectorDNN library of fast convolutions.  (non-jit, not yet
+      publicly available, so not integrated into gen-dnn for Aurora yet).
 
 ### My notes: port to another CPU/platform (XX) modifications
 
-- cmake support is developed in subdirectory dev-cmake-XX
-  - changes to XX platform spec go into a tarfile that get untarred in gen-dnn root dir
+- cmake support was developed in subdirectory dev-cmake-XX
+  - now in subdirectory Platform/
   - ** cmake-3.8 ** is OK, cmake-3.0 is not
     - because cmake-3.8 has a handy call to Platform/XX-Initialize that I require
-  - ./build.sh -dqst   [runs cmake on platform XX]
-    - ---> build-XX/ and build-XX.log
 
-- Platform issues
+- Platform issues (comment here are mostly for SX port)
   - has no posix_memalign :(
   - int is only 32-bit (even though you can use -size_t64)
-  - has many conversion warnings.
-  - linking now OK
-  - most tests OK (some memory formats don't need support for non-JIT)
+  - has many more precision/sign-related warnings about type-conversions
   - Non-SX-specific mods have mostly been accepted by [upstream mkl-dnn](https://github.com/01org/mkl-dnn)
     - Many warning-removal SX patches identical to those for the Windows mkl-dnn port.
-  - At some point it might be nice to push a compilation flag limiting supported
-    CPU types...
-    - especially for a 'none' flag that uses only C/C++ code and no JIT code at all
-
   - For SX-specific details, see [README-SX](doc/README-SX.md)
   - For SX-Aurora-specific details, see [README-Aurora](doc/README-Aurora.md)
 
-## Original README.md ...
+## Original [old] README.md ...
 
 > Intel MKL-DNN repository migrated to [https://github.com/intel/mkl-dnn](https://github.com/intel/mkl-dnn).
 > The old address will continue to be available and will redirect to the new repo.
