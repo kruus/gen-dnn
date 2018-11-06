@@ -52,8 +52,8 @@
 } while(0)
 
 #define CHECK_EQUAL(expr,val) do { \
-    auto e_ = (expr); \
-    auto f_ = (val); \
+    int e_ = (expr); \
+    int f_ = (val); \
     if (!(e_ == f_)) { \
         printf("[%s:%d] %s == %s failed, %d != %d\n", __FILE__, __LINE__, #expr,#val,(int)e_,(int)f_); \
         exit(2); \
@@ -472,10 +472,10 @@ void test3() {
                     l2_pd, mkldnn_query_num_of_inputs_s32, 0));
     printf("l2_pd num_outputs: %d\n",(int)mkldnn_primitive_desc_query_s32(
                     l2_pd, mkldnn_query_num_of_outputs_s32, 0));
-    CHECK_EQUAL(mkldnn_primitive_desc_query_s32( 1,
-                l2_pd, mkldnn_query_num_of_inputs_s32), 0);
-    CHECK_EQUAL(mkldnn_primitive_desc_query_s32( 1,
-                l2_pd, mkldnn_query_num_of_outputs_s32), 0);
+    CHECK_EQUAL(mkldnn_primitive_desc_query_s32( l2_pd,
+                mkldnn_query_num_of_inputs_s32, 1), 0);
+    CHECK_EQUAL(mkldnn_primitive_desc_query_s32( l2_pd,
+                mkldnn_query_num_of_outputs_s32, 1), 0);
 
     CHECK(mkldnn_primitive_desc_destroy(l2_pd));
 
@@ -549,3 +549,4 @@ int main() {
     printf("\n test3 test DONE\n");
     return 0;
 }
+// vim: et ts=4 sw=4 cindent cino=^l0,\:0,N-s

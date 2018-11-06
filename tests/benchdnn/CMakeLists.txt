@@ -18,9 +18,21 @@ file(GLOB_RECURSE HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.hpp
     )
-file(GLOB_RECURSE SOURCES
+file(GLOB SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/conv/*.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ip/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ip/*.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/bnorm/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/bnorm/*.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/rnn/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/rnn/*.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/reorder/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/reorder/*.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/self/*.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/self/*.hpp
     )
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}

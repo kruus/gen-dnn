@@ -1,4 +1,4 @@
-/*******************************************************************************
+/******************************************************************************y
 * Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
@@ -1734,4 +1734,5 @@ mkldnn_status_t MKLDNN_API mkldnn_sgemm(const char *transa, const char *transb,
 }
 #endif
 
+// vim: et ts=4 sw=4 cindent cino=^l0,\:0,N-s
 #endif
