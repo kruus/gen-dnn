@@ -242,6 +242,8 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE_avx2(jit_avx2_convolution_bwd_weights_t)
     INSTANCE_sse42(jit_sse42_convolution_fwd_t)
     INSTANCE_ve(vednnx_convolution_fwd_t)
+    INSTANCE_ve(vednnx_convolution_bwd_data_t)
+    INSTANCE_ve(vednnx_convolution_bwd_weights_t)
     INSTANCE(gemm_convolution_fwd_t)
     INSTANCE(gemm_convolution_bwd_data_t)
     INSTANCE(gemm_convolution_bwd_weights_t)

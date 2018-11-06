@@ -13,6 +13,8 @@
 #include <unordered_set> // to track new ref_convolutions (potential to optimize?)
 #endif
 
+#include <iostream>
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -135,7 +137,9 @@ vednnx_convolution_fwd_t
 #endif // TARGET_VANILLA (constructor)
 
 void vednnx_convolution_fwd_t
-        ::execute_forward() {
+::execute_forward() {
+    using std::cout;
+    using std::endl;
     auto src = reinterpret_cast<const src_data_t *>(this->input_memory(0));
     auto weights = reinterpret_cast<const wei_data_t *>(this->input_memory(1));
     auto bias = reinterpret_cast<const char *>(this->input_memory(2));
@@ -183,8 +187,12 @@ void vednnx_convolution_fwd_t
     vednnTensorParam_t tpIn {DTYPE_FLOAT, MB, IC*G, IW, IH}; // nb strange order
     vednnFilterParam_t tpKrn{DTYPE_FLOAT, IC, OC, KW, KH};
     vednnTensorParam_t tpOut{DTYPE_FLOAT, MB, OC*G, OW, OH};
+    cout<<"tpIn {f32,"<<MB<<","<<IC*G<<","<<IW<<","<<IH<<"}"<<endl;
+    cout<<"tpKrn{f32,"<<IC<<","<<OC<<","<<KW<<","<<KH<<"}"<<endl;
+    cout<<"tpOut{f32,"<<MB<<","<<OC*G<<","<<OW<<","<<OH<<"}"<<endl;
 
     vednnConvolutionParam_t parm{ G, KSW, KSH, padL, padT, KDW, KDH };
+    cout<<"parm{g"<<G<<"_sw"<<KSW<<"sh"<<KSH<<"_pw"<<padL<<"ph"<<padT<<"_dw"<<KDW<<"dh"<<KDH<<"}"<<endl;
 
     vednnError_t status;
     if (bias){
@@ -195,12 +203,14 @@ void vednnx_convolution_fwd_t
                 &tpBias, bias,
                 &tpOut,  dst,
                 &parm, VEDNN_CONV_ALGORITHM_DIRECT );
+        cout<<"FWD_B status"<<status<<endl;
     }else{
         status = vednnConvolutionForward(
                 &tpIn,  src,
                 &tpKrn, weights,
                 &tpOut, dst,
                 &parm, VEDNN_CONV_ALGORITHM_DIRECT );
+        cout<<"FWD_D status"<<status<<endl;
     }
     assert(status == VEDNN_SUCCESS);
 #if 0
@@ -390,6 +400,8 @@ void vednnx_convolution_bwd_weights_t
 
     const int ndims = conf_.cdesc()->src_desc.ndims;
 
+    using std::cout;
+    using std::endl;
 #if 1
     // bias update is simple because grad(bias) = grad(output)
     // so it is usually not calculated.
@@ -399,9 +411,10 @@ void vednnx_convolution_bwd_weights_t
     // rv[3] = createConvolutionParam(&pConv->pParamConv, pNw->group, pNw->strideWidth, pNw->strideHeight, pNw->padWidth, pNw->padHeight, 1, 1);
     //
     vednnTensorParam_t tpIn     {DTYPE_FLOAT, MB, IC*G, IW, IH}; // nb strange order
-    vednnTensorParam_t tpGradOut{DTYPE_FLOAT, MB, IC*G, IW, IH};
+    vednnTensorParam_t tpGradOut{DTYPE_FLOAT, MB, OC*G, OW, OH};
     vednnFilterParam_t tpGradKrn{DTYPE_FLOAT, IC, OC, KW, KH}; // <-- calc ~ diff_weights
     vednnConvolutionParam_t parm{ G, KSW, KSH, padL, padT, KDW, KDH };
+    cout<<"parm{g"<<G<<"_sw"<<KSW<<"sh"<<KSH<<"_pw"<<padL<<"ph"<<padT<<"_dw"<<KDW<<"dh"<<KDH<<"}"<<endl;
 
     vednnError_t const status
         = vednnConvolutionBackwardFilter(
@@ -409,10 +422,11 @@ void vednnx_convolution_bwd_weights_t
                 &tpGradOut, diff_dst,
                 &tpGradKrn, diff_weights,
                 &parm, VEDNN_CONV_ALGORITHM_DIRECT );
+    cout<<"BWD_W status"<<status<<endl;
     assert(status == VEDNN_SUCCESS);
 
     // libvednn does not calculate bias gradient, but mkl-dnn does...
-#if 0
+#if 1
     auto ker_bias = [=](acc_data_t &d, int g, int oc) {
         for (int mb = 0; mb < MB; ++mb) {
             // XXX next loops are over dense data, for nchw
@@ -438,20 +452,27 @@ void vednnx_convolution_bwd_weights_t
     if(diff_bias){
         parallel_nd(G, OC, [&](int g, int oc) {
                 acc_data_t db = 0;
-                //ker_bias(db, g, oc);
-                // XXX replace fn call to 'off' w/ nchw inline formula XXX
-                //diff_bias[diff_bias_d.off(g*OC+oc)]
-                //    = saturate<diff_wei_data_t>(db);
-                // libvednn bias is never padded, always dense, f32
+#if 1
+                ker_bias(db, g, oc);
+#else
                 int const MBsz = G*OC*OH*OW;
                 int const OHOW = OH*OW;
                 int const goc = g*OC + oc;
                 for (int mb = 0; mb < MB; ++mb) {
                 /**/for (int ohow=0; ohow<OHOW; ++ohow){
-                /*  */ d += (acc_data_t)diff_dst[mb*MBsz + goc*OHOW + ohow];
+                /*  */ db += (acc_data_t)diff_dst[mb*MBsz + goc*OHOW + ohow];
                 /**/}
                 }
+#endif
+#if 1
+                diff_bias[diff_bias_d.off(g*OC+oc)]
+                    //= saturate<diff_wei_data_t>(db);
+                    = saturate<data_t>(db);
+#else
+                // XXX replace fn call to 'off' w/ nchw inline formula XXX
+                // libvednn bias is never padded, always dense, f32
                 diff_bias[g*OC+oc] = db;
+#endif
                 });
     }
 #else
