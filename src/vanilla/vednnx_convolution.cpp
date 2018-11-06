@@ -171,9 +171,12 @@ void vednnx_convolution_fwd_t
     const int KSH = conf_.KSH();
     const int KSW = conf_.KSW();
 
-    const int KDD = conf_.KDD(); //zero
-    const int KDH = conf_.KDH();
-    const int KDW = conf_.KDW();
+    // important! libvednn convention!
+    //if (KDW==0) KDW = 1;
+    //if (KDH==0) KDH = 1;
+    const int KDD = (conf_.KDD()? conf_.KDD(): 1); //zero
+    const int KDH = (conf_.KDH()? conf_.KDH(): 1);
+    const int KDW = (conf_.KDW()? conf_.KDW(): 1);
 
     const int padFront = conf_.padFront();
     const int padT = conf_.padT();
@@ -191,6 +194,7 @@ void vednnx_convolution_fwd_t
     cout<<"tpKrn{f32,"<<IC<<","<<OC<<","<<KW<<","<<KH<<"}"<<endl;
     cout<<"tpOut{f32,"<<MB<<","<<OC*G<<","<<OW<<","<<OH<<"}"<<endl;
 
+    //vednnConvolutionParam_t parm{ G, KSW, KSH, padL, padT, KDW, KDH };
     vednnConvolutionParam_t parm{ G, KSW, KSH, padL, padT, KDW, KDH };
     cout<<"parm{g"<<G<<"_sw"<<KSW<<"sh"<<KSH<<"_pw"<<padL<<"ph"<<padT<<"_dw"<<KDW<<"dh"<<KDH<<"}"<<endl;
 
