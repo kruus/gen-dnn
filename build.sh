@@ -42,7 +42,7 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
         a) # NEC Aurora VE
             if [ "${DOTARGET}" == "j" ]; then VEJIT=100; else
                 if [ ! "${DOTARGET}" == "x" ]; then echo "-a no good: already have -${DOTARGET}"; usage; fi
-                VEJIT=0; use something like #if DOJIT > 0 && defined(__ve) ...
+                VEJIT=0; # use something like #if DOJIT > 0 && defined(__ve) ...
             fi
             DOTARGET="a"; SIZE_T=64; DONEEDMKL="n"
             JOBS="-j1" # -j1 to avoid SIGSEGV in ccom

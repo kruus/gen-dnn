@@ -126,19 +126,39 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
     const mkldnn::impl::primitive_desc_t *hint_fwd)
 {
     using namespace std;
+    using namespace mkldnn::impl;
+    using namespace mkldnn::impl::status;
     typedef typename prim::pd_t pd_t;
-    mkldnn::impl::status_t ret = primitive_desc_t::create<pd_t>( pd, adesc,
-            attr, engine, hint_fwd );
+    auto const ret = primitive_desc_t::create<pd_t>( pd, adesc, attr, engine,
+            hint_fwd );
     if( ret == success ) {
-        printf(" created descriptor %s name %s\n",
-                mkldnn_prim_kind2str(adesc->kind), (*pd)->name());
-        char const* result;
-        mkldnn_primitive_desc_query( *pd, mkldnn_query_impl_info_str, 0, &result );
-        printf(" created descriptor %s\n", result);
-        fflush(stdout);
+        printf(" created descriptor %s name %s\n\t%s\n",
+                mkldnn_prim_kind2str(adesc->kind), (*pd)->name(),
+                (*pd)->info());
+        // above line better; older mkl-dnn used mkldnn_primitive_desc_query
+        //char const* result;
+        //mkldnn_primitive_desc_query( *pd, mkldnn_query_impl_info_str, 0, &result );
+        //printf(" created descriptor %s\n", result);
+        //fflush(stdout);
+    }else if(ret == unimplemented && /*opt.*/ adesc->kind == pd_t::base_pkind){
+        printf(" skip-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
+        // partially construct (no init(), no init_info()) to get the name()
+        //     This allows printing right-kind-but-skipped messages
+        //                      [see src/common/primitive_desc.hpp]
+        // TODO: primitive_desc.hpp can return an optional const char* name()
+        //       result, sometimes, even if the full construction failed.
+        //    Q: Is prop_kind a universal attribute of all prim? Probably not.
+        using pd_op_desc_t = typename pkind_traits<pd_t::base_pkind>::desc_type;
+        auto _pd = new pd_t(engine, (const pd_op_desc_t *)adesc, attr,
+            reinterpret_cast<const typename pd_t::hint_class *> (hint_fwd));
+        if (_pd != nullptr){ // get the 'name()' ~ short impl_name string
+            char const* name = _pd->name();
+            printf(":%s", name); fflush(stdout);
+            delete _pd;
+        }
     }else{
-        printf(" no-%s", mkldnn_prim_kind2str(adesc->kind));
-        fflush(stdout);
+        // printing wrong-kind msg not too interesting [and lengthy]
+        //printf(" no-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
     }
     return ret;
 }
@@ -180,7 +200,7 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
 #if VEJIT > 0
 #define INSTANCE_ve(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
-#define INSTANCE_sse42(...) /* placeholder "non-null ptr-to-never-impl here?" */
+#define INSTANCE_ve(...) /* placeholder "non-null ptr-to-never-impl here?" */
 #endif
 
 // JITFUNCS >= JIT_FUNCS_ANY (always include this impl)

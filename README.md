@@ -17,6 +17,7 @@
                    # add 'v' for *vanilla* (no jit)
                    # --> build/    and build.log
 # Platform Aurora:
+# untar the ve*.tar.gz distro tarballs
 ./build.sh -adttT  # a:Aurora platform, d:debug compile, T:trace cmake decisions
                    # a=NEC Aurora; use S for NEC SX
 ```

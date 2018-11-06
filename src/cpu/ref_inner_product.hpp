@@ -48,7 +48,7 @@ struct ref_inner_product_fwd_t: public cpu_primitive_t {
             using namespace prop_kind;
             using namespace data_type;
             assert(engine()->kind() == engine_kind::cpu);
-            Consistency ok("ref_conv init"); // default here is never-verbose, SCHK
+            Consistency ok("ref_ip init"); // default here is never-verbose, SCHK
 #define AND_(...) SCHKV(ok,__VA_ARGS__)
                 AND_(this->set_default_params() == status::success);
                 AND_(utils::one_of(desc()->prop_kind, forward_training,
