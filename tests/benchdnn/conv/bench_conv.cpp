@@ -26,6 +26,7 @@
 #include "mkldnn_memory.hpp"
 
 #include "conv/conv.hpp"
+#include "conv/input_conv.hpp"
 
 namespace conv {
 
@@ -118,6 +119,13 @@ int bench(int argc, char **argv, bool main_bench) {
             }
             check_correctness(&c);
         }
+    }
+
+    if (main_bench && benchdnn_stat.tests == 0) {
+        const int N = sizeof(default_list) / sizeof(default_list[0]);
+        print(0,"/* using default list of %d problems */", N);
+        for (int n = 0; n < N; ++n)
+            check_correctness(&default_list[n]);
     }
 
     return OK;
