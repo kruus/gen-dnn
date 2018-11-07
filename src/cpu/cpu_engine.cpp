@@ -132,9 +132,11 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
     auto const ret = primitive_desc_t::create<pd_t>( pd, adesc, attr, engine,
             hint_fwd );
     if( ret == success ) {
-        printf(" created descriptor %s name %s\n\t%s\n",
-                mkldnn_prim_kind2str(adesc->kind), (*pd)->name(),
-                (*pd)->info());
+        // actually the new 'info' call has it all..
+        printf(" prim %s\n", (*pd)->info());
+        //printf(" created descriptor %s name %s\n\t%s\n",
+        //        mkldnn_prim_kind2str(adesc->kind), (*pd)->name(),
+        //        (*pd)->info());
         // above line better; older mkl-dnn used mkldnn_primitive_desc_query
         //char const* result;
         //mkldnn_primitive_desc_query( *pd, mkldnn_query_impl_info_str, 0, &result );
@@ -153,9 +155,10 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
             reinterpret_cast<const typename pd_t::hint_class *> (hint_fwd));
         if (_pd != nullptr){ // get the 'name()' ~ short impl_name string
             char const* name = _pd->name();
-            printf(":%s", name); fflush(stdout);
+            printf(":%s", name);
             delete _pd;
         }
+        printf("\n"); fflush(stdout);
     }else{
         // printing wrong-kind msg not too interesting [and lengthy]
         //printf(" no-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);

@@ -30,6 +30,7 @@ INST_TEST_CASE(SimpleSmall_NCHW_expected_failures,
     PARAMS_EXPECT_FAIL(nchw, oihw, FMT_BIAS, nchw, mkldnn_invalid_arguments, 1, 1, 4, 4, 4, 6, 4, 4, 3, 3, 1, 1, 0, 0)
 );
 
+#if MKLDNN_JIT_TYPES > 0
 INST_TEST_CASE(SimpleSmall_Blocked16_padded,
     // non-1x1 (all)
     PARAMS(FMT_DATA_BLOCKED16, FMT_WEIGHTS_BLOCKED16, FMT_BIAS, FMT_DATA_BLOCKED16, 2, 1, 17, 13, 13, 23, 12, 12, 3, 3, 0, 0, 1, 1),
@@ -44,7 +45,9 @@ INST_TEST_CASE(SimpleSmall_Blocked16_padded,
     PARAMS(FMT_DATA_BLOCKED16, FMT_WEIGHTS_BLOCKED16_IOhw16o16i, FMT_BIAS, FMT_DATA_BLOCKED16, 2, 1, 21, 13, 13, 16, 13, 13, 1, 1, 0, 0, 1, 1),
     PARAMS(FMT_DATA_BLOCKED16, FMT_WEIGHTS_BLOCKED16_IOhw16o16i, FMT_BIAS, FMT_DATA_BLOCKED16, 2, 1, 23, 13, 13, 19, 13, 13, 1, 1, 0, 0, 1, 1)
 );
+#endif
 
+#if MKLDNN_JIT_TYPES > 0
 INST_TEST_CASE(SimpleSmall_Blocked8_padded,
     // non-1x1 (all)
     PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED, FMT_BIAS, FMT_DATA_BLOCKED, 2, 1, 17, 13, 13, 23, 12, 12, 3, 3, 0, 0, 1, 1),
@@ -55,6 +58,7 @@ INST_TEST_CASE(SimpleSmall_Blocked8_padded,
     PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED, FMT_BIAS, FMT_DATA_BLOCKED, 2, 1, 21, 13, 13, 16, 13, 13, 1, 1, 0, 0, 1, 1),
     PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED, FMT_BIAS, FMT_DATA_BLOCKED, 2, 1, 23, 13, 13, 19, 13, 13, 1, 1, 0, 0, 1, 1)
 );
+#endif
 
 INST_TEST_CASE(SimpleSmall_NCHW,
     PARAMS(nchw, oihw, FMT_BIAS, nchw,

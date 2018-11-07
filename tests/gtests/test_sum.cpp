@@ -191,9 +191,20 @@ protected:
         {memory::format::ifmt0, memory::format::ifmt1}, memory::format::ofmt, \
         memory::dims dims_, {1.0f, 1.0f}, ef, st}
 
-#define INST_TEST_CASE(test) \
-TEST_P(test, TestsSum) {} \
+#define INST_TEST_CASE_NCHW(test) \
+TEST_P(test, TestsSumNchw) {} \
 INSTANTIATE_TEST_CASE_P(TestSum, test, ::testing::Values( \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nchw}, memory::format::nchw, \
+    {2, 8, 2, 2}, {1.0f, 1.0f}}, \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nchw}, memory::format::nchw, \
+    {2, 8, 2, 2}, {2.0f, 3.0f}} \
+));
+
+#define INST_TEST_CASE_JIT1(test) \
+TEST_P(test, TestsSumJit1) {} \
+INSTANTIATE_TEST_CASE_P(TestSumJit1, test, ::testing::Values( \
     sum_test_params{engine::kind::cpu, \
     {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw, \
     {0, 7, 4, 4}, {1.0f, 1.0f}}, \
@@ -209,18 +220,12 @@ INSTANTIATE_TEST_CASE_P(TestSum, test, ::testing::Values( \
     \
     sum_test_params{engine::kind::cpu, \
     {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw, \
-    {1, 1024, 38, 50}, {1.0f, 1.0f}}, \
-    sum_test_params{engine::kind::cpu, \
-    {memory::format::nchw, memory::format::nchw}, memory::format::nchw, \
-    {2, 8, 2, 2}, {1.0f, 1.0f}}, \
-    sum_test_params{engine::kind::cpu, \
-    {memory::format::nchw, memory::format::nchw}, memory::format::nchw, \
-    {2, 8, 2, 2}, {2.0f, 3.0f}} \
+    {1, 1024, 38, 50}, {1.0f, 1.0f}} \
 ));
 
-#define INST_TEST_CASE_JIT(test) \
-TEST_P(test, TestsSumJit) {} \
-INSTANTIATE_TEST_CASE_P(TestSumJit, test, ::testing::Values( \
+#define INST_TEST_CASE_JIT2(test) \
+TEST_P(test, TestsSumJit2) {} \
+INSTANTIATE_TEST_CASE_P(TestSumJit2, test, ::testing::Values( \
     sum_test_params{engine::kind::cpu, \
     {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c, \
     {2, 16, 3, 4}, {1.0f, 1.0f}}, \
@@ -255,6 +260,7 @@ using sum_test_float = sum_test<float,float>;
 using sum_test_u8 = sum_test<uint8_t,float>;
 using sum_test_s32 = sum_test<int32_t,float>;
 
+//#if MKLDNN_JIT_TYPES > 0
 using sum_cc_f32 = sum_test<float,float>;
 TEST_P(sum_cc_f32, TestSumCornerCases) {}
 INSTANTIATE_TEST_CASE_P(TestSumCornerCases, sum_cc_f32, ::testing::Values(
@@ -265,15 +271,21 @@ INSTANTIATE_TEST_CASE_P(TestSumCornerCases, sum_cc_f32, ::testing::Values(
     ));
 #undef CASE_CC
 
-INST_TEST_CASE(sum_test_float)
-INST_TEST_CASE(sum_test_u8)
-INST_TEST_CASE(sum_test_s32)
+INST_TEST_CASE_NCHW(sum_test_float)
+INST_TEST_CASE_NCHW(sum_test_u8)
+INST_TEST_CASE_NCHW(sum_test_s32)
 
 #if MKLDNN_JIT_TYPES > 0
-INST_TEST_CASE_JIT(sum_test_float)
-INST_TEST_CASE_JIT(sum_test_u8)
-INST_TEST_CASE_JIT(sum_test_s32)
+INST_TEST_CASE_JIT1(sum_test_float)
+INST_TEST_CASE_JIT1(sum_test_u8)
+INST_TEST_CASE_JIT1(sum_test_s32)
+
+INST_TEST_CASE_JIT2(sum_test_float)
+INST_TEST_CASE_JIT2(sum_test_u8)
+INST_TEST_CASE_JIT2(sum_test_s32)
 #endif
 
-#undef INST_TEST_CASE
+#undef INST_TEST_CASE_NCHW
+#undef INST_TEST_CASE_JIT1
+#undef INST_TEST_CASE_JIT2
 }

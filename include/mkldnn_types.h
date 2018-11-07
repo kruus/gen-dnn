@@ -96,7 +96,7 @@ typedef enum {
 #ifdef TARGET_VANILLA
 #define MKLDNN_JIT_TYPES 0
 #else
-#define MKLDNN_JIT_TYPES 1
+#define MKLDNN_JIT_TYPES 9
 #endif
 //@}
 

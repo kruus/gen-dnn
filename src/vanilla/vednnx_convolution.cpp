@@ -1,5 +1,8 @@
 #include "vednnx_convolution.hpp"
 #if VEJIT > 0
+#if !defined(__ve)
+#error "libvednn convolution must have Aurora compiler predefines '__ve'"
+#endif
 
 #include "vednnx.h"
 
@@ -13,6 +16,22 @@
 #include <unordered_set> // to track new ref_convolutions (potential to optimize?)
 #endif
 
+#define STR(...) #__VA_ARGS__
+#if 0 && defined(__ve)
+// enable to debug ve segfault mode CORR (but not in PERF) for BWD_D
+#define DBG(...) do{cout<<__VA_ARGS__; cout.flush();}while(0)
+#else
+#define DBG(...) do{}while(0)
+#endif
+
+#ifdef FTRACE
+#include <ftrace.h>
+#define FTRACE_BEGIN(...) do{DBG(" Begin "<<__VA_ARGS__<<"\n"); ftrace_region_begin(STR(__VA_ARGS__));}while(0)
+#define FTRACE_END(...)   do{ftrace_region_end(STR(__VA_ARGS__)); DBG("  End  "<<__VA_ARGS__<<"\n");}while(0)
+#else
+#define FTRACE_BEGIN(...) do{DBG(" Begin "<<__VA_ARGS__<<"\n");}while(0)
+#define FTRACE_END(...)   do{DBG("  End  "<<__VA_ARGS__<<"\n");}while(0)
+#endif
 #include <iostream>
 
 namespace mkldnn {
@@ -174,9 +193,9 @@ void vednnx_convolution_fwd_t
     // important! libvednn convention!
     //if (KDW==0) KDW = 1;
     //if (KDH==0) KDH = 1;
-    const int KDD = conf_.KDD()+1;  //  one
-    const int KDH = conf_.KDH()+1;
-    const int KDW = conf_.KDW()+1;
+    const int KDD = conf_.KDD() + 1; //zero --> 1 etc. for libvednn
+    const int KDH = conf_.KDH() + 1;
+    const int KDW = conf_.KDW() + 1;
 
     const int padFront = conf_.padFront();
     const int padT = conf_.padT();
@@ -190,13 +209,12 @@ void vednnx_convolution_fwd_t
     vednnTensorParam_t tpIn {DTYPE_FLOAT, MB, IC*G, IW, IH}; // nb strange order
     vednnFilterParam_t tpKrn{DTYPE_FLOAT, IC, OC, KW, KH};
     vednnTensorParam_t tpOut{DTYPE_FLOAT, MB, OC*G, OW, OH};
-    cout<<"tpIn {f32,"<<MB<<","<<IC*G<<","<<IW<<","<<IH<<"}"<<endl;
-    cout<<"tpKrn{f32,"<<IC<<","<<OC<<","<<KW<<","<<KH<<"}"<<endl;
-    cout<<"tpOut{f32,"<<MB<<","<<OC*G<<","<<OW<<","<<OH<<"}"<<endl;
-
-    //vednnConvolutionParam_t parm{ G, KSW, KSH, padL, padT, KDW, KDH };
     vednnConvolutionParam_t parm{ G, KSW, KSH, padL, padT, KDW, KDH };
-    cout<<"parm{g"<<G<<"_sw"<<KSW<<"sh"<<KSH<<"_pw"<<padL<<"ph"<<padT<<"_dw"<<KDW<<"dh"<<KDH<<"}"<<endl;
+    // similar to libvednn's ve_cmpconv test
+    DBG("tpIn {f32,"<<MB<<","<<IC*G<<","<<IW<<","<<IH<<"}"<<endl);
+    DBG("tpKrn{f32,"<<IC<<","<<OC<<","<<KW<<","<<KH<<"}"<<endl);
+    DBG("tpOut{f32,"<<MB<<","<<OC*G<<","<<OW<<","<<OH<<"}"<<endl);
+    DBG("parm {g"<<G<<"_sw"<<KSW<<"sh"<<KSH<<"_pw"<<padL<<"ph"<<padT<<"_dw"<<KDW<<"dh"<<KDH<<"}");
 
     vednnError_t status;
     if (bias){
@@ -207,14 +225,14 @@ void vednnx_convolution_fwd_t
                 &tpBias, bias,
                 &tpOut,  dst,
                 &parm, VEDNN_CONV_ALGORITHM_DIRECT );
-        cout<<"FWD_B status"<<status<<endl;
+        DBG(" FWD_B status"<<status<<endl);
     }else{
         status = vednnConvolutionForward(
                 &tpIn,  src,
                 &tpKrn, weights,
                 &tpOut, dst,
                 &parm, VEDNN_CONV_ALGORITHM_DIRECT );
-        cout<<"FWD_D status"<<status<<endl;
+        DBG(" FWD_D status"<<status<<endl);
     }
     assert(status == VEDNN_SUCCESS);
 #if 0
@@ -229,7 +247,9 @@ void vednnx_convolution_fwd_t
 }
 
 void vednnx_convolution_bwd_data_t
-        ::execute_backward_data() {
+::execute_backward_data() {
+    using std::cout;
+    using std::endl;
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto weights = reinterpret_cast<const data_t *>(this->input_memory(1));
     auto diff_src = reinterpret_cast<data_t*>(this->memory());
@@ -261,12 +281,12 @@ void vednnx_convolution_bwd_data_t
     const int KSH = conf_.KSH();
     const int KSW = conf_.KSW();
 
-    // important! libvednn convention!
-    //if (KDW==0) KDW = 1;
-    //if (KDH==0) KDH = 1;
-    const int KDD = conf_.KDD()+1; // one
-    const int KDH = conf_.KDH()+1;
-    const int KDW = conf_.KDW()+1;
+    //const int KDD = conf_.KDD(); //zero
+    //const int KDH = conf_.KDH();
+    //const int KDW = conf_.KDW();
+    const int KDD = conf_.KDD() + 1; //zero --> 1 etc. for libvednn
+    const int KDH = conf_.KDH() + 1;
+    const int KDW = conf_.KDW() + 1;
 
     const int padFront = conf_.padFront();
     const int padT = conf_.padT();
@@ -285,7 +305,12 @@ void vednnx_convolution_bwd_data_t
     vednnFilterParam_t tpKrn    {DTYPE_FLOAT, IC, OC, KW, KH};
     vednnTensorParam_t tpGradOut{DTYPE_FLOAT, MB, OC*G, OW, OH}; // <-- calc ~ diff_src
     vednnConvolutionParam_t parm{ G, KSW, KSH, padL, padT, KDW, KDH };
+    DBG("tpGOut{f32,"<<MB<<","<<OC*G<<","<<OW<<","<<OH<<"}"<<endl);
+    DBG("tpKrn {f32,"<<IC<<","<<OC  <<","<<KW<<","<<KH<<"}"<<endl);
+    DBG("tpGin {f32,"<<MB<<","<<IC*G<<","<<IW<<","<<IH<<"}"<<endl);
+    DBG("parm{g"<<G<<"_sw"<<KSW<<"sh"<<KSH<<"_pw"<<padL<<"ph"<<padT<<"_dw"<<KDW<<"dh"<<KDH<<"}"<<endl);
 
+    FTRACE_BEGIN("vednnConvolutionBackwardData");
     // mkl-dnn uses bias, but just for sanity checking
     vednnError_t const status
         = vednnConvolutionBackwardData(
@@ -295,6 +320,7 @@ void vednnx_convolution_bwd_data_t
                 &parm, VEDNN_CONV_ALGORITHM_DIRECT );
     assert(status == VEDNN_SUCCESS);
     //Consistency ok("vednn-bkwd"); SHCKV(ok,status==VEDNN_SUCCESS); //?
+    FTRACE_END("vednnConvolutionBackwardData");
 #else
     auto ker = [=](acc_data_t &d, int g, int mb, int ic, int id, int ih,
             int iw) {
@@ -397,12 +423,12 @@ void vednnx_convolution_bwd_weights_t
     const int KSH = conf_.KSH();
     const int KSW = conf_.KSW();
 
-    // important! libvednn convention!
-    //if (KDW==0) KDW = 1;
-    //if (KDH==0) KDH = 1;
-    const int KDD = conf_.KDD()+1;  // one
-    const int KDH = conf_.KDH()+1;
-    const int KDW = conf_.KDW()+1;
+    //const int KDD = conf_.KDD(); //zero
+    //const int KDH = conf_.KDH();
+    //const int KDW = conf_.KDW();
+    const int KDD = conf_.KDD() + 1; //zero --> 1 etc. for libvednn
+    const int KDH = conf_.KDH() + 1;
+    const int KDW = conf_.KDW() + 1;
 
     const int padFront = conf_.padFront();
     const int padT = conf_.padT();
@@ -424,15 +450,20 @@ void vednnx_convolution_bwd_weights_t
     vednnTensorParam_t tpGradOut{DTYPE_FLOAT, MB, OC*G, OW, OH};
     vednnFilterParam_t tpGradKrn{DTYPE_FLOAT, IC, OC, KW, KH}; // <-- calc ~ diff_weights
     vednnConvolutionParam_t parm{ G, KSW, KSH, padL, padT, KDW, KDH };
-    cout<<"parm{g"<<G<<"_sw"<<KSW<<"sh"<<KSH<<"_pw"<<padL<<"ph"<<padT<<"_dw"<<KDW<<"dh"<<KDH<<"}"<<endl;
+    DBG("tpIn  {f32,"<<MB<<","<<IC*G<<","<<IW<<","<<IH<<"}"<<endl);
+    DBG("tpGOut{f32,"<<MB<<","<<OC*G<<","<<OW<<","<<OH<<"}"<<endl);
+    DBG("tpKrn {f32,"<<IC<<","<<OC  <<","<<KW<<","<<KH<<"}"<<endl);
+    DBG("parm{g"<<G<<"_sw"<<KSW<<"sh"<<KSH<<"_pw"<<padL<<"ph"<<padT<<"_dw"<<KDW<<"dh"<<KDH<<"}"<<endl);
 
+    FTRACE_BEGIN("vednnConvolutionBackwardFilter");
     vednnError_t const status
         = vednnConvolutionBackwardFilter(
                 &tpIn,      src,
                 &tpGradOut, diff_dst,
                 &tpGradKrn, diff_weights,
                 &parm, VEDNN_CONV_ALGORITHM_DIRECT );
-    cout<<"BWD_W status"<<status<<endl;
+    FTRACE_END("vednnConvolutionBackwardFilter");
+    DBG("BWD_W status"<<status<<endl);
     assert(status == VEDNN_SUCCESS);
 
     // libvednn does not calculate bias gradient, but mkl-dnn does...
@@ -460,6 +491,7 @@ void vednnx_convolution_bwd_weights_t
 #endif
 
     if(diff_bias){
+        DBG(" no libvednn bias gradient, doing it manually...");
         parallel_nd(G, OC, [&](int g, int oc) {
                 acc_data_t db = 0;
 #if 1

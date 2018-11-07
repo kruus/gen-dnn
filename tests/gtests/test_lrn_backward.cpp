@@ -367,6 +367,7 @@ INSTANTIATE_TEST_CASE_P(TestLRNBackwardEF, lrn_test_float,
             true, mkldnn_invalid_arguments }
             ));
 
+#if MKLDNN_JIT_TYPES > 0
 INSTANTIATE_TEST_CASE_P(TestLRNBackward_nChw16c_padded, lrn_test_float,
         ::testing::Values(
             lrn_test_params_float{ prop_kind::forward_training,
@@ -382,7 +383,9 @@ INSTANTIATE_TEST_CASE_P(TestLRNBackward_nChw16c_padded, lrn_test_float,
             engine::kind::cpu, algorithm::lrn_across_channels, memory::format::nChw16c,
             memory::format::nChw16c, { 2, 12, 4, 4, 1.0e-4f, 0.75f, 5.7f, 5, ACROSS } }
             ));
+#endif
 
+#if MKLDNN_JIT_TYPES > 0
 INSTANTIATE_TEST_CASE_P(TestLRNBackward_nChw8c_padded, lrn_test_float,
         ::testing::Values(
             lrn_test_params_float{ prop_kind::forward_training,
@@ -398,6 +401,7 @@ INSTANTIATE_TEST_CASE_P(TestLRNBackward_nChw8c_padded, lrn_test_float,
             engine::kind::cpu, algorithm::lrn_across_channels, memory::format::nChw8c,
             memory::format::nChw8c, { 2, 12, 4, 4, 1.0e-4f, 0.75f, 5.7f, 5, ACROSS } }
             ));
+#endif
 
 INSTANTIATE_TEST_CASE_P(TestLRN, lrn_test_float,
         ::testing::Values(
@@ -427,6 +431,7 @@ INSTANTIATE_TEST_CASE_P(TestLRN, lrn_test_float,
             memory::format::nchw, { 20, 12, 7, 7, 1.0e-2f, 0.5f, 6.5f, 3, ACROSS } }
             ));
 
+#if !defined(__ve)
 INSTANTIATE_TEST_CASE_P(TestLRNNHWC, lrn_test_float,
         ::testing::Values(
             lrn_test_params_float{ prop_kind::forward_training,
@@ -442,6 +447,7 @@ INSTANTIATE_TEST_CASE_P(TestLRNNHWC, lrn_test_float,
             engine::kind::cpu, algorithm::lrn_across_channels, memory::format::nhwc,
             memory::format::nhwc, { 2, 10, 4, 4, 1.0e-4f, 0.75f, 3.0f, 5, ACROSS } }
             ));
+#endif
 
 #if MKLDNN_JIT_TYPES > 0
 INSTANTIATE_TEST_CASE_P(TestLRN_nChw8c, lrn_test_float,
@@ -542,6 +548,7 @@ INSTANTIATE_TEST_CASE_P(
             memory::format::nchw, { 2, 4, 5, 5, 1.0f, 0.75f, 1.0f, 5, ACROSS } }
             ));
 
+#if !defined(__ve)
 INSTANTIATE_TEST_CASE_P(
         TestLRNCaffeNHWC, lrn_test_float,
         ::testing::Values(
@@ -558,7 +565,9 @@ INSTANTIATE_TEST_CASE_P(
             engine::kind::cpu, algorithm::lrn_across_channels, memory::format::nhwc,
             memory::format::nhwc, { 2, 4, 5, 5, 1.0f, 0.75f, 1.0f, 5, ACROSS } }
             ));
+#endif
 
+#if MKLDNN_JIT_FUNCS > 0
 INSTANTIATE_TEST_CASE_P(
         TestLRNCaffe_nChw8c, lrn_test_float,
         ::testing::Values(
@@ -592,10 +601,12 @@ INSTANTIATE_TEST_CASE_P(
             engine::kind::cpu, algorithm::lrn_across_channels, memory::format::nChw16c,
             memory::format::nChw16c, { 2, 96, 55, 55, 1.0f, 0.75f, 1.0f, 3, ACROSS } }
             ));
+#endif
 
 INSTANTIATE_TEST_CASE_P(
         TestLRNAlexnetNCHW, lrn_test_float,
         ::testing::Values(
+		// ref impl slow for next params:
             lrn_test_params_float{ prop_kind::forward_training,
             engine::kind::cpu, algorithm::lrn_across_channels, memory::format::nchw,
             memory::format::nchw, { 2, 96, 55, 55, 1.0e-4f, 0.75f, 1.0f, 5, ACROSS } }
@@ -610,6 +621,7 @@ INSTANTIATE_TEST_CASE_P(
             memory::format::nchw, { 2, 256, 27, 27, 1.0e-4f, 0.75f, 1.0f, 5, ACROSS } }
             ));
 
+#if !defined(__ve)
 INSTANTIATE_TEST_CASE_P(
         TestLRNAlexnetNHWC, lrn_test_float,
         ::testing::Values(
@@ -626,6 +638,7 @@ INSTANTIATE_TEST_CASE_P(
                 engine::kind::cpu, algorithm::lrn_across_channels, memory::format::nhwc,
                 memory::format::nhwc, { 2, 256, 27, 27, 1.0e-4f, 0.75f, 1.0f, 5, ACROSS } }
             ));
+#endif
 
 #if MKLDNN_JIT_TYPES > 0
 INSTANTIATE_TEST_CASE_P(

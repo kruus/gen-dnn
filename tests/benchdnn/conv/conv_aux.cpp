@@ -150,7 +150,6 @@ int str2desc(desc_t *desc, const char *str, bool is_deconv) {
         else if (!d.pd && d.od != compute_out(is_deconv, d.id, d.kd, d.sd, d.pd, d.dd))
             d.pd = compute_pad(is_deconv, d.od, d.id, d.kd, d.sd, d.dd);
     }
-
     if (no_w && no_h && d.id) {
         d.iw = d.ih = d.id;
         d.kw = d.kh = d.kd;
@@ -174,6 +173,20 @@ int str2desc(desc_t *desc, const char *str, bool is_deconv) {
         d.dh = d.dw;
     }
     if (d.id<1) {d.id = 1; d.kd = 1; d.od = 1; d.sd = 1; d.pd = 0; d.dd = 0;}
+
+    // There are still some the have outsize < required [ejk]
+    // and we also have to avoid the output size being < 1
+    // (not sure if pad<0 every happened)
+#define CHK_Ox_Px(oh, ih,kh,sh,ph,dh) do \
+    { \
+        if( d.oh != compute_out(is_deconv, d.ih, d.kh, d.sh, d.ph, d.dh)) \
+        while( d.ph < 0 || (d.oh = \
+                    compute_out(is_deconv, d.ih, d.kh, d.sh, d.ph, d.dh)) < 1) \
+        ++d.ph; \
+    }while(0)
+    CHK_Ox_Px(oh, ih,kh,sh,ph,dh);
+    CHK_Ox_Px(ow, iw,kw,sw,pw,dw);
+    CHK_Ox_Px(od, id,kd,sd,pd,dd);
 
     *desc = d;
 
@@ -303,3 +316,4 @@ void prb2str(const prb_t *p, char *buffer, bool canonical) {
 }
 
 }
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
