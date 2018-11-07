@@ -473,9 +473,9 @@ void test3() {
     printf("l2_pd num_outputs: %d\n",(int)mkldnn_primitive_desc_query_s32(
                     l2_pd, mkldnn_query_num_of_outputs_s32, 0));
     CHECK_EQUAL(mkldnn_primitive_desc_query_s32( l2_pd,
-                mkldnn_query_num_of_inputs_s32, 1), 0);
+                mkldnn_query_num_of_inputs_s32, 0), 1);
     CHECK_EQUAL(mkldnn_primitive_desc_query_s32( l2_pd,
-                mkldnn_query_num_of_outputs_s32, 1), 0);
+                mkldnn_query_num_of_outputs_s32, 0), 1);
 
     CHECK(mkldnn_primitive_desc_destroy(l2_pd));
 

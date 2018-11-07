@@ -561,16 +561,20 @@ int doit(const prb_t *p, res_t *r) {
             SAFE(compare_dst(p, dst, dst_fp, r, true), WARN);
         }
     } else if (p->dir == BWD_D) {
-        mkldnn_primitive_at_t inputs[3] = { {dst_dt.p_, 0}, {wei_dt.p_, 0}, };
+        //mkldnn_primitive_at_t inputs[3] = { {dst_dt.p_, 0}, {wei_dt.p_, 0}, };
+        mkldnn_primitive_at_t inputs[3] = { {dst_dt.p_, 0}, {wei_dt.p_, 0}, {NULL,0} };
         const_mkldnn_primitive_t outputs[] = { src_dt.p_ };
         DNN_SAFE(mkldnn_primitive_create(&c, cpd, inputs, outputs), WARN);
         SAFE(execute(c), WARN);
         if (bench_mode & CORR) {
+            print(55,"%s", "BWD_D CORR...");
             compute_ref_bwd_d(p, src_fp, wei_fp, bia_fp, dst_fp);
             dnn_mem_t src(src_dt, fp, src_format);
             SAFE(src.reorder(src_dt), WARN);
             SAFE(compare_src(p, src, src_fp, r, true), WARN);
+            print(5,"%s", "BWD_D CORR...DONE");
         }
+        print(55,"%s", "BWD_D...DONE");
     } else if (p->dir & FLAG_BWD && p->dir & FLAG_WEI) {
         mkldnn_primitive_at_t inputs[3] = { {src_dt.p_, 0}, {dst_dt.p_, 0}, };
         const_mkldnn_primitive_t outputs[] = { wei_dt.p_,
@@ -617,3 +621,4 @@ int doit(const prb_t *p, res_t *r) {
 }
 
 }
+// vim: et ts=4 sw=4 cindent cino=^l0,\:0,N-s
