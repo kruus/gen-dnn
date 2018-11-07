@@ -229,7 +229,9 @@ void vednnx_convolution_fwd_t
 }
 
 void vednnx_convolution_bwd_data_t
-        ::execute_backward_data() {
+::execute_backward_data() {
+    using std::cout;
+    using std::endl;
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto weights = reinterpret_cast<const data_t *>(this->input_memory(1));
     auto diff_src = reinterpret_cast<data_t*>(this->memory());
@@ -285,6 +287,10 @@ void vednnx_convolution_bwd_data_t
     vednnFilterParam_t tpKrn    {DTYPE_FLOAT, IC, OC, KW, KH};
     vednnTensorParam_t tpGradOut{DTYPE_FLOAT, MB, OC*G, OW, OH}; // <-- calc ~ diff_src
     vednnConvolutionParam_t parm{ G, KSW, KSH, padL, padT, KDW, KDH };
+    cout<<"tpGin {f32,"<<MB<<","<<IC*G<<","<<IW<<","<<IH<<"}"<<endl;
+    cout<<"tpKrn {f32,"<<IC<<","<<OC  <<","<<KW<<","<<KH<<"}"<<endl;
+    cout<<"tpGOut{f32,"<<MB<<","<<OC*G<<","<<OW<<","<<OH<<"}"<<endl;
+    cout<<"parm{g"<<G<<"_sw"<<KSW<<"sh"<<KSH<<"_pw"<<padL<<"ph"<<padT<<"_dw"<<KDW<<"dh"<<KDH<<"}"<<endl;
 
     // mkl-dnn uses bias, but just for sanity checking
     vednnError_t const status

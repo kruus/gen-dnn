@@ -150,6 +150,13 @@ int str2desc(desc_t *desc, const char *str, bool is_deconv) {
         else if (!d.pd && d.od != compute_out(is_deconv, d.id, d.kd, d.sd, d.pd, d.dd))
             d.pd = compute_pad(is_deconv, d.od, d.id, d.kd, d.sd, d.dd);
     }
+    // There are still some the have outsize < required [ejk]
+    if( d.oh != compute_out(is_deconv, d.ih, d.kh, d.sh, d.ph, d.dh))
+	    d.oh = compute_out(is_deconv, d.ih, d.kh, d.sh, d.ph, d.dh);
+    if (d.ow != compute_out(is_deconv, d.iw, d.kw, d.sw, d.pw, d.dw))
+	    d.ow = compute_out(is_deconv, d.iw, d.kw, d.sw, d.pw, d.dw);
+    if (d.od != compute_out(is_deconv, d.id, d.kd, d.sd, d.pd, d.dd))
+	    d.od = compute_out(is_deconv, d.id, d.kd, d.sd, d.pd, d.dd);
 
     if (no_w && no_h && d.id) {
         d.iw = d.ih = d.id;
