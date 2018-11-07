@@ -175,7 +175,7 @@ void im2col(
                 float *col_;
 
                 if(work_amount > 0) {
-                    OMP(omp parallel)//;
+                    OMP(parallel)//;
                     {
                         const int ithr = omp_get_thread_num();
                         const int nthr = omp_get_num_threads();
@@ -417,7 +417,7 @@ void im2col(
         //auto im2col_1st = [&](const float *im, float *col)
         {
             const size_t work_amount = jcp.oh * jcp.kh;
-            OMP(omp parallel)//;
+            OMP(parallel)//;
             {
                 const int ithr = omp_get_thread_num();
                 const int nthr = omp_get_num_threads();

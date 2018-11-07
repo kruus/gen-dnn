@@ -349,7 +349,8 @@ echo "PATH $PATH"
         CMAKEOPT="${CMAKEOPT} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}"
         # adjust here for VE shared library and Openmp use
         CMAKEOPT="${CMAKEOPT} -DUSE_SHAREDLIB=OFF"
-        if [ "a" == "a" ]; then
+        # USE_OPENMP defaults to off, so force it on (VE openmp has improved)
+        if [ "a" == "z" ]; then
             CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=OFF"
         else
             CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=ON"

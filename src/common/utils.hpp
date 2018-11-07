@@ -204,11 +204,13 @@ inline T nd_iterator_init(T start, U &x, const W &X, Args &&... tuple) {
 inline bool nd_iterator_step() { return true; }
 template<typename U, typename W, typename... Args>
 inline bool nd_iterator_step(U &x, const W &X, Args &&... tuple) {
+    // nc++: err(1813) Cannot branch into or out of OpenMP construct.
+    bool ret = false;
     if (nd_iterator_step(utils::forward<Args>(tuple)...) ) {
         x = (x + 1) % X;
-        return x == 0;
+        ret = (x == 0);
     }
-    return false;
+    return ret;
 }
 
 template<typename U, typename W, typename Y>
