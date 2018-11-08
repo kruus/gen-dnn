@@ -34,6 +34,15 @@
 #include "bnorm/bnorm.hpp"
 #include "rnn/rnn.hpp"
 
+#if defined(_OPENMP)
+#include <omp.h>
+#else
+inline int omp_get_max_threads() { return 1; }
+inline int omp_get_num_threads() { return 1; }
+inline int omp_get_thread_num() { return 0; }
+inline int omp_in_parallel() { return 0; }
+#endif
+
 int verbose {0};
 bench_mode_t bench_mode {CORR};
 stat_t benchdnn_stat {0};
@@ -65,6 +74,14 @@ int main(int argc, char **argv) {
         --argc;
         ++argv;
     }
+
+    int omp_max_thr = omp_get_max_threads();
+    printf("benchdnn --%s --mode=%s -v%d ... init omp_max_thr=%d ",
+                (prim==CONV? "conv": prim==IP? "ip": prim==SELF? "self"
+                 : prim==DECONV ? "deconv" : prim==RNN? "rnn"
+                 : prim==REORDER? "reorder": prim==BNORM? "bnorm": "Huh?"),
+                bench_mode2str(bench_mode), verbose, omp_max_thr);
+    fflush(stdout);
 
     init();
 

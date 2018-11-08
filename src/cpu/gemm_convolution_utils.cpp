@@ -121,7 +121,7 @@ void im2col(
     const size_t col_step = jcp.ks * jcp.os;
 
     if (jcp.ic != 1) {
-        if(1){ // MAKE THIS SELECTABLE FROM jcp
+        if(0){ // MAKE THIS SELECTABLE FROM jcp
             //auto im2col_common = [&](const float *im, float *col)
             {
                 const size_t work_amount = jcp.ic;
