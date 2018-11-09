@@ -31,7 +31,7 @@ tar xvfz vednnx.tar.gz
 tar xvfz vejit.tar.gz
 ```
 
-Before building, make sure `CC` and `CXX` are set to `ncc` and `nc++`A
+Before building, make sure `CC` and `CXX` are set to `ncc` and `nc++`
 and that they are in your path.  Also, `NLC_BASE` must be set
 to the base directory of the NEC Numeric Library Collection (for BLAS).
 For example:
