@@ -450,31 +450,43 @@ inline int init_pd(const prb_t *p, mkldnn_convolution_desc_t &cd,
     auto mkldnn_attr = create_mkldnn_attr(p->attr, p->oc, p->scales);
 
     mkldnn_status_t init_status = mkldnn_success;
+    mkldnn_primitive_desc_iterator_t cpdit;
+
     if (p->merge == RELU) {
         mkldnn_convolution_relu_desc_t crd;
         DNN_SAFE(mkldnn_convolution_relu_desc_init(&crd, &cd, 0), WARN);
-        init_status = mkldnn_primitive_desc_create_v2(&cpd, &crd, mkldnn_attr,
-                engine, NULL);
+
+        init_status = mkldnn_primitive_desc_iterator_create_v2(&cpdit, 
+                                               (const mkldnn_op_desc_t *) &crd,
+                                               mkldnn_attr, engine, NULL);
     } else {
-        init_status = mkldnn_primitive_desc_create_v2(&cpd, &cd, mkldnn_attr,
-                engine, NULL);
+        init_status = mkldnn_primitive_desc_iterator_create_v2(&cpdit, 
+                                               (const mkldnn_op_desc_t *) &cd,
+                                               mkldnn_attr, engine, NULL);
     }
 
     mkldnn_primitive_attr_destroy(mkldnn_attr);
 
-    if (init_status == mkldnn_unimplemented)
+    if (init_status != mkldnn_success) {
+        mkldnn_primitive_desc_iterator_destroy(cpdit);
         return r->state = UNIMPLEMENTED, OK;
-    else
-        SAFE(init_status, WARN);
+    } else {
+        cpd = mkldnn_primitive_desc_iterator_fetch(cpdit);
+    }
 
     const char *impl_str = query_impl_info(cpd);
-    if (maybe_skip(skip_impl, impl_str)) {
+    while (maybe_skip(skip_impl, impl_str)) {
         print(2, "SKIPPED: mkldnn implementation: %s\n", impl_str);
-        DNN_SAFE(mkldnn_primitive_desc_destroy(cpd), WARN);
-        return r->state = SKIPPED, OK;
-    } else {
-        print(5, "mkldnn implementation: %s\n", impl_str);
+        if(mkldnn_primitive_desc_iterator_next(cpdit) == mkldnn_iterator_ends) {
+            DNN_SAFE(mkldnn_primitive_desc_destroy(cpd), WARN);
+            mkldnn_primitive_desc_iterator_destroy(cpdit);
+            return r->state = SKIPPED, OK;
+        }
+        cpd = mkldnn_primitive_desc_iterator_fetch(cpdit);
+        impl_str = query_impl_info(cpd);
     }
+    print(5, "mkldnn implementation: %s\n", impl_str);
+    mkldnn_primitive_desc_iterator_destroy(cpdit);
 
     auto q = [=](mkldnn_query_t query, int index = 0) {
         return *mkldnn_primitive_desc_query_memory_d(
