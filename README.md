@@ -3,6 +3,7 @@
 This fork of MKL-DNN provides the same API for non-Intel chips, targeting:
 * NEC SX-Aurora TSUBASA chip, ncc compiler
 * NEC SX,            sxcc compiler
+
 It provides a "vanilla" build that removes Intel-specific JIT instructions
 as well as an Aurora build with a few optimized instructions for Aurora.
 The optimizations are a work in progress.
@@ -12,8 +13,7 @@ theoretical FLOPS/s.  For Aurora, higher efficiencies are available
 for several primitives via the hand-coded VEDNN library.
 
 We plan to develop some simple jit examples for convolutions on NEC's Aurora
-chip. The jit operations may be slow, invoking the assembler or compiler as
-required!
+chip.
 
 Last merge with upstream was around v0.16 of mkl-dnn (~ Sept 2018)
 * This fork: [gen-dnn Github URL](https://github.com/necla-ml/gen-dnn)
