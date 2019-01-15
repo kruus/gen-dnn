@@ -10,7 +10,15 @@ usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
     awk '/getopts/{flag=1;next} /done/{flag=0} flag&&/^[^#]+\) #/; flag&&/^ *# /' $0
-    echo ""
+    echo " This runs a default set of tests, typically some large convolutions"
+    echo " from some real deep neural nets."
+    echo " Examples:"
+    echo "   ./bench.sh -v -t 4 -D 'BWD_D BWD_B'"
+    echo "       # vanilla build, 4 threads, some BWD tests of default convolutions"
+    echo "   ./bench.sh -q"
+    echo "       # quick test only, FWD_B direction, debug jit build"
+    echo "   ./bench.sh -v -t 6 -D 'FWD_B FWD_D BWD_D BWD_W BWD_WB'"
+    echo "       # Long vanilla build test, 6 threads, all directions"
     exit 0
 }
 ################# LOGDIR
@@ -57,7 +65,7 @@ SKIP=""
 MODE="--mode=P"
 DIRS=(FWD_B) # FWD_D FWD_B BWD_D BWD_W BWD_WB
 # TODO: add batch file selection for some long tests examples [other than the default list]
-while getopts ":hqvjdm:t:V:s:" arg; do
+while getopts ":hqvjdD:m:t:V:s:" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         v) # [yes] (if available, vanilla C/C++ only: no JIT)

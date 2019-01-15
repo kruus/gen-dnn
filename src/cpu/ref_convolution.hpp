@@ -68,9 +68,15 @@ struct _ref_convolution_fwd_t: public cpu_primitive_t {
         }
     };
 
+#if defined(TARGET_VANILLA)
+    // moved to .cpp for extra debug
+    _ref_convolution_fwd_t(const pd_t *pd, const input_vector &inputs,
+            const output_vector &outputs);
+#else
     _ref_convolution_fwd_t(const pd_t *pd, const input_vector &inputs,
             const output_vector &outputs)
         : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {}
+#endif
 
     typedef typename prec_traits<src_type>::type src_data_t;
     typedef typename prec_traits<wei_type>::type wei_data_t;
