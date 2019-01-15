@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
 
 #ifndef MKLDNN_TYPES_H
 #define MKLDNN_TYPES_H
+
+#include "mkldnn_os.h" // compiler/OS compatibility macros
 
 #ifdef __cplusplus
 extern "C" {
@@ -74,15 +76,29 @@ typedef enum {
     mkldnn_u8 = 6,
 } mkldnn_data_type_t;
 
+//@{
 /** Some platforms do not need all memory layouts.
+ *
+ * Testing without a full spectrum of JIT support can be quite slow.
+ * In such cases, it can be useful to cut down tests to a subset of layouts,
+ * especially since many of the interleaved formats cater to specific
+ * simd lengths important for JIT impls.
+ *
  * - 0 : no blocked (8,16) or interleaved data layouts for mkldnn_memory_format_t
- * - 1 : full spectrum of data layouts (jit expects this)
+ * - 1 : (TBD) add nChw8c and nChw16c
+ * - ...
+ * - 100 : full spectrum of data layouts (jit expects this)
+ *
+ * Now we test for "not one of", so all data layouts need to be defined.
+ * We can still check MKLDNN_JIT_TYPES to enable testing subsets of memory layouts
+ * This will speed up the already-slow testing for -DTARGET_VANILLA.
  */
-#if defined(TARGET_VANILLA) || defined(_SX)
+#ifdef TARGET_VANILLA
 #define MKLDNN_JIT_TYPES 0
 #else
-#define MKLDNN_JIT_TYPES 1
+#define MKLDNN_JIT_TYPES 9
 #endif
+//@}
 
 /** Rounding mode */
 typedef enum {
@@ -134,14 +150,22 @@ typedef enum {
     mkldnn_nhwc,
     /** 4D data tensor in the @c chwn format typically used in Neon. */
     mkldnn_chwn,
-#if MKLDNN_JIT_TYPES > 0
     /** 4D data tensor in the @c nchw format with channels data laid out in
      * memory in 8-element blocks. */
     mkldnn_nChw8c,
     /** 4D data tensor in the @c nchw format with channels data laid out in
      * memory in 16-element blocks. */
     mkldnn_nChw16c,
-#endif
+    /** 5D data tensor in the @c ncdhw format. */
+    mkldnn_ncdhw,
+    /** 5D data tensor in the @c ndhwc format typically used in TensorFlow. */
+    mkldnn_ndhwc,
+    /** 5D data tensor in the @c ncdhw format with channels data laid out in
+     * memory in 8-element blocks. */
+    mkldnn_nCdhw8c,
+    /** 5D data tensor in the @c ncdhw format with channels data laid out in
+     * memory in 16-element blocks. */
+    mkldnn_nCdhw16c,
     /** 2D weights tensor in the format (input channels, output channels). */
     mkldnn_oi,
     /** 2D weights tensor in the format (input channels, output channels). */
@@ -155,7 +179,36 @@ typedef enum {
     /** 4D weights tensor in the format (height, width, input channels,
      * output channels). */
     mkldnn_hwio,
-#if MKLDNN_JIT_TYPES > 0
+    /** 5D weights tensor in the format (depth, height, width, input channels,
+     * output channels). */
+    mkldnn_dhwio,
+    /** 5D weight tensor in the @c oidhw format. */
+    mkldnn_oidhw,
+   /** 6D weights tensor in the @c oidhw format with output channels data
+    * laid out in memory in 8-element blocks and input channels data
+     * laid out in memory in 8-element blocks blocked by quadruple. */
+    mkldnn_OIdhw8i8o,
+    /** 6D weights tensor in the @c oihw format with both input and output
+     * channels data laid out in memory in 8-element blocks. */
+    mkldnn_OIdhw8o8i,
+    /** 5D weights tensor in the blocked version of @c oidhw format with output
+     * channels data laid out in memory in 8-element blocks. */
+    mkldnn_Odhwi8o,
+    /** 4D weights tensor in the @c oihw format with both input and output
+     * channels data laid out in memory in 8-element blocks. */
+   /** 6D weights tensor in the @c oidhw format with output channels data
+    * laid out in memory in 16-element blocks and input channels data
+     * laid out in memory in 4-element blocks blocked by quadruple. */
+    mkldnn_OIdhw16i16o,
+    /** 6D weights tensor in the @c oihw format with both input and output
+     * channels data laid out in memory in 16-element blocks. */
+    mkldnn_OIdhw16o16i,
+    /** 5D weights tensor in the blocked version of @c oidhw format with output
+     * channels data laid out in memory in 16-element blocks. */
+    mkldnn_Oidhw16o,
+    /** 5D weights tensor in the blocked version of @c oidhw format with output
+     * channels data laid out in memory in 16-element blocks. */
+    mkldnn_Odhwi16o,
     /** 4D weights tensor in the @c oihw format with both input and output
      * channels data laid out in memory in 8-element blocks. */
     mkldnn_OIhw8i8o,
@@ -164,8 +217,16 @@ typedef enum {
     mkldnn_OIhw16i16o,
     /** 4D weights tensor in the @c oihw format with output channels data
      * laid out in memory in 16-element blocks and input channels data
-     * laid out in memory in 8-element blocks blocked by pairs. */
+     * laid out in memory in 4-element blocks blocked by quadruple. */
+    mkldnn_OIhw4i16o4i,
+     /** 4D weights tensor in the @c oihw format with output channels data
+      * laid out in memory in 16-element blocks and input channels data
+      * laid out in memory in 8-element blocks blocked by pairs. */
     mkldnn_OIhw8i16o2i,
+    /** 5D weights tensor in the @c oidhw format with output channels data
+     * laid out in memory in 16-element blocks and input channels data
+     * laid out in memory in 8-element blocks blocked by pairs. */
+    mkldnn_OIdhw8i16o2i,
     /** 4D weights tensor in the @c oihw format with input channels data
      * laid out in memory in 16-element blocks and output channels data
      * laid out in memory in 8-element blocks blocked by pairs. */
@@ -198,11 +259,22 @@ typedef enum {
     /** 4D weights tensor in the @c oihw format with both input and output
      * channels data laid out in memory in 16-element and 4-element blocks. */
     mkldnn_OhIw16o4i,
-#endif
     /** 5D weights tensor in the @c oihw format with extra outer dimension for
      * groups. */
     mkldnn_goihw,
-#if MKLDNN_JIT_TYPES > 0
+    /** 5D weights tensor in the @c hwio format with extra dimension for
+     * groups that comes after the output channels. */
+    mkldnn_hwigo,
+    /** 6D weights tensor in the @c oidhw format with output channels data
+     * laid out in memory in 8-element blocks and input channels data
+     * laid out in memory in 8-element blocks blocked by quadruple. */
+    mkldnn_gOIdhw8i8o,
+    /** 6D weights tensor in the @c oihw format with both input and output
+     * channels data laid out in memory in 8-element blocks. */
+    mkldnn_gOIdhw8o8i,
+    /** 5D weights tensor in the blocked version of @c oidhw format with output
+     * channels data laid out in memory in 8-element blocks. */
+    mkldnn_gOdhwi8o,
     /** 5D weights tensor in the blocked version of @c goihw format with both
      * input and output channels data laid out in memory in 8-element blocks.
      */
@@ -213,8 +285,16 @@ typedef enum {
     mkldnn_gOIhw16i16o,
     /** 5D weights tensor in the @c oihw format with output channels data
      * laid out in memory in 16-element blocks and input channels data
+     * laid out in memory in 4-element blocks blocked by quadruple. */
+    mkldnn_gOIhw4i16o4i,
+    /** 5D weights tensor in the @c oihw format with output channels data
+     * laid out in memory in 16-element blocks and input channels data
      * laid out in memory in 8-element blocks blocked by pairs. */
     mkldnn_gOIhw8i16o2i,
+    /** 6D weights tensor in the @c oidhw format with output channels data
+     * laid out in memory in 16-element blocks and input channels data
+     * laid out in memory in 8-element blocks blocked by pairs. */
+    mkldnn_gOIdhw8i16o2i,
     /** 5D weights tensor in the @c oihw format with input channels data
      * laid out in memory in 16-element blocks and output channels data
      * laid out in memory in 8-element blocks blocked by pairs. */
@@ -243,19 +323,69 @@ typedef enum {
     /** 5D weights tensor in the blocked version of @c goihw format with output
      * channels data laid out in memory in 16-element blocks. */
     mkldnn_gOhwi16o,
+    /** 5D weights tensor in the blocked version of @c goihw format with group
+     * data laid out in memory in 8-element blocks. */
+    mkldnn_Goihw8g,
+    /** 5D weights tensor in the blocked version of @c goihw format with group
+     * data laid out in memory in 16-element blocks. */
+    mkldnn_Goihw16g,
     /** 5D weights tensor in the @c goihw format with both input and output
      * channels data laid out in memory in 16-element and 4-element blocks. */
     mkldnn_gOhIw16o4i,
+    /** 6D weight tensor in the @c goidhw format with extra dimension for
+     * groups */
+    mkldnn_goidhw,
+   /** 6D weights tensor in the @c oidhw format with output channels data
+    * laid out in memory in 16-element blocks and input channels data
+     * laid out in memory in 4-element blocks blocked by quadruple. */
+    mkldnn_gOIdhw16i16o,
+    /** 6D weights tensor in the blocked version of @c goihw format with both
+     * input and output channels data laid out in memory in 16-element blocks.
+     */
+    mkldnn_gOIdhw16o16i,
+    /** 6D weights tensor in the blocked version of @c goidhw format with output
+     * channels data laid out in memory in 16-element blocks. */
+    mkldnn_gOidhw16o,
+    /** 6D weights tensor in the blocked version of @c goidhw format with output
+     * channels data laid out in memory in 16-element blocks. */
+    mkldnn_gOdhwi16o,
+    /** 3D data tensor in the format (batch, seq_length, input channels). */
+    mkldnn_ntc,
+    /** 3D data tensor in the format (seq_length, batch, input channels). */
+    mkldnn_tnc,
+    /** 5D states tensor in the format (num_layers, num_directions, num_states,
+     * batch, state channels). */
+    mkldnn_ldsnc,
+    /** 5D weights tensor in the format (num_layers, num_directions,
+     *  input_chanels, num_gates, output_channels). */
+    mkldnn_ldigo,
+    /** 5D weights tensor in the blocked format. */
+    mkldnn_ldigo_p,
+    /** 5D weights tensor in the format (num_layers, num_directions, num_gates,
+     *  output_channels, input_chanels). */
+    mkldnn_ldgoi,
+    /** 5D weights tensor in the blocked format. */
+    mkldnn_ldgoi_p,
+    /** 4D bias tensor in the format (num_layers, num_directions, num_gates,
+     * output_channels). */
+    mkldnn_ldgo,
+    /** General tensor format for integer 8bit winograd convolution. */
+    mkldnn_wino_fmt,
+    /** Just a sentinel, not real memory format. Must be changed after new
+     * format is added. */
+    mkldnn_format_last,
     /** 4D weights tensor in the oihw format with input channels data laid out
      * in memory in 8-element blocks. */
     mkldnn_oIhw8i = mkldnn_nChw8c,
     /** 4D weights tensor in the oihw format with input channels data laid out
      * in memory in 16-element blocks. */
     mkldnn_oIhw16i = mkldnn_nChw16c,
-    mkldnn_memory_format_max = mkldnn_gOhIw16o4i,
-#else
-    mkldnn_memory_format_max = mkldnn_goihw,
-#endif
+    /** 5D weights tensor in the oihw format with input channels data laid out
+     * in memory in 8-element blocks. */
+    mkldnn_oIdhw8i = mkldnn_nCdhw8c,
+    /** 5D weights tensor in the oihw format with input channels data laid out
+     * in memory in 16-element blocks. */
+    mkldnn_oIdhw16i = mkldnn_nCdhw16c,
 } mkldnn_memory_format_t;
 
 /** Kinds of padding. Define how to interpret the data in padding regions. */
@@ -309,9 +439,11 @@ typedef enum {
     mkldnn_sum,
     /** A convolution primitive. */
     mkldnn_convolution,
+    /** A deconvolution primitive. */
+    mkldnn_deconvolution,
     /** An element-wise primitive. */
     mkldnn_eltwise,
-    /** A ReLU primitive, @deprecated. */
+    /** A ReLU primitive. @deprecated */
     mkldnn_relu = mkldnn_eltwise,
     /** A Softmax primitive. */
     mkldnn_softmax,
@@ -323,12 +455,15 @@ typedef enum {
     mkldnn_batch_normalization,
     /** An inner product primitive. */
     mkldnn_inner_product,
-    /** A convolution primitive merged with relu */
+    /** A convolution primitive merged with ReLU. @deprecated */
     mkldnn_convolution_relu,
+    /** A rnn primitive. */
+    mkldnn_rnn,
 } mkldnn_primitive_kind_t;
 
 /** Kinds of algorithms. */
 typedef enum {
+    mkldnn_alg_kind_undef,
     /** Direct convolution */
     mkldnn_convolution_direct = 1,
     /** Winograd convolution */
@@ -364,6 +499,25 @@ typedef enum {
     mkldnn_lrn_across_channels = 65,
     /** LRN within a single channel */
     mkldnn_lrn_within_channel = 66,
+    /** Direct deconvolution */
+    mkldnn_deconvolution_direct = 71,
+    /** Winograd deconvolution */
+    mkldnn_deconvolution_winograd = 72,
+    /** RNN cell */
+    mkldnn_vanilla_rnn = 80,
+    /** LSTM cell */
+    mkldnn_vanilla_lstm = 81,
+    /** GRU cell */
+    mkldnn_vanilla_gru = 82,
+    /** GRU cell with linear before reset
+     *
+     * Modification of original GRU cell. Differs from #mkldnn_vanilla_gru
+     * in how the new memory gate is calculated:
+     * \f[ c_t = tanh(W_c*x_t + b_{c_h} + r_t*(U_c*h_{t-1}+b_{c_h})) \f]
+     * Primitive expects 4 biases on input:
+     * \f$[b_{u}, b_{r}, b_{c_x}, b_{c_h}]\f$
+     * */
+    mkldnn_gru_linear_before_reset = 83,
 } mkldnn_alg_kind_t;
 
 /** Flags for batch-normalization primititve. */
@@ -396,13 +550,22 @@ typedef enum {
     mkldnn_use_scaleshift = 0x2U,
     /** Omit statistics
      *
-     * @warning: deprecated, use #mkldnn_use_global_stats instead
+     * @deprecated use #mkldnn_use_global_stats instead
      *
      * For time being had an affect on backward propagation only which allowed
      * skipping some computations (the same semantics as
      * #mkldnn_use_global_stats)
      */
     mkldnn_omit_stats = mkldnn_use_global_stats,
+    /** Fuse with ReLU
+     *
+     * If specified:
+     *  - on inference this option behaves the same as if the primitive were
+     *    fused with ReLU via post ops API
+     *  - on training primitive requires workspace (required to be able to
+     *    perform backward pass)
+     */
+    mkldnn_fuse_bn_relu = 0x4U,
 } mkldnn_batch_normalization_flag_t;
 
 /** @} */
@@ -437,6 +600,31 @@ typedef struct {
     ptrdiff_t offset_padding;
 } mkldnn_blocking_desc_t;
 
+typedef enum {
+    /** Undefined memory format, used for empty memory descriptors. */
+    mkldnn_wino_undef = 0,
+    /** Tensors of weights for 2x3 winograd convolutions. */
+    mkldnn_wino_wei_aaOIoi,
+    mkldnn_wino_wei_aaOio,
+    mkldnn_wino_wei_aaOBiOo,
+    /** Tensor of weights for 4x3 convolution. */
+    mkldnn_wino_wei_OBaaIBOIio
+} mkldnn_wino_memory_format_t;
+
+/** Description of tensor of weights for integer 8bit winograd convolution. */
+typedef struct {
+    mkldnn_wino_memory_format_t wino_format;
+    int r;
+    int alpha;
+    int ic;
+    int oc;
+    int ic_block;
+    int oc_block;
+    int ic2_block;
+    int oc2_block;
+    size_t size;
+} mkldnn_wino_desc_t;
+
 /** @addtogroup c_api_types_op_descs Operation descriptors
  *  @{*/
 
@@ -466,6 +654,8 @@ typedef struct {
         /** Description of the data layout for memory formats that use
          * blocking. */
         mkldnn_blocking_desc_t blocking;
+        /** Tensor of weights for integer 8bit winograd convolution. */
+        mkldnn_wino_desc_t wino_desc;
         /* ... other descriptions possible */
     } layout_desc;
 } mkldnn_memory_desc_t;
@@ -513,6 +703,9 @@ typedef struct {
     /** The accumulator data type. Initialized automatically. */
     mkldnn_data_type_t accum_data_type;
 } mkldnn_convolution_desc_t;
+
+/** A descriptor of a deconvolution operation. */
+typedef mkldnn_convolution_desc_t mkldnn_deconvolution_desc_t;
 
 /** A descriptor of a element-wise operation. */
 typedef struct {
@@ -566,6 +759,8 @@ typedef struct {
     mkldnn_prop_kind_t prop_kind;
     /** Source and destination memory descriptor. */
     mkldnn_memory_desc_t data_desc;
+    /** Source and Destination of gradient memory descriptor. */
+    mkldnn_memory_desc_t diff_desc;
     /** The axis along which to perform the softmax. */
     int softmax_axis;
 } mkldnn_softmax_desc_t;
@@ -703,6 +898,87 @@ typedef struct {
     float negative_slope;
 } mkldnn_convolution_relu_desc_t;
 
+/** Flags for RNN cell. */
+typedef enum {
+    mkldnn_rnn_cell_with_relu = 0x1U,
+    mkldnn_rnn_cell_with_clipping = 0x2U,
+} mkldnn_rnn_cell_flags_t;
+
+typedef struct {
+    /** RNN cell kind. Must be one of #mkldnn_vanilla_rnn,
+     * #mkldnn_vanilla_lstm, #mkldnn_vanilla_gru
+     * or #mkldnn_gru_linear_before_reset. */
+    mkldnn_alg_kind_t cell_kind;
+    /** Activation function used. Must be one of #mkldnn_eltwise_relu,
+     * #mkldnn_eltwise_tanh. */
+    mkldnn_alg_kind_t activation_kind;
+    /** RNN cell flags */
+    unsigned int flags;
+    /** alpha is a negative slope parameter (used only if
+     * (flags & #mkldnn_rnn_cell_with_relu) != 0) */
+    float alpha;
+    /** clipping parameter (used only if
+     * (flags & #mkldnn_rnn_cell_with_clipping) != 0) */
+    float clipping;
+} mkldnn_rnn_cell_desc_t;
+
+/** A direction of RNN primitive execution */
+typedef enum {
+    /* Unidirectional execution of RNN primitive from left to right. */
+    mkldnn_unidirectional_left2right,
+    /* Unidirectional execution of RNN primitive from right to left. */
+    mkldnn_unidirectional_right2left,
+    /* Bidirectional execution of RNN primitive with concatenation of the
+     * results. */
+    mkldnn_bidirectional_concat,
+    /* Bidirectional execution of RNN primitive with summation of the
+     * results. */
+    mkldnn_bidirectional_sum,
+    mkldnn_unidirectional = mkldnn_unidirectional_left2right,
+} mkldnn_rnn_direction_t;
+
+/** A descriptor for an rnn operation */
+typedef struct {
+    /** The kind of primitive. Used for self identifying the primitive
+     * descriptor. Must be #mkldnn_rnn. */
+    mkldnn_primitive_kind_t primitive_kind;
+    /** The kind of propagation. Possible values: #mkldnn_forward_training,
+     * #mkldnn_forward_inference, #mkldnn_backward. */
+    mkldnn_prop_kind_t prop_kind;
+    /** The RNN cell desc. */
+    mkldnn_rnn_cell_desc_t cell_desc;
+    /** The direction of RNN primitive execution. */
+    mkldnn_rnn_direction_t direction;
+    /** Source layer memory descriptor. */
+    mkldnn_memory_desc_t src_layer_desc;
+    /** Source iteration memory descriptor. */
+    mkldnn_memory_desc_t src_iter_desc;
+    /** Weights layer memory descriptor. */
+    mkldnn_memory_desc_t weights_layer_desc;
+    /** Weights iteration memory descriptor. */
+    mkldnn_memory_desc_t weights_iter_desc;
+    /** Bias memory descriptor. */
+    mkldnn_memory_desc_t bias_desc;
+    /** Destination layer memory descriptor. */
+    mkldnn_memory_desc_t dst_layer_desc;
+    /** Destination iter memory descriptor. */
+    mkldnn_memory_desc_t dst_iter_desc;
+    /** Source gradient layer memory descriptor. */
+    mkldnn_memory_desc_t diff_src_layer_desc;
+    /** Source gradient iter memory descriptor. */
+    mkldnn_memory_desc_t diff_src_iter_desc;
+    /** Weights gradient layer memory descriptor. */
+    mkldnn_memory_desc_t diff_weights_layer_desc;
+    /** Weights gradient iter memory descriptor. */
+    mkldnn_memory_desc_t diff_weights_iter_desc;
+    /** Bias gradient memory descriptor. */
+    mkldnn_memory_desc_t diff_bias_desc;
+    /** Destination gradient layer memory descriptor. */
+    mkldnn_memory_desc_t diff_dst_layer_desc;
+    /** Destination gradient iteration memory descriptor. */
+    mkldnn_memory_desc_t diff_dst_iter_desc;
+} mkldnn_rnn_desc_t;
+
 /** @} */
 
 /** @addtogroup c_api_engine_types Engine
@@ -780,6 +1056,33 @@ typedef struct mkldnn_primitive_attr *mkldnn_primitive_attr_t;
 /** @brief A constant primitive descriptor attributes handle. */
 typedef const struct mkldnn_primitive_attr *const_mkldnn_primitive_attr_t;
 
+/** @struct mkldnn_post_ops
+ * @brief An opaque structure for a chain of post operations.
+ *
+ * mkldnn_post_ops can be used to perform some (trivial) operations like
+ * accumulation or eltwise after certain primitives like convolution.
+ *
+ * Post operations might be combined together, making a chain of post
+ * operations. For instance one can configure convolution followed by
+ * accumulation followed by eltwise (relu). This might be especially beneficial
+ * for residual learning blocks.
+ *
+ * @warning
+ *      Of course not all the combinations are supported, so user should handle
+ *      error accordingly.
+ *
+ * Supported post operations:
+ *  - accumulation (base primitive: convolution)
+ *  - eltwise (base primitive: convolution)
+ */
+struct mkldnn_post_ops;
+
+/** @brief A post operation chain handle. */
+typedef struct mkldnn_post_ops *mkldnn_post_ops_t;
+
+/** @brief A constant post operation chain handle. */
+typedef const struct mkldnn_post_ops *const_mkldnn_post_ops_t;
+
 /** @} */
 
 /** @addtogroup c_api_types_primitive Primitive
@@ -828,11 +1131,11 @@ typedef struct {
  *     reference. All numbers are returned by value.
  *
  * @warning
- *     All[\*] returned references point to constant objects and valid only
- *     during the lifetime of queried primitive descriptor. Returned objects
- *     must not be destroyed by user. If there is a need to keep the object
- *     longer than a lifetime of queried primitive descriptor use
- *     \c mkldnn_primitive_desc_clone() to make a copy.
+ *     All[\*] returned references point to constant objects and valid only during
+ *     the lifetime of queried primitive descriptor. Returned objects must not
+ *     be destroyed by user. If there is a need to keep the object longer than
+ *     a lifetime of queried primitive descriptor use
+ *     mkldnn_primitive_desc_clone() to make a copy.
  *
  * - [1] For now, string return values are exempt from the lifetime warning.
  *
@@ -868,6 +1171,7 @@ typedef enum {
     mkldnn_query_some_d = 64, /**< stub */
     mkldnn_query_memory_d, /**< memory descriptor for memory and view */
     mkldnn_query_convolution_d, /**< convolution descriptor */
+    mkldnn_query_deconvolution_d, /**< deconvolution descriptor */
     mkldnn_query_eltwise_d, /**< eltwise descriptor */
     mkldnn_query_relu_d = mkldnn_query_eltwise_d, /**< @deprecated */
     mkldnn_query_softmax_d, /**< softmax descriptor */
@@ -875,7 +1179,8 @@ typedef enum {
     mkldnn_query_lrn_d, /**< lrn descriptor */
     mkldnn_query_batch_normalization_d, /**< batch normalization descriptor */
     mkldnn_query_inner_product_d, /**< inner product descriptor */
-    mkldnn_query_convolution_relu_d, /**< convolution-relu descriptor */
+    mkldnn_query_convolution_relu_d, /**< @deprecated */
+    mkldnn_query_rnn_d, /**< rnn descriptor */
 
     /* (memory) primitive descriptor section */
     mkldnn_query_some_pd = 128, /**< stub */
@@ -922,5 +1227,5 @@ typedef const struct mkldnn_stream *const_mkldnn_stream_t;
 }
 #endif
 
-/* vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s */
+/* vim: set et ts=4 sw=4 cino=^=l0,\:0,N-s: */
 #endif

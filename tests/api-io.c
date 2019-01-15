@@ -51,6 +51,15 @@
     } \
 } while(0)
 
+#define CHECK_EQUAL(expr,val) do { \
+    int e_ = (expr); \
+    int f_ = (val); \
+    if (!(e_ == f_)) { \
+        printf("[%s:%d] %s == %s failed, %d != %d\n", __FILE__, __LINE__, #expr,#val,(int)e_,(int)f_); \
+        exit(2); \
+    } \
+} while(0)
+
 static size_t product(int *arr, size_t size) {
     size_t prod = 1;
     for (size_t i = 0; i < size; ++i) prod *= arr[i];
@@ -67,7 +76,10 @@ void io0() {
         char buf[len]; // On SX, this gives a warning:
         // "use of a const variable in a constant expression is nonstandard in C"
         mkldnn_dims_t d = {1};
-        printf("\n\nmkldnn_name_dims, buf[%d]...\n",len); fflush(stdout);
+        printf("\n\nmkldnn_name_dims, buf[%d]...\n",len);
+        fflush(stdout);
+        for(int i=0; i<TENSOR_MAX_DIMS; ++i) printf(" %d",d[i]);
+        fflush(stdout);
         int sz0 = mkldnn_name_dims( d, buf, len );
         fflush(stdout);
 #if defined(_SX)
@@ -75,6 +87,7 @@ void io0() {
 #else
         printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
 #endif
+        fflush(stdout);
         CHECK_TRUE(sz0 < len);
         CHECK_TRUE(buf[sz0] == '\0');
 #undef len
@@ -84,12 +97,15 @@ void io0() {
         //int const len=9;
         char buf[len];
         mkldnn_dims_t d = {1};
+        for(int i=0; i<TENSOR_MAX_DIMS; ++i) printf(" %d",d[i]);
+        fflush(stdout);
         int sz0 = mkldnn_name_dims( d, buf, len );
 #if defined(_SX)
         printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %lu\n", sz0, len, buf, (long unsigned)strlen(&buf[0]));
 #else
         printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
 #endif
+        fflush(stdout);
         CHECK_TRUE(sz0 < len);
         CHECK_TRUE(buf[sz0] == '\0');
 #undef len
@@ -105,6 +121,7 @@ void io0() {
 #else
         printf("mkldnn_dims_t d={1} full len sz0=%d into buf[%d] as <%s> strlen is %zu\n", sz0, len, buf, strlen(&buf[0]));
 #endif
+        fflush(stdout);
         CHECK_TRUE(sz0 == len);
         CHECK_TRUE(buf[len-1] == '\0');
 #undef len
@@ -451,10 +468,14 @@ void test3() {
     CHECK_TRUE(mkldnn_memory_primitive_desc_equal(
                 mkldnn_primitive_desc_query_pd(
                     l2_pd, mkldnn_query_dst_pd, 0), l2_data_pd));
-    CHECK_TRUE(mkldnn_primitive_desc_query_s32(
-                l2_pd, mkldnn_query_num_of_inputs_s32, 0) == 1);
-    CHECK_TRUE(mkldnn_primitive_desc_query_s32(
-                l2_pd, mkldnn_query_num_of_outputs_s32, 0) == 1);
+    printf("l2_pd num_inputs : %d\n",(int)mkldnn_primitive_desc_query_s32(
+                    l2_pd, mkldnn_query_num_of_inputs_s32, 0));
+    printf("l2_pd num_outputs: %d\n",(int)mkldnn_primitive_desc_query_s32(
+                    l2_pd, mkldnn_query_num_of_outputs_s32, 0));
+    CHECK_EQUAL(mkldnn_primitive_desc_query_s32( l2_pd,
+                mkldnn_query_num_of_inputs_s32, 0), 1);
+    CHECK_EQUAL(mkldnn_primitive_desc_query_s32( l2_pd,
+                mkldnn_query_num_of_outputs_s32, 0), 1);
 
     CHECK(mkldnn_primitive_desc_destroy(l2_pd));
 
@@ -528,3 +549,4 @@ int main() {
     printf("\n test3 test DONE\n");
     return 0;
 }
+// vim: et ts=4 sw=4 cindent cino=^l0,\:0,N-s

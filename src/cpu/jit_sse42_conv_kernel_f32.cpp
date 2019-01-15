@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 #include "c_types_map.hpp"
 #include "nstl.hpp"
 #include "type_helpers.hpp"
+#include "cpu_memory.hpp"
 
 #include "jit_sse42_conv_kernel_f32.hpp"
 
@@ -160,13 +161,25 @@ void jit_sse42_conv_fwd_kernel_f32::width_blk_step(int ur_w,
 
     L(init_simd_iter_label);
 
-    test(reg_ci_flag, FLAG_IC_FIRST);
-    jne(init_first_label, T_NEAR);
+    if (!jcp.with_sum) {
+        test(reg_ci_flag, FLAG_IC_FIRST);
+        jne(init_first_label, T_NEAR);
+    }
 
     for (int ii = 0; ii < oc_blocks; ii++)
         for (int jj = 0; jj < ur_w; jj++)
             movups(Xmm(ur_w * ii + jj + 1), xword[reg_output
                    + sizeof(float) * (ii * oh * ow + jj) * oc_blk]);
+
+    if (jcp.with_sum && jcp.with_bias) {
+        test(reg_ci_flag, FLAG_IC_FIRST);
+        je(init_done_label, T_NEAR);
+
+        for (int ii = 0; ii < oc_blocks; ii++)
+            for (int jj = 0; jj < ur_w; jj++)
+                addps(Xmm(ur_w * ii + jj + 1),
+                    xword[reg_bias + sizeof(float) * ii * oc_blk]);
+    }
 
     jmp(init_done_label);
 
@@ -214,7 +227,7 @@ void jit_sse42_conv_fwd_kernel_f32::width_blk_step(int ur_w,
     jit_tagged_label done_label("done", pad_tag, oc_blocks_tag);
     jit_tagged_label regular_store_label("store", pad_tag, oc_blocks_tag);
 
-    if (this->jcp.with_relu) {
+    if (jcp.with_relu) {
         assert(oc_blocks * ur_w < 15);
         test(reg_ci_flag, FLAG_IC_LAST);
         je(regular_store_label, T_NEAR);
@@ -232,10 +245,8 @@ void jit_sse42_conv_fwd_kernel_f32::width_blk_step(int ur_w,
                 const size_t o_off = (ii * oh * ow + jj) * oc_blk;
                 Xmm reg_out = Xmm(ur_w * ii + jj + 1);
 
-                const unsigned char _cmp_gt_os = 6;
-
                 pxor(xmask, xmask);
-                cmpps(xmask, reg_out, _cmp_gt_os);
+                cmpps(xmask, reg_out, _cmp_nle_us);
                 movups(xmm_res_ns, reg_out);
                 mulps(xmm_res_ns, xmm_relu_ns);
                 blendvps(reg_out, xmm_res_ns);
@@ -368,10 +379,32 @@ void jit_sse42_conv_fwd_kernel_f32::generate()
     this->postamble();
 }
 
+bool jit_sse42_conv_fwd_kernel_f32::post_ops_ok(
+        jit_conv_conf_t &jcp, const primitive_attr_t &attr) {
+    const auto &p = attr.post_ops_;
+
+    auto is_relu = [&](int idx) { return p.entry_[idx].is_relu(); };
+    auto is_sum = [&](int idx) { return p.entry_[idx].is_sum(); };
+
+    switch (p.len_) {
+    case 0: return true; // no post_ops
+    case 1:
+        return true // sum OR relu
+                && !jcp.with_relu && (is_relu(0) || is_sum(0));
+    case 2:
+        return true // sum->relu
+                && !jcp.with_relu && (is_sum(0) && is_relu(1));
+    default: return false;
+    }
+
+    return false;
+}
+
+
 status_t jit_sse42_conv_fwd_kernel_f32::init_conf(jit_conv_conf_t &jcp,
         const convolution_desc_t &cd, const memory_desc_wrapper &src_d,
         const memory_desc_wrapper &weights_d, const memory_desc_wrapper &dst_d,
-        bool with_relu, float relu_negative_slope)
+        const primitive_attr_t &attr, bool with_relu, float relu_negative_slope)
 {
     if (!mayiuse(sse42)) return status::unimplemented;
 
@@ -406,6 +439,16 @@ status_t jit_sse42_conv_fwd_kernel_f32::init_conf(jit_conv_conf_t &jcp,
     jcp.with_bias = cd.bias_desc.format != memory_format::undef;
     jcp.with_relu = with_relu;
     jcp.relu_negative_slope = relu_negative_slope;
+
+    if (!post_ops_ok(jcp, attr))
+        return status::unimplemented;
+
+    const auto &p = attr.post_ops_;
+    jcp.with_sum = p.find(primitive_kind::sum) != -1;
+    if (!jcp.with_relu) {
+        jcp.with_relu = p.find(primitive_kind::eltwise) != -1;
+        jcp.relu_negative_slope = 0;
+    }
 
     const bool flat = jcp.ic == 3;
     const bool mimo = !flat;

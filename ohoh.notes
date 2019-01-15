@@ -1,0 +1,53 @@
+ve_cmpconv:
+tpIn {f32,1,16,5,5}
+tpKrn{f32,16,16,7,7}
+tpOut{f32,1,16,5,5}
+parm{g1_sw1sh1_pw1ph1_dw1dh1}
+
+mkldnn implementation: ve-fwd:nchw
+tpIn {f32,1,16,5,5}
+tpKrn{f32,16,16,7,7}
+tpOut{f32,1,16,3,3} <--- fixed in mkl-dnn
+parm{g1_sw1sh1_pw3ph3_dw1dh1}
+
+run: --dir=BWD_D --cfg=f32_full mb1ic16ih1oc16oh3kh3ph2n"wip"
+ve_cmpconv.........
+tpGo {f32,1,16,3,3}
+tpKrn{f32,16,16,3,3}
+tpGin{f32,1,16,1,1}
+parm{g1_sw1sh1_pw2ph2_dw1dh1}
+benchdnn ...........
+tpGin {f32,1,16,1,1}
+tpKrn {f32,16,16,3,3}
+tpGOut{f32,1,16,3,3}
+parm{g1_sw1sh1_pw2ph2_dw1dh1}
+
+segfault failure in test_ve_bwd_nans
+benchdnn:
+tpGin {f32,2,4,4,4}
+tpKrn {f32,4,6,3,3}
+tpGOut{f32,2,6,4,4}
+parm{g1_sw1sh1_pw1ph1_dw1dh1}
+ve_cmpconv:
+tpGo {f32,2,6,4,4}
+tpKrn{f32,4,6,3,3}
+tpGin{f32,2,4,4,4}
+parm{g1_sw1sh1_pw1ph1_dw1dh1}
+
+FAILED (errors:16 total:16) __REPRO: --dir=BWD_D 
+41: mkldnn_verbose,exec,convolution,ve-bwd:nchw,backward_data,fsrc:nchw fwei:oihw fbia:undef fdst:nchw,alg:convolution_direct,mb2_g1ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.903076
+
+57:FAILED (errors:16 total:16) __REPRO: --dir=BWD_D --cfg=f32_full mb1ic16ih1oc16oh3kh3ph2n"wip"
+61:FAILED (errors:16 total:16) __REPRO: --dir=BWD_D --cfg=f32_full mb1ic16ih1oc16oh3kh5ph3n"wip"
+62:FAILED (errors:16 total:16) __REPRO: --dir=BWD_D --cfg=f32_full mb1ic16ih1oc16oh5kh5ph4n"wip"
+ve_cmpconv:
+tpIn {f32,1,16,1,1}
+tpKrn{f32,16,16,3,3}
+tpOut{f32,1,16,3,3}
+parm{g1_sw1sh1_pw2ph2_dw1dh1
+benchdnn:
+tpIn {f32,1,16,1,1}
+tpKrn{f32,16,16,3,3}
+tpOut{f32,1,16,3,3}
+parm{g1_sw1sh1_pw2ph2_dw1dh1}
+

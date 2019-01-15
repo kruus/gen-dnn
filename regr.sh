@@ -2,6 +2,45 @@
 # Usage:
 #  regr.sh {FWD*|BWD_D|BWD_W*} ...other bench.sh args
 #
+#if [ $NLC_BASE ]; then    # NEC SX Aurora VE
+#    VE_EXEC=ve_exec
+#fi
+BUILDDIR=build
+if [ "`uname -m`" = "SX-ACE" ]; then BUILDDIR=build-sx; fi
+echo "BUILDDIR: $BUILDDIR"
+
+VE_EXEC=''
+# if compiled and VE_EXEC existed, use that path
+if [ -f "${BUILDDIR}/bash_help.inc" ]; then
+    # snarf some CMAKE variables
+    source "${BUILDDIR}/bash_help.inc"
+    #echo " From bash_help_inc, CMAKE_CROSSCOMPILING_EMULATOR is ${CMAKE_CROSSCOMPILING_EMULATOR}"
+    #echo " NECVE is ${NECVE}"
+    #echo " VE_EXEC is ${VE_EXEC}"
+    if [ "${VE_EXEC}" ]; then
+        if [ "${CMAKE_CROSSCOMPILING_EMULATOR}" ]; then
+            VE_EXEC="${CMAKE_CROSSCOMPILING_EMULATOR}"
+            if [ ! -x "${VE_EXEC}" ]; then
+                VE_EXEC='';
+                echo "cmake crosscompiling emulator ${CMAKE_CROSSCOMPILING_EMULATOR} [such as ve_exec] not available"
+            fi
+        fi
+        if [ "${VE_EXEC}" = "" -a "${NECVE}" ]; then
+            # otherwise check for VE_EXEC in PATH on this machine
+            for try in ve_exec /opt/nec/ve/bin/ve_exec; do
+                if { $try --version 2> /dev/null; } then
+                    VE_EXEC="$try";
+                    break;
+                fi
+            done
+        fi    
+        if [ ! "${VE_EXEC}" ]; then VE_EXEC="echo Not-Running"; fi
+    fi
+    # In this script, we do need ve_exec, because we are running test
+    #executables directly, rather than via a 'make' target
+    echo "VE_EXEC : ${VE_EXEC}"
+fi
+
 ORIGINAL_CMD="$0 $*"
 usage() {
     echo " command: $ORIGINAL_CMD"
@@ -28,15 +67,17 @@ if ! [[ "$THREADS" =~ $re_nonneg ]]; then # non-digits? no threads argument
 else
     shift                                 # gobble the threads arg
 fi
+# Hack : NECVE does not support omp yet
+# NEW [2108] NECVE support openmp ... (supposedly)
+#if [ "${NECVE}" ]; then
+#    THREADS=1
+#fi
 if [ "$#" -lt 1 ]; then usage; exit; fi
 ARGS=($*)
 BASE=''
 COPY="cp -uav"
 if [ "`uname -m`" = "SX-ACE" ]; then COPY="cp -a"; fi
 echo "COPY    : $COPY"
-BUILDDIR=build
-if [ "`uname -m`" = "SX-ACE" ]; then BUILDDIR=build-sx; fi
-echo "BUILDDIR: $BUILDDIR"
 batch_check() {
     BATCH="$1"
     # if batch is a file, copy to build dir and prepend --batch=
@@ -52,7 +93,7 @@ batch_check() {
 }
 nopt=0
 SXskip=''
-if [ `uname -m` == "SX-ACE" ]; then SXskip='--skip-impl=orig:sx2'; fi
+if [ `uname -m` == "SX-ACE" ]; then SXskip='--skip-impl=sx2'; fi
 for ((i=0; i<${#ARGS[*]}; ++i)); do
     #echo "$i : ${ARGS[i]}"
     xform="${ARGS[i]}"
@@ -152,6 +193,7 @@ echo "nopt    : $nopt"
 #(cd "${BUILDDIR}" && make && cd tests/benchdnn && /usr/bin/time -v ./benchdnn --mode=PT --batch=inputs/test_fwd_regression) 2>&1 | tee PT.log
 HOSTNAME=`hostname -s` # SX-ACCE does not support --short
 if [ "`uname -m`" = "SX-ACE" ]; then HOSTNAME='sx'; fi # I could not put spaces here, for SX-ACE (so no awk/sed)
+if [ "${NECVE}" ]; then HOSTNAME='ve'; fi
 LOGFILE="${BASE}-${HOSTNAME}.log"
 if [ ! "$THREADS" = "" ]; then LOGFILE="${BASE}-t${THREADS}-${HOSTNAME}.log"; fi
 echo "LOGFILE : $LOGFILE"
@@ -169,7 +211,7 @@ set +x
             if [ "$THREADS" = "" ]; then unset OMP_NUM_THREADS;
             else THREADS="OMP_NUM_THREADS=$THREADS"; fi
             echo "THREADS  : $THREADS"
-            echo "cmd      : $THREADS /usr/bin/time -v ./benchdnn --mode=PT ${ARGS[@]}"
+            echo "cmd      : $THREADS C_PROGINF=DETAIL ${TIME} $VE_EXEC ./benchdnn --mode=PT ${ARGS[@]}"
             cd tests/benchdnn;
 pwd
 ls -l .
@@ -178,7 +220,8 @@ ls -l .
 set +x
 echo "COLUMN ... $COLUMN"
             (cd inputs && ls -1) | awk '//{p=p " " $0;++n} n>=4{print p; p=""; n=0} END{print p}' | ${COLUMN}
-            eval $THREADS C_PROGINF=DETAIL ${TIME} ./benchdnn --mode=PT ${ARGS[@]}
+            echo "eval $THREADS C_PROGINF=DETAIL ${TIME} $VE_EXEC ./benchdnn --mode=PT ${ARGS[@]}"
+            eval $THREADS C_PROGINF=DETAIL ${TIME} $VE_EXEC ./benchdnn --mode=PT ${ARGS[@]}
         }
     } || { echo "Problems?"; false; }
     ) >& "$LOGFILE" \

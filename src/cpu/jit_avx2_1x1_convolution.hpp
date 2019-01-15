@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -41,9 +41,11 @@ struct _jit_avx2_1x1_convolution_fwd_t: public cpu_primitive_t {
                 const typename pd_t::base_class *hint_fwd_pd)
             : _cpu_convolution_fwd_pd_t<with_relu>(engine, adesc, attr,
                     hint_fwd_pd)
-            , jcp_({}), rtus_({}) {}
+            , jcp_(), rtus_() {}
 
-        DECLARE_COMMON_PD_T(_jit_avx2_1x1_convolution_fwd_t<with_relu>);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("jit_1x1:", avx2, ""),
+                _jit_avx2_1x1_convolution_fwd_t<with_relu>);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -53,6 +55,7 @@ struct _jit_avx2_1x1_convolution_fwd_t: public cpu_primitive_t {
                 && utils::one_of(this->cdesc_().prop_kind, forward_training,
                         forward_inference)
                 && this->cdesc_().alg_kind == alg_kind::convolution_direct
+                && !this->has_zero_dim_memory()
                 && utils::everyone_is(data_type::f32,
                         this->cdesc_().src_desc.data_type,
                         this->cdesc_().weights_desc.data_type,
@@ -67,7 +70,8 @@ struct _jit_avx2_1x1_convolution_fwd_t: public cpu_primitive_t {
 
             return jit_avx2_1x1_conv_kernel_f32::init_conf(jcp_,
                     *conv_d, *src_d, *this->weights_pd_.desc(),
-                    *this->dst_pd_.desc(), with_relu, this->negative_slope());
+                    *this->dst_pd_.desc(), *this->attr(),
+                    with_relu, this->negative_slope());
         }
 
         jit_1x1_conv_conf_t jcp_;
@@ -99,15 +103,25 @@ struct _jit_avx2_1x1_convolution_fwd_t: public cpu_primitive_t {
             const output_vector &outputs)
         : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
         , kernel_(nullptr), rtus_driver_(nullptr), ws_per_thread_(0)
-        , scratch_(nullptr)
+        , scratch_(nullptr), padded_bias_(nullptr)
     {
-        kernel_ = new jit_avx2_1x1_conv_kernel_f32(conf_.jcp_);
+        kernel_ = new jit_avx2_1x1_conv_kernel_f32(conf_.jcp_, *conf_.attr());
         init_rtus_driver<avx2>(this);
+
+        if (conf_.want_padded_bias()) {
+            const auto &j = conf_.jcp_;
+            assert(j.ngroups == 1);
+            padded_bias_ = (data_t *)malloc(sizeof(data_t) * j.oc, 64);
+            for (int oc = j.oc_without_padding; oc < j.oc; ++oc)
+                padded_bias_[oc] = 0;
+        }
+
     }
     ~_jit_avx2_1x1_convolution_fwd_t() {
         delete kernel_;
         delete rtus_driver_;
         free(scratch_);
+        free(padded_bias_);
     }
 
     typedef typename prec_traits<data_type::f32>::type data_t;
@@ -126,6 +140,7 @@ private:
     rtus_driver_t<avx2> *rtus_driver_;
     size_t ws_per_thread_;
     data_t *scratch_;
+    data_t *padded_bias_;
 };
 
 using jit_avx2_1x1_convolution_fwd_t = _jit_avx2_1x1_convolution_fwd_t<false>;
@@ -138,9 +153,11 @@ struct jit_avx2_1x1_convolution_bwd_data_t: public cpu_primitive_t {
                 const primitive_attr_t *attr,
                 const convolution_fwd_pd_t *hint_fwd_pd)
             : cpu_convolution_bwd_data_pd_t(engine, adesc, attr, hint_fwd_pd)
-            , jcp_({}), rtus_({}) {}
+            , jcp_(), rtus_() {}
 
-        DECLARE_COMMON_PD_T(jit_avx2_1x1_convolution_bwd_data_t);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("jit_1x1:", avx2, ""),
+                jit_avx2_1x1_convolution_bwd_data_t);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -149,6 +166,7 @@ struct jit_avx2_1x1_convolution_bwd_data_t: public cpu_primitive_t {
                 && this->set_default_params() == status::success
                 && this->desc()->prop_kind == backward_data
                 && this->desc()->alg_kind == alg_kind::convolution_direct
+                && !this->has_zero_dim_memory()
                 && utils::everyone_is(data_type::f32,
                         this->desc()->diff_src_desc.data_type,
                         this->desc()->weights_desc.data_type,
@@ -161,7 +179,7 @@ struct jit_avx2_1x1_convolution_bwd_data_t: public cpu_primitive_t {
 
             return jit_avx2_1x1_conv_kernel_f32::init_conf(jcp_, *conv_d,
                     *diff_src_d, *this->weights_pd_.desc(),
-                    *this->diff_dst_pd_.desc());
+                    *this->diff_dst_pd_.desc(), *this->attr());
         }
 
         // TODO (Roma): structs conf header cleanup
@@ -195,7 +213,7 @@ struct jit_avx2_1x1_convolution_bwd_data_t: public cpu_primitive_t {
         , kernel_(nullptr), rtus_driver_(nullptr), ws_per_thread_(0)
         , scratch_(nullptr)
     {
-        kernel_ = new jit_avx2_1x1_conv_kernel_f32(conf_.jcp_);
+        kernel_ = new jit_avx2_1x1_conv_kernel_f32(conf_.jcp_, *conf_.attr());
         init_rtus_driver<avx2>(this);
     }
     ~jit_avx2_1x1_convolution_bwd_data_t() {
@@ -235,9 +253,11 @@ struct jit_avx2_1x1_convolution_bwd_weights_t: public cpu_primitive_t {
                 const primitive_attr_t *attr,
                 const convolution_fwd_pd_t *hint_fwd_pd)
             : cpu_convolution_bwd_weights_pd_t(engine, adesc, attr, hint_fwd_pd)
-            , jcp_({}), rtus_({}) {}
+            , jcp_(), rtus_() {}
 
-        DECLARE_COMMON_PD_T(jit_avx2_1x1_convolution_bwd_weights_t);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("jit_1x1:", avx2, ""),
+                jit_avx2_1x1_convolution_bwd_weights_t);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -246,6 +266,7 @@ struct jit_avx2_1x1_convolution_bwd_weights_t: public cpu_primitive_t {
                 && this->set_default_params() == status::success
                 && this->desc()->prop_kind == backward_weights
                 && this->desc()->alg_kind == alg_kind::convolution_direct
+                && !this->has_zero_dim_memory()
                 && utils::everyone_is(data_type::f32,
                         this->desc()->src_desc.data_type,
                         this->desc()->diff_weights_desc.data_type,
@@ -260,7 +281,7 @@ struct jit_avx2_1x1_convolution_bwd_weights_t: public cpu_primitive_t {
 
             return jit_avx2_1x1_conv_kernel_f32::init_conf(jcp_, *conv_d,
                     *src_d, *this->diff_weights_pd_.desc(),
-                    *this->diff_dst_pd_.desc());
+                    *this->diff_dst_pd_.desc(), *this->attr());
         }
 
         // TODO (Roma): structs conf header cleanup
@@ -296,7 +317,10 @@ struct jit_avx2_1x1_convolution_bwd_weights_t: public cpu_primitive_t {
     ~jit_avx2_1x1_convolution_bwd_weights_t() {
         delete kernel_;
         delete rtus_driver_;
+        delete reducer_weights_;
+        delete reducer_bias_;
         free(scratch_);
+        free(padded_bias_);
     }
 
     typedef typename prec_traits<data_type::f32>::type data_t;
@@ -323,6 +347,7 @@ private:
     rtus_driver_t<avx2> *rtus_driver_;
     size_t ws_per_thread_;
     data_t *scratch_;
+    data_t *padded_bias_;
 };
 
 }

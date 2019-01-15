@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@
 #include "cpu_engine.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+#include "consistency.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -35,27 +36,45 @@ struct ref_eltwise_fwd_t: public cpu_primitive_t {
         pd_t(engine_t *engine, const eltwise_desc_t *adesc,
                 const primitive_attr_t *attr,
                 const eltwise_fwd_pd_t *hint_fwd_pd)
-            : cpu_eltwise_fwd_pd_t(engine, adesc, attr, hint_fwd_pd)
-            , is_dense(false) {}
+            : cpu_eltwise_fwd_pd_t(engine, adesc, attr, hint_fwd_pd) {}
 
-        DECLARE_COMMON_PD_T(ref_eltwise_fwd_t);
+        DECLARE_COMMON_PD_T("ref:any", ref_eltwise_fwd_t);
 
         virtual status_t init() override {
             using namespace prop_kind;
+            using namespace memory_format;
+            using namespace utils;
             assert(engine()->kind() == engine_kind::cpu);
 
-            is_dense = memory_desc_wrapper(src_pd()).is_dense();
-            bool ok = true
-                && utils::one_of(desc()->prop_kind, forward_training,
-                        forward_inference)
-                && utils::everyone_is(data_type, desc()->data_desc.data_type)
-                && utils::implication(!is_dense, src_pd()->desc()->ndims == 4);
+            auto src_d = memory_desc_wrapper(src_pd());
+
+            use_dense_ = false
+                || src_d.is_dense()
+                || (src_d.is_dense(true) && is_zero_preserved());
+
+            use_nCspBc_padded_ = !use_dense_
+                && one_of(desc()->data_desc.format, nChw8c, nChw16c,
+                    nCdhw8c, nCdhw16c)
+                && src_d.only_padded_dim(1)
+                && src_d.is_dense(true);
+
+            if (has_zero_dim_memory())
+                use_dense_ = use_nCspBc_padded_ = false;
+
+            const bool use_generic = !use_dense_ && !use_nCspBc_padded_;
+
+            Consistency ok;
+            SCHKV(ok,one_of(desc()->prop_kind, forward_training,
+                            forward_inference)); // fairly common
+            OK_AND(everyone_is(data_type, desc()->data_desc.data_type));
+            OK_AND(implication(use_generic, one_of(src_d.ndims(), 4, 5)));
+            OK_AND(attr()->has_default_values());
             if (!ok) return status::unimplemented;
 
             return status::success;
         }
 
-        bool is_dense;
+        bool use_dense_, use_nCspBc_padded_;
     };
 
     ref_eltwise_fwd_t(const pd_t *pd, const input_vector &inputs,
@@ -64,12 +83,17 @@ struct ref_eltwise_fwd_t: public cpu_primitive_t {
     typedef typename prec_traits<data_type>::type data_t;
 
     virtual void execute(event_t *e) {
-        if (conf_.is_dense) execute_forward_dense();
-        else execute_forward_generic();
+        if (conf_.use_dense_)
+            execute_forward_dense();
+        else if (conf_.use_nCspBc_padded_)
+            execute_forward_nCspBc_padded();
+        else
+            execute_forward_generic();
         e->set_state(event_t::ready);
     }
 
 private:
+    void execute_forward_nCspBc_padded();
     void execute_forward_dense();
     void execute_forward_generic();
     pd_t conf_;
@@ -81,31 +105,45 @@ struct ref_eltwise_bwd_t: public cpu_primitive_t {
         pd_t(engine_t *engine, const eltwise_desc_t *adesc,
                 const primitive_attr_t *attr,
                 const eltwise_fwd_pd_t *hint_fwd_pd)
-            : cpu_eltwise_bwd_pd_t(engine, adesc, attr, hint_fwd_pd)
-            , is_dense_(false) {}
+            : cpu_eltwise_bwd_pd_t(engine, adesc, attr, hint_fwd_pd) {}
 
-        DECLARE_COMMON_PD_T(ref_eltwise_bwd_t);
+        DECLARE_COMMON_PD_T("ref:any", ref_eltwise_bwd_t);
 
         virtual status_t init() override {
             using namespace prop_kind;
+            using namespace utils;
             assert(engine()->kind() == engine_kind::cpu);
-            bool ok = true
-                && desc()->prop_kind == backward_data
-                && utils::everyone_is(data_type, desc()->data_desc.data_type,
-                        desc()->diff_data_desc.data_type);
+            Consistency ok;
+            SCHKV(ok,desc()->prop_kind == backward_data); // fairly common
+            OK_AND(everyone_is(data_type, desc()->data_desc.data_type,
+                             desc()->diff_data_desc.data_type));
+            OK_AND(attr()->has_default_values());
             if (!ok) return status::unimplemented;
 
-            const bool same_fmt = memory_desc_wrapper(diff_dst_pd())
-                == memory_desc_wrapper(src_pd());
-            is_dense_ = memory_desc_wrapper(src_pd()).is_dense() && same_fmt;
+            auto diff_dst_d = memory_desc_wrapper(diff_dst_pd());
+            const bool same_fmt_ = diff_dst_d == memory_desc_wrapper(src_pd());
 
-            if (!utils::implication(!is_dense_, src_pd()->desc()->ndims == 4))
+            use_dense_ = true
+                && same_fmt_
+                && diff_dst_d.is_dense(true)
+                && is_zero_preserved()
+                && !has_zero_dim_memory();
+            const bool use_generic = !use_dense_;
+
+#if 0
+            if (use_generic && !one_of(diff_dst_d.ndims(), 4, 5))
                 return status::unimplemented;
+#else
+            // oops: following would FORCE all nondense to be jit impls !
+            //OK_AND(use_generic && !one_of(diff_dst_d.ndims(), 4, 5));
+            OK_AND(implication(use_generic, one_of(diff_dst_d.ndims(), 4, 5)));
+            if (!ok) return status::unimplemented;
+#endif
 
             return status::success;
         }
 
-        bool is_dense_;
+        bool use_dense_;
     };
 
     ref_eltwise_bwd_t(const pd_t *pd, const input_vector &inputs,
@@ -114,7 +152,7 @@ struct ref_eltwise_bwd_t: public cpu_primitive_t {
     typedef typename prec_traits<data_type>::type data_t;
 
     virtual void execute(event_t *e) {
-        if (conf_.is_dense_) execute_backward_dense();
+        if (conf_.use_dense_) execute_backward_dense();
         else execute_backward_generic();
         e->set_state(event_t::ready);
     }

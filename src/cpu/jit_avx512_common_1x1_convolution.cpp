@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -23,14 +23,6 @@
 #include "type_helpers.hpp"
 
 #include "jit_generator.hpp"
-
-#if (defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1600) || defined(_MSC_VER)
-/* Excluding ICC 16.0 from adding simd because it results in accuracy issues.
- * MSC doesn't support simd in _pragma */
-#    define pragma_simd
-#else
-#    define pragma_simd _Pragma("simd")
-#endif
 
 namespace mkldnn {
 namespace impl {
@@ -80,6 +72,12 @@ void _jit_avx512_common_1x1_convolution_fwd_t
     const memory_desc_wrapper weights_d(conf_.weights_pd(0));
 
     const auto &jcp = kernel_->jcp;
+    if (conf_.want_padded_bias()) {
+        assert(jcp.ngroups == 1);
+        for (int oc = 0; oc < jcp.oc_without_padding; ++oc)
+            padded_bias_[oc] = bias[oc];
+        bias = padded_bias_;
+    }
 
     const int work_amount = jcp.mb * jcp.ngroups * jcp.nb_bcast;
 
@@ -97,9 +95,9 @@ void _jit_avx512_common_1x1_convolution_fwd_t
     {
         int ithr = omp_get_thread_num(), nthr = omp_get_num_threads();
 
-        jit_1x1_conv_call_s p = {};
+        auto p = jit_1x1_conv_call_s();
 
-        rtus_driver_t<avx512_common>::call_params_t rp = {};
+        auto rp = rtus_driver_t<avx512_common>::call_params_t();
 
         const int nb_oc = jcp.nb_load;
         const int nb_ic = jcp.nb_reduce;
@@ -145,7 +143,7 @@ void _jit_avx512_common_1x1_convolution_fwd_t
         {
             const int nb_ic_blocking_step =
                 nstl::min(icb + nb_ic_blocking, nb_ic) - icb;
-            p.reduce_pos_flag = 0
+            p.first_last_flag = 0
                 | (icb == 0 ? FLAG_REDUCE_FIRST : 0)
                 | (icb + nb_ic_blocking_step >= nb_ic
                         ? FLAG_REDUCE_LAST : 0);
@@ -306,8 +304,8 @@ void _jit_avx512_common_1x1_convolution_bwd_data_t
     {
         int ithr = omp_get_thread_num(), nthr = omp_get_num_threads();
 
-        jit_1x1_conv_call_s p = {};
-        rtus_driver_t<avx512_common>::call_params_t rp = {};
+        auto p = jit_1x1_conv_call_s();
+        auto rp = rtus_driver_t<avx512_common>::call_params_t();
 
         int bcast_start{0}, bcast_end{0}, icb_start{0}, icb_end{0};
         balance2D(nthr, ithr, work_amount, bcast_start, bcast_end,
@@ -385,7 +383,7 @@ void _jit_avx512_common_1x1_convolution_bwd_data_t
                             ? weights_d.blk_off(g, ocb, icb)
                             : weights_d.blk_off(ocb, icb)];
 
-                        p.reduce_pos_flag = ocb == 0 ? FLAG_REDUCE_FIRST : 0;
+                        p.first_last_flag = ocb == 0 ? FLAG_REDUCE_FIRST : 0;
 
                         p.reduce_dim = this_block_size(ocb * jcp.oc_block,
                             jcp.oc, nb_oc_blocking_step * jcp.oc_block);
@@ -417,36 +415,43 @@ jit_avx512_common_1x1_convolution_bwd_weights_t ::
     : cpu_primitive_t(&conf_, inputs, outputs)
     , conf_(*pd), kernel_(nullptr), acc_ker_(nullptr), reducer_bias_(nullptr)
     , trans_kernel_(nullptr), rtus_driver_(nullptr), ws_per_thread_(0)
-    , scratch_(nullptr), bctx_(nullptr), tr_src_(nullptr)
-    , ws_reduction_(nullptr)
+    , scratch_(nullptr), padded_bias_(nullptr), bctx_(nullptr)
+    , tr_src_(nullptr), ws_reduction_(nullptr)
 {
-    kernel_ = new jit_avx512_common_1x1_conv_kernel(conf_.jcp_);
+    kernel_ = new jit_avx512_common_1x1_conv_kernel(conf_.jcp_, *conf_.attr());
 
     const auto &jcp = kernel_->jcp;
 
     bctx_ = (simple_barrier::ctx_t *)malloc(
-            jcp.nthr_ * sizeof(simple_barrier::ctx_t), 64);
-    for (int i = 0; i < jcp.nthr_; ++i)
+            jcp.nthr * sizeof(simple_barrier::ctx_t), 64);
+    for (int i = 0; i < jcp.nthr; ++i)
         simple_barrier::ctx_init(&bctx_[i]);
 
     const int wei_size = jcp.ngroups * jcp.oc * jcp.ic;
     ws_reduction_ =
-        (data_t *)malloc((jcp.nthr_mb_ - 1) * wei_size * sizeof(data_t), 64);
+        (data_t *)malloc((jcp.nthr_mb - 1) * wei_size * sizeof(data_t), 64);
     acc_ker_ = new cpu_accumulator_1d_t<data_type::f32>();
 
     if (conf_.with_bias()) {
-        const size_t max_buffer_size = jcp.nthr_ * 3 * 5 * 5 * 16 * 16;
+        const size_t max_buffer_size = jcp.nthr * 3 * 5 * 5 * 16 * 16;
         reducer_bias_ = new cpu_reducer_t<data_type::f32>(
-                reduce_balancer_t(jcp.nthr_, jcp.oc_block,
+                reduce_balancer_t(jcp.nthr, jcp.oc_block,
                         jcp.ngroups * jcp.nb_load, jcp.mb, max_buffer_size));
+
+        if (conf_.want_padded_bias()) {
+            assert(jcp.ngroups == 1);
+            padded_bias_ = (data_t *)malloc(sizeof(data_t) * jcp.oc, 64);
+        }
     }
+
     if (jcp.transpose_src) {
-        const size_t tr_src_size =
-            jcp.nthr_mb_ * jcp.ngroups * jcp.ic * jcp.tr_is;
+        const ptrdiff_t tr_src_size = (ptrdiff_t)jcp.nthr_mb
+            * (ptrdiff_t)jcp.ngroups * (ptrdiff_t)jcp.ic * jcp.tr_is;
         tr_src_ = (data_t *)malloc(tr_src_size * sizeof(data_t), 64);
-        for (size_t i = 0; i < tr_src_size; i++)
+#       pragma omp parallel for
+        for (ptrdiff_t i = 0; i < tr_src_size; i++)
             tr_src_[i] = 0;
-        jit_transpose4x16_src_t tp = {};
+        auto tp = jit_transpose4x16_src_t();
         tp.src_pf0_distance = 4;
         tp.tr_src_pf0_distance = 0;
         tp.src_pf1 = true;
@@ -455,7 +460,6 @@ jit_avx512_common_1x1_convolution_bwd_weights_t ::
     }
 
     init_rtus_driver<avx512_common>(this);
-
 }
 
 void jit_avx512_common_1x1_convolution_bwd_weights_t::execute_backward_weights()
@@ -463,15 +467,14 @@ void jit_avx512_common_1x1_convolution_bwd_weights_t::execute_backward_weights()
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
     auto diff_weights = reinterpret_cast<data_t *>(this->memory(0));
-    auto diff_bias = reinterpret_cast<data_t *>(this->memory(1));
+    auto diff_bias_in = reinterpret_cast<data_t *>(this->memory(1));
+    data_t *diff_bias = conf_.want_padded_bias() ? padded_bias_ : diff_bias_in;
 
     const memory_desc_wrapper diff_dst_d(conf_.diff_dst_pd());
     const memory_desc_wrapper src_d(conf_.src_pd());
     const memory_desc_wrapper diff_weights_d(conf_.diff_weights_pd(0));
-    const memory_desc_wrapper diff_bias_d(conf_.diff_weights_pd(1));
 
     const auto &jcp = kernel_->jcp;
-
     const int wei_size = jcp.ngroups * jcp.oc * jcp.ic;
 
     simple_barrier::ctx_t reduction_barrier;
@@ -537,7 +540,7 @@ void jit_avx512_common_1x1_convolution_bwd_weights_t::execute_backward_weights()
 
         const int my_work = end - start;
         for (int iwork = 0; iwork < my_work; iwork++) {
-            jit_src_transpose_s par_trans = {};
+            auto par_trans = jit_src_transpose_s();
             assert(sp_size % 4 == 0 || sp_size % 4 == jcp.is % 4);
             par_trans.size = sp_size;
             par_trans.src = src1;
@@ -552,26 +555,26 @@ void jit_avx512_common_1x1_convolution_bwd_weights_t::execute_backward_weights()
     };
 
     auto ker = [&](const int ithr, const int nthr) {
-        const int ithr_ic_b = ithr % jcp.nthr_ic_b_;
-        const int ithr_oc_b = ithr / jcp.nthr_ic_b_ % jcp.nthr_oc_b_;
-        const int ithr_g = ithr / jcp.nthr_ic_b_ / jcp.nthr_oc_b_ % jcp.nthr_g_;
-        const int ithr_mb = ithr / jcp.nthr_ic_b_ / jcp.nthr_oc_b_ /
-                            jcp.nthr_g_;
+        const int ithr_ic_b = ithr % jcp.nthr_ic_b;
+        const int ithr_oc_b = ithr / jcp.nthr_ic_b % jcp.nthr_oc_b;
+        const int ithr_g = ithr / jcp.nthr_ic_b / jcp.nthr_oc_b % jcp.nthr_g;
+        const int ithr_mb = ithr / jcp.nthr_ic_b / jcp.nthr_oc_b /
+                            jcp.nthr_g;
 
         const int ithr_but_oc
-                = (ithr_mb * jcp.nthr_g_ + ithr_g) * jcp.nthr_ic_b_ + ithr_ic_b;
+                = (ithr_mb * jcp.nthr_g + ithr_g) * jcp.nthr_ic_b + ithr_ic_b;
 
         /* reduction dimension */
         int mb_sp_b_start{ 0 }, mb_sp_b_end{ 0 };
-        if (jcp.transpose_src && jcp.nthr_mb_ < jcp.mb / 2) {
+        if (jcp.transpose_src && jcp.nthr_mb < jcp.mb / 2) {
             // it's preferable to parallelize by mb if possible
             int img_start{ 0 }, img_end{ 0 };
-            balance211(jcp.mb, jcp.nthr_mb_, ithr_mb, img_start, img_end);
+            balance211(jcp.mb, jcp.nthr_mb, ithr_mb, img_start, img_end);
             mb_sp_b_start = img_start * sp_nb;
             mb_sp_b_end = img_end * sp_nb;
         }
         else {
-            balance211(mb_sp_work, jcp.nthr_mb_, ithr_mb, mb_sp_b_start,
+            balance211(mb_sp_work, jcp.nthr_mb, ithr_mb, mb_sp_b_start,
                     mb_sp_b_end);
         }
 
@@ -579,10 +582,10 @@ void jit_avx512_common_1x1_convolution_bwd_weights_t::execute_backward_weights()
         int g_start{ 0 }, oc_b_start{ 0 }, ic_b_start{ 0 };
         int g_end{ 0 }, oc_b_end{ 0 }, ic_b_end{ 0 };
 
-        balance211(jcp.ngroups, jcp.nthr_g_, ithr_g, g_start, g_end);
-        balance211(jcp.nb_load, jcp.nthr_oc_b_, ithr_oc_b, oc_b_start,
+        balance211(jcp.ngroups, jcp.nthr_g, ithr_g, g_start, g_end);
+        balance211(jcp.nb_load, jcp.nthr_oc_b, ithr_oc_b, oc_b_start,
                     oc_b_end);
-        balance211(jcp.nb_bcast, jcp.nthr_ic_b_, ithr_ic_b, ic_b_start,
+        balance211(jcp.nb_bcast, jcp.nthr_ic_b, ithr_ic_b, ic_b_start,
                     ic_b_end);
 
         const int g_work = g_end - g_start;
@@ -610,17 +613,17 @@ void jit_avx512_common_1x1_convolution_bwd_weights_t::execute_backward_weights()
                     bcast_step = step(nb_ic_blocking, ic_b_end - ic_b,
                             jcp.nb_bcast_blocking_max);
                     if (jcp.transpose_src) {
-                        if (jcp.nthr_oc_b_ > 1)
+                        if (jcp.nthr_oc_b > 1)
                             simple_barrier::barrier(
-                                    &bctx_[ithr_but_oc], jcp.nthr_oc_b_);
+                                    &bctx_[ithr_but_oc], jcp.nthr_oc_b);
                         const int sp_size
                                 = nstl::min(sp_b_step * jcp.reduce_block,
                                         jcp.is - sp_b * jcp.reduce_block);
                         uker_trans(ithr_mb, img, sp_b, sp_size, g, 1, ic_b,
-                            bcast_step, ithr_oc_b, jcp.nthr_oc_b_, ic_b_start);
-                        if (jcp.nthr_oc_b_ > 1)
+                            bcast_step, ithr_oc_b, jcp.nthr_oc_b, ic_b_start);
+                        if (jcp.nthr_oc_b > 1)
                             simple_barrier::barrier(
-                                    &bctx_[ithr_but_oc], jcp.nthr_oc_b_);
+                                    &bctx_[ithr_but_oc], jcp.nthr_oc_b);
                     }
 
                     for (int oc_b = oc_b_start; oc_b < oc_b_end;
@@ -646,8 +649,8 @@ void jit_avx512_common_1x1_convolution_bwd_weights_t::execute_backward_weights()
                                 = &diff_dst[diff_dst_d.blk_off(img, _oc_b)];
                         const data_t *local_src = diff_src;
 
-                        jit_1x1_conv_call_s p = {};
-                        rtus_driver_t<avx512_common>::call_params_t rp = {};
+                        auto p = jit_1x1_conv_call_s();
+                        auto rp = rtus_driver_t<avx512_common>::call_params_t();
 
                         p.output_stride
                                 = jcp.ic * jcp.oc_block * jcp.typesize_out;
@@ -661,7 +664,7 @@ void jit_avx512_common_1x1_convolution_bwd_weights_t::execute_backward_weights()
                         p.reduce_dim = sp_b_step * jcp.reduce_block;
                         rp.os = p.reduce_dim;
 
-                        p.reduce_pos_flag = 0
+                        p.first_last_flag = 0
                             | (mb_sp_b == mb_sp_b_start ? FLAG_REDUCE_FIRST : 0)
                             | (sp_b_end == sp_nb ? FLAG_SP_LAST : 0);
 
@@ -695,15 +698,15 @@ void jit_avx512_common_1x1_convolution_bwd_weights_t::execute_backward_weights()
         }
 
         /* diff_weights[:] += sum(ws_reduction_[thr_mb][:]) */
-        if (jcp.nthr_mb_ > 1) {
-            simple_barrier::barrier(&reduction_barrier, jcp.nthr_);
+        if (jcp.nthr_mb > 1) {
+            simple_barrier::barrier(&reduction_barrier, jcp.nthr);
             const int work = g_work * oc_b_work * ic_b_work;
             int start{ 0 }, end{ 0 };
-            balance211(work, jcp.nthr_mb_, ithr_mb, start, end);
+            balance211(work, jcp.nthr_mb, ithr_mb, start, end);
             if (start == end)
                 return;
 
-            for (int thr_mb = 1; thr_mb < jcp.nthr_mb_; ++thr_mb) {
+            for (int thr_mb = 1; thr_mb < jcp.nthr_mb; ++thr_mb) {
                 int w = start;
                 int sub_g_start{ 0 }, sub_oc_b_start{ 0 },
                         sub_ic_b_start{ 0 };
@@ -767,7 +770,7 @@ void jit_avx512_common_1x1_convolution_bwd_weights_t::execute_backward_weights()
                         d_bias[o] = 0.;
 
                 for (int hw = 0; hw < jcp.oh * jcp.ow; ++hw) {
-#                   pragma omp simd
+                    PRAGMA_OMP_SIMD()
                     for (int o = 0; o < 16; ++o)
                         d_bias[o] += d_dst[o];
                     d_dst += 16;
@@ -779,13 +782,20 @@ void jit_avx512_common_1x1_convolution_bwd_weights_t::execute_backward_weights()
         rb->reduce(ithr, diff_bias);
     };
 
-#pragma omp parallel num_threads(jcp.nthr_)
+#pragma omp parallel num_threads(jcp.nthr)
     {
         int ithr = omp_get_thread_num();
-        assert(jcp.nthr_ == omp_get_num_threads());
-        ker(ithr, jcp.nthr_);
+        assert(jcp.nthr == omp_get_num_threads());
+        ker(ithr, jcp.nthr);
         if (conf_.with_bias())
-            ker_bias(ithr, jcp.nthr_);
+            ker_bias(ithr, jcp.nthr);
+    }
+
+    /* TODO: put this in ker_bias */
+    if (conf_.want_padded_bias()) {
+        assert(jcp.ngroups == 1);
+        for (int oc = 0; oc < jcp.oc_without_padding; ++oc)
+            diff_bias_in[oc] = diff_bias[oc];
     }
 }
 

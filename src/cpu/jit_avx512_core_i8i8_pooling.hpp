@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -36,21 +36,25 @@ struct jit_avx512_core_i8i8_pooling_fwd_t : public cpu_primitive_t {
                 const pooling_fwd_pd_t  *hint_fwd_pd)
         : cpu_pooling_fwd_pd_t(engine, adesc, attr, hint_fwd_pd) {}
 
-        DECLARE_COMMON_PD_T(jit_avx512_core_i8i8_pooling_fwd_t);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("jit:", avx512_core, ""),
+                jit_avx512_core_i8i8_pooling_fwd_t);
 
         virtual status_t init() override {
             assert(this->engine()->kind() == engine_kind::cpu);
             bool ok = true
+                && desc()->src_desc.ndims == 4
                 && set_default_params() == status::success
                 && desc()->prop_kind == prop_kind::forward_inference
                 && utils::one_of(desc()->alg_kind, alg_kind::pooling_max,
                         alg_kind::pooling_avg_include_padding,
                         alg_kind::pooling_avg_exclude_padding)
-                && utils::one_of(src_pd()->desc()->data_type, data_type::s8,
-                        data_type::u8)
+                && utils::one_of(src_pd()->desc()->data_type, data_type::s32,
+                        data_type::s8, data_type::u8)
                 && src_pd()->desc()->data_type == dst_pd()->desc()->data_type
                 && utils::everyone_is(memory_format::nhwc,
-                        src_pd()->desc()->format, dst_pd()->desc()->format);
+                        src_pd()->desc()->format, dst_pd()->desc()->format)
+                && attr()->has_default_values();
             if (!ok) return status::unimplemented;
 
             return jit_conf();

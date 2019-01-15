@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -75,7 +75,6 @@ struct memory_pd_t: public primitive_desc_t {
     { return memory_desc_wrapper(desc_).size(); }
 
     virtual status_t set_format(memory_format_t fmt) {
-        assert(desc_.format == memory_format::any);
         memory_desc_t md = desc_;
         md.format = fmt;
         status_t status = memory_desc_wrapper::compute_blocking(md);
@@ -100,7 +99,7 @@ struct view_pd_t: public primitive_desc_t {
     virtual const memory_pd_t *output_pd(int index = 0) const override
     { return index == 0 ? dst_pd() : nullptr; }
     virtual int n_inputs() const override { return 1; }
-    virtual int n_outputs() const override { return 1; }
+    virtual int n_outputs() const override { return 0; }
 };
 
 struct concat_pd_t: public primitive_desc_t {
@@ -111,6 +110,7 @@ struct concat_pd_t: public primitive_desc_t {
     virtual ~concat_pd_t() {}
 
     virtual const op_desc_t *op_desc() const override { return nullptr; }
+    virtual void init_info() override { init_info_mem(this, this->info_); }
 
     virtual const memory_pd_t *input_pd(int index = 0) const override
     { return index < n_inputs() ? src_pd(index) : nullptr; }
@@ -118,6 +118,7 @@ struct concat_pd_t: public primitive_desc_t {
     { return index == 0 ? dst_pd() : nullptr; }
     virtual int n_inputs() const override { return n_; }
     virtual int n_outputs() const override { return 1; }
+    virtual int concat_dim() const { return concat_dim_; }
 protected:
     int n_, concat_dim_;
 };
@@ -129,6 +130,7 @@ struct sum_pd_t: public primitive_desc_t {
     virtual ~sum_pd_t() {}
 
     virtual const op_desc_t *op_desc() const override { return nullptr; }
+    virtual void init_info() override { init_info_mem(this, this->info_); }
 
     virtual const memory_pd_t *input_pd(int index = 0) const override
     { return index < n_inputs() ? src_pd(index) : nullptr; }

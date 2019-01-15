@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -18,12 +18,20 @@
 #define JIT_AVX512_COMMON_CONV_WINOGRAD_KERNEL_F32_HPP
 
 #include "c_types_map.hpp"
+#include "cpu_memory.hpp"
+
 #include "jit_generator.hpp"
 #include "jit_primitive_conf.hpp"
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
+
+//alpha determines the output tile_size
+constexpr int alpha = 6;
+constexpr int tile_size = 4;
+//simd length used for vectorization
+constexpr int simd_w = 16;
 
 struct _jit_avx512_common_conv_winograd_data_kernel_f32 : public jit_generator {
     _jit_avx512_common_conv_winograd_data_kernel_f32(
@@ -36,13 +44,15 @@ struct _jit_avx512_common_conv_winograd_data_kernel_f32 : public jit_generator {
                 = (decltype(gemm_loop_ker_first_iter)) this->getCode();
 
         //************** Subsequent iterations kernel **************//
-        if (jcp.nb_ic > 1) {
+        if (jcp.dimK_nb_block > 1) {
             align();
             const Xbyak::uint8 *addr = getCurr();
             this->gemm_loop_generate(false);
             gemm_loop_ker = (decltype(gemm_loop_ker))addr;
         }
     }
+
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(_jit_avx512_common_conv_winograd_data_kernel_f32)
 
     static status_t init_conf_common(jit_conv_winograd_conf_t &jcp,
             const convolution_desc_t &cd, const memory_desc_wrapper &src_d,
@@ -76,11 +86,13 @@ struct jit_avx512_common_conv_winograd_fwd_kernel_f32
     using _jit_avx512_common_conv_winograd_data_kernel_f32::
             _jit_avx512_common_conv_winograd_data_kernel_f32;
 
+    static bool post_ops_ok(jit_conv_conf_t &jcp, const primitive_attr_t &attr);
+
     static status_t init_conf(jit_conv_winograd_conf_t &jcp,
             const convolution_desc_t &cd, const memory_desc_wrapper &src_d,
             const memory_desc_wrapper &weights_d,
-            const memory_desc_wrapper &dst_d, bool with_relu = false,
-            float relu_negative_slope = 0.);
+            const memory_desc_wrapper &dst_d, const primitive_attr_t &attr,
+            bool with_relu = false, float relu_negative_slope = 0.);
 };
 
 struct jit_avx512_common_conv_winograd_bwd_data_kernel_f32
@@ -96,6 +108,8 @@ struct jit_avx512_common_conv_winograd_bwd_data_kernel_f32
 
 struct jit_avx512_common_conv_winograd_bwd_weights_kernel_f32
         : public jit_generator {
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(_jit_avx512_common_conv_winograd_bwd_weights_kernel_f32)
+
     jit_avx512_common_conv_winograd_bwd_weights_kernel_f32(
             jit_conv_winograd_conf_t ajcp)
         : jcp(ajcp)
@@ -152,6 +166,7 @@ private:
     reg64_t reg_srcA = r9;
     reg64_t reg_nb_ic = r10;
     reg64_t reg_loop_cpt = r11;
+    reg64_t reg_transB_idx = r13;
 
     /* Registers used by new kernel */
     reg64_t reg_dimM_block_loop_cnt = r10;

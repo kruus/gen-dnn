@@ -1,138 +1,190 @@
-# Generic MKL-DNN
+# Generic MKL-DNN for vector compilers
 
-## BRANCH for non-jit version of MKL-DNN, to ease porting API to non-Intel platforms
+This fork of MKL-DNN provides the same API for non-Intel chips, targeting:
+* NEC SX-Aurora TSUBASA chip, ncc compiler
+* NEC SX,            sxcc compiler
 
-### Quickstart:
+It provides a "vanilla" build that removes Intel-specific JIT instructions
+as well as an Aurora build with a few optimized instructions for Aurora.
+The optimizations are a work in progress.
 
-```
-./build.sh -h         # help</BR>
-Intel: ./build.sh -tt # build and run all tests (no jit)</BR>
-           --> build/    and build.log
-Platform XX:
-       ./build.sh -sdttT    # s:other system, d:debug compile, T:trace cmake decisions
+GEMM convolutions on SX and Aurora attain about 60-75% of the chips
+theoretical FLOPS/s.  For Aurora, higher efficiencies are available
+for several primitives via the hand-coded VEDNN library.
 
-This public branch reflects some work done on an internal git repository
-porting mkl-dnn to:
-- non-JIT cpu
-- HPC-style cpu with 32-bit int
+We plan to develop some simple jit examples for convolutions on NEC's Aurora
+chip.
 
-I intend also to port some fast C/C++ impls of convolutions suited
-for machines with very long SIMD registers.
+Last merge with upstream was around v0.16 of mkl-dnn (~ Sept 2018)
+* This fork: [gen-dnn Github URL](https://github.com/necla-ml/gen-dnn)
+* Upstream: [mkl-dnn Github URL](https://github.com/intel/mkl-dnn)
 
 [Erik Kruus, NEC Labs America]
+
+### Getting started on NEC Aurora
+
+First untar the `ve*.tar.gz` tarballs at the top level of the source directory.
+VEDNN contains optimized implementations of various convolution kernels.
+
+```
+tar xvfz vednnx.tar.gz
+tar xvfz vejit.tar.gz
 ```
 
-### Purpose
+Before building, make sure `CC` and `CXX` are set to `ncc` and `nc++`
+and that they are in your path.  Also, `NLC_BASE` must be set
+to the base directory of the NEC Numeric Library Collection (for BLAS).
+For example:
 
-This branch builds a "TARGET_VANILLA" version of mkl-dnn that:
+```
+export PATH=/opt/nec/ve/bin:$PATH
+export NLC_BASE=/opt/nec/ve/nlc/1.0.0
+export CC=ncc
+export CXX=nc++
+```
 
-* can remove all Intel Jit stuff
+Make sure you are using CMake 3.8 or later.
+Then, to build with VEDNN optimized kernels:
 
-* adds some i/o funcs (because I know I will have to debug sooner or later)
+```
+./build.sh -ajq
+```
 
-- Various build options added
-  - build.sh -h
-- defaults are:
-  - "vanilla" C/C++, and
-  - builds a RelWithDebug libmkldnn.so
-  - creates an ROOTDIR/install/ directory with extensive doxygen docs.
-    - browse at install/share/doc/mkldnn/reference/html/index.html
-- So far, I have added some debug stuff, a build.sh to build original/vanilla
-  - I plan to add some slightly faster C++ impls (because the reference ones
-    seem to be "gold standard" readable impls, rather than trying hard to be
-    fast)
-- I might try some C++ versions of Winograd convolution, if I have time.
-- There are no plans to put low-level impls for other chips into this public repo
+Alternatively, you can build with GEMM convolution kernels by omitting
+the `j` flag: `./build.sh -aq`.
 
-### My notes: port to another CPU/platform (XX) modifications
+The libraries will be built in `build-vej` (if using VEDNN) or `build`
+(if using GEMM), and a script of the compilation session will
+be in `build-vej.log` or `build.log`.
+You may benchmark the implementation with
 
-- cmake support is developed in subdirectory dev-cmake-XX
-  - changes to XX platform spec go into a tarfile that get untarred in gen-dnn root dir
-  - ** cmake-3.8 ** is OK, cmake-3.0 is not
-    - because cmake-3.8 has a handy call to Platform/XX-Initialize that I require
-  - ./build.sh -dqst   [runs cmake on platform XX]
-    - ---> build-XX/ and build-XX.log
+```
+cd build-vej/tests/benchdnn
+ve_exec ./benchdnn --mode=P
+```
+which will time forward passes through 204 layers from various
+popular networks (AlexNet, VGG 19, ResNet-50, GoogleNet v1 and GoogleNet v2).
+The output format and additional options for testing backward passes
+or testing different layers are described in the
+[benchdnn README](tests/benchdnn/README.md).
+To run on a specific VE node, use the `VE_NODE_NUMBER` environment variable,
+and to run with multiple threads, use the `OMP_NUM_THREADS`
+environment variable.
 
-- Platform issues
-  - has no posix_memalign :(
-  - int is only 32-bit (even though you can use -size_t64)
-  - has many conversion warnings.
-  - linking now OK
-  - most tests OK (some memory formats don't need support for non-JIT)
-  - Non-SX-specific mods have mostly been accepted by [upstream mkl-dnn](https://github.com/01org/mkl-dnn)
-    - Many warning-removal SX patches identical to those for the Windows mkl-dnn port.
-  - At some point it might be nice to push a compilation flag limiting supported
-    CPU types...
-    - especially for a 'none' flag that uses only C/C++ code and no JIT code at all
+### More build options:
 
-  - For SX-specific details, see [README-SX](doc/README-SX.md)
+```
+./build.sh -h      # help</BR>
+./build.sh -tt     # Intel x86 build and run some tests (w/ jit)
+                   # add 'v' for *vanilla* (no jit)
+                   # --> build/    and build.log
+# Platform Aurora:
+# untar the ve*.tar.gz distro tarballs
+./build.sh -adttT  # a:Aurora platform, d:debug compile, T:trace cmake decisions
+                   # a=NEC Aurora; use S for NEC SX
+```
+
+Without the `-q` flag to `build.sh`, Doxygen documentation
+will be produced in `install/share/doc/mkldnn/reference/html/index.html`.
 
 ## Original README.md ...
 
-## Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)
-[![Apache License Version 2.0](https://img.shields.io/badge/license-Apache_2.0-green.svg)](LICENSE)
-![v0.11 beta](https://img.shields.io/badge/v0.11-beta-orange.svg)
+> Intel MKL-DNN repository migrated to [https://github.com/intel/mkl-dnn](https://github.com/intel/mkl-dnn).
+> The old address will continue to be available and will redirect to the new repo.
+> Please update your links.
 
-Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN) is an
-open source performance library for Deep Learning (DL) applications intended
-for acceleration of DL frameworks on Intel(R) architecture. Intel(R) MKL-DNN
-includes highly vectorized and threaded building blocks for implementation of
-convolutional neural networks (CNN) with C and C++ interfaces. We created this
-project to enable the DL community to innovate on Intel(R) processors.
+# Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)
+![v0.16 beta](https://img.shields.io/badge/v0.16-beta-orange.svg)
 
-Intel MKL-DNN includes functionality similar to [Intel(R) Math Kernel
-Library (Intel(R) MKL) 2017](https://software.intel.com/en-us/intel-mkl), but is not
-API compatible. We are investigating how to unify the APIs in future Intel MKL releases.
+Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN) is
+an open source performance library for deep learning applications. The library
+accelerates deep learning applications and framework on Intel(R) architecture. 
+Intel(R) MKL-DNN contains vectorized and threaded building blocks which you can
+use to implement deep neural networks (DNN) with C and C++ interfaces.
 
-This release contains a range of performance critical functions used in modern
-image recognition topologies including Cifar\*, AlexNet\*, VGG\*, 
-GoogleNet\* and ResNet\* optimized for wide range of Intel processors.
+DNN functionality optimized for Intel architecture is also included in 
+[Intel(R) Math Kernel Library (Intel(R) MKL)](https://software.intel.com/en-us/mkl/features/deep-neural-networks).
+API in this implementation is not compatible with Intel MKL-DNN and does not
+include certain new and experimental features.
 
-Functionality related to integer data types `s16s16s32` and `u8s8u8` included
-in this release is experimental and might change without prior notification in
-future releases.
+This release contains performance critical functions that improve performance of
+of the following deep learning topologies and variations of these.
+
+| Application                               | Example topology
+|:---                                       |:---
+| Image recognition                         | AlexNet, VGG, GoogleNet, ResNet, MobileNet
+| Image segmenation                         | FCN, SegNet, MaskRCNN, U-Net
+| Volumetric segmentation                   | 3D-Unet
+| Object detection                          | SSD, Faster R-CNN, Yolo
+| Neural Machine Translation (experimental) | GNMT
+| Speech Recognition (experimental)         | DeepSpeech
+| Adversarial Networks                      | DCGAN, 3DGAN
+| Reinforcement Learning                    | A3C
+
+Intel MKL-DNN is used in the following software products:
+* [Caffe\* Optimized for Intel Architecture](https://github.com/intel/caffe)
+* [Chainer\*](https://chainer.org)
+* [DeepBench](https://github.com/baidu-research/DeepBench)
+* [PaddlePaddle\*](http://www.paddlepaddle.org)
+* [Tensorflow\*](https://www.tensorflow.org)
+* [Microsoft\* Cognitive Toolkit (CNTK)](https://www.microsoft.com/en-us/cognitive-toolkit/)
+* [Apache\* MXNet](https://mxnet.apache.org/)
+* [OpenVINO(TM) toolkit](https://software.intel.com/en-us/openvino-toolkit)
+* [Intel(R) Nervana(TM) Graph](https://github.com/NervanaSystems/ngraph)
+* [Menoh\*](https://github.com/pfnet-research/menoh)
 
 ## License
 Intel MKL-DNN is licensed under
-[Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
+[Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0). This
+software includes the following third party components:
+* [Xbyak](https://github.com/herumi/xbyak) distributed under [3-clause BSD licence](src/cpu/xbyak/COPYRIGHT)
+* [gtest](https://github.com/google/googletest) distributed under [3-clause BSD license](tests/gtests/gtest/LICENSE)
 
 ## Documentation
-The latest version of Intel MKL-DNN reference manual is available 
-[GitHub pages](http://01org.github.io/mkl-dnn/). Basic concepts are also
-explained in the tutorial
-* [Intel MKL-DNN: Part 1--Overview and Installation](https://software.intel.com/en-us/articles/intel-mkl-dnn-part-1-library-overview-and-installation)
-* [Intel MKL-DNN: Part 2--Code Build and Walkthrough](https://software.intel.com/en-us/articles/intel-mkl-dnn-part-2-sample-code-build-and-walkthrough)
+* [Introduction](https://intel.github.io/mkl-dnn) explains programming model
+and basic concepts
+* [Reference manual](https://intel.github.io/mkl-dnn/modules.html) provides
+detailed functionality description
+* [Examples](https://github.com/intel/mkl-dnn/tree/master/examples) 
+demonstrate use of C and C++ APIs in simple topologies
+* [Tutorial](https://software.intel.com/en-us/articles/intel-mkl-dnn-part-1-library-overview-and-installation) 
+provides step by step installation instructions and an example walkthrough
 
 ## Support
-Please report issues and suggestions via
-[GitHub issues](https://github.com/01org/mkl-dnn/issues) or start a topic on
-[Intel MKL forum](https://software.intel.com/en-us/forums/intel-math-kernel-library).
+Please submit your questions, feature requests and bug reports on
+[GitHub issues](https://github.com/intel/mkl-dnn/issues) page.
+
+**WARNING** The following functionality has preview status and might change
+without prior notification in future releases:
+* Convolutions with `s16` data type in source, weights or destination
+* Convolutions and auxillary primitives for 3D spatial data
+* RNN, LSTM and GRU primitives
 
 ## How to Contribute
 We welcome community contributions to Intel MKL-DNN. If you have an idea how to improve the library:
 
 * Share your proposal via
- [GitHub issues](https://github.com/01org/mkl-dnn/issues).
-
+ [GitHub issues](https://github.com/intel/mkl-dnn/issues).
 * Ensure you can build the product and run all the examples with your patch
-
 * In the case of a larger feature, create a test
-
-* Submit a [pull request](https://github.com/01org/mkl-dnn/pulls)
+* Submit a [pull request](https://github.com/intel/mkl-dnn/pulls)
 
 We will review your contribution and, if any additional fixes or modifications
 are necessary, may provide feedback to guide you. When accepted, your pull
-request will be merged into our internal and GitHub repositories.
+request will be merged the repository.
 
 ## System Requirements
-Intel MKL-DNN supports Intel(R) 64 architecture processors and is optimized for
+Intel MKL-DNN supports Intel(R) 64 architecture and compatible architectures.
+The library is optimized for the systems based on
 * Intel Atom(R) processor with Intel(R) SSE4.1 support
 * 4th, 5th, 6th and 7th generation Intel(R) Core processor
-* Intel(R) Xeon(R) processor E5 v3 family (code named Haswell)
-* Intel(R) Xeon(R) processor E5 v4 family (code named Broadwell)
-* Intel(R) Xeon(R) Platinum processor family (code name Skylake)
-* Intel(R) Xeon Phi(TM) product family x200 (code named Knights Landing)
-* Future Intel(R) Xeon Phi(TM) processor (code named Knights Mill)
+* Intel(R) Xeon(R) processor E5 v3 family (formerly Haswell)
+* Intel Xeon processor E5 v4 family (formerly Broadwell)
+* Intel Xeon Platinum processor family (formerly Skylake)
+* Intel(R) Xeon Phi(TM) processor x200 product family (formerly Knights Landing)
+* Intel Xeon Phi processor x205 product family (formerly Knights Mill)
+
+and compatible processors.
 
 The software dependencies are:
 * [Cmake](https://cmake.org/download/) 2.8.0 or later
@@ -140,19 +192,15 @@ The software dependencies are:
 * C++ compiler with C++11 standard support
 
 The software was validated on RedHat\* Enterprise Linux 7 with
-* GNU\* Compiler Collection 4.8
-* GNU Compiler Collection 6.1
-* GNU Compiler Collection 7.2
+* GNU\* Compiler Collection 4.8, 5.2, 6.1 and 7.2
 * Clang\* 3.8.0
 * [Intel(R) C/C++ Compiler](https://software.intel.com/en-us/intel-parallel-studio-xe)
-  17.0
-* [Intel C/C++ Compiler](https://software.intel.com/en-us/intel-parallel-studio-xe)
-  18.0
+  17.0 and 18.0
 
 on Windows Server\* 2012 R2 with
 * Microsoft\* Visual C++ 14.0 (Visual Studio 2015)
 * [Intel(R) C/C++ Compiler](https://software.intel.com/en-us/intel-parallel-studio-xe)
-  17.0
+  17.0 and 18.0
 
 on macOS\* 10.13 (High Sierra) with
 * Apple LLVM version 9.0.0 (XCode 9.0.0)
@@ -163,15 +211,15 @@ The implementation uses OpenMP\* 4.0 SIMD extensions. We recommend using
 Intel(R) Compiler for the best performance results.
 
 ## Installation
-Download [Intel MKL-DNN source code](https://github.com/01org/mkl-dnn/archive/master.zip)
+Download [Intel MKL-DNN source code](https://github.com/intel/mkl-dnn/archive/master.zip)
 or clone the repository to your system
 
 ```
-	git clone https://github.com/01org/mkl-dnn.git
+	git clone https://github.com/intel/mkl-dnn.git
 ```
 
 Ensure that all software dependencies are in place and have at least minimal
-supported version. 
+supported version.
 
 Intel MKL-DNN can take advantage of optimized
 matrix-matrix multiplication (GEMM) function from Intel MKL. The dynamic
@@ -179,11 +227,17 @@ library with this functionality is included in the repository. If you choose
 to build Intel MKL-DNN with the binary dependency download Intel MKL small
 libraries using provided script
 
+###### Linux/macOS
 ```
 	cd scripts && ./prepare_mkl.sh && cd ..
 ```
 
-or manually from [GitHub release section](https://github.com/01org/mkl-dnn/releases)
+###### Windows
+```
+	cd scripts && call prepare_mkl.bat && cd ..
+```
+
+or manually from [GitHub release section](https://github.com/intel/mkl-dnn/releases)
 and unpack it to the `external` directory in the repository root. 
 
 You can choose to build Intel MKL-DNN without binary dependency. The resulting
@@ -241,17 +295,18 @@ undefined behavior resulting in incorrect results or crashes.
 
 Intel MKL-DNN library built with binary dependency will link against Intel OpenMP
 runtime included with Intel MKL small libraries package. Intel OpenMP runtime
-is binary compatible with GNU OpenMP and CLANG OpenMP runtimes and should
-be used in the final application. Here are example linklines for GNU C++ compiler
-and Intel C++ compiler.
+is binary compatible with GNU OpenMP and CLANG OpenMP runtimes and is 
+recommended for the best performance results. Here are example linklines for 
+GNU C++ compiler and Intel C++ compiler.
 ```
-	g++ -std=c++11 -fopenmp -Wl,--as-needed -I${MKLDNNROOT}/include -L${MKLDNNROOT}/lib simple_net.cpp -lmkldnn -lmklml_intel -liomp5
+	g++ -std=c++11 -I${MKLDNNROOT}/include -L${MKLDNNROOT}/lib simple_net.cpp -lmkldnn -lmklml_intel -liomp5
 ```
 ```
 	icpc -std=c++11 -qopenmp -I${MKLDNNROOT}/include -L${MKLDNNROOT}/lib simple_net.cpp -lmkldnn -lmklml_intel
 ```
-In `g++` example option `-Wl,--as-needed` forces linker to resolve OpenMP symbols
-in Intel OpenMP runtime library.
+Using GNU compiler with `-fopenmp` and `-liomp5` options will link the 
+application with both Intel and GNU OpenMP runtime libraries. This will lead
+to undefined behavior of the application.
 
 Intel MKL-DNN library built standalone will use OpenMP runtime supplied by
 the compiler, so as long as both the library and the application use the

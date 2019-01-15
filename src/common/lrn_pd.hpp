@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ struct lrn_fwd_pd_t: public primitive_desc_t {
     const lrn_desc_t *desc() const { return &desc_; }
     virtual const op_desc_t *op_desc() const override
     { return reinterpret_cast<const op_desc_t *>(this->desc()); }
+    virtual void init_info() override { init_info_lrn(this, this->info_); }
 
     virtual const memory_pd_t *input_pd(int index = 0) const override
     { return index == 0 ? src_pd() : nullptr; }
@@ -70,6 +71,9 @@ struct lrn_fwd_pd_t: public primitive_desc_t {
     inline int H() const { return desc_.data_desc.dims[2]; }
     inline int W() const { return desc_.data_desc.dims[3]; }
 
+    bool has_zero_dim_memory() const
+    { return memory_desc_wrapper(desc_.data_desc).has_zero_dim(); }
+
 protected:
     lrn_desc_t desc_;
     const lrn_fwd_pd_t *hint_fwd_pd_;
@@ -89,6 +93,7 @@ struct lrn_bwd_pd_t: public primitive_desc_t {
     const lrn_desc_t *desc() const { return &desc_; }
     virtual const op_desc_t *op_desc() const override
     { return reinterpret_cast<const op_desc_t *>(this->desc()); }
+    virtual void init_info() override { init_info_lrn(this, this->info_); }
 
     virtual const memory_pd_t *input_pd(int index = 0) const override {
         if (index == 0) return src_pd();
@@ -120,6 +125,9 @@ struct lrn_bwd_pd_t: public primitive_desc_t {
     inline int C() const { return desc_.data_desc.dims[1]; }
     inline int H() const { return desc_.data_desc.dims[2]; }
     inline int W() const { return desc_.data_desc.dims[3]; }
+
+    bool has_zero_dim_memory() const
+    { return memory_desc_wrapper(desc_.data_desc).has_zero_dim(); }
 
 protected:
     lrn_desc_t desc_;

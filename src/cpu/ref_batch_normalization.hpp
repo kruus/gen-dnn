@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ struct ref_batch_normalization_fwd_t: public cpu_primitive_t {
             : cpu_batch_normalization_fwd_pd_t(engine, adesc, attr,
                     hint_fwd_pd) {}
 
-        DECLARE_COMMON_PD_T(ref_batch_normalization_fwd_t);
+        DECLARE_COMMON_PD_T("ref:any", ref_batch_normalization_fwd_t);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -47,7 +47,8 @@ struct ref_batch_normalization_fwd_t: public cpu_primitive_t {
                 && utils::one_of(desc()->prop_kind, forward_training,
                         forward_inference)
                 && utils::everyone_is(data_type, desc()->data_desc.data_type,
-                        desc()->data_scaleshift_desc.data_type);
+                        desc()->data_scaleshift_desc.data_type)
+                && (attr()->has_default_values() || this->with_relu_post_op());
             if (!ok) return status::unimplemented;
 
             if (stats_is_src() || is_training()) {
@@ -58,6 +59,9 @@ struct ref_batch_normalization_fwd_t: public cpu_primitive_t {
                 mean_pd_ = cpu_memory_t::pd_t(engine_, &stats_d);
                 variance_pd_ = cpu_memory_t::pd_t(engine_, &stats_d);
             }
+
+            if (is_training() && fuse_bn_relu())
+                bn_init_default_ws(this, this->workspace_pd_, 8);
 
             return status::success;
         }
@@ -87,7 +91,7 @@ struct ref_batch_normalization_bwd_t: public cpu_primitive_t {
             : cpu_batch_normalization_bwd_pd_t(engine, adesc, attr,
                     hint_fwd_pd) {}
 
-        DECLARE_COMMON_PD_T(ref_batch_normalization_bwd_t);
+        DECLARE_COMMON_PD_T("ref:any", ref_batch_normalization_bwd_t);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -97,9 +101,23 @@ struct ref_batch_normalization_bwd_t: public cpu_primitive_t {
                 && utils::everyone_is(data_type, desc()->data_desc.data_type,
                         desc()->diff_data_desc.data_type,
                         desc()->data_desc.data_type,
-                        desc()->data_scaleshift_desc.data_type);
+                        desc()->data_scaleshift_desc.data_type)
+                && attr()->has_default_values()
+                && hint_fwd_pd_ != nullptr;
             if (!ok) return status::unimplemented;
 
+            if (fuse_bn_relu()) {
+                bn_init_default_ws(this, this->workspace_pd_, 8);
+                const size_t this_ws_sz
+                    = memory_desc_wrapper(this->workspace_pd()).size();
+
+                bool ws_ok = true
+                    && hint_fwd_pd_->workspace_pd()
+                    && memory_desc_wrapper(hint_fwd_pd_->workspace_pd()).size()
+                            == this_ws_sz;
+                if (!ws_ok)
+                    return status::unimplemented;
+            }
 
             bool stats_ok = true
                 && hint_fwd_pd_->mean_pd()->desc()->ndims == 1

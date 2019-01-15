@@ -1,5 +1,5 @@
 #===============================================================================
-# Copyright 2016-2017 Intel Corporation
+# Copyright 2016-2018 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,23 +14,53 @@
 # limitations under the License.
 #===============================================================================
 
+if (NOT WITH_TEST)
+    return()
+endif()
+
 if(POLICY CMP0065)
     cmake_policy(SET CMP0065 NEW)
 endif()
+if(POLICY CMP0060)
+    cmake_policy(SET CMP0060 NEW)
+endif()
 
-#[ejk] library not found for cygwin -- it links with lib${LIB_NAME}.dll.a
-if((UNIX OR APPLE) AND NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "SX")
+# propagate TEST specific flags
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_TEST_CCXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_TEST_CCXX_FLAGS}")
+
+set(CMAKE_TEST_CCXX_NOWARN_FLAGS)
+
+# propagate no warning flags
+set(CMAKE_TEST_CCXX_NOWARN_FLAGS
+    "${CMAKE_TEST_CCXX_NOWARN_FLAGS} ${CMAKE_CCXX_NOWARN_FLAGS}")
+
+# adjust no warning flags
+if((UNIX OR APPLE OR MINGW) AND NOT NECSX)
     # workaround for Intel Compiler 16.0 that doesn't suppress warning on
     # deprecation with "-Wno-deprecated" compiler flag
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel" AND
             CMAKE_CXX_COMPILER_VERSION VERSION_LESS "17.0")
-        set(SUPPRESS_DEPRECATE_WARNS "-diag-disable:1478")
-    else()
-        set(SUPPRESS_DEPRECATE_WARNS "-Wno-deprecated-declarations")
+        set(CMAKE_TEST_CCXX_NOWARN_FLAGS
+            "${CMAKE_TEST_CCXX_NOWARN_FLAGS} -diag-disable:1478")
+    elseif(NOT NECVE)
+        set(CMAKE_TEST_CCXX_NOWARN_FLAGS
+            "${CMAKE_TEST_CCXX_NOWARN_FLAGS} -Wno-deprecated-declarations")
     endif()
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SUPPRESS_DEPRECATE_WARNS}")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SUPPRESS_DEPRECATE_WARNS}")
+elseif(WIN32 AND NOT MINGW)
+    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
+        # 1478: deprecated functions
+        set(CMAKE_TEST_CCXX_NOWARN_FLAGS
+            "${CMAKE_TEST_CCXX_NOWARN_FLAGS} /Qdiag-disable:1478")
+    else()
+        # c4244: conversion with possible loss of data
+        # c4996: unsafe / deprecated functions
+        set(CMAKE_TEST_CCXX_NOWARN_FLAGS
+            "${CMAKE_TEST_CCXX_NOWARN_FLAGS} /wd4996 /wd4244")
+    endif()
 endif()
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_TEST_CCXX_NOWARN_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_TEST_CCXX_NOWARN_FLAGS}")
 
 #add_executable(api-check-c api_check.c)
 #target_link_libraries(api-check-c ${LIB_NAME} ${EXTRA_LIBS})
@@ -44,20 +74,15 @@ endif()
 add_executable(api-c api.c)
 set_property(TARGET api-c PROPERTY C_STANDARD 99)
 target_link_libraries(api-c ${LIB_NAME} ${EXTRA_LIBS})
-add_test(api-c api-c)
+add_test(NAME api-c COMMAND api-c)
 
 if(WIN32)
     set_property(TEST api-c PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
     configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
         api-c.vcxproj.user @ONLY)
-    # c4244: conversion with possible loss of data
-    # c4996: unsafe / deprecated functions
-    set(SUPPRESS_SOME_WARNINGS "/wd4996 /wd4244")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${SUPPRESS_SOME_WARNINGS}")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SUPPRESS_SOME_WARNINGS}")
 endif()
 
-if(UNIX OR APPLE) # Is NECSX a UNIX ?
+if(UNIX OR APPLE OR MINGW) # Is NECSX a UNIX ?
     set(test_c_symbols "${CMAKE_CURRENT_BINARY_DIR}/test_c_symbols.c")
     add_executable(test_c_symbols-c ${test_c_symbols})
     add_custom_command(
@@ -66,12 +91,16 @@ if(UNIX OR APPLE) # Is NECSX a UNIX ?
         ${CMAKE_CURRENT_SOURCE_DIR}/.. ${test_c_symbols}
     )
     target_link_libraries(test_c_symbols-c ${LIB_NAME} ${EXTRA_LIBS})
-    add_test(test_c_symbols-c test_c_symbols-c)
-
+    add_test(NAME test_c_symbols-c COMMAND test_c_symbols-c)
     add_executable(api-io-c api-io.c)
     set_property(TARGET api-io-c PROPERTY C_STANDARD 99)
     target_link_libraries(api-io-c ${LIB_NAME})
-    add_test(api-io-c api-io-c)
+    add_test(NAME api-io-c COMMAND api-io-c)
+    if(MINGW)
+        configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
+            test_c_symbols-c.vcxproj.user @ONLY)
+        set_property(TEST test_c_symbols-c PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
+    endif()
 # elseif(WIN32)
 # No Windows support for: test_c_symbols.c
 endif()

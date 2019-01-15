@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -56,18 +56,38 @@ struct _cpu_convolution_fwd_pd_t: public _convolution_fwd_pd_t<with_relu> {
         return nullptr;
     }
 
+    bool want_padded_bias() const {
+        if (!this->with_bias()) return false;
+        memory_desc_wrapper dst_d(&dst_pd_);
+        if (!dst_d.is_blocking_desc()) return false;
+        return this->OC() != dst_d.blocking_desc().padding_dims[1];
+    }
+
 protected:
     cpu_memory_pd_t src_pd_, dst_pd_;
     cpu_memory_pd_t weights_pd_, bias_pd_;
 
+    inline memory_format_t src_format()
+    {
+        using namespace memory_format;
+        return (this->cdesc_().src_desc.ndims == 4) ? nchw : ncdhw;
+    }
+    inline memory_format_t wei_format()
+    {
+        using namespace memory_format;
+        return (this->cdesc_().src_desc.ndims == 4)
+            ? this->with_groups() ? goihw : oihw
+            : this->with_groups() ? goidhw : oidhw;
+    }
+
     virtual status_t set_default_params() {
         using namespace memory_format;
         if (src_pd_.desc()->format == any)
-            CHECK(src_pd_.set_format(nchw));
+            CHECK(src_pd_.set_format(src_format()));
         if (dst_pd_.desc()->format == any)
             CHECK(dst_pd_.set_format(src_pd_.desc()->format));
         if (weights_pd_.desc()->format == any)
-            CHECK(weights_pd_.set_format(this->with_groups() ? goihw : oihw));
+            CHECK(weights_pd_.set_format(wei_format()));
         if (bias_pd_.desc()->format == any)
             CHECK(bias_pd_.set_format(x));
         return status::success;
@@ -87,28 +107,47 @@ struct cpu_convolution_bwd_data_pd_t: public convolution_bwd_data_pd_t {
         : convolution_bwd_data_pd_t(engine, adesc, attr, hint_fwd_pd)
         , diff_src_pd_(this->engine_, &this->desc_.diff_src_desc)
         , diff_dst_pd_(this->engine_, &this->desc_.diff_dst_desc)
-        , weights_pd_(this->engine_, &this->desc_.weights_desc) {}
+        , weights_pd_(this->engine_, &this->desc_.weights_desc)
+        , bias_pd_(this->engine_, &this->desc_.bias_desc) {}
     virtual ~cpu_convolution_bwd_data_pd_t() {}
 
     virtual const cpu_memory_pd_t *diff_src_pd(int index = 0) const override
     { return index == 0 ? &diff_src_pd_ : nullptr; }
     virtual const cpu_memory_pd_t *diff_dst_pd(int index = 0) const override
     { return index == 0 ? &diff_dst_pd_ : nullptr; }
-    virtual const cpu_memory_pd_t *weights_pd(int index = 0) const override
-    { return index == 0 ? &weights_pd_ : nullptr; }
+    virtual const cpu_memory_pd_t *weights_pd(int index = 0) const override {
+        if (index == 0) return &weights_pd_;
+        if (index == 1 && this->with_bias()) return &bias_pd_;
+        return nullptr;
+    }
 
 protected:
     cpu_memory_pd_t diff_src_pd_, diff_dst_pd_;
-    cpu_memory_pd_t weights_pd_;
+    cpu_memory_pd_t weights_pd_, bias_pd_;
+
+    inline memory_format_t src_format()
+    {
+        using namespace memory_format;
+        return (this->desc_.diff_src_desc.ndims == 4) ? nchw : ncdhw;
+    }
+    inline memory_format_t wei_format()
+    {
+        using namespace memory_format;
+        return (this->desc_.diff_src_desc.ndims == 4)
+            ? this->with_groups() ? goihw : oihw
+            : this->with_groups() ? goidhw : oidhw;
+    }
 
     virtual status_t set_default_params() {
         using namespace memory_format;
         if (diff_src_pd_.desc()->format == any)
-            CHECK(diff_src_pd_.set_format(nchw));
+            CHECK(diff_src_pd_.set_format(src_format()));
         if (diff_dst_pd_.desc()->format == any)
             CHECK(diff_dst_pd_.set_format(diff_src_pd_.desc()->format));
         if (weights_pd_.desc()->format == any)
-            CHECK(weights_pd_.set_format(this->with_groups() ? goihw : oihw));
+           CHECK(weights_pd_.set_format(wei_format()));
+        if (bias_pd_.desc()->format == any)
+            CHECK(bias_pd_.set_format(x));
         return status::success;
     }
 };
@@ -138,20 +177,39 @@ struct cpu_convolution_bwd_weights_pd_t: public convolution_bwd_weights_pd_t {
             return  nullptr;
         }
 
+    bool want_padded_bias() const {
+        if (!this->with_bias()) return false;
+        memory_desc_wrapper diff_dst_d(&diff_dst_pd_);
+        if (!diff_dst_d.is_blocking_desc()) return false;
+        return OC() != diff_dst_d.blocking_desc().padding_dims[1];
+    }
+
 protected:
     cpu_memory_pd_t src_pd_;
     cpu_memory_pd_t diff_dst_pd_;
     cpu_memory_pd_t diff_weights_pd_, diff_bias_pd_;
 
+    inline memory_format_t src_format()
+    {
+        using namespace memory_format;
+        return (this->desc_.src_desc.ndims == 4) ? nchw : ncdhw;
+    }
+    inline memory_format_t wei_format()
+    {
+        using namespace memory_format;
+        return (this->desc_.src_desc.ndims == 4)
+            ? this->with_groups() ? goihw : oihw
+            : this->with_groups() ? goidhw : oidhw;
+    }
+
     virtual status_t set_default_params() {
         using namespace memory_format;
         if (src_pd_.desc()->format == any)
-            CHECK(src_pd_.set_format(nchw));
+            CHECK(src_pd_.set_format(src_format()));
         if (diff_dst_pd_.desc()->format == any)
-            CHECK(diff_dst_pd_.set_format(nchw));
+            CHECK(diff_dst_pd_.set_format(src_format()));
         if (diff_weights_pd_.desc()->format == any)
-            CHECK(diff_weights_pd_.set_format(
-                        this->with_groups() ? goihw : oihw));
+            CHECK(diff_weights_pd_.set_format(wei_format()));
         if (diff_bias_pd_.desc()->format == any)
             CHECK(diff_bias_pd_.set_format(x));
         return status::success;

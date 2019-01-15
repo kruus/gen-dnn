@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -28,6 +28,8 @@ struct relu_test_params {
     memory::format diff_format;
     data_t negative_slope;
     memory::dims dims;
+    bool expect_to_fail;
+    mkldnn_status_t expected_status;
 };
 
 template <typename data_t>
@@ -94,7 +96,13 @@ private:
 
 protected:
     virtual void SetUp() {
-        p = ::testing::TestWithParam<relu_test_params<data_t>>::GetParam();
+        p = ::testing::TestWithParam<decltype(p)>::GetParam();
+        catch_expected_failures([=](){Test();}, p.expect_to_fail,
+                p.expected_status);
+    }
+
+    void Test() {
+        p = ::testing::TestWithParam<decltype(p)>::GetParam();
 
         ASSERT_TRUE(p.engine_kind == engine::kind::cpu);
         eng.reset(new engine(p.engine_kind, 0));
@@ -144,10 +152,9 @@ protected:
                 data_t(0), data_t(1));
 
         auto relu_bwd_desc = relu_backward::desc(algorithm::eltwise_relu,
-                *diff_data_desc, *data_desc,
-                p.negative_slope);
-        auto relu_bwd_prim_desc = relu_backward::primitive_desc(relu_bwd_desc,
-                *eng, *relu_prim_desc);
+                *diff_data_desc, *data_desc, p.negative_slope);
+        auto relu_bwd_prim_desc = relu_backward::primitive_desc(
+                relu_bwd_desc, *eng, *relu_prim_desc);
         auto relu_bwd = relu_backward(relu_bwd_prim_desc, *src, *diff_dst,
                 *diff_src);
 
@@ -173,13 +180,30 @@ TEST_P(relu_test_float, TestsReLU)
 
 #define ENGINE engine::kind::cpu
 
-#define PARAMS(data, diff_data, ns, mb, c, h, w) \
+#define PARAMS_EF(data, diff_data, ns, mb, c, h, w, ef, es) \
     relu_test_params_float { ENGINE, \
     EXPAND_FORMATS(data), EXPAND_FORMATS(diff_data), \
-    ns, EXPAND_SIZES(mb, c, h, w) }
+    ns, EXPAND_SIZES(mb, c, h, w), ef, es}
+
+#define PARAMS(data, diff_data, ns, mb, c, h, w) \
+    PARAMS_EF(data, diff_data, ns, mb, c, h, w, false, mkldnn_success)
 
 #define INST_TEST_CASE(str, ...) INSTANTIATE_TEST_CASE_P( \
         str, relu_test_float, ::testing::Values(__VA_ARGS__))
+
+INST_TEST_CASE(SimpleZeroDim,
+    PARAMS(nchw, nchw, 0.f, 0, 8, 4, 4),
+    PARAMS(nchw, nchw, 0.f, 2, 0, 4, 4),
+    PARAMS(nchw, nchw, 0.f, 2, 8, 0, 4),
+    PARAMS(nchw, nchw, 0.f, 2, 8, 4, 0)
+);
+
+INST_TEST_CASE(SimpleEF,
+    PARAMS_EF(nchw, nchw, 0.f, -1, 8, 4, 4, true, mkldnn_invalid_arguments),
+    PARAMS_EF(nchw, nchw, 0.f, 2, -1, 4, 4, true, mkldnn_invalid_arguments),
+    PARAMS_EF(nchw, nchw, 0.f, 2, 8, -1, 4, true, mkldnn_invalid_arguments),
+    PARAMS_EF(nchw, nchw, 0.f, 2, 8, 4, -1, true, mkldnn_invalid_arguments)
+);
 
 INST_TEST_CASE(SimpleZeroNegativeSlope_NCHW,
     //PARAMS(nchw, nchw, 0.f, 1, 8, 10000, 10000),  // is a tensor of 3 Gb data ok? YES (330 s runtime, slow)

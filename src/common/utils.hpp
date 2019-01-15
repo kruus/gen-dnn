@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -18,11 +18,12 @@
 #define UTILS_HPP
 
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#ifdef WIN32
-#include <malloc.h>
-#endif
+
+#include "c_types_map.hpp"
+#include "mkldnn_os.h"
 
 namespace mkldnn {
 namespace impl {
@@ -38,6 +39,13 @@ namespace impl {
 
 #ifdef _WIN32
 #define __PRETTY_FUNCTION__ __FUNCSIG__
+#endif
+
+#ifdef __APPLE__
+// older XCode doesn't support thread_local
+#define THREAD_LOCAL __thread
+#else
+#define THREAD_LOCAL thread_local
 #endif
 
 namespace utils {
@@ -115,8 +123,14 @@ inline void array_copy(T *dst, const T *src, size_t size) {
 }
 template<typename T>
 inline bool array_cmp(const T *a1, const T *a2, size_t size) {
+#if defined(__ve)
+    bool ret=true;
+    for (size_t i = 0; i < size; ++i) if (a1[i] != a2[i]) {ret=false; break; }
+    return ret;
+#else
     for (size_t i = 0; i < size; ++i) if (a1[i] != a2[i]) return false;
     return true;
+#endif
 }
 template<typename T, typename U>
 inline void array_set(T *arr, const U& val, size_t size) {
@@ -139,9 +153,9 @@ inline T array_product(const T *arr) {
     return product_impl::product_impl(arr, product_impl::int2type<num-1>());
 }
 
-template<typename T>
-inline T array_product(const T *arr, size_t size) {
-    T prod = 1;
+template<typename T, typename R = T>
+inline R array_product(const T *arr, size_t size) {
+    R prod = 1;
     for (size_t i = 0; i < size; ++i) prod *= arr[i];
     return prod;
 }
@@ -190,11 +204,13 @@ inline T nd_iterator_init(T start, U &x, const W &X, Args &&... tuple) {
 inline bool nd_iterator_step() { return true; }
 template<typename U, typename W, typename... Args>
 inline bool nd_iterator_step(U &x, const W &X, Args &&... tuple) {
+    // nc++: err(1813) Cannot branch into or out of OpenMP construct.
+    bool ret = false;
     if (nd_iterator_step(utils::forward<Args>(tuple)...) ) {
         x = (x + 1) % X;
-        return x == 0;
+        ret = (x == 0);
     }
-    return false;
+    return ret;
 }
 
 template<typename U, typename W, typename Y>
@@ -223,21 +239,49 @@ inline bool nd_iterator_jump(U &cur, const U end, W &x, const Y &X,
     return false;
 }
 
+template <typename Telem, size_t Tdims>
+struct array_offset_calculator {
+    template <typename... Targs>
+    array_offset_calculator(Telem *base, Targs... Fargs) : _dims{ Fargs... }
+    {
+        _base_ptr = base;
+    }
+    template <typename... Targs>
+    inline Telem &operator()(Targs... Fargs)
+    {
+        return *(_base_ptr + _offset(1, Fargs...));
+    }
+
+private:
+    template <typename... Targs>
+    inline size_t _offset(size_t const dimension, size_t element)
+    {
+        return element;
+    }
+
+    template <typename... Targs>
+    inline size_t _offset(size_t const dimension, size_t theta, size_t element)
+    {
+        return element + (_dims[dimension] * theta);
+    }
+
+    template <typename... Targs>
+    inline size_t _offset(size_t const dimension, size_t theta, size_t element,
+            Targs... Fargs)
+    {
+        size_t t_prime = element + (_dims[dimension] * theta);
+        return _offset(dimension + 1, t_prime, Fargs...);
+    }
+
+    Telem *_base_ptr;
+    const int _dims[Tdims];
+};
+
 }
 
 #if !defined(_SX)
-inline void* malloc(size_t size, int alignment) {
-    void *ptr;
-
-#ifdef _WIN32
-    ptr = _aligned_malloc(size, alignment);
-    int rc = ptr ? 0 : -1;
-#else
-    int rc = ::posix_memalign(&ptr, alignment, size);
-#endif
-
-    return (rc == 0) ? ptr : 0;
-}
+void *malloc(size_t size, int alignment);
+void free(void *p);
 #else
 /** SX -> std malloc and free, instead of aligning pointers.
  * Until I am sure that we do not use these pointers in mkldnn.hpp
@@ -248,15 +292,8 @@ inline void* malloc(size_t size, int alignment) {
  * \p alignment arg ignored.
  */
 inline void* malloc(size_t size, int /*alignment*/) { return ::malloc(size); }
+inline void free(void *p) { ::free(p); }
 #endif
-
-inline void free(void *p) {
-#ifdef _WIN32
-    _aligned_free(p);
-#else
-    ::free(p);
-#endif
-}
 
 struct c_compatible {
     enum { default_alignment = 64 };
@@ -273,9 +310,16 @@ struct c_compatible {
 
 inline void yield_thread() { }
 
+int mkldnn_getenv(char *value, const char *name, int len);
+bool mkldnn_jit_dump();
+FILE *mkldnn_fopen(const char *filename, const char *mode);
+
+void set_rnd_mode(round_mode_t rnd_mode);
+void restore_rnd_mode();
+
 }
 }
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

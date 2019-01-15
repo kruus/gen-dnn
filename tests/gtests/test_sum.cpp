@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -25,13 +25,14 @@ struct sum_test_params {
     const engine::kind engine_kind;
     std::vector<memory::format> srcs_format;
     memory::format dst_format;
-    std::vector<memory::dims> srcs_cds;
-    memory::dims dst_cds;
+    memory::dims dims;
     std::vector<float> scale;
+    bool expect_to_fail;
+    mkldnn_status_t expected_status;
 };
 
 
-template <typename data_t>
+template <typename data_t, typename acc_t>
 class sum_test: public ::testing::TestWithParam<sum_test_params> {
     void check_data(const std::vector<memory> &srcs,
                     const std::vector<float> scale,
@@ -41,12 +42,12 @@ class sum_test: public ::testing::TestWithParam<sum_test_params> {
         const auto &dst_d = dst.get_primitive_desc().desc();
         const auto dst_dims = dst_d.data.dims;
 
-#       pragma omp parallel for collapse(4) schedule(static)
+	OMP(parallel for collapse(4) schedule(static))//;
         for (auto n = 0; n < dst_dims[0]; n++)
         for (auto c = 0; c < dst_dims[1]; c++)
         for (auto h = 0; h < dst_dims[2]; h++)
         for (auto w = 0; w < dst_dims[3]; w++) {
-            data_t src_sum = 0.0;
+            acc_t src_sum = 0.0;
             for (size_t num = 0; num < srcs.size(); num++) {
                 const data_t *src_data =
                     (const data_t *)srcs[num].get_data_handle();
@@ -63,15 +64,19 @@ class sum_test: public ::testing::TestWithParam<sum_test_params> {
                     src_sum += data_t(scale[num])* src_data[map_index(src_d, src_idx)];
                 }
 
+                src_sum = std::max(std::min(src_sum,
+                            std::numeric_limits<acc_t>::max()),
+                        std::numeric_limits<acc_t>::lowest());
+
             }
 
             auto dst_idx = w
                 + dst_dims[3]*h
                 + dst_dims[2]*dst_dims[3]*c
                 + dst_dims[1]*dst_dims[2]*dst_dims[3]*n;
-            EXPECT_NEAR((src_sum - dst_data[map_index(dst_d, dst_idx)]) / src_sum,
-                        0.0,
-                        1.2e-7);
+            auto diff = src_sum - dst_data[map_index(dst_d, dst_idx)];
+            auto e = (std::abs(src_sum) > 1e-4) ? diff / src_sum : diff;
+            EXPECT_NEAR(e, 0.0, 1.2e-7);
         }
     }
 
@@ -79,22 +84,27 @@ protected:
     virtual void SetUp() {
         sum_test_params p
             = ::testing::TestWithParam<sum_test_params>::GetParam();
+        catch_expected_failures([=](){Test();}, p.expect_to_fail,
+                    p.expected_status);
+    }
 
-        for (size_t i = 0; i < p.srcs_cds.size(); i++) {
-            for (size_t dim = 0; dim < p.dst_cds.size(); dim++) {
-                ASSERT_TRUE(p.srcs_cds[i][dim] == p.dst_cds[dim]);
-            }
-        }
+    void Test() {
+        sum_test_params p
+            = ::testing::TestWithParam<sum_test_params>::GetParam();
+
+        ASSERT_EQ(p.srcs_format.size(), p.scale.size());
+        const auto num_srcs = p.srcs_format.size();
+
         ASSERT_TRUE(p.engine_kind == engine::kind::cpu);
         auto eng = engine(p.engine_kind, 0);
         memory::data_type data_type = data_traits<data_t>::data_type;
-        ASSERT_EQ(data_type, mkldnn::memory::data_type::f32);
 
         std::vector<memory::primitive_desc> srcs_pd;
         std::vector<memory> srcs;
-        for (size_t i = 0; i < p.srcs_cds.size(); i++) {
+
+        for (size_t i = 0; i < num_srcs; i++) {
             auto desc =
-                memory::desc(p.srcs_cds[i], data_type, p.srcs_format[i]);
+                memory::desc(p.dims, data_type, p.srcs_format[i]);
             auto mpd = memory::primitive_desc(desc, eng);
             auto src_memory = memory(mpd);
             const size_t sz =
@@ -104,91 +114,178 @@ protected:
             srcs.push_back(src_memory);
         }
 
-        auto dst_desc = memory::desc(p.dst_cds, data_type, p.dst_format);
-        auto sum_pd = sum::primitive_desc(dst_desc, p.scale, srcs_pd);
-        auto dst = memory(sum_pd.dst_primitive_desc());
+        std::shared_ptr<memory> dst;
 
+#if 0 //old
+#if 0 // old
         data_t *dst_data = (data_t *)dst.get_data_handle();
         const size_t sz =
             dst.get_primitive_desc().get_size() / sizeof(data_t);
         // overwriting dst to prevent false positives for test cases.
-# pragma omp parallel for
+	OMP(parallel for)//;
         for (size_t i = 0; i < sz; i++) {
             dst_data[i] = -32;
         }
+#endif
+        auto test = [&](){
+            auto dst_desc = memory::desc(p.dims, data_type, p.dst_format);
+            auto sum_pd = sum::primitive_desc(dst_desc, p.scale, srcs_pd);
+            dst.reset(new memory(sum_pd.dst_primitive_desc()));
 
-        std::vector<primitive::at> inputs;
-        for (size_t i = 0; i < p.srcs_cds.size(); i++) {
-            inputs.push_back(srcs[i]);
+            ASSERT_EQ(sum_pd.dst_primitive_desc().desc().data.format,
+                    dst_desc.data.format);
+            ASSERT_EQ(sum_pd.dst_primitive_desc().desc().data.ndims,
+                    dst_desc.data.ndims);
+
+            data_t *dst_data = (data_t *)dst->get_data_handle();
+            const size_t sz =
+                dst->get_primitive_desc().get_size() / sizeof(data_t);
+            // overwriting dst to prevent false positives for test cases.
+            OMP(parallel for)
+            for (size_t i = 0; i < sz; i++) {
+                dst_data[i] = -32;
+            }
+
+            std::vector<primitive::at> inputs;
+            for (size_t i = 0; i < num_srcs; i++) {
+                inputs.push_back(srcs[i]);
+            }
         }
-        auto c = sum(sum_pd, inputs, dst);
+#endif
+        auto dst_desc = memory::desc(p.dims, data_type, p.dst_format);
+        auto sum_pd = sum::primitive_desc(dst_desc, p.scale, srcs_pd);
+        dst.reset(new memory(sum_pd.dst_primitive_desc()));
 
         ASSERT_EQ(sum_pd.dst_primitive_desc().desc().data.format,
                 dst_desc.data.format);
         ASSERT_EQ(sum_pd.dst_primitive_desc().desc().data.ndims,
                 dst_desc.data.ndims);
 
+        data_t *dst_data = (data_t *)dst->get_data_handle();
+        const size_t sz =
+            dst->get_primitive_desc().get_size() / sizeof(data_t);
+        // overwriting dst to prevent false positives for test cases.
+        OMP(parallel for)//;
+        for (ptrdiff_t i = 0; i < (ptrdiff_t)sz; i++) {
+            dst_data[i] = -32;
+        }
+
+        std::vector<primitive::at> inputs;
+        for (size_t i = 0; i < num_srcs; i++) {
+            inputs.push_back(srcs[i]);
+        }
+
+        auto c = sum(sum_pd, inputs, *dst);
         std::vector<primitive> pipeline;
         pipeline.push_back(c);
         auto s = stream(stream::kind::eager);
         s.submit(pipeline).wait();
 
-        check_data(srcs, p.scale, dst);
+        check_data(srcs, p.scale, *dst);
     }
 };
 
-using sum_test_float = sum_test<float>;
-using sum_test_params_float = sum_test_params;
+/* corner cases */
+#define CASE_CC(ifmt0, ifmt1, ofmt, dims_, ef, st) \
+    sum_test_params{engine::kind::cpu, \
+        {memory::format::ifmt0, memory::format::ifmt1}, memory::format::ofmt, \
+        memory::dims dims_, {1.0f, 1.0f}, ef, st}
 
-TEST_P(sum_test_float, TestsSum)
-{
-}
-
-INSTANTIATE_TEST_CASE_P(TestSum, sum_test_float, ::testing::Values(
-    sum_test_params_float{engine::kind::cpu,
-    {memory::format::nchw, memory::format::nchw}, memory::format::nchw,
-    {{2, 8, 2, 2}, {2, 8, 2, 2}}, {2, 8, 2, 2}, {1.0f, 1.0f}}
-#if MKLDNN_JIT_TYPES > 0
-    , sum_test_params_float{engine::kind::cpu,
-    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c,
-    {{2, 16, 3, 4}, {2, 16, 3, 4}}, {2, 16, 3, 4}, {1.0f, 1.0f}}
-    , sum_test_params_float{engine::kind::cpu,
-    {memory::format::nchw, memory::format::nchw}, memory::format::nChw8c,
-    {{2, 16, 2, 2}, {2, 16, 2, 2}}, {2, 16, 2, 2}, {1.0f, 1.0f}}
-    , sum_test_params_float{engine::kind::cpu,
-    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nchw,
-    {{2, 16, 3, 4}, {2, 16, 3, 4}}, {2, 16, 3, 4}, {1.0f, 1.0f}}
-#endif
-
-    , sum_test_params_float{engine::kind::cpu,
-    {memory::format::nchw, memory::format::nchw}, memory::format::nchw,
-    {{2, 8, 2, 2}, {2, 8, 2, 2}}, {2, 8, 2, 2}, {2.0f, 3.0f}}
-#if MKLDNN_JIT_TYPES > 0
-    , sum_test_params_float{engine::kind::cpu,
-    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c,
-    {{2, 16, 3, 4}, {2, 16, 3, 4}}, {2, 16, 3, 4}, {2.0f, 3.0f}}
-    , sum_test_params_float{engine::kind::cpu,
-    {memory::format::nchw, memory::format::nchw}, memory::format::nChw8c,
-    {{2, 16, 2, 2}, {2, 16, 2, 2}}, {2, 16, 2, 2}, {2.0f, 3.0f}}
-    , sum_test_params_float{engine::kind::cpu,
-    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nchw,
-    {{2, 16, 3, 4}, {2, 16, 3, 4}}, {2, 16, 3, 4}, {2.0f, 3.0f}}
-#endif
-
-#if MKLDNN_JIT_TYPES > 0
-    , sum_test_params_float{engine::kind::cpu,
-    {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw,
-    {{5, 8, 3, 3}, {5, 8, 3, 3}}, {5, 8, 3, 3}, {2.0f, 3.0f}}
-    , sum_test_params_float{engine::kind::cpu,
-    {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw,
-    {{32, 32, 13, 14}, {32, 32, 13, 14}}, {32, 32, 13, 14}, {2.0f, 3.0f}}
-#endif
-
-#if MKLDNN_JIT_TYPES > 0
-    , sum_test_params_float{engine::kind::cpu,
-    {memory::format::nChw16c, memory::format::nChw8c}, memory::format::nChw16c,
-    {{2, 16, 3, 3}, {2, 16, 3, 3}}, {2, 16, 3, 3}, {2.0f, 3.0f}}
-#endif
+#define INST_TEST_CASE_NCHW(test) \
+TEST_P(test, TestsSumNchw) {} \
+INSTANTIATE_TEST_CASE_P(TestSum, test, ::testing::Values( \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nchw}, memory::format::nchw, \
+    {2, 8, 2, 2}, {1.0f, 1.0f}}, \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nchw}, memory::format::nchw, \
+    {2, 8, 2, 2}, {2.0f, 3.0f}} \
 ));
 
+#define INST_TEST_CASE_JIT1(test) \
+TEST_P(test, TestsSumJit1) {} \
+INSTANTIATE_TEST_CASE_P(TestSumJit1, test, ::testing::Values( \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw, \
+    {0, 7, 4, 4}, {1.0f, 1.0f}}, \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw, \
+    {1, 0, 4, 4}, {1.0f, 1.0f}}, \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw, \
+    {1, 8, 0, 4}, {1.0f, 1.0f}}, \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw, \
+    {-1, 8, 4, 4}, {1.0f, 1.0f}, true, mkldnn_invalid_arguments}, \
+    \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw, \
+    {1, 1024, 38, 50}, {1.0f, 1.0f}} \
+));
+
+#define INST_TEST_CASE_JIT2(test) \
+TEST_P(test, TestsSumJit2) {} \
+INSTANTIATE_TEST_CASE_P(TestSumJit2, test, ::testing::Values( \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c, \
+    {2, 16, 3, 4}, {1.0f, 1.0f}}, \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nchw}, memory::format::nChw8c, \
+    {2, 16, 2, 2}, {1.0f, 1.0f}}, \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nchw, \
+    {2, 16, 3, 4}, {1.0f, 1.0f}}, \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nChw8c,\
+    {2, 16, 3, 4}, {2.0f, 3.0f}}, \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nchw}, memory::format::nChw8c, \
+    {2, 16, 2, 2}, {2.0f, 3.0f}}, \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nChw8c, memory::format::nChw8c}, memory::format::nchw, \
+    {2, 16, 3, 4}, {2.0f, 3.0f}}, \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw, \
+    {5, 8, 3, 3}, {2.0f, 3.0f}}, \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nchw, memory::format::nChw8c}, memory::format::nchw, \
+    {32, 32, 13, 14}, {2.0f, 3.0f}}, \
+    sum_test_params{engine::kind::cpu, \
+    {memory::format::nChw16c, memory::format::nChw8c}, \
+    memory::format::nChw16c, \
+    {2, 16, 3, 3}, {2.0f, 3.0f}} \
+));
+
+using sum_test_float = sum_test<float,float>;
+using sum_test_u8 = sum_test<uint8_t,float>;
+using sum_test_s32 = sum_test<int32_t,float>;
+
+//#if MKLDNN_JIT_TYPES > 0
+using sum_cc_f32 = sum_test<float,float>;
+TEST_P(sum_cc_f32, TestSumCornerCases) {}
+INSTANTIATE_TEST_CASE_P(TestSumCornerCases, sum_cc_f32, ::testing::Values(
+    CASE_CC(nchw, nChw8c, nchw, ({0, 7, 4, 4}), false, mkldnn_success),
+    CASE_CC(nchw, nChw8c, nchw, ({1, 0, 4, 4}), false, mkldnn_success),
+    CASE_CC(nchw, nChw8c, nchw, ({1, 8, 0, 4}), false, mkldnn_success),
+    CASE_CC(nchw, nChw8c, nchw, ({-1, 8, 4, 4}), true, mkldnn_invalid_arguments)
+    ));
+#undef CASE_CC
+
+INST_TEST_CASE_NCHW(sum_test_float)
+INST_TEST_CASE_NCHW(sum_test_u8)
+INST_TEST_CASE_NCHW(sum_test_s32)
+
+#if MKLDNN_JIT_TYPES > 0
+INST_TEST_CASE_JIT1(sum_test_float)
+INST_TEST_CASE_JIT1(sum_test_u8)
+INST_TEST_CASE_JIT1(sum_test_s32)
+
+INST_TEST_CASE_JIT2(sum_test_float)
+INST_TEST_CASE_JIT2(sum_test_u8)
+INST_TEST_CASE_JIT2(sum_test_s32)
+#endif
+
+#undef INST_TEST_CASE_NCHW
+#undef INST_TEST_CASE_JIT1
+#undef INST_TEST_CASE_JIT2
 }

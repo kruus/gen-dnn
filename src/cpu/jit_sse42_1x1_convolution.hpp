@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -40,9 +40,11 @@ struct _jit_sse42_1x1_convolution_fwd_t: public cpu_primitive_t {
                 const typename pd_t::base_class *hint_fwd_pd)
             : _cpu_convolution_fwd_pd_t<with_relu>(engine, adesc, attr,
                     hint_fwd_pd)
-            , jcp_({}) {}
+            , jcp_() {}
 
-        DECLARE_COMMON_PD_T(_jit_sse42_1x1_convolution_fwd_t<with_relu>);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("jit_1x1:", sse42, ""),
+                _jit_sse42_1x1_convolution_fwd_t<with_relu>);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -52,6 +54,7 @@ struct _jit_sse42_1x1_convolution_fwd_t: public cpu_primitive_t {
                 && utils::one_of(this->cdesc_().prop_kind, forward_training,
                         forward_inference)
                 && this->cdesc_().alg_kind == alg_kind::convolution_direct
+                && !this->has_zero_dim_memory()
                 && utils::everyone_is(data_type::f32,
                         this->cdesc_().src_desc.data_type,
                         this->cdesc_().weights_desc.data_type,
@@ -63,7 +66,8 @@ struct _jit_sse42_1x1_convolution_fwd_t: public cpu_primitive_t {
             status_t result = jit_sse42_1x1_conv_kernel_f32::init_conf(jcp_,
                     this->cdesc_(),
                     *this->src_pd_.desc(), *this->weights_pd_.desc(),
-                    *this->dst_pd_.desc(), with_relu, this->negative_slope());
+                    *this->dst_pd_.desc(), *this->attr(), with_relu,
+                    this->negative_slope());
 
             return result;
         }
@@ -89,7 +93,7 @@ struct _jit_sse42_1x1_convolution_fwd_t: public cpu_primitive_t {
     _jit_sse42_1x1_convolution_fwd_t(const pd_t *pd,
             const input_vector &inputs, const output_vector &outputs)
         : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
-    { kernel_ = new jit_sse42_1x1_conv_kernel_f32(conf_.jcp_); }
+    { kernel_ = new jit_sse42_1x1_conv_kernel_f32(conf_.jcp_, *conf_.attr()); }
     ~_jit_sse42_1x1_convolution_fwd_t() { delete kernel_; };
 
     typedef typename prec_traits<data_type::f32>::type data_t;

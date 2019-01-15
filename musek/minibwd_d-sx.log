@@ -1,0 +1,121 @@
+THREADS  : 
+cmd      :  /usr/bin/time -v ./benchdnn --mode=PT --skip-impl=sx2 --dir=BWD_D --skip-impl=sx2 --batch=inputs/minialex
+/usr/uhome/aurora/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/benchdnn
+total 34253
+drwxr-srwx    6 nlabhpg  4gi           36864 Dec 15 13:16 CMakeFiles
+-rw-r--r--    1 nlabhpg  4gi             344 Dec 15 13:16 CTestTestfile.cmake
+-rw-r--r--    1 nlabhpg  4gi           38447 Dec 15 13:16 Makefile
+-rwxr-xr-x    1 nlabhpg  4gi        17184845 Dec 15 13:53 benchdnn
+-rw-r--r--    1 nlabhpg  4gi             887 Dec 15 13:16 cmake_install.cmake
+-rw-r--r--    1 nlabhpg  4gi          164254 Dec 15 15:21 ftrace.out
+drwxrwsrwx    2 nlabhpg  4gi          110592 Dec 15 15:21 inputs
+ /usr/uhome/aurora/4gi/nlabhpg/wrk/simd/gen-dnn/build-sx/tests/benchdnn inputs:
+COLUMN ... cat
+ conv_alexnet conv_all conv_dilated conv_googlenet_v1
+ conv_googlenet_v2 conv_googlenet_v3 conv_regression_dilate conv_regression_group
+ conv_regression_padding conv_regression_small_spatial conv_regression_stride conv_resnet_50
+ conv_resnet_50_sparse conv_segnet conv_ssd_300_voc0712 conv_vgg_11
+ conv_vgg_19 deepbench deepbench_inference_device deepbench_inference_server
+ deepbench_training minialex test_bwd_d_regression test_bwd_w_regression
+ test_conv_all test_conv_regression test_fwd_regression
+benchdnn --conv --mode=PERF+TEST -v0 ... init omp_max_thr=1  OK
+batch: inputs/minialex ???batch: inputs/minialex OK
+
+t:0 orig 291 s ok   7.970 MFlops   1.00 x BWD_D --dir=BWD_D mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+t:1 sx3 1 s ok   1.894 GFlops 237.64 x BWD_D --dir=BWD_D mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+t:2 sx4 8 s ok 290.075 MFlops  36.39 x BWD_D --dir=BWD_D mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+t:3 ref3 211 s ok  10.977 MFlops   1.38 x BWD_D --dir=BWD_D mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+t:4 ref4 44 s ok  52.597 MFlops   6.60 x BWD_D --dir=BWD_D mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+ TEST all_passed=1 0:PASSED __REPRO:     2.3e+09 ops BWD_D --dir=BWD_D mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 290972.822  avg_ms: 290972.822  avg speedup: 1.000 x 8.0 Mflops
+T:1  sx3    loops: 1   speedup: 237.645x  wins: 1     tot_ms: 1224.403  avg_ms: 1224.403  avg speedup: 237.645 x 1894.1 Mflops
+T:2  sx4    loops: 1   speedup: 36.395x  wins: 0     tot_ms: 7994.946  avg_ms: 7994.946  avg speedup: 36.395 x 290.1 Mflops
+T:3  ref3   loops: 1   speedup: 1.377 x  wins: -1    tot_ms: 211263.566  avg_ms: 211263.566  avg speedup: 1.377 x 11.0 Mflops
+T:4  ref4   loops: 1   speedup: 6.599 x  wins: 0     tot_ms: 44092.263  avg_ms: 44092.263  avg speedup: 6.599 x 52.6 Mflops
+
+t:0 orig 284 s ok  15.831 MFlops   1.00 x BWD_D --dir=BWD_D g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+t:1 sx3 2 s ok   2.341 GFlops 147.90 x BWD_D --dir=BWD_D g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+t:2 sx4 11 s ok 399.780 MFlops  25.25 x BWD_D --dir=BWD_D g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+t:3 ref3 227 s ok  19.808 MFlops   1.25 x BWD_D --dir=BWD_D g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+t:4 ref4 78 s ok  57.405 MFlops   3.63 x BWD_D --dir=BWD_D g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+ TEST all_passed=1 1:PASSED __REPRO:     4.5e+09 ops BWD_D --dir=BWD_D g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+T:0  orig   loops: 2   speedup: 1.000 x  wins: 0     tot_ms: 575131.790  avg_ms: 287565.895  avg speedup: 1.000 x 11.9 Mflops
+T:1  sx3    loops: 2   speedup: 147.898x  wins: 2     tot_ms: 3145.726  avg_ms: 1572.863  avg speedup: 182.830 x 2167.3 Mflops
+T:2  sx4    loops: 2   speedup: 25.252x  wins: 0     tot_ms: 19247.799  avg_ms: 9623.900  avg speedup: 29.880 x 354.2 Mflops
+T:3  ref3   loops: 2   speedup: 1.251 x  wins: -2    tot_ms: 438380.790  avg_ms: 219190.395  avg speedup: 1.312 x 15.6 Mflops
+T:4  ref4   loops: 2   speedup: 3.626 x  wins: 0     tot_ms: 122458.786  avg_ms: 61229.393  avg speedup: 4.697 x 55.7 Mflops
+
+t:0 orig 314 s ok   9.418 MFlops   1.00 x BWD_D --dir=BWD_D mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+t:1 sx3 7 s ok 426.961 MFlops  45.33 x BWD_D --dir=BWD_D mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+t:2 sx4 10 s ok 289.761 MFlops  30.77 x BWD_D --dir=BWD_D mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+t:3 ref3 252 s ok  11.767 MFlops   1.25 x BWD_D --dir=BWD_D mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+t:4 ref4 53 s ok  56.292 MFlops   5.98 x BWD_D --dir=BWD_D mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+ TEST all_passed=1 2:PASSED __REPRO:       3e+09 ops BWD_D --dir=BWD_D mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+T:0  orig   loops: 3   speedup: 1.000 x  wins: 0     tot_ms: 889491.014  avg_ms: 296497.005  avg speedup: 1.000 x 11.0 Mflops
+T:1  sx3    loops: 3   speedup: 45.333x  wins: 3     tot_ms: 10080.122  avg_ms: 3360.041  avg speedup: 88.242 x 970.1 Mflops
+T:2  sx4    loops: 3   speedup: 30.766x  wins: 0     tot_ms: 29465.601  avg_ms: 9821.867  avg speedup: 30.187 x 331.9 Mflops
+T:3  ref3   loops: 3   speedup: 1.249 x  wins: -3    tot_ms: 689998.512  avg_ms: 229999.504  avg speedup: 1.289 x 14.2 Mflops
+T:4  ref4   loops: 3   speedup: 5.977 x  wins: 0     tot_ms: 175054.926  avg_ms: 58351.642  avg speedup: 5.081 x 55.9 Mflops
+
+t:0 orig 237 s ok   9.365 MFlops   1.00 x BWD_D --dir=BWD_D g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+t:1 sx3 2 s ok   1.331 GFlops 142.16 x BWD_D --dir=BWD_D g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+t:2 sx4 5 s ok 472.125 MFlops  50.41 x BWD_D --dir=BWD_D g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+t:3 ref3 190 s ok  11.666 MFlops   1.25 x BWD_D --dir=BWD_D g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+t:4 ref4 37 s ok  59.440 MFlops   6.35 x BWD_D --dir=BWD_D g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+ TEST all_passed=1 3:PASSED __REPRO:     2.2e+09 ops BWD_D --dir=BWD_D g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+T:0  orig   loops: 4   speedup: 1.000 x  wins: 0     tot_ms: 1126606.080  avg_ms: 281651.520  avg speedup: 1.000 x 10.7 Mflops
+T:1  sx3    loops: 4   speedup: 142.157x  wins: 4     tot_ms: 11748.101  avg_ms: 2937.025  avg speedup: 95.897 x 1021.4 Mflops
+T:2  sx4    loops: 4   speedup: 50.415x  wins: 0     tot_ms: 34168.887  avg_ms: 8542.222  avg speedup: 32.972 x 351.2 Mflops
+T:3  ref3   loops: 4   speedup: 1.246 x  wins: -4    tot_ms: 880347.086  avg_ms: 220086.771  avg speedup: 1.280 x 13.6 Mflops
+T:4  ref4   loops: 4   speedup: 6.347 x  wins: 0     tot_ms: 212412.850  avg_ms: 53103.213  avg speedup: 5.304 x 56.5 Mflops
+TEST final stats:
+T:0  orig   loops: 4   speedup: 1.000 x  wins: 0     tot_ms: 1126606.080  avg_ms: 281651.520  avg speedup: 1.000 x 10.7 Mflops
+T:1  sx3    loops: 4   speedup: 142.157x  wins: 4     tot_ms: 11748.101  avg_ms: 2937.025  avg speedup: 95.897 x 1021.4 Mflops
+T:2  sx4    loops: 4   speedup: 50.415x  wins: 0     tot_ms: 34168.887  avg_ms: 8542.222  avg speedup: 32.972 x 351.2 Mflops
+T:3  ref3   loops: 4   speedup: 1.246 x  wins: -4    tot_ms: 880347.086  avg_ms: 220086.771  avg speedup: 1.280 x 13.6 Mflops
+T:4  ref4   loops: 4   speedup: 6.347 x  wins: 0     tot_ms: 212412.850  avg_ms: 53103.213  avg speedup: 5.304 x 56.5 Mflops
+tests:4 impls:4 passed:0 skipped:0 mistrusted:4 unimplemented:0 failed:0 test_fail: 0
+
+     ******  Program Information  ******
+  Real Time (sec)               :          5667.879345
+  User Time (sec)               :          6764.504541
+  Sys  Time (sec)               :             2.143253
+  Vector Time (sec)             :          4847.230557
+  Inst. Count                   :        1322211002381.
+  V. Inst. Count                :         296652862869.
+  V. Element Count              :       31756823041509.
+  V. Load Element Count         :        2550639587739.
+  FLOP Count                    :        2579778521605.
+  MOPS                          :          4846.235372
+  MFLOPS                        :           381.369915
+  MOPS   (concurrent)           :          5787.068844
+  MFLOPS (concurrent)           :           455.407916
+  A. V. Length                  :           107.050452
+  V. Op. Ratio (%)              :            96.871618
+  Memory Size (MB)              :          1152.000000
+  Max Concurrent Proc.          :                    4.
+    Conc. Time(>= 1) (sec)      :          5664.764333
+    Conc. Time(>= 2) (sec)      :           367.009852
+    Conc. Time(>= 3) (sec)      :           366.984929
+    Conc. Time(>= 4) (sec)      :           365.745458
+  Event Busy Count              :                    0.
+  Event Wait (sec)              :             0.000000
+  Lock Busy Count               :                    4.
+  Lock Wait (sec)               :             0.001378
+  Barrier Busy Count            :                    0.
+  Barrier Wait (sec)            :             0.000000
+  MIPS                          :           195.463096
+  MIPS (concurrent)             :           233.409710
+  I-Cache (sec)                 :             0.163046
+  O-Cache (sec)                 :            76.010138
+  Bank Conflict Time
+    CPU Port Conf. (sec)        :             5.026653
+    Memory Network Conf. (sec)  :           229.574971
+  ADB Hit Element Ratio (%)     :             0.000000
+
+  Start Time (date)    :  Fri Dec 15 15:21:11 GMT 2017
+  End   Time (date)    :  Fri Dec 15 16:55:39 GMT 2017
+
+real  1:34:27.9
+user    41:09.5
+sys         2.1

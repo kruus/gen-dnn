@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -24,6 +24,15 @@
 #include "cpu_engine.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+#include "consistency.hpp"
+
+#if !defined(MKLDNN_REF_CONV_DBG)
+#if !defined(NDEBUG)
+#define MKLDNN_REF_CONV_DBG 1
+#else
+#define MKLDNN_REF_CONV_DBG 1
+#endif
+#endif
 
 namespace mkldnn {
 namespace impl {
@@ -43,27 +52,30 @@ struct _ref_convolution_fwd_t: public cpu_primitive_t {
                     hint_fwd_pd)
         {}
 
-        DECLARE_COMMON_PD_T(_ref_convolution_fwd_t);
+        DECLARE_COMMON_PD_T("ref:any", _ref_convolution_fwd_t);
 
         virtual status_t init() override {
             using namespace prop_kind;
             using namespace data_type;
             assert(this->engine()->kind() == engine_kind::cpu);
-            bool ok = true
-                && this->set_default_params() == status::success
-                && utils::one_of(this->cdesc_().prop_kind, forward_training,
-                        forward_inference)
-                && this->cdesc_().alg_kind == alg_kind::convolution_direct
-                && this->cdesc_().src_desc.data_type == src_type
-                && this->cdesc_().weights_desc.data_type == wei_type
-                && this->cdesc_().accum_data_type == acc_type
-                && this->cdesc_().dst_desc.data_type == dst_type
-                && utils::implication(this->with_bias(), true
+            Consistency ok("ref_conv init"); // default here is never-verbose, SCHK
+#define AND_(...) SCHKV(ok,__VA_ARGS__)
+            AND_(this->set_default_params() == status::success);
+            AND_(utils::one_of(this->cdesc_().prop_kind, forward_training,
+                        forward_inference));
+            AND_(this->cdesc_().alg_kind == alg_kind::convolution_direct);
+            AND_(this->cdesc_().src_desc.data_type == src_type);
+            AND_(this->cdesc_().weights_desc.data_type == wei_type);
+            AND_(this->cdesc_().accum_data_type == acc_type);
+            AND_(this->cdesc_().dst_desc.data_type == dst_type);
+            AND_(utils::implication(this->with_bias(), true
                         && utils::implication(src_type == u8,
                             utils::one_of(this->cdesc_().bias_desc.data_type,
                                 f32, s32, s8, u8))
                         && utils::implication(src_type == f32,
-                            this->cdesc_().bias_desc.data_type == f32));
+                            this->cdesc_().bias_desc.data_type == f32)));
+            AND_(this->attr()->has_default_values());
+#undef AND_
             return ok ? status::success : status::unimplemented;
         }
     };
@@ -75,6 +87,9 @@ struct _ref_convolution_fwd_t: public cpu_primitive_t {
 #else
     _ref_convolution_fwd_t(const pd_t *pd, const input_vector &inputs,
             const output_vector &outputs)
+#ifdef TARGET_VANILLA
+        ; /* moved to .cpp file for more control & debug */
+#else
         : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {}
 #endif
 
@@ -124,22 +139,37 @@ struct ref_convolution_bwd_data_t: public cpu_primitive_t {
             : cpu_convolution_bwd_data_pd_t(engine, adesc, attr, hint_fwd_pd)
         {}
 
-        DECLARE_COMMON_PD_T(ref_convolution_bwd_data_t);
+        DECLARE_COMMON_PD_T("ref:any", ref_convolution_bwd_data_t);
 
         virtual status_t init() override {
             using namespace prop_kind;
             assert(this->engine()->kind() == engine_kind::cpu);
-            bool ok = true
-                && this->set_default_params() == status::success
-                && utils::one_of(this->desc()->prop_kind, backward,
-                        backward_data)
-                && this->desc()->alg_kind == alg_kind::convolution_direct
-                && this->desc()->diff_dst_desc.data_type == diff_dst_type
-                && this->desc()->weights_desc.data_type == wei_type
-                && this->desc()->accum_data_type == acc_type
-                && this->desc()->diff_src_desc.data_type == diff_src_type;
+            Consistency ok; // default here is never-verbose
+#ifdef MKLDNN_REF_CONV_DBG
+            {
+                char const* result;
+                mkldnn_primitive_desc_query( this, mkldnn_query_impl_info_str, 0, &result );
+                printf(" conv-fwd:%s:", result);
+                fflush(stdout);
+            }
+#endif
+#define AND_(...) SCHKV(ok,__VA_ARGS__)
+            AND_(this->set_default_params() == status::success);
+            AND_(this->desc()->prop_kind == backward_data);
+            AND_(this->desc()->alg_kind == alg_kind::convolution_direct);
+            AND_(this->desc()->diff_dst_desc.data_type == diff_dst_type);
+            AND_(this->desc()->weights_desc.data_type == wei_type);
+            AND_(this->desc()->accum_data_type == acc_type);
+            AND_(this->desc()->diff_src_desc.data_type == diff_src_type);
+            AND_(this->attr()->has_default_values());
+#undef AND_
+#ifdef MKLDNN_REF_CONV_DBG
+            if(ok){ printf("init-ok "); fflush(stdout); }
+#endif
             return ok ? status::success : status::unimplemented;
         }
+
+        virtual bool support_bias() const override { return true; }
     };
 
     ref_convolution_bwd_data_t(const pd_t *pd, const input_vector &inputs,
@@ -153,7 +183,6 @@ struct ref_convolution_bwd_data_t: public cpu_primitive_t {
 
     virtual void execute(event_t *e) {
         switch (conf_.desc()->prop_kind) {
-        case prop_kind::backward:
         case prop_kind::backward_data:
             execute_backward_data();
             break;
@@ -180,23 +209,23 @@ struct ref_convolution_bwd_weights_t: public cpu_primitive_t {
             : cpu_convolution_bwd_weights_pd_t(engine, adesc, attr, hint_fwd_pd)
         {}
 
-        DECLARE_COMMON_PD_T(ref_convolution_bwd_weights_t);
+        DECLARE_COMMON_PD_T("ref:any", ref_convolution_bwd_weights_t);
 
         virtual status_t init() override {
             using namespace prop_kind;
             assert(this->engine()->kind() == engine_kind::cpu);
-            bool ok = true
-                && this->set_default_params() == status::success
-                && utils::one_of(this->desc()->prop_kind, backward,
-                        backward_weights)
-                && this->desc()->alg_kind == alg_kind::convolution_direct
-                && this->desc()->src_desc.data_type == src_type
-                && this->desc()->diff_weights_desc.data_type == diff_wei_type
-                && this->desc()->diff_dst_desc.data_type == diff_dst_type
-                && this->desc()->accum_data_type == acc_type
-                && utils::implication(this->with_bias(),
+            Consistency ok;
+            OK_AND(this->set_default_params() == status::success);
+            OK_AND(this->desc()->prop_kind == backward_weights);
+            OK_AND(this->desc()->alg_kind == alg_kind::convolution_direct);
+            OK_AND(this->desc()->src_desc.data_type == src_type);
+            OK_AND(this->desc()->diff_weights_desc.data_type == diff_wei_type);
+            OK_AND(this->desc()->diff_dst_desc.data_type == diff_dst_type);
+            OK_AND(this->desc()->accum_data_type == acc_type);
+            OK_AND(utils::implication(this->with_bias(),
                         this->desc()->diff_bias_desc.data_type
-                        == diff_wei_type);
+                        == diff_wei_type));
+            OK_AND(this->attr()->has_default_values());
             return ok ? status::success : status::unimplemented;
         }
     };
@@ -212,7 +241,6 @@ struct ref_convolution_bwd_weights_t: public cpu_primitive_t {
 
     virtual void execute(event_t *e) {
         switch (conf_.desc()->prop_kind) {
-        case prop_kind::backward:
         case prop_kind::backward_weights:
             execute_backward_weights();
             break;

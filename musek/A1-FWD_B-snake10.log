@@ -1,0 +1,116 @@
+[ 23%] Built target mkldnn
+[ 24%] Built target simple-net-cpp
+[ 25%] Built target simple-training-net-c
+[ 26%] Built target simple-training-net-cpp
+[ 27%] Built target simple-net-c
+[ 28%] Built target test_c_symbols-c
+[ 29%] Built target api-c
+[ 30%] Built target api-io-c
+[ 31%] Built target mkldnn_gtest
+[ 32%] Built target test_convolution_backward_data_f32
+[ 35%] Built target test_convolution_relu_forward_s16s16s32
+[ 36%] Built target test_convolution_relu_forward_f32
+[ 38%] Built target test_convolution_forward_u8s8s32
+[ 39%] Built target test_convolution_forward_s16s16s32
+[ 41%] Built target test_convolution_forward_f32
+[ 43%] Built target test_reorder
+[ 44%] Built target test_sum
+[ 45%] Built target test_pooling_backward
+[ 46%] Built target test_convolution_format_any
+[ 48%] Built target test_iface_pd_iter
+[ 51%] Built target test_convolution_backward_weights
+[ 53%] Built target test_lrn_backward
+[ 55%] Built target test_convolution_forward_u8s8fp
+[ 57%] Built target test_concat
+[ 59%] Built target test_lrn_forward
+[ 61%] Built target test_softmax_forward
+[ 62%] Built target test_relu
+[ 64%] Built target test_inner_product_backward_weights
+[ 67%] Built target test_iface_attr
+[ 69%] Built target test_pooling_forward
+[ 71%] Built target test_batch_normalization
+[ 73%] Built target test_convolution_backward_data_s16s16s32
+[ 74%] Built target test_eltwise
+[ 75%] Built target test_inner_product_forward
+[ 76%] Built target test_inner_product_backward_data
+[100%] Built target benchdnn
+THREADS  : 
+cmd      :  C_PROGINF=DETAIL /usr/bin/time -v  ./benchdnn --mode=PT --dir=FWD_B g1mb8ic3ih227oc96oh55kh11sh4ph0n"mini:conv1" 
+/local/kruus/sx/sx-dnn/build/tests/benchdnn
+total 424
+-rwxrwxr-x 1 kruus ML 360216 Jan  3 08:16 benchdnn
+drwxrwxr-x 7 kruus ML   4096 Jan  3 08:13 CMakeFiles
+-rw-rw-r-- 1 kruus ML   1019 Jan  3 08:13 cmake_install.cmake
+-rw-rw-r-- 1 kruus ML    293 Jan  3 08:13 CTestTestfile.cmake
+drwxrwxr-x 3 kruus ML   4096 Jan  3 08:13 inputs
+-rw-rw-r-- 1 kruus ML  55199 Jan  3 08:13 Makefile
+ /local/kruus/sx/sx-dnn/build/tests/benchdnn inputs:
+COLUMN ... column -t
+bnorm                       conv_alexnet                conv_all                 conv_dilated
+conv_googlenet_v1           conv_googlenet_v2           conv_googlenet_v3        conv_regression_dilate
+conv_regression_general     conv_regression_group       conv_regression_padding  conv_regression_small_spatial
+conv_regression_stride      conv_resnet_50              conv_resnet_50_sparse    conv_segnet
+conv_ssd_300_voc0712        conv_vgg_11                 conv_vgg_19              deepbench
+deepbench_inference_device  deepbench_inference_server  deepbench_training       minialex
+test_bwd_d_regression       test_bwd_w_regression       test_conv_all            test_conv_attrs
+test_conv_dilated           test_conv_regression        test_fwd_regression
+eval  C_PROGINF=DETAIL /usr/bin/time -v  ./benchdnn --mode=PT --dir=FWD_B g1mb8ic3ih227oc96oh55kh11sh4ph0n"mini:conv1" 
+benchdnn --conv --mode=PERF+TEST -v0 ... init omp_max_thr=12  OK
+
+t:0 orig             2 s ok 933.673 MFlops   1.00 x FWD_B mb8ic3ih227oc96oh55kh11sh4nmini:conv1
+t:1 0.12             2 s ok 953.910 MFlops   1.02 x FWD_B mb8ic3ih227oc96oh55kh11sh4nmini:conv1
+t:2 sx3        18.965 ms ok  88.935 GFlops  95.25 x FWD_B mb8ic3ih227oc96oh55kh11sh4nmini:conv1
+t:3 sx4        20.352 ms ok  82.875 GFlops  88.76 x FWD_B mb8ic3ih227oc96oh55kh11sh4nmini:conv1
+[9075][REORDER DST][0,0,3,0,0] fp:   31718 fp0:   31718 dt:       0 diff:   31718 rdiff:       1
+[9076][REORDER DST][0,0,3,0,1] fp:   49895 fp0:   49895 dt:       0 diff:   49895 rdiff:       1
+[9077][REORDER DST][0,0,3,0,2] fp:   10552 fp0:   10552 dt:       0 diff:   10552 rdiff:       1
+[9078][REORDER DST][0,0,3,0,3] fp:  -35692 fp0:  -35692 dt:       0 diff:   35692 rdiff:       1
+[9079][REORDER DST][0,0,3,0,4] fp:  -51378 fp0:  -51378 dt:       0 diff:   51378 rdiff:       1
+[9080][REORDER DST][0,0,3,0,5] fp:  -11477 fp0:  -11477 dt:       0 diff:   11477 rdiff:       1
+[9081][REORDER DST][0,0,3,0,6] fp:   79553 fp0:   79553 dt:       0 diff:   79553 rdiff:       1
+[9082][REORDER DST][0,0,3,0,7] fp:   23301 fp0:   23301 dt:       0 diff:   23301 rdiff:       1
+[9083][REORDER DST][0,0,3,0,8] fp:  -41832 fp0:  -41832 dt:       0 diff:   41832 rdiff:       1
+@@@ [DST] diff: l0(``1``) l1:(5.68529e+10,1.77347e+09,5.50794e+10,``0.968806``) l2:(4.73834e+07,8.36221e+06,4.66397e+07,``0.984304``) l8:(125529,124008,125529,``1``)
+@@@ error [conv::doit(const conv::prb_t*, res_t*)::<lambda()>:1130]: 'compare_dst(p, dst_tt, dst_fp, r)' -> 1
+t:4 ref3        4.364 ms INCORRECT 386.507 GFlops 413.96 x FWD_B mb8ic3ih227oc96oh55kh11sh4nmini:conv1
+@@@ error [conv::doit(const conv::prb_t*, res_t*)::<lambda()>:1130]: 'compare_dst(p, dst_tt, dst_fp, r)' -> 1
+t:5 ref4      120.445 ms INCORRECT  14.003 GFlops  15.00 x FWD_B mb8ic3ih227oc96oh55kh11sh4nmini:conv1
+ TEST all_passed=0 0:MISTRUSTED __REPRO: mb8ic3ih227oc96oh55kh11sh4nmini:conv1
+T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 1806.460  avg_ms: 1806.460  avg speedup: 1.000 x 933.7 Mflops
+T:1  0.12   loops: 1   speedup: 1.022 x  wins: 1     tot_ms: 1768.137  avg_ms: 1768.137  avg speedup: 1.022 x 953.9 Mflops
+T:2  sx3    loops: 1   speedup: 95.253x  wins: 2     tot_ms: 18.965    avg_ms: 18.965  avg speedup: 95.253 x 88934.9 Mflops
+T:3  sx4    loops: 1   speedup: 88.763x  wins: 1     tot_ms: 20.352    avg_ms: 20.352  avg speedup: 88.763 x 82875.5 Mflops
+T:4  ref3   loops: 1   speedup: 413.964x  wins: 4     tot_ms: 4.364     avg_ms: 4.364  avg speedup: 413.964 x 386506.9 Mflops
+T:5  ref4   loops: 1   speedup: 14.998x  wins: -1    tot_ms: 120.445   avg_ms: 120.445  avg speedup: 14.998 x 14003.4 Mflops
+TEST final stats:
+T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 1806.460  avg_ms: 1806.460  avg speedup: 1.000 x 933.7 Mflops
+T:1  0.12   loops: 1   speedup: 1.022 x  wins: 1     tot_ms: 1768.137  avg_ms: 1768.137  avg speedup: 1.022 x 953.9 Mflops
+T:2  sx3    loops: 1   speedup: 95.253x  wins: 2     tot_ms: 18.965    avg_ms: 18.965  avg speedup: 95.253 x 88934.9 Mflops
+T:3  sx4    loops: 1   speedup: 88.763x  wins: 1     tot_ms: 20.352    avg_ms: 20.352  avg speedup: 88.763 x 82875.5 Mflops
+T:4  ref3   loops: 1   speedup: 413.964x  wins: 4     tot_ms: 4.364     avg_ms: 4.364  avg speedup: 413.964 x 386506.9 Mflops
+T:5  ref4   loops: 1   speedup: 14.998x  wins: -1    tot_ms: 120.445   avg_ms: 120.445  avg speedup: 14.998 x 14003.4 Mflops
+tests:1 impls:1 passed:0 skipped:0 mistrusted:1 unimplemented:0 failed:0total perf: min(ms):119.796 avg(ms):119.796
+ test_fail: 1
+	Command being timed: "./benchdnn --mode=PT --dir=FWD_B g1mb8ic3ih227oc96oh55kh11sh4ph0nmini:conv1"
+	User time (seconds): 115.90
+	System time (seconds): 0.20
+	Percent of CPU this job got: 1196%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:09.70
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 66588
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 3080
+	Voluntary context switches: 50
+	Involuntary context switches: 5452
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

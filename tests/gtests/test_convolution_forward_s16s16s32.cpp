@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+
 #include <stdint.h>
 #include "mkldnn_test_common.hpp"
 #include "gtest/gtest.h"
@@ -31,6 +32,6 @@ TEST_P(convolution_test, TestConvolution)
 #define S16S16S32
 #define DIRECTION_FORWARD
 #include "convolution_common.h"
-#include "diluted_convolution.h"
+#include "dilated_convolution.h"
 
 }

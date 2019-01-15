@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@
 #include "c_types_map.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+#include "consistency.hpp" // debug: print reason for consistency failures
 
 using namespace mkldnn::impl;
 using namespace mkldnn::impl::utils;
@@ -28,7 +29,8 @@ using namespace mkldnn::impl::prop_kind;
 using namespace mkldnn::impl::alg_kind;
 using namespace mkldnn::impl::types;
 
-namespace {
+namespace mkldnn {
+namespace impl {
 status_t conv_desc_init(convolution_desc_t *conv_desc,
         prop_kind_t prop_kind, alg_kind_t alg_kind,
         const memory_desc_t *src_desc, const memory_desc_t *weights_desc,
@@ -52,7 +54,7 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
 
     if (padding_r == nullptr) padding_r = padding_l;
 
-    convolution_desc_t cd = {};
+    auto cd = convolution_desc_t();
     cd.primitive_kind = primitive_kind::convolution;
     cd.prop_kind = prop_kind;
     cd.alg_kind = alg_kind;
@@ -88,76 +90,75 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
             weights_desc->data_type, dst_desc->data_type, prop_kind);
 
     const int g = with_groups ? weights_desc->dims[0] : 1;
+    const int bias_dim = prop_kind == backward_data
+        ? src_desc->dims[1]
+        : dst_desc->dims[1];
 
-#ifdef NDEBUG
+#if 0 // orig
     bool consistency = true
-        && src_desc->ndims == 4
-        && dst_desc->ndims == 4
-        && utils::one_of(weights_desc->ndims, 4, 5)
+        && memory_desc_wrapper(weights_desc).nelems()
+        && src_desc->ndims == dst_desc->ndims
+        && utils::one_of(src_desc->ndims, 4, 5)
+        && utils::one_of(weights_desc->ndims, src_desc->ndims,
+                src_desc->ndims + 1)
         && (with_bias ? bias_desc->ndims == 1 : true)
-        && (with_bias ? bias_desc->dims[0] == dst_desc->dims[1] : true)
+        && (with_bias ? bias_desc->dims[0] == bias_dim : true)
         && src_desc->dims[0] == dst_desc->dims[0]
         && src_desc->dims[1] == g * weights_desc->dims[with_groups + 1]
         && dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0];
 #else
-    int const lenmax = 1024;
-    static char buffer[lenmax];
-    char *buf = &buffer[0];
-    int rem_len = lenmax;
-#define DPRINT(...) do \
-    { \
-        int n = snprintf(buf, rem_len, __VA_ARGS__); \
-        if( n > rem_len ){ rem_len = 0; } \
-        else { buf+=n; rem_len-=n; } \
-    } while(0)
-#define AND_WANT( COND ) do { \
-    bool cond; \
-    if (!(cond=(COND))){ \
-        DPRINT("Oops [%s:%d] %s\n", __FILE__, __LINE__, #COND); \
-        consistency = false; \
-    } \
-}while(0)
-    bool consistency = true;
-    AND_WANT((src_desc->ndims == 4));
-    AND_WANT((dst_desc->ndims == 4));
-    AND_WANT((utils::one_of(weights_desc->ndims, 4, 5)));
-    AND_WANT(((with_bias ? bias_desc->ndims == 1 : true)));
-    AND_WANT(((with_bias ? bias_desc->dims[0] == dst_desc->dims[1] : true)));
-    AND_WANT((src_desc->dims[0] == dst_desc->dims[0]));
-    AND_WANT((src_desc->dims[1] == g * weights_desc->dims[with_groups + 1]));
-    AND_WANT((dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0]));
+    // SCHK is silent, SCHKV prints failures in debug mode: consistency.hpp
+    // SCHK* macros short-circuit evaluation, ACHK* macros do not.
+#define AND_(...) SCHKV(consistency,__VA_ARGS__)
+    Consistency consistency("convolution consistency:");
+    AND_(memory_desc_wrapper(weights_desc).nelems());
+    AND_(src_desc->ndims == dst_desc->ndims);
+    AND_(utils::one_of(src_desc->ndims, 4, 5));
+    AND_(utils::one_of(weights_desc->ndims, src_desc->ndims,
+            src_desc->ndims + 1));
+    AND_(with_bias ? bias_desc->ndims == 1 : true);
+    AND_(with_bias ? bias_desc->dims[0] == bias_dim : true);
+    AND_(src_desc->dims[0] == dst_desc->dims[0]);
+    AND_(src_desc->dims[1] == g * weights_desc->dims[with_groups + 1]);
+    AND_(dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0]);
 #endif
-    for (int i = 2; i <= 3; ++i)
+    for (int i = 2; i < src_desc->ndims; ++i)
     {
         int src = src_desc->dims[i];
         int ker = weights_desc->dims[with_groups + i];
         int dil = cd.dilates[i - 2];
-        int pad = padding_l[i - 2] + padding_r[i - 2];
+        int pad_l = padding_l[i - 2];
+        int pad_r = padding_r[i - 2];
         int str = strides[i - 2];
         int dst = dst_desc->dims[i];
+        int ker_range = 1 + (ker - 1) * (dil + 1);
 
-#ifdef NDEBUG
+#if 0 // old
         consistency = consistency &&
             (src - ((ker - 1) * (dil + 1) + 1) + pad) / str + 1 == dst;
+#endif
+#if 0 // orig
+        if (str < 1) return invalid_arguments; // XXX why special?
+        consistency = consistency
+            && dil >= 0
+            && pad_l >= 0
+            && pad_r + str > 0
+            && (src - ker_range + pad_l + pad_r) / str + 1 == dst;
 #else
-        AND_WANT((src - ((ker - 1) * (dil + 1) + 1) + pad) / str + 1 == dst);
-        if( !consistency ){ DPRINT("(src-((ker-1)+(dil+1)+1) + pad)/str+1 = (%d-(%d*%d+1)+%d)/%d+1 = %d/%d+1 = %d, but dst = %d\n",
-                src,ker-1,dil+1,pad,str, (src - ((ker - 1) * (dil + 1) + 1) + pad), str,  (src - ((ker - 1) * (dil + 1) + 1) + pad) / str + 1, dst);}
+        //consistency:
+        AND_(str >= 1);
+        AND_(dil >= 0);
+        AND_(pad_l >= 0);
+        AND_(pad_r + str > 0);
+        AND_((src - ker_range + pad_l + pad_r) / str + 1 == dst);
 #endif
     }
-#ifndef NDEBUG
-    //printf("consistency = %s\n", (consistency?"true":"false"));
-    if (!consistency){
-        printf("Msg %s\n", &buffer[0]);
-        fflush(stdout);
-    }
-#undef AND_WANT
-#undef DPRINT
-#endif
+#undef AND_
     if (!consistency) return invalid_arguments;
 
     *conv_desc = cd;
     return success;
+}
 }
 }
 
@@ -169,7 +170,7 @@ status_t mkldnn_convolution_forward_desc_init(convolution_desc_t *conv_desc,
         padding_kind_t padding_kind) {
     if (!one_of(prop_kind, forward_training, forward_inference))
         return invalid_arguments;
-    return conv_desc_init(conv_desc, prop_kind, alg_kind, src_desc,
+    return mkldnn::impl::conv_desc_init(conv_desc, prop_kind, alg_kind, src_desc,
             weights_desc, bias_desc, dst_desc, strides, nullptr,
             padding_l, padding_r, padding_kind);
 }
@@ -183,7 +184,7 @@ status_t mkldnn_dilated_convolution_forward_desc_init(
         const dims_t padding_r, padding_kind_t padding_kind) {
     if (!one_of(prop_kind, forward_training, forward_inference))
         return invalid_arguments;
-    return conv_desc_init(conv_desc, prop_kind, alg_kind, src_desc,
+    return mkldnn::impl::conv_desc_init(conv_desc, prop_kind, alg_kind, src_desc,
             weights_desc, bias_desc, dst_desc, strides, dilates,
             padding_l, padding_r, padding_kind);
 }
@@ -194,9 +195,9 @@ status_t mkldnn_convolution_backward_data_desc_init(
         const memory_desc_t *diff_dst_desc, const dims_t strides,
         const dims_t padding_l, const dims_t padding_r,
         padding_kind_t padding_kind) {
-    return conv_desc_init(conv_desc, backward_data, alg_kind, diff_src_desc,
-            weights_desc, nullptr, diff_dst_desc, strides,      /*no bias  */
-            nullptr, padding_l, padding_r, padding_kind);       /*no dilate*/
+    return mkldnn::impl::conv_desc_init(conv_desc, backward_data, alg_kind, diff_src_desc,
+            weights_desc, nullptr, diff_dst_desc, strides, nullptr,
+            padding_l, padding_r, padding_kind); /* no bias, no dilate */
 }
 
 status_t mkldnn_dilated_convolution_backward_data_desc_init(
@@ -205,7 +206,7 @@ status_t mkldnn_dilated_convolution_backward_data_desc_init(
         const memory_desc_t *diff_dst_desc, const dims_t strides,
         const dims_t dilates, const dims_t padding_l, const dims_t padding_r,
         padding_kind_t padding_kind) {
-    return conv_desc_init(conv_desc, backward_data, alg_kind, diff_src_desc,
+    return mkldnn::impl::conv_desc_init(conv_desc, backward_data, alg_kind, diff_src_desc,
             weights_desc, nullptr, diff_dst_desc, strides, dilates,
             padding_l, padding_r, padding_kind);
 }
@@ -217,7 +218,7 @@ status_t mkldnn_convolution_backward_weights_desc_init(
         const memory_desc_t *diff_dst_desc, const dims_t strides,
         const dims_t padding_l, const dims_t padding_r,
         padding_kind_t padding_kind) {
-    return conv_desc_init(conv_desc, backward_weights, alg_kind, src_desc,
+    return mkldnn::impl::conv_desc_init(conv_desc, backward_weights, alg_kind, src_desc,
             diff_weights_desc, diff_bias_desc, diff_dst_desc, strides,
             nullptr, padding_l, padding_r, padding_kind);
 }
@@ -229,7 +230,7 @@ status_t mkldnn_dilated_convolution_backward_weights_desc_init(
         const memory_desc_t *diff_dst_desc, const dims_t strides,
         const dims_t dilates, const dims_t padding_l, const dims_t padding_r,
         padding_kind_t padding_kind) {
-    return conv_desc_init(conv_desc, backward_weights, alg_kind, src_desc,
+    return mkldnn::impl::conv_desc_init(conv_desc, backward_weights, alg_kind, src_desc,
             diff_weights_desc, diff_bias_desc, diff_dst_desc, strides,
             dilates, padding_l, padding_r, padding_kind);
 }

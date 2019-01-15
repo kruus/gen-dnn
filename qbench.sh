@@ -1,0 +1,3 @@
+# a sample one-liner to go through a lot of fast benchdnn tests: build/ + 1 thread + FWD_D + test_conv_regression (adjust as needed)
+#cp -uarv tests/benchdnn/inputs/* build/tests/benchdnn/inputs/ && (cd build && make && cd tests/benchdnn && OMP_NUM_THREADS=1 ./benchdnn --conv --mode=T -v0 --cfg=f32 --dir=FWD_D --batch=inputs/test_conv_regression && echo YAY) >& foo.log; tail foo.log
+cp -uarv tests/benchdnn/inputs/* build/tests/benchdnn/inputs/ && (cd build && make && cd tests/benchdnn && OMP_NUM_THREADS=1 ./benchdnn --conv --mode=T -v0 --cfg=f32 --dir=FWD_D --batch=inputs/test_conv_regression && echo YAY) >& foo.log; tail foo.log

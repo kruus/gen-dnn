@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -18,9 +18,14 @@
 #define CPU_BARRIER_HPP
 
 #include <assert.h>
-
-#include "jit_generator.hpp"
+#include "cpu_isa_traits.hpp"    // poor man's version is all that is needed for generic header
 #include "utils.hpp"
+#if defined(_MULTI_THREAD) && ! MULTI_THREAD
+#include <stdexcept>
+#endif
+#if !defined(TARGET_VANILLA)
+#include "jit_generator.hpp"
+#endif
 
 namespace mkldnn {
 namespace impl {
@@ -28,9 +33,20 @@ namespace cpu {
 
 namespace simple_barrier {
 
-STRUCT_ALIGN(64,
+#if defined(_MULTI_THREAD) && ! MULTI_THREAD
+struct ctx_t {};
+
+// In C++14 can be constexpr, not C++11
+inline void ctx_init( ctx_t *ctx_t ) {}
+inline void barrier(ctx_t *ctx, int nthr){
+    if (nthr > 1)
+        throw std::runtime_error("nthr must be <= 1 (compiled without _MULTI_THREAD)");
+}
+
+#else // assume multiple thread support
+
+STRUCT_ALIGN(CACHE_LINE_SIZE,
 struct ctx_t {
-    enum { CACHE_LINE_SIZE = 64 };
     volatile size_t ctr;
     char pad1[CACHE_LINE_SIZE - 1 * sizeof(size_t)];
     volatile size_t sense;
@@ -40,15 +56,20 @@ struct ctx_t {
 inline void ctx_init(ctx_t *ctx) { *ctx = utils::zero<ctx_t>(); }
 void barrier(ctx_t *ctx, int nthr);
 
+#endif // "barrier(ctx,nthr)" support
+
+#if !defined(TARGET_VANILLA)
 /** injects actual barrier implementation into another jitted code
- * @p code      -- jit_generator object where the barrier is to be injected
- * @p reg_ctx   -- read-only register with pointer to the barrier context
- * @p reg_nnthr -- read-only register with the # of synchronizing threads
+ * @params:
+ *   code      -- jit_generator object where the barrier is to be injected
+ *   reg_ctx   -- read-only register with pointer to the barrier context
+ *   reg_nnthr -- read-only register with the # of synchronizing threads
  */
 void generate(jit_generator &code, Xbyak::Reg64 reg_ctx,
         Xbyak::Reg64 reg_nthr);
+#endif
 
-}
+}//simple_barrier::
 
 }
 }

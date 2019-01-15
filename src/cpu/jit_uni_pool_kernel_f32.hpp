@@ -1,5 +1,6 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
+* Copyright 2018 YANDEX LLC
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -41,20 +42,22 @@ struct jit_uni_pool_kernel_f32: public jit_generator {
 
     jit_pool_conf_t jpp;
 
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_uni_pool_kernel_f32)
+
     void operator()(jit_pool_call_s *arg) { jit_ker(arg); }
     static status_t init_conf(jit_pool_conf_t &jbp,
             const pooling_desc_t &pd, const memory_desc_wrapper &src_d,
             const memory_desc_wrapper &dst_d);
 
 private:
-    using Vmm = typename utils::conditional3<isa == sse42, Xmm, isa == avx2,
+    using Vmm = typename utils::conditional3<isa == sse42, Xmm, isa == avx,
                                              Ymm, Zmm>::type;
     Xmm xreg(int idx) { return Xmm((isa == avx512_common ? 31 : 15) - idx); }
     Ymm yreg(int idx) { return Ymm(xreg(idx).getIdx()); }
     Vmm vreg(int idx) { return Vmm(xreg(idx).getIdx()); }
 
     const AddressFrame &vmmword = (isa == sse42) ? xword :
-                                  (isa == avx2) ? yword : zword;
+                                  (isa == avx) ? yword : zword;
 
     Xmm vmm_mask = Xmm(0);
     Xmm xmm_ker_area_h = Xmm(2);
@@ -75,7 +78,7 @@ private:
     reg64_t aux_reg_input  = r9;
     reg64_t reg_index      = r10;
     reg64_t reg_output     = r12;
-    reg64_t reg_arr_init   = r13;
+    reg64_t reg_kd_pad_shift = r13;
     reg64_t dst_ptr        = abi_param1;
 
     reg64_t kj      = r14;
@@ -85,40 +88,90 @@ private:
     reg64_t tmp_gpr = abi_not_param1;
     reg64_t reg_ker_area_h = rdx;
 
+    reg64_t zero_size = r15;
+    reg64_t ki = r12;
+    reg64_t aux_reg_input_d = r8;
+
     Xbyak::Reg32 reg_shuf_mask = esi;
 
     int prev_kw;
     void (*jit_ker)(jit_pool_call_s *);
 
     void maybe_recalculate_divisor(int jj, int ur_w, int pad_l, int pad_r);
-    void avg_step(int ur_w, int pad_l, int pad_r, const char *kh_label);
-    void max_step_fwd(int ur_w, int pad_l, int pad_r, const char *kh_label);
-    void max_step_bwd(int ur_w, int pad_l, int pad_r, const char *kh_label);
+    void avg_step(int ur_w, int pad_l, int pad_r);
+    void max_step_fwd(int ur_w, int pad_l, int pad_r);
+    void max_step_bwd(int ur_w, int pad_l, int pad_r);
 
     void maybe_zero_diff_src();
 
-    void step(int ur_w, int pad_l, int pad_r, const char *kh_label) {
+    void step(int ur_w, int pad_l, int pad_r) {
         if (jpp.alg == alg_kind::pooling_max) {
             if(jpp.is_backward)
-                max_step_bwd(ur_w, pad_l, pad_r, kh_label);
+                max_step_bwd(ur_w, pad_l, pad_r);
             else
-                max_step_fwd(ur_w, pad_l, pad_r, kh_label);
+                max_step_fwd(ur_w, pad_l, pad_r);
         }
         else
-            avg_step(ur_w, pad_l, pad_r, kh_label);
+            avg_step(ur_w, pad_l, pad_r);
     }
 
-    void step_high_half(int ur_w, int pad_l, int pad_r, const char *kh_label) {
+    void step_high_half(int ur_w, int pad_l, int pad_r) {
         add(reg_input, sizeof(float) * 4);
         add(reg_output, sizeof(float) * 4);
         if (jpp.alg == alg_kind::pooling_max &&
                 (jpp.is_training || jpp.is_backward))
             add(reg_index, types::data_type_size(jpp.ind_dt) * 4);
 
-        step(ur_w, pad_l, pad_r, kh_label);
+        step(ur_w, pad_l, pad_r);
     }
 
     void generate();
+
+    void avx_vpadd1(const Ymm& y0, const Xmm& x1, const Xmm& xtmp) {
+        assert(y0.getIdx() != x1.getIdx());
+        vextractf128(xtmp, y0, 0);
+        vpaddd(xtmp, xtmp, x1);
+        vinsertf128(y0, y0, xtmp, 0);
+        vextractf128(xtmp, y0, 1);
+        vpaddd(xtmp, xtmp, x1);
+        vinsertf128(y0, y0, xtmp, 1);
+    }
+
+    void avx_vpadd1(const Xmm& x0, const Xmm& x1, const Xmm&) {
+        assert(false /*function should not be used*/);
+        paddd(x0, x1);
+    }
+
+    void avx_pmovzxbd(const Ymm& y0, const Xmm& x1, const Xmm& xtmp) {
+        Xmm x0(y0.getIdx());
+        pshufd(xmm_tmp, x1, 1);
+        pmovzxbd(x0, x1);
+        pmovzxbd(xmm_tmp, xmm_tmp);
+        vinsertf128(y0, y0, xmm_tmp, 1);
+    }
+
+    void avx_pmovzxbd(const Xmm& x0, const Xmm& x1, const Xmm&) {
+        assert(false /*function should not be used*/);
+        pmovzxbd(x0, x1);
+    }
+
+    void avx_pcmpeqd(const Ymm& y0, const Ymm& y1, const Ymm& y2, const Xmm& xtmp) {
+        assert(y0.getIdx() != y1.getIdx());
+        assert(y0.getIdx() != y2.getIdx());
+        Xmm x0(y0.getIdx());
+        Xmm x2(y2.getIdx());
+        vextractf128(x0, y1, 1);
+        vextractf128(xtmp, y2, 1);
+        pcmpeqd(xtmp, x0);
+        vextractf128(x0, y1, 0);
+        pcmpeqd(x0, x2);
+        vinsertf128(y0, y0, xtmp, 1);
+    }
+
+    void avx_pcmpeqd(const Xmm& x0, const Xmm& x1, const Xmm&, const Xmm&) {
+        assert(false /*function should not be used*/);
+        pcmpeqd(x0, x1);
+    }
 };
 
 }

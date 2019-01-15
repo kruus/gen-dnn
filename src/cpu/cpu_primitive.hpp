@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -22,6 +22,12 @@
 #include "c_types_map.hpp"
 #include "event.hpp"
 #include "primitive.hpp"
+
+#define CPU_PRIMITIVE_HPP_DBG 0
+
+#if CPU_PRIMITIVE_HPP_DBG
+#include "mkldnn_io.h"
+#endif
 
 namespace mkldnn {
 namespace impl {
@@ -48,7 +54,24 @@ struct cpu_primitive_t: public primitive_t {
     }
 
     const char *input_memory(size_t index = 0) const {
-        if (index >= this->inputs().size()) return nullptr;
+        //if (index >= this->inputs().size()) return nullptr;
+        if (index >= this->inputs().size()) {
+#if CPU_PRIMITIVE_HPP_DBG
+            printf(" No cpu_primitive.hpp input_memory(index=%lu) --> nullptr",
+                   (long unsigned)index);
+            fflush(stdout);
+#endif
+            return nullptr;
+        }
+#if CPU_PRIMITIVE_HPP_DBG
+        char buf[500];
+        mkldnn_name_primitive_at( &this->inputs()[index], buf, 500 );
+        printf(" cpu_primitive.hpp input_memory(index=%lu) :\n"
+               "    this->inputs()[index] = %s\n",
+               (long unsigned)index, &buf[0]);
+        fflush(stdout);
+#endif
+
         const size_t oi = this->inputs()[index].output_index;
         auto p = static_cast<const cpu_primitive_t *>(
                 this->inputs()[index].primitive);

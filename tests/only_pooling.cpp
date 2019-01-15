@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ typedef float real_t;
 static void init_src(const mkldnn::tensor::dims &dim, real_t *x)
 {
     int N = dim[0], C = dim[1], H = dim[2], W = dim[3];
-#   pragma omp parallel for collapse(2)
+    OMP(parallel for collapse(2))//;
     for (int n = 0; n < N; n += 1)
     for (int c = 0; c < C; c += 1)
     for (int h = 2; h+2 <= H; h += 2)
@@ -42,15 +42,14 @@ static int check_dst(const mkldnn::tensor::dims &dim, const real_t *x)
 {
     int n_errors = 0;
     int N = dim[0], C = dim[1], H = dim[2], W = dim[3];
-#   pragma omp parallel for collapse(4)
+    OMP(parallel for collapse(4))//;
     for (int n = 0; n < N; ++n)
     for (int c = 0; c < C; ++c)
     for (int h = 0; h < H; ++h)
     for (int w = 0; w < W; ++w)
     {
         if (x[w + W*h + c*W*H + n*W*H*C] != c*n)
-#           pragma omp atomic
-            n_errors += 1;
+            OMP(atomic) n_errors += 1;
     }
     return n_errors;
 }
@@ -98,3 +97,4 @@ int main(int argc, char **argv) {
     printf("lazy: %s\n", rc ? "failed" : "passed");
     return rc;
 }
+// vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s

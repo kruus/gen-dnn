@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
+#include "mkldnn_io.hpp" // ve debug (uninitialized structs compiler bug)
 using namespace mkldnn::impl;
 using namespace mkldnn::impl::utils;
 using namespace mkldnn::impl::status;
@@ -42,7 +43,7 @@ status_t eltwise_desc_init(eltwise_desc_t *eltwise_desc, prop_kind_t prop_kind,
         && implication(prop_kind == backward_data, diff_data_desc != nullptr);
     if (!args_ok) return invalid_arguments;
 
-    eltwise_desc_t ed = {};
+    auto ed = eltwise_desc_t();
     ed.primitive_kind = primitive_kind::eltwise;
     ed.prop_kind = prop_kind;
     ed.alg_kind = alg_kind;
@@ -51,9 +52,31 @@ status_t eltwise_desc_init(eltwise_desc_t *eltwise_desc, prop_kind_t prop_kind,
     ed.diff_data_desc =
         (ed.prop_kind == backward_data) ? *diff_data_desc : zero_md();
 
+#if 0 && defined(__ve) // ve debug
+    if( ed.prop_kind != backward_data ){
+        for(int i=0; i<sizeof(mkldnn_memory_desc_t); ++i){
+            if( ((const char *)&ed.diff_data_desc) [i] != '\0' ){
+                printf(" WARNING: zero_md had a nonzero byte [i=%d]\n",i);
+            }
+        }
+    }
+#endif
+
     ed.alpha = alpha;
     ed.beta = beta;
     ed.negative_slope = ed.alpha;
+    // Good. all struct values initialized
+
+#if 0 && defined(__ve) // ve debug
+    {
+        using namespace std;
+        using mkldnn::operator<<; //(std::ostream& os, mkldnn_memory_desc_t const& md);
+        cout<<" "<<__FILE__<<":"<<__LINE__<<" memory_desc_wrapper(ed.data_desc).nelems() = "
+            <<memory_desc_wrapper(ed.data_desc).nelems()<<endl;
+        cout<<" eltwise data_desc = "<<ed.data_desc<<endl;
+        cout<<" eltwise diff_data_desc = "<<ed.diff_data_desc<<endl;
+    }
+#endif
 
     bool consistency = true
         && implication(ed.prop_kind == backward_data,
@@ -97,4 +120,4 @@ status_t mkldnn_relu_backward_desc_init(eltwise_desc_t *relu_desc,
 }
 
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

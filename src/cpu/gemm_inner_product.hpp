@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@
 #include "cpu_engine.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+#include "gemm/gemm.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -37,39 +38,29 @@ struct gemm_inner_product_fwd_t: public cpu_primitive_t {
                 const inner_product_fwd_pd_t *hint_fwd_pd)
             : cpu_inner_product_fwd_pd_t(engine, adesc, attr, hint_fwd_pd) {}
 
-        DECLARE_COMMON_PD_T(gemm_inner_product_fwd_t);
+        DECLARE_COMMON_PD_T(GEMM_IMPL_STR, gemm_inner_product_fwd_t);
 
         virtual status_t init() override {
-#ifdef USE_CBLAS
-            using namespace prop_kind;
-            using namespace memory_format;
             using namespace utils;
             assert(engine()->kind() == engine_kind::cpu);
+
             bool ok = true
                 && this->set_default_params() == status::success
-                && one_of(desc()->prop_kind, forward_training,
-                        forward_inference)
+                && one_of(desc()->prop_kind, prop_kind::forward_training,
+                        prop_kind::forward_inference)
+                && !has_zero_dim_memory()
                 && everyone_is(data_type, desc()->src_desc.data_type,
                         desc()->weights_desc.data_type,
                         desc()->dst_desc.data_type)
                 && implication(this->with_bias(),
                         data_type == desc()->bias_desc.data_type)
-#if MKLDNN_JIT_TYPES > 0
-                && implication(src_pd_.desc()->format == nChw8c,
-                        weights_pd_.desc()->format == oIhw8i)
-#endif
-                && implication(src_pd_.desc()->format == nchw,
-                        weights_pd_.desc()->format == oihw)
-                && implication(src_pd_.desc()->format == nc,
-                        weights_pd_.desc()->format == oi)
-                && dst_pd_.desc()->format == nc
-                && memory_desc_wrapper(src_pd()).is_dense()
-                && memory_desc_wrapper(dst_pd()).is_dense()
-                && memory_desc_wrapper(weights_pd()).is_dense();
+                && attr()->output_scales_.has_default_values()
+                && attr()->post_ops_.len_ <= 1
+                && utils::implication(attr()->post_ops_.len_ == 1,
+                        attr()->post_ops_.entry_[0].is_relu(true, false))
+                && dense_gemm_consitency_check(src_pd(), weights_pd(),
+                        dst_pd());
             return ok ? status::success : status::unimplemented;
-#else
-            return status::unimplemented;
-#endif
         }
     };
 
@@ -97,36 +88,23 @@ struct gemm_inner_product_bwd_data_t: public cpu_primitive_t {
             : cpu_inner_product_bwd_data_pd_t(engine, adesc, attr,
                     hint_fwd_pd) {}
 
-        DECLARE_COMMON_PD_T(gemm_inner_product_bwd_data_t);
+        DECLARE_COMMON_PD_T(GEMM_IMPL_STR, gemm_inner_product_bwd_data_t);
 
         virtual status_t init() override {
-#ifdef USE_CBLAS
-            using namespace prop_kind;
-            using namespace memory_format;
             using namespace utils;
             assert(engine()->kind() == engine_kind::cpu);
+
             bool ok = true
                 && this->set_default_params() == status::success
-                && desc()->prop_kind == backward_data
+                && desc()->prop_kind == prop_kind::backward_data
+                && !has_zero_dim_memory()
                 && everyone_is(data_type, desc()->diff_src_desc.data_type,
                         desc()->weights_desc.data_type,
                         desc()->diff_dst_desc.data_type)
-#if MKLDNN_JIT_TYPES > 0
-                && implication(diff_src_pd_.desc()->format == nChw8c,
-                        weights_pd_.desc()->format == oIhw8i)
-#endif
-                && implication(diff_src_pd_.desc()->format == nchw,
-                        weights_pd_.desc()->format == oihw)
-                && implication(diff_src_pd_.desc()->format == nc,
-                        weights_pd_.desc()->format == oi)
-                && diff_dst_pd_.desc()->format == nc
-                && memory_desc_wrapper(diff_src_pd()).is_dense()
-                && memory_desc_wrapper(diff_dst_pd()).is_dense()
-                && memory_desc_wrapper(weights_pd()).is_dense();
+                && attr()->has_default_values()
+                && dense_gemm_consitency_check(diff_src_pd(), weights_pd(),
+                        diff_dst_pd());
             return ok ? status::success : status::unimplemented;
-#else
-            return status::unimplemented;
-#endif
         }
     };
 
@@ -154,36 +132,23 @@ struct gemm_inner_product_bwd_weights_t: public cpu_primitive_t {
             : cpu_inner_product_bwd_weights_pd_t(engine, adesc, attr,
                     hint_fwd_pd) {}
 
-        DECLARE_COMMON_PD_T(gemm_inner_product_bwd_weights_t);
+        DECLARE_COMMON_PD_T(GEMM_IMPL_STR, gemm_inner_product_bwd_weights_t);
 
         virtual status_t init() override {
-#ifdef USE_CBLAS
-            using namespace prop_kind;
-            using namespace memory_format;
             using namespace utils;
             assert(engine()->kind() == engine_kind::cpu);
             bool ok = true
                 && this->set_default_params() == status::success
-                && desc()->prop_kind == backward_weights
+                && desc()->prop_kind == prop_kind::backward_weights
+                && !has_zero_dim_memory()
                 && everyone_is(data_type, desc()->src_desc.data_type,
                         desc()->diff_weights_desc.data_type,
                         desc()->diff_dst_desc.data_type)
-#if MKLDNN_JIT_TYPES > 0
-                && implication(src_pd_.desc()->format == nChw8c,
-                        diff_weights_pd_.desc()->format == oIhw8i)
-#endif
-                && implication(src_pd_.desc()->format == nchw,
-                        diff_weights_pd_.desc()->format == oihw)
-                && implication(src_pd_.desc()->format == nc,
-                        diff_weights_pd_.desc()->format == oi)
-                && diff_dst_pd_.desc()->format == nc
-                && memory_desc_wrapper(src_pd()).is_dense()
-                && memory_desc_wrapper(diff_dst_pd()).is_dense()
-                && memory_desc_wrapper(diff_weights_pd()).is_dense();
+                && attr()->has_default_values()
+                && dense_gemm_consitency_check(src_pd(), diff_weights_pd(),
+                        diff_dst_pd());
+
             return ok ? status::success : status::unimplemented;
-#else
-            return status::unimplemented;
-#endif
         }
     };
 

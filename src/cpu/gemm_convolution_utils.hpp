@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -20,8 +20,10 @@
 #include "c_types_map.hpp"
 #include "cpu_convolution_pd.hpp"
 #include "cpu_engine.hpp"
+// This jit_*.hpp file is also used for vanilla, with heavily pruned conf_t structures
 #include "jit_primitive_conf.hpp"
 #include "mkldnn_thread.hpp"
+#include "scratchpad.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -29,16 +31,22 @@ namespace cpu {
 
 namespace jit_gemm_convolution_utils {
 
-    void im2col (jit_gemm_conv_conf_t &jcp, const float *im, float *col);
-    void col2im (jit_gemm_conv_conf_t &jcp, const float *col, float *im);
+    void im2col_3d(jit_gemm_conv_conf_t &jcp, const float *im, float *col,
+        int od);
+    void im2col(jit_gemm_conv_conf_t &jcp, const float *im, float *col);
+    void im2col_u8(jit_gemm_conv_conf_t &jcp, const uint8_t *im, uint8_t *col);
+    void col2im_s32(jit_gemm_conv_conf_t &jcp, const int32_t *col, int32_t *im);
+    void col2im_3d(jit_gemm_conv_conf_t &jcp, const float *col, float *im,
+        int od);
+    void col2im(jit_gemm_conv_conf_t &jcp, const float *col, float *im);
 
     void init_conf(jit_gemm_conv_conf_t &jcp,
         const convolution_desc_t &cd, const memory_desc_wrapper &src_d,
         const memory_desc_wrapper &weights_d, const memory_desc_wrapper &dst_d,
-        bool with_relu = false, float relu_negative_slope = -1.0);
+        int max_threads, bool with_relu = false, float relu_negative_slope = -1.0);
 
-    status_t prepare_workspace(jit_gemm_conv_conf_t &jcp, float **ws,
-        bool is_bwd_filt, const size_t weights_size);
+    status_t prepare_scratchpad(jit_gemm_conv_conf_t &jcp,
+                scratchpad_t **col_scratchpad_, size_t size, const int nthr);
 
     void bwd_weights_balance(int ithr, int nthr,
         int ngroups, int mb, int &ithr_g, int &nthr_g, int &ithr_mb,

@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -23,6 +23,10 @@
 #include <stdint.h>
 
 #include "gtest/gtest.h"
+
+#if defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+#define collapse(x)
+#endif
 
 #include "mkldnn.hpp"
 
@@ -48,16 +52,58 @@ template <> inline void assert_eq<float>(float a, float b) {
     ASSERT_FLOAT_EQ(a, b);
 }
 
-inline size_t map_index(const mkldnn::memory::desc &md, size_t index) {
-#if MKLDNN_JIT_TYPES > 0
-    using fmt = mkldnn::memory::format;
-    const fmt fwd_weights_g = fmt::gOIhw8i16o2i;
-    const fmt fwd_weights = fmt::OIhw8i16o2i;
-    const fmt bwd_weights_g = fmt::gOIhw8o16i2o;
-    const fmt bwd_weights = fmt::OIhw8o16i2o;
+template <typename data_t> inline data_t out_round(float x,
+        mkldnn_round_mode_t rmode = mkldnn_round_nearest)
+{ return (data_t)(rmode == mkldnn_round_down ? floorf(x) : nearbyintf(x)); }
+template <> inline float out_round<float>(float x, mkldnn_round_mode_t rmode)
+{ (void)rmode; return x; }
 
-    const bool with_groups = (md.data.format == fwd_weights_g)
-                          || (md.data.format == bwd_weights_g);
+inline int right_padding(int i, int o, int k, int p, int s, int d = 0) {
+    return (o - 1) * s + (k - 1) * (d + 1) - (p + i - 1);
+}
+
+template <typename data_t> struct acc_t { typedef data_t type; };
+template<> struct acc_t<int8_t> { typedef int type; };
+template<> struct acc_t<uint8_t> { typedef int type; };
+
+inline size_t map_index(const mkldnn::memory::desc &md, size_t index,
+    bool with_padding = true) {
+#if 1 || MKLDNN_JIT_TYPES > 0
+    using fmt = mkldnn::memory::format;
+
+    const fmt fwd_weights_g_qvnni = fmt::gOIhw8i16o2i;
+    const fmt fwd_weights_qvnni = fmt::OIhw8i16o2i;
+    const fmt bwd_weights_g_qvnni = fmt::gOIhw8o16i2o;
+    const fmt bwd_weights_qvnni = fmt::OIhw8o16i2o;
+
+    const fmt fwd_weights_g_vnni = fmt::gOIhw4i16o4i;
+    const fmt fwd_weights_vnni = fmt::OIhw4i16o4i;
+
+    const bool with_groups = (md.data.format == fwd_weights_g_qvnni)
+                          || (md.data.format == bwd_weights_g_qvnni)
+                          || (md.data.format == fwd_weights_g_vnni);
+
+    const bool qvnni = (md.data.format == fwd_weights_g_qvnni)
+                    || (md.data.format == bwd_weights_g_qvnni)
+                    || (md.data.format == fwd_weights_qvnni)
+                    || (md.data.format == bwd_weights_qvnni);
+
+    const bool vnni = (md.data.format == fwd_weights_g_vnni)
+                   || (md.data.format == fwd_weights_vnni);
+
+    const bool fwd_wei = (md.data.format == fwd_weights_g_qvnni)
+                      || (md.data.format == fwd_weights_qvnni)
+                      || (md.data.format == fwd_weights_g_vnni)
+                      || (md.data.format == fwd_weights_vnni);
+
+    const bool bwd_wei = (md.data.format == bwd_weights_g_qvnni)
+                      || (md.data.format == bwd_weights_qvnni);
+#else
+    //const bool with_groups = false; // unused
+    //const bool qvnni = false;
+    //const bool vnni = false;
+    const bool fwd_wei = false;
+    const bool bwd_wei = false;
 #endif
 
     const int ndims = md.data.ndims;
@@ -69,17 +115,15 @@ inline size_t map_index(const mkldnn::memory::desc &md, size_t index) {
     auto *strides_within_block = md.data.layout_desc.blocking.strides[1];
 
     size_t ph_index = 0;
-#if MKLDNN_JIT_TYPES > 0
-    size_t oc_16 = 0, ic_2 = 0,
-        oc_2 = 0, ic_16 = 0;
-#endif
+    size_t oc_lb = 0, ic_sb = 0,
+        oc_sb = 0, ic_lb = 0;
 
     for (int rd = 0; rd < ndims; ++rd) {
         int d = ndims - rd - 1;
 
         EXPECT_LE(dims[d], pdims[d]);
 
-        int cur_dim = dims[d];
+        int cur_dim = with_padding ? pdims[d] : dims[d];
         EXPECT_GT(cur_dim, 0);
         int cur_block = md.data.layout_desc.blocking.block_dims[d];
 
@@ -90,33 +134,89 @@ inline size_t map_index(const mkldnn::memory::desc &md, size_t index) {
         size_t cur_pos_block = cur_pos / cur_block;
         size_t cur_pos_within_block = cur_pos % cur_block;
 
-#if MKLDNN_JIT_TYPES > 0
-        if (d == (with_groups + 0)) { oc_16 = pos_d % 16; oc_2 = pos_d % 2; }
-        if (d == (with_groups + 1)) { ic_2 = pos_d % 2; ic_16 = pos_d % 16; }
+#if 1 || MKLDNN_JIT_TYPES > 0
+        if (d == (with_groups + 0)) {
+            if (qvnni) { oc_lb = pos_d % 16;  oc_sb = pos_d % 2; }
+            else  if (vnni) { oc_lb = pos_d % 16; }
+        }
+        if (d == (with_groups + 1)) {
+            if (qvnni) { ic_sb = pos_d % 2; ic_lb = pos_d % 16; }
+            else if (vnni) { ic_sb = pos_d % 4; }
+        }
 #endif
-
         ph_index += cur_pos_block*strides_block[d];
         ph_index += cur_pos_within_block*strides_within_block[d];
 
         index /= cur_dim;
     }
-#if MKLDNN_JIT_TYPES > 0
-    if (md.data.format == fwd_weights_g || md.data.format == fwd_weights) {
-        //ph_index += -16 * ic_2 + oc_16 + ic_2;
-        ph_index += oc_16 + ic_2;
-        EXPECT_GE(ph_index, 16*ic_2);
-        ph_index -= 16*ic_2;
-    } else
-        if (md.data.format == bwd_weights_g || md.data.format == bwd_weights) {
-            //ph_index += -16 * oc_2 + ic_16 + oc_2;
-            ph_index += ic_16 + oc_2;
-            EXPECT_GE(ph_index, 16 * oc_2);
-            ph_index -= 16 * oc_2;
-        }
+    //int scale = (vnni) ? 3 : 1;
+    int scale = 1;
+#if 1 || MKLDNN_JIT_TYPES > 0
+    if (vnni) scale = 3;
 #endif
+    if (fwd_wei) {
+        //ph_index += -16 * ic_2 + oc_16 + ic_2;
+        ph_index += scale * oc_lb + ic_sb;
+        EXPECT_GE(ph_index, 16 * ic_sb);
+        ph_index -= 16 * ic_sb;
+    } else
+        if (bwd_wei) {
+            //ph_index += -16 * oc_2 + ic_16 + oc_2;
+            ph_index += ic_lb + oc_sb;
+            EXPECT_GE(ph_index, 16 * oc_sb);
+            ph_index -= 16 * oc_sb;
+        }
     ph_index += md.data.layout_desc.blocking.offset_padding;
 
     return ph_index;
+}
+
+#define MAX_NDIMS 12
+// check_zero_tail - check on zero or set to zero padded memory
+template <typename data_t>
+void check_zero_tail(int set_zero_flag, mkldnn::memory &src) {
+
+    data_t *src_data = (data_t *)src.get_data_handle();
+
+    const mkldnn::memory::desc src_d = src.get_primitive_desc().desc();
+    const int ndims = src_d.data.ndims;
+    const int *dims = src_d.data.dims;
+    const int *pdims = src_d.data.layout_desc.blocking.padding_dims;
+
+    size_t idx[MAX_NDIMS] = {}, str[MAX_NDIMS] = {};
+    size_t nelems = 1;
+    int tail_flag = 0;
+    for (int i = 0; i < ndims; ++i) {
+        if (dims[ndims-i-1] != pdims[ndims-i-1]) tail_flag = 1;
+        nelems *= pdims[ndims-i-1];
+        idx[i] = 0;
+        str[i] = (i==0) ? 1 : str[i-1] * pdims[ndims-i];
+    }
+    if (tail_flag == 0) return;
+
+    for (size_t i = 0; i < nelems; ++i) {
+        size_t off = 0;
+        bool flag = 0;
+        for (int j = 0; j < ndims; ++j) {
+            off += idx[j] * str[j];
+            if (idx[j] >= (size_t)dims[ndims-j-1]) flag = 1;
+        }
+        if (flag == 1) {
+            size_t blk_off = map_index(src_d,off);
+            if (set_zero_flag) {
+                src_data[blk_off] = 0.0;
+            } else {
+                EXPECT_EQ(src_data[blk_off], 0.0) << " blk_off = " << blk_off
+                << "off = " << off;
+            }
+        }
+        /*Update idx*/
+        for (int j = 0; j < ndims; ++j) {
+            idx[j] ++;
+            if (idx[j] < (size_t)pdims[ndims-j-1]) break;
+            idx[j] = 0;
+        }
+    }
 }
 
 inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
@@ -127,40 +227,63 @@ inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
     switch (fmt) {
     case f::x:
         ndims = 1; break;
+        //---------------
     case f::nc:
     case f::oi:
+    case f::io:
         ndims = 2; break;
     case f::nchw:
     case f::nhwc:
     case f::chwn:
-#if MKLDNN_JIT_TYPES > 0
     case f::nChw8c:
     case f::nChw16c:
-#endif
     case f::oihw:
-#if MKLDNN_JIT_TYPES > 0
+    case f::hwio:
     case f::OIhw8i8o:
     case f::OIhw16i16o:
     case f::OIhw8i16o2i:
     case f::OIhw8o16i2o:
+    case f::OIhw4i16o4i:
     case f::OIhw8o8i:
     case f::OIhw16o16i:
     case f::IOhw16o16i:
     case f::Ohwi8o:
     case f::Ohwi16o:
-#endif
         ndims = 4; break;
+        //---------------
+    case f::ncdhw:
+    case f::ndhwc:
+    case f::nCdhw8c:
+    case f::nCdhw16c:
+    case f::dhwio:
+    case f::oidhw:
     case f::goihw:
-#if MKLDNN_JIT_TYPES > 0
+    case f::hwigo:
+    case f::OIdhw8i8o:
+    case f::OIdhw16i16o:
+    case f::OIdhw8o8i:
+    case f::OIdhw16o16i:
+    case f::gOhwi8o:
+    case f::Goihw8g:
+    case f::Goihw16g:
     case f::gOIhw8i8o:
     case f::gOIhw16i16o:
     case f::gOIhw8i16o2i:
     case f::gOIhw8o16i2o:
+    case f::gOIhw4i16o4i:
     case f::gOIhw8o8i:
     case f::gOIhw16o16i:
     case f::gIOhw16o16i:
-#endif
         ndims = 5; break;
+        //---------------
+    case f::goidhw:
+    case f::gOIdhw8i8o:
+    case f::gOIdhw16i16o:
+    case f::gOIdhw8o8i:
+    case f::gOIdhw16o16i:
+    case f::gOdhwi16o:
+        ndims = 6; break;
+        //---------------
     case f::format_undef:
         ndims = 0; break;
     case f::any:
@@ -199,8 +322,8 @@ template <typename data_t>
 static void fill_data(const size_t size, data_t *data, data_t mean,
         data_t deviation, double sparsity = 1.)
 {
-#   pragma omp parallel for schedule(static)
-    for (size_t n = 0; n < size; n++) {
+    OMP(parallel for schedule(static))//;
+    for (ptrdiff_t n = 0; n < (ptrdiff_t)size; n++) {
         data[n] = set_value<data_t>(n, mean, deviation, sparsity);
     }
 }
@@ -209,8 +332,8 @@ template <typename data_t>
 static void fill_data(const size_t size, data_t *data, double sparsity = 1.,
         bool init_negs = false)
 {
-#   pragma omp parallel for schedule(static)
-    for (size_t n = 0; n < size; n++) {
+    OMP(parallel for schedule(static))//;
+    for (ptrdiff_t n = 0; n < (ptrdiff_t)size; n++) {
         data[n] = set_value<data_t>(n, data_t(1), data_t(2e-1), sparsity);
 
         if (init_negs && n%4 == 0U)
@@ -248,7 +371,7 @@ static void compare_data(mkldnn::memory& ref, mkldnn::memory& dst)
     data_t *ref_data = (data_t *)ref.get_data_handle();
     data_t *dst_data = (data_t *)dst.get_data_handle();
 
-#   pragma omp parallel for schedule(static)
+    OMP(parallel for schedule(static))//;
     for (ptrdiff_t i = 0; i < num; ++i) {
         data_t ref = ref_data[map_index(ref_desc, i)];
         data_t got = dst_data[map_index(dst_desc, i)];
@@ -258,11 +381,25 @@ static void compare_data(mkldnn::memory& ref, mkldnn::memory& dst)
             data_t e = (std::abs(ref) > (data_t)1e-4) ? diff / ref : diff;
             EXPECT_NEAR(e, (data_t)0.0, (data_t)1e-4)
                 << "Index: " << i << " Total: " << num;
-        } else if (data_traits<data_t>::data_type == data_type::s32) {
+        } else {
             EXPECT_EQ(ref, got) << "Index: " << i << " Total: " << num;
         }
     }
 }
+
+inline const char *query_impl_info(const_mkldnn_primitive_desc_t pd) {
+    const char *str;
+    mkldnn_primitive_desc_query(pd, mkldnn_query_impl_info_str, 0, &str);
+    return str;
+};
+
+mkldnn_status_t get_conv_impl_status(const_mkldnn_primitive_desc_t pd, const char *match_str){
+    const char* conv_str = query_impl_info(pd);
+
+    if( strstr(conv_str, match_str) != NULL)
+        return mkldnn_status_t::mkldnn_success;
+    return mkldnn_status_t::mkldnn_unimplemented;
+};
 
 struct test_convolution_sizes_t {
     test_convolution_sizes_t(
@@ -293,6 +430,43 @@ struct test_convolution_sizes_t {
     int dilh, dilw;
 };
 
+struct test_convolution_attr_t {
+    struct scale_t {
+        enum policy_t { NONE = 0, COMMON };
+
+        bool is_def() const { return policy != NONE; }
+
+        scale_t (float s, policy_t p = NONE) :
+            scale(s) { policy = p; }
+
+        policy_t policy;
+        float scale;
+    };
+
+    void mkldnn_attr_recreate() {
+        mkl_attr = mkldnn::primitive_attr();
+        mkl_attr.set_int_output_round_mode(rmode);
+        if (oscale.is_def()) {
+            const int count = 1;
+            const int mask = 0;
+            std::vector<float> s(count, oscale.scale);
+            mkl_attr.set_output_scales(mask, s);
+        }
+    }
+
+    test_convolution_attr_t(mkldnn::round_mode rm, float s,
+        scale_t::policy_t p = scale_t::policy_t::NONE) :
+            rmode(rm), oscale(s, p), mkl_attr() {}
+
+    test_convolution_attr_t() :
+        rmode(mkldnn::round_mode::round_nearest),
+        oscale(1.0), mkl_attr() {}
+
+    mkldnn::round_mode rmode;
+    scale_t oscale;
+    mkldnn::primitive_attr mkl_attr;
+};
+
 struct test_convolution_formats_t {
     mkldnn::memory::format src_format;
     mkldnn::memory::format weights_format;
@@ -305,7 +479,78 @@ struct test_convolution_params_t {
     mkldnn::algorithm aalgorithm;
     const float relu_negative_slope;
     test_convolution_formats_t formats;
+    test_convolution_attr_t attr;
     test_convolution_sizes_t sizes;
+    bool expect_to_fail;
+    mkldnn_status_t expected_status;
+};
+
+template<typename F> bool catch_expected_failures(const F &f,
+        bool expect_to_fail, mkldnn_status_t expected_status)
+{
+    try {
+        f();
+    } catch (const mkldnn::error &e) {
+        // Rethrow the exception if it is not expected or the error status did
+        // not match.
+        if (!(expect_to_fail) || e.status != (expected_status)) {
+            // Ignore unimplemented
+            if (e.status == mkldnn_unimplemented)
+                return true;
+            else
+                throw e;
+        }
+        // Return normally if the failure is expected
+        if (expect_to_fail)
+            return true;
+    }
+
+    // Throw an exception if the failure is expected but did not happen
+    if (expect_to_fail)
+        throw std::exception();
+
+    return false;
+}
+
+#define TEST_MALLOC_OFFSET 8
+char *test_malloc(size_t size) {
+    void *ptr;
+    const size_t align = 64;
+    const size_t padded_size = TEST_MALLOC_OFFSET + size;
+#ifdef _WIN32
+    ptr = _aligned_malloc(padded_size, align);
+    int rc = ((ptr) ? 0 : errno);
+#else
+    int rc = ::posix_memalign(&ptr, align, padded_size);
+#endif /* _WIN32 */
+    return rc == 0 ? (char*)ptr + TEST_MALLOC_OFFSET: 0;
+}
+
+void test_free(char *ptr) {
+    char *base_ptr = ptr - TEST_MALLOC_OFFSET;
+#ifdef _WIN32
+    _aligned_free(base_ptr);
+#else
+    return ::free(base_ptr);
+#endif /* _WIN32 */
+}
+#undef TEST_MALLOC_OFFSET
+
+class test_memory {
+public:
+    test_memory(const mkldnn::memory::desc &d, const mkldnn::engine &e) {
+        auto pd = mkldnn::memory::primitive_desc(d, e);
+        pd_size_ = pd.get_size();
+        data_.reset(test_malloc(pd_size_), test_free);
+        mem_.reset(new mkldnn::memory(pd, data_.get()));
+    }
+    size_t get_size() const { return pd_size_; }
+    mkldnn::memory &get() { return *mem_; }
+
+private:
+    std::shared_ptr<mkldnn::memory> mem_;
+    std::shared_ptr<char> data_;
+    size_t pd_size_;
 };
 
 #endif

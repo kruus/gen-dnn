@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -26,19 +26,27 @@ namespace impl {
 namespace cpu {
 
 struct jit_avx2_conv_fwd_kernel_f32: public jit_generator {
-    jit_avx2_conv_fwd_kernel_f32(jit_conv_conf_t ajcp): jcp(ajcp)
+    jit_avx2_conv_fwd_kernel_f32(jit_conv_conf_t ajcp,
+            const primitive_attr_t &attr): jcp(ajcp), attr_(attr)
     {
         this->generate();
         jit_ker = (void (*)(jit_conv_call_s *))this->getCode();
     }
 
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx2_conv_fwd_kernel_f32)
+
+    static bool post_ops_ok(jit_conv_conf_t &jcp,
+            const primitive_attr_t &attr);
     static status_t init_conf(jit_conv_conf_t &jcp,
             const convolution_desc_t &cd, const memory_desc_wrapper &src_d,
             const memory_desc_wrapper &weights_d,
-            const memory_desc_wrapper &dst_d, bool with_relu = false,
+            const memory_desc_wrapper &dst_d,
+            const primitive_attr_t &attr,
+            bool with_relu = false,
             float relu_negative_slope = 0.);
 
     jit_conv_conf_t jcp;
+    const primitive_attr_t &attr_;
     void (*jit_ker)(jit_conv_call_s *);
 
 private:
@@ -50,12 +58,17 @@ private:
     reg64_t reg_output = rsi;
     reg64_t reg_bias = rbx;
 
+    reg64_t aux_reg_inp_d = r11;
+    reg64_t aux_reg_ker_d = abi_not_param1;
+
+    reg64_t reg_ki = rsi;
     reg64_t kj = r10;
     reg64_t oi_iter = r11;
     reg64_t ki_iter = r12;
     reg64_t reg_kh = abi_not_param1;
     reg64_t reg_oc_blocks = r14;
     reg64_t imm_addr64 = r15;
+    reg64_t reg_long_offt = r15;
     Xbyak::Reg32 reg_ci_flag = r13d;
 
     Xbyak::Xmm xmm_relu_ns = Xbyak::Xmm(13);
@@ -76,6 +89,8 @@ private:
 };
 
 struct jit_avx2_conv_bwd_data_kernel_f32: public jit_generator {
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx2_conv_bwd_data_kernel_f32)
+
     jit_avx2_conv_bwd_data_kernel_f32(jit_conv_conf_t ajcp): jcp(ajcp)
     {
         this->generate();
@@ -105,10 +120,15 @@ private:
     reg64_t aux_reg_output = rbx;
     reg64_t aux_reg_dsrc = rbx;
 
+    reg64_t aux_reg_dst_d = r12;
+    reg64_t aux_reg_ker_d = r14;
+
+    reg64_t reg_ki  = abi_not_param1;
     reg64_t kj      = r11;
     reg64_t oi_iter = r12;
     reg64_t reg_kh  = r14;
     reg64_t ki_iter = r13;
+    reg64_t reg_long_offt = r15;
 
     inline void hsw_iter_s1(int ur_w, int l_overflow, int r_overflow,
             const char* kh_label);
@@ -117,6 +137,8 @@ private:
 };
 
 struct jit_avx2_conv_bwd_weights_kernel_f32: public jit_generator {
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx2_conv_bwd_weights_kernel_f32)
+
     jit_avx2_conv_bwd_weights_kernel_f32(jit_conv_conf_t ajcp): jcp(ajcp)
     {
         this->generate();
@@ -143,7 +165,12 @@ private:
     reg64_t reg_tmp = r11;
     reg64_t reg_oj = r15;
     reg64_t reg_ih_count = rbx;
+    reg64_t aux_reg_input = r12;
+    reg64_t aux_reg_kernel = r13;
+    reg64_t ki = r14;
+    reg64_t reg_long_offt = r11;
 
+    inline void od_step_comeback_pointers();
     inline void oh_step_comeback_pointers(const char *kh_comeback_label);
     inline void compute_ic_block_step(int ur_w, int pad_l, int pad_r,
             int ic_block_step, int input_offset, int kernel_offset,

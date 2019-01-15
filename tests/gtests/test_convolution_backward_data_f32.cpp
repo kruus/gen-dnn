@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -32,6 +32,6 @@ TEST_P(convolution_test, TestConvolution)
 #define FP32
 #define DIRECTION_BACKWARD_DATA
 #include "convolution_common.h"
-#include "diluted_convolution.h"
+#include "dilated_convolution.h"
 
 }

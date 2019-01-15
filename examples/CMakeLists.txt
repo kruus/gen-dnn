@@ -1,5 +1,5 @@
 #===============================================================================
-# Copyright 2016-2017 Intel Corporation
+# Copyright 2016-2018 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,12 +14,24 @@
 # limitations under the License.
 #===============================================================================
 
+if (NOT WITH_EXAMPLE)
+    return()
+endif()
+
+# propagate EXAMPLE specific flags
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_EXAMPLE_CCXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_EXAMPLE_CCXX_FLAGS}")
+
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
+#message(STATUS "ex: CMAKE_CROSSCOMPILING ${CMAKE_CROSSCOMPILING}")
+#message(STATUS "ex: CMAKE_CROSSCOMPILING_EMULATOR ${CMAKE_CROSSCOMPILING_EMULATOR}")
+#message(STATUS "ex: VE_EXEC ${VE_EXEC}")
+# if you set up CMAKE_CROSSCOMPILING_EMULATOR, then you do not need VE_EXEC or such.
 add_executable(simple-net-c simple_net.c)
 set_property(TARGET simple-net-c PROPERTY C_STANDARD 99)
 target_link_libraries(simple-net-c ${LIB_NAME})
-add_test(simple-net-c simple-net-c)
+add_test(NAME simple-net-c COMMAND simple-net-c)
 if(WIN32)
     configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
         simple-net-c.vcxproj.user @ONLY)
@@ -29,7 +41,7 @@ endif()
 add_executable(simple-net-cpp simple_net.cpp)
 set_property(TARGET simple-net-cpp PROPERTY CXX_STANDARD 11)
 target_link_libraries(simple-net-cpp ${LIB_NAME})
-add_test(simple-net-cpp simple-net-cpp)
+add_test(NAME simple-net-cpp COMMAND simple-net-cpp)
 if(WIN32)
     configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
         simple-net-cpp.vcxproj.user @ONLY)
@@ -43,7 +55,7 @@ target_link_libraries(simple-training-net-c ${LIB_NAME})
 else()
 target_link_libraries(simple-training-net-c ${LIB_NAME} m)
 endif()
-add_test(simple-training-net-c simple-training-net-c)
+add_test(NAME simple-training-net-c COMMAND simple-training-net-c)
 if(WIN32)
     configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
         simple-training-net-c.vcxproj.user @ONLY)
@@ -57,9 +69,41 @@ target_link_libraries(simple-training-net-cpp ${LIB_NAME})
 else()
 target_link_libraries(simple-training-net-cpp ${LIB_NAME} m)
 endif()
-add_test(simple-training-net-cpp simple-training-net-cpp)
+add_test(NAME simple-training-net-cpp COMMAND simple-training-net-cpp)
 if(WIN32)
     configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
         simple-training-net-cpp.vcxproj.user @ONLY)
     set_property(TEST simple-training-net-cpp PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
+endif()
+
+add_executable(simple-net-int8-cpp simple_net_int8.cpp)
+set_property(TARGET simple-net-int8-cpp PROPERTY CXX_STANDARD 11)
+target_link_libraries(simple-net-int8-cpp ${LIB_NAME})
+add_test(simple-net-int8-cpp simple-net-int8-cpp)
+if(WIN32)
+    configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
+        simple-net-int8-cpp.vcxproj.user @ONLY)
+    set_property(TEST simple-net-int8-cpp PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
+endif()
+
+if (HAVE_MKL)
+    add_executable(simple-rnn-cpp simple_rnn.cpp)
+    set_property(TARGET simple-rnn-cpp PROPERTY CXX_STANDARD 11)
+    target_link_libraries(simple-rnn-cpp ${LIB_NAME})
+    add_test(simple-rnn-cpp simple-rnn-cpp)
+    if(WIN32)
+        configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
+            simple-rnn-cpp.vcxproj.user @ONLY)
+        set_property(TEST simple-rnn-cpp PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
+    endif()
+endif()
+
+add_executable(simple-rnn-training-cpp simple_rnn_training.cpp)
+set_property(TARGET simple-rnn-training-cpp PROPERTY CXX_STANDARD 11)
+target_link_libraries(simple-rnn-training-cpp ${LIB_NAME})
+add_test(simple-rnn-training-cpp simple-rnn-training-cpp)
+if(WIN32)
+    configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
+        simple-rnn-training-cpp.vcxproj.user @ONLY)
+    set_property(TEST simple-rnn-training-cpp PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
 endif()

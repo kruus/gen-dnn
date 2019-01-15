@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -44,9 +44,11 @@ struct _jit_avx512_common_1x1_convolution_fwd_t : public cpu_primitive_t {
                 const typename pd_t::base_class *hint_fwd_pd)
             : _cpu_convolution_fwd_pd_t<with_relu>(engine, adesc, attr,
                     hint_fwd_pd)
-            , jcp_({}), rtus_({}) {}
+            , jcp_(), rtus_() {}
 
-        DECLARE_COMMON_PD_T(_jit_avx512_common_1x1_convolution_fwd_t);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("jit_1x1:", avx512_common, ""),
+                _jit_avx512_common_1x1_convolution_fwd_t);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -57,6 +59,7 @@ struct _jit_avx512_common_1x1_convolution_fwd_t : public cpu_primitive_t {
                 && utils::one_of(this->cdesc_().prop_kind, forward_training,
                         forward_inference)
                 && this->cdesc_().alg_kind == alg_kind::convolution_direct
+                && !this->has_zero_dim_memory()
                 && this->cdesc_().src_desc.data_type == src_type
                 && this->cdesc_().weights_desc.data_type == wei_type
                 && this->cdesc_().dst_desc.data_type == dst_type
@@ -72,7 +75,8 @@ struct _jit_avx512_common_1x1_convolution_fwd_t : public cpu_primitive_t {
             rtus_prepare(this, conv_d, src_d, this->dst_pd_.desc());
             return jit_avx512_common_1x1_conv_kernel::init_conf(jcp_,
                     *conv_d, *src_d, *this->weights_pd_.desc(),
-                    *this->dst_pd_.desc(), with_relu, this->negative_slope(),
+                    *this->dst_pd_.desc(), *this->attr(),
+                    with_relu, this->negative_slope(),
                     omp_get_max_threads(), rtus_.reduce_src_);
         }
 
@@ -113,15 +117,27 @@ struct _jit_avx512_common_1x1_convolution_fwd_t : public cpu_primitive_t {
                                           const output_vector &outputs)
         : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
         , kernel_(nullptr), rtus_driver_(nullptr), ws_per_thread_(0)
-        , scratch_(nullptr)
+        , scratch_(nullptr), padded_bias_(nullptr)
     {
-        kernel_ = new jit_avx512_common_1x1_conv_kernel(conf_.jcp_);
+        kernel_ = new jit_avx512_common_1x1_conv_kernel(conf_.jcp_,
+                    *conf_.attr());
+
         init_rtus_driver<avx512_common>(this);
+
+        if (conf_.want_padded_bias()) {
+            const auto &j = conf_.jcp_;
+            assert(j.ngroups == 1);
+            padded_bias_ = (dst_data_t *)malloc(sizeof(dst_data_t) * j.oc, 64);
+            for (int oc = j.oc_without_padding; oc < j.oc; ++oc)
+                padded_bias_[oc] = 0;
+        }
     }
+
     ~_jit_avx512_common_1x1_convolution_fwd_t() {
         delete kernel_;
         delete rtus_driver_;
         free(scratch_);
+        free(padded_bias_);
     }
 
     typedef typename prec_traits<src_type>::type src_data_t;
@@ -141,6 +157,7 @@ struct _jit_avx512_common_1x1_convolution_fwd_t : public cpu_primitive_t {
     rtus_driver_t<avx512_common> *rtus_driver_;
     size_t ws_per_thread_;
     src_data_t *scratch_;
+    dst_data_t *padded_bias_;
 };
 
 using jit_avx512_common_1x1_convolution_fwd_f32_t
@@ -164,9 +181,11 @@ struct _jit_avx512_common_1x1_convolution_bwd_data_t : public cpu_primitive_t {
                 const primitive_attr_t *attr,
                 const convolution_fwd_pd_t *hint_fwd_pd)
             : cpu_convolution_bwd_data_pd_t(engine, adesc, attr, hint_fwd_pd)
-            , jcp_({}), rtus_({}) {}
+            , jcp_(), rtus_() {}
 
-        DECLARE_COMMON_PD_T(_jit_avx512_common_1x1_convolution_bwd_data_t);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("jit_1x1:", avx512_common, ""),
+                _jit_avx512_common_1x1_convolution_bwd_data_t);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -175,6 +194,7 @@ struct _jit_avx512_common_1x1_convolution_bwd_data_t : public cpu_primitive_t {
                 && this->set_default_params() == status::success
                 && this->desc()->prop_kind == backward_data
                 && this->desc()->alg_kind == alg_kind::convolution_direct
+                && !this->has_zero_dim_memory()
                 && this->desc()->diff_dst_desc.data_type == diff_dst_type
                 && this->desc()->weights_desc.data_type == wei_type
                 && this->desc()->diff_src_desc.data_type == diff_src_type;
@@ -185,8 +205,8 @@ struct _jit_avx512_common_1x1_convolution_bwd_data_t : public cpu_primitive_t {
             rtus_prepare(this, conv_d, diff_src_d, this->diff_dst_pd_.desc());
             return jit_avx512_common_1x1_conv_kernel::init_conf(jcp_,
                             *conv_d, *diff_src_d, *this->weights_pd_.desc(),
-                            *this->diff_dst_pd_.desc(), omp_get_max_threads(),
-                            rtus_.reduce_src_);
+                            *this->diff_dst_pd_.desc(), *this->attr(),
+                            omp_get_max_threads(), rtus_.reduce_src_);
         }
 
         // TODO (Roma): structs conf header cleanup
@@ -231,7 +251,8 @@ struct _jit_avx512_common_1x1_convolution_bwd_data_t : public cpu_primitive_t {
         , kernel_(nullptr), rtus_driver_(nullptr), ws_per_thread_(0)
         , scratch_(nullptr)
     {
-        kernel_ = new jit_avx512_common_1x1_conv_kernel(conf_.jcp_);
+        kernel_ = new jit_avx512_common_1x1_conv_kernel(conf_.jcp_,
+                    *conf_.attr());
         init_rtus_driver<avx512_common>(this);
     }
     ~_jit_avx512_common_1x1_convolution_bwd_data_t()
@@ -280,9 +301,11 @@ struct jit_avx512_common_1x1_convolution_bwd_weights_t : public cpu_primitive_t
                 const primitive_attr_t *attr,
                 const convolution_fwd_pd_t *hint_fwd_pd)
             : cpu_convolution_bwd_weights_pd_t(engine, adesc, attr, hint_fwd_pd)
-            , jcp_({}), rtus_({}) {}
+            , jcp_(), rtus_() {}
 
-        DECLARE_COMMON_PD_T(jit_avx512_common_1x1_convolution_bwd_weights_t);
+        DECLARE_COMMON_PD_T(
+                JIT_IMPL_NAME_HELPER("jit_1x1:", avx512_common, ""),
+                jit_avx512_common_1x1_convolution_bwd_weights_t);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -291,6 +314,7 @@ struct jit_avx512_common_1x1_convolution_bwd_weights_t : public cpu_primitive_t
                 && this->set_default_params() == status::success
                 && this->desc()->prop_kind == backward_weights
                 && this->desc()->alg_kind == alg_kind::convolution_direct
+                && !this->has_zero_dim_memory()
                 && utils::everyone_is(data_type::f32,
                         this->desc()->src_desc.data_type,
                         this->desc()->diff_weights_desc.data_type,
@@ -304,8 +328,8 @@ struct jit_avx512_common_1x1_convolution_bwd_weights_t : public cpu_primitive_t
             rtus_prepare(this, conv_d, src_d, this->diff_dst_pd_.desc());
             return jit_avx512_common_1x1_conv_kernel::init_conf(jcp_,
                             *conv_d, *src_d, *this->diff_weights_pd_.desc(),
-                            *this->diff_dst_pd_.desc(), omp_get_max_threads(),
-                            rtus_.reduce_src_);
+                            *this->diff_dst_pd_.desc(), *this->attr(),
+                            omp_get_max_threads(), rtus_.reduce_src_);
         }
 
         // TODO (Roma): structs conf header cleanup
@@ -347,6 +371,8 @@ struct jit_avx512_common_1x1_convolution_bwd_weights_t : public cpu_primitive_t
         free(bctx_);
         free(ws_reduction_);
         free(scratch_);
+        free(tr_src_);
+        free(padded_bias_);
     }
 
     typedef typename prec_traits<data_type::f32>::type data_t;
@@ -375,6 +401,7 @@ struct jit_avx512_common_1x1_convolution_bwd_weights_t : public cpu_primitive_t
     rtus_driver_t<avx512_common> *rtus_driver_;
     size_t ws_per_thread_;
     data_t *scratch_;
+    data_t *padded_bias_;
 
     simple_barrier::ctx_t *bctx_;
     data_t *tr_src_;

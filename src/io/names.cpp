@@ -4,6 +4,7 @@
 #define MKLDNN_IO 1 // allow it, just here
 #include "mkldnn_io.h"
 #include "mkldnn_io.hpp"
+#include "mkldnn_debug.h"       // use the "official" functions when appropriate
 
 #include <cstdio> // snprintf
 #include <cstring>
@@ -121,6 +122,7 @@ char const* mkldnn_primitive_desc_shorten(char const* impl_str)
 #define NAMEENUM_T( TYPENAME ) char const* mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const e )
 /*NAMEENUM_T(status){*/
 char const* mkldnn_name_status( mkldnn_status_t const e ){
+#if 0
     char const * ret = "Huh?";
     switch(e){
       case(mkldnn_success): ret = "status:success"; break;
@@ -134,8 +136,12 @@ char const* mkldnn_name_status( mkldnn_status_t const e ){
       case(mkldnn_not_required): ret = "status:not_required"; break;
     }
     return ret;
+#else
+    return mkldnn_status2str(e);
+#endif
 }
 NAMEENUM_T(data_type){
+#if 0
     char const * ret = "Huh?";
     switch(e){
       case(mkldnn_data_type_undef): ret = "data_type:undef"; break;
@@ -146,9 +152,15 @@ NAMEENUM_T(data_type){
       case(mkldnn_u8): ret = "data_type:u8"; break;
     }
     return ret;
+#else
+    return mkldnn_dt2str(e);
+#endif
 }
 NAMEENUM_T(memory_format){
+#if 0
     char const * ret = "Huh?";
+    // NEW: now all memory formats must always be **defined**, so we enable
+    //      printing all of them (no MKLDNN_JIT_TYPES checking here)
     switch(e){
     case(mkldnn_format_undef): ret = "memory_format:format_undef"; break;
     case(mkldnn_any): ret = "memory_format:any"; break;
@@ -158,18 +170,16 @@ NAMEENUM_T(memory_format){
     case(mkldnn_nchw): ret = "memory_format:nchw"; break;
     case(mkldnn_nhwc): ret = "memory_format:nhwc"; break;
     case(mkldnn_chwn): ret = "memory_format:chwn"; break;
-#if MKLDNN_JIT_TYPES > 0
     case(mkldnn_nChw8c): ret = "memory_format:nChw8c"; break;
     case(mkldnn_nChw16c): ret = "memory_format:nChw16c"; break;
-#endif
     case(mkldnn_oi): ret = "memory_format:oi"; break;
     case(mkldnn_io): ret = "memory_format:io"; break;
     case(mkldnn_oihw): ret = "memory_format:oihw"; break;
     case(mkldnn_ihwo): ret = "memory_format:ihwo"; break;
     case(mkldnn_hwio): ret = "memory_format:hwio"; break;
-#if MKLDNN_JIT_TYPES > 0
     case(mkldnn_OIhw8i8o): ret = "memory_format:OIhw8i8o"; break;
     case(mkldnn_OIhw16i16o): ret = "memory_format:OIhw16i16o"; break;
+    case(mkldnn_OIhw4i16o4i): ret = "memory_format:OIhw4i16o4i"; break;
     case(mkldnn_OIhw8i16o2i): ret = "memory_format:OIhw8i16o2i"; break;
     case(mkldnn_OIhw8o16i2o): ret = "memory_format:OIhw8o16i2o"; break;
     case(mkldnn_OIhw8o8i): ret = "memory_format:OIhw8o8i"; break;
@@ -180,11 +190,11 @@ NAMEENUM_T(memory_format){
     case(mkldnn_Ohwi8o): ret = "memory_format:Ohwi8o"; break;
     case(mkldnn_Ohwi16o): ret = "memory_format:Ohwi16o"; break;
     case(mkldnn_OhIw16o4i): ret = "memory_format:OhIw16o4i"; break;
-#endif
     case(mkldnn_goihw): ret = "memory_format:goihw"; break;
-#if MKLDNN_JIT_TYPES > 0
+    case(mkldnn_hwigo): ret = "memory_format:hwigo"; break;
     case(mkldnn_gOIhw8i8o): ret = "memory_format:gOIhw8i8o"; break;
     case(mkldnn_gOIhw16i16o): ret = "memory_format:gOIhw16i16o"; break;
+    case(mkldnn_gOIhw4i16o4i): ret = "memory_format:gOIhw4i16o4i"; break;
     case(mkldnn_gOIhw8i16o2i): ret = "memory_format:gOIhw8i16o2i"; break;
     case(mkldnn_gOIhw8o16i2o): ret = "memory_format:gOIhw8i16o2i"; break;
     case(mkldnn_gOIhw8o8i): ret = "memory_format:gOIhw8o8i"; break;
@@ -194,12 +204,28 @@ NAMEENUM_T(memory_format){
     case(mkldnn_gOihw16o): ret = "memory_format:gOIhwi16o"; break;
     case(mkldnn_gOhwi8o): ret = "memory_format:gOIhwi8o"; break;
     case(mkldnn_gOhwi16o): ret = "memory_format:gOIhwi16o"; break;
+    case(mkldnn_Goihw8g): ret = "memory_format:Goihw8g"; break;
+    case(mkldnn_Goihw16g): ret = "memory_format:Goihw16g"; break;
     case(mkldnn_gOhIw16o4i): ret = "memory_format:gOhIw16o4i"; break;
-#endif
+    case(mkldnn_ncdhw): ret = "memory_format:mkldnn_ncdhw"; break;
+    case(mkldnn_oidhw): ret = "memory_format:mkldnn_oidhw"; break;
+    case(mkldnn_goidhw): ret = "memory_format:mkldnn_goidhw"; break;
+    case(mkldnn_ntc): ret = "memory_format:mkldnn_ntc"; break;
+    case(mkldnn_tnc): ret = "memory_format:mkldnn_tnc"; break;
+    case(mkldnn_ldsnc): ret = "memory_format:mkldnn_ldsnc"; break;
+    case(mkldnn_ldigo): ret = "memory_format:mkldnn_ldigo"; break;
+    case(mkldnn_ldigo_p): ret = "memory_format:mkldnn_ldigo_p"; break;
+    case(mkldnn_ldgoi): ret = "memory_format:mkldnn_ldgoi"; break;
+    case(mkldnn_ldgoi_p): ret = "memory_format:mkldnn_ldgoi_p"; break;
+    case(mkldnn_ldgo): ret = "memory_format:mkldnn_ldgo"; break;
+    case(mkldnn_format_last): ret = "memory_format:last"; break;
     // dup case(mkldnn_oIhw8i): ret = "memory_format:oIhw8i"; break; // alias for nChw8c
     // dup case(mkldnn_oIhw16i): ret = "memory_format:oIhw16i"; break; // alias for nChw16c
     }
     return ret;
+#else
+    return mkldnn_fmt2str(e);
+#endif
 }
 NAMEENUM_T(padding_kind){
     char const * ret = "Huh?";
@@ -209,6 +235,7 @@ NAMEENUM_T(padding_kind){
     return ret;
 }
 NAMEENUM_T(prop_kind){
+#if 0
     char const * ret = "Huh?";
     switch(e){
       case(mkldnn_prop_kind_undef): ret = "prop_kind:prop_kind_undef"; break;
@@ -222,8 +249,12 @@ NAMEENUM_T(prop_kind){
       case(mkldnn_backward_bias): ret = "prop_kind:backward_bias"; break;
     }
     return ret;
+#else
+    return mkldnn_prop_kind2str(e);
+#endif
 }
 NAMEENUM_T(primitive_kind){
+#if 0
     char const * ret = "Huh?";
     switch(e){
       case(mkldnn_undefined_primitive): ret = "primitive_kind:undefined_primitive"; break;
@@ -234,6 +265,7 @@ NAMEENUM_T(primitive_kind){
       case(mkldnn_concat_inplace): ret = "primitive_kind:concat_inplace"; break;
       case(mkldnn_sum): ret = "primitive_kind:sum"; break;
       case(mkldnn_convolution): ret = "primitive_kind:convolution"; break;
+      case(mkldnn_deconvolution): ret = "primitive_kind:deconvolution"; break;
       case(mkldnn_relu): ret = "primitive_kind:relu"; break;
       case(mkldnn_softmax): ret = "primitive_kind:softmax"; break;
       case(mkldnn_pooling): ret = "primitive_kind:pooling"; break;
@@ -241,12 +273,18 @@ NAMEENUM_T(primitive_kind){
       case(mkldnn_batch_normalization): ret = "primitive_kind:batch_normalization"; break;
       case(mkldnn_inner_product): ret = "primitive_kind:inner_product"; break;
       case(mkldnn_convolution_relu): ret = "primitive_kind:convolution_relu"; break;
+      case(mkldnn_rnn): ret = "primitive_kind:rnn"; break;
     }
     return ret;
+#else
+    return mkldnn_prim_kind2str(e);
+#endif
 }
 NAMEENUM_T(alg_kind){
+#if 0
     char const * ret = "Huh?";
     switch(e){
+      case(mkldnn_alg_kind_undef): ret = "alg_kind:undef"; break;
       case(mkldnn_convolution_direct): ret = "alg_kind:convolution_direct"; break;
       case(mkldnn_convolution_winograd): ret = "alg_kind:convolution_winograd"; break;
       case(mkldnn_eltwise_relu): ret = "alg_kind:eltwise_relu"; break;
@@ -264,8 +302,16 @@ NAMEENUM_T(alg_kind){
       case(mkldnn_pooling_avg_exclude_padding): ret = "alg_kind:pooling_avg-padding"; break;
       case(mkldnn_lrn_across_channels): ret = "alg_kind:lrn_across_channels"; break;
       case(mkldnn_lrn_within_channel): ret = "alg_kind:lrn_within_channel"; break;
+      case(mkldnn_deconvolution_direct): ret = "alg_kind:deconvolution_direct"; break;
+      case(mkldnn_deconvolution_winograd): ret = "alg_kind:deconvolution_winograd"; break;
+      case(mkldnn_vanilla_rnn): ret = "alg_kind:vanilla_rnn"; break;
+      case(mkldnn_vanilla_lstm): ret = "alg_kind:vanilla_lstm"; break;
+      case(mkldnn_vanilla_gru): ret = "alg_kind:vanilla_gru"; break;
     }
     return ret;
+#else
+    return mkldnn_alg_kind2str(e);
+#endif
 }
 NAMEENUM_T(batch_normalization_flag){
     char const * ret = "Huh?";
@@ -273,6 +319,7 @@ NAMEENUM_T(batch_normalization_flag){
       case(mkldnn_use_global_stats): ret = "batch_normalization_flag:use_global_stats"; break;
       case(mkldnn_use_scaleshift): ret = "batch_normalization_flag:use_scaleshift"; break;
       //case(mkldnn_omit_stats): ret = "batch_normalization_flag:omit_stats"; break; /* duplicate */
+      case(mkldnn_fuse_bn_relu): ret = "batch_normalization_flag:mkldnn_fuse_bn_relu"; break;
     }
     return ret;
 }
@@ -304,6 +351,7 @@ NAMEENUM_T(query){
       case(mkldnn_query_some_d): ret = "query:some_d"; break;
       case(mkldnn_query_memory_d): ret = "query:memory_d"; break;
       case(mkldnn_query_convolution_d): ret = "query:convolution_d"; break;
+      case(mkldnn_query_deconvolution_d): ret = "query:deconvolution_d"; break;
       case(mkldnn_query_relu_d): ret = "query:relu_d"; break;
       case(mkldnn_query_softmax_d): ret = "query:softmax_d"; break;
       case(mkldnn_query_pooling_d): ret = "query:pooling_d"; break;
@@ -311,6 +359,7 @@ NAMEENUM_T(query){
       case(mkldnn_query_batch_normalization_d): ret = "query:batch_normalization_d"; break;
       case(mkldnn_query_inner_product_d): ret = "query:inner_product_d"; break;
       case(mkldnn_query_convolution_relu_d): ret = "query:convolution_relu_d"; break;
+      case(mkldnn_query_rnn_d): ret = "query:rnn_d"; break;
                                              /* (memory) primitive descriptor section */
       case(mkldnn_query_some_pd): ret = "query:some_pd"; break;
       case(mkldnn_query_input_pd): ret = "query:input_pd"; break;
@@ -342,7 +391,8 @@ NAMEENUM_T(stream_kind){
 
 #define NAMEFUNC_TPTR( TYPENAME, VAR ) int mkldnn_name_##TYPENAME ( mkldnn_##TYPENAME##_t const VAR, char * const buf, int len )
 
-#define SCAN_LASTNZ( ARR, SZ ) do{lastnz= -1; for(int i=0; i<(SZ); ++i){ if( ARR[i] > 0 ){ lastnz=i; }}}while(0)
+// volatile l_nz introduced to avoid a g++-7.2.0 optimization bug.
+#define SCAN_LASTNZ( ARR, SZ ) do{volatile int l_nz= -1; for(int i=0; i<(SZ); ++i){ if( ARR[i] > 0 ){ l_nz=i; }} lastnz=l_nz;}while(0)
 
 /** debug flag for SX compiler bug with -Cdebug or -Cnoopt */
 // - C99 behavior always returns the # of chars that would have been written.
@@ -372,10 +422,26 @@ NAMEENUM_T(stream_kind){
         errno=0; printf("zeros-case"); fflush(stdout); int const n = snprintf(b,len, "ZEROS" ); CHKBUF; \
     }else{ \
         for(int i=0; i<=lastnz; ++i){ \
-            printf("\nfmt=%s ARR[%d]=" FMTSPEC, "%c" FMTSPEC, i, ARR[i]); \
+            printf("\nfmt=%s ARR[%d]=" FMTSPEC "%c", \
+                   FMTSPEC, i, ARR[i]); \
             {errno=0; int const n = snprintf(b,len, "%c" FMTSPEC,(i==0?'{':','),ARR[i]); CHKBUF;} \
         } \
-        printf(" fmt=%s", "}"); \
+        printf(" end=%s", "}"); \
+        {errno=0; int const n = snprintf(b,len,"}"); CHKBUF;} \
+    } \
+}while(0)
+#define ARR_SZ( ARR, SZ, FMTSPEC ) do{ \
+    ssize_t const sz=(ssize_t)(SZ); \
+    if(sz <= 0){ \
+        errno=0; printf("sz=%td",sz); fflush(stdout); int const n = snprintf(b,len, "{}" ); CHKBUF; \
+    }else{ \
+        for(ssize_t i=0; i<=sz; ++i){ \
+            printf("\nfmt=%s ARR[%td]=" FMTSPEC "%c", \
+                   FMTSPEC, i, ARR[i]); \
+            {errno=0; int const n = snprintf(b,len, "%c" FMTSPEC, \
+                                             (i==0?'{':','), ARR[i] ); CHKBUF;} \
+        } \
+        printf(" end=%s", "}"); \
         {errno=0; int const n = snprintf(b,len,"}"); CHKBUF;} \
     } \
 }while(0)
@@ -396,6 +462,18 @@ NAMEENUM_T(stream_kind){
             {int const n = snprintf(b,len, "%c" FMTSPEC,(i==0?'{':','),ARR[i]); CHKBUF;} \
         } \
         {int const n = snprintf(b,len,"}"); CHKBUF;} \
+    } \
+}while(0)
+#define ARR_SZ( ARR, SZ, FMTSPEC ) do{ \
+    ssize_t const arr_sz=(ssize_t)(SZ); \
+    if(arr_sz <= 0){ \
+        errno=0; int const n = snprintf(b,len, (arr_sz<0? "{err:sz<0}":"{}")); CHKBUF; \
+    }else{ \
+        for(ssize_t i=0; i<=arr_sz; ++i){ \
+            errno=0; int const n = snprintf(b,len, "%c" FMTSPEC, \
+                                             (i==0?'{':','), ARR[i] ); CHKBUF; \
+        } \
+        {errno=0; int const n = snprintf(b,len,"}"); CHKBUF;} \
     } \
 }while(0)
 #endif
@@ -523,10 +601,32 @@ int mkldnn_name_blocking_desc( mkldnn_blocking_desc_t const *bd, char *const buf
     }
     return ret;
 }
+int mkldnn_name_blocking_desc_sz( mkldnn_blocking_desc_t const *bd, size_t sz, char *const buf, int len){
+    int ret=0;
+    char * b = buf;
+    if( sz > TENSOR_MAX_DIMS ){
+        assert(sz <= TENSOR_MAX_DIMS);
+        sz = TENSOR_MAX_DIMS;
+    }
+    {int n = snprintf(b,len, "blocking_desc:"); CHKBUF;}
+    if(bd == nullptr){
+        {int n = snprintf(b,len,"NULL"); CHKBUF;}
+    }else{
+        {int n = snprintf(b,len, "block_dims"); CHKBUF;}
+        ARR_SZ( bd->block_dims, sz, "%d" );
+        {int n = snprintf(b,len, ",strides[0]"); CHKBUF;}
+        ARR_SZ( bd->strides[0], sz, "%td" );
+        {int n = snprintf(b,len, ",strides[1]"); CHKBUF;}
+        ARR_SZ( bd->strides[1], sz, "%td" );
+        {int n = snprintf(b,len, ",padding_dims"); CHKBUF;}
+        ARR_SZ( bd->padding_dims, sz, "%d" );
+    }
+    return ret;
+}
 int mkldnn_name_memory_desc( mkldnn_memory_desc_t const *md, char * const buf, int len){
     int ret=0;
     char * b = buf;
-    {int n = snprintf(b,len, "memory_desc:"); CHKBUF;}
+    {int n = snprintf(b,len, "memory_desc="); CHKBUF;}
     if(md == nullptr){
         {int n = snprintf(b,len,"NULL"); CHKBUF;}
     }else{
@@ -548,9 +648,9 @@ int mkldnn_name_memory_desc( mkldnn_memory_desc_t const *md, char * const buf, i
         }
         {int n = snprintf(b,len, "}"); CHKBUF;}
 #endif
-        /* TODO: There is a REAL FUNCTION to do this correctly ! */
         if(md->format == mkldnn_blocked){ /* md->blocking  (optional: for memory formats that use them) */
-            {int n = mkldnn_name_blocking_desc( &md->layout_desc.blocking, b, len ); CHKBUF; }
+            //{int n = mkldnn_name_blocking_desc( &md->layout_desc.blocking, b, len ); CHKBUF; }
+            {int n = mkldnn_name_blocking_desc_sz( &md->layout_desc.blocking, md->ndims, b, len ); CHKBUF; }
         }
     }
     return ret;

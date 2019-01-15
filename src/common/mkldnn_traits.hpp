@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -32,8 +32,6 @@ namespace impl {
 template <data_type_t> struct prec_traits {}; /* ::type -> float */
 template <typename> struct data_traits {}; /* ::data_type -> f32 */
 template <primitive_kind_t> struct pkind_traits {}; /* ::desc_type, ::query_d */
-//template <data_type_t> struct accum_traits {}; /* --> float_t and accsqr_t */
-
 
 template <> struct prec_traits<data_type::f32> { typedef float type; };
 template <> struct prec_traits<data_type::s32> { typedef int32_t type; };
@@ -52,21 +50,6 @@ template <> struct data_traits<int8_t>
 template <> struct data_traits<uint8_t>
 { static constexpr data_type_t data_type = data_type::u8; };
 
-#if 0
-/** float_t for calcs like pow, accsqr_t for summing squares.
- *  traits-like in case you want to go to double someday. */
-template <> struct accum_traits<data_type::f32>
-{ typedef float float_t; typedef float accsqr_t; };
-template <> struct accum_traits<data_type::s32>
-{ typedef float float_t; typedef float accsqr_t; };
-template <> struct accum_traits<data_type::s16>
-{ typedef float float_t; typedef float/*int64_t?*/ accsqr_t; };
-template <> struct accum_traits<data_type::s8>
-{ typedef float float_t; typedef uint32_t accsqr_t; };
-template <> struct accum_traits<data_type::u8>
-{ typedef float float_t; typedef uint32_t accsqr_t; };
-#endif
-
 #define PKIND_TRAITS_INST(op) \
 template <> struct pkind_traits<primitive_kind::op> { \
     typedef CONCAT2(op, _desc_t) desc_type; \
@@ -74,6 +57,7 @@ template <> struct pkind_traits<primitive_kind::op> { \
 }
 PKIND_TRAITS_INST(memory);
 PKIND_TRAITS_INST(convolution);
+PKIND_TRAITS_INST(deconvolution);
 PKIND_TRAITS_INST(eltwise);
 PKIND_TRAITS_INST(softmax);
 PKIND_TRAITS_INST(pooling);
@@ -81,6 +65,7 @@ PKIND_TRAITS_INST(lrn);
 PKIND_TRAITS_INST(batch_normalization);
 PKIND_TRAITS_INST(inner_product);
 PKIND_TRAITS_INST(convolution_relu);
+PKIND_TRAITS_INST(rnn);
 #undef PKIND_TRAITS_INST
 
 }

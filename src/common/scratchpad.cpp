@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -13,6 +13,9 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+
+#include "mkldnn_thread.hpp"
+#include "utils.hpp"
 
 #include "scratchpad.hpp"
 
@@ -76,15 +79,15 @@ struct global_scratchpad_t : public scratchpad_t {
     }
 
 private:
-    static char *scratchpad_;
-    static size_t size_;
-    static unsigned int reference_count_;
-#pragma omp threadprivate(scratchpad_, size_, reference_count_)
+    THREAD_LOCAL static char *scratchpad_;
+    THREAD_LOCAL static size_t size_;
+    THREAD_LOCAL static unsigned int reference_count_;
+    //OMP(threadprivate(scratchpad_, size_, reference_count_))//;
 };
 
-char *global_scratchpad_t::scratchpad_ = nullptr;
-size_t global_scratchpad_t::size_ = 0;
-unsigned int global_scratchpad_t::reference_count_ = 0;
+THREAD_LOCAL char *global_scratchpad_t::scratchpad_ = nullptr;
+THREAD_LOCAL size_t global_scratchpad_t::size_ = 0;
+THREAD_LOCAL unsigned int global_scratchpad_t::reference_count_ = 0;
 
 
 /*
@@ -100,3 +103,4 @@ scratchpad_t *create_scratchpad(size_t size) {
 
 }
 }
+// vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s

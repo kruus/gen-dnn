@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@
 #include "mkldnn_io.h"
 
 #include <assert.h>
-#ifdef WIN32
+#ifdef _WIN32
 #include <malloc.h>
 #endif
 
@@ -60,7 +60,7 @@ void *aligned_malloc(size_t size, size_t alignment) {
 }
 #else
 void *aligned_malloc(size_t size, size_t alignment) {
-#ifdef WIN32
+#ifdef _WIN32
     return _aligned_malloc(size, alignment);
 #elif defined(_SX)
     return malloc(size);
@@ -72,7 +72,6 @@ void *aligned_malloc(size_t size, size_t alignment) {
 #endif
 
 #ifndef NDEBUG
-#include "mkldnn_io.h"
 #define PRT_PRIMITIVE_AT( MSG, PRIMITIVE_AT ) do{ \
     printf("\n%s ",MSG); \
     int len = 1024; char buf[1024]; \
@@ -90,7 +89,7 @@ void *aligned_malloc(size_t size, size_t alignment) {
 }while(0) 
 #endif
 
-#ifdef WIN32
+#ifdef _WIN32
 void _free(void *ptr) {
     _aligned_free(ptr);
 }
@@ -322,7 +321,7 @@ mkldnn_status_t simple_net(){
     /* AlexNet: relu
      * {BATCH, 96, 55, 55} -> {BATCH, 96, 55, 55}
      */
-    float negative_slope = 1.0;
+    float negative_slope = 1.0f;
 
     int *relu_dst_sizes = conv_dst_sizes;
     float *relu_dst_buffer =
@@ -370,9 +369,9 @@ mkldnn_status_t simple_net(){
      * beta: 0.75
      */
     uint32_t local_size = 5;
-    float alpha = 0.0001;
-    float beta = 0.75;
-    float k = 1.0;
+    float alpha = 0.0001f;
+    float beta = 0.75f;
+    float k = 1.0f;
 
     int32_t *lrn_dst_sizes = relu_dst_sizes;
 

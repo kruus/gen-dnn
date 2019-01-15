@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ status_t pooling_desc_init(pooling_desc_t *pool_desc,
 
     if (padding_r == nullptr) padding_r = padding_l;
 
-    pooling_desc_t pd = {};
+    auto pd = pooling_desc_t();
     pd.primitive_kind = primitive_kind::pooling;
     pd.prop_kind = prop_kind;
     pd.alg_kind = alg_kind;
@@ -74,11 +74,11 @@ status_t pooling_desc_init(pooling_desc_t *pool_desc,
     }
 
     bool consistency = true
-        && src_desc->ndims == 4
-        && dst_desc->ndims == 4
+        && utils::one_of(src_desc->ndims, 4, 5)
+        && utils::one_of(dst_desc->ndims, 4, 5)
         && src_desc->dims[0] == dst_desc->dims[0]
         && src_desc->dims[1] == dst_desc->dims[1];
-    for (int i = 2; i <= 3; ++i)
+    for (int i = 2; i < src_desc->ndims; ++i)
         consistency = consistency && (
                 (src_desc->dims[i] - kernel[i - 2] + padding_l[i - 2]
                  + padding_r[i - 2]) / strides[i - 2] + 1

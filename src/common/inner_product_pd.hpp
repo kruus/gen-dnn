@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ struct inner_product_fwd_pd_t: public primitive_desc_t {
     const inner_product_desc_t *desc() const { return &desc_; }
     virtual const op_desc_t *op_desc() const override
     { return reinterpret_cast<const op_desc_t *>(this->desc()); }
+    virtual void init_info() override { init_info_iprod(this, this->info_); }
 
     virtual const memory_pd_t *input_pd(int index = 0) const override {
         switch (index) {
@@ -74,18 +75,36 @@ struct inner_product_fwd_pd_t: public primitive_desc_t {
     { return utils::array_product(&desc_.src_desc.dims[1], ndims() - 1); }
     inline int OC() const { return desc_.dst_desc.dims[1]; }
 
-    inline int IH() const
-    { assert(ndims() == 4); return desc_.src_desc.dims[2]; }
-    inline int IW() const
-    { assert(ndims() == 4); return desc_.src_desc.dims[3]; }
-    inline int KH() const
-    { assert(ndims() == 4); return desc_.weights_desc.dims[2]; }
-    inline int KW() const
-    { assert(ndims() == 4); return desc_.weights_desc.dims[3]; }
+    inline int ID() const
+    { return ndims() == 5 ? desc_.src_desc.dims[2] : 1; }
+    inline int IH() const {
+        assert(ndims() == 4 || ndims() == 5);
+        return desc_.src_desc.dims[ndims()-2];
+    }
+    inline int IW() const {
+        assert(ndims() == 4 || ndims() == 5);
+        return desc_.src_desc.dims[ndims()-1];
+    }
+    inline int KD() const
+    { return ndims() == 5 ? desc_.weights_desc.dims[2] : 1; }
+    inline int KH() const {
+        assert(ndims() == 4 || ndims() == 5);
+        return desc_.weights_desc.dims[ndims()-2];
+    }
+    inline int KW() const {
+        assert(ndims() == 4 || ndims() == 5);
+        return desc_.weights_desc.dims[ndims()-1];
+    }
 
     inline int ndims() const { return desc_.src_desc.ndims; }
     inline bool with_bias() const
     { return !memory_desc_wrapper(desc_.bias_desc).is_zero(); }
+
+    bool has_zero_dim_memory() const {
+        return false
+            || memory_desc_wrapper(desc_.src_desc).has_zero_dim()
+            || memory_desc_wrapper(desc_.dst_desc).has_zero_dim();
+    }
 
 protected:
     inner_product_desc_t desc_;
@@ -110,6 +129,7 @@ struct inner_product_bwd_data_pd_t: public primitive_desc_t {
     const inner_product_desc_t *desc() const { return &desc_; }
     virtual const op_desc_t *op_desc() const override
     { return reinterpret_cast<const op_desc_t *>(this->desc()); }
+    virtual void init_info() override { init_info_iprod(this, this->info_); }
 
     virtual const memory_pd_t *input_pd(int index = 0) const override {
         switch (index) {
@@ -142,18 +162,36 @@ struct inner_product_bwd_data_pd_t: public primitive_desc_t {
     { return utils::array_product(&desc_.diff_src_desc.dims[1], ndims() - 1); }
     inline int OC() const { return desc_.diff_dst_desc.dims[1]; }
 
-    inline int IH() const
-    { assert(ndims() == 4); return desc_.diff_src_desc.dims[2]; }
-    inline int IW() const
-    { assert(ndims() == 4); return desc_.diff_src_desc.dims[3]; }
-    inline int KH() const
-    { assert(ndims() == 4); return desc_.weights_desc.dims[2]; }
-    inline int KW() const
-    { assert(ndims() == 4); return desc_.weights_desc.dims[3]; }
+    inline int ID() const
+    { return ndims() == 5 ? desc_.diff_src_desc.dims[2] : 1; }
+    inline int IH() const {
+        assert(ndims() == 4 || ndims() == 5);
+        return desc_.diff_src_desc.dims[ndims()-2];
+    }
+    inline int IW() const {
+        assert(ndims() == 4 || ndims() == 5);
+        return desc_.diff_src_desc.dims[ndims()-1];
+    }
+    inline int KD() const
+    { return ndims() == 5 ? desc_.weights_desc.dims[2] : 1; }
+    inline int KH() const {
+        assert(ndims() == 4 || ndims() == 5);
+        return desc_.weights_desc.dims[ndims()-2];
+    }
+    inline int KW() const {
+        assert(ndims() == 4 || ndims() == 5);
+        return desc_.weights_desc.dims[ndims()-1];
+    }
 
     inline int ndims() const { return desc_.diff_src_desc.ndims; }
     inline bool with_bias() const
     { return !memory_desc_wrapper(desc_.bias_desc).is_zero(); }
+
+    bool has_zero_dim_memory() const {
+        return false
+            || memory_desc_wrapper(desc_.diff_src_desc).has_zero_dim()
+            || memory_desc_wrapper(desc_.diff_dst_desc).has_zero_dim();
+    }
 
 protected:
     inner_product_desc_t desc_;
@@ -178,18 +216,19 @@ struct inner_product_bwd_weights_pd_t: public primitive_desc_t {
     const inner_product_desc_t *desc() const { return &desc_; }
     virtual const op_desc_t *op_desc() const override
     { return reinterpret_cast<const op_desc_t *>(this->desc()); }
+    virtual void init_info() override { init_info_iprod(this, this->info_); }
 
     virtual const memory_pd_t *input_pd(int index = 0) const override {
         switch (index) {
         case 0: return src_pd();
-        case 1: return with_bias() ? diff_dst_pd(1) : nullptr;
+        case 1: return diff_dst_pd();
         default: return nullptr;
         }
     }
     virtual const memory_pd_t *output_pd(int index = 0) const override {
         switch (index) {
         case 0: return diff_weights_pd(0);
-        case 1: with_bias() ? diff_weights_pd(1) : nullptr;
+        case 1: return with_bias() ? diff_weights_pd(1) : nullptr;
         default: return nullptr;
         }
     }
@@ -215,18 +254,36 @@ struct inner_product_bwd_weights_pd_t: public primitive_desc_t {
     { return utils::array_product(&desc_.src_desc.dims[1], ndims() - 1); }
     inline int OC() const { return desc_.diff_dst_desc.dims[1]; }
 
-    inline int IH() const
-    { assert(ndims() == 4); return desc_.src_desc.dims[2]; }
-    inline int IW() const
-    { assert(ndims() == 4); return desc_.src_desc.dims[3]; }
-    inline int KH() const
-    { assert(ndims() == 4); return desc_.src_desc.dims[2]; }
-    inline int KW() const
-    { assert(ndims() == 4); return desc_.src_desc.dims[3]; }
+    inline int ID() const
+    { return ndims() == 5 ? desc_.src_desc.dims[2] : 1; }
+    inline int IH() const {
+        assert(ndims() == 4 || ndims() == 5);
+        return desc_.src_desc.dims[ndims()-2];
+    }
+    inline int IW() const {
+        assert(ndims() == 4 || ndims() == 5);
+        return desc_.src_desc.dims[ndims()-1];
+    }
+    inline int KD() const
+    { return ndims() == 5 ? desc_.src_desc.dims[2] : 1; }
+    inline int KH() const {
+        assert(ndims() == 4 || ndims() == 5);
+        return desc_.src_desc.dims[ndims()-2];
+    }
+    inline int KW() const {
+        assert(ndims() == 4 || ndims() == 5);
+        return desc_.src_desc.dims[ndims()-1];
+    }
 
     inline int ndims() const { return desc_.src_desc.ndims; }
     inline bool with_bias() const
     { return !memory_desc_wrapper(desc_.diff_bias_desc).is_zero(); }
+
+    bool has_zero_dim_memory() const {
+        return false
+            || memory_desc_wrapper(desc_.src_desc).has_zero_dim()
+            || memory_desc_wrapper(desc_.diff_dst_desc).has_zero_dim();
+    }
 
 protected:
     inner_product_desc_t desc_;

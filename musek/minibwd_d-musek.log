@@ -1,0 +1,132 @@
+[ 23%] Built target mkldnn
+[ 25%] Built target simple-training-net-c
+[ 26%] Built target simple-net-c
+[ 27%] Built target simple-net-cpp
+[ 28%] Built target simple-training-net-cpp
+[ 29%] Built target api-c
+[ 31%] Built target test_c_symbols-c
+[ 32%] Built target api-io-c
+[ 35%] Built target mkldnn_gtest
+[ 37%] Built target test_convolution_backward_weights
+[ 39%] Built target test_lrn_forward
+[ 41%] Built target test_sum
+[ 43%] Built target test_relu
+[ 45%] Built target test_lrn_backward
+[ 47%] Built target test_softmax_forward
+[ 49%] Built target test_eltwise
+[ 51%] Built target test_convolution_relu_forward_s16s16s32
+[ 53%] Built target test_inner_product_backward_weights
+[ 54%] Built target test_iface_attr
+[ 56%] Built target test_concat
+[ 58%] Built target test_convolution_backward_data_f32
+[ 60%] Built target test_pooling_backward
+[ 62%] Built target test_batch_normalization
+[ 64%] Built target test_reorder
+[ 67%] Built target test_convolution_format_any
+[ 69%] Built target test_inner_product_forward
+[ 71%] Built target test_pooling_forward
+[ 73%] Built target test_inner_product_backward_data
+[ 75%] Built target test_convolution_forward_f32
+[ 77%] Built target test_convolution_forward_s16s16s32
+[ 79%] Built target test_convolution_relu_forward_f32
+[ 81%] Built target test_convolution_backward_data_s16s16s32
+[100%] Built target benchdnn
+THREADS  : 
+cmd      :  /usr/bin/time -v ./benchdnn --mode=PT --dir=BWD_D  --batch=inputs/minialex
+/home/kruus/w/gen-dnn/build/tests/benchdnn
+total 304
+-rwxrwxr-x 1 kruus kruus 257112 Dec 14 18:17 benchdnn
+drwxrwxr-x 6 kruus kruus   4096 Dec 14 18:17 CMakeFiles
+-rw-rw-r-- 1 kruus kruus   1017 Dec 14 18:17 cmake_install.cmake
+-rw-rw-r-- 1 kruus kruus    291 Dec 14 18:17 CTestTestfile.cmake
+drwxrwxr-x 2 kruus kruus   4096 Dec 14 18:17 inputs
+-rw-rw-r-- 1 kruus kruus  34857 Dec 14 18:17 Makefile
+ /home/kruus/w/gen-dnn/build/tests/benchdnn inputs:
+COLUMN ... column -t
+conv_alexnet             conv_all                       conv_dilated                conv_googlenet_v1
+conv_googlenet_v2        conv_googlenet_v3              conv_regression_dilate      conv_regression_group
+conv_regression_padding  conv_regression_small_spatial  conv_regression_stride      conv_resnet_50
+conv_resnet_50_sparse    conv_segnet                    conv_ssd_300_voc0712        conv_vgg_11
+conv_vgg_19              deepbench                      deepbench_inference_device  deepbench_inference_server
+deepbench_training       minialex                       test_bwd_d_regression       test_bwd_w_regression
+test_conv_all            test_conv_regression           test_fwd_regression
+benchdnn --conv --mode=PERF+TEST -v0 ... init omp_max_thr=4  OK
+batch: inputs/minialex ???batch: inputs/minialex OK
+
+t:0 orig            13 s ok 185.192 MFlops   1.00 x BWD_D --dir=BWD_D mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+t:1 sx3       358.024 ms ok   6.478 GFlops  34.98 x BWD_D --dir=BWD_D mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+t:2 sx4       426.814 ms ok   5.434 GFlops  29.34 x BWD_D --dir=BWD_D mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+t:3 ref3             1 s ok   2.262 GFlops  12.21 x BWD_D --dir=BWD_D mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+t:4 ref4             3 s ok 782.910 MFlops   4.23 x BWD_D --dir=BWD_D mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+ TEST all_passed=1 0:PASSED __REPRO:     2.3e+09 ops BWD_D --dir=BWD_D mb11ic3ih227oc96oh55kh11sh4n"alex-mb16:conv1"
+T:0  orig   loops: 1   speedup: 1.000 x  wins: 0     tot_ms: 12522.873  avg_ms: 12522.873  avg speedup: 1.000 x 185.2 Mflops
+T:1  sx3    loops: 1   speedup: 34.978x  wins: 1     tot_ms: 358.024   avg_ms: 358.024  avg speedup: 34.978 x 6477.6 Mflops
+T:2  sx4    loops: 1   speedup: 29.340x  wins: 0     tot_ms: 426.814   avg_ms: 426.814  avg speedup: 29.340 x 5433.6 Mflops
+T:3  ref3   loops: 1   speedup: 12.214x  wins: -1    tot_ms: 1025.302  avg_ms: 1025.302  avg speedup: 12.214 x 2261.9 Mflops
+T:4  ref4   loops: 1   speedup: 4.228 x  wins: -2    tot_ms: 2962.196  avg_ms: 2962.196  avg speedup: 4.228 x 782.9 Mflops
+
+t:0 orig            15 s ok 291.439 MFlops   1.00 x BWD_D --dir=BWD_D g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+t:1 sx3       562.306 ms ok   8.000 GFlops  27.45 x BWD_D --dir=BWD_D g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+t:2 sx4       679.436 ms ok   6.621 GFlops  22.72 x BWD_D --dir=BWD_D g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+t:3 ref3             1 s ok   4.252 GFlops  14.59 x BWD_D --dir=BWD_D g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+t:4 ref4             5 s ok 824.854 MFlops   2.83 x BWD_D --dir=BWD_D g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+ TEST all_passed=1 1:PASSED __REPRO:     4.5e+09 ops BWD_D --dir=BWD_D g2mb11ic96ih27oc256oh27kh5ph2n"alex-mb16:conv2"
+T:0  orig   loops: 2   speedup: 1.000 x  wins: 0     tot_ms: 27958.881  avg_ms: 13979.441  avg speedup: 1.000 x 243.9 Mflops
+T:1  sx3    loops: 2   speedup: 27.451x  wins: 2     tot_ms: 920.331   avg_ms: 460.165  avg speedup: 30.379 x 7408.0 Mflops
+T:2  sx4    loops: 2   speedup: 22.719x  wins: 0     tot_ms: 1106.250  avg_ms: 553.125  avg speedup: 25.274 x 6163.0 Mflops
+T:3  ref3   loops: 2   speedup: 14.589x  wins: -2    tot_ms: 2083.349  avg_ms: 1041.674  avg speedup: 13.420 x 3272.5 Mflops
+T:4  ref4   loops: 2   speedup: 2.830 x  wins: -4    tot_ms: 8416.087  avg_ms: 4208.044  avg speedup: 3.322 x 810.1 Mflops
+
+t:0 orig            10 s ok 285.510 MFlops   1.00 x BWD_D --dir=BWD_D mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+t:1 sx3       787.559 ms ok   3.759 GFlops  13.17 x BWD_D --dir=BWD_D mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+t:2 sx4       858.096 ms ok   3.450 GFlops  12.08 x BWD_D --dir=BWD_D mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+t:3 ref3             1 s ok   2.833 GFlops   9.92 x BWD_D --dir=BWD_D mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+t:4 ref4             3 s ok 892.968 MFlops   3.13 x BWD_D --dir=BWD_D mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+ TEST all_passed=1 2:PASSED __REPRO:       3e+09 ops BWD_D --dir=BWD_D mb11ic256ih13oc384oh13kh3ph1n"alexnet:conv3"
+T:0  orig   loops: 3   speedup: 1.000 x  wins: 0     tot_ms: 38328.829  avg_ms: 12776.276  avg speedup: 1.000 x 255.1 Mflops
+T:1  sx3    loops: 3   speedup: 13.167x  wins: 3     tot_ms: 1707.889  avg_ms: 569.296  avg speedup: 22.442 x 5725.5 Mflops
+T:2  sx4    loops: 3   speedup: 12.085x  wins: 0     tot_ms: 1964.346  avg_ms: 654.782  avg speedup: 19.512 x 4978.0 Mflops
+T:3  ref3   loops: 3   speedup: 9.922 x  wins: -3    tot_ms: 3128.520  avg_ms: 1042.840  avg speedup: 12.251 x 3125.6 Mflops
+T:4  ref4   loops: 3   speedup: 3.128 x  wins: -6    tot_ms: 11731.683  avg_ms: 3910.561  avg speedup: 3.267 x 833.5 Mflops
+
+t:0 orig             8 s ok 288.124 MFlops   1.00 x BWD_D --dir=BWD_D g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+t:1 sx3       418.807 ms ok   5.302 GFlops  18.40 x BWD_D --dir=BWD_D g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+t:2 sx4       407.695 ms ok   5.447 GFlops  18.90 x BWD_D --dir=BWD_D g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+t:3 ref3      836.171 ms ok   2.656 GFlops   9.22 x BWD_D --dir=BWD_D g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+t:4 ref4             2 s ok 907.578 MFlops   3.15 x BWD_D --dir=BWD_D g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+ TEST all_passed=1 3:PASSED __REPRO:     2.2e+09 ops BWD_D --dir=BWD_D g2mb11ic384ih13oc384oh13kh3ph1n"alex-mb16:conv4"
+T:0  orig   loops: 4   speedup: 1.000 x  wins: 0     tot_ms: 46035.731  avg_ms: 11508.933  avg speedup: 1.000 x 260.6 Mflops
+T:1  sx3    loops: 4   speedup: 18.402x  wins: 4     tot_ms: 2126.696  avg_ms: 531.674  avg speedup: 21.647 x 5642.1 Mflops
+T:2  sx4    loops: 4   speedup: 18.904x  wins: 2     tot_ms: 2372.042  avg_ms: 593.010  avg speedup: 19.408 x 5058.5 Mflops
+T:3  ref3   loops: 4   speedup: 9.217 x  wins: -4    tot_ms: 3964.692  avg_ms: 991.173  avg speedup: 11.611 x 3026.5 Mflops
+T:4  ref4   loops: 4   speedup: 3.150 x  wins: -8    tot_ms: 14178.348  avg_ms: 3544.587  avg speedup: 3.247 x 846.3 Mflops
+TEST final stats:
+T:0  orig   loops: 4   speedup: 1.000 x  wins: 0     tot_ms: 46035.731  avg_ms: 11508.933  avg speedup: 1.000 x 260.6 Mflops
+T:1  sx3    loops: 4   speedup: 18.402x  wins: 4     tot_ms: 2126.696  avg_ms: 531.674  avg speedup: 21.647 x 5642.1 Mflops
+T:2  sx4    loops: 4   speedup: 18.904x  wins: 2     tot_ms: 2372.042  avg_ms: 593.010  avg speedup: 19.408 x 5058.5 Mflops
+T:3  ref3   loops: 4   speedup: 9.217 x  wins: -4    tot_ms: 3964.692  avg_ms: 991.173  avg speedup: 11.611 x 3026.5 Mflops
+T:4  ref4   loops: 4   speedup: 3.150 x  wins: -8    tot_ms: 14178.348  avg_ms: 3544.587  avg speedup: 3.247 x 846.3 Mflops
+tests:4 impls:4 passed:0 skipped:0 mistrusted:4 unimplemented:0 failed:0 test_fail: 0
+	Command being timed: "./benchdnn --mode=PT --dir=BWD_D --batch=inputs/minialex"
+	User time (seconds): 602.03
+	System time (seconds): 0.57
+	Percent of CPU this job got: 326%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 3:04.62
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 76556
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 6316
+	Voluntary context switches: 78
+	Involuntary context switches: 698520
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 48
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

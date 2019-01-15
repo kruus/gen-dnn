@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -22,11 +22,21 @@
 #include <stdlib.h>
 #include <math.h>
 #include "mkldnn.h"
-#ifdef WIN32
+#ifdef _WIN32
 #include <malloc.h>
 #endif
 
 #define BATCH 32
+
+#if 0 // mostly this was for primitive_at{foo} vs primitive_at{foo,0}
+#if !defined(STRUCT_INIT_BUG)
+#if defined(_SX) // || defined(__ve)
+#define STRUCT_INIT_BUG 1
+#else
+#define STRUCT_INIT_BUG 0
+#endif
+#endif
+#endif
 
 #define CHECK(f)                                                               \
     do {                                                                       \
@@ -53,7 +63,7 @@ void *aligned_malloc(size_t size, size_t alignment) {
 }
 #else
 void *aligned_malloc(size_t size, size_t alignment) {
-#ifdef WIN32
+#ifdef _WIN32
     return _aligned_malloc(size, alignment);
 #else
     void *p;
@@ -62,7 +72,7 @@ void *aligned_malloc(size_t size, size_t alignment) {
 }
 #endif
 
-#ifdef WIN32
+#ifdef _WIN32
 void _free(void *ptr) {
     _aligned_free(ptr);
 }
@@ -311,7 +321,7 @@ mkldnn_status_t simple_net()
     /* AlexNet: relu
      * {BATCH, 96, 55, 55} -> {BATCH, 96, 55, 55}
      */
-    float negative_slope = 1.0;
+    float negative_slope = 1.0f;
 
     int *relu_dst_sizes = conv_dst_sizes;
     float *relu_dst_buffer =
@@ -344,6 +354,7 @@ mkldnn_status_t simple_net()
 
     /* finally create a relu primitive */
     mkldnn_primitive_t relu;
+    // some compilers have a struct init bug, so need explicit ", 0"...
     mkldnn_primitive_at_t relu_srcs = { conv_internal_dst_memory, 0 };
     const_mkldnn_primitive_t relu_dsts[] = { relu_dst_memory };
 
@@ -357,9 +368,9 @@ mkldnn_status_t simple_net()
      * k: 1.0
      */
     uint32_t local_size = 5;
-    float alpha = 0.0001;
-    float beta = 0.75;
-    float k = 1.0;
+    float alpha = 0.0001f;
+    float beta = 0.75f;
+    float k = 1.0f;
 
     int32_t *lrn_dst_sizes = relu_dst_sizes;
 

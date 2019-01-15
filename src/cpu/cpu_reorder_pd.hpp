@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -35,11 +35,19 @@ struct cpu_reorder_pd_t: public reorder_pd_t {
     using cpu_memory_pd_t = cpu_memory_t::pd_t;
 
     cpu_reorder_pd_t(const cpu_memory_pd_t *input_pd,
-            const cpu_memory_pd_t *output_pd,
-            const primitive_attr_t *attr, float beta)
-        : reorder_pd_t(input_pd->engine(), attr, beta)
+            const cpu_memory_pd_t *output_pd, const primitive_attr_t *attr)
+        : reorder_pd_t(input_pd->engine(), attr)
         , input_pd_(*input_pd), output_pd_(*output_pd) {}
     virtual ~cpu_reorder_pd_t() {}
+
+    virtual status_t init() const {
+        const auto &post_ops = attr()->post_ops_;
+        bool args_ok = true
+            && utils::implication(post_ops.len_ != 0,
+                    post_ops.len_ == 1
+                    && post_ops.entry_[0].kind == primitive_kind::sum);
+        return args_ok ? success : unimplemented;
+    }
 
     virtual const cpu_memory_pd_t *input_pd(int index = 0) const override
     { return index == 0 ? &input_pd_ : nullptr; }

@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -17,59 +17,41 @@
 #ifndef CPU_JIT_AVX2_GENERATOR_HPP
 #define CPU_JIT_AVX2_GENERATOR_HPP
 #if defined(TARGET_VANILLA)
-#error "jit_generator.hpp should not be included for TARGET_VANILLA compile"
+#warning "jit_generator.hpp should not be included for TARGET_VANILLA compile"
 #endif
 
-#include <type_traits>
-#include "cpu_isa.hpp"
+#include <limits.h>
+#include "cpu_isa_traits.hpp"
 
-#define XBYAK64
-#define XBYAK_NO_OP_NAMES
-/* in order to make selinux happy memory that would be marked with X-bit should
- * be obtained with mmap */
-#define XBYAK_USE_MMAP_ALLOCATOR
-#include "xbyak/xbyak.h"
-#include "xbyak/xbyak_util.h"
+#include "utils.hpp"
+#include "mkldnn_thread.hpp"
 
-#ifdef _WIN32
-#   define STRUCT_ALIGN(al, ...) __declspec(align(al)) __VA_ARGS__
+#ifdef JIT_PROFILING_VTUNE
+#include "jitprofiling.h"
+#endif
+
+#if defined(_WIN32)
 #   define OFFSET_SHADOWSPACE 0x28
-#else
-#   define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__(al)))
 #endif
+
+#define DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_name) \
+    const char *name() const override { return STRINGIFY(jit_name); } \
+    const char *source_file() const override { return __FILE__; \
+    }
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-template <cpu_isa_t> struct cpu_isa_traits {}; /* ::vlen -> 32 (for avx2) */
-
-template <> struct cpu_isa_traits<sse42> {
-    static constexpr int vlen_shift = 4;
-    static constexpr int vlen = 16;
-    static constexpr int n_vregs = 16;
-};
-template <> struct cpu_isa_traits<avx2> {
-    static constexpr int vlen_shift = 5;
-    static constexpr int vlen = 32;
-    static constexpr int n_vregs = 16;
-};
-template <> struct cpu_isa_traits<avx512_common> {
-    static constexpr int vlen_shift = 6;
-    static constexpr int vlen = 64;
-    static constexpr int n_vregs = 32;
-};
-template <> struct cpu_isa_traits<avx512_core>:
-    public cpu_isa_traits<avx512_common> {};
-
-template <> struct cpu_isa_traits<avx512_mic>:
-    public cpu_isa_traits<avx512_common> {};
-
-template <> struct cpu_isa_traits<avx512_mic_4ops>:
-    public cpu_isa_traits<avx512_common> {};
-
 // TODO: move this to jit_generator class?
 namespace {
+
+#if 0 // moved to cpu_isa_traits (also used for non-jit malloc size)    
+typedef enum {
+    PAGE_4K = 4096,
+    PAGE_2M = 2097152,
+} cpu_page_size_t;
+#endif
 
 // TODO: move this somewhere else? Although this is only used by jit kernels
 // (Roma)
@@ -100,18 +82,15 @@ static inline int float2int(float x) {
 // (Roma)
 
 #ifdef XBYAK64
-constexpr Xbyak::Operand::Code abi_save_regs[] = {
-    Xbyak::Operand::RBX, Xbyak::Operand::RSP, Xbyak::Operand::RBP,
-    Xbyak::Operand::R12, Xbyak::Operand::R13, Xbyak::Operand::R14,
-    Xbyak::Operand::R15,
-#ifdef _WIN
+constexpr Xbyak::Operand::Code abi_save_gpr_regs[] = {
+    Xbyak::Operand::RBX, Xbyak::Operand::RBP, Xbyak::Operand::R12,
+    Xbyak::Operand::R13, Xbyak::Operand::R14, Xbyak::Operand::R15,
+#ifdef _WIN32
     Xbyak::Operand::RDI, Xbyak::Operand::RSI,
 #endif
 };
-constexpr size_t num_abi_save_regs
-    = sizeof(abi_save_regs) / sizeof(abi_save_regs[0]);
 
-#ifdef _WIN
+#ifdef _WIN32
 static const Xbyak::Reg64 abi_param1(Xbyak::Operand::RCX),
              abi_param2(Xbyak::Operand::RDX),
              abi_param3(Xbyak::Operand::R8),
@@ -126,50 +105,31 @@ static const Xbyak::Reg64 abi_param1(Xbyak::Operand::RDI),
 #endif
 #endif
 
-static Xbyak::util::Cpu cpu;
-static inline bool mayiuse(const cpu_isa_t cpu_isa) {
-    using namespace Xbyak::util;
-
-    switch (cpu_isa) {
-    case sse42:
-        return cpu.has(Cpu::tSSE42);
-    case avx2:
-        return cpu.has(Cpu::tAVX2);
-    case avx512_common:
-        return cpu.has(Cpu::tAVX512F);
-    case avx512_core:
-        return true
-            && cpu.has(Cpu::tAVX512F)
-            && cpu.has(Cpu::tAVX512BW)
-            && cpu.has(Cpu::tAVX512VL)
-            && cpu.has(Cpu::tAVX512DQ);
-    case avx512_mic:
-        return true
-            && cpu.has(Cpu::tAVX512F)
-            && cpu.has(Cpu::tAVX512CD)
-            && cpu.has(Cpu::tAVX512ER)
-            && cpu.has(Cpu::tAVX512PF);
-    case avx512_mic_4ops:
-        return true
-            && mayiuse(avx512_mic)
-            && cpu.has(Cpu::tAVX512_4FMAPS)
-            && cpu.has(Cpu::tAVX512_4VNNIW);
-    case isa_any:
-        return true;
-    }
-    return false;
-}
-
+#if 0 // --> cpu_isa_traits.hpp (maybe not right place for it)
+// XXX sometimes called from non-jit code!!!
 inline unsigned int get_cache_size(int level, bool per_core = true){
     unsigned int l = level - 1;
-    if (cpu.data_cache_levels == 0)
-        throw Xbyak::Error(Xbyak::ERR_INTERNAL);
-    if (l < cpu.data_cache_levels)
-        return cpu.data_cache_size[l] /
-            (per_core ? cpu.cores_sharing_data_cache[l] : 1);
-    else
+    // Currently, if XByak is not able to fetch the cache topology
+    // we default to 32KB of L1, 512KB of L2 and 1MB of L3 per core.
+    if (cpu.data_cache_levels == 0){
+        const int L1_cache_per_core = 32000;
+        const int L2_cache_per_core = 512000;
+        const int L3_cache_per_core = 1024000;
+        int num_cores = per_core ? 1 : omp_get_max_threads();
+        switch(l){
+        case(0): return L1_cache_per_core * num_cores;
+        case(1): return L2_cache_per_core * num_cores;
+        case(2): return L3_cache_per_core * num_cores;
+        default: return 0;
+        }
+    }
+    if (l < cpu.data_cache_levels) {
+        return cpu.data_cache_size[l]
+            / (per_core ? cpu.cores_sharing_data_cache[l] : 1);
+    } else
         return 0;
 }
+#endif
 
 }
 
@@ -218,28 +178,48 @@ typedef jit_tagged_label_base<> jit_tagged_label;
 class jit_generator : public Xbyak::CodeGenerator
 {
 private:
-    const int xmm_len = 16;
-#ifdef _WIN
-    const int xmm_to_preserve_start = 6;
-    const int xmm_to_preserve = 10;
+    const size_t xmm_len = 16;
+#ifdef _WIN32
+    const size_t xmm_to_preserve_start = 6;
+    const size_t xmm_to_preserve = 10;
 #else
-    const int xmm_to_preserve_start = 0;
-    const int xmm_to_preserve = 0;
+    const size_t xmm_to_preserve_start = 0;
+    const size_t xmm_to_preserve = 0;
 #endif
 
+    const size_t num_abi_save_gpr_regs
+        = sizeof(abi_save_gpr_regs) / sizeof(abi_save_gpr_regs[0]);
+
+    const size_t size_of_abi_save_regs
+        = num_abi_save_gpr_regs * rax.getBit() / 8
+        + xmm_to_preserve * xmm_len;
+
 public:
+    enum {
+        _cmp_eq_oq = 0u,
+        _cmp_lt_os = 1u,
+        _cmp_le_os = 2u,
+        _cmp_neq_uq = 4u,
+        _cmp_nlt_us = 5u,
+        _cmp_nle_us = 6u,
+    };
+
     Xbyak::Reg64 param1 = abi_param1;
     const int EVEX_max_8b_offt = 0x200;
     const Xbyak::Reg64 reg_EVEX_max_8b_offt = rbp;
 
+    inline size_t get_size_of_abi_save_regs() {
+        return size_of_abi_save_regs;
+    }
+
     void preamble() {
         if (xmm_to_preserve) {
             sub(rsp, xmm_to_preserve * xmm_len);
-            for (int i = 0; i < xmm_to_preserve; ++i)
+            for (size_t i = 0; i < xmm_to_preserve; ++i)
                 movdqu(ptr[rsp + i * xmm_len], Xbyak::Xmm(xmm_to_preserve_start + i));
         }
-        for (size_t i = 0; i < num_abi_save_regs; ++i)
-            push(Xbyak::Reg64(abi_save_regs[i]));
+        for (size_t i = 0; i < num_abi_save_gpr_regs; ++i)
+            push(Xbyak::Reg64(abi_save_gpr_regs[i]));
         if (mayiuse(avx512_common)) {
             mov(reg_EVEX_max_8b_offt, 2 * EVEX_max_8b_offt);
         }
@@ -260,14 +240,20 @@ public:
             prefetcht2(a);
     }
 
+    void uni_vzeroupper() {
+        if (mayiuse(avx) && !mayiuse(avx512_mic))
+            vzeroupper();
+    }
+
     void postamble() {
-        for (size_t i = 0; i < num_abi_save_regs; ++i)
-            pop(Xbyak::Reg64(abi_save_regs[num_abi_save_regs - 1 - i]));
+        for (size_t i = 0; i < num_abi_save_gpr_regs; ++i)
+            pop(Xbyak::Reg64(abi_save_gpr_regs[num_abi_save_gpr_regs - 1 - i]));
         if (xmm_to_preserve) {
-            for (int i = 0; i < xmm_to_preserve; ++i)
+            for (size_t i = 0; i < xmm_to_preserve; ++i)
                 movdqu(Xbyak::Xmm(xmm_to_preserve_start + i), ptr[rsp + i * xmm_len]);
             add(rsp, xmm_to_preserve * xmm_len);
         }
+        uni_vzeroupper();
         ret();
     }
 
@@ -280,6 +266,7 @@ public:
         using Xbyak::Address;
         using Xbyak::RegExp;
 
+        assert(raw_offt <= INT_MAX);
         auto offt = static_cast<int>(raw_offt);
 
         int scale = 0;
@@ -302,6 +289,45 @@ public:
             return zword [re];
     }
 
+    Xbyak::Address make_safe_addr(const Xbyak::Reg64 &reg_out, size_t offt,
+        const Xbyak::Reg64 &tmp_reg, bool bcast = false) {
+        if (offt > INT_MAX) {
+            mov(tmp_reg, offt);
+            return bcast ? ptr_b[reg_out + tmp_reg] : ptr[reg_out + tmp_reg];
+        } else {
+            return bcast ? ptr_b[reg_out + offt] : ptr[reg_out + offt];
+        }
+    }
+
+    Xbyak::Address EVEX_compress_addr_safe(const Xbyak::Reg64 &base,
+        size_t raw_offt, const Xbyak::Reg64 &reg_offt, bool bcast = false) {
+        if (raw_offt > INT_MAX) {
+            return make_safe_addr(base, raw_offt, reg_offt, bcast);
+        } else {
+            return EVEX_compress_addr(base, raw_offt, bcast);
+        }
+    }
+
+    void safe_add(const Xbyak::Reg64 &base, size_t raw_offt,
+        const Xbyak::Reg64 &reg_offt) {
+        if (raw_offt > INT_MAX) {
+            mov(reg_offt, raw_offt);
+            add(base, reg_offt);
+        } else {
+            add(base, raw_offt);
+        }
+    }
+
+    void safe_sub(const Xbyak::Reg64 &base, size_t raw_offt,
+        const Xbyak::Reg64 &reg_offt) {
+        if (raw_offt > INT_MAX) {
+            mov(reg_offt, raw_offt);
+            sub(base, reg_offt);
+        } else {
+            sub(base, raw_offt);
+        }
+    }
+
     // Provide overrides for custom jit_tagged_label and C strings rather than
     // implement a conversion of jit_tagge_label to std::string to avoid
     // additional C++ runtime dependency
@@ -321,7 +347,11 @@ public:
     }
     void uni_vpxor(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2,
                    const Xbyak::Operand &op) {
-        vpxor(x1, x2, op);
+        if (mayiuse(avx2)) {
+            vpxor(x1, x2, op);
+        } else {
+            vxorps(x1, x2, op);
+        }
     }
     void uni_vpxor(const Xbyak::Zmm &x1, const Xbyak::Zmm &x2,
                    const Xbyak::Operand &op) {
@@ -374,7 +404,14 @@ public:
         shufps(x, x, 0x0);
     }
     void uni_vbroadcastss(const Xbyak::Ymm &x, const Xbyak::Operand &op) {
-        vbroadcastss(x, op);
+        if (mayiuse(avx2)) {
+            vbroadcastss(x, op);
+        } else {
+            Xbyak::Xmm t(x.getIdx());
+            if (t.getIdx() != op.getIdx()) movss(t, op);
+            vinsertf128(x, x, t, 1);
+            vshufps(x, x, x, 0);
+        }
     }
 
     void uni_vpbroadcastd(const Xbyak::Xmm &x, const Xbyak::Operand &op) {
@@ -382,7 +419,14 @@ public:
         pshufd(x, x, 0x0);
     }
     void uni_vpbroadcastd(const Xbyak::Ymm &x, const Xbyak::Operand &op) {
-        vpbroadcastd(x, op);
+        if (mayiuse(avx2)) {
+            vpbroadcastd(x, op);
+        } else {
+            Xbyak::Xmm t(x.getIdx());
+            if (t.getIdx() != op.getIdx()) movsd(t, op);
+            vinsertf128(x, x, t, 1);
+            vshufps(x, x, x, 0);
+        }
     }
 
     void uni_vdivps(const Xbyak::Xmm &x, const Xbyak::Operand &op1,
@@ -392,6 +436,20 @@ public:
     }
     void uni_vdivps(const Xbyak::Ymm &x, const Xbyak::Operand &op1,
                     const Xbyak::Operand &op2 = Xbyak::Operand()) {
+        vdivps(x, op1, op2);
+    }
+
+    void uni_vdivps(const Xbyak::Xmm &x, const Xbyak::Operand &op1,
+                    const Xbyak::Operand &op2, const Xbyak::Xmm &buf) {
+        movups(buf, op1);
+        divps(buf, op2);
+        if (x.getIdx() != buf.getIdx()) {
+            movups(x, buf);
+        }
+    }
+
+    void uni_vdivps(const Xbyak::Ymm &x, const Xbyak::Operand &op1,
+                    const Xbyak::Operand &op2, const Xbyak::Ymm &buf) {
         vdivps(x, op1, op2);
     }
 
@@ -422,6 +480,20 @@ public:
     }
     void uni_vsubps(const Xbyak::Ymm &x, const Xbyak::Operand &op1,
                     const Xbyak::Operand &op2 = Xbyak::Operand()) {
+        vsubps(x, op1, op2);
+    }
+
+    void uni_vsubps(const Xbyak::Xmm &x, const Xbyak::Operand &op1,
+                    const Xbyak::Operand &op2, const Xbyak::Xmm &buf) {
+        movups(buf, op1);
+        subps(buf, op2);
+        if (x.getIdx() != buf.getIdx()) {
+            movups(x, buf);
+        }
+    }
+
+    void uni_vsubps(const Xbyak::Ymm &x, const Xbyak::Operand &op1,
+                    const Xbyak::Operand &op2, const Xbyak::Ymm &buf) {
         vsubps(x, op1, op2);
     }
 
@@ -485,7 +557,7 @@ public:
 
     void uni_vandps(const Xbyak::Xmm &x, const Xbyak::Operand &op1,
                     const Xbyak::Operand &op2 = Xbyak::Operand()) {
-        assert(x.getIdx() != op1.getIdx());
+        assert(x.getIdx() == op1.getIdx());
         andps(x, op2);
     }
     void uni_vandps(const Xbyak::Ymm &x, const Xbyak::Operand &op1,
@@ -495,7 +567,7 @@ public:
 
     void uni_vorps(const Xbyak::Xmm &x, const Xbyak::Operand &op1,
                     const Xbyak::Operand &op2 = Xbyak::Operand()) {
-        assert(x.getIdx() != op1.getIdx());
+        assert(x.getIdx() == op1.getIdx());
         orps(x, op2);
     }
     void uni_vorps(const Xbyak::Ymm &x, const Xbyak::Operand &op1,
@@ -505,7 +577,7 @@ public:
 
     void uni_vpslld(const Xbyak::Xmm &x, const Xbyak::Operand &op,
                     const int imm) {
-        assert(x.getIdx() != op.getIdx());
+        assert(x.getIdx() == op.getIdx());
         pslld(x, imm);
     }
     void uni_vpslld(const Xbyak::Ymm &x, const Xbyak::Operand &op,
@@ -515,7 +587,7 @@ public:
 
     void uni_vpsrld(const Xbyak::Xmm &x, const Xbyak::Operand &op,
                     const int imm) {
-        assert(x.getIdx() != op.getIdx());
+        assert(x.getIdx() == op.getIdx());
         psrld(x, imm);
     }
     void uni_vpsrld(const Xbyak::Ymm &x, const Xbyak::Operand &op,
@@ -525,7 +597,7 @@ public:
 
     void uni_vmaxps(const Xbyak::Xmm &x, const Xbyak::Operand &op1,
                     const Xbyak::Operand &op2 = Xbyak::Operand()) {
-        assert(x.getIdx() != op1.getIdx());
+        assert(x.getIdx() == op1.getIdx());
         maxps(x, op2);
     }
     void uni_vmaxps(const Xbyak::Ymm &x, const Xbyak::Operand &op1,
@@ -535,7 +607,7 @@ public:
 
     void uni_vminps(const Xbyak::Xmm &x, const Xbyak::Operand &op1,
                     const Xbyak::Operand &op2 = Xbyak::Operand()) {
-        assert(x.getIdx() != op1.getIdx());
+        assert(x.getIdx() == op1.getIdx());
         minps(x, op2);
     }
     void uni_vminps(const Xbyak::Ymm &x, const Xbyak::Operand &op1,
@@ -545,7 +617,7 @@ public:
 
     void uni_vcmpgtps(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
                       const Xbyak::Operand &op) {
-        assert(x1.getIdx() != x2.getIdx());
+        assert(x1.getIdx() == x2.getIdx());
         cmpps(x1, op, 0x6);
     }
     void uni_vcmpgtps(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2,
@@ -555,7 +627,7 @@ public:
 
     void uni_vblendvps(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
                        const Xbyak::Operand &op, const Xbyak::Xmm &msk) {
-        assert(x1.getIdx() != x2.getIdx());
+        assert(x1.getIdx() == x2.getIdx());
         blendvps(x1, op);
     }
     void uni_vblendvps(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2,
@@ -626,44 +698,65 @@ public:
         mov(out, tmp);
     }
 
+    void dump_code(const Xbyak::uint8 *code) const {
+        if (code) {
+            static int counter = 0;
+#define MAX_FNAME_LEN 256
+            char fname[MAX_FNAME_LEN + 1];
+            snprintf(fname, MAX_FNAME_LEN, "mkldnn_dump_%s.%d.bin", name(),
+                    counter);
+            counter++;
+
+            FILE *fp = mkldnn_fopen(fname, "w+");
+            // Failure to dump code is not fatal
+            if (fp) {
+                size_t unused = fwrite(code, getSize(), 1, fp);
+                UNUSED(unused);
+                fclose(fp);
+            }
+        }
+#undef MAX_FNAME_LEN
+    }
+
+    void register_code(const Xbyak::uint8 *code) const {
+#ifdef JIT_PROFILING_VTUNE
+        if (iJIT_IsProfilingActive() == iJIT_SAMPLING_ON) {
+            auto jmethod = iJIT_Method_Load();
+            jmethod.method_id = iJIT_GetNewMethodID();
+            jmethod.method_name = (char *)name();
+            jmethod.class_file_name = NULL;
+            jmethod.source_file_name = (char *)source_file();
+            jmethod.method_load_address = (void *)code;
+            jmethod.method_size = getSize();
+
+            iJIT_NotifyEvent(iJVM_EVENT_TYPE_METHOD_LOAD_FINISHED,
+                    (void*)&jmethod);
+        }
+#endif
+    }
 
 public:
     jit_generator(
         void *code_ptr = nullptr,
-        size_t code_size = 128 * 1024
+        size_t code_size = 256 * 1024
         ) : Xbyak::CodeGenerator(code_size, code_ptr)
     {
     }
+    virtual ~jit_generator() {}
+
+    virtual const char *name() const = 0;
+    virtual const char *source_file() const = 0;
 
     // XXX: use normal_case name and update all callees (?)
     const Xbyak::uint8 *getCode() {
         const Xbyak::uint8 *code = CodeGenerator::getCode();
-#ifdef CPU_ENABLE_JIT_DUMP
-        if (code) {
-#define SIMPLE_NAME_COUNTER
-#ifdef SIMPLE_NAME_COUNTER
-            static int counter = 0;
-#define MAX_FNAME_LEN 256
-            char fname[MAX_FNAME_LEN + 1];
-            snprintf(fname, MAX_FNAME_LEN, "mkldnn_jit_dump.%d.bin", counter);
-            counter++;
-#else
-            const char *fname = "mkldnn_jit_dump.bin";
-#endif
-            // TODO (Roma): add a virtual name() function that would be
-            // used to notify profilers like Intel(R) Vtune(TM) Amplifier
-            // about generated code and generate a meaningful file name
+        register_code(code);
 
-            FILE *fp = fopen(fname, "w+");
-            // Failure to dump code is not fatal
-            if (fp) {
-                fwrite(code, getSize(), 1, fp);
-                fclose(fp);
-            }
-        }
-#endif
+        if (mkldnn_jit_dump())
+            dump_code(code);
+
         return code;
-    };
+    }
 
     template<typename F> const F getCode() {
         // XXX (Roma): Xbyak code probably has a bug here

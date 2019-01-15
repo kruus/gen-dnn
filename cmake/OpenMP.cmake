@@ -1,5 +1,5 @@
 #===============================================================================
-# Copyright 2017 Intel Corporation
+# Copyright 2017-2018 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #===============================================================================
+
 # Manage OpenMP-related compiler flags
 #===============================================================================
 
@@ -25,6 +26,7 @@ include("cmake/MKL.cmake")
 
 if(WIN32 AND ${CMAKE_CXX_COMPILER_ID} STREQUAL MSVC)
     add_definitions(/Qpar)
+    add_definitions(/openmp)
 else()
     find_package(OpenMP)
     #newer version for findOpenMP (>= v. 3.9)
@@ -37,11 +39,25 @@ else()
         set(OpenMP_C_FOUND true)
         set(OpenMP_CXX_FOUND true)
     endif()
-    if(OpenMP_C_FOUND)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Aurora")
+        set(OpenMP_CXX_FLAGS "-fopenmp")
+        set(OpenMP_C_FLAGS "-fopenmp")
+        set(OpenMP_C_FOUND true)
+        set(OpenMP_CXX_FOUND true)
     endif()
-    if(OpenMP_CXX_FOUND)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    #if(OPENMP_FOUND AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+    #    set(OpenMP_C_FLAGS "${OpenMP_C_FLAGS} -fopenmp-simd")
+    #    set(OpenMP_CXX_FLAGS "${OpenMP_CXX_FLAGS} -fopenmp-simd")
+    #endif()
+    if(OpenMP_C_FOUND AND USE_OPENMP)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS} -DENABLE_OMP=1")
+    else()
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DENABLE_OMP=0")
+    endif()
+    if(OpenMP_CXX_FOUND AND USE_OPENMP)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS} -DENABLE_OMP=1")
+    else()
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_OMP=0")
     endif()
 endif()
 
@@ -59,3 +75,9 @@ if(HAVE_MKL AND NOT WIN32 AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
     message(STATUS "OpenMP.cmake EXTRA_LIBS=${EXTRA_LIBS}")
 endif()
 
+if (MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Xclang -fopenmp")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Xclang -fopenmp")
+    list(APPEND EXTRA_LIBS ${MKLIOMP5LIB})
+endif()
+# vim: et ts=4 sw=4 ai :

@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2017 Intel Corporation
+* Copyright 2016-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@ struct batch_normalization_pd_t: public primitive_desc_t {
     const batch_normalization_desc_t *desc() const { return &desc_; }
     virtual const op_desc_t *op_desc() const override
     { return reinterpret_cast<const op_desc_t *>(this->desc()); }
+    virtual void init_info() override { init_info_bnorm(this, this->info_); }
 
     virtual status_t query(query_t what, int idx, void *result) const override
     {
@@ -75,8 +76,28 @@ struct batch_normalization_pd_t: public primitive_desc_t {
 
     inline int MB() const { return desc_.data_desc.dims[0]; }
     inline int C() const { return desc_.data_desc.dims[1]; }
-    inline int H() const { return desc_.data_desc.dims[2]; }
-    inline int W() const { return desc_.data_desc.dims[3]; }
+    inline int D() const { return ndims() == 5 ? desc_.data_desc.dims[2] : 1; }
+    inline int H() const {
+        assert(ndims() == 4 || ndims() == 5);
+        return desc_.data_desc.dims[ndims()-2];
+    }
+    inline int W() const {
+        assert(ndims() == 4 || ndims() == 5);
+        return desc_.data_desc.dims[ndims()-1];
+    }
+
+    bool with_relu_post_op() const {
+        const auto &p = this->attr()->post_ops_;
+        return p.len_ == 1 && p.entry_[0].is_relu(true, true);
+    }
+
+    bool fuse_bn_relu() const
+    { return desc_.flags & mkldnn_fuse_bn_relu; }
+
+    inline int ndims() const { return desc_.data_desc.ndims; }
+
+    bool has_zero_dim_memory() const
+    { return memory_desc_wrapper(desc_.data_desc).has_zero_dim(); }
 
 protected:
     batch_normalization_desc_t desc_;
@@ -109,6 +130,10 @@ struct batch_normalization_fwd_pd_t: public batch_normalization_pd_t {
             if (index == 1) return mean_pd();
             if (index == 2) return variance_pd();
         }
+
+        if (index == ws_idx() && is_training() && fuse_bn_relu())
+            return workspace_pd();
+
         return nullptr;
     }
 
@@ -122,7 +147,9 @@ struct batch_normalization_fwd_pd_t: public batch_normalization_pd_t {
     { return 1 + 2 * stats_is_src() + use_scaleshift(); }
 
     virtual int n_outputs() const override
-    { return 1 + 2 * (!stats_is_src()) * is_training(); }
+    { return 1 + (fuse_bn_relu() + 2 * (!stats_is_src())) * is_training(); }
+
+    int ws_idx() const { return !stats_is_src() ? 3 : 1; }
 };
 
 struct batch_normalization_bwd_pd_t: public batch_normalization_pd_t {
@@ -139,6 +166,9 @@ struct batch_normalization_bwd_pd_t: public batch_normalization_pd_t {
         if (index == 2) return variance_pd();
         if (index == 3) return diff_dst_pd();
         if (use_scaleshift() && index == 4) return weights_pd();
+
+        if (index == ws_idx() && fuse_bn_relu()) return workspace_pd();
+
         return nullptr;
     }
 
@@ -151,9 +181,12 @@ struct batch_normalization_bwd_pd_t: public batch_normalization_pd_t {
     virtual const memory_pd_t *mean_pd() const { return src_pd(1); }
     virtual const memory_pd_t *variance_pd() const { return src_pd(2); }
 
-    virtual int n_inputs() const override { return 4 + use_scaleshift(); }
+    virtual int n_inputs() const override
+    { return 4 + use_scaleshift() + fuse_bn_relu(); }
     virtual int n_outputs() const override
     { return 1 + (desc_.prop_kind == prop_kind::backward); }
+
+    int ws_idx() const { return use_scaleshift() ? 5 : 4; }
 };
 
 }
