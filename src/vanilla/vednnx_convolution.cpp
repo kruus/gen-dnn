@@ -482,7 +482,7 @@ void vednnx_convolution_bwd_weights_t
                         //    mb, g*OC + oc, oh, ow)];
                         // libvednn supports only nchw ...
                         d += (acc_data_t)diff_dst[ mb*G*OC*OH*OW
-                            + (g*OC*oc)*OH*OW + oh*OW + ow ];
+                            + (g*OC+oc)*OH*OW + oh*OW + ow ];
                     }
                 }
             //}
