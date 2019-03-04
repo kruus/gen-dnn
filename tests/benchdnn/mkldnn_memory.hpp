@@ -20,83 +20,36 @@
 #include "mkldnn_common.hpp"
 
 struct dnn_mem_t {
-    dnn_mem_t &operator=(const dnn_mem_t &rhs) = delete;
-    dnn_mem_t(const dnn_mem_t &rhs) = delete;
+    dnn_mem_t(): active_(false) {}
 
-    /** md_ now explicitly initialized.
-     * Sometimes we want to check whether the md_ is valid,
-     * without having access to \c this->active_. */
-    dnn_mem_t(): md_(), active_(false) {}
-
-    /** create a memory block "just like" \c md (same layout, dims and
-     * data-type), owning a zero-initialized \c this->data region or
-     * optionally referring to unowned pre-initialized \c data. */
     dnn_mem_t(const mkldnn_memory_desc_t &md, void *data = NULL)
-        : active_(initialize(md, data) == OK)
-    {}
+        : active_(initialize(md, data) == OK) {}
 
     dnn_mem_t(int ndims, const mkldnn_dims_t dims, mkldnn_data_type_t dt,
             mkldnn_memory_format_t fmt, void *data = NULL)
         : active_(initialize(ndims, dims, dt, fmt, data) == OK) {}
 
-    /** get dims from \c md but force data type \c dt.
-     * - optionally override layout \c fmt.
-     * - optionally skip creating owned, zero-initialized \c this->data
-     *   by instead referring to unowned pre-initialized \c data */
     dnn_mem_t(const mkldnn_memory_desc_t &md, mkldnn_data_type_t dt,
             mkldnn_memory_format_t fmt = mkldnn_format_undef,
             void *data = NULL)
-#if 1 //mine
-        : active_(initialize(md.ndims, md.dims, dt,
-                    (fmt != mkldnn_format_undef? fmt: md.format), data) == OK)
-    {}
-#else
         : active_(initialize(md, dt, fmt, data) == OK) {}
-#endif
 
-#if 0 // mine
-    dnn_mem_t(const dnn_mem_t &rhs, mkldnn_data_type_t dt,
-            mkldnn_memory_format_t fmt = mkldnn_format_undef,
-            void *data = NULL)
-        : dnn_mem_t(rhs.md_, dt, fmt, data)
-    {
-        if(active_) reorder(rhs);
-    }
-#else // theirs (identical)
     dnn_mem_t(const dnn_mem_t &rhs, mkldnn_data_type_t dt,
             mkldnn_memory_format_t fmt = mkldnn_format_undef,
             void *data = NULL): dnn_mem_t(rhs.md_, dt, fmt, data)
     { if (active_) reorder(rhs); }
-#endif
 
-#if 1
-    /** Construct an optionally active dnn_mem_t.
-     * - if ! \c active,  use \c dnn_mem_t()
-     * - else construct using \c args ; i.e. \c dnn_mem_t(args...)
-     * \return rvalue that you can assign to an object.  */
-    template< class... REST >
-    static dnn_mem_t optional(bool const active, REST...args)
-    {
-        return active
-            ? dnn_mem_t(args...)
-            : dnn_mem_t();
-    }
-    /** Move constructor.
-     * use with \c dnn_mem_t::optional(bool, ...) tmp object helper */
-    dnn_mem_t( dnn_mem_t &&rhs ) : md_(rhs.md_), mpd_(rhs.mpd_), p_(rhs.p_),
-            data_(rhs.data_), is_data_owner_(rhs.is_data_owner_),
-            active_(rhs.active_)
-    { rhs.active_ = false; /* avoid cleanup of tmp rvalue */ }
-#endif
+    /* FIXME: ugly RT assert... need better mkldnn memory handling */
+    dnn_mem_t &operator=(const dnn_mem_t &rhs)
+    { []() { SAFE(FAIL, CRIT); return 0; }(); return *this; }
+    dnn_mem_t(const dnn_mem_t &rhs)
+    { []() { SAFE(FAIL, CRIT); return 0; }(); }
 
     ~dnn_mem_t() { cleanup(); }
 
-    /** Make \c this to <em>look like</em> \c rhs, so \c this gets the re-ordered
-     * \em content of \c rhs */
     int reorder(const dnn_mem_t &rhs) { return reorder(rhs, NULL); }
     int reorder(const dnn_mem_t &rhs, const mkldnn_primitive_attr_t &attr) {
         if (this == &rhs) return OK;
-        if (!rhs.active_) return FAIL;
 
         mkldnn_primitive_desc_t rpd;
         mkldnn_primitive_t r;
@@ -112,15 +65,15 @@ struct dnn_mem_t {
         return OK;
     }
 
-    int N() const { return md_.dims[0]; }
-    int with_G() const { return md_.ndims == 5; }
-    int G() const { return md_.ndims == 5 ? md_.dims[0] : 1; }
+    int N() { return md_.dims[0]; }
+    int with_G() { return md_.ndims == 5; }
+    int G() { return md_.ndims == 5 ? md_.dims[0] : 1; }
 
-    int C() const { return md_.ndims == 1 ? md_.dims[0] : md_.dims[1]; }
-    int OC() const { return md_.dims[with_G() + 0]; }
-    int IC() const { return md_.dims[with_G() + 1]; }
-    int H() const { return md_.dims[with_G() + 2]; } // works for both IH and KH
-    int W() const { return md_.dims[with_G() + 3]; } // works for both IW and KW
+    int C() { return md_.ndims == 1 ? md_.dims[0] : md_.dims[1]; }
+    int OC() { return md_.dims[with_G() + 0]; }
+    int IC() { return md_.dims[with_G() + 1]; }
+    int H() { return md_.dims[with_G() + 2]; } // works for both IH and KH
+    int W() { return md_.dims[with_G() + 3]; } // works for both IW and KW
 
     size_t size() const { return mkldnn_memory_primitive_desc_get_size(mpd_); }
 
@@ -193,15 +146,6 @@ struct dnn_mem_t {
 private:
     int initialize(const mkldnn_memory_desc_t &md, mkldnn_data_type_t dt,
             mkldnn_memory_format_t fmt, void *data) {
-#if 0 // old
-        // [ejk] avoid mkldnn_primitive_create fp exception (or assertion)
-        //if (md.primitive_kind == mkldnn_undefined_primitive)
-        if (md.primitive_kind != mkldnn_memory)
-            return FAIL;
-        md_ = md;
-#endif
-        if (md.primitive_kind != mkldnn_memory)
-            return FAIL;
         if (fmt == mkldnn_format_undef || fmt == mkldnn_blocked) {
             md_ = md;
             md_.data_type = dt;
@@ -209,7 +153,6 @@ private:
             DNN_SAFE(mkldnn_memory_desc_init(&md_, md.ndims, md.dims, dt, fmt),
                     CRIT);
         }
-        //---------------------
         DNN_SAFE(mkldnn_memory_primitive_desc_create(&mpd_, &md_, engine),
                 CRIT);
         DNN_SAFE(mkldnn_primitive_create(&p_, mpd_, NULL, NULL), CRIT);
@@ -233,11 +176,10 @@ private:
     }
 
     int initialize(int ndims, const mkldnn_dims_t dims, mkldnn_data_type_t dt,
-		    mkldnn_memory_format_t fmt, void* data) {
+                    mkldnn_memory_format_t fmt, void* data) {
         mkldnn_memory_desc_t xmd;
-	DNN_SAFE(mkldnn_memory_desc_init(&xmd, ndims, dims, dt, fmt), CRIT);
-	SAFE(initialize(xmd, data), CRIT);
-        //return init(); // old ???
+        DNN_SAFE(mkldnn_memory_desc_init(&xmd, ndims, dims, dt, fmt), CRIT);
+        SAFE(initialize(xmd, data), CRIT);
         return OK;
     }
 

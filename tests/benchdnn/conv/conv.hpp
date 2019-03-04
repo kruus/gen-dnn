@@ -28,9 +28,10 @@
 
 #include "conv/conv_common.hpp"
 namespace conv {
+
 int doit(const prb_t *p, res_t *res);
 int bench(int argc, char **argv, bool main_bench = true);
+
 }
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
 #endif

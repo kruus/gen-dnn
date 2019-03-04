@@ -22,16 +22,20 @@
 #include <stdlib.h>
 #include <math.h>
 #include "mkldnn.h"
-#ifdef WIN32
+#ifdef _WIN32
 #include <malloc.h>
 #endif
 
 #define BATCH 32
 
-#if defined(_SX)
+#if 0 // mostly this was for primitive_at{foo} vs primitive_at{foo,0}
+#if !defined(STRUCT_INIT_BUG)
+#if defined(_SX) // || defined(__ve)
 #define STRUCT_INIT_BUG 1
 #else
 #define STRUCT_INIT_BUG 0
+#endif
+#endif
 #endif
 
 #define CHECK(f)                                                               \
@@ -59,7 +63,7 @@ void *aligned_malloc(size_t size, size_t alignment) {
 }
 #else
 void *aligned_malloc(size_t size, size_t alignment) {
-#ifdef WIN32
+#ifdef _WIN32
     return _aligned_malloc(size, alignment);
 #else
     void *p;
@@ -68,7 +72,7 @@ void *aligned_malloc(size_t size, size_t alignment) {
 }
 #endif
 
-#ifdef WIN32
+#ifdef _WIN32
 void _free(void *ptr) {
     _aligned_free(ptr);
 }
@@ -150,22 +154,14 @@ prepare_reorder(mkldnn_primitive_t *user_memory,               /** in */
              * already appeared in in- and out- memory primitive descriptors */
             CHECK(mkldnn_reorder_primitive_desc_create(
                     &reorder_pd, user_memory_pd, *prim_memory_pd));
-#if STRUCT_INIT_BUG
             mkldnn_primitive_at_t inputs = { *user_memory, 0 };
-#else
-            mkldnn_primitive_at_t inputs = { *user_memory };
-#endif
             const_mkldnn_primitive_t outputs[] = { *prim_memory };
             CHECK(mkldnn_primitive_create(reorder, reorder_pd, &inputs,
                                           outputs));
         } else {
             CHECK(mkldnn_reorder_primitive_desc_create(
                     &reorder_pd, *prim_memory_pd, user_memory_pd));
-#if STRUCT_INIT_BUG
             mkldnn_primitive_at_t inputs = { *prim_memory, 0 };
-#else
-            mkldnn_primitive_at_t inputs = { *prim_memory };
-#endif
             const_mkldnn_primitive_t outputs[] = { *user_memory };
             CHECK(mkldnn_primitive_create(reorder, reorder_pd, &inputs,
                                           outputs));
@@ -316,11 +312,7 @@ mkldnn_status_t simple_net()
                 mkldnn_primitive_at(conv_weights_memory, 0),
                 mkldnn_primitive_at(conv_user_bias_memory, 0) };
 
-#if STRUCT_INIT_BUG
     const_mkldnn_primitive_t conv_dsts[] = { conv_internal_dst_memory, 0 };
-#else
-    const_mkldnn_primitive_t conv_dsts[] = { conv_internal_dst_memory };
-#endif
 
     /* finally create a convolution primitive */
     mkldnn_primitive_t conv;
@@ -329,7 +321,7 @@ mkldnn_status_t simple_net()
     /* AlexNet: relu
      * {BATCH, 96, 55, 55} -> {BATCH, 96, 55, 55}
      */
-    float negative_slope = 1.0;
+    float negative_slope = 1.0f;
 
     int *relu_dst_sizes = conv_dst_sizes;
     float *relu_dst_buffer =
@@ -362,11 +354,8 @@ mkldnn_status_t simple_net()
 
     /* finally create a relu primitive */
     mkldnn_primitive_t relu;
-#if STRUCT_INIT_BUG
+    // some compilers have a struct init bug, so need explicit ", 0"...
     mkldnn_primitive_at_t relu_srcs = { conv_internal_dst_memory, 0 };
-#else
-    mkldnn_primitive_at_t relu_srcs = { conv_internal_dst_memory };
-#endif
     const_mkldnn_primitive_t relu_dsts[] = { relu_dst_memory };
 
     CHECK(mkldnn_primitive_create(&relu, relu_pd, &relu_srcs, relu_dsts));
@@ -379,9 +368,9 @@ mkldnn_status_t simple_net()
      * k: 1.0
      */
     uint32_t local_size = 5;
-    float alpha = 0.0001;
-    float beta = 0.75;
-    float k = 1.0;
+    float alpha = 0.0001f;
+    float beta = 0.75f;
+    float k = 1.0f;
 
     int32_t *lrn_dst_sizes = relu_dst_sizes;
 
@@ -426,11 +415,7 @@ mkldnn_status_t simple_net()
     CHECK(mkldnn_memory_set_data_handle(lrn_workspace_memory,
                                         lrn_workspace_buffer));
 
-#if STRUCT_INIT_BUG
     mkldnn_primitive_at_t lrn_srcs = { relu_dst_memory, 0 };
-#else
-    mkldnn_primitive_at_t lrn_srcs = { relu_dst_memory };
-#endif
 
     const_mkldnn_primitive_t lrn_dsts[]
             = { lrn_dst_memory, lrn_workspace_memory };
@@ -505,11 +490,7 @@ mkldnn_status_t simple_net()
                           &pool_internal_dst_memory, &pool_reorder_dst,
                           pool_dst_buffer));
 
-#if STRUCT_INIT_BUG
     mkldnn_primitive_at_t pool_srcs = { lrn_dst_memory, 0 };
-#else
-    mkldnn_primitive_at_t pool_srcs = { lrn_dst_memory };
-#endif
 
     pool_dst_memory = pool_internal_dst_memory ? pool_internal_dst_memory
                                                : pool_user_dst_memory;
@@ -657,11 +638,7 @@ mkldnn_status_t simple_net()
                 mkldnn_primitive_at(pool_diff_src_memory, 0),
                 mkldnn_primitive_at(lrn_workspace_memory, 0) };
 
-#if STRUCT_INIT_BUG
     const_mkldnn_primitive_t lrn_diff_srcs[] = { lrn_diff_src_memory, 0 };
-#else
-    const_mkldnn_primitive_t lrn_diff_srcs[] = { lrn_diff_src_memory };
-#endif
 
     /* finally create backward lrn primitive */
     mkldnn_primitive_t lrn_bwd;

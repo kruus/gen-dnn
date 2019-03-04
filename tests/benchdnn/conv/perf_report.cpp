@@ -27,7 +27,7 @@
 
 namespace conv {
 
-#if 0 // from benchdnn README.md:
+#if 0
 **benchdnn** supports custom performance report. Template is passed via
 command line and consists of terminal and nonterminal symbols. Nonterminal
 symbols are printed as is. Description of terminal symbols is given below.
@@ -39,15 +39,15 @@ table of modifiers below.
 
 | abbreviation  | description
 |:------------  |:-----------
-| \%d           | problem descriptor
-| \%D           | expanded problem descriptor (conv parameters in csv format)
-| \%n           | problem name
-| \%z           | direction
-| \%O           | number of ops required (padding is not taken into account)
-| \%@t          | time in ms
-| %@c           | time in clocks [opt?]
-| \%@p          | ops per second
-| \%i           | convolution implementation string
+| %d            | problem descriptor
+| %D            | expanded problem descriptor (conv parameters in csv format)
+| %n            | problem name
+| %z            | direction
+| %@F           | effective cpu frequency computed as clocks[@] / time[@]
+| %O            | number of ops required (padding is not taken into account)
+| %@t           | time in ms
+| %@c           | time in clocks
+| %@p           | ops per second
 
 | modifier  | description
 |:--------  |:-----------
@@ -55,7 +55,7 @@ table of modifiers below.
 | -         | min (time) -- default
 | 0         | avg (time)
 | +         | max (time)
-| --------- | ----------
+|           |
 | K         | Kilo (1e3)
 | M         | Mega (1e6)
 | G         | Giga (1e9)
@@ -64,7 +64,7 @@ The definition of expanded problem descriptor is:
 `g,mb,ic,ih,iw,oc,oh,ow,kh,kw,sh,sw,ph,pw`.
 #endif
 
-void perf_report(const prb_t *p, const res_t *r, const char *pstr, const char *impl) {
+void perf_report(const prb_t *p, const res_t *r, const char *pstr) {
     const auto &t = r->timer;
     const int max_len = 400;
     int rem_len = max_len - 1;
@@ -90,7 +90,6 @@ void perf_report(const prb_t *p, const res_t *r, const char *pstr, const char *i
     };
 
     const char *pt = perf_template;
-    //print(0," perf_template %s\n", pt);
     char c;
 
     while ((c = *pt++) != '\0') {
@@ -111,7 +110,7 @@ void perf_report(const prb_t *p, const res_t *r, const char *pstr, const char *i
             c = *pt++;
         }
 
-        if (c == 'd') DPRINT("\"%s\"", pstr);
+        if (c == 'd') DPRINT("%s", pstr);
         else if (c == 'D')
             DPRINT("%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", p->g, p->mb,
                     p->ic, p->ih, p->iw, p->oc, p->oh, p->ow, p->kh, p->kw,
@@ -122,16 +121,14 @@ void perf_report(const prb_t *p, const res_t *r, const char *pstr, const char *i
             DPRINT("%s", dir2str(p->dir));
         else if (c == 'O')
             DPRINT("%g", p->ops / unit);
-        else if (c == 'F') // re-enable, document as unuseful
+        else if (c == 'F')
             DPRINT("%g", t.ticks(mode) / t.ms(mode) / unit * 1e3);
         else if (c == 't')
             DPRINT("%g", t.ms(mode) / unit);
-        else if (c == 'c') // re-enable, document as unuseful
+        else if (c == 'c')
             DPRINT("%g", t.ticks(mode) / unit);
         else if (c == 'p')
             DPRINT("%g", p->ops / t.ms(mode) / unit * 1e3);
-        else if (c == 'i')
-            DPRINT("\"%s\"", (impl? impl: "conv"));
         else
             []() { SAFE(FAIL, CRIT); return 0; }();
     }
@@ -140,7 +137,7 @@ void perf_report(const prb_t *p, const res_t *r, const char *pstr, const char *i
     assert(rem_len >= 0);
 
 #   undef DPRINT
-    print(0, "%s", buffer);
+    print(0, "%s\n", buffer);
 }
 
 }

@@ -34,3 +34,4 @@ TEST_P(convolution_test, TestConvolution)
 #include "convolution_common.h"
 
 }
+// vim: et ts=4 sw=4 cindent cino=^l0,\:0,N-s

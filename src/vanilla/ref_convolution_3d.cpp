@@ -1,1 +1,0 @@
-../cpu/ref_convolution_3d.cpp

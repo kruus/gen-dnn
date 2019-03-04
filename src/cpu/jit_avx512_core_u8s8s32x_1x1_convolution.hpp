@@ -40,7 +40,7 @@ struct _jit_avx512_core_u8s8s32x_1x1_convolution_fwd_t : public cpu_primitive_t 
                 const typename pd_t::base_class *hint_fwd_pd)
             : _cpu_convolution_fwd_pd_t<with_relu>(engine, adesc, attr,
                     hint_fwd_pd)
-            , jcp_({}), rtus_({}) {}
+            , jcp_(), rtus_() {}
 
         DECLARE_COMMON_PD_T(
                 JIT_IMPL_NAME_HELPER("jit_1x1:", avx512_core, ""),
@@ -56,6 +56,7 @@ struct _jit_avx512_core_u8s8s32x_1x1_convolution_fwd_t : public cpu_primitive_t 
                 && utils::one_of(this->cdesc_().prop_kind, forward_training,
                         forward_inference)
                 && this->cdesc_().alg_kind == alg_kind::convolution_direct
+                && !this->has_zero_dim_memory()
                 && this->cdesc_().src_desc.data_type == data_type::u8
                 && this->cdesc_().dst_desc.data_type == dst_type
                 && this->cdesc_().weights_desc.data_type == data_type::s8
@@ -109,15 +110,11 @@ struct _jit_avx512_core_u8s8s32x_1x1_convolution_fwd_t : public cpu_primitive_t 
     {
         kernel_ = new jit_avx512_core_u8s8s32x_1x1_conv_kernel(conf_.jcp_,
                     *conf_.attr());
-
-        ws_size_ = conf_.jcp_.mb * conf_.jcp_.oc * conf_.jcp_.ow * conf_.jcp_.oh;
-        ws_ = (acc_data_t *)malloc(ws_size_ * sizeof(acc_data_t), 64);
         init_rtus_driver<avx512_common>(this);
     }
     ~_jit_avx512_core_u8s8s32x_1x1_convolution_fwd_t() {
         delete kernel_;
         delete rtus_driver_;
-        free(ws_);
         free(scratch_);
     }
 
@@ -139,8 +136,6 @@ struct _jit_avx512_core_u8s8s32x_1x1_convolution_fwd_t : public cpu_primitive_t 
     rtus_driver_t<avx512_common> *rtus_driver_;
     size_t ws_per_thread_;
     src_data_t *scratch_;
-    acc_data_t *ws_;
-    size_t ws_size_;
 };
 
 template <impl::data_type_t dst_type>

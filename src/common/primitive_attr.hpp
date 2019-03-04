@@ -64,7 +64,8 @@ private:
 #if defined(SXAURORA)
     alignas(8) float scales_buf_[scales_buf_size];
 #else
-    alignas(64) float scales_buf_[scales_buf_size];
+    //alignas(64) float scales_buf_[scales_buf_size];
+    float scales_buf_[scales_buf_size];
 #endif
 
     void cleanup() {

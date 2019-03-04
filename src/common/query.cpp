@@ -22,6 +22,9 @@
 #include "memory_pd.hpp"
 #include "primitive_desc.hpp"
 #include "utils.hpp"
+#include "consistency.hpp"
+
+#define AND_(...) SCHKV(args_ok,__VA_ARGS__)
 
 using namespace mkldnn::impl;
 using namespace mkldnn::impl::utils;
@@ -57,10 +60,11 @@ const primitive_desc_t *mkldnn_primitive_desc_query_pd(
 int mkldnn_primitive_desc_query_s32(const primitive_desc_t *primitive_desc,
         query_t what, int index) {
     int res_s32;
-    bool args_ok = primitive_desc != nullptr
-        && one_of(what, query::num_of_inputs_s32, query::num_of_outputs_s32)
-        && mkldnn_primitive_desc_query(primitive_desc, what, index, &res_s32)
-                == success;
+    Consistency args_ok("args_ok:");
+    AND_(primitive_desc != nullptr);
+    AND_(one_of(what, query::num_of_inputs_s32, query::num_of_outputs_s32));
+    AND_(mkldnn_primitive_desc_query(primitive_desc, what, index, &res_s32)
+            == success);
     return args_ok ? res_s32 : 0;
 }
 

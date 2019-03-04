@@ -54,7 +54,7 @@ if(CMAKE_C_COMPILER_LOADED)
         message(STATUS "unix-like CMAKE_C_COMPILER_ID ${CMAKE_C_COMPILER_ID}")
         if(${CMAKE_C_COMPILER_ID} STREQUAL "GNU")
             # gcc: interspersed source/assembler
-            string(REPLACE " -S <SOURCE>" " -g ${asm_VERBOSE_FLAG} -Wa,-adhln -c <SOURCE>"
+            string(REPLACE " -S <SOURCE>" " -g2 ${asm_VERBOSE_FLAG} -Wa,-adhln -c <SOURCE>"
                 asm_C_CREATE_ASSEMBLY "${CMAKE_C_CREATE_ASSEMBLY_SOURCE}")
             string(REPLACE "-o <ASSEMBLY_SOURCE>" "-o /dev/null > <ASSEMBLY_SOURCE>.0"
                 asm_C_CREATE_ASSEMBLY "${asm_C_CREATE_ASSEMBLY}")
@@ -80,7 +80,7 @@ if(CMAKE_CXX_COMPILER_LOADED)
         message(STATUS "CMAKE_CXX_COMPILER_ID ${CMAKE_CXX_COMPILER_ID}")
         if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" OR NECVE)
             # gcc: interspersed source/assembler, and copy .s files to easy-to-find spot
-            string(REPLACE " -S <SOURCE>" " -g ${asm_VERBOSE_FLAG} -Wa,-adhln -c <SOURCE>"
+            string(REPLACE " -S <SOURCE>" " -g2 ${asm_VERBOSE_FLAG} -Wa,-adhln -c <SOURCE>"
                 asm_CXX_CREATE_ASSEMBLY "${CMAKE_CXX_CREATE_ASSEMBLY_SOURCE}")
             string(REPLACE "-o <ASSEMBLY_SOURCE>" "-o /dev/null > <ASSEMBLY_SOURCE>.0"
                 asm_CXX_CREATE_ASSEMBLY "${asm_CXX_CREATE_ASSEMBLY}")

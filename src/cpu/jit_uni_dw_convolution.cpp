@@ -42,6 +42,12 @@ void _jit_uni_dw_convolution_fwd_t<isa, with_relu>::execute_forward() {
 
     const auto &jcp = kernel_->jcp;
 
+    if (conf_.want_padded_bias()) {
+        for (int oc = 0; oc < jcp.oc_without_padding; ++oc)
+            padded_bias_[oc] = bias[oc];
+        bias = padded_bias_;
+    }
+
     int dil_h = jcp.dilate_h + 1;
     int dil_w = jcp.dilate_w + 1;
     int str_h = jcp.stride_h;
@@ -53,7 +59,7 @@ void _jit_uni_dw_convolution_fwd_t<isa, with_relu>::execute_forward() {
 
     auto kernel_params = [&](int ur_w_step, int ow, int oh, int ih, int kh,
             int kh_padding, int ch, int ch_num, int n) {
-        jit_conv_call_s par_conv = {};
+        auto par_conv = jit_conv_call_s();
 
         const int i_l_overflow = nstl::max(0, (jcp.l_pad - ow * str_w));
         const int i_r_overflow = nstl::max(jcp.iw, (ow * str_w
@@ -177,7 +183,7 @@ void _jit_uni_dw_convolution_bwd_data_t<isa>::execute_backward_data() {
     auto kernel_params = [&](int ur_str_w, int iw, int oh, int ih,
             int i_t_overflow, int i_b_overflow, int stride_off_h,
             int ch, int ch_num, int n) {
-        jit_conv_call_s par_conv = {};
+        auto par_conv = jit_conv_call_s();
 
         const int i_l_overflow = nstl::max(0, (jcp.kw - 1 - iw - jcp.l_pad));
         const int i_r_overflow = nstl::max(0, (jcp.kw - 1 - (jcp.iw - 1 - iw)

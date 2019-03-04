@@ -817,7 +817,14 @@ private:
     }
 
     void soft_relu_vectorized() {
-        uni_vminps(Vmm(1), Vmm(1), ptr[imm_addr64 + 24 * vlen]);
+        // duplicate src
+        uni_vmovups(Vmm(9), Vmm(1));
+        // get vmm_mask = src > max logf
+        uni_vmovups(Vmm(3), ptr[imm_addr64 + 24 * vlen]);
+        uni_vmovups(vmm_mask, Vmm(1));
+        uni_vcmpgtps(vmm_mask, vmm_mask, Vmm(3));
+
+        uni_vminps(Vmm(1), Vmm(1), Vmm(3));
         uni_vmaxps(Vmm(1), Vmm(1), ptr[imm_addr64 + 25 * vlen]);
         uni_vmovups(Vmm(8), Vmm(1));
         // calculate exp(x)
@@ -886,6 +893,8 @@ private:
         uni_vmulps(Vmm(1), Vmm(1), ptr[imm_addr64 + 3 * vlen]);
         uni_vaddps(Vmm(8), Vmm(8), Vmm(1));
         uni_vaddps(Vmm(8), Vmm(8), Vmm(5));
+        // y = (x < max log f) ? soft_relu(x) : x
+        uni_vblendvps(Vmm(8), Vmm(8), Vmm(9), vmm_mask);
     }
 
     void soft_relu_vectorized_body() {
@@ -945,13 +954,14 @@ status_t jit_uni_eltwise_fwd_t<isa>::pd_t::init() {
     bool ok = true && mayiuse(isa)
         && utils::one_of(desc()->prop_kind, prop_kind::forward_training,
                 prop_kind::forward_inference)
+        && utils::everyone_is(data_type::f32, desc()->data_desc.data_type)
+        && !has_zero_dim_memory()
         && utils::implication(isa > avx2, utils::one_of(desc()->alg_kind,
                 eltwise_relu, eltwise_elu))
         && utils::implication(isa == sse42 || isa == avx2, utils::one_of(
                     desc()->alg_kind, eltwise_relu, eltwise_tanh, eltwise_elu,
                     eltwise_square, eltwise_abs, eltwise_sqrt, eltwise_linear,
                     eltwise_bounded_relu, eltwise_soft_relu, eltwise_logistic))
-        && utils::everyone_is(data_type::f32, desc()->data_desc.data_type)
         && memory_desc_wrapper(src_pd()).is_dense()
         && attr()->has_default_values();
 
@@ -996,7 +1006,7 @@ void jit_uni_eltwise_fwd_t<isa>::execute_forward() {
         start = nstl::min(nelems, start * cache_line);
         end = nstl::min(nelems, end * cache_line);
 
-        jit_args arg = {};
+        auto arg = jit_args();
         arg.from = &src[start];
         arg.for_comparison = &src[start];
         arg.to = &dst[start];
@@ -1016,10 +1026,11 @@ status_t jit_uni_eltwise_bwd_t<isa>::pd_t::init() {
     assert(engine()->kind() == engine_kind::cpu);
 
     bool ok = true
-        && mayiuse(isa)
         && desc()->prop_kind == prop_kind::backward_data
         && utils::one_of(desc()->alg_kind, alg_kind::eltwise_relu)
         && src_pd()->desc()->data_type == data_type::f32
+        && !has_zero_dim_memory()
+        && mayiuse(isa)
         && memory_desc_wrapper(src_pd()).is_dense()
         && memory_desc_wrapper(diff_dst_pd()) == memory_desc_wrapper(src_pd())
         && attr()->has_default_values();
@@ -1067,7 +1078,7 @@ void jit_uni_eltwise_bwd_t<isa>::execute_backward() {
         start = nstl::min(nelems, start * cache_line);
         end = nstl::min(nelems, end * cache_line);
 
-        jit_args arg = {};
+        auto arg = jit_args();
         arg.from = &diff_dst[start];
         arg.to = &diff_src[start];
         arg.for_comparison = &src[start];

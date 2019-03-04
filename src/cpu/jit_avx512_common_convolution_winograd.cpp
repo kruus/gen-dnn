@@ -46,7 +46,7 @@ void inline load_ps(float *dest, const float *src_mem) {
     __m512 *Iv512 = (__m512 *)dest;
     Iv512[0] = _mm512_load_ps(src_mem);
 #else
-#pragma omp simd
+    PRAGMA_OMP_SIMD()
     for (int v = 0; v < simd_w; v++) dest[v] = src_mem[v];
 #endif
 }
@@ -58,7 +58,7 @@ void inline store_output(float *dest, const float *data, bool streamout) {
     else
         _mm512_store_ps(dest, *((__m512 *)data));
 #else
-#pragma omp simd
+    PRAGMA_OMP_SIMD()
     for (int v = 0; v < simd_w; v++)
         dest[v] = data[v];
 #endif
@@ -77,15 +77,18 @@ void inline accum_output(
     else
         _mm512_store_ps(dest, _data);
 #else
-#pragma omp simd
+    PRAGMA_OMP_SIMD()
     for (int v = 0; v < simd_w; v++)
         data[v] += dest[v];
-    if (with_relu_postsum)
-#pragma omp simd
+
+    if (with_relu_postsum) {
+        PRAGMA_OMP_SIMD()
         for (int v = 0; v < simd_w; v++)
             if (data[v] < 0.f)
                 data[v] = 0.f;
-#pragma omp simd
+    }
+
+    PRAGMA_OMP_SIMD()
     for (int v = 0; v < simd_w; v++)
         dest[v] = data[v];
 #endif
@@ -106,7 +109,7 @@ void trans_W_4x4_3x3(float Fw_[6][6][16][16], float F[3][3][16][16]) {
     for (int j = 0; j < 16; j++) {
 #pragma unroll
         for (int i = 0; i < 3; i++) {
-#pragma omp simd
+            PRAGMA_OMP_SIMD()
             for (int k = 0; k < 16; k++) {
                 t0[k] = 0.26890756302521f * F[2][i][j][k];
                 t1[k] = -t0[k] - 0.688403361344538f * F[0][i][j][k];
@@ -122,7 +125,7 @@ void trans_W_4x4_3x3(float Fw_[6][6][16][16], float F[3][3][16][16]) {
         }
 #pragma unroll
         for (int i = 0; i < 6; i++) {
-#pragma omp simd
+            PRAGMA_OMP_SIMD()
             for (int k = 0; k < 16; k++) {
                 t0[k] = 0.26890756302521f * T[i][2][k];
                 t1[k] = -t0[k] - 0.688403361344538f * T[i][0][k];
@@ -152,7 +155,7 @@ void trans_O_4x4_3x3(float Mw[6][6][16], float O[4][4][16]) {
 
 #pragma unroll
     for (int i = 0; i < 6; i++) {
-#pragma omp simd
+        PRAGMA_OMP_SIMD()
         for (int v = 0; v < 16; v++) {
             t0[v] = Mw[1][i][v] + Mw[2][i][v];
             t1[v] = Mw[3][i][v] + Mw[4][i][v];
@@ -167,7 +170,7 @@ void trans_O_4x4_3x3(float Mw[6][6][16], float O[4][4][16]) {
     }
 #pragma unroll
     for (int i = 0; i < 4; i++) {
-#pragma omp simd
+        PRAGMA_OMP_SIMD()
         for (int v = 0; v < 16; v++) {
             t0[v] = T[i][1][v] + T[i][2][v];
             t1[v] = T[i][3][v] + T[i][4][v];
@@ -199,7 +202,7 @@ void trans_W_3x3_4x4(float Fw[6][6][16], float F[4][6][16])
 
 pragma_unroll
     for (int i = 0; i < 4; i++) {
-#pragma omp simd
+        PRAGMA_OMP_SIMD()
         for (int j = 0; j < 16; j++) {
             t0[j] = F[2][i][j] * rcp6;
             t1[j] = F[0][i][j] * -rcp6 - t0[j];
@@ -217,7 +220,7 @@ pragma_unroll
     }
 pragma_unroll
     for (int i = 0; i < 6; i++) {
-#pragma omp simd
+        PRAGMA_OMP_SIMD()
         for (int j = 0; j < 16; j++) {
             t0[j] = T[i][2][j] * rcp6;
             t1[j] = T[i][0][j] * -rcp6 - t0[j];
@@ -246,7 +249,7 @@ void trans_O_3x3_4x4(float Mw[6][6][16][16], float M[3][3][16][16])
     for (int j = 0; j < 16; j++) {
 pragma_unroll
         for (int i = 0; i < 6; i++) {
-#pragma omp simd
+            PRAGMA_OMP_SIMD()
             for (int l = 0; l < 16; l++) {
                 t0[l] = Mw[1][i][j][l] + Mw[2][i][j][l];
                 t1[l] = Mw[3][i][j][l] + Mw[4][i][j][l];
@@ -260,7 +263,7 @@ pragma_unroll
         }
 pragma_unroll
         for (int i = 0; i < 3; i++) {
-#pragma omp simd
+            PRAGMA_OMP_SIMD()
             for (int l = 0; l < 16; l++) {
                 t0[l] = T[i][1][l] + T[i][2][l];
                 t1[l] = T[i][3][l] + T[i][4][l];
@@ -291,7 +294,7 @@ void trans_I_4x4_3x3(float Iw[6][6][16], float I[6][6][16])
 
 pragma_unroll
     for (int i = 0; i < 6; i++) {
-#pragma omp simd
+        PRAGMA_OMP_SIMD()
         for (int v = 0; v < 16; v++) {
             t0[v] = I[2][i][v] * -2.25f + I[4][i][v];
             t1[v] = I[1][i][v] * -2.25f + I[3][i][v];
@@ -311,7 +314,7 @@ pragma_unroll
 
 pragma_unroll
     for (int i = 0; i < 6; i++) {
-#pragma omp simd
+        PRAGMA_OMP_SIMD()
         for (int v = 0; v < 16; v++) {
             t0[v] = T[i][2][v] * -2.25f + T[i][4][v];
             t1[v] = T[i][1][v] * -2.25f + T[i][3][v];
@@ -341,7 +344,7 @@ void trans_W_3x3_4x4_wu(float Fw[6][6][16], float F[4][6][16])
 
 pragma_unroll
     for (int i = 0; i < 4; i++) {
-#pragma omp simd
+        PRAGMA_OMP_SIMD()
         for (int v = 0; v < 16; v++) {
             t0[v] = F[2][i][v] * 0.26890756302521f;
             t1[v] = F[0][i][v] * -0.688403361344538f - t0[v];
@@ -391,7 +394,7 @@ void trans_O_3x3_4x4_wu(float Mw[6][6][16][16], float M[3][3][16][16])
     for (int j = 0; j < 16; j++) {
 pragma_unroll
         for (int i = 0; i < 6; i++) {
-#pragma omp simd
+            PRAGMA_OMP_SIMD()
             for (int v = 0; v < 16; v++) {
                 t0[v] = Mw[1][i][j][v] + Mw[2][i][j][v];
                 t1[v] = Mw[3][i][j][v] + Mw[4][i][j][v];
@@ -405,7 +408,7 @@ pragma_unroll
         }
 pragma_unroll
         for (int i = 0; i < 3; i++) {
-#pragma omp simd
+            PRAGMA_OMP_SIMD()
             for (int v = 0; v < 16; v++) {
                 t0[v] = T[i][1][v] + T[i][2][v];
                 t1[v] = T[i][3][v] + T[i][4][v];
@@ -419,7 +422,7 @@ pragma_unroll
 
 pragma_unroll
             for (int k = 0; k < 3; k++) {
-#pragma omp simd
+                PRAGMA_OMP_SIMD()
                 for (int v = 0; v < 16; v++) {
                     M[i][k][j][v] = M_[k][v];
                 }
@@ -468,7 +471,7 @@ void input_transform_data(int image, const jit_conv_winograd_conf_t &jcp,
                             float *pinp_i = pinp_j + (xdim - l_pad) * 16;
                             load_ps(I[j][i], pinp_i);
                         } else {
-#pragma omp simd
+                            PRAGMA_OMP_SIMD()
                             for (int v = 0; v < simd_w; v++) {
                                 I[j][i][v] = 0.0f;
                             }
@@ -476,7 +479,7 @@ void input_transform_data(int image, const jit_conv_winograd_conf_t &jcp,
                     }
                 } else {
                     for (int i = 0; i < alpha; i++) {
-#pragma omp simd
+                        PRAGMA_OMP_SIMD()
                         for (int v = 0; v < simd_w; v++) {
                             I[j][i][v] = 0.0f;
                         }
@@ -551,7 +554,7 @@ void input_transform_tileblock_data(int tile_block,
                             float *pinp_i = pinp_j + (xdim - l_pad) * simd_w;
                             load_ps(I[j][i], pinp_i);
                         } else {
-#pragma omp simd
+                            PRAGMA_OMP_SIMD()
                             for (int v = 0; v < simd_w; v++) {
                                 I[j][i][v] = 0.0f;
                             }
@@ -559,7 +562,7 @@ void input_transform_tileblock_data(int tile_block,
                     }
                 } else {
                     for (int i = 0; i < alpha; i++) {
-#pragma omp simd
+                        PRAGMA_OMP_SIMD()
                         for (int v = 0; v < simd_w; v++) {
                             I[j][i][v] = 0.0f;
                         }
@@ -607,7 +610,7 @@ void weight_transform_data(const jit_conv_winograd_conf_t &jcp,
                 float *base_inp = is_fwd
                                 ? &(input(0, 0, j, i, v1, 0))
                                 : &(input(0, 0, 2 - j, 2 - i, v1, 0));
-#pragma omp simd
+                PRAGMA_OMP_SIMD()
                 for (int v2 = 0; v2 < simd_w; v2++) {
                     if (is_fwd)
                         F[j][i][v1][v2] = *(base_inp + v2);
@@ -623,7 +626,7 @@ void weight_transform_data(const jit_conv_winograd_conf_t &jcp,
     for (int j = 0; j < alpha; j++) {
         for (int i = 0; i < alpha; i++) {
             for (int v1 = 0; v1 < simd_w; v1++) {
-#pragma omp simd
+                PRAGMA_OMP_SIMD()
                 for (int v2 = 0; v2 < simd_w; v2++) {
                     output(0, j, i, 0, 0, 0, v1, v2) = Fw[j][i][v1][v2];
                 }
@@ -661,7 +664,7 @@ void output_transform_data(int image, const jit_conv_winograd_conf_t &jcp,
         for (int ti = 0; ti < jcp.itiles; ti++) {
             for (int j = 0; j < alpha; j++) {
                 for (int i = 0; i < alpha; i++) {
-#pragma omp simd
+                    PRAGMA_OMP_SIMD()
                     for (int v = 0; v < simd_w; v++) {
                         Ow[j][i][v] = input(tile_block, 0,
                                 j, i,
@@ -682,7 +685,7 @@ void output_transform_data(int image, const jit_conv_winograd_conf_t &jcp,
                         if (xdim < outw) {
                             float *pout_i = pout_j + xdim * simd_w;
                             if (is_fwd) {
-#pragma omp simd
+                                PRAGMA_OMP_SIMD()
                                 for (int v = 0; v < simd_w; v++) {
                                     O[j][i][v] += with_bias ? bias[v] : 0.f;
                                     O[j][i][v] = true
@@ -766,7 +769,7 @@ void output_transform_tileblock_data(int tile_block,
                         if (xdim < outw) {
                             float *pout_i = pout_j + xdim * simd_w;
                             if (is_fwd) {
-#pragma omp simd
+                                PRAGMA_OMP_SIMD()
                                 for (int v = 0; v < simd_w; v++) {
                                     O[j][i][v] += with_bias ? bias[v] : 0.f;
                                     O[j][i][v] = true
@@ -830,14 +833,14 @@ void diff_src_transform_bwd_weights(int image, jit_conv_winograd_conf_t conv,
                     for (int i = 0; i < alpha; i++) {
                         int xdim = ti * tile_size + i;
                         if ((conv.l_pad <= xdim) && xdim < ifwp) {
-#pragma omp simd
+                            PRAGMA_OMP_SIMD()
                             for (int v = 0; v < simd_w; v++) {
                                 I[j][i][v] = input(0, 0,
                                         ydim - conv.t_pad,
                                         xdim - conv.l_pad, v);
                             }
                         } else {
-#pragma omp simd
+                            PRAGMA_OMP_SIMD()
                             for (int v = 0; v < simd_w; v++) {
                                 I[j][i][v] = 0.0f;
                             }
@@ -845,7 +848,7 @@ void diff_src_transform_bwd_weights(int image, jit_conv_winograd_conf_t conv,
                     }
                 } else {
                     for (int i = 0; i < alpha; i++) {
-#pragma omp simd
+                        PRAGMA_OMP_SIMD()
                         for (int v = 0; v < simd_w; v++) {
                             I[j][i][v] = 0.0f;
                         }
@@ -859,7 +862,7 @@ void diff_src_transform_bwd_weights(int image, jit_conv_winograd_conf_t conv,
                     for (int i = 0; i < alpha; i++) {
                         float *Iw_temp_base = &(Iw_trans_temp(j, i,
                                                         tile_4fma, 0));
-#pragma omp simd
+                        PRAGMA_OMP_SIMD()
                         for (int v = 0; v < simd_w; v++) {
                             Iw_temp_base[v] = Iw[j][i][v];
                         }
@@ -903,7 +906,7 @@ void diff_src_transform_bwd_weights(int image, jit_conv_winograd_conf_t conv,
             for (int i = 0; i < alpha; i++) {
                 for (int tb = tile_4fma; tb < conv.tile_4fma; tb++) {
                     float *Iw_temp_base = &(Iw_trans_temp(j, i, tb, 0));
-#                   pragma omp simd
+                    PRAGMA_OMP_SIMD()
                     for (int v = 0; v < simd_w; v++) {
                         Iw_temp_base[v] = 0;
                     }
@@ -951,18 +954,19 @@ void diff_dst_transform_bwd_weights(int image, jit_conv_winograd_conf_t conv,
                         int xdim = ti * tile_size + i;
                         if (xdim < conv.ow) {
                             float *input_base = &(input(0, 0, ydim, xdim, 0));
-#pragma omp simd
+
+                            PRAGMA_OMP_SIMD()
                             for (int v = 0; v < simd_w; v++) {
                                 I[j][i][v] = input_base[v];
                             }
                             if (with_bias && j < tile_size && i < tile_size) {
-#pragma omp simd
+                                PRAGMA_OMP_SIMD()
                                 for (int v = 0; v < simd_w; v++) {
                                     dbias[v] += input_base[v];
                                 }
                             }
                         } else {
-#pragma omp simd
+                            PRAGMA_OMP_SIMD()
                             for (int v = 0; v < simd_w; v++) {
                                 I[j][i][v] = 0.0f;
                             }
@@ -970,7 +974,7 @@ void diff_dst_transform_bwd_weights(int image, jit_conv_winograd_conf_t conv,
                     }
                 } else {
                     for (int i = 0; i < alpha; i++) {
-#pragma omp simd
+                        PRAGMA_OMP_SIMD()
                         for (int v = 0; v < simd_w; v++) {
                             I[j][i][v] = 0.0f;
                         }
@@ -1023,7 +1027,7 @@ void diff_weights_transform_bwd_weights(jit_conv_winograd_conf_t conv,
     for (int j = 0; j < alpha; j++) {
         for (int i = 0; i < alpha; i++) {
             for (int v = 0; v < conv.ic_simd_block; v++) {
-#pragma omp simd
+                PRAGMA_OMP_SIMD()
                 for (int k = 0; k < conv.oc_simd_block; k++) {
                     Fw[j][i][v][k] = input(0, 0, j, i, 0, 0, v, k);
                 }
@@ -1117,84 +1121,77 @@ void _jit_avx512_common_convolution_winograd_t<is_fwd>::_execute_data_W_S_G_D(
 
     const bool output_is_aligned = ((size_t)out_ptr & (64 - 1)) == 0;
 
-#pragma omp parallel
-    {
-#pragma omp for nowait collapse(3)
-        for (int img = 0; img < jcp.mb; img++) {
-            for (int K_blk1 = 0; K_blk1 < jcp.dimK_nb_block; K_blk1++) {
-                for (int K_blk2 = 0; K_blk2 < jcp.dimK_block; K_blk2++) {
-                    input_transform_data<is_fwd>(img, jcp,
-                            &(input(img, K_blk1 * jcp.dimK_block + K_blk2,
-                                    0, 0, 0)),
-                            &(V(0, 0, 0, 0, K_blk1, K_blk2, 0, 0)), V_streamout);
-                }
-            }
-        }
-
-#pragma omp for nowait collapse(4) schedule(static)
-    for (int ofm1 = 0; ofm1 < jcp.nb_oc; ofm1++) {
-        for (int ifm1 = 0; ifm1 < jcp.nb_ic; ifm1++) {
-            for (int ofm2 = 0; ofm2 < jcp.oc_block; ofm2++) {
-                for (int ifm2 = 0; ifm2 < jcp.ic_block; ifm2++) {
-                    float *U_base_ptr = is_fwd
-                                      ? &(U(ofm1, 0, 0, ifm1, ofm2, ifm2, 0, 0))
-                                      : &(U(ifm1, 0, 0, ofm1, ifm2, ofm2, 0, 0));
-                    weight_transform_data<is_fwd>(jcp,
-                            &(weights(ofm1 * jcp.oc_block + ofm2,
-                                    ifm1 * jcp.ic_block + ifm2,
-                                    0, 0, 0, 0)),
-                            U_base_ptr);
-                }
-            }
-        }
+    const bool want_padded_bias = jcp.with_bias
+        && jcp.oc_without_padding != jcp.oc;
+    float last_slice_bias[simd_w] = {0};
+    if (want_padded_bias) {
+        for (int oc = 0; oc < jcp.oc_without_padding % jcp.oc_simd_block; ++oc)
+            last_slice_bias[oc] = bias(jcp.dimM / jcp.dimM_simd_block - 1, oc);
     }
 
-#pragma omp barrier
-#pragma omp for collapse(5) nowait schedule(static)
-        for (int N_blk1 = 0; N_blk1 < jcp.dimN_nb_block; N_blk1++) {
-            for (int oj = 0; oj < alpha; oj++) {
-                for (int oi = 0; oi < alpha; oi++) {
-                    for (int M_blk1 = 0; M_blk1 < jcp.dimM_nb_block; M_blk1++) {
-                        for (int N_blk2 = 0;
-                                N_blk2 < jcp.dimN_block;
-                                N_blk2++) {
-                            kernel_->gemm_loop_ker_first_iter(
-                                    (float *)&(M(N_blk1, M_blk1, oj, oi,
-                                            N_blk2, 0, 0, 0)),
-                                    (const float *)&(U(M_blk1, oj, oi,
-                                            0, 0, 0, 0, 0)),
-                                    (const float *)&(V(N_blk1, oj, oi,
-                                            N_blk2, 0, 0, 0, 0)));
-                            for (int K_blk1 = 1; K_blk1 < jcp.dimK_nb_block; K_blk1++) {
-                                kernel_->gemm_loop_ker(
-                                        (float *)&(M(N_blk1, M_blk1, oj, oi,
-                                                N_blk2, 0, 0, 0)),
-                                        (const float *)&(U(M_blk1, oj, oi,
-                                                K_blk1, 0, 0, 0, 0)),
-                                        (const float *)&(V(N_blk1, oj, oi,
-                                                N_blk2, K_blk1,
-                                                0, 0, 0)));
-                            }
-                        }
-                    }
-                }
-            }
-        }
+#pragma omp parallel
+    {
+        parallel_nd_in_omp(jcp.mb, jcp.dimK_nb_block, jcp.dimK_block,
+            [&](int img, int K_blk1, int K_blk2) {
+            input_transform_data<is_fwd>(img, jcp,
+                &(input(img, K_blk1 * jcp.dimK_block + K_blk2, 0, 0, 0)),
+                &(V(0, 0, 0, 0, K_blk1, K_blk2, 0, 0)), V_streamout);
+        });
+
+        parallel_nd_in_omp(jcp.nb_oc, jcp.nb_ic, jcp.oc_block, jcp.ic_block,
+            [&](int ofm1, int ifm1, int ofm2, int ifm2) {
+            float *U_base_ptr = is_fwd
+                ? &(U(ofm1, 0, 0, ifm1, ofm2, ifm2, 0, 0))
+                : &(U(ifm1, 0, 0, ofm1, ifm2, ofm2, 0, 0));
+            weight_transform_data<is_fwd>(jcp,
+                &(weights(ofm1 * jcp.oc_block + ofm2,
+                ifm1 * jcp.ic_block + ifm2, 0, 0, 0, 0)), U_base_ptr);
+        });
 
 #pragma omp barrier
-#pragma omp for collapse(3)
-        for (int img = 0; img < jcp.mb; img++) {
-            for (int M_blk1 = 0; M_blk1 < jcp.dimM_nb_block; M_blk1++) {
-                for (int M_blk2 = 0; M_blk2 < jcp.dimM_block; M_blk2++) {
-                    output_transform(img, jcp, p_ops,
-                            &(M(0, M_blk1, 0, 0, 0, M_blk2, 0, 0)),
-                            &(output(img, M_blk1 * jcp.dimM_block + M_blk2,
-                                    0, 0, 0)),
-                            &(bias(M_blk1 * jcp.dimM_block + M_blk2, 0)),
-                            output_is_aligned);
-                }
+
+        parallel_nd_in_omp(jcp.dimN_nb_block, alpha, alpha, jcp.dimM_nb_block, jcp.dimN_block,
+            [&](int N_blk1, int oj, int oi, int M_blk1, int N_blk2) {
+
+            kernel_->gemm_loop_ker_first_iter(
+                    (float *)&(M(N_blk1, M_blk1, oj, oi,
+                            N_blk2, 0, 0, 0)),
+                    (const float *)&(U(M_blk1, oj, oi,
+                            0, 0, 0, 0, 0)),
+                    (const float *)&(V(N_blk1, oj, oi,
+                            N_blk2, 0, 0, 0, 0)));
+            for (int K_blk1 = 1; K_blk1 < jcp.dimK_nb_block; K_blk1++) {
+                kernel_->gemm_loop_ker(
+                        (float *)&(M(N_blk1, M_blk1, oj, oi,
+                                N_blk2, 0, 0, 0)),
+                        (const float *)&(U(M_blk1, oj, oi,
+                                K_blk1, 0, 0, 0, 0)),
+                        (const float *)&(V(N_blk1, oj, oi,
+                                N_blk2, K_blk1,
+                                0, 0, 0)));
             }
-        }
+
+        });
+
+
+#pragma omp barrier
+
+        parallel_nd_in_omp(jcp.mb, jcp.dimM_nb_block, jcp.dimM_block,
+                    [&](int img, int M_blk1, int M_blk2) {
+
+            const int M_blk = M_blk1 * jcp.dimM_block + M_blk2;
+
+            float *bias_ptr = want_padded_bias
+                && M_blk == jcp.dimM / jcp.dimM_simd_block - 1
+                ? last_slice_bias : &bias(M_blk, 0);
+
+            output_transform(img, jcp, p_ops,
+                    &(M(0, M_blk1, 0, 0, 0, M_blk2, 0, 0)),
+                    &(output(img, M_blk, 0, 0, 0)),
+                    bias_ptr, output_is_aligned);
+
+       });
+
     }
 }
 
@@ -1270,25 +1267,30 @@ void _jit_avx512_common_convolution_winograd_t<is_fwd>::_execute_data_W_SGD(
 
     const bool output_is_aligned = ((size_t)out_ptr & (64 - 1)) == 0;
 
+    const bool want_padded_bias = jcp.with_bias
+        && jcp.oc_without_padding != jcp.oc;
+    float last_slice_bias[simd_w] = {0};
+    if (want_padded_bias) {
+        for (int oc = 0; oc < jcp.oc_without_padding % jcp.oc_simd_block; ++oc)
+            last_slice_bias[oc] = bias(jcp.dimM / jcp.dimM_simd_block - 1, oc);
+    }
+
 #pragma omp parallel
     {
-#pragma omp for collapse(4) schedule(static)
-    for (int ofm1 = 0; ofm1 < jcp.nb_oc; ofm1++) {
-        for (int ifm1 = 0; ifm1 < jcp.nb_ic; ifm1++) {
-            for (int ofm2 = 0; ofm2 < jcp.oc_block; ofm2++) {
-                for (int ifm2 = 0; ifm2 < jcp.ic_block; ifm2++) {
-                    float *U_base_ptr = is_fwd
-                                      ? &(U(ofm1, 0, 0, ifm1, ofm2, ifm2, 0, 0))
-                                      : &(U(ifm1, 0, 0, ofm1, ifm2, ofm2, 0, 0));
-                    weight_transform_data<is_fwd>(jcp,
-                            &(weights(ofm1 * jcp.oc_block + ofm2,
-                                    ifm1 * jcp.ic_block + ifm2,
-                                    0, 0, 0, 0)),
-                            U_base_ptr);
-                }
-            }
-        }
-    }
+        parallel_nd_in_omp(jcp.nb_oc, jcp.nb_ic, jcp.oc_block, jcp.ic_block,
+            [&](int ofm1, int ifm1, int ofm2, int ifm2) {
+
+            float *U_base_ptr = is_fwd
+                              ? &(U(ofm1, 0, 0, ifm1, ofm2, ifm2, 0, 0))
+                              : &(U(ifm1, 0, 0, ofm1, ifm2, ofm2, 0, 0));
+            weight_transform_data<is_fwd>(jcp,
+                    &(weights(ofm1 * jcp.oc_block + ofm2,
+                            ifm1 * jcp.ic_block + ifm2,
+                            0, 0, 0, 0)),
+                    U_base_ptr);
+        });
+
+#pragma omp barrier
 
     int ithr = omp_get_thread_num();
 
@@ -1330,12 +1332,15 @@ void _jit_avx512_common_convolution_winograd_t<is_fwd>::_execute_data_W_SGD(
 
         for (int M_blk1 = 0; M_blk1 < jcp.dimM_nb_block; M_blk1++) {
             for (int M_blk2 = 0; M_blk2 < jcp.dimM_block; M_blk2++) {
-                float *bias_ptr = is_fwd
-                                ? &(bias(M_blk1 * jcp.dimM_block + M_blk2, 0))
-                                : NULL;
+                const int M_blk = M_blk1 * jcp.dimM_block + M_blk2;
+
+                float *bias_ptr = want_padded_bias
+                    && M_blk == jcp.dimM / jcp.dimM_simd_block - 1
+                    ? last_slice_bias : &bias(M_blk, 0);
+
                 output_transform_tileblock(tile_block, jcp, p_ops,
                         &(M(ithr, M_blk1, 0, 0, 0, M_blk2, 0, 0)),
-                        &(output(0, M_blk1 * jcp.dimM_block + M_blk2, 0, 0, 0)),
+                        &(output(0, M_blk, 0, 0, 0)),
                         bias_ptr, output_is_aligned);
             }
         }
@@ -1349,6 +1354,15 @@ _jit_avx512_common_convolution_winograd_t<true>::_execute_data_W_SGD(
 template void
 _jit_avx512_common_convolution_winograd_t<false>::_execute_data_W_SGD(
         float *, float *, float *, float *);
+
+void jit_avx512_common_convolution_winograd_bwd_weights_t::
+_maybe_execute_diff_bias_copy() {
+    if (conf_.want_padded_bias()) {
+        float *diff_bias = (float *)this->memory(1);
+        for (int oc = 0; oc < conf_.jcp_.oc_without_padding; ++oc)
+            diff_bias[oc] = this->padded_bias_[oc];
+    }
+}
 
 void jit_avx512_common_convolution_winograd_bwd_weights_t::
 _execute_backward_weights_S_D_G_W()
@@ -1370,7 +1384,8 @@ _execute_backward_weights_S_D_G_W()
     array_offset_calculator<float, 6> diff_weights((float *)this->memory(0),
             jcp.oc/simd_w, jcp.ic/simd_w, jcp.kh, jcp.kw, simd_w, simd_w);
     array_offset_calculator<float, 2> diff_bias(
-            (float *)this->memory(1), jcp.oc/simd_w, simd_w);
+            conf_.want_padded_bias() ? padded_bias_ : (float *)this->memory(1),
+            jcp.oc/simd_w, simd_w);
 
     array_offset_calculator<float, 8> U(
             (float *)(scratchpad_->U_ptr()),
@@ -1407,102 +1422,80 @@ _execute_backward_weights_S_D_G_W()
 #pragma omp parallel num_threads(nthreads)
     {
         if (jcp.with_bias) {
-#pragma omp for nowait collapse(2)
-            for (int ithr = 0; ithr < nthreads; ithr++) {
-                for (int ofm = 0; ofm < jcp.oc; ofm++) {
-                    diff_bias_prv(ithr, ofm) = 0.0f;
-                }
-            }
+            parallel_nd_in_omp(nthreads, jcp.oc, [&](int ithr, int ofm) {
+                diff_bias_prv(ithr, ofm) = 0.0f;
+            });
 
 #pragma omp for nowait
             for (int bofm = 0; bofm < jcp.oc / simd_w; bofm++) {
-#pragma omp simd
+                PRAGMA_OMP_SIMD()
                 for (int v = 0; v < simd_w; v++)
                     diff_bias(bofm, v) = 0.0f;
             }
         }
 
         const int ithread = omp_get_thread_num();
-#pragma omp for nowait collapse(3)
-        for (int img = 0; img < jcp.mb; img++) {
-            for (int ifm1 = 0; ifm1 < jcp.nb_ic; ++ifm1) {
-                for (int ifm2 = 0; ifm2 < jcp.ic_block; ++ifm2) {
-                    float *transb = jcp.ver == ver_4fma
-                                  ? &(trans_buffer(ithread, 0))
-                                  : NULL;
-                    diff_src_transform_bwd_weights_ver(img, jcp,
-                            &(diff_src(img, ifm1 * jcp.ic_block + ifm2,
-                                    0, 0, 0)),
-                            &(V(ifm1, 0, 0, 0, ifm2, 0, 0, 0)),
-                            transb,
-                            kernel_->transpose_4fma_ker);
-                }
-            }
-        }
 
-#pragma omp for nowait collapse(3)
-        for (int img = 0; img < jcp.mb; img++) {
-            for (int ofm1 = 0; ofm1 < jcp.nb_oc; ofm1++) {
-                for (int ofm2 = 0; ofm2 < jcp.oc_block; ofm2++) {
-                    float *dbias = jcp.with_bias
-                           ? &(diff_bias_prv(ithread,
-                                       simd_w * (ofm1 * jcp.oc_block + ofm2)))
-                           : NULL;
-                    diff_dst_transform_bwd_weights_ver(img, jcp,
-                            &(diff_dst(img, ofm1 * jcp.oc_block + ofm2,
-                                    0, 0, 0)),
-                            &(M(ofm1, 0, 0, 0, ofm2, 0, 0, 0)),
-                            dbias);
-                }
-            }
-        }
+        parallel_nd_in_omp(jcp.mb, jcp.nb_ic, jcp.ic_block,
+            [&](int img, int ifm1, int ifm2) {
+            float *transb = jcp.ver == ver_4fma
+               ? &(trans_buffer(ithread, 0))
+               : NULL;
+            diff_src_transform_bwd_weights_ver(img, jcp,
+               &(diff_src(img, ifm1 * jcp.ic_block + ifm2,
+                       0, 0, 0)),
+               &(V(ifm1, 0, 0, 0, ifm2, 0, 0, 0)),
+               transb,
+               kernel_->transpose_4fma_ker);
+        });
+
+        parallel_nd_in_omp(jcp.mb, jcp.nb_oc, jcp.oc_block,
+            [&](int img, int ofm1, int ofm2) {
+            float *dbias = jcp.with_bias
+                   ? &(diff_bias_prv(ithread,
+                               simd_w * (ofm1 * jcp.oc_block + ofm2)))
+                   : NULL;
+            diff_dst_transform_bwd_weights_ver(img, jcp,
+                    &(diff_dst(img, ofm1 * jcp.oc_block + ofm2,
+                            0, 0, 0)),
+                    &(M(ofm1, 0, 0, 0, ofm2, 0, 0, 0)),
+                    dbias);
+        });
 
 #pragma omp barrier
 
         for (int ifm1 = 0; ifm1 < jcp.nb_ic; ifm1++) {
-#pragma omp for nowait collapse(3) schedule(static)
-            for (int oj = 0; oj < alpha; oj++) {
-                for (int oi = 0; oi < alpha; oi++) {
-                    for (int ofm1 = 0; ofm1 < jcp.nb_oc; ofm1++) {
-                        kernel_->gemm_loop_ker_first_iter(
-                                (float *)&(U(ifm1, ofm1,
-                                        oj, oi,
-                                        0, 0, 0, 0)),
-                                (const float *)&(M(ofm1, oj, oi,
-                                        0, 0, 0, 0, 0)),
-                                (const float *)&(V(ifm1, oj, oi,
-                                        0, 0, 0, 0, 0)));
-                        for (int tile_block = 1; tile_block < jcp.tile_block;
-                                tile_block++) {
-                            kernel_->gemm_loop_ker((float *)&(U(ifm1, ofm1,
-                                            oj, oi,
-                                            0, 0, 0, 0)),
-                                    (const float *)&(M(ofm1, oj, oi, tile_block,
-                                            0, 0, 0, 0)),
-                                    (const float *)&(V(ifm1, oj, oi, tile_block,
-                                            0, 0, 0, 0)));
-                        }
-                    }
+            parallel_nd_in_omp(alpha, alpha, jcp.nb_oc,
+                [&](int oj, int oi, int ofm1) {
+                kernel_->gemm_loop_ker_first_iter(
+                    (float *)&(U(ifm1, ofm1, oj, oi,
+                            0, 0, 0, 0)),
+                    (const float *)&(M(ofm1, oj, oi,
+                            0, 0, 0, 0, 0)),
+                    (const float *)&(V(ifm1, oj, oi,
+                            0, 0, 0, 0, 0)));
+                for (int tile_block = 1; tile_block < jcp.tile_block;
+                     tile_block++) {
+                    kernel_->gemm_loop_ker((float *)&(U(ifm1, ofm1,
+                                oj, oi,
+                                0, 0, 0, 0)),
+                        (const float *)&(M(ofm1, oj, oi, tile_block,
+                                0, 0, 0, 0)),
+                        (const float *)&(V(ifm1, oj, oi, tile_block,
+                                0, 0, 0, 0)));
                 }
-            }
+            });
         }
 
 #pragma omp barrier
 
-#pragma omp for nowait collapse(4)
-        for (int ifm1 = 0; ifm1 < jcp.nb_ic; ifm1++) {
-            for (int ofm1 = 0; ofm1 < jcp.nb_oc; ofm1++) {
-                for (int ofm2 = 0; ofm2 < jcp.oc_block; ofm2++) {
-                    for (int ifm2 = 0; ifm2 < jcp.ic_block; ifm2++) {
-                        diff_weights_transform_bwd_weights(jcp,
-                                &(diff_weights(ofm1 * jcp.oc_block + ofm2,
-                                        ifm1 * jcp.ic_block + ifm2,
-                                        0, 0, 0, 0)),
-                                &(U(ifm1, ofm1, 0, 0, ofm2, ifm2, 0, 0)));
-                    }
-                }
-            }
-        }
+        parallel_nd_in_omp(jcp.nb_ic, jcp.nb_oc, jcp.oc_block, jcp.ic_block,
+            [&](int ifm1, int ofm1, int ofm2, int ifm2) {
+            diff_weights_transform_bwd_weights(jcp,
+                    &(diff_weights(ofm1 * jcp.oc_block + ofm2,
+                            ifm1 * jcp.ic_block + ifm2, 0, 0, 0, 0)),
+                    &(U(ifm1, ofm1, 0, 0, ofm2, ifm2, 0, 0)));
+        });
 
         if (jcp.with_bias) {
 #pragma omp for
@@ -1511,14 +1504,16 @@ _execute_backward_weights_S_D_G_W()
                     float* base_bias_ptr = &(diff_bias(ofm1, 0));
                     float* base_bias_prv_ptr = &(diff_bias_prv(
                                 ithr * jcp.oc + ofm1 * simd_w));
-#pragma omp simd
+                    PRAGMA_OMP_SIMD()
                     for (int ofm2 = 0; ofm2 < simd_w; ofm2++) {
                         base_bias_ptr[ofm2] += base_bias_prv_ptr[ofm2];
                     }
                 }
             }
         }
-    } // end omp parallel
+    }
+
+    _maybe_execute_diff_bias_copy();
 }
 
 namespace {
@@ -1569,7 +1564,7 @@ void diff_src_transform_bwd_weights_tile(int tile_block,
                     for (int i = 0; i < alpha; i++) {
                         int xdim = ti * tile_size + i;
                         if ((conv.l_pad <= xdim) && xdim < ifwp) {
-#pragma omp simd
+                            PRAGMA_OMP_SIMD()
                             for (int v = 0; v < simd_w; v++) {
                                 I[j][i][v] = input(img, 0,
                                     ydim - conv.t_pad,
@@ -1577,7 +1572,7 @@ void diff_src_transform_bwd_weights_tile(int tile_block,
                             }
                         }
                         else {
-#pragma omp simd
+                            PRAGMA_OMP_SIMD()
                             for (int v = 0; v < simd_w; v++) {
                                 I[j][i][v] = 0.0f;
                             }
@@ -1586,7 +1581,7 @@ void diff_src_transform_bwd_weights_tile(int tile_block,
                 }
                 else {
                     for (int i = 0; i < alpha; i++) {
-#pragma omp simd
+                        PRAGMA_OMP_SIMD()
                         for (int v = 0; v < simd_w; v++) {
                             I[j][i][v] = 0.0f;
                         }
@@ -1599,7 +1594,7 @@ void diff_src_transform_bwd_weights_tile(int tile_block,
             if (ver_4fma) {
                 for (int j = 0; j < alpha; j++) {
                     for (int i = 0; i < alpha; i++) {
-#pragma omp simd
+                        PRAGMA_OMP_SIMD()
                         for (int v = 0; v < simd_w; v++) {
                             Iw_scratchpad(j, i, tile_4fma, v) = Iw[j][i][v];
                         }
@@ -1662,19 +1657,20 @@ void diff_dst_transform_bwd_weights_tile(int tile_block,
                         int xdim = ti * tile_size + i;
                         if (xdim < conv.ow) {
                             float *input_base = &input(img, 0, ydim, xdim, 0);
-#pragma omp simd
+
+                            PRAGMA_OMP_SIMD()
                             for (int v = 0; v < simd_w; v++) {
                                 I[j][i][v] = input_base[v];
                             }
                             if (with_bias && j < tile_size && i < tile_size) {
-#pragma omp simd
+                                PRAGMA_OMP_SIMD()
                                 for (int v = 0; v < simd_w; v++) {
                                     dbias[v] += input_base[v];
                                 }
                             }
                         }
                         else {
-#pragma omp simd
+                            PRAGMA_OMP_SIMD()
                             for (int v = 0; v < simd_w; v++) {
                                 I[j][i][v] = 0.0f;
                             }
@@ -1683,7 +1679,7 @@ void diff_dst_transform_bwd_weights_tile(int tile_block,
                 }
                 else {
                     for (int i = 0; i < alpha; i++) {
-#pragma omp simd
+                        PRAGMA_OMP_SIMD()
                         for (int v = 0; v < simd_w; v++) {
                             I[j][i][v] = 0.0f;
                         }
@@ -1725,13 +1721,13 @@ void array_sum(int num_arrs, float *output,
             size_t start_e = nb * block_size;
             size_t end_e = start_e + block_size;
             if (!reduce_to_first) {
-#               pragma omp simd
+                PRAGMA_OMP_SIMD()
                 for (size_t e = start_e; e < end_e; e++) {
                     output[e] = input_ptrs[0][e];
                 }
             }
             for (int a = 1; a < num_arrs; a++) {
-#               pragma omp simd
+                PRAGMA_OMP_SIMD()
                 for (size_t e = start_e; e < end_e; e++) {
                     output[e] += input_ptrs[a][e];
                 }
@@ -1742,13 +1738,13 @@ void array_sum(int num_arrs, float *output,
             size_t start_e = nelems - tail;
             size_t end_e = nelems;
             if (!reduce_to_first) {
-#               pragma omp simd
+                PRAGMA_OMP_SIMD()
                 for (size_t e = start_e; e < end_e; e++) {
                     output[e] = input_ptrs[0][e];
                 }
             }
             for (int a = 1; a < num_arrs; a++) {
-#               pragma omp simd
+                PRAGMA_OMP_SIMD()
                 for (size_t e = start_e; e < end_e; e++) {
                     output[e] += input_ptrs[a][e];
                 }
@@ -1777,22 +1773,26 @@ void subarray_sum(int num_arrs, float *output, size_t nelems,
             size_t end_e = start_e + block_size;
             size_t input_start = max(start_e, min(input_starts[0], end_e));
             size_t input_end = max(start_e, min(input_ends[0], end_e));
-#pragma omp simd
+
+            PRAGMA_OMP_SIMD()
             for (size_t e = start_e; e < input_start; e++) {
                 output[e] = 0.f;
             }
-#pragma omp simd
+
+            PRAGMA_OMP_SIMD()
             for (size_t e = input_start; e < input_end; e++) {
                 output[e] = input_ptrs[0][e];
             }
-#pragma omp simd
+
+            PRAGMA_OMP_SIMD()
             for (size_t e = input_end; e < end_e; e++) {
                 output[e] = 0.f;
             }
             for (int a = 1; a < num_arrs; a++) {
                 input_start = max(start_e, input_starts[a]);
                 input_end = min(input_ends[a], end_e);
-#pragma omp simd
+
+                PRAGMA_OMP_SIMD()
                 for (size_t e = input_start; e < input_end; e++) {
                     output[e] += input_ptrs[a][e];
                 }
@@ -1804,22 +1804,26 @@ void subarray_sum(int num_arrs, float *output, size_t nelems,
             size_t end_e = nelems;
             size_t input_start = max(start_e, min(input_starts[0], end_e));
             size_t input_end = max(start_e, min(input_ends[0], end_e));
-#pragma omp simd
+
+            PRAGMA_OMP_SIMD()
             for (size_t e = start_e; e < input_start; e++) {
                 output[e] = 0.f;
             }
-#pragma omp simd
+
+            PRAGMA_OMP_SIMD()
             for (size_t e = input_start; e < input_end; e++) {
                 output[e] = input_ptrs[0][e];
             }
-#pragma omp simd
+
+            PRAGMA_OMP_SIMD()
             for (size_t e = input_end; e < end_e; e++) {
                 output[e] = 0.f;
             }
             for (int a = 1; a < num_arrs; a++) {
                 input_start = max(start_e, input_starts[a]);
                 input_end = min(input_ends[a], end_e);
-#pragma omp simd
+
+                PRAGMA_OMP_SIMD()
                 for (size_t e = start_e; e < end_e; e++) {
                     output[e] += input_ptrs[a][e];
                 }
@@ -1850,7 +1854,8 @@ _execute_backward_weights_S_D_Giot_W()
     array_offset_calculator<float, 6> diff_weights((float *)this->memory(0),
             jcp.oc / simd_w, jcp.ic / simd_w, jcp.kh, jcp.kw, simd_w, simd_w);
     array_offset_calculator<float, 2> diff_bias(
-            (float *)this->memory(1), jcp.oc / simd_w, simd_w);
+            conf_.want_padded_bias() ? padded_bias_ : (float *)this->memory(1),
+            jcp.oc / simd_w, simd_w);
 
     array_offset_calculator<float, 8> U((float *)(scratchpad_->U_ptr()),
             jcp.nb_ic, jcp.nb_oc,
@@ -1890,15 +1895,12 @@ _execute_backward_weights_S_D_Giot_W()
 #pragma omp parallel
     {
         if (jcp.with_bias) {
-#pragma omp for nowait collapse(2)
-            for (int ithr = 0; ithr < nthreads; ithr++) {
-                for (int ofm = 0; ofm < jcp.oc; ofm++) {
-                    diff_bias_prv(ithr, ofm) = 0.0f;
-                }
-            }
+            parallel_nd_in_omp(nthreads, jcp.oc, [&](int ithr, int ofm) {
+                diff_bias_prv(ithr, ofm) = 0.0f;
+            });
 #pragma omp for nowait
             for (int bofm = 0; bofm < jcp.oc / simd_w; bofm++) {
-#pragma omp simd
+                PRAGMA_OMP_SIMD()
                 for (int v = 0; v < simd_w; v++)
                     diff_bias(bofm, v) = 0.0f;
             }
@@ -1908,84 +1910,71 @@ _execute_backward_weights_S_D_Giot_W()
 #pragma omp parallel
     {
         const int ithread = omp_get_thread_num();
-#pragma omp for nowait collapse(3)
-        for (int img = 0; img < jcp.mb; img++) {
-            for (int ifm1 = 0; ifm1 < jcp.nb_ic; ++ifm1) {
-                for (int ifm2 = 0; ifm2 < jcp.ic_block; ++ifm2) {
-                    float *transb = jcp.ver == ver_4fma
-                        ? &(trans_buffer(ithread, 0))
-                        : NULL;
-                    diff_src_transform_bwd_weights_ver(img, jcp,
-                        &(diff_src(img, ifm1 * jcp.ic_block + ifm2,
+        parallel_nd_in_omp(jcp.mb, jcp.nb_ic, jcp.ic_block,
+            [&](int img, int ifm1, int ifm2) {
+                float *transb = jcp.ver == ver_4fma
+                    ? &(trans_buffer(ithread, 0))
+                    : NULL;
+                diff_src_transform_bwd_weights_ver(img, jcp,
+                    &(diff_src(img, ifm1 * jcp.ic_block + ifm2,
                             0, 0, 0)),
-                        &(V(ifm1, 0, 0, 0, ifm2, 0, 0, 0)),
-                        transb,
-                        kernel_->transpose_4fma_ker);
-                }
-            }
-        }
+                    &(V(ifm1, 0, 0, 0, ifm2, 0, 0, 0)),
+                    transb,
+                    kernel_->transpose_4fma_ker);
+        });
     }
 
 #pragma omp parallel num_threads(nthreads)
-#pragma omp for nowait collapse(3)
-    for (int img = 0; img < jcp.mb; img++) {
-        for (int ofm1 = 0; ofm1 < jcp.nb_oc; ofm1++) {
-            for (int ofm2 = 0; ofm2 < jcp.oc_block; ofm2++) {
+    {
+        parallel_nd_in_omp(jcp.mb, jcp.nb_oc, jcp.oc_block,
+            [&](int img, int ofm1, int ofm2) {
                 const int ithread = omp_get_thread_num();
                 float *dbias = jcp.with_bias
                     ? &(diff_bias_prv(ithread,
-                                simd_w * (ofm1 * jcp.oc_block + ofm2)))
+                        simd_w * (ofm1 * jcp.oc_block + ofm2)))
                     : NULL;
                 diff_dst_transform_bwd_weights_ver(img, jcp,
-                        &(diff_dst(img, ofm1 * jcp.oc_block + ofm2, 0, 0, 0)),
-                        &(M(ofm1, 0, 0, 0, ofm2, 0, 0, 0)), dbias);
-            }
-        }
+                    &(diff_dst(img, ofm1 * jcp.oc_block + ofm2, 0, 0, 0)),
+                    &(M(ofm1, 0, 0, 0, ofm2, 0, 0, 0)), dbias);
+        });
     }
 
     size_t input_starts[max_threads_number];
     size_t input_ends[max_threads_number];
     int th_counter = 0;
-#pragma omp parallel firstprivate(th_counter) \
-    num_threads(nthreads)
-#pragma omp for nowait collapse(5) schedule(static)
-    for (int ifm1 = 0; ifm1 < jcp.nb_ic; ifm1++) {
-        for (int ofm1 = 0; ofm1 < jcp.nb_oc; ofm1++) {
-            for (int oj = 0; oj < alpha; oj++) {
-                for (int oi = 0; oi < alpha; oi++) {
-                    for (int tile_block = 0; tile_block < jcp.tile_block;
-                            tile_block++) {
-                        int ithr = omp_get_thread_num();
-                        if (th_counter == 0) {
-                            input_starts[ithr] = (float *)&(Us(ithr, ifm1, ofm1,
-                                oj, oi, 0, 0, 0, 0)) - (float *)&(Us(ithr, 0, 0,
-                                    0, 0, 0, 0, 0, 0));
-                            input_ends[ithr] = input_starts[ithr]
-                                    + jcp.oc_block * jcp.ic_block
-                                      * jcp.ic_simd_block * jcp.oc_simd_block;
-                        }
-                        else if (tile_block == 0) {
-                            input_ends[ithr] += jcp.oc_block * jcp.ic_block
-                                * jcp.ic_simd_block * jcp.oc_simd_block;
-                        }
-
-                        if (th_counter == 0 || tile_block == 0) {
-                            kernel_->gemm_loop_ker_first_iter(
-                                    &(Us(ithr, ifm1, ofm1, oj, oi, 0, 0, 0, 0)),
-                                    &(M(ofm1, oj, oi, tile_block, 0, 0, 0, 0)),
-                                    &(V(ifm1, oj, oi, tile_block, 0, 0, 0, 0)));
-                        } else {
-                            kernel_->gemm_loop_ker(
-                                    &(Us(ithr, ifm1, ofm1, oj, oi, 0, 0, 0, 0)),
-                                    &(M(ofm1, oj, oi, tile_block, 0, 0, 0, 0)),
-                                    &(V(ifm1, oj, oi, tile_block, 0, 0, 0, 0)));
-                        }
-                        th_counter++;
-                    }
+#pragma omp parallel firstprivate(th_counter) num_threads(nthreads)
+    {
+        parallel_nd_in_omp(jcp.nb_ic, jcp.nb_oc, alpha, alpha, jcp.tile_block,
+            [&](int ifm1, int ofm1, int oj, int oi, int tile_block) {
+                int ithr = omp_get_thread_num();
+                if (th_counter == 0) {
+                    input_starts[ithr] = (float *)&(Us(ithr, ifm1, ofm1,
+                            oj, oi, 0, 0, 0, 0)) - (float *)&(Us(ithr, 0, 0,
+                            0, 0, 0, 0, 0, 0));
+                    input_ends[ithr] = input_starts[ithr]
+                        + jcp.oc_block * jcp.ic_block
+                        * jcp.ic_simd_block * jcp.oc_simd_block;
                 }
-            }
-        }
+                else if (tile_block == 0) {
+                    input_ends[ithr] += jcp.oc_block * jcp.ic_block
+                        * jcp.ic_simd_block * jcp.oc_simd_block;
+                }
+
+                if (th_counter == 0 || tile_block == 0) {
+                    kernel_->gemm_loop_ker_first_iter(
+                        &(Us(ithr, ifm1, ofm1, oj, oi, 0, 0, 0, 0)),
+                        &(M(ofm1, oj, oi, tile_block, 0, 0, 0, 0)),
+                        &(V(ifm1, oj, oi, tile_block, 0, 0, 0, 0)));
+                } else {
+                    kernel_->gemm_loop_ker(
+                        &(Us(ithr, ifm1, ofm1, oj, oi, 0, 0, 0, 0)),
+                        &(M(ofm1, oj, oi, tile_block, 0, 0, 0, 0)),
+                        &(V(ifm1, oj, oi, tile_block, 0, 0, 0, 0)));
+                }
+                th_counter++;
+        });
     }
+
 
     // Reduce diff-weights
     {
@@ -1998,21 +1987,14 @@ _execute_backward_weights_S_D_Giot_W()
                 nthreads, output, nelems, input_ptrs, input_starts, input_ends);
     }
 
-#pragma omp parallel
-#pragma omp for collapse(4)
-    for (int ifm1 = 0; ifm1 < jcp.nb_ic; ifm1++) {
-        for (int ofm1 = 0; ofm1 < jcp.nb_oc; ofm1++) {
-            for (int ofm2 = 0; ofm2 < jcp.oc_block; ofm2++) {
-                for (int ifm2 = 0; ifm2 < jcp.ic_block; ifm2++) {
-                    diff_weights_transform_bwd_weights(jcp,
-                            &(diff_weights(ofm1 * jcp.oc_block + ofm2,
-                                    ifm1 * jcp.ic_block + ifm2,
-                                    0, 0, 0, 0)),
-                            &(U(ifm1, ofm1, 0, 0, ofm2, ifm2, 0, 0)));
-                }
-            }
-        }
-    }
+    parallel_nd(jcp.nb_ic, jcp.nb_oc, jcp.oc_block, jcp.ic_block,
+        [&](int ifm1, int ofm1, int ofm2, int ifm2) {
+            diff_weights_transform_bwd_weights(jcp,
+                    &(diff_weights(ofm1 * jcp.oc_block + ofm2,
+                            ifm1 * jcp.ic_block + ifm2,
+                            0, 0, 0, 0)),
+                    &(U(ifm1, ofm1, 0, 0, ofm2, ifm2, 0, 0)));
+    });
 
 #pragma omp parallel
     if (jcp.with_bias) {
@@ -2022,13 +2004,15 @@ _execute_backward_weights_S_D_Giot_W()
                 float* base_bias_ptr = &(diff_bias(ofm1, 0));
                 float* base_bias_prv_ptr = &(diff_bias_prv(
                             ithr * jcp.oc + ofm1 * simd_w));
-#pragma omp simd
+                PRAGMA_OMP_SIMD()
                 for (int ofm2 = 0; ofm2 < simd_w; ofm2++) {
                     base_bias_ptr[ofm2] += base_bias_prv_ptr[ofm2];
                 }
             }
         }
     }
+
+    _maybe_execute_diff_bias_copy();
 }
 
 void jit_avx512_common_convolution_winograd_bwd_weights_t::
@@ -2051,7 +2035,8 @@ _execute_backward_weights_SDGtWo()
     array_offset_calculator<float, 6> diff_weights((float *)this->memory(0),
             jcp.oc / simd_w, jcp.ic / simd_w, jcp.kh, jcp.kw, simd_w, simd_w);
     array_offset_calculator<float, 3> diff_bias(
-            (float *)this->memory(1), jcp.nb_oc, jcp.oc_block, simd_w);
+            conf_.want_padded_bias() ? padded_bias_ : (float *)this->memory(1),
+            jcp.nb_oc, jcp.oc_block, simd_w);
 
     array_offset_calculator<float, 8> Us((float *)(scratchpad_->U_ptr()),
             0, jcp.nb_ic, alpha, alpha,
@@ -2080,15 +2065,13 @@ _execute_backward_weights_SDGtWo()
 #pragma omp parallel
         {
             if (jcp.with_bias) {
-#pragma omp for nowait collapse(2)
-                for (int ithr = 0; ithr < nthreads; ithr++) {
-                    for (int ofm = 0; ofm < jcp.oc / jcp.nb_oc; ofm++) {
+                parallel_nd_in_omp(nthreads, jcp.oc / jcp.nb_oc,
+                    [&](int ithr, int ofm) {
                         diff_bias_prv(ithr, ofm) = 0.0f;
-                    }
-                }
+                });
 #pragma omp for nowait
                 for (int bofm = 0; bofm < jcp.oc_block; bofm++) {
-#pragma omp simd
+                    PRAGMA_OMP_SIMD()
                     for (int v = 0; v < simd_w; v++)
                         diff_bias(ofm1, bofm, v) = 0.0f;
                 }
@@ -2148,19 +2131,14 @@ _execute_backward_weights_SDGtWo()
             array_sum(nthreads, output, nelems, input_ptrs);
         }
 
-#pragma omp parallel
-#pragma omp for collapse(3)
-        for (int ifm1 = 0; ifm1 < jcp.nb_ic; ifm1++) {
-            for (int ofm2 = 0; ofm2 < jcp.oc_block; ofm2++) {
-                for (int ifm2 = 0; ifm2 < jcp.ic_block; ifm2++) {
-                    diff_weights_transform_bwd_weights(jcp,
-                            &(diff_weights(ofm1 * jcp.oc_block + ofm2,
-                                    ifm1 * jcp.ic_block + ifm2,
-                                    0, 0, 0, 0)),
-                            &(Us(0, ifm1, 0, 0, ofm2, ifm2, 0, 0)));
-                }
-            }
-        }
+        parallel_nd(jcp.nb_ic, jcp.oc_block, jcp.ic_block,
+            [&](int ifm1, int ofm2, int ifm2) {
+            diff_weights_transform_bwd_weights(jcp,
+                    &(diff_weights(ofm1 * jcp.oc_block + ofm2,
+                            ifm1 * jcp.ic_block + ifm2,
+                            0, 0, 0, 0)),
+                    &(Us(0, ifm1, 0, 0, ofm2, ifm2, 0, 0)));
+        });
 
 #pragma omp parallel
         if (jcp.with_bias) {
@@ -2170,7 +2148,7 @@ _execute_backward_weights_SDGtWo()
                     float* base_bias_ptr = &(diff_bias(ofm1, ofm2, 0));
                     float* base_bias_prv_ptr = &(diff_bias_prv(
                                 ithr * jcp.oc_block * simd_w + ofm2 * simd_w));
-#pragma omp simd
+                    PRAGMA_OMP_SIMD()
                     for (int ofm3 = 0; ofm3 < simd_w; ofm3++) {
                         base_bias_ptr[ofm3] += base_bias_prv_ptr[ofm3];
                     }
@@ -2178,6 +2156,8 @@ _execute_backward_weights_SDGtWo()
             }
         }
     }
+
+    _maybe_execute_diff_bias_copy();
 }
 
 void jit_avx512_common_convolution_winograd_bwd_weights_t::
@@ -2200,7 +2180,8 @@ _execute_backward_weights_SDGt_W()
     array_offset_calculator<float, 6> diff_weights((float *)this->memory(0),
             jcp.oc / simd_w, jcp.ic / simd_w, jcp.kh, jcp.kw, simd_w, simd_w);
     array_offset_calculator<float, 2> diff_bias(
-            (float *)this->memory(1), jcp.oc / simd_w, simd_w);
+            conf_.want_padded_bias() ? padded_bias_ : (float *)this->memory(1),
+            jcp.oc / simd_w, simd_w);
 
     array_offset_calculator<float, 8> U((float *)(scratchpad_->U_ptr()),
             jcp.nb_oc, jcp.nb_ic,
@@ -2231,15 +2212,13 @@ _execute_backward_weights_SDGt_W()
 #pragma omp parallel
     {
         if (jcp.with_bias) {
-#pragma omp for nowait collapse(2)
-            for (int ithr = 0; ithr < nthreads; ithr++) {
-                for (int ofm = 0; ofm < jcp.oc; ofm++) {
+            parallel_nd_in_omp(nthreads, jcp.oc,
+                [&](int ithr, int ofm) {
                     diff_bias_prv(ithr, ofm) = 0.0f;
-                }
-            }
+            });
 #pragma omp for nowait
             for (int bofm = 0; bofm < jcp.oc / simd_w; bofm++) {
-#pragma omp simd
+                PRAGMA_OMP_SIMD()
                 for (int v = 0; v < simd_w; v++)
                     diff_bias(bofm, v) = 0.0f;
             }
@@ -2308,21 +2287,13 @@ _execute_backward_weights_SDGt_W()
         array_sum(nthreads, output, nelems, input_ptrs);
     }
 
-#pragma omp parallel
-#pragma omp for collapse(4)
-    for (int ofm1 = 0; ofm1 < jcp.nb_oc; ofm1++) {
-        for (int ifm1 = 0; ifm1 < jcp.nb_ic; ifm1++) {
-            for (int ofm2 = 0; ofm2 < jcp.oc_block; ofm2++) {
-                for (int ifm2 = 0; ifm2 < jcp.ic_block; ifm2++) {
-                    diff_weights_transform_bwd_weights(jcp,
-                            &(diff_weights(ofm1 * jcp.oc_block + ofm2,
-                                    ifm1 * jcp.ic_block + ifm2,
-                                    0, 0, 0, 0)),
-                            &(U(ofm1, ifm1, 0, 0, ofm2, ifm2, 0, 0)));
-                }
-            }
-        }
-    }
+    parallel_nd(jcp.nb_oc, jcp.nb_ic, jcp.oc_block, jcp.ic_block,
+        [&](int ofm1, int ifm1, int ofm2, int ifm2) {
+        diff_weights_transform_bwd_weights(jcp,
+                &(diff_weights(ofm1 * jcp.oc_block + ofm2,
+                        ifm1 * jcp.ic_block + ifm2, 0, 0, 0, 0)),
+                &(U(ofm1, ifm1, 0, 0, ofm2, ifm2, 0, 0)));
+    });
 
 #pragma omp parallel
     if (jcp.with_bias) {
@@ -2332,13 +2303,15 @@ _execute_backward_weights_SDGt_W()
                 float* base_bias_ptr = &(diff_bias(ofm1, 0));
                 float* base_bias_prv_ptr = &(diff_bias_prv(
                             ithr * jcp.oc + ofm1 * simd_w));
-#pragma omp simd
+                PRAGMA_OMP_SIMD()
                 for (int ofm2 = 0; ofm2 < simd_w; ofm2++) {
                     base_bias_ptr[ofm2] += base_bias_prv_ptr[ofm2];
                 }
             }
         }
     }
+
+    _maybe_execute_diff_bias_copy();
 }
 }
 }

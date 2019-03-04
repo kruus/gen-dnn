@@ -1,5 +1,6 @@
 /*******************************************************************************
 * Copyright 2016-2018 Intel Corporation
+* Copyright 2018 YANDEX LLC
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -234,7 +235,13 @@ void jit_avx2_1x1_conv_kernel_f32::reduce_loop(int load_loop_blk, int ur,
         for (int u = 0; u < jcp.reduce_loop_unroll; ++u) {
             for (int j = 0; j < ur; ++j) {
                 for (int i = 0; i < load_loop_blk; ++i) {
-                    vfmadd231ps(vreg_accum(i, j), vreg_load(i), vreg_bcast);
+                    if (mayiuse(avx2))
+                        vfmadd231ps(vreg_accum(i, j), vreg_load(i), vreg_bcast);
+                    else { // AVX support
+                        auto tmp = vmask;
+                        vmulps(tmp, vreg_bcast, vreg_load(i));
+                        vaddps(vreg_accum(i, j), vreg_accum(i, j), tmp);
+                    }
                     if (j == ur - 1 && !(last_block
                                 && u == jcp.reduce_loop_unroll - 1))
                         vmovups(vreg_load(i), load_ptr(u + 1, i));
@@ -353,7 +360,7 @@ void jit_avx2_1x1_conv_kernel_f32::generate()
     mov(reg_load_loop_work, ptr[param1 + GET_OFF(load_dim)]);
     mov(reg_bcast_loop_work, ptr[param1 + GET_OFF(bcast_dim)]);
     mov(reg_reduce_loop_work, ptr[param1 + GET_OFF(reduce_dim)]);
-    mov(reg_reduce_pos_flag, ptr[param1 + GET_OFF(reduce_pos_flag)]);
+    mov(reg_reduce_pos_flag, ptr[param1 + GET_OFF(first_last_flag)]);
     if (jcp.prop_kind == backward_weights)
         mov(reg_output_stride, ptr[param1 + GET_OFF(output_stride)]);
 
@@ -455,7 +462,7 @@ status_t jit_avx2_1x1_conv_kernel_f32::init_conf(jit_1x1_conv_conf_t &jcp,
         const memory_desc_wrapper &weights_d, const memory_desc_wrapper &dst_d,
         const primitive_attr_t &attr, bool with_relu, float relu_negative_slope)
 {
-    if (!mayiuse(avx2)) return status::unimplemented;
+    if (!mayiuse(avx)) return status::unimplemented;
 
     // TODO (Roma): this code is duplicated from the generic kernel; maybe the
     // configuration struct could do some stuff below
@@ -467,6 +474,7 @@ status_t jit_avx2_1x1_conv_kernel_f32::init_conf(jit_1x1_conv_conf_t &jcp,
     jcp.mb = src_d.dims()[0];
 
     jcp.oc = dst_d.dims()[1] / jcp.ngroups;
+    jcp.oc_without_padding = jcp.oc;
     jcp.ic = src_d.dims()[1] / jcp.ngroups;
 
     jcp.ih = src_d.dims()[2];
@@ -508,6 +516,11 @@ status_t jit_avx2_1x1_conv_kernel_f32::init_conf(jit_1x1_conv_conf_t &jcp,
     memory_format_t weights_format
         = weights_formats[with_groups][jcp.prop_kind == backward_data];
 
+    const int simd_w = 8;
+
+    jcp.oc = rnd_up(jcp.oc, simd_w);
+    jcp.ic = rnd_up(jcp.ic, simd_w);
+
     bool args_ok = true
         && jcp.ngroups == 1
         && src_d.format() == nChw8c
@@ -515,8 +528,6 @@ status_t jit_avx2_1x1_conv_kernel_f32::init_conf(jit_1x1_conv_conf_t &jcp,
         && one_of(cd.bias_desc.format, memory_format::undef, any, x)
         && dst_d.format() == nChw8c;
     if (!args_ok) return status::unimplemented;
-
-    const int simd_w = 8;
 
     args_ok = true
         && jcp.oc % simd_w == 0 && jcp.ic % simd_w == 0
@@ -527,7 +538,7 @@ status_t jit_avx2_1x1_conv_kernel_f32::init_conf(jit_1x1_conv_conf_t &jcp,
 
     jcp.ic_block = jcp.oc_block = simd_w;
 
-    jcp.ur = 4;
+    jcp.ur = mayiuse(avx2) ? 4 : 3; // AVX support
 
     int load_blocking{ 0 };
     int load_blocking_max{ 0 };

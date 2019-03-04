@@ -42,8 +42,8 @@ double get_msec();
 #define MKLDNN_VERBOSE_PRB_LEN 384
 
 #define DECL_DAT_AUX_PRB_STRS() \
-    char dat_str[MKLDNN_VERBOSE_PRB_LEN] = {'\0'}; MAYBE_UNUSED(dat_str); \
-    char aux_str[MKLDNN_VERBOSE_PRB_LEN] = {'\0'}; MAYBE_UNUSED(aux_str); \
+    char dat_str[MKLDNN_VERBOSE_DAT_LEN] = {'\0'}; MAYBE_UNUSED(dat_str); \
+    char aux_str[MKLDNN_VERBOSE_AUX_LEN] = {'\0'}; MAYBE_UNUSED(aux_str); \
     char prb_str[MKLDNN_VERBOSE_PRB_LEN] = {'\0'}; MAYBE_UNUSED(prb_str)
 
 inline void verbose_templ(char *buffer, mkldnn_primitive_kind_t prim_kind,
@@ -70,9 +70,12 @@ template <typename pd_t> static void init_info_bnorm(pd_t *s, char *buffer) {
     {
         snprintf(prb_str, MKLDNN_VERBOSE_PRB_LEN,
             "mb%dic%did%dih%diw%d", s->MB(), s->C(), s->D(), s->H(), s->W());
-    } else {
+    } else if (s->ndims() == 4) {
         snprintf(prb_str, MKLDNN_VERBOSE_PRB_LEN,
             "mb%dic%dih%diw%d", s->MB(), s->C(), s->H(), s->W());
+    } else if (s->ndims() == 2) {
+        snprintf(prb_str, MKLDNN_VERBOSE_PRB_LEN,
+            "mb%dic%d", s->MB(), s->C());
     }
 
     verbose_templ(buffer, s->kind(), s->name(), s->desc()->prop_kind, dat_str,
@@ -101,41 +104,8 @@ template <typename pd_t> static void init_info_conv(pd_t *s, char *buffer) {
     snprintf(aux_str, MKLDNN_VERBOSE_AUX_LEN,
             "alg:%s", mkldnn_alg_kind2str(s->cdesc()->alg_kind));
 
-    snprintf(prb_str, MKLDNN_VERBOSE_PRB_LEN,
-            "mb%d_g%dic%doc%d"
-            "_ih%doh%dkh%dsh%ddh%dph%d"
-            "_iw%dow%dkw%dsw%ddw%dpw%d",
-            s->MB(), s->G(), s->IC(), s->OC(),
-            s->IH(), s->OH(), s->KH(), s->KSH(), s->KDH(), s->padT(),
-            s->IW(), s->OW(), s->KW(), s->KSW(), s->KDW(), s->padL());
-
-    verbose_templ(buffer, s->kind(), s->name(), s->cdesc()->prop_kind, dat_str,
-            aux_str, prb_str);
-}
-
-template <typename pd_t> static void init_info_conv_3d(pd_t *s, char *buffer) {
-    DECL_DAT_AUX_PRB_STRS();
-
-    auto fmt_src = (s->cdesc()->prop_kind == prop_kind::backward_data
-            ? s->diff_src_pd() : s->src_pd())->desc()->format;
-    auto fmt_wei = (s->cdesc()->prop_kind == prop_kind::backward_weights
-            ? s->diff_weights_pd(0) : s->weights_pd(0))->desc()->format;
-    auto fmt_bia = s->with_bias()
-        ? (s->cdesc()->prop_kind == prop_kind::backward_weights
-                ? s->diff_weights_pd(1) : s->weights_pd(1))->desc()->format
-        : memory_format::undef;
-    auto fmt_dst = (s->cdesc()->prop_kind == prop_kind::backward_data
-            || s->cdesc()->prop_kind == prop_kind::backward_weights
-        ? s->diff_dst_pd() : s->dst_pd())->desc()->format;
-    snprintf(dat_str, MKLDNN_VERBOSE_DAT_LEN,
-            "fsrc:%s fwei:%s fbia:%s fdst:%s",
-            mkldnn_fmt2str(fmt_src), mkldnn_fmt2str(fmt_wei),
-            mkldnn_fmt2str(fmt_bia), mkldnn_fmt2str(fmt_dst));
-
-    snprintf(aux_str, MKLDNN_VERBOSE_AUX_LEN,
-            "alg:%s", mkldnn_alg_kind2str(s->cdesc()->alg_kind));
-
-    snprintf(prb_str, MKLDNN_VERBOSE_PRB_LEN,
+    if (s->ndims() == 5) {
+        snprintf(prb_str, MKLDNN_VERBOSE_PRB_LEN,
             "mb%d_g%dic%doc%d"
             "_id%dod%dkd%dsd%ddd%dpd%d"
             "_ih%doh%dkh%dsh%ddh%dph%d"
@@ -144,6 +114,15 @@ template <typename pd_t> static void init_info_conv_3d(pd_t *s, char *buffer) {
             s->ID(), s->OD(), s->KD(), s->KSD(), s->KDD(), s->padFront(),
             s->IH(), s->OH(), s->KH(), s->KSH(), s->KDH(), s->padT(),
             s->IW(), s->OW(), s->KW(), s->KSW(), s->KDW(), s->padL());
+    } else {
+        snprintf(prb_str, MKLDNN_VERBOSE_PRB_LEN,
+            "mb%d_g%dic%doc%d"
+            "_ih%doh%dkh%dsh%ddh%dph%d"
+            "_iw%dow%dkw%dsw%ddw%dpw%d",
+            s->MB(), s->G(), s->IC(), s->OC(),
+            s->IH(), s->OH(), s->KH(), s->KSH(), s->KDH(), s->padT(),
+            s->IW(), s->OW(), s->KW(), s->KSW(), s->KDW(), s->padL());
+    }
 
     verbose_templ(buffer, s->kind(), s->name(), s->cdesc()->prop_kind, dat_str,
             aux_str, prb_str);
@@ -272,7 +251,8 @@ template <typename pd_t> static void init_info_pool(pd_t *s, char *buffer) {
 template <typename pd_t> static void init_info_softmax(pd_t *s, char *buffer) {
     DECL_DAT_AUX_PRB_STRS();
 
-    auto fmt_data = s->src_pd()->desc()->format;
+    auto fmt_data = (s->desc()->prop_kind == prop_kind::backward_data
+            ? s->diff_src_pd() : s->src_pd())->desc()->format;
     auto fmt_diff = s->desc()->prop_kind == prop_kind::backward_data
         ? s->diff_src_pd()->desc()->format : memory_format::undef;
     snprintf(dat_str, MKLDNN_VERBOSE_DAT_LEN, "fdata:%s fdiff:%s",
@@ -295,7 +275,7 @@ template <typename pd_t> static void init_info_rnn(pd_t *s, char *buffer) {
 
     snprintf(prb_str, MKLDNN_VERBOSE_PRB_LEN,
             "l%dd%dmb%dt%d_ic%dsc%doc%d_wi%dws%d",
-             s->L(), s->D(), s->T(), s->MB(),
+             s->L(), s->D(), s->MB(), s->T(),
              s->SLC(), s->DIC(), s->DIC(),
              s->SLC(), s->SIC());
 
@@ -326,4 +306,5 @@ DEFINE_STUB(rnn);
 }
 }
 
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
 #endif

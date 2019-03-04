@@ -1,0 +1,74 @@
+# vim: set sw=4 ts=4 et ft=cmake
+if(SX_TRACE)
+    message(STATUS " *** Platform/SX-C ***")
+endif()
+set(CMAKE_C_COMPILER_ID "SX")
+set(CMAKE_C_PLATFORM_ID "SX")
+SET(CMAKE_C_COMPILER   sxcc)
+
+# stop the normal id stuff from running
+set(CMAKE_C_COMPILER_ID_RUN 1)
+
+# NEW :
+set(CMAKE_C_CREATE_PREPROCESSED_SOURCE "<CMAKE_C_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -E <SOURCE> > <PREPROCESSED_SOURCE>" )
+set(CMAKE_C_CREATE_ASSEMBLY_SOURCE     "<CMAKE_C_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -S <SOURCE> -o <ASSEMBLY_SOURCE>" )
+
+# stop normal abi detection (may need to hardwire some stuff (see SX-CXX comments))
+# This is reset AFTER here, try Platform/SX instead for this short-circuit ...
+#set(CMAKE_C_ABI_COMPILED 1)
+
+# cmake-3.8 does this via Platform/SX-Initialize
+#     short-circuit default settings in CMakeDetermineCCompiler.cmake (for CmakeFindBinUtils)
+#set(_CMAKE_TOOLCHAIN_PREFIX "sx")
+# give cmake a HINT location for toolchain location [in case it is not in current path?]
+#set(CMAKE_C_COMPILER_EXTERNAL_TOOLCHAIN "/SX/usr")
+
+
+#
+# Then CMakeFindBinUtils
+#
+# Here are some things you can set up more correctly here
+#
+# They are actually set in CMakeCCompiler.cmake.in, so look there to
+# be sure to set the correct @FOO@ substitution variables
+#
+# CMakeCCompiler.cmake(1):  set(CMAKE_C_COMPILER /SX/usr/bin/sxcc )
+# CMakeCCompiler.cmake(2):  set(CMAKE_C_COMPILER_ARG1  )
+# CMakeCCompiler.cmake(3):  set(CMAKE_C_COMPILER_ID SX )
+# CMakeCCompiler.cmake(4):  set(CMAKE_C_COMPILER_VERSION  )
+# CMakeCCompiler.cmake(5):  set(CMAKE_C_COMPILER_WRAPPER  )
+# CMakeCCompiler.cmake(6):  set(CMAKE_C_STANDARD_COMPUTED_DEFAULT  )
+# CMakeCCompiler.cmake(7):  set(CMAKE_C_COMPILE_FEATURES  )
+# CMakeCCompiler.cmake(8):  set(CMAKE_C90_COMPILE_FEATURES  )
+# CMakeCCompiler.cmake(9):  set(CMAKE_C99_COMPILE_FEATURES  )
+# CMakeCCompiler.cmake(10):  set(CMAKE_C11_COMPILE_FEATURES  )
+# CMakeCCompiler.cmake(12):  set(CMAKE_C_PLATFORM_ID SX )
+# CMakeCCompiler.cmake(13):  set(CMAKE_C_SIMULATE_ID  )
+# CMakeCCompiler.cmake(14):  set(CMAKE_C_SIMULATE_VERSION  )
+# CMakeCCompiler.cmake(16):  set(CMAKE_AR /home/4gi/nlabhpg/local/cmake-sample/ar )
+# CMakeCCompiler.cmake(17):  set(CMAKE_RANLIB /home/4gi/nlabhpg/local/cmake-sample/ranlib )
+# CMakeCCompiler.cmake(18):  set(CMAKE_LINKER /SX/usr/bin/sxld )
+# CMakeCCompiler.cmake(19):  set(CMAKE_COMPILER_IS_GNUCC )
+# CMakeCCompiler.cmake(20):  set(CMAKE_C_COMPILER_LOADED 1 )
+# CMakeCCompiler.cmake(21):  set(CMAKE_C_COMPILER_WORKS )
+# CMakeCCompiler.cmake(22):  set(CMAKE_C_ABI_COMPILED )
+# CMakeCCompiler.cmake(23):  set(CMAKE_COMPILER_IS_MINGW )
+# CMakeCCompiler.cmake(24):  set(CMAKE_COMPILER_IS_CYGWIN )
+# CMakeCCompiler.cmake(25):  if(CMAKE_COMPILER_IS_CYGWIN )
+# CMakeCCompiler.cmake(30):  set(CMAKE_C_COMPILER_ENV_VAR CC )
+# CMakeCCompiler.cmake(32):  if(CMAKE_COMPILER_IS_MINGW )
+# CMakeCCompiler.cmake(35):  set(CMAKE_C_COMPILER_ID_RUN 1 )
+# CMakeCCompiler.cmake(36):  set(CMAKE_C_SOURCE_FILE_EXTENSIONS c;m )
+# CMakeCCompiler.cmake(37):  set(CMAKE_C_IGNORE_EXTENSIONS h;H;o;O;obj;OBJ;def;DEF;rc;RC )
+# CMakeCCompiler.cmake(38):  set(CMAKE_C_LINKER_PREFERENCE 10 )
+# CMakeCCompiler.cmake(41):  set(CMAKE_C_SIZEOF_DATA_PTR  )
+# CMakeCCompiler.cmake(42):  set(CMAKE_C_COMPILER_ABI  )
+# CMakeCCompiler.cmake(43):  set(CMAKE_C_LIBRARY_ARCHITECTURE  )
+# CMakeCCompiler.cmake(45):  if(CMAKE_C_SIZEOF_DATA_PTR )
+# CMakeCCompiler.cmake(49):  if(CMAKE_C_COMPILER_ABI )
+# CMakeCCompiler.cmake(53):  if(CMAKE_C_LIBRARY_ARCHITECTURE )
+# CMakeCCompiler.cmake(57):  set(CMAKE_C_CL_SHOWINCLUDES_PREFIX  )
+# CMakeCCompiler.cmake(58):  if(CMAKE_C_CL_SHOWINCLUDES_PREFIX )
+# CMakeCCompiler.cmake(66):  set(CMAKE_C_IMPLICIT_LINK_LIBRARIES  )
+# CMakeCCompiler.cmake(67):  set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES  )
+# CMakeCCompiler.cmake(68):  set(CMAKE_C_IMPLICIT_LINK_FRAMEWORK_DIRECTORIES  )

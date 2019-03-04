@@ -14,8 +14,6 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "perf.h"
-
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -80,21 +78,12 @@ int main(int argc, char **argv) {
     int omp_max_thr = omp_get_max_threads();
     printf("benchdnn --%s --mode=%s -v%d ... init omp_max_thr=%d ",
                 (prim==CONV? "conv": prim==IP? "ip": prim==SELF? "self"
+                 : prim==DECONV ? "deconv" : prim==RNN? "rnn"
                  : prim==REORDER? "reorder": prim==BNORM? "bnorm": "Huh?"),
                 bench_mode2str(bench_mode), verbose, omp_max_thr);
     fflush(stdout);
 
     init();
-    printf(" OK\n"); fflush(stdout);
-    // [ejk] perf stuff is a stub init for rdtsc/rdpmc/frequency governor.
-    //       It is not necessary with 'ticks' removed from benchdnn.
-    //       If reintroduced, an alternate approach is to expose xbyak's
-    //       rdtsc support within mkldnn headers.
-    perf_t const * perf_data = perf_begin();
-    if(perf_data == nullptr) { // [ejk] may need some timing system init
-        printf("ERROR: perf_begin failed!\n");
-        exit(-1);
-    }
 
     switch (prim) {
     case SELF: self::bench(argc, argv); break;
@@ -107,22 +96,19 @@ int main(int argc, char **argv) {
     default: fprintf(stderr, "err: unknown driver\n");
     }
 
-    perf_end(perf_data);
     finalize();
 
-    printf("tests:%d impls:%d %s:%d skipped:%d mistrusted:%d unimplemented:%d "
-            "failed:%d",
-            benchdnn_stat.tests, benchdnn_stat.impls,
-            (bench_mode&CORR? "correct": "passed"), benchdnn_stat.passed,
+    printf("tests:%d passed:%d "
+            "skipped:%d mistrusted:%d unimplemented:%d "
+            "failed:%d\n",
+            benchdnn_stat.tests, benchdnn_stat.passed,
             benchdnn_stat.skipped, benchdnn_stat.mistrusted,
             benchdnn_stat.unimplemented, benchdnn_stat.failed);
-    if (bench_mode & PERF)
-        printf(" total perf: min(ms):%g avg(ms):%g\n",
+    if (bench_mode & PERF) {
+        printf("total perf: min(ms):%g avg(ms):%g\n",
                 benchdnn_stat.ms[benchdnn_timer_t::min],
                 benchdnn_stat.ms[benchdnn_timer_t::avg]);
-    if ((bench_mode & TEST))
-        printf(" test_fail: %d", benchdnn_stat.test_fail);
-    printf("\n");
+    }
 
     return !!benchdnn_stat.failed;
 }

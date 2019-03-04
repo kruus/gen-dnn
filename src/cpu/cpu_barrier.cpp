@@ -14,9 +14,18 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include <assert.h>
-
 #include "cpu_barrier.hpp"
+#if defined(_MULTI_THREAD) && ! MULTI_THREAD
+// nothing to do (barrier throws if nthr > 1, o/w does nothing)
+
+#else // provide a nontrivial barrier impl
+
+#if defined(__ve)
+//#include "C++/xatomic.h" // things like std::_Atomic_fetch_add_8, and _Atomic_counter_t
+#include <memory>          // shared pointer support defines memory_order_seq_cst
+#elif defined(TARGET_VANILLA)
+#include <atomic>          // the usual place we expect memory_order_seq_cst
+#endif
 
 namespace mkldnn {
 namespace impl {
@@ -24,6 +33,87 @@ namespace cpu {
 
 namespace simple_barrier {
 
+#if defined(__ve) // also implies TARGET_VANILLA
+#warning "Aurora: if xatomic0.h usable, using _Atomic_counter_t might give a trivial impl"
+
+// TODO: check that ncc uses proper fences for volatile variables
+void barrier(ctx_t *ctx, int nthr) {
+    if (nthr > 1){
+        size_t sense_sav;
+
+        /* take and save current sense */
+        register size_t tmp = ctx->sense;
+        *&sense_sav = tmp; // "push"
+
+        tmp = 1U;
+        //__sync_fetch_and_add( &ctx->ctr, tmp );
+        //tmp += 1U;
+        //__sync_add_and_fetch( &ctx->ctr, tmp);
+        assert( sizeof(ctx->ctr) == 8 );
+        //std::_Atomic_fetch_add_8( reinterpret_cast<volatile std::_Uint8_t*>(&ctx->ctr), tmp, std::memory_order_seq_cst );
+        //__atomic_add_fetch( &ctx->ctr, tmp, __ATOMIC_SEQ_CST); // maybe this one exists?
+        __atomic_add_fetch( &ctx->ctr, tmp, std::memory_order_seq_cst); // maybe this one exists?
+
+        bool last_thread = (tmp == static_cast<size_t>(nthr));
+        tmp = *&sense_sav; // "pop"
+        if (last_thread){
+            ctx->ctr = 0U;      // reset thread counter
+            // notify waiting threads
+            tmp = !tmp;
+            ctx->sense = tmp;
+            //goto barrier_exit_restore_label;
+        }else{
+            //spin_label:
+            // XXX: do we need to explicitly clear caches w/ FENCE?
+            // XXX shouldd this use the .nc "Not cached on ADB" suffix for the load?
+            while (ctx->sense == tmp){
+                asm("nop" :::);
+            }
+        }
+        //barrier_exit_restore_label:
+        // (nothing to do)
+        //barrier_exit_label:
+    }
+}
+#elif defined(TARGET_VANILLA)
+void barrier(ctx_t *ctx, int nthr) {
+    // assume ctx_init zeroes out ctx
+    if (nthr > 1){
+        size_t sense_sav;
+
+        /* take and save current sense */
+        register size_t tmp = ctx->sense;
+        *&sense_sav = tmp; // "push"
+
+        tmp = 1U;
+        //__sync_fetch_and_add( &ctx->ctr, tmp );
+        //tmp += 1U;
+        // simpler:
+        //__sync_add_and_fetch( &ctx->ctr, tmp);  // N/A for __ve (NEC Aurora)
+        //__atomic_add_fetch( &ctx->ctr, tmp, __ATOMIC_SEQ_CST); // maybe this one exists?
+        __atomic_add_fetch( &ctx->ctr, tmp, std::memory_order_seq_cst); // maybe this one exists?
+
+        bool last_thread = (tmp == static_cast<size_t>(nthr));
+        tmp = *&sense_sav; // "pop"
+        if (last_thread){
+            ctx->ctr = 0U;      // reset thread counter
+            // notify waiting threads
+            tmp = !tmp;
+            ctx->sense = tmp;
+            //goto barrier_exit_restore_label;
+        }else{
+            //spin_label:
+            while (ctx->sense == tmp){
+                __builtin_ia32_pause(); // gcc perhaps has this
+            }
+        }
+        //barrier_exit_restore_label:
+        // (nothing to do)
+        //barrier_exit_label:
+    }
+}
+
+#else
 void generate(jit_generator &code, Xbyak::Reg64 reg_ctx,
             Xbyak::Reg64 reg_nthr) {
 #   define BAR_CTR_OFF offsetof(ctx_t, ctr)
@@ -102,11 +192,13 @@ void barrier(ctx_t *ctx, int nthr) {
     static jit_t j; /* XXX: constructed on load ... */
     j.barrier(ctx, nthr);
 }
+#endif // !TARGET_VANILLA
 
-}
+}//simple_barrier::
 
-}
-}
-}
+}//cpu::
+}//impl::
+}//mkldnn::
+#endif // _MULTI_THREAD
 
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

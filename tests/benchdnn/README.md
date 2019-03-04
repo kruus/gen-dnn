@@ -1,7 +1,7 @@
 # benchdnn
 
 **benchdnn** is a standalone correctness and performance benchmark for
-[Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)](http://github.com/intel/mkl-dnn) library.
+[Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)](/intel/mkl-dnn) library.
 The purpose of the benchmark is extended and robust correctness verification of
 the primitives provided by MKL-DNN. So far **benchdnn** supports convolutions
 and inner products of different data types. It also implicitly tests reorders.
@@ -25,12 +25,7 @@ where:
 
  - `HARNESS` is either `conv` [default], `ip`, `reorder`, `bnorm`, `rnn` or `self`
 
- - `MODE` -- string that contains flags for benchmark mode.
-   - Use `C` or `c` for correctness (used by default), and `P` or `p` for performance.
-     - ... of mkl-dnn implementations
-   - For `--conv`, an `A` in `--mode` will loop over all available mkl-dnn implementations
-   - For `--conv`, a `T` in `--mode` will loop over alt benchdnn reference impls.
-     - `--conv --mode=PT` will do timing runs *just* for alt benchdnn reference impls.
+ - `MODE` -- string that contains flags for benchmark mode. Use `C` or `c` for correctness (used by default), and `P` or `p` for performance
 
  - `N` -- verbose level (integer from 0 [default] to ...)
 
@@ -50,7 +45,7 @@ The usage:
 where *harness-knobs* are:
 
  - `--cfg={f32, u8s8u8s32, ...}` configuration (see below), default `f32`
- - `--dir={FWD_D (forward data), FWD_B (forward data + bias), BWD_D (backward data), BWD_W (backward weights), BWD_WB (backward weights + bias)}` direction, default `FWD_B`
+ - `--dir={FWD_D (forward data), FWD_B (forward data + bias),FWD_I (forward data inference), BWD_D (backward data), BWD_W (backward weights), BWD_WB (backward weights + bias)}` direction, default `FWD_B`
  - `--alg={DIRECT, WINO}` convolution algorithm, default DIRECT
  - `--merge={NONE, RELU}` merged primitive, default NONE (nothing merged)
  - `--attr="attr_str"` convolution attributes (see in the section below), default `""` (no attributes set)
@@ -93,8 +88,6 @@ is 1.0. Known policies are:
   - `none` (default) means no output scales set (i.e. scale = 1.)
   - `common` corresponds to `mask=0` with common scale factor
   - `per_oc` corresponds to `mask=1<<1` (i.e. output channels) with different scale factors
-
-*attr_str* is used for `--mode` C[orrectness] or P[erformance], not for T[est].
 
 Next, `post_ops` stands for post operation sequence. Currently supported post
 ops are:
@@ -139,65 +132,61 @@ table of modifiers below.
 
 | abbreviation  | description
 |:------------  |:-----------
-| \%d           | problem descriptor
-| \%D           | expanded problem descriptor (conv parameters in csv format)
-| \%n           | problem name
-| \%z           | direction
-| \%@F          | [\*] effective cpu frequency computed as clocks[@] / time[s]
-| \%O           | number of ops required (padding is not taken into account)
-| \%@t          | time in ms
-| \%@c          | [\*] time in ops
-| \%@p          | ops per second
-| \%i           | convolution implementation string
+| %d            | problem descriptor
+| %D            | expanded problem descriptor (conv parameters in csv format)
+| %n            | problem name
+| %z            | direction
+| %@F           | effective cpu frequency computed as clocks[@] / time[@]
+| %O            | number of ops required (padding is not taken into account)
+| %@t           | time in ms
+| %@c           | time in clocks
+| %@p           | ops per second
 
 | modifier  | description
 |:--------  |:-----------
 |           | default
-| -         | min (time) = default
+| -         | min (time) -- default
 | 0         | avg (time)
 | +         | max (time)
-| --------- | ----------
+|           |
 | K         | Kilo (1e3)
 | M         | Mega (1e6)
 | G         | Giga (1e9)
-
-[\*] (time stamp counter code may be disabled on some platforms)
 
 The definition of expanded problem descriptor is:
 `g,mb,ic,ih,iw,oc,oh,ow,kh,kw,sh,sw,ph,pw`.
 
 The default template can be found in conv/bench_conv.cpp that is defined as
-`perf,\%n,\%d,\%GO,\%GF,\%-t,\%-Gp,\%-t,\%-Gp,\%0t,%0Gp,\%i`. That will produce the following output
+`perf,%n,%d,%GO,%GF,%-t,%-Gp,%0t,%0Gp`. That will produce the following output
 in CSV format:
 ```
 string: perf
 convolution name
 full conv-desc
 number of giga ops calculated
-[\*] effective cpu frequency in GHz (amb clocks[min] / time[min])
+effective cpu frequency in GHz (amb clocks[min] / time[min])
 minimum time spent in ms
 best gigaops (since it corresponds to mimimum time)
 average time spent in ms
 average gigaops (since it corresponds to average time)
-convolution implementation name
 ```
 
 ## Examples
 
 Run the set of f32 forward convolutions from inputs/conv_all file w/ bias and default minibatch:
-```ShellSession
+```
     $ ./benchdnn --conv \
         --cfg=f32 --dir=FWD_B --batch=inputs/conv_all
 ```
 
 Run the same but with merged ReLU:
-```ShellSession
+```
     $ ./benchdnn --conv \
         --cfg=f32 --dir=FWD_B --merge=RELU --batch=inputs/conv_all
 ```
 
 Run the same as previous but also measure performance:
-```ShellSession
+```
     $ ./benchdnn --conv --mode=CORRnPERF \
         --cfg=f32 --dir=FWD_B --merge=RELU --batch=inputs/conv_all
 ```
@@ -206,14 +195,14 @@ Run the same as previous but also measure performance:
 
 Run a set of f32 backward convolutions wrt weights with kh=3 and
 verbose level set to 2:
-```ShellSession
+```
     $ ./benchdnn --conv -v2 \
         --cfg=f32 --dir=BWD_W --match='.*kh3[^0-9].*' --batch=inputs/conv_all
 ```
 
 Run a set of u8s8u8s32 backward convolutions wrt data but skip all
 the convolutions that will use reference or gemm-based implementation:
-```ShellSession
+```
     $ ./benchdnn --conv \
         --cfg=u8s8u8s32 --dir=BWD_B --skip-impl='ref:gemm' --batch=inputs/conv_all
 ```
@@ -221,44 +210,18 @@ the convolutions that will use reference or gemm-based implementation:
 Run explicitly specified 1st forward convolution (including bias) from Alexnet
 with the minibatch set to 4, verbose level set to 1 for two given
 configurations (`u8s8u8s32` and `f32`):
-```ShellSession
+```
     $ ./benchdnn --conv -v1 \
         --mb=4 --dir=FWD_B \
         --cfg=u8s8u8s32 ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_n"alexnet:conv1" \
         --cfg=f32 ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_n"alexnet:conv1"
 ```
 
-Run the 1st Alexnet convolution **comparing** all convolution
-**implementations** except for the reference one. `--mode`
-setting is for <b>A</b>ll <b>P</b>erformance. The spec was shortened
-because when height and width of things are equal, you only need to specify
-one of them.
-```ShellSession
-    $ ./benchdnn --conv --mode=AP \
-        --dir=FWD_D --skip-impl=ref ic3ih227_oc96oh55_kh11_sh4ph0_n"alexnet:conv1"
-```
-(On my desktop, the above yielded
-```Text linenos:false
-    benchdnn init ... omp_max_thr=12 OK
-
-    perf,alexnet:conv1,"--dir=FWD_D ic3ih227oc96oh55kh11sh4nalexnet:conv1",0.421661,0.814615,517.62,0.890699,473.404,"_jit_avx2_convolution_fwd_t"
-    perf,alexnet:conv1,"--dir=FWD_D ic3ih227oc96oh55kh11sh4nalexnet:conv1",0.421661,2.61064,161.516,2.85301,147.795,"_jit_sse42_convolution_fwd_t"
-    0:PASSED __REPRO: --dir=FWD_D ic3ih227oc96oh55kh11sh4nalexnet:conv1
-    tests:1 impls:3 passed:2 skipped:1 mistrusted:0 unimplemented:0 failed:0
-```
-- For this convolution, `avx2` was over 3x faster than the `sse2` (473 vs 148
-  Mops).  Prefacing the command with `OMP_NUM_THREADS=1`, I got 81 vs 27 Mops.
-- If you were to runn with `--mode=CAP`, the final output line should read
-  `correct:2` instead of `passed:2`.
-- If you were to run with `--mode=CAPT`, and you have defined reference loops other
-  than the normal ones in `benchdnn/conv/ref_conv.cpp`, then you *may* see lines like:
-  `TEST #1 ... time 471.092000 ms CORRECT`
-
 Run batch file for different algorithms (assuming the file only specifies
 convolutions and does not include harness options that would override ones
 passed in the command line). Also ignore mkldnn_unimplemented errors in case of
 Winograd:
-```ShellSession
+```
     $ ./benchdnn --conv \
         --alg=DIRECT --batch=convs.in \
         --allow-unimpl=true \
@@ -269,7 +232,7 @@ Run a set of u8s8u8s32 forward convolutions w/o bias, skipping
 reference implementations and not triggering unimplemented as an error, with
 one common output scale set to 0.5 with rounding mode set to down
 (via attributes):
-```ShellSession
+```
     $ ./benchdnn --conv \
         --cfg=u8s8u8s32 --dir=FWD_D --skip-impl="ref" --allow-unimpl=true \
         --attr="irmode=down;oscale=common:.5" --batch=inputs/conv_all
@@ -278,7 +241,7 @@ one common output scale set to 0.5 with rounding mode set to down
 Almost the same as above (with minor changes), but also add post operation
 sequence **(relu, then sum with scale .3, then relu)** using
 attributes/mkldnn_post_ops_t:
-```ShellSession
+```
     $ ./benchdnn --conv \
         --cfg=u8s8s32s32 --dir=FWD_B \
         --attr="oscale=common:.5;post_ops='relu;sum:.3;relu'" --batch=inputs/conv_all
@@ -295,54 +258,19 @@ attributes/mkldnn_post_ops_t:
 | dst           | Destination image (output image for forward convolution)
 | acc           | Accumulation (typically in terms of data type)
 | ic, oc        | Input/Output channels (aka feature maps)
-| id, ih, iw    | Input depth[1], height, width
-| od, oh, ow    | Output depth[1]height, width
-| kd, kh, kw    | Kernel (filter, weights) depth[1], height, width
-| sd, sh, sw    | Convolution stride over depth[1], height, width (stride&gt;=1)
-| pd, ph, pw	| Convolution top, left, near padding (0=none)
-| dd, dh, dw    | Dilation of image region covered by kernel (0 =&gt; x1)
+| ih, iw        | Input height and width
+| oh, ow        | Output height and width
+| kh, kw        | Kernel (filter, weights) height and width
+| sh, sw        | Convolution stride over height and width
+| ph, pw        | Convolution top and left padding
 | mb            | Minibatch (amount of images processed at once)
 | g             | Groups (a way to reduce the amount of computations, see Alexnet topology)
-| FWD\_{D,B}     | forward w/o and w/ bias
-| BWD\_{D,W,WB}  | backward wrt data, weights, and weights and bias
+| FWD_{D,B}     | forward w/o and w/ bias
+| BWD_{D,W,WB}  | backward wrt data, weights, and weights and bias
 | DIRECT, WINO  | convolution algorithm: direct or Winograd based
 | NONE, RELU    | merged primitives: nothing or ReLU
 
 
-## Performance testing
-
-A number of approaches to vectorizing and parallelizing the convolutions can be
-tested via --mode=PT (Performance Test).  The general approach was to replace
-conditional tests in inner loops with exactly calculated loop limits in a more
-outer loop.
-
-Condition <B>hoisting</B> was tricky for two reasons:
-
-- signed integer division in C rounds to zero, so just manipulating the
-  mathematical equations won't in general work.
-  - a set of round-to-negative-infinity routines ease developing a set
-    of mathematically correct hoists.
-- stride and dilation sometimes involves a modulo condition.
-  - this leads to a pair of linear Diophantine equations, whose efficient
-    solution involves running the extended Euclid algorithm.
-
-After hoisting with \c idiv.hpp division routines, one can derive alternative
-formulations that will work with signed/unsigned integers by keeping all
-intermediate quantities >= 1.  Then one can get *if* -based formulas that would
-also be valid for unsigned calculation, as well as begin able to use C
-integer division without problems with zero or negatives.  The *idiv*
-approach is actually pretty fast on Intel hardware since it produces
-branchless code (cmov) and is written to allow the compiler to use
-masking instructions for some other *if* statements.
-
-In coding for the SX chipset, the compiler needed much hand-holding, but the
-resulting benchdnn impls (for gnchw data format) also worked better than what
-I had arrived at for Intel.
-
-Todays Intel performance tests on 6-core avx2 yielded 100x speedup for a
-'minialex' test in FWD, but BWD\_D and BWD\_WB still lag at only 7-12x speedup.
-             
-    
 ## Usage (batch normalization harness)
 
 The usage:

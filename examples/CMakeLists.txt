@@ -14,10 +14,13 @@
 # limitations under the License.
 #===============================================================================
 
-option(WITH_EXAMPLE "include examples" ON)
 if (NOT WITH_EXAMPLE)
     return()
 endif()
+
+# propagate EXAMPLE specific flags
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_EXAMPLE_CCXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_EXAMPLE_CCXX_FLAGS}")
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
@@ -93,4 +96,14 @@ if (HAVE_MKL)
             simple-rnn-cpp.vcxproj.user @ONLY)
         set_property(TEST simple-rnn-cpp PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
     endif()
+endif()
+
+add_executable(simple-rnn-training-cpp simple_rnn_training.cpp)
+set_property(TARGET simple-rnn-training-cpp PROPERTY CXX_STANDARD 11)
+target_link_libraries(simple-rnn-training-cpp ${LIB_NAME})
+add_test(simple-rnn-training-cpp simple-rnn-training-cpp)
+if(WIN32)
+    configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
+        simple-rnn-training-cpp.vcxproj.user @ONLY)
+    set_property(TEST simple-rnn-training-cpp PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
 endif()

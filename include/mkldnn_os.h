@@ -20,22 +20,27 @@
 
 //#include "os_common.hpp" // not available -- we use mkldnn public API only.
 #if 1
-#if defined(SXAURORA)
+#if defined(__ve)
 #define strnlen strnlen_s
 #endif
 
 // How is the restrict keyword handled? (disallow it as you encounter errors, please)
-#if !defined(restrict)
 #if defined(_SX)
+
 #elif defined(__ve)
 // restrict is allowed
+#ifndef __restrict
+#define __restrict restrict /* ve/musl/include/stdlib.h uses __restrict !!! */
+#endif
+
 #elif defined(__INTEL_COMPILER) || defined(__GNUC__)
 #define restrict /*no-restrict*/
+
 #elif defined(WIN32)
 // ???
 #else
-#endif
-#endif
+// ???
+#endif // restrict keyword handling
 
 // Any restrictions on the alignas attribute?
 #ifdef __ve
@@ -90,7 +95,7 @@
 //
 // Oh! ALLOC_ON_VREG cannot "decay" into RETAIN, because syntax is different
 // -----------------------------------
-#define BENCHDNN_YPRAGMA(str) do{int ypr=str;}while(0);
+//#define BENCHDNN_YPRAGMA(str) do{int ypr=str;}while(0);
 #define BENCHDNN_MPRAGMA(str) _Pragma(str)
 #define BENCHDNN_STRINGIZE(...) #__VA_ARGS__
 #define PragmaQuote(...) BENCHDNN_MPRAGMA(BENCHDNN_STRINGIZE(__VA_ARGS__))
@@ -99,88 +104,115 @@
 // SX preprocessor generates _Pragma(XXX) and sxc++ might be ignoring
 //    *some*, based on failure to produce some warning messages.
 //#warning "SX optimization pragmas IN EFFECT"
-#define VREG(...) PragmaQuote(cdir vreg(__VA_ARGS__))
-#define ALLOC_ON_VREG(...) PragmaQuote(cdir alloc_on_vreg(__VA_ARGS__))
-#define ALLOC_ON_ADB(...) PragmaQuote(cdir alloc_on_adb(__VA_ARGS__))
+#   define VREG(...) PragmaQuote(cdir vreg(__VA_ARGS__))
+#   define ALLOC_ON_VREG(...) PragmaQuote(cdir alloc_on_vreg(__VA_ARGS__))
+#   define ALLOC_ON_ADB(...) PragmaQuote(cdir alloc_on_adb(__VA_ARGS__))
 // Is there a pre-for-loop RETAIN for SX? For now, kludge as on_adb.
-#define RETAIN(...) PragmaQuote(cdir on_adb(__VA_ARGS__))
-#define RETAIN1st(var,...) PragmaQuote(cdir on_adb(var))
-#define ShortLoop() _Pragma("cdir shortloop")
-#define ShortLoopTest() /*?*/
-#define IVDEP() _Pragma("cdir nodep")
-#define UNROLL(x)
+#   define RETAIN(...) PragmaQuote(cdir on_adb(__VA_ARGS__))
+#   define RETAIN1st(var,...) PragmaQuote(cdir on_adb(var))
+#   define ShortLoop() _Pragma("cdir shortloop")
+#   define ShortLoopTest() /*?*/
+#   define IVDEP() _Pragma("cdir nodep")
+#   define UNROLL(x)
 
 #elif ENABLE_OPT_PRAGMAS && defined(__ve)
-#warning "__ve optimization pragmas IN EFFECT"
-#define VREG(...) PragmaQuote(_NEC vreg(__VA_ARGS__))
-#define ALLOC_ON_VREG(...)
-#define ALLOC_ON_ADB(...)
-#define RETAIN(...) PragmaQuote(_NEC retain(__VA_ARGS__))
-#define RETAIN1st(var,...) PragmaQuote(_NEC retain(var))
-#define ShortLoop() _Pragma("_NEC shortloop")
-#define ShortLoopTest() _Pragma("_NEC shortloop_reduction")
-#define IVDEP() _Pragma("_NEC ivdep")
-#define UNROLL(x) PragmaQuote(_NEC unroll(x))
+//#   warning "__ve optimization pragmas IN EFFECT"
+#   define VREG(...) PragmaQuote(_NEC vreg(__VA_ARGS__))
+#   define ALLOC_ON_VREG(...)
+#   define ALLOC_ON_ADB(...)
+#   define RETAIN(...) PragmaQuote(_NEC retain(__VA_ARGS__))
+#   define RETAIN1st(var,...) PragmaQuote(_NEC retain(var))
+#   define ShortLoop() _Pragma("_NEC shortloop")
+#   define ShortLoopTest() _Pragma("_NEC shortloop_reduction")
+#   define IVDEP() _Pragma("_NEC ivdep")
+#   define UNROLL(x) PragmaQuote(_NEC unroll(x))
 
 #elif ENABLE_OPT_PRAGMAS && defined(__INTEL_COMPILER)
 // restrict keyword requires the "-restrict" CFLAG; __restrict__ works anyway
-#define restrict __restrict__
-#define IVDEP() _Pragma("ivdep")
-#define UNROLL(x) PragmaQuote(unroll(x))
-// TODO:
-#define VREG(...)
-#define ALLOC_ON_VREG(...)
-#define ALLOC_ON_ADB(...)
-#define RETAIN(...)
-#define ShortLoop()
-#define ShortLoopTest()
+#   define restrict __restrict__
+#   define IVDEP() _Pragma("ivdep")
+#   define UNROLL(x) PragmaQuote(unroll(x))
+//  TODO:
+#   define VREG(...)
+#   define ALLOC_ON_VREG(...)
+#   define ALLOC_ON_ADB(...)
+#   define RETAIN(...)
+#   define ShortLoop()
+#   define ShortLoopTest()
+
+#elif ENABLE_OPT_PRAGMAS && defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+//--------------------------------------------
+//  taken from MSVC code in mkldnn_thread.hpp
+//# warning "MSVC still supports omp 2.0 only"
+#   define collapse(x)
+//#  define PRAGMA_OMP_SIMD(...) ... below
+//--------------------------------------------
+#   define VREG(...)
+#   define ALLOC_ON_VREG(...)
+#   define ALLOC_ON_ADB(...)
+#   define RETAIN(...)
+#   define ShortLoop()
+#   define ShortLoopTest()
 
 #elif ENABLE_OPT_PRAGMAS && defined(__GNUC__)
 //#warning "__GNUC optimization pragmas IN EFFECT"
-#define VREG(...)
-#define ALLOC_ON_VREG(...)
-#define ALLOC_ON_ADB(...)
-#define RETAIN(...)
-#define ShortLoop()
-#define ShortLoopTest()
-#define IVDEP() _Pragma("GCC ivdep")
-#define UNROLL(x) PragmaQuote(GCC unroll x)
+#   define VREG(...)
+#   define ALLOC_ON_VREG(...)
+#   define ALLOC_ON_ADB(...)
+#   define RETAIN(...)
+#   define ShortLoop()
+#   define ShortLoopTest()
+#   define IVDEP() _Pragma("GCC ivdep")
+#   define UNROLL(x) PragmaQuote(GCC unroll x)
 
 #else /* A new system might begin by ignoring the optimization pragmas */
-#warning "Please check if _Pragma macros can be defined for this platorm"
-#define VREG(...)
-#define ALLOC_ON_VREG(...)
-#define ALLOC_ON_ADB(...)
-#define RETAIN(...)
-#define ShortLoop()
-#define ShortLoopTest()
-#define IVDEP()
-#define UNROLL(x)
+#   warning "Please check if _Pragma macros can be defined for this platorm"
+#   define VREG(...)
+#   define ALLOC_ON_VREG(...)
+#   define ALLOC_ON_ADB(...)
+#   define RETAIN(...)
+#   define ShortLoop()
+#   define ShortLoopTest()
+#   define IVDEP()
+#   define UNROLL(x)
 
 #endif
 
 
 #if ENABLE_OMP
-#define OMP(...) PragmaQuote(omp __VA_ARGS__)
-#if defined(__ve)
-#warning "__ve enabling #pragma omp"
+#   define OMP(...) PragmaQuote(omp __VA_ARGS__)
+#   if defined(__ve)
+#      warning "__ve enabling #pragma omp"
+#   endif
+#   if defined(_SX) // no support for "simd" pragmas
+#   elif defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+#   else // defined(__GNUC) or intel or ...
+#      if defined(__ve)
+#         warning "__ve enabling #pragma [omp] simd"
+#      endif
+#      define PRAGMASIMD(...) PragmaQuote(simd __VA_ARGS__)
+#      define OMPSIMD(...) PragmaQuote(omp simd __VA_ARGS__)
+#      ifndef PRAGMA_OMP_SIMD // original was in mkldnn_thread.hpp
+#         define PRAGMA_OMP_SIMD(...) PragmaQuote(omp simd __VA_ARGS__)
+#      endif
+#   endif
 #endif
-#if defined(_SX) // no support for "simd" pragmas
-#else // defined(__GNUC) or intel or ...
-#if defined(__ve)
-#warning "__ve enabling #pragma [omp] simd"
+
+#ifndef PRAGMASIMD
+#   define PRAGMASIMD(...)
 #endif
-#define PRAGMASIMD(...) PragmaQuote(simd __VA_ARGS__)
-#define OMPSIMD(...) PragmaQuote(omp simd __VA_ARGS__)
+#ifndef OMPSIMD
+#   define OMPSIMD(...)
 #endif
+#ifndef PRAGMA_OMP_SIMD
+#   define PRAGMA_OMP_SIMD(...)
 #endif
 
 #ifndef OMP
-#define OMP(...)
-#warning "not enabling #pragma omp"
+#   define OMP(...)
+#if defined(REF_LRN_HPP) // mostly ignore: show for cpu_engine compile at least
+#   warning "not enabling #pragma omp (mkldnn_os.h)"
 #endif
-#ifndef OMPSIMD
-#define OMPSIMD(...)
 #endif
 
 #endif // _MKLDNN_OS_H_

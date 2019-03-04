@@ -28,22 +28,27 @@
 
 #include "cpu/gemm_convolution.hpp"
 #include "cpu/gemm_u8s8s32x_convolution.hpp"
-#include "cpu/ref_convolution_3d.hpp"
+//#include "cpu/ref_convolution_3d.hpp"
 #include "cpu/ref_convolution.hpp"
 #include "cpu/ref_deconvolution.hpp"
 #include "cpu/ref_eltwise.hpp"
 #include "cpu/ref_softmax.hpp"
 #include "cpu/ref_pooling.hpp"
 #include "cpu/nchw_pooling.hpp"
+#include "cpu/nhwc_pooling.hpp"
 #include "cpu/ref_lrn.hpp"
 #include "cpu/ref_batch_normalization.hpp"
+#include "cpu/ncsp_batch_normalization.hpp"
+#include "cpu/nspc_batch_normalization.hpp"
 #include "cpu/ref_inner_product.hpp"
 #include "cpu/gemm_inner_product.hpp"
+#include "cpu/gemm_u8s8s32x_inner_product.hpp"
 
 #if JITFUNCS > 0
-#warning "including jit headers..."
+//#warning "including jit headers..."
 #include "cpu/jit_avx512_core_u8s8s32x_1x1_convolution.hpp"
 #include "cpu/jit_avx512_common_1x1_convolution.hpp"
+#include "cpu/jit_avx512_core_fp32_wino_conv_4x3.hpp"
 #include "cpu/jit_avx512_common_convolution_winograd.hpp"
 #include "cpu/jit_avx512_core_u8s8s32x_convolution.hpp"
 #include "cpu/jit_avx512_common_convolution.hpp"
@@ -57,8 +62,15 @@
 #include "cpu/jit_avx512_common_lrn.hpp"
 #include "cpu/jit_uni_lrn.hpp"
 #include "cpu/jit_uni_batch_normalization.hpp"
-#include "cpu/jit_uni_inner_product.hpp"
+//#include "cpu/jit_uni_inner_product.hpp"
 #include "cpu/jit_uni_dw_convolution.hpp"
+#include "cpu/jit_uni_dw_convolution.hpp"
+#include "cpu/jit_avx512_core_u8s8s32x_wino_convolution.hpp"
+#include "cpu/jit_avx512_core_fp32_wino_conv_2x3.hpp"
+#endif
+
+#if VEJIT > 0
+#include "vanilla/vednnx_convolution.hpp"
 #endif
 
 namespace mkldnn {
@@ -77,10 +89,12 @@ status_t cpu_engine_t::view_primitive_desc_create(view_pd_t **view_pd,
             const memory_pd_t *memory_pd, const dims_t dims,
             const dims_t offsets) {
     assert(memory_pd->engine() == this);
-    auto mpd = (const cpu_memory_t::pd_t *)memory_pd;
-    /* FIXME: what if failed? */
-    return safe_ptr_assign<view_pd_t>(*view_pd,
-            new cpu_view_t::pd_t(this, mpd, dims, offsets));
+    cpu_view_t::pd_t *cpu_vpd = nullptr;
+    status_t status = cpu_view_t::pd_t::create(&cpu_vpd,
+            (const cpu_memory_t::pd_t *)memory_pd, dims, offsets);
+    if (status != success) return status;
+    *view_pd = cpu_vpd;
+    return success;
 }
 
 using pd_create_f = mkldnn::impl::engine_t::primitive_desc_create_f;
@@ -96,7 +110,10 @@ using namespace mkldnn::impl::data_type;
  * 2. Set VERBOSE_PRIMITIVE_CREATE to print the names of created primitives.
  */
 #if VERBOSE_PRIMITIVE_CREATE
-/** A verbose version of primitive_desc_t::create<pd_t>. \sa primitive_desc.hpp */
+/** A verbose version of primitive_desc_t::create<pd_t>. \sa primitive_desc.hpp.
+ * Note: now you can also just call mkldnn_verbose_set(2) in cpu_engine constructor (or so),
+ *       and get more detailed info about execution and construction.
+ * So the only real use of this is to track failed/successful creations (and not the executions) */
 template<typename prim>
 #if !defined(_SX)
 static
@@ -109,14 +126,48 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
     const mkldnn::impl::primitive_desc_t *hint_fwd)
 {
     using namespace std;
+    using namespace mkldnn::impl;
+    using namespace mkldnn::impl::status;
     typedef typename prim::pd_t pd_t;
-    mkldnn::impl::status_t ret = primitive_desc_t::create<pd_t>( pd, adesc,
-            attr, engine, hint_fwd );
-    if( ret == success )
-        printf(" create<%s>::pd_t(pd,adesc,engine,hint_fwd) --> %d\n",
-                (*pd)->name(), ret );
+    auto const ret = primitive_desc_t::create<pd_t>( pd, adesc, attr, engine,
+            hint_fwd );
+    if( ret == success ) {
+        // actually the new 'info' call has it all..
+        printf(" prim %s\n", (*pd)->info());
+        //printf(" created descriptor %s name %s\n\t%s\n",
+        //        mkldnn_prim_kind2str(adesc->kind), (*pd)->name(),
+        //        (*pd)->info());
+        // above line better; older mkl-dnn used mkldnn_primitive_desc_query
+        //char const* result;
+        //mkldnn_primitive_desc_query( *pd, mkldnn_query_impl_info_str, 0, &result );
+        //printf(" created descriptor %s\n", result);
+        //fflush(stdout);
+    }else if(ret == unimplemented && /*opt.*/ adesc->kind == pd_t::base_pkind){
+        printf(" skip-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
+        // partially construct (no init(), no init_info()) to get the name()
+        //     This allows printing right-kind-but-skipped messages
+        //                      [see src/common/primitive_desc.hpp]
+        // TODO: primitive_desc.hpp can return an optional const char* name()
+        //       result, sometimes, even if the full construction failed.
+        //    Q: Is prop_kind a universal attribute of all prim? Probably not.
+        using pd_op_desc_t = typename pkind_traits<pd_t::base_pkind>::desc_type;
+        auto _pd = new pd_t(engine, (const pd_op_desc_t *)adesc, attr,
+            reinterpret_cast<const typename pd_t::hint_class *> (hint_fwd));
+        if (_pd != nullptr){ // get the 'name()' ~ short impl_name string
+            char const* name = _pd->name();
+            printf(":%s", name);
+            delete _pd;
+        }
+        printf("\n"); fflush(stdout);
+    }else{
+        // printing wrong-kind msg not too interesting [and lengthy]
+        //printf(" no-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
+    }
     return ret;
 }
+// unfortunately, a one-liner as follows would create a temporary...
+//#define INSTANCE_CREATOR(...) WrapCreate(verbose_primitive_desc_create<__VA_ARGS__>, #__VA_ARGS__)
+// so we "lose" the asked for name ...
 #define INSTANCE_CREATOR(...) verbose_primitive_desc_create<__VA_ARGS__>
 #else
 #define INSTANCE_CREATOR(...) primitive_desc_t::create<__VA_ARGS__::pd_t>
@@ -125,9 +176,9 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
 
 #if JITFUNCS >= JITFUNCS_AVX512
 #define INSTANCE_avx512(...) &INSTANCE_CREATOR(__VA_ARGS__),
-#warning "jit avx512 YES"
+//#warning "jit avx512 YES"
 #else
-#warning "INSTANCE_avx512 is NO-OP"
+//#warning "INSTANCE_avx512 is NO-OP"
 #define INSTANCE_avx512(...) /* placeholder "non-null ptr-to-never-impl here?" */
 #endif
 
@@ -137,10 +188,22 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
 #define INSTANCE_avx2(...) /* placeholder "non-null ptr-to-never-impl here?" */
 #endif
 
+#if JITFUNCS >= JITFUNCS_AVX
+#define INSTANCE_avx(...) &INSTANCE_CREATOR(__VA_ARGS__),
+#else
+#define INSTANCE_avx(...) /* placeholder "non-null ptr-to-never-impl here?" */
+#endif
+
 #if JITFUNCS >= JITFUNCS_SSE42
 #define INSTANCE_sse42(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
 #define INSTANCE_sse42(...) /* placeholder "non-null ptr-to-never-impl here?" */
+#endif
+
+#if VEJIT > 0
+#define INSTANCE_ve(...) &INSTANCE_CREATOR(__VA_ARGS__),
+#else
+#define INSTANCE_ve(...) /* placeholder "non-null ptr-to-never-impl here?" */
 #endif
 
 // JITFUNCS >= JIT_FUNCS_ANY (always include this impl)
@@ -151,16 +214,6 @@ static const pd_create_f cpu_impl_list[] = {
     /* RNN */
     INSTANCE(ref_rnn_fwd_t)
     INSTANCE(ref_rnn_bwd_t)
-    /* conv 3d */
-    INSTANCE(ref_convolution_3d_fwd_t<f32>)
-    INSTANCE(ref_convolution_3d_fwd_t<s16,s16, s32, s32>)
-    INSTANCE(ref_convolution_3d_fwd_t<u8, s8, s32, s32>)
-    INSTANCE(ref_convolution_3d_fwd_t<u8, s8, s8, s32>)
-    INSTANCE(ref_convolution_3d_fwd_t<u8, s8, u8, s32>)
-    INSTANCE(ref_convolution_3d_bwd_data_t<f32, f32, f32, f32>)
-    INSTANCE(ref_convolution_3d_bwd_data_t<s32, s16, s16, s32>)
-    INSTANCE(ref_convolution_3d_bwd_weights_t<f32, f32, f32, f32>)
-    INSTANCE(ref_convolution_3d_bwd_weights_t<s16, s32, s16, s32>)
     /* conv */
     INSTANCE_avx512(jit_avx512_common_dw_convolution_fwd_t)
     INSTANCE_avx512(jit_avx512_common_dw_convolution_bwd_data_t)
@@ -169,18 +222,21 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE_avx512(jit_avx512_common_1x1_convolution_bwd_weights_t)
     INSTANCE_avx512(jit_avx512_common_1x1_convolution_fwd_s16s16s32_t)
     INSTANCE_avx512(jit_avx512_common_1x1_convolution_bwd_data_s16s16s32_t)
+    INSTANCE_avx512(jit_avx512_core_fp32_wino_conv_2x3_fwd_t)
+    INSTANCE_avx512(jit_avx512_core_fp32_wino_conv_4x3_fwd_t)
+    INSTANCE_avx512(jit_avx512_core_fp32_wino_conv_4x3_bwd_data_t)
+    INSTANCE_avx512(jit_avx512_core_fp32_wino_conv_4x3_bwd_weights_t)
     INSTANCE_avx512(jit_avx512_common_convolution_winograd_fwd_t)
     INSTANCE_avx512(jit_avx512_common_convolution_winograd_bwd_data_t)
     INSTANCE_avx512(jit_avx512_common_convolution_winograd_bwd_weights_t)
     INSTANCE_avx512(jit_avx512_common_convolution_fwd_t<f32>)
-    //INSTANCE_avx512(_jit_avx512_core_u8s8s32x_convolution_fwd_t<false, f32>)
     INSTANCE_avx512(jit_avx512_common_convolution_bwd_data_t<f32>)
     INSTANCE_avx512(jit_avx512_common_convolution_bwd_weights_t<f32>)
-    INSTANCE_avx512(jit_avx2_dw_convolution_fwd_t)
-    INSTANCE_avx512(jit_avx2_dw_convolution_bwd_data_t)
-    INSTANCE_avx512(jit_avx2_1x1_convolution_fwd_t)
-    INSTANCE_avx512(jit_avx2_1x1_convolution_bwd_data_t)
-    INSTANCE_avx512(jit_avx2_1x1_convolution_bwd_weights_t)
+    INSTANCE_avx2(jit_avx2_dw_convolution_fwd_t)
+    INSTANCE_avx2(jit_avx2_dw_convolution_bwd_data_t)
+    INSTANCE_avx2(jit_avx2_1x1_convolution_fwd_t)
+    INSTANCE_avx2(jit_avx2_1x1_convolution_bwd_data_t)
+    INSTANCE_avx2(jit_avx2_1x1_convolution_bwd_weights_t)
     INSTANCE_sse42(jit_sse42_dw_convolution_fwd_t)
     INSTANCE_sse42(jit_sse42_dw_convolution_bwd_data_t)
     INSTANCE_sse42(jit_sse42_1x1_convolution_fwd_t)
@@ -188,19 +244,20 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE_avx2(jit_avx2_convolution_bwd_data_t)
     INSTANCE_avx2(jit_avx2_convolution_bwd_weights_t)
     INSTANCE_sse42(jit_sse42_convolution_fwd_t)
-    INSTANCE(mkl_gemm_convolution_fwd_t)
-    INSTANCE(mkl_gemm_convolution_bwd_data_t)
-    INSTANCE(mkl_gemm_convolution_bwd_weights_t)
-    INSTANCE_avx512(jit_avx512_common_gemm_convolution_fwd_t)
-    INSTANCE_avx512(jit_avx512_common_gemm_convolution_bwd_data_t)
-    INSTANCE_avx512(jit_avx512_common_gemm_convolution_bwd_weights_t)
-    INSTANCE_avx2(jit_avx2_gemm_convolution_fwd_t)
-    INSTANCE_avx2(jit_avx2_gemm_convolution_bwd_data_t)
-    INSTANCE_avx2(jit_avx2_gemm_convolution_bwd_weights_t)
+    INSTANCE_ve(vednnx_convolution_fwd_t)
+    INSTANCE_ve(vednnx_convolution_bwd_data_t)
+    INSTANCE_ve(vednnx_convolution_bwd_weights_t)
+    INSTANCE(gemm_convolution_fwd_t)
+    INSTANCE(gemm_convolution_bwd_data_t)
+    INSTANCE(gemm_convolution_bwd_weights_t)
     INSTANCE(ref_convolution_fwd_t<f32>)
     INSTANCE(ref_convolution_bwd_data_t<f32, f32, f32, f32>)
     INSTANCE(ref_convolution_bwd_weights_t<f32, f32, f32, f32>)
     /* conv (int) */
+    INSTANCE_avx512(jit_avx512_core_u8s8s32x_wino_convolution_fwd_t<f32>)
+    INSTANCE_avx512(jit_avx512_core_u8s8s32x_wino_convolution_fwd_t<s32>)
+    INSTANCE_avx512(jit_avx512_core_u8s8s32x_wino_convolution_fwd_t<s8>)
+    INSTANCE_avx512(jit_avx512_core_u8s8s32x_wino_convolution_fwd_t<u8>)
     INSTANCE_avx512(jit_avx512_common_convolution_fwd_t<s16, s16, s32>)
     INSTANCE_avx512(jit_avx512_core_u8s8s32x_1x1_convolution_fwd_t<f32>)
     INSTANCE_avx512(jit_avx512_core_u8s8s32x_1x1_convolution_fwd_t<s32>)
@@ -216,43 +273,55 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(_gemm_u8s8s32x_convolution_fwd_t<false, u8>)
     INSTANCE(_gemm_u8s8s32x_convolution_fwd_t<false, s8>)
     INSTANCE(_gemm_u8s8s32x_convolution_fwd_t<false, f32>)
-    INSTANCE(ref_convolution_fwd_t<s16,s16, s32, s32>)
+    INSTANCE(_gemm_u8s8s32x_convolution_bwd_data_t<s32>)
+    INSTANCE(_gemm_u8s8s32x_convolution_bwd_data_t<u8>)
+    INSTANCE(_gemm_u8s8s32x_convolution_bwd_data_t<s8>)
+    INSTANCE(_gemm_u8s8s32x_convolution_bwd_data_t<f32>)
+    INSTANCE(ref_convolution_fwd_t<s16, s16, s32, s32>)
+    INSTANCE(ref_convolution_fwd_t<u8, s8, f32, s32>)
     INSTANCE(ref_convolution_fwd_t<u8, s8, s32, s32>)
     INSTANCE(ref_convolution_fwd_t<u8, s8, s8, s32>)
     INSTANCE(ref_convolution_fwd_t<u8, s8, u8, s32>)
     INSTANCE(ref_convolution_bwd_data_t<s32, s16, s16, s32>)
+    INSTANCE(ref_convolution_bwd_data_t<f32, s8, u8, s32>)
+    INSTANCE(ref_convolution_bwd_data_t<s32, s8, u8, s32>)
+    INSTANCE(ref_convolution_bwd_data_t<s8, s8, u8, s32>)
+    INSTANCE(ref_convolution_bwd_data_t<u8, s8, u8, s32>)
     INSTANCE(ref_convolution_bwd_weights_t<s16, s32, s16, s32>)
     /* deconv */
     INSTANCE(ref_deconvolution_bwd_weights_t)
     INSTANCE(ref_deconvolution_bwd_data_t)
     INSTANCE(ref_deconvolution_fwd_t)
     /* eltwise */
-    INSTANCE_avx512(jit_uni_eltwise_fwd_t<avx512_common>)
-    INSTANCE_avx512(jit_uni_eltwise_bwd_t<avx512_common>)
-    INSTANCE_avx2(jit_uni_eltwise_fwd_t<avx2>)
-    INSTANCE_avx2(jit_uni_eltwise_bwd_t<avx2>)
-    INSTANCE_sse42(jit_uni_eltwise_fwd_t<sse42>)
-    INSTANCE_sse42(jit_uni_eltwise_bwd_t<sse42>)
+    //INSTANCE_avx512(jit_uni_eltwise_fwd_t<avx512_common>)
+    //INSTANCE_avx512(jit_uni_eltwise_bwd_t<avx512_common>)
+    //INSTANCE_avx2(jit_uni_eltwise_fwd_t<avx2>)
+    //INSTANCE_avx2(jit_uni_eltwise_bwd_t<avx2>)
+    //INSTANCE_sse42(jit_uni_eltwise_fwd_t<sse42>)
+    //INSTANCE_sse42(jit_uni_eltwise_bwd_t<sse42>)
     INSTANCE(ref_eltwise_fwd_t<f32>)
     INSTANCE(ref_eltwise_bwd_t<f32>)
     /* eltwise (int) */
-    INSTANCE(ref_eltwise_fwd_t<s32>)
-    INSTANCE(ref_eltwise_fwd_t<s16>)
-    INSTANCE(ref_eltwise_fwd_t<s8>)
-    INSTANCE(ref_eltwise_fwd_t<u8>)
-    INSTANCE(ref_eltwise_bwd_t<s32>)
-    INSTANCE(ref_eltwise_bwd_t<s16>)
+    //INSTANCE(ref_eltwise_fwd_t<s32>)
+    //INSTANCE(ref_eltwise_fwd_t<s16>)
+    //INSTANCE(ref_eltwise_fwd_t<s8>)
+    //INSTANCE(ref_eltwise_fwd_t<u8>)
+    //INSTANCE(ref_eltwise_bwd_t<s32>)
+    //INSTANCE(ref_eltwise_bwd_t<s16>)
     /* softmax */
     INSTANCE(ref_softmax_fwd_t<f32>)
+    INSTANCE(ref_softmax_bwd_t<f32>)
     /* pool */
     INSTANCE_avx512(jit_uni_pooling_fwd_t<avx512_common>)
     INSTANCE_avx512(jit_uni_pooling_bwd_t<avx512_common>)
-    INSTANCE_avx2(jit_uni_pooling_fwd_t<avx2>)
-    INSTANCE_avx2(jit_uni_pooling_bwd_t<avx2>)
+    INSTANCE_avx(jit_uni_pooling_fwd_t<avx>)
+    INSTANCE_avx(jit_uni_pooling_bwd_t<avx>)
     INSTANCE_sse42(jit_uni_pooling_fwd_t<sse42>)
     INSTANCE_sse42(jit_uni_pooling_bwd_t<sse42>)
     INSTANCE(nchw_pooling_fwd_t<f32>)
     INSTANCE(nchw_pooling_bwd_t<f32>)
+    INSTANCE(nhwc_pooling_fwd_t<f32>)
+    INSTANCE(nhwc_pooling_bwd_t<f32>)
     INSTANCE(ref_pooling_fwd_t<f32>)
     INSTANCE(ref_pooling_bwd_t<f32>)
     /* pool (int) */
@@ -276,26 +345,36 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE_avx512(jit_uni_batch_normalization_bwd_t<avx512_common>)
     INSTANCE_avx2(jit_uni_batch_normalization_fwd_t<avx2>)
     INSTANCE_avx2(jit_uni_batch_normalization_bwd_t<avx2>)
-    INSTANCE_sse42(jit_uni_batch_normalization_fwd_t<sse42>) /* bwd not there */
+    INSTANCE_sse42(jit_uni_batch_normalization_fwd_t<sse42>)
+    INSTANCE_sse42(jit_uni_batch_normalization_bwd_t<sse42>)
+    INSTANCE(ncsp_batch_normalization_fwd_t)
+    INSTANCE(ncsp_batch_normalization_bwd_t)
+    INSTANCE(nspc_batch_normalization_fwd_t)
+    INSTANCE(nspc_batch_normalization_bwd_t)
     INSTANCE(ref_batch_normalization_fwd_t<f32>)
     INSTANCE(ref_batch_normalization_bwd_t<f32>)
     /* inner product */
+#if 1 // debugging...
     INSTANCE(gemm_inner_product_fwd_t<f32>)
     INSTANCE(gemm_inner_product_bwd_data_t<f32>)
     INSTANCE(gemm_inner_product_bwd_weights_t<f32>)
-    INSTANCE_avx512(jit_uni_inner_product_fwd_t<avx512_common>)
-    INSTANCE_avx512(jit_uni_inner_product_bwd_weights_t<avx512_common>)
-    INSTANCE_avx512(jit_uni_inner_product_bwd_data_t<avx512_common>)
-    INSTANCE_avx2(jit_uni_inner_product_fwd_t<avx2>)
-    INSTANCE_avx2(jit_uni_inner_product_bwd_weights_t<avx2>)
-    INSTANCE_avx2(jit_uni_inner_product_bwd_data_t<avx2>)
+#endif
     INSTANCE(ref_inner_product_fwd_t<f32>)
     INSTANCE(ref_inner_product_bwd_data_t<f32, f32, f32, f32>)
     INSTANCE(ref_inner_product_bwd_weights_t<f32>)
+#if 1
     /* inner product (int) */
+    INSTANCE(gemm_u8s8s32x_inner_product_fwd_t<u8>)
+    INSTANCE(gemm_u8s8s32x_inner_product_fwd_t<s8>)
+    INSTANCE(gemm_u8s8s32x_inner_product_fwd_t<s32>)
+    INSTANCE(gemm_u8s8s32x_inner_product_fwd_t<f32>)
+    INSTANCE(ref_inner_product_fwd_t<u8, s8, u8, s32>)
+    INSTANCE(ref_inner_product_fwd_t<u8, s8, s8, s32>)
+    INSTANCE(ref_inner_product_fwd_t<u8, s8, s32, s32>)
+    INSTANCE(ref_inner_product_fwd_t<u8, s8, f32, s32>)
     INSTANCE(ref_inner_product_fwd_t<s16, s16, s32, s32>)
     INSTANCE(ref_inner_product_bwd_data_t<s32, s16, s16, s32>)
-    INSTANCE(ref_inner_product_fwd_t<u8, s8, u8, s32>)
+#endif
     /* conv_eltwise */
     INSTANCE_avx512(jit_avx512_common_dw_convolution_relu_t)
     INSTANCE_avx512(jit_avx512_common_convolution_winograd_relu_t)
@@ -307,11 +386,13 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE_sse42(jit_sse42_1x1_convolution_relu_t)
     INSTANCE_avx2(jit_avx2_convolution_relu_t)
     INSTANCE_sse42(jit_sse42_convolution_relu_t)
-    INSTANCE(mkl_gemm_convolution_relu_t)
-    INSTANCE_avx512(jit_avx512_common_gemm_convolution_relu_t)
-    INSTANCE_avx2(jit_avx2_gemm_convolution_relu_t)
+    INSTANCE(gemm_convolution_relu_t)
     INSTANCE(ref_convolution_relu_t<f32>)
     /* conv_eltwise (int) */
+    INSTANCE_avx512(jit_avx512_core_u8s8s32x_wino_convolution_relu_t<f32>)
+    INSTANCE_avx512(jit_avx512_core_u8s8s32x_wino_convolution_relu_t<s32>)
+    INSTANCE_avx512(jit_avx512_core_u8s8s32x_wino_convolution_relu_t<s8>)
+    INSTANCE_avx512(jit_avx512_core_u8s8s32x_wino_convolution_relu_t<u8>)
     INSTANCE_avx512(jit_avx512_common_1x1_convolution_relu_s16s16s32_t)
     INSTANCE_avx512(jit_avx512_common_convolution_relu_t<s16, s16, s32>)
     INSTANCE_avx512(jit_avx512_core_u8s8s32x_1x1_convolution_relu_t<f32>)

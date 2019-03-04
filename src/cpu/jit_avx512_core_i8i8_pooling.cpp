@@ -167,7 +167,7 @@ void jit_avx512_core_i8i8_pool_fwd_ker_t::load_src(int jj, int ll, int c_tail) {
                             vpmovzxbd(vreg_src_s32(jj, ll) | mask(ll),
                                     ptr[aux_reg_src_w + offset]);
                             break;
-                        default: assert(!"unsopported src data type");
+                        default: assert(!"unsupported src data type");
                     }
                 }
             } else {
@@ -184,7 +184,7 @@ void jit_avx512_core_i8i8_pool_fwd_ker_t::load_src(int jj, int ll, int c_tail) {
                         vpmovzxbd(vreg_src_s32(jj, ll),
                                 ptr[aux_reg_src_w + offset]);
                         break;
-                    default: assert(!"unsopported src data type");
+                    default: assert(!"unsupported src data type");
                 }
             }
             break;
@@ -286,7 +286,12 @@ void jit_avx512_core_i8i8_pool_fwd_ker_t::compute_max_step(int ur_c, int c_tail)
                     vpblendmd(vreg_dst(jj) | k_cmp_mask, vreg_dst(jj),
                             vreg_src(jj));
                 } else {
-                    vpcmpb(k_cmp_mask, vreg_dst(jj), vreg_src(jj), _cmp_lt_os);
+                    if (jpp.src_dt == data_type::s8)
+                        vpcmpb(k_cmp_mask, vreg_dst(jj), vreg_src(jj),
+                                _cmp_lt_os);
+                    else
+                        vpcmpub(k_cmp_mask, vreg_dst(jj), vreg_src(jj),
+                                _cmp_lt_os);
                     vpblendmb(vreg_dst(jj) | k_cmp_mask, vreg_dst(jj),
                             vreg_src(jj));
                 }
@@ -555,7 +560,7 @@ void jit_avx512_core_i8i8_pooling_fwd_t::execute_forward() {
         int n{0}, oh{0}, ow{0};
         nd_iterator_init(start, n, jpp.mb, oh, jpp.oh, ow, jpp.ow);
 
-        jit_avx512_core_i8i8_pool_fwd_ker_t::call_params_t p = {};
+        auto p = jit_avx512_core_i8i8_pool_fwd_ker_t::call_params_t();
 
         for (int iwork = start; iwork < end; ++iwork) {
             const int ih = nstl::max(oh*jpp.stride_h - jpp.t_pad, 0);

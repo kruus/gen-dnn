@@ -40,7 +40,7 @@ merge_t merge = NONE;
 attr_t attr;
 const char *skip_impl = "";
 bool allow_unimpl = false;
-const char *perf_template = "perf,%n,%d,%GO,%GF,%-t,%-Gp,%0t,%0Gp,%i";
+const char *perf_template = "perf,%n,%d,%GO,%GF,%-t,%-Gp,%0t,%0Gp";
 
 void reset_parameters() {
     cfg = conf_f32;
@@ -54,18 +54,6 @@ void reset_parameters() {
     allow_unimpl = false;
 }
 
-static bool check_mkldnn_support( const prb_t *p, res_t *res ) {
-    char const *errmsg = nullptr;
-    // v0.11 mkl-dnn did not support dilates
-    if (errmsg != nullptr){
-        printf("\nUNTESTABLE: mkl-dnn probably doesn't handle this case yet\n"
-               "          %s\n", errmsg);
-        auto &bs = benchdnn_stat;
-        res->state = SKIPPED;
-        ++bs.skipped;
-    }
-    return errmsg == nullptr;
-}
 void check_correctness(const desc_t *c) {
     const prb_t p(*c, dir, cfg, alg, merge, attr, mb);
     char pstr[max_prb_len];
@@ -76,23 +64,17 @@ void check_correctness(const desc_t *c) {
     print(1, "run: %s\n", pstr);
 
     res_t res{};
-    // Nicely avoid unsupported things:
-    const bool mkldnn_ok = check_mkldnn_support(&p, &res);
-    int status = (mkldnn_ok? deconv::doit(&p, &res): OK); // <-- run benchmark
-    RT_ASSERT( status == OK || status == FAIL );
+    const int status = doit(&p, &res);
+    (void)status;
 
-    bool want_perf_report = (bench_mode & PERF);
+    bool want_perf_report = false;
 
     parse_result(res, want_perf_report, allow_unimpl, status, pstr);
 
-    // perf is report PER IMPL (in case we want to compare ALL impls)
-    //if (want_perf_report && bench_mode & PERF)
-    //    perf_report(&p, &res, pstr, impl); // where do I get impl str?
+    if (want_perf_report && bench_mode & PERF)
+        perf_report(&p, &res, pstr);
 
     benchdnn_stat.tests++;
-    if(mkldnn_ok && (bench_mode & TEST) && benchdnn_stat.ts){
-        benchdnn_stat.ts->prt();
-    }
 }
 
 int bench(int argc, char **argv, bool main_bench) {

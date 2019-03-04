@@ -31,7 +31,4 @@ TEST_P(convolution_test, TestConvolution)
 #define DIRECTION_FORWARD
 #include "convolution_common.h"
 
-#undef NEGATIVE_SLOPE
-#define NEGATIVE_SLOPE 0.2f
-#include "convolution_common.h"
 }

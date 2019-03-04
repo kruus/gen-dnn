@@ -52,7 +52,7 @@ endif()
 
 set(PROJECT_NAME "GEN-DNN generic MKL-DNN)")
 set(PROJECT_FULL_NAME "Generic (Intel(R) MKL-DNN)")
-set(PROJECT_VERSION "0.13")
+set(PROJECT_VERSION "0.16")
 
 set(LIB_NAME mkldnn)
 
@@ -72,57 +72,17 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
 
+set(CMAKE_SRC_CCXX_FLAGS)       # SRC specifics
+set(CMAKE_EXAMPLE_CCXX_FLAGS)   # EXAMPLE specifics
+set(CMAKE_TEST_CCXX_FLAGS)      # TESTS specifics
 
-####################################
-# [ejk] support a TARGET_VANILLA **alternative** to src/cpu/ 
-include(CMakeDependentOption)
-# The following did not work as expected:
-#CMAKE_DEPENDENT_OPTION(TARGET_VANILLA "Use only pure C/C++ source_code, no JIT assembler" OFF
-#    "NECVE OR NECSX" ON)
-# Here's what I expected:
-if(NECVE OR NECSX)
-    set(TARGET_VANILLA ON) # no option here
-else()
-    option(TARGET_VANILLA "Use only pure C/C++ source_code, no JIT assembler" OFF)
-endif()
-# NECVE: OpenMP support is rumored to be here, but experience suggests otherwise :0
-#CMAKE_DEPENDENT_OPTION(USE_OPENMP "Use OpenMP?" ON
-#                                        "NECVE" OFF)
-#CMAKE_DEPENDENT_OPTION(USE_SHAREDLIB "Use shared libs?" ON   # libmkldnn.so
-#                                                "NECVE" OFF) # libmkldnn.a
-if(NECVE)
-    option(USE_OPENMP "Use OpenMP (#pragma omp)?" OFF)
-    option(USE_SHAREDLIB "Use shared libs?" OFF)   # libmkldnn.a preferred
-else()
-    option(USE_OPENMP "Use OpenMP (#pragma omp)?" ON)
-    option(USE_SHAREDLIB "Use shared libs?" ON)   # libmkldnn.so
-endif()
-# These options can be overridden from the cmake command line
-if(TARGET_VANILLA)
-    set(TARGET_VANILLA ON)
-    set(TARGET_JIT OFF)
-    set(TARGET_DEFS "-DTARGET_VANILLA ${TARGET_DEFS}")
-else()
-    set(TARGET_JIT ON)
-    set(TARGET_VANILLA OFF)
-endif()
-if(TARGET_VANILLA)
-    set(CPU_DIR vanilla)
-else()
-    set(CPU_DIR cpu)
-endif()
-MESSAGE(STATUS "NECVE: ${NECVE}    NECSX: ${NECSX}   TARGET_JIT: ${TARGET_JIT}")
-message(STATUS "-DTARGET_VANILLA=${TARGET_VANILLA} -DUSE_OPENMP=${USE_OPENMP} -DUSE_SHAREDLIB=${USE_SHAREDLIB}")
-#if(NECVE)
-#    show_cmake_stuff("Initial setup completed ...")
-#endif()
-####################################
-
+include("cmake/options.cmake")
 include("cmake/platform.cmake")
 include("cmake/asm.cmake")
 if(TRUE AND NECVE)
     set(CMAKE_THREAD_PREFER_PTHREAD 1)
     set(THREADS_PREFER_PTHREAD_FLAG 1)
+    set(Threads_FIND_QUIETLY FALSE)
     find_package(Threads REQUIRED)
 endif()
 include("cmake/MKL.cmake")

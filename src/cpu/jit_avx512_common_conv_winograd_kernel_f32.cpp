@@ -342,15 +342,13 @@ void _jit_avx512_common_conv_winograd_data_kernel_f32::gemm_loop_generate(
     };
 
     /* Preamble */
-    // register used to handle long fma encoding
-    push(reg_EVEX_max_8b_offt);
-    mov(reg_EVEX_max_8b_offt, 2 * EVEX_max_8b_offt);
+    preamble();
 
     /* kernel */
     inner_loops();
 
     /* Postamble */
-    pop(reg_EVEX_max_8b_offt);
+    postamble();
     ret();
 }
 
@@ -374,6 +372,7 @@ status_t _jit_avx512_common_conv_winograd_data_kernel_f32::init_conf_common(
     jcp.ngroups = with_groups ? weights_d.dims()[0] : 1;
     jcp.mb = src_d.dims()[0];
     jcp.oc = dst_d.dims()[1] / jcp.ngroups;
+    jcp.oc_without_padding = jcp.oc;
     jcp.ic = src_d.dims()[1] / jcp.ngroups;
     jcp.ih = src_d.dims()[2];
     jcp.iw = src_d.dims()[3];
@@ -396,6 +395,12 @@ status_t _jit_avx512_common_conv_winograd_data_kernel_f32::init_conf_common(
     jcp.ohp = jcp.oh;
     jcp.owp = jcp.ow;
 
+    bool ok_to_pad_channels = jcp.ngroups == 1;
+    if (ok_to_pad_channels) {
+        jcp.oc = rnd_up(jcp.oc, simd_w);
+        jcp.ic = rnd_up(jcp.ic, simd_w);
+    }
+
     // Checking conditions not supported by these kernels
     if (jcp.ngroups != 1)
         return status::unimplemented;
@@ -415,11 +420,17 @@ status_t _jit_avx512_common_conv_winograd_data_kernel_f32::init_conf_common(
     if (dst_d.format() != nChw16c)
         return status::unimplemented;
 
+    bool layout_consistency = true
+        && jcp.ic <= src_d.blocking_desc().padding_dims[1]
+        && jcp.oc <= dst_d.blocking_desc().padding_dims[1]
+        && jcp.ic <= weights_d.blocking_desc().padding_dims[with_groups + 1]
+        && jcp.oc <= weights_d.blocking_desc().padding_dims[with_groups + 0];
+    if (!layout_consistency) return status::unimplemented;
 
     return status::success;
 }
 
-status_t set_wsched_DATA_W_SGD(jit_conv_winograd_conf_t &jcp) {
+status_t set_wsched_DATA_W_SGD_avx512_common(jit_conv_winograd_conf_t &jcp) {
 
     if (jcp.ver != ver_avx512_core)
         return status::unimplemented;
@@ -497,7 +508,7 @@ status_t set_wsched_DATA_W_SGD(jit_conv_winograd_conf_t &jcp) {
 }
 
 
-status_t set_wsched_DATA_W_S_G_D(jit_conv_winograd_conf_t &jcp) {
+status_t set_wsched_DATA_W_S_G_D_avx512_common(jit_conv_winograd_conf_t &jcp) {
 
     auto test_cond_dimN_reg_block = [](jit_conv_winograd_conf_t &jcp,
             int dimN_reg_block, int current_best) {
@@ -606,8 +617,8 @@ status_t _jit_avx512_common_conv_winograd_data_kernel_f32::init_conf_kernel(
     jcp.dimM = dimM;
 
     jcp.sched_policy = WSCHED_INVALID;
-    if (!(set_wsched_DATA_W_SGD(jcp) == status::success))
-        set_wsched_DATA_W_S_G_D(jcp);
+    if (!(set_wsched_DATA_W_SGD_avx512_common(jcp) == status::success))
+        set_wsched_DATA_W_S_G_D_avx512_common(jcp);
 
     assert(jcp.sched_policy != WSCHED_INVALID);
     return status::success;
@@ -727,13 +738,15 @@ void jit_avx512_common_conv_winograd_bwd_weights_kernel_f32::transpose_ker_gener
         }
     };
 
+    preamble();
     int curr = 0;
     for (int j = 0; j < alpha; j++) {
         for (int i = 0; i < alpha; i++) {
             int origB_offset = (j * alpha + i) * jcp.dimK_4fma;
-            int transB_offset = (j * alpha + i) * jcp.dimK_nb_block *
+            size_t transB_offset = (size_t)(j * alpha + i) * jcp.dimK_nb_block *
                 jcp.dimN_block * jcp.dimK_block * jcp.dimK_reg_block *
-                jcp.dimK_4fma * jcp.dimN_reg_block;
+                jcp.dimK_4fma * jcp.dimN_reg_block * sizeof(float);
+            mov(reg_transB_idx, transB_offset);
             for (int tb = 0; tb < jcp.dimK_4fma; tb+=4) {
                 /*double buffering to hide load latencies*/
                 int next = (curr + 4) % 8;
@@ -757,23 +770,24 @@ void jit_avx512_common_conv_winograd_bwd_weights_kernel_f32::transpose_ker_gener
                 vunpcklpd(Zmm(8), Zmm(curr), Zmm(curr + 1));
                 vunpckhpd(Zmm(9), Zmm(curr), Zmm(curr + 1));
 
-                vmovntps(zword[reg_transB
-                        + sizeof(float) * (transB_offset + tb * jcp.dimN_reg_block)],
+                vmovntps(zword[reg_transB + reg_transB_idx
+                        + sizeof(float) * tb * jcp.dimN_reg_block],
                         Zmm(curr+2));
-                vmovntps(zword[reg_transB
-                        + sizeof(float) * (transB_offset + (tb + 1) * jcp.dimN_reg_block)],
+                vmovntps(zword[reg_transB + reg_transB_idx
+                        + sizeof(float) * (tb + 1) * jcp.dimN_reg_block],
                         Zmm(curr+3));
-                vmovntps(zword[reg_transB
-                        + sizeof(float) * (transB_offset + (tb + 2) * jcp.dimN_reg_block)],
+                vmovntps(zword[reg_transB + reg_transB_idx
+                        + sizeof(float) * (tb + 2) * jcp.dimN_reg_block],
                         Zmm(8));
-                vmovntps(zword[reg_transB
-                        + sizeof(float) * (transB_offset + (tb + 3) * jcp.dimN_reg_block)],
+                vmovntps(zword[reg_transB + reg_transB_idx
+                        + sizeof(float) * (tb + 3) * jcp.dimN_reg_block],
                         Zmm(9));
                 curr = next;
 
             }
         }
     }
+    postamble();
     ret();
 }
 void jit_avx512_common_conv_winograd_bwd_weights_kernel_f32::gemm_loop_generate(
@@ -940,15 +954,12 @@ void jit_avx512_common_conv_winograd_bwd_weights_kernel_f32::gemm_loop_generate(
 
     /* Preamble */
     // register used to handle long fma encoding
-    push(reg_EVEX_max_8b_offt);
-    push(reg_dimK_block_loop_cnt);
-    mov(reg_EVEX_max_8b_offt, 2 * EVEX_max_8b_offt);
+    preamble();
     mov(reg_srcA, reg_srcA_const);
     inner_loops();
 
     /* Postamble */
-    pop(reg_dimK_block_loop_cnt);
-    pop(reg_EVEX_max_8b_offt);
+    postamble();
     ret();
 }
 
@@ -1002,7 +1013,7 @@ bool check_cond2_wu(int dimM_block, int dimM_simdw, int dimK_block,
 }
 } // namespace
 
-bool set_wsched_WEI_S_D_G_W(jit_conv_winograd_conf_t &jcp)
+bool set_wsched_WEI_S_D_G_W_avx512_common(jit_conv_winograd_conf_t &jcp)
 {
     /*************** Choose dimN_reg_block (ic_simd_block)
      * *******************************/
@@ -1137,9 +1148,9 @@ void set_jcp_WEI_params(jit_conv_winograd_conf_t &jcp, int tile_block_ur,
     jcp.dimM_block = jcp.oc_block;
     jcp.dimM_nb_block = jcp.nb_oc;
 }
-} // namespace
+}
 
-bool set_wsched_WEI_SDGt_W(jit_conv_winograd_conf_t &jcp)
+bool set_wsched_WEI_SDGt_W_avx512_common(jit_conv_winograd_conf_t &jcp)
 {
     jcp.ic_simd_block = jcp.oc_simd_block = 16;
     int nb_ic_simd_block = jcp.ic / jcp.ic_simd_block;
@@ -1209,7 +1220,7 @@ bool set_wsched_WEI_SDGt_W(jit_conv_winograd_conf_t &jcp)
     return false;
 }
 
-bool set_wsched_WEI_SDGtWo(jit_conv_winograd_conf_t &jcp)
+bool set_wsched_WEI_SDGtWo_avx512_common(jit_conv_winograd_conf_t &jcp)
 {
     jcp.ic_simd_block = jcp.oc_simd_block = 16;
     int nb_ic_simd_block = jcp.ic / jcp.ic_simd_block;
@@ -1283,7 +1294,7 @@ bool set_wsched_WEI_SDGtWo(jit_conv_winograd_conf_t &jcp)
     return false;
 }
 
-bool set_wsched_WEI_S_D_Giot_W(jit_conv_winograd_conf_t &jcp)
+bool set_wsched_WEI_S_D_Giot_W_avx512_common(jit_conv_winograd_conf_t &jcp)
 {
     jcp.ic_simd_block = jcp.oc_simd_block = 16;
     int nb_ic_simd_block = jcp.ic / jcp.ic_simd_block;
@@ -1355,6 +1366,7 @@ status_t jit_avx512_common_conv_winograd_bwd_weights_kernel_f32::init_conf(
     jcp.ngroups = with_groups ? diff_weights_d.dims()[0] : 1;
     jcp.mb = src_d.dims()[0];
     jcp.oc = diff_dst_d.dims()[1] / jcp.ngroups;
+    jcp.oc_without_padding = jcp.oc;
     jcp.ic = src_d.dims()[1] / jcp.ngroups;
     jcp.ih = src_d.dims()[2];
     jcp.iw = src_d.dims()[3];
@@ -1377,6 +1389,12 @@ status_t jit_avx512_common_conv_winograd_bwd_weights_kernel_f32::init_conf(
     jcp.with_bias = (cd.diff_bias_desc.format != memory_format::undef);
     jcp.dilate_h = cd.dilates[0];
     jcp.dilate_w = cd.dilates[1];
+
+    bool ok_to_pad_channels = jcp.ngroups == 1;
+    if (ok_to_pad_channels) {
+        jcp.oc = rnd_up(jcp.oc, simd_w);
+        jcp.ic = rnd_up(jcp.ic, simd_w);
+    }
 
     if (!mayiuse(avx512_common))
         return status::unimplemented;
@@ -1409,6 +1427,13 @@ status_t jit_avx512_common_conv_winograd_bwd_weights_kernel_f32::init_conf(
         return status::unimplemented;
     if (diff_dst_d.format() != nChw16c)
         return status::unimplemented;
+
+    bool layout_consistency = true
+        && jcp.ic <= src_d.blocking_desc().padding_dims[1]
+        && jcp.oc <= diff_dst_d.blocking_desc().padding_dims[1]
+        && jcp.ic <= diff_weights_d.blocking_desc().padding_dims[with_groups + 1]
+        && jcp.oc <= diff_weights_d.blocking_desc().padding_dims[with_groups + 0];
+    if (!layout_consistency) return status::unimplemented;
 
     /*************************** New Kernel Parameters
      * *****************************/
@@ -1451,10 +1476,10 @@ status_t jit_avx512_common_conv_winograd_bwd_weights_kernel_f32::init_conf(
     status_t res;
     jcp.sched_policy = WSCHED_INVALID;
     if ((jcp.ver == ver_avx512_core &&
-            (set_wsched_WEI_SDGt_W(jcp)
-            || set_wsched_WEI_SDGtWo(jcp)
-            || set_wsched_WEI_S_D_Giot_W(jcp)))
-        || set_wsched_WEI_S_D_G_W(jcp))
+            (set_wsched_WEI_SDGt_W_avx512_common(jcp)
+            || set_wsched_WEI_SDGtWo_avx512_common(jcp)
+            || set_wsched_WEI_S_D_Giot_W_avx512_common(jcp)))
+        || set_wsched_WEI_S_D_G_W_avx512_common(jcp))
         res = status::success;
     else
         return status::unimplemented;

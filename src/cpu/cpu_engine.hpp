@@ -20,7 +20,7 @@
 #include <assert.h>
 
 #include "mkldnn.h"
-#include "cpu_isa.hpp"
+#include "cpu_isa_traits.hpp" // set JITFUNCS preprocessor symbol
 
 #include "c_types_map.hpp"
 #include "../common/engine.hpp"
@@ -37,10 +37,13 @@
  *
  * In particularly, with mods to various init() functions, you can use
  * this flag to also print out precisely why an impl was skipped.
+ *
+ * \deprecated Easier to mkldnn_verbose_set(2) in cpu_engine constructor (see below)
  */
-#define VERBOSE_PRIMITIVE_CREATE 0/*release mode compile*/
+#define VERBOSE_PRIMITIVE_CREATE 1/*release mode compile*/
 #else
-#define VERBOSE_PRIMITIVE_CREATE 0/*debug output here can be lengthy*/
+// debug output here can be lengthy, ex. "no-FOO" for every impl in list
+#define VERBOSE_PRIMITIVE_CREATE 1
 #endif
 #endif
 
@@ -51,7 +54,11 @@ namespace cpu {
 
 class cpu_engine_t: public engine_t {
 public:
-    cpu_engine_t(): engine_t(engine_kind::cpu) {}
+    cpu_engine_t(): engine_t(engine_kind::cpu) {
+#if 0 && !defined(NDEBUG) // use env variable MKLDNN_VERBOSE to debug specific tests
+        mkldnn_verbose_set(2);
+#endif
+    }
 
     virtual status_t submit(primitive_t *p, event_t *e,
             event_vector &prerequisites);

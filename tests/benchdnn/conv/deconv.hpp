@@ -26,7 +26,6 @@
 #include "mkldnn_common.hpp"
 #include "mkldnn_memory.hpp"
 #include "conv/conv_common.hpp"
-#include "conv/conv_test_data.hpp"
 
 namespace deconv {
 int doit(const conv::prb_t *p, res_t *res);

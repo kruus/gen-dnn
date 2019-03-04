@@ -28,8 +28,6 @@
 
 namespace conv {
 
-typedef ptrdiff_t ssize_t;
-
 enum alg_t { DIRECT, WINO };
 alg_t str2alg(const char *str);
 const char *alg2str(alg_t alg);
@@ -70,7 +68,7 @@ void desc2str(const desc_t *d, char *buffer, bool canonical = false);
  */
 typedef struct dt_conf_t {
     mkldnn_data_type_t dt;
-    int min, max; /* representative */
+    double min, max; /* representative */
     int f_min, f_max; /* fill range */
     int f_base; /* fill base, use 0 */
     int f_step; /* fill step, use 1 */
@@ -87,6 +85,10 @@ extern const _dt_conf_t conf_s16s32s16s32;
 extern const _dt_conf_t conf_u8s8s32s32;
 extern const _dt_conf_t conf_u8s8s8s32;
 extern const _dt_conf_t conf_u8s8u8s32;
+extern const _dt_conf_t conf_u8s8f32s32_wino;
+extern const _dt_conf_t conf_u8s8s32s32_wino;
+extern const _dt_conf_t conf_u8s8s8s32_wino;
+extern const _dt_conf_t conf_u8s8u8s32_wino;
 
 const dt_conf_t *str2cfg(const char *str);
 const char *cfg2str(const dt_conf_t *cfg);
@@ -127,39 +129,38 @@ extern bool allow_unimpl; /* true means do not treat unimplemented as error */
 extern const char *perf_template; /* performance output template */
 
 inline size_t src_off_f(const prb_t *p, int mb, int g, int ic,
-        int id, int ih, int iw)
+                        int id, int ih, int iw)
 {
     return ((((size_t)mb * p->ic + g * p->ic/p->g + ic)
-                * p->id + id) * p->ih + ih) * p->iw + iw;
+        * p->id + id) * p->ih + ih) * p->iw + iw;
 }
 
 inline void inv_src_off_f(const prb_t *p, size_t off, int &mb, int &g, int &ic,
         int &id, int &ih, int &iw) {
-    iw = off % p->iw;           off /= p->iw;
-    ih = off % p->ih;           off /= p->ih;
-    id = off % p->id;           off /= p->id;
-    ic = off % (p->ic / p->g);  off /= (p->ic / p->g);
-    g = off % p->g;             off /= p->g;
-    mb = off % p->mb;           off /= p->mb;
+    iw = off % p->iw; off /= p->iw;
+    ih = off % p->ih; off /= p->ih;
+    id = off % p->id; off /= p->id;
+    ic = off % (p->ic / p->g); off /= (p->ic / p->g);
+    g = off % p->g; off /= p->g;
+    mb = off % p->mb; off /= p->mb;
     assert(off == 0);
 }
 
-/* NB: no id (check!) */
 inline size_t wei_off_f(const prb_t *p, int g, int oc, int ic,
-        int kd, int kh, int kw)
+                        int kd, int kh, int kw)
 {
     return (((((size_t)g * p->oc / p->g + oc) * p->ic / p->g + ic)
-                * p->kd + kd) * p->kh + kh) * p->kw + kw;
+        * p->kd + kd) * p->kh + kh) * p->kw + kw;
 }
 
 inline void inv_wei_off_f(const prb_t *p, size_t off, int &g, int &oc, int &ic,
         int &kd, int &kh, int &kw) {
-    kw = off % p->kw;           off /= p->kw;
-    kh = off % p->kh;           off /= p->kh;
-    kd = off % p->kd;           off /= p->kd;
-    ic = off % (p->ic / p->g);  off /= (p->ic / p->g);
-    oc = off % (p->oc / p->g);  off /= (p->oc / p->g);
-    g = off % p->g;             off /= p->g;
+    kw = off % p->kw; off /= p->kw;
+    kh = off % p->kh; off /= p->kh;
+    kd = off % p->kd; off /= p->kd;
+    ic = off % (p->ic / p->g); off /= (p->ic / p->g);
+    oc = off % (p->oc / p->g); off /= (p->oc / p->g);
+    g = off % p->g; off /= p->g;
     assert(off == 0);
 }
 
@@ -168,8 +169,8 @@ inline size_t bia_off_f(const prb_t *p, int g, int oc) {
 }
 
 inline void inv_bia_off_f(const prb_t *p, size_t off, int &g, int &oc) {
-    oc = off % (p->oc / p->g);  off /= (p->oc / p->g);
-    g = off % p->g;             off /= p->g;
+    oc = off % (p->oc / p->g); off /= (p->oc / p->g);
+    g = off % p->g; off /= p->g;
     assert(off == 0);
 }
 
@@ -182,215 +183,39 @@ inline size_t dst_off_f(const prb_t *p, int mb, int g, int oc,
 
 inline void inv_dst_off_f(const prb_t *p, size_t off, int &mb, int &g, int &oc,
         int &od, int &oh, int &ow) {
-    ow = off % p->ow;           off /= p->ow;
-    oh = off % p->oh;           off /= p->oh;
-    od = off % p->od;           off /= p->od;
-    oc = off % (p->oc / p->g);  off /= (p->oc / p->g);
-    g = off % p->g;             off /= p->g;
-    mb = off % p->mb;           off /= p->mb;
+    ow = off % p->ow; off /= p->ow;
+    oh = off % p->oh; off /= p->oh;
+    od = off % p->od; off /= p->od;
+    oc = off % (p->oc / p->g); off /= (p->oc / p->g);
+    g = off % p->g; off /= p->g;
+    mb = off % p->mb; off /= p->mb;
     assert(off == 0);
 }
-
-#if 1 // additions
-inline ssize_t src_off_f2(const prb_t *p, ssize_t mb, ssize_t g, ssize_t ic,
-        ssize_t id, ssize_t ih, ssize_t iw)
-{
-    return (((mb * p->ic + g * p->ic/p->g + ic)
-                * p->id + id) * p->ih + ih) * p->iw + iw;
-}
-
-
-inline size_t src_off_f_nog(const prb_t *p, int mb, /*int g,*/ int ic,
-        int id, int ih, int iw)
-{
-    // ic now ranges over full range [0,p->ic)
-    //                     vvvvvvvvvvvvvvvvvvvv
-    return (((mb * p->ic + /* g * p->ic/p->g */ + ic)
-                * p->id + id) * p->ih + ih) * p->iw + iw;
-}
-
-inline ssize_t wei_off_f2(const prb_t *p, size_t g, size_t oc, size_t ic,
-        size_t kd, size_t kh, size_t kw)
-{
-    return ((((g * p->oc / p->g + oc) * p->ic / p->g + ic)
-                * p->kd + kd) * p->kh + kh) * p->kw + kw;
-}
-
-/** A non-optimization if within an innermost loop.
- * Difficult to use, because 'g' must be common to oc and ic. */
-inline constexpr size_t wei_off_f_nog(const prb_t *p, /*int g,*/ int oc, int ic,
-        int kd, int kh, int kw)
-{
-    return ((((    (size_t)oc       ) * p->ic/p->g + ic%(p->ic/p->g))
-                * p->kd + kd) * p->kh + kh) * p->kw + kw;
-    // (((g * p->oc/p->g) + oc)) *p->ic/p->g + ic) *p->kd ..)..)*p->kw+kw
-    // (( g * p->oc/p->g  + oc)) *p->ic/p->g + ic) *p->kd ..)..)*p->kw+kw
-    // ((       oc_nog        )) *p->ic/p->g + ic) *p->kd ..)..)*p->kw+kw
-    //
-    // Now define ic_nog = g*p->ic/p->g + ic running from 0..p->ic
-    // so  g  = ic_nog / (p->ic/p->g)
-    // and ic = ic_nog % (p->ic/p->g)
-    //
-    // Similarly, oc = oc_nog%(p->ic/p->g)
-    //
-    // ((       oc_nog        )) *p->ic/p->g + ic_nog%(p->ic/p->g)) *p->kd ..)..)*p->kw+kw
-}
-
-inline void zero_wei( const prb_t *p, dnn_mem_t const& wei_m ){
-#if 1
-    // weight_off_f_nog is dense in oc,ic,kh,kw so all loops collapse into one!
-    memset( (float*)wei_m, 0, wei_m.size() );
-#else
-    OMP(parallel for collapse(4))//;
-    for (int ic = 0; ic < p->ic; ++ic) { // dw = 0
-        for (int oc=0; oc < p->oc; ++oc) {
-            for (int kh = 0; kh < p->kh; ++kh) {
-                for (int kw = 0; kw < p->kw; ++kw) {
-                    size_t wei_off = wei_off_f_nog(p, /*g,*/ oc, ic, kh, kw);
-                    *((float*)wei_m)[wei_off] = 0;
-                }
-            }
-        }
-    }
-#endif
-} 
-
-inline constexpr ssize_t bia_off_f2(const prb_t *p, ssize_t const g, ssize_t const oc) {
-    return g * p->oc / p->g + oc;
-}
-/** occasionally it is useful [ex memset loops] to get largest possible
- * loop ranges by ignoring the loop over groups.
- *
- * When \c p->g groups is one, these are called "full" convolutions.
- * Groups segregate channels and saves parameters by *reuse* weights.
- * mkl-dnn (and most other implementations) assume the number of channels
- * is perfectly divisible by the groups.
- *
- * \code
- * 1. for (int g = 0; g < p->g; ++g)
- *   2. for (int oc = 0; oc < p->oc/p->g; ++oc)
- *     3. for (int ic = 0; ic < p->ic/p->g; ++ic)
- *       ... kh, kw, mb, oh, ow ...
- *       foo(   dst/src/bia(... g, ...)   );
- * \endcode
- * get transformed into possibly larger ranges as:
- * \code
- *   1. for (int oc = 0; oc < p->oc; ++oc)
- *     2. for (int ic = 0; ic < p->ic; ++ic)
- *       ... kh, kw, mb, oh, ow ...
- *       foo( dst/src/bia_nog( ... ); // *no* g
- * \endcode
- */
-inline size_t bia_off_f_nog(const prb_t *p, /*int g,*/ int oc) {
-    return (size_t)oc;
-}
-
-inline void zero_bia( const prb_t *p, dnn_mem_t const& bia_m ){
-#if 0
-    // bia_off_f_nog is just a single for-loop, so assume bia is dense
-    // (I suppose it might be longer, but this is still likely fastest way)
-    memset( (float*)bia_m, 0, bia_m.size() );
-#else
-    for (int oc=0; oc < p->oc; ++oc) {
-        size_t bia_off = bia_off_f_nog(p, oc);
-        float &db = ((float*)bia_m)[bia_off];
-        db = 0;
-    }
-#endif
-} 
-
-inline ssize_t dst_off_f2(const prb_t *p, ssize_t mb, ssize_t g, ssize_t oc,
-        ssize_t od, ssize_t oh, ssize_t ow)
-{
-    return (((mb * p->oc + g * p->oc/p->g + oc) * p->od + od)
-        * p->oh + oh) * p->ow + ow;
-}
-
-inline size_t dst_off_f_nog(const prb_t *p, int mb, /*int g,*/ int oc,
-        int od, int oh, int ow)
-{
-    // with no group, oc itself has full range of 0..p->oc
-    //                     vvvvvvvvvvvvvvvvvvvv
-    return (((mb * p->oc + /* g * p->oc/p->g */ + oc) * p->od + od)
-        * p->oh + oh) * p->ow + ow;
-}
-/** no group-loop + merge oh- and ow-loops into ohw in p->oh*p->ow */
-inline size_t dst_off_f_nog_ohw(const prb_t *p, int mb, /*int g,*/
-        int od, int oc, int ohw)
-{
-    //  ohw runs through all values oh*p->ow + ow
-    //return (((mb * p->oc + oc) * p->od + od) * p->oh + oh) * p->ow + ow;
-    //return (((mb * p->oc + oc) * p->od + od) * p->oh*p->ow +  oh*p->ow + ow;
-    return (((size_t)mb * p->oc + oc) * p->od + od) * p->oh * p->ow   +   ohw;
-}
-
-#endif // additions
 
 float oscale(const prb_t *p, int oc);
 
 void compute_ref_fwd(const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &wei_m,
         dnn_mem_t &bia_m, dnn_mem_t &dst_m);
 void compute_ref_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m, dnn_mem_t &wei_m,
-        dnn_mem_t &diff_dst_m);
+        dnn_mem_t &bia_m, dnn_mem_t &diff_dst_m);
 void compute_ref_bwd_w(const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &diff_wei_m,
         dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m);
 
-#if 1   // additional "ref impls", catering to specific compilers
-        // (none of these pure-C++ codes match im2col gemm,
-        //  some compilers never get fast, some do.)
-typedef void (*conv_fwd_fn)   (const prb_t *p, dnn_mem_t &src_m,
-        dnn_mem_t &wei_m, dnn_mem_t &bia_m, dnn_mem_t &dst_m);
-typedef void (*conv_bwd_d_fn) (const prb_t *p, dnn_mem_t &diff_src_m,
-        dnn_mem_t &wei_m, dnn_mem_t &diff_dst_m);
-typedef void (*conv_bwd_w_fn )(const prb_t *p, dnn_mem_t &src_m,
+void compute_ref_direct_fwd(const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &wei_m,
+        dnn_mem_t &bia_m, dnn_mem_t &dst_m);
+void compute_ref_direct_bwd_d(const prb_t *p, dnn_mem_t &diff_src_m, dnn_mem_t &wei_m,
+        dnn_mem_t &bia_m, dnn_mem_t &diff_dst_m);
+void compute_ref_direct_bwd_w(const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &diff_wei_m,
+        dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m);
+
+void compute_wino_ref_fwd(const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &wei_m,
+        dnn_mem_t &bia_m, dnn_mem_t &dst_m);
+void compute_wino_ref_bwd_d(const prb_t *p, dnn_mem_t &idiff_src_m,
+        dnn_mem_t &wei_m, dnn_mem_t &bia_m, dnn_mem_t &diff_dst_m);
+void compute_wino_ref_bwd_w(const prb_t *p, dnn_mem_t &src_m,
         dnn_mem_t &diff_wei_m, dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m);
 
-#define COMPUTE_REF_DECL( PFX ) \
-extern void PFX##_fwd   (const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &wei_m, \
-                         dnn_mem_t &bia_m, dnn_mem_t &dst_m); \
-extern void PFX##_bwd_d (const prb_t *p, dnn_mem_t &diff_src_m, dnn_mem_t &wei_m, \
-                         dnn_mem_t &diff_dst_m); \
-extern void PFX##_bwd_w (const prb_t *p, dnn_mem_t &src_m, dnn_mem_t &diff_wei_m, \
-                         dnn_mem_t &diff_bia_m, dnn_mem_t &diff_dst_m);
-
-typedef struct {
-    char const*   name;
-    conv_fwd_fn   fwd;
-    conv_bwd_d_fn bwd_d;
-    conv_bwd_w_fn bwd_w;
-} conv_impls_t;
-/** list of TEST mode convolution impls.
- * TEST mode is distinct from bench_mode 'A', which runs **all** mkl-dnn impls.
- *
- * We expect to investigate convolutions in 'T'est mode, and if they are fast and
- * correct move them to mkl-dnn (and comment them out of general use in benchdnn).
- *
- * \sa bench_mode.
- */
-conv_impls_t * get_ref_impls();
-
-//COMPUTE_REF_DECL( compute_ref ) /* ref_conv.cpp */
-#if 1
-size_t constexpr get_nref_impls() { return 2U; }
-#else
-COMPUTE_REF_DECL( compute_ref1 ) /* ref_conv_012.cpp NEW in version 0.12*/
-COMPUTE_REF_DECL( refconv_2 )   /* ref_conv2.cpp */
-COMPUTE_REF_DECL( refconv_3 )   /* ref_conv3.cpp */
-COMPUTE_REF_DECL( refconv_4 )   /* ref_conv4.cpp */
-COMPUTE_REF_DECL( refconv_5 )   /* ref_conv4.cpp */
-COMPUTE_REF_DECL( refconv_99 )   /* ref_conv99.cpp */
-#if 1 || defined(_SX) /* also OK for ncc, but performance remained pretty bad! */
-COMPUTE_REF_DECL( sxconv_2 )   /* sx_conv2.cpp */ // +post_opts
-COMPUTE_REF_DECL( sxconv_3 )   /* sx_conv3.cpp */
-COMPUTE_REF_DECL( sxconv_4 )   /* sx_conv4.cpp */
-COMPUTE_REF_DECL( sxconv_5 )   /* sx_conv5.cpp */ // +post_ops
-#endif
-size_t constexpr get_nref_impls() { return 6U; }
-#endif
-
-#endif // additions
-
-void perf_report(const prb_t *p, const res_t *r, const char *pstr, const char* impl);
+void perf_report(const prb_t *p, const res_t *r, const char *pstr);
 
 int compare_src(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
         res_t *r, bool final_compare = false);
@@ -416,5 +241,4 @@ void compute_ref_bwd_weights(const prb_t *p, dnn_mem_t &src_m,dnn_mem_t &diff_we
 
 }
 
-// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
 #endif

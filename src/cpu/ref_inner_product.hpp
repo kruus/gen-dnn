@@ -24,6 +24,7 @@
 #include "cpu_engine.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+#include "consistency.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -37,31 +38,42 @@ struct ref_inner_product_fwd_t: public cpu_primitive_t {
         pd_t(engine_t *engine, const inner_product_desc_t *adesc,
                 const primitive_attr_t *attr,
                 const inner_product_fwd_pd_t *hint_fwd_pd)
-            : cpu_inner_product_fwd_pd_t(engine, adesc, attr, hint_fwd_pd) {}
+            : cpu_inner_product_fwd_pd_t(engine, adesc, attr, hint_fwd_pd){
+                //printf("ref_inner_product_fwd_t::pd_t "); fflush(stdout);
+            }
 
         DECLARE_COMMON_PD_T("ref:any", ref_inner_product_fwd_t);
 
         virtual status_t init() override {
             using namespace prop_kind;
+            using namespace data_type;
             assert(engine()->kind() == engine_kind::cpu);
-            bool ok = true
-                && this->set_default_params() == status::success
-                && utils::one_of(desc()->prop_kind, forward_training,
-                        forward_inference)
-                && desc()->src_desc.data_type == src_type
-                && desc()->weights_desc.data_type == wei_type
-                && desc()->accum_data_type == acc_type
-                && desc()->dst_desc.data_type == dst_type
-                && utils::implication(this->with_bias(),
-                        desc()->bias_desc.data_type == dst_type)
-                && attr()->has_default_values();
+            Consistency ok("ref_ip init"); // default here is never-verbose, SCHK
+#define AND_(...) SCHKV(ok,__VA_ARGS__)
+                AND_(this->set_default_params() == status::success);
+                AND_(utils::one_of(desc()->prop_kind, forward_training,
+                    forward_inference));
+                AND_(desc()->src_desc.data_type == src_type);
+                AND_(desc()->weights_desc.data_type == wei_type);
+                AND_(desc()->accum_data_type == acc_type);
+                AND_(desc()->dst_desc.data_type == dst_type);
+                AND_(utils::implication(with_bias(),
+                        utils::one_of(desc()->bias_desc.data_type,
+                            f32, s32, s8, u8)));
+                AND_(attr()->output_scales_.has_default_values());
+                AND_(attr()->post_ops_.len_ <= 1);
+                AND_(utils::implication(attr()->post_ops_.len_ == 1,
+                    attr()->post_ops_.entry_[0].is_relu(true, false)));
+#undef AND_
             return ok ? status::success : status::unimplemented;
         }
     };
 
     ref_inner_product_fwd_t(const pd_t *pd, const input_vector &inputs,
             const output_vector &outputs)
-        : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {}
+        : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {
+            //printf("ref_inner_product_fwd_t(pd,...)"); fflush(stdout);
+        }
 
     typedef typename prec_traits<src_type>::type src_data_t;
     typedef typename prec_traits<wei_type>::type wei_data_t;

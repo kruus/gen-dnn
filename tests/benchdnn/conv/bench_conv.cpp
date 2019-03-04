@@ -19,9 +19,6 @@
 #include <stdio.h>
 #include <float.h>
 #include <math.h>
-#if defined(_SX)
-#include <libgen.h>	/* dirname and strnlen tucked away here! */
-#endif
 
 #include "mkldnn.h"
 
@@ -29,8 +26,7 @@
 #include "mkldnn_memory.hpp"
 
 #include "conv/conv.hpp"
-#include "conv/conv_test_data.hpp"
-// removed in v0.13 #include "conv/input_conv.hpp"          /* default_list of conv tests */
+#include "conv/input_conv.hpp"
 
 namespace conv {
 
@@ -44,7 +40,7 @@ merge_t merge = NONE;
 attr_t attr;
 const char *skip_impl = "";
 bool allow_unimpl = false;
-const char *perf_template = "perf,%n,%d,%GO,%GF,%-t,%-Gp,%0t,%0Gp,%i";
+const char *perf_template = "perf,%n,%d,%GO,%GF,%-t,%-Gp,%0t,%0Gp";
 
 void reset_parameters() {
     cfg = conf_f32;
@@ -55,23 +51,9 @@ void reset_parameters() {
     merge = NONE;
     attr = attr_t();
     skip_impl = "";
-    attr = attr_t();
     allow_unimpl = false;
 }
 
-/** return true if we think mkldnn ought to support this problem. */
-static bool check_mkldnn_support( const prb_t *p, res_t *res ) {
-    char const *errmsg = nullptr;
-    // v0.11 mkl-dnn did not support dilates
-    if (errmsg != nullptr){
-        printf("\nUNTESTABLE: mkl-dnn probably doesn't handle this case yet\n"
-               "          %s\n", errmsg);
-        auto &bs = benchdnn_stat;
-        res->state = SKIPPED;
-        ++bs.skipped;
-    }
-    return errmsg == nullptr;
-}
 void check_correctness(const desc_t *c) {
     const prb_t p(*c, dir, cfg, alg, merge, attr, mb);
     char pstr[max_prb_len];
@@ -79,39 +61,23 @@ void check_correctness(const desc_t *c) {
 
     if (pattern && !match_regex(pstr, pattern))
         return;
-    print(1, "run: %s", pstr);
+    print(1, "run: %s\n", pstr);
 
     res_t res{};
-    // Nicely avoid unsupported things:
-    const bool mkldnn_ok = check_mkldnn_support(&p, &res);
-    int status = (mkldnn_ok? conv::doit(&p, &res): OK); // <-- run benchmark
-    RT_ASSERT( status == OK || status == FAIL );
+    const int status = conv::doit(&p, &res);
+    (void)status;
 
-    bool want_perf_report = (bench_mode & PERF);
+    bool want_perf_report = false;
 
     parse_result(res, want_perf_report, allow_unimpl, status, pstr);
 
-    ++benchdnn_stat.tests;
-    if(mkldnn_ok && (bench_mode & TEST) && benchdnn_stat.ts){
-        benchdnn_stat.ts->prt();
-    }
+    if (want_perf_report && bench_mode & PERF)
+        perf_report(&p, &res, pstr);
+
+    benchdnn_stat.tests++;
 }
 
 int bench(int argc, char **argv, bool main_bench) {
-    static bool own_ts = false;
-    static unsigned recurse = 0U;
-
-    int const dbg_alloc = 20;
-    print(dbg_alloc, "%s recurse=%u\n", "***** conv/bench_conv.cpp *****", recurse);
-    if (recurse == 0U){
-        if ((benchdnn_stat.ts == nullptr)){
-            print(dbg_alloc, "%s", "***** new test_stats\n");
-            benchdnn_stat.ts = new test_stats();
-            own_ts = true;
-        }
-    }
-    ++recurse;
-
     for (int arg = 0; arg < argc; ++arg) {
         if (!strncmp("--batch=", argv[arg], 8))
             SAFE(batch(argv[arg] + 8, bench), CRIT);
@@ -155,27 +121,14 @@ int bench(int argc, char **argv, bool main_bench) {
         }
     }
 
-#if 0
-    /* input_conv.hpp has been removed for v 0.13 */
     if (main_bench && benchdnn_stat.tests == 0) {
         const int N = sizeof(default_list) / sizeof(default_list[0]);
         print(0,"/* using default list of %d problems */", N);
         for (int n = 0; n < N; ++n)
             check_correctness(&default_list[n]);
     }
-#endif
-
-    --recurse;
-    print(dbg_alloc, "%s recurse=%u\n", "*END* conv/bench_conv.cpp *****", recurse);
-    if (recurse == 0 && own_ts){
-        RT_ASSERT(benchdnn_stat.ts != nullptr);
-        print(dbg_alloc, "%s", "***** delete test_stats\n");
-        delete benchdnn_stat.ts;
-        benchdnn_stat.ts = nullptr;
-    }
 
     return OK;
 }
 
 }
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

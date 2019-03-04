@@ -16,6 +16,7 @@ QUICK=0
 DOGCC_VER=0
 NEC_FTRACE=0
 DOTARGET="x"
+VEJIT=0
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -30,6 +31,7 @@ usage() {
     echo "         quick, quick: no cmake, just make --- $0 -qqa"
     echo "     see what cmake is doing, and create build.log"
     echo "         CMAKEOPT='--trace -LAH' ./build.sh -q >&/dev/null"
+    echo " NEW: ./build.sh -aj for Aurora + vednn/jit compile (binary Aurora libvednn distro)"
     echo "Debug: Individual tests can be run like build-sx/tests/gtests/test_relu"
     echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
@@ -38,11 +40,13 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
-            if [ ! "${DOTARGET}" == "x" ]; then echo "-a no good: already have -${DOTARGET}"; usage; fi
-            DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
+            if [ "${DOTARGET}" == "j" ]; then VEJIT=100; else
+                if [ ! "${DOTARGET}" == "x" ]; then echo "-a no good: already have -${DOTARGET}"; usage; fi
+                VEJIT=0; # use something like #if DOJIT > 0 && defined(__ve) ...
+            fi
+            DOTARGET="a"; SIZE_T=64; DONEEDMKL="n"
             JOBS="-j1" # -j1 to avoid SIGSEGV in ccom
             if [ `uname -n` = "zoro" ]; then JOBS="-j8"; fi
-            #export LDFLAGS="${LDFLAGS} -L/opt/nec/ve/musl/lib"
             ;;
         F) # NEC Aurora VE or SX : add ftrace support (generate ftrace.out)
             NEC_FTRACE=1
@@ -59,9 +63,11 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
             if [ ! "${DOTARGET}" == "x" ]; then echo "-v no good: already have -${DOTARGET}"; usage; fi
             if [ -d src/vanilla ]; then DOTARGET="v"; fi
             ;;
-        j) # force Intel JIT (src/cpu/ JIT assembly code)
-            if [ ! "${DOTARGET}" == "x" ]; then echo "-j no good: already have -${DOTARGET}"; usage; fi
-            DOTARGET="j"; DOJIT=100 # 100 means all JIT funcs enabled
+        j) # force Intel [or Aurora libvednnx] JIT (src/cpu/ JIT assembly code)
+            if [ "${DOTARGET}" == "a" ]; then VEJIT=100; else
+                if [ ! "${DOTARGET}" == "x" ]; then echo "-j no good: already have -${DOTARGET}"; usage; fi
+                DOTARGET="j"; VEJIT=0; #DOJIT=100 # 100 means all JIT funcs enabled
+            fi
             ;;
         d) # [no] debug release
             DODEBUG="y"
@@ -74,6 +80,9 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
             ;;
         Q) # really quick: skip build and doxygen docs [JUST run cmake and stop]
             BUILDOK="n"; DODOC="n"
+            ;;
+        T) # cmake --trace
+            CMAKETRACE="--trace"
             ;;
         p) # permissive: disable the FAIL_WITHOUT_MKL switch
             DONEEDMKL="n"
@@ -98,9 +107,6 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
             ;;
         W) # lots of compiler warnings (default)
             DOWARN=1
-            ;;
-        T) # cmake --trace
-            CMAKETRACE="--trace"
             ;;
         1) # make -j1
             JOBS="-j1"
@@ -130,6 +136,7 @@ if [ "${DOTARGET}" == "x" ]; then
         echo "auto-detected '-a' Aurora compiler (ncc, nc++)"
         DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
         if [ `uname -n` = "zoro" ]; then JOBS="-j8"; else JOBS="-j1"; fi
+        if [ -f vejit/include/vednn.h ]; then VEJIT=100; echo "auto-detected libvednn"; fi
     elif [ -d src/vanilla ]; then
         DOTARGET="v" # v for vanilla (C/C++ code)
     else
@@ -163,7 +170,11 @@ fi
 #
 #
 if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx';
-elif [ "$DOTARGET" != "a" ]; then
+elif [ "$DOTARGET" == "a" ]; then
+    if [ "$VEJIT" -gt 0 ]; then
+        INSTALLDIR="${INSTALLDIR}-vej"; BUILDDIR="${BUILDDIR}-vej";
+    fi
+else #if [ "$DOTARGET" != "a" ]; then
     if [ "$DOGCC_VER" == "icc" ]; then
         echo "LOOKING for icc ... which icc = `which icc`"
         set -x
@@ -197,8 +208,12 @@ elif [ "$DOTARGET" != "a" ]; then
     fi
 fi
 if [ ! "x${CC}" == "x" -a ! "`which ${CC}`" ]; then
-    echo "./build.sh: CC=${CC} , but did not find that compiler."
-    exit -1
+    if [ -x ${CC} ]; then
+        echo "Using specific compiler version: ${CC}";
+    else
+        echo "./build.sh: CC=${CC} , but did not find that compiler."
+        exit -1
+    fi
 fi
 
 #if [ "$DOTARGET" == "v" ]; then ; fi
@@ -259,9 +274,27 @@ if [ -d "$INSTALLDIR}" -a $QUICK -lt 2 ]; then
     rm -rf "$INSTALLDIR}".bak && mv -v "$INSTALLDIR}" "$INSTALLDIR}".bak
 fi
 
-TESTRUNNER='time'
-if { /usr/bin/time -v echo Hello >& /dev/null; } then
-    TESTRUNNER='/usr/bin/time -v'
+# Obtain initial guesses for TESTRUNNER and VE_EXEC
+if [ "" ]; then
+    VE_EXEC=''
+    TESTRUNNER=''
+    if [ "$DOTARGET" = "a" ]; then
+        export OMP_NUM_THREADS=1; # for now XXX
+        if { ve_exec --version 2> /dev/null; } then
+            # oops, this will not work for "${TESTRUNNER} make test"
+            #TESTRUNNER="${TESTRUNNER} ve_exec"
+            #echo "ve_exec! TESTRUNNER ${TESTRUNNER}"
+            VE_EXEC=ve_exec
+        else
+            TESTRUNNER="echo Not-Running "
+            echo "Aurora: ve_exec not found"
+        fi
+    fi
+    if { /usr/bin/time -v echo Hello >& /dev/null; } then
+        TESTRUNNER='/usr/bin/time -v'
+    fi
+    echo "TESTRUNNER ${TESTRUNNER}"
+    echo "VE_EXEC    ${VE_EXEC}"
 fi
 #if [ "$NEC_FTRACE" -gt 0 ]; then
 if [ "$DOTARGET" = "a" -o "$DOTARGET" = "s" ]; then
@@ -276,26 +309,6 @@ fi
 if [ "$DOTARGET" = "a" ]; then
     export OMP_NUM_THREADS=1; # for now XXX
 fi
-# Obtain initial guesses for TESTRUNNER and VE_EXEC
-if [ "" ]; then
-VE_EXEC=''
-TESTRUNNER=''
-if [ "$DOTARGET" = "a" ]; then
-    export OMP_NUM_THREADS=1; # for now XXX
-    if { ve_exec --version 2> /dev/null; } then
-        # oops, this will not work for "${TESTRUNNER} make test"
-        #TESTRUNNER="${TESTRUNNER} ve_exec"
-        #echo "ve_exec! TESTRUNNER ${TESTRUNNER}"
-        VE_EXEC=ve_exec
-    else
-        TESTRUNNER="echo Not-Running "
-        echo "Aurora: ve_exec not found"
-    fi
-fi
-echo "TESTRUNNER ${TESTRUNNER}"
-echo "VE_EXEC    ${VE_EXEC}"
-#read asdf
-fi
 
 export PATH
 echo "PATH $PATH"
@@ -303,6 +316,7 @@ echo "PATH $PATH"
     echo "# vim: set ro ft=log:"
     echo "DOTARGET   $DOTARGET"
     echo "DOJIT      $DOJIT"
+    echo "VEJIT      $VEJIT"
     echo "DOTEST     $DOTEST"
     echo "DODEBUG    $DODEBUG"
     echo "DODOC      $DODOC"
@@ -333,16 +347,39 @@ echo "PATH $PATH"
         TOOLCHAIN=../cmake/ve.cmake
         if [ ! -f "${TOOLCHAIN}" ]; then echo "Ohoh. ${TOOLCHAIN} not found?"; BUILDOK="n"; fi
         CMAKEOPT="${CMAKEOPT} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}"
-        CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=OFF -DUSE_SHAREDLIB=OFF"
+        # adjust here for VE shared library and Openmp use
+        CMAKEOPT="${CMAKEOPT} -DUSE_SHAREDLIB=OFF"
+        # USE_OPENMP defaults to off, so force it on (VE openmp has improved)
+        if [ "a" == "z" ]; then
+            CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=OFF"
+        else
+            CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=ON"
+            # ?? -mparallel and -fopenmp both => -pthread
+            export CFLAGS="${CFLAGS} -fopenmp"
+            export CXXFLAGS="${CFLAGS} -fopenmp"
+        fi
+        # TODO proginf is not working automatically any more?
         # -proginf  : Run with 'export VE_PROGINF=YES' to get some stats output
         # export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
         # export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
         export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
         export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
         if [ "$NEC_FTRACE" -eq 1 ]; then
-            export CFLAGS="${CFLAGS} -ftrace"
-            export CXXFLAGS="${CXXFLAGS} -ftrace"
+            #export CFLAGS="${CFLAGS} -ftrace"
+            #export CXXFLAGS="${CXXFLAGS} -ftrace"
+            # at some point above was sufficent (ve.cmake) set things
+            # TODO have ve.cmake etc do this NICELY with a cmake option...
+            VEPERF_DIR="/usr/uhome/aurora/mpc/pub/veperf/180218-ELF"
+            VEPERF_INC_DIR="${VEPERF_DIR}/include"
+            VEPERF_LIB_DIR="${VEPERF_DIR}/lib"
+            export CFLAGS="${CFLAGS} -I${VEPERF_INC_DIR} -DFTRACE -ftrace"
+            export CXXFLAGS="${CXXFLAGS} -I${VEPERF_INC_DIR} -DFTRACE -ftrace"
+            export LDFLAGS="${LDFLAGS} -L${VEPERF_LIB_DIR} -lveperf"
+            #export LDFLAGS="${LDLIBS} -Wl,-rpath,${VEPERF_LIB_DIR}"
         fi
+        CMAKEOPT="${CMAKEOPT} -DVEJIT=${VEJIT}"
+        #export CFLAGS="${CFLAGS} -DVEJIT=${VEJIT}"
+        #export CXXFLAGS="${CXXFLAGS} -DVEJIT=${VEJIT}"
         echo "Aurora CMAKEOPT = ${CMAKEOPT}"
     fi
     if [ ${DOWARN} == 'y' ]; then
@@ -429,9 +466,9 @@ echo "PATH $PATH"
             set +x
         fi
         # Make some assembly-source translations automatically...
-        cxxfiles=`(cd ../tests/benchdnn && ls -1 conv/*conv?.cpp conv/*.cxx)`
-        echo "cxxfiles = $cxxfiles"
-        (cd tests/benchdnn && { for f in ${cxxfiles}; do make -j1 VERBOSE=1 $f.s; done; }) || true
+        #cxxfiles=`(cd ../tests/benchdnn && ls -1 conv/*conv?.cpp conv/*.cxx)`
+        #echo "cxxfiles = $cxxfiles"
+        (cd tests/benchdnn && { for f in conv/*conv?.cpp conv/*.cxx; do if -f "${f}"; then echo $f.s; make -j1 VERBOSE=1 $f.s; fi; done; }) || true
         pwd
         ls -l asm || true
 
@@ -463,11 +500,11 @@ echo "PATH $PATH"
             # because 'make' tragets already supply VE_EXEC if needed.
         fi
         # Whatever you are currently debugging (and is a quick sanity check) can go here
-        if [ -x tests/api-io-c ]; then
-            { echo "api-io-c                ..."; ${TESTRUNNER} ${VE_EXEC} tests/api-io-c || BUILDOK="n"; }
-        else
+        #if [ -x tests/api-io-c ]; then
+        #    { echo "api-io-c                ..."; ${TESTRUNNER} ${VE_EXEC} tests/api-io-c || BUILDOK="n"; }
+        #else
             { echo "api-c                ..."; ${TESTRUNNER} ${VE_EXEC} tests/api-c || BUILDOK="n"; }
-        fi
+        #fi
         if [ $DOTEST -eq 0 -a $DOJIT -gt 0 ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
             { echo "simple-training-net-cpp ..."; ${TESTRUNNER}  ${VE_EXEC} examples/simple-training-net-cpp || BUILDOK="n"; }
         fi
@@ -504,6 +541,11 @@ if [ -f "${BUILDDIR}/bash_help.inc" ]; then
         fi
     fi
 fi
+if { /usr/bin/time -v echo Hello >& /dev/null; } then
+    TESTRUNNER='/usr/bin/time -v'
+fi
+# next is optional, for verbose primitive creation and run messages
+TESTRUNNER="${TESTRUNNER}"
 set -x
 echo "TESTRUNNER ${TESTRUNNER}"
 echo "VE_EXEC    ${VE_EXEC}"
@@ -526,18 +568,18 @@ if [ "$BUILDOK" == "y" ]; then
     echo "Testing ?"
     if [ ! $DOTEST -eq 0 -a ! "$DOTARGET" == "s" ]; then # non-SX: -t might run some tests
         rm -f test1.log test2.log test3.log
-        echo "Testing ... test1"
+        echo "Testing in ${BUILDDIR} ... test1"
         if [ true ]; then
-            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' ${TESTRUNNER} make test) 2>&1 | tee "${BUILDDIR}/test1.log" || true
+            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' MKLDNN_VERBOSE=2 ${TESTRUNNER} make VERBOSE=1 test) 2>&1 | tee "${BUILDDIR}/test1.log" || true
         fi
         if [ $DOTEST -ge 2 ]; then
             echo "Testing ... test2"
             (cd "${BUILDDIR}" && ARGS='-VV -N' ${TESTRUNNER} make test \
-            && ARGS='-VV -R .*test_.*' ${TESTRUNNER}  make test) 2>&1 | tee "${BUILDDIR}/test2.log" || true
+            && ARGS='-VV -R .*test_.*' MKLDNN_VERBOSE=2 ${TESTRUNNER}  make test) 2>&1 | tee "${BUILDDIR}/test2.log" || true
         fi
         if [ $DOTEST -ge 3 ]; then
             if [ -x ./bench.sh ]; then
-                ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
+                MKLDNN_VERBOSE=2 ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
             fi
         fi
         echo "Tests done"

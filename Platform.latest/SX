@@ -1,0 +1,92 @@
+# vim: set sw=4 ts=4 et ft=cmake
+if(SX_TRACE)
+    message(STATUS " *** Platform/SX ***")
+endif()
+# Purpose seems to be helping Modules/CMakeSystemSpecificInformation.cmake
+set(UNIX TRUE)
+set(CMAKE_C_LINK_SHARED_LIBRARY )
+set(CMAKE_C_LINK_MODULE_LIBRARY )
+
+# short-circuit some cmake attempts ...
+set(CMAKE_C_ABI_COMPILED 1 CACHE BOOL "")
+set(CMAKE_CXX_ABI_COMPILED 1 CACHE BOOL "")
+#   ??? may need to hardwire things like ...
+#set(ABI_SIZEOF_DPTR 8)
+#set(ABI_SIZEOF_DATA_PTR 8)
+#set(CMAKE_${lang}_IMPLICIT_LINK_LIBRARIES ...)
+#set(CMAKE_${lang}_IMPLICIT_LINK_DIRECTORIES ...)
+#set(CMAKE_${lang}_IMPLICIT_LINK_FRAMEWORK_DIRECTORIES ...)
+# ? CMAKE_LIBRARY_ARCHITECTURE_REGEX
+# then CMakeDetermineCompileFeatures.cmake
+#      CMakeCCompiler.cmake
+
+# cmake-3.8 does this in Platform/SX-Initialize.
+# *** cmake-3.0 does not automatically invoke Platform/SX-Initialize ***
+#     short-circuit default settings in CMakeDetermineCCompiler.cmake (for CmakeFindBinUtils)
+#set(_CMAKE_TOOLCHAIN_PREFIX "sx")
+# give cmake a HINT location for toolchain location [in case it is not in current path?]
+#set(CMAKE_CXX_COMPILER_EXTERNAL_TOOLCHAIN "/SX/usr")
+
+
+
+# note that this runs after SX-C (so after CMakeFindBinUtils), so no good to
+# set this up here:
+#     short-circuit default settings in CMakeDetermineCCompiler.cmake (for CmakeFindBinUtils)
+#set(_CMAKE_TOOLCHAIN_PREFIX "sx")
+# give cmake a HINT location for toolchain location [in case it is not in current path?]
+#set(CMAKE_C_COMPILER_EXTERNAL_TOOLCHAIN "/SX/usr")
+#  (just C or CXX setting is enough)
+
+# ** NO ** short-circuit some cmake compiler determination logic
+# **MUST** be in toolchain file
+#    set(CMAKE_C_COMPILER "sxcc")
+#    set(CMAKE_CXX_COMPILER "sxc++")
+#    set(CMAKE_Fortran_COMPILER "sxf03") # ?
+
+#
+# ``
+#  ... AND ... we can override many things in CMakeGenericSystem.cmake
+#CMakeGenericSystem.cmake(5):  set(CMAKE_SHARED_LIBRARY_C_FLAGS  )
+#CMakeGenericSystem.cmake(6):  set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS -shared )
+#CMakeGenericSystem.cmake(7):  set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS  )
+#CMakeGenericSystem.cmake(8):  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG  )
+#CMakeGenericSystem.cmake(9):  set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP  )
+#CMakeGenericSystem.cmake(10):  set(CMAKE_INCLUDE_FLAG_C -I )
+#CMakeGenericSystem.cmake(11):  set(CMAKE_INCLUDE_FLAG_C_SEP  )
+#CMakeGenericSystem.cmake(12):  set(CMAKE_LIBRARY_PATH_FLAG -L )
+#CMakeGenericSystem.cmake(13):  set(CMAKE_LIBRARY_PATH_TERMINATOR  )
+#CMakeGenericSystem.cmake(14):  set(CMAKE_LINK_LIBRARY_FLAG -l )
+#CMakeGenericSystem.cmake(16):  set(CMAKE_LINK_LIBRARY_SUFFIX  )
+#CMakeGenericSystem.cmake(17):  set(CMAKE_STATIC_LIBRARY_PREFIX lib )
+#CMakeGenericSystem.cmake(18):  set(CMAKE_STATIC_LIBRARY_SUFFIX .a )
+#CMakeGenericSystem.cmake(19):  set(CMAKE_SHARED_LIBRARY_PREFIX lib )
+#CMakeGenericSystem.cmake(20):  set(CMAKE_SHARED_LIBRARY_SUFFIX .so )
+#CMakeGenericSystem.cmake(21):  set(CMAKE_EXECUTABLE_SUFFIX  )
+#CMakeGenericSystem.cmake(22):  set(CMAKE_DL_LIBS dl )
+#CMakeGenericSystem.cmake(24):  set(CMAKE_FIND_LIBRARY_PREFIXES lib )
+#CMakeGenericSystem.cmake(25):  set(CMAKE_FIND_LIBRARY_SUFFIXES .so .a )
+set(CMAKE_FIND_LIBRARY_SUFFIXES .a )
+#CMakeGenericSystem.cmake(28):  set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE )
+set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS FALSE)
+#CMakeGenericSystem.cmake(30):  set(CMAKE_SKIP_RPATH NO CACHE BOOL If set, runtime paths are not added when using shared libraries. )
+#CMakeGenericSystem.cmake(32):  set(CMAKE_SKIP_INSTALL_RPATH NO CACHE BOOL If set, runtime paths are not added when installing shared libraries, but are added when building. )
+#CMakeGenericSystem.cmake(35):  set(CMAKE_VERBOSE_MAKEFILE FALSE CACHE BOOL If this value is on, makefiles will be generated without the .SILENT directive, and all commands will be echoed to the console during the make.  This is useful for debugging only. With Visual Studio IDE projects all commands are done without /nologo. )
+#CMakeGenericSystem.cmake(37):  if(CMAKE_GENERATOR MATCHES Make )
+#CMakeGenericSystem.cmake(38):  set(CMAKE_COLOR_MAKEFILE ON CACHE BOOL Enable/Disable color output during build. )
+#CMakeGenericSystem.cmake(41):  mark_as_advanced(CMAKE_COLOR_MAKEFILE )
+#CMakeGenericSystem.cmake(42):  if(DEFINED CMAKE_RULE_MESSAGES )
+#CMakeGenericSystem.cmake(45):  if(DEFINED CMAKE_TARGET_MESSAGES )
+#CMakeGenericSystem.cmake(48):  if(CMAKE_GENERATOR MATCHES Unix Makefiles )
+#CMakeGenericSystem.cmake(49):  set(CMAKE_EXPORT_COMPILE_COMMANDS OFF CACHE BOOL Enable/Disable output of compile commands during generation. )
+#CMakeGenericSystem.cmake(52):  mark_as_advanced(CMAKE_EXPORT_COMPILE_COMMANDS )
+#CMakeGenericSystem.cmake(56):  if(CMAKE_GENERATOR MATCHES Ninja )
+#CMakeGenericSystem.cmake(70):  function(GetDefaultWindowsPrefixBase var )
+#CMakeGenericSystem.cmake(156):  if(NOT DEFINED CMAKE_INSTALL_PREFIX )
+#CMakeGenericSystem.cmake(157):  set(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT 1 )
+#CMakeGenericSystem.cmake(161):  if(CMAKE_HOST_UNIX )
+#CMakeGenericSystem.cmake(162):  set(CMAKE_INSTALL_PREFIX /usr/local CACHE PATH Install path prefix, prepended onto install directories. )
+set(CMAKE_INSTALL_PREFIX "../install-sx" CACHE PATH "SX Install path prefix, prepended onto install directories."  FORCE)
+#CMakeGenericSystem.cmake(174):  set(CMAKE_INSTALL_DEFAULT_COMPONENT_NAME Unspecified )
+#CMakeGenericSystem.cmake(176):  mark_as_advanced(CMAKE_SKIP_RPATH CMAKE_SKIP_INSTALL_RPATH CMAKE_VERBOSE_MAKEFILE )
+#CMakeSystemSpecificInformation.cmake(24):  set(CMAKE_SYSTEM_INFO_FILE Platform/${CMAKE_SYSTEM_NAME} )
+#CMakeSystemSpecificInformation.cmake(26):  include(${CMAKE_SYSTEM_INFO_FILE} OPTIONAL RESULT_VARIABLE _INCLUDED_SYSTEM_INFO_FILE )

@@ -64,7 +64,9 @@ double get_msec() {
 
 mkldnn_status_t mkldnn_verbose_set(int level) {
     using namespace mkldnn::impl::status;
-    if (level < 0 || level > 2) return invalid_arguments;
+    if ((level & ~0x7)) return invalid_arguments; // bit 3-4 make consistency.hpp more verbose
+    if ((level&0x3) > 2) return invalid_arguments;
     mkldnn::impl::verbose.level = level;
     return success;
 }
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

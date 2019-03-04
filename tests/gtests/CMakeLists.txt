@@ -22,18 +22,29 @@ set(MAIN_SRC_GTEST main.cpp)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${CMAKE_CURRENT_SOURCE_DIR}/gtest
                     ${CMAKE_CURRENT_SOURCE_DIR}/in
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/common
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/cpu
                     )
+if(WIN32)
+    # Correct 'jnl' macro/jit issue
+    if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Qlong-double")
+    endif()
+endif()
+
 # TODO: enable me!
 #file(GLOB API_TEST_CASES_SRC api_tests/*.cpp)
 #file(GLOB PRIM_TEST_CASES_SRC test_*.cpp)
 file(GLOB PRIM_TEST_CASES_SRC
                               test_iface_pd_iter.cpp
                               test_iface_attr.cpp
+                              test_memory.cpp
                               test_sum.cpp
                               test_reorder.cpp
                               test_concat.cpp
                               test_ve_bwd_d_nans.cpp
                               test_softmax_forward.cpp
+                              test_softmax_backward.cpp
                               test_eltwise.cpp
                               test_relu.cpp
                               test_lrn_forward.cpp
@@ -50,12 +61,14 @@ file(GLOB PRIM_TEST_CASES_SRC
                               test_convolution_forward_u8s8s32.cpp
                               test_convolution_forward_u8s8fp.cpp
                               test_convolution_relu_forward_f32.cpp
+                              test_convolution_relu_forward_neg_slope_f32.cpp
                               test_convolution_relu_forward_s16s16s32.cpp
                               test_convolution_backward_data_f32.cpp
                               test_convolution_backward_data_s16s16s32.cpp
                               test_convolution_backward_weights_f32.cpp
                               test_convolution_backward_weights_s16s16s32.cpp
                               test_deconvolution.cpp
+                              test_gemm.cpp
                               ) #temporary
 
 foreach(TEST_FILE ${PRIM_TEST_CASES_SRC})

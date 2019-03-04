@@ -15,9 +15,14 @@
 *******************************************************************************/
 
 #include <string.h>
-#ifdef WIN32
+#ifdef _WIN32
 #include <malloc.h>
 #include <windows.h>
+#endif
+#if defined(__ve) || defined(SX)
+#include <ieeefp.h>
+#else
+#include "xmmintrin.h"
 #endif
 
 #include "utils.hpp"
@@ -80,6 +85,42 @@ FILE *mkldnn_fopen(const char *filename, const char *mode) {
 #endif
 }
 
+static THREAD_LOCAL unsigned int mxcsr_save;
+
+#if defined(__ve)
+// we use ieeefp.h functions ...
+void set_rnd_mode(round_mode_t rnd_mode) {
+    mxcsr_save = (unsigned int)fpgetround();
+    enum fp_rnd want;
+    switch(rnd_mode) {
+    case round_mode::nearest: want = FP_RN; break;
+    case round_mode::down: want = FP_RM; break;
+    default: assert(!"unreachable");
+    }
+    if ((unsigned int)want != mxcsr_save)
+        fpsetround(want);
+}
+
+void restore_rnd_mode() {
+    fpsetround((enum fp_rnd)mxcsr_save);
+}
+#else
+void set_rnd_mode(round_mode_t rnd_mode) {
+    mxcsr_save = _mm_getcsr();
+    unsigned int mxcsr = mxcsr_save & ~(3u << 13);
+    switch (rnd_mode) {
+    case round_mode::nearest: mxcsr |= (0u << 13); break;
+    case round_mode::down: mxcsr |= (1u << 13); break;
+    default: assert(!"unreachable");
+    }
+    if (mxcsr != mxcsr_save) _mm_setcsr(mxcsr);
+}
+
+void restore_rnd_mode() {
+    _mm_setcsr(mxcsr_save);
+}
+#endif
+
 void *malloc(size_t size, int alignment) {
     void *ptr;
 
@@ -103,3 +144,4 @@ void free(void *p) {
 
 }
 }
+/* vim: set et ts=4 sw=4 cino=^=l0,\:0,N-s: */

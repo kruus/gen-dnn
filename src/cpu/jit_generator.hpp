@@ -20,23 +20,8 @@
 #warning "jit_generator.hpp should not be included for TARGET_VANILLA compile"
 #endif
 
-#include <type_traits>
-#include "cpu_isa.hpp"
-
-#define XBYAK64
-#define XBYAK_NO_OP_NAMES
-/* in order to make selinux happy memory that would be marked with X-bit should
- * be obtained with mmap */
-#define XBYAK_USE_MMAP_ALLOCATOR
-#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
-/* turn off `size_t to other-type implicit casting` warning
- * currently we have a lot of jit-generated instructions that
- * take uint32_t, but we pass size_t (e.g. due to using sizeof).
- * FIXME: replace size_t parameters with the appropriate ones */
-#pragma warning (disable: 4267)
-#endif
-#include "xbyak/xbyak.h"
-#include "xbyak/xbyak_util.h"
+#include <limits.h>
+#include "cpu_isa_traits.hpp"
 
 #include "utils.hpp"
 #include "mkldnn_thread.hpp"
@@ -45,11 +30,8 @@
 #include "jitprofiling.h"
 #endif
 
-#ifdef _WIN32
-#   define STRUCT_ALIGN(al, ...) __declspec(align(al)) __VA_ARGS__
+#if defined(_WIN32)
 #   define OFFSET_SHADOWSPACE 0x28
-#else
-#   define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__(al)))
 #endif
 
 #define DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_name) \
@@ -61,14 +43,15 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-//typedef enum { ... } cpu_isa_t; // moved to alt header, cpu_isa.hpp
 // TODO: move this to jit_generator class?
 namespace {
 
+#if 0 // moved to cpu_isa_traits (also used for non-jit malloc size)    
 typedef enum {
     PAGE_4K = 4096,
     PAGE_2M = 2097152,
 } cpu_page_size_t;
+#endif
 
 // TODO: move this somewhere else? Although this is only used by jit kernels
 // (Roma)
@@ -102,12 +85,12 @@ static inline int float2int(float x) {
 constexpr Xbyak::Operand::Code abi_save_gpr_regs[] = {
     Xbyak::Operand::RBX, Xbyak::Operand::RBP, Xbyak::Operand::R12,
     Xbyak::Operand::R13, Xbyak::Operand::R14, Xbyak::Operand::R15,
-#ifdef _WIN
+#ifdef _WIN32
     Xbyak::Operand::RDI, Xbyak::Operand::RSI,
 #endif
 };
 
-#ifdef _WIN
+#ifdef _WIN32
 static const Xbyak::Reg64 abi_param1(Xbyak::Operand::RCX),
              abi_param2(Xbyak::Operand::RDX),
              abi_param3(Xbyak::Operand::R8),
@@ -122,47 +105,8 @@ static const Xbyak::Reg64 abi_param1(Xbyak::Operand::RDI),
 #endif
 #endif
 
-static Xbyak::util::Cpu cpu;
-static inline bool mayiuse(const cpu_isa_t cpu_isa) {
-    using namespace Xbyak::util;
-
-    switch (cpu_isa) {
-    case sse42:
-        return cpu.has(Cpu::tSSE42);
-    case avx2:
-        return cpu.has(Cpu::tAVX2);
-    case avx512_common:
-        return cpu.has(Cpu::tAVX512F);
-    case avx512_core:
-        return true
-            && cpu.has(Cpu::tAVX512F)
-            && cpu.has(Cpu::tAVX512BW)
-            && cpu.has(Cpu::tAVX512VL)
-            && cpu.has(Cpu::tAVX512DQ);
-    case avx512_core_vnni:
-        return true
-            && cpu.has(Cpu::tAVX512F)
-            && cpu.has(Cpu::tAVX512BW)
-            && cpu.has(Cpu::tAVX512VL)
-            && cpu.has(Cpu::tAVX512DQ)
-            && cpu.has(Cpu::tAVX512_VNNI);
-    case avx512_mic:
-        return true
-            && cpu.has(Cpu::tAVX512F)
-            && cpu.has(Cpu::tAVX512CD)
-            && cpu.has(Cpu::tAVX512ER)
-            && cpu.has(Cpu::tAVX512PF);
-    case avx512_mic_4ops:
-        return true
-            && mayiuse(avx512_mic)
-            && cpu.has(Cpu::tAVX512_4FMAPS)
-            && cpu.has(Cpu::tAVX512_4VNNIW);
-    case isa_any:
-        return true;
-    }
-    return false;
-}
-
+#if 0 // --> cpu_isa_traits.hpp (maybe not right place for it)
+// XXX sometimes called from non-jit code!!!
 inline unsigned int get_cache_size(int level, bool per_core = true){
     unsigned int l = level - 1;
     // Currently, if XByak is not able to fetch the cache topology
@@ -185,6 +129,7 @@ inline unsigned int get_cache_size(int level, bool per_core = true){
     } else
         return 0;
 }
+#endif
 
 }
 
@@ -234,7 +179,7 @@ class jit_generator : public Xbyak::CodeGenerator
 {
 private:
     const size_t xmm_len = 16;
-#ifdef _WIN
+#ifdef _WIN32
     const size_t xmm_to_preserve_start = 6;
     const size_t xmm_to_preserve = 10;
 #else
@@ -295,6 +240,11 @@ public:
             prefetcht2(a);
     }
 
+    void uni_vzeroupper() {
+        if (mayiuse(avx) && !mayiuse(avx512_mic))
+            vzeroupper();
+    }
+
     void postamble() {
         for (size_t i = 0; i < num_abi_save_gpr_regs; ++i)
             pop(Xbyak::Reg64(abi_save_gpr_regs[num_abi_save_gpr_regs - 1 - i]));
@@ -303,6 +253,7 @@ public:
                 movdqu(Xbyak::Xmm(xmm_to_preserve_start + i), ptr[rsp + i * xmm_len]);
             add(rsp, xmm_to_preserve * xmm_len);
         }
+        uni_vzeroupper();
         ret();
     }
 
@@ -315,6 +266,7 @@ public:
         using Xbyak::Address;
         using Xbyak::RegExp;
 
+        assert(raw_offt <= INT_MAX);
         auto offt = static_cast<int>(raw_offt);
 
         int scale = 0;
@@ -337,6 +289,45 @@ public:
             return zword [re];
     }
 
+    Xbyak::Address make_safe_addr(const Xbyak::Reg64 &reg_out, size_t offt,
+        const Xbyak::Reg64 &tmp_reg, bool bcast = false) {
+        if (offt > INT_MAX) {
+            mov(tmp_reg, offt);
+            return bcast ? ptr_b[reg_out + tmp_reg] : ptr[reg_out + tmp_reg];
+        } else {
+            return bcast ? ptr_b[reg_out + offt] : ptr[reg_out + offt];
+        }
+    }
+
+    Xbyak::Address EVEX_compress_addr_safe(const Xbyak::Reg64 &base,
+        size_t raw_offt, const Xbyak::Reg64 &reg_offt, bool bcast = false) {
+        if (raw_offt > INT_MAX) {
+            return make_safe_addr(base, raw_offt, reg_offt, bcast);
+        } else {
+            return EVEX_compress_addr(base, raw_offt, bcast);
+        }
+    }
+
+    void safe_add(const Xbyak::Reg64 &base, size_t raw_offt,
+        const Xbyak::Reg64 &reg_offt) {
+        if (raw_offt > INT_MAX) {
+            mov(reg_offt, raw_offt);
+            add(base, reg_offt);
+        } else {
+            add(base, raw_offt);
+        }
+    }
+
+    void safe_sub(const Xbyak::Reg64 &base, size_t raw_offt,
+        const Xbyak::Reg64 &reg_offt) {
+        if (raw_offt > INT_MAX) {
+            mov(reg_offt, raw_offt);
+            sub(base, reg_offt);
+        } else {
+            sub(base, raw_offt);
+        }
+    }
+
     // Provide overrides for custom jit_tagged_label and C strings rather than
     // implement a conversion of jit_tagge_label to std::string to avoid
     // additional C++ runtime dependency
@@ -356,7 +347,11 @@ public:
     }
     void uni_vpxor(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2,
                    const Xbyak::Operand &op) {
-        vpxor(x1, x2, op);
+        if (mayiuse(avx2)) {
+            vpxor(x1, x2, op);
+        } else {
+            vxorps(x1, x2, op);
+        }
     }
     void uni_vpxor(const Xbyak::Zmm &x1, const Xbyak::Zmm &x2,
                    const Xbyak::Operand &op) {
@@ -409,7 +404,14 @@ public:
         shufps(x, x, 0x0);
     }
     void uni_vbroadcastss(const Xbyak::Ymm &x, const Xbyak::Operand &op) {
-        vbroadcastss(x, op);
+        if (mayiuse(avx2)) {
+            vbroadcastss(x, op);
+        } else {
+            Xbyak::Xmm t(x.getIdx());
+            if (t.getIdx() != op.getIdx()) movss(t, op);
+            vinsertf128(x, x, t, 1);
+            vshufps(x, x, x, 0);
+        }
     }
 
     void uni_vpbroadcastd(const Xbyak::Xmm &x, const Xbyak::Operand &op) {
@@ -417,7 +419,14 @@ public:
         pshufd(x, x, 0x0);
     }
     void uni_vpbroadcastd(const Xbyak::Ymm &x, const Xbyak::Operand &op) {
-        vpbroadcastd(x, op);
+        if (mayiuse(avx2)) {
+            vpbroadcastd(x, op);
+        } else {
+            Xbyak::Xmm t(x.getIdx());
+            if (t.getIdx() != op.getIdx()) movsd(t, op);
+            vinsertf128(x, x, t, 1);
+            vshufps(x, x, x, 0);
+        }
     }
 
     void uni_vdivps(const Xbyak::Xmm &x, const Xbyak::Operand &op1,
@@ -427,6 +436,20 @@ public:
     }
     void uni_vdivps(const Xbyak::Ymm &x, const Xbyak::Operand &op1,
                     const Xbyak::Operand &op2 = Xbyak::Operand()) {
+        vdivps(x, op1, op2);
+    }
+
+    void uni_vdivps(const Xbyak::Xmm &x, const Xbyak::Operand &op1,
+                    const Xbyak::Operand &op2, const Xbyak::Xmm &buf) {
+        movups(buf, op1);
+        divps(buf, op2);
+        if (x.getIdx() != buf.getIdx()) {
+            movups(x, buf);
+        }
+    }
+
+    void uni_vdivps(const Xbyak::Ymm &x, const Xbyak::Operand &op1,
+                    const Xbyak::Operand &op2, const Xbyak::Ymm &buf) {
         vdivps(x, op1, op2);
     }
 
@@ -457,6 +480,20 @@ public:
     }
     void uni_vsubps(const Xbyak::Ymm &x, const Xbyak::Operand &op1,
                     const Xbyak::Operand &op2 = Xbyak::Operand()) {
+        vsubps(x, op1, op2);
+    }
+
+    void uni_vsubps(const Xbyak::Xmm &x, const Xbyak::Operand &op1,
+                    const Xbyak::Operand &op2, const Xbyak::Xmm &buf) {
+        movups(buf, op1);
+        subps(buf, op2);
+        if (x.getIdx() != buf.getIdx()) {
+            movups(x, buf);
+        }
+    }
+
+    void uni_vsubps(const Xbyak::Ymm &x, const Xbyak::Operand &op1,
+                    const Xbyak::Operand &op2, const Xbyak::Ymm &buf) {
         vsubps(x, op1, op2);
     }
 
@@ -673,7 +710,8 @@ public:
             FILE *fp = mkldnn_fopen(fname, "w+");
             // Failure to dump code is not fatal
             if (fp) {
-                fwrite(code, getSize(), 1, fp);
+                size_t unused = fwrite(code, getSize(), 1, fp);
+                UNUSED(unused);
                 fclose(fp);
             }
         }
@@ -683,7 +721,7 @@ public:
     void register_code(const Xbyak::uint8 *code) const {
 #ifdef JIT_PROFILING_VTUNE
         if (iJIT_IsProfilingActive() == iJIT_SAMPLING_ON) {
-            iJIT_Method_Load jmethod = {0};
+            auto jmethod = iJIT_Method_Load();
             jmethod.method_id = iJIT_GetNewMethodID();
             jmethod.method_name = (char *)name();
             jmethod.class_file_name = NULL;
@@ -704,6 +742,7 @@ public:
         ) : Xbyak::CodeGenerator(code_size, code_ptr)
     {
     }
+    virtual ~jit_generator() {}
 
     virtual const char *name() const = 0;
     virtual const char *source_file() const = 0;

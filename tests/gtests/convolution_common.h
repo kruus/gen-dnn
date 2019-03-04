@@ -25,6 +25,8 @@
 #define ENGINE mkldnn::engine::kind::cpu
 #define ALGORITHM mkldnn::convolution_direct
 
+// Note: these are geared for testing JIT implementations.
+//       should these change for TARGET_VANILLA compile?
 #ifdef DIRECTION_FORWARD
 #define FMT_WEIGHTS_BLOCKED OIhw8i8o
 #define FMT_WEIGHTS_BLOCKED_G gOIhw8i8o
@@ -38,6 +40,7 @@
 #define FMT_WEIGHTS_BLOCKED16 OIhw4i16o4i
 #define FMT_WEIGHTS_BLOCKED16_G gOIhw4i16o4i
 #endif
+#define FMT_WEIGHTS_BLOCKED16_IOhw16o16i FMT_WEIGHTS_BLOCKED16
 #define TEST_CASE_NAME_PREFIX Forward
 #elif defined DIRECTION_BACKWARD_DATA
 #define FMT_WEIGHTS_BLOCKED OIhw8o8i
@@ -50,6 +53,8 @@
 #elif defined(S16S16S32)
 #define FMT_WEIGHTS_BLOCKED16 OIhw8o16i2o
 #define FMT_WEIGHTS_BLOCKED16_G gOIhw8o16i2o
+#define FMT_WEIGHTS_BLOCKED16_IOhw16o16i FMT_WEIGHTS_BLOCKED16
+#define FMT_WEIGHTS_BLOCKED16_G_IOhw16o16i FMT_WEIGHTS_BLOCKED16_G
 #endif
 #define TEST_CASE_NAME_PREFIX BackwardData
 #elif defined DIRECTION_BACKWARD_WEIGHTS
@@ -57,6 +62,8 @@
 #define FMT_WEIGHTS_BLOCKED_G gOIhw8i8o
 #define FMT_WEIGHTS_BLOCKED16 OIhw16i16o
 #define FMT_WEIGHTS_BLOCKED16_G gOIhw16i16o
+#define FMT_WEIGHTS_BLOCKED16_IOhw16o16i FMT_WEIGHTS_BLOCKED16
+#define FMT_WEIGHTS_BLOCKED16_G_IOhw16o16i FMT_WEIGHTS_BLOCKED16_G
 #define TEST_CASE_NAME_PREFIX BackwardWeights
 #endif
 

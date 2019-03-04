@@ -48,20 +48,21 @@ struct jit_conv_conf_t {
     conv_loop_order_t loop_order;
 #endif
 
+    int ndims;
     int mb;
-    int ngroups, ic, oc;
-    int ih, iw, oh, ow;
-    int l_pad, t_pad;
-    int r_pad, b_pad;
-    int kh, kw;
-    int stride_h, stride_w;
-    int dilate_h, dilate_w;
+    int ngroups, ic, oc, oc_without_padding, ic_without_padding;
+    int id, ih, iw, od, oh, ow;
+    int f_pad, l_pad, t_pad;
+    int back_pad, r_pad, b_pad;
+    int kd, kh, kw;
+    int stride_d, stride_h, stride_w;
+    int dilate_d, dilate_h, dilate_w;
     memory_format_t src_fmt;
     bool with_bias, with_relu;
     float relu_negative_slope;
     bool with_sum;
 
-    int ihp, iwp, ohp, owp;
+    int idp, ihp, iwp, ohp, owp;
     int nb_ic, ic_block;
     int nb_oc, oc_block;
     int nb_ic_blocking, nb_oc_blocking; // blocking of nb_ic and nb_ic
@@ -101,7 +102,61 @@ struct jit_conv_conf_t {
     int is_oc_scale;
     // dw conv
     int nb_ch, ch_block, nb_ch_blocking;
+    // [ejk] check...
+    bool is_depthwise;
+    int aligned_threads;
 #endif
+};
+
+struct jit_conv_conf_2x3_wino_t {
+#ifndef TARGET_VANILLA
+    conv_version_t ver;
+#endif
+
+    int m;
+    int r;
+    int alpha;
+    int tile_h, tile_w;
+
+    int mb;
+    int ngroups, ic, oc;
+    int ih, iw, oh, ow;
+    int l_pad, t_pad;
+    int r_pad, b_pad;
+    int kh, kw;
+    int stride_h, stride_w;
+    int dilate_h, dilate_w;
+
+    int nb_ic, ic_block;
+    int nb_oc, oc_block;
+
+    int w_block_size, h_block_size;
+
+    data_type_t bia_dt;
+    data_type_t dst_dt;
+
+    int is_oc_scale;
+    int typesize_in;
+    int typesize_out;
+    int typesize_bia;
+    int typesize_acc;
+
+    memory_format_t src_fmt;
+    bool with_bias, with_relu;
+    float relu_negative_slope;
+    bool with_sum;
+    bool small_mb;
+
+    int xb, yb;
+    int inp_stride;
+    int out_stride;
+    int wei_stride;
+    int bia_stride;
+
+    int M, N, K;
+    int m_block, n_block, k_block;
+    int n2_block, n_chunks;
+    int k2_block, k_chunks;
 };
 
 /*
@@ -136,8 +191,8 @@ enum winograd_sched_t {
 
     /* Backward-weights */
     WSCHED_WEI_S_D_G_W,
-    WSCHED_WEI_S_D_Giot_W,
     WSCHED_WEI_SDGtWo,
+    WSCHED_WEI_S_D_Giot_W,
     WSCHED_WEI_SDGt_W,
 };
 
@@ -145,15 +200,18 @@ struct jit_conv_winograd_conf_t : public jit_conv_conf_t {
     int itiles;
     int jtiles;
     int ntiles;
-    int ic_simd_block;
+    int ic_simd_block=16;
     int tile_4fma_padding;
     int tile_4fma;
-    int oc_simd_block;
+    int oc_simd_block=16;
+    int oc_reg_block;
+    int ic_reg_block;
     int tile_block;
     int tile_block_ur;
     int nb_tile_block_ur;
 
     bool double_buffering;
+    bool with_relu_postsum;
     int zmm_start;
     int nb_reg;
 
@@ -164,12 +222,14 @@ struct jit_conv_winograd_conf_t : public jit_conv_conf_t {
     int dimK_nb_block;
 
     int dimM;
+    int dimM_reg_block;
     int dimM_simd_block;
     int dimM_block;
     int dimM_nb_block;
 
     int dimN;
     int dimN_reg_block;
+    int dimN_bcast_ur;
     int dimN_block;
     int dimN_nb_block;
 
@@ -188,6 +248,8 @@ struct jit_conv_call_s {
     const void *bias_prf;
     const void *scales;
     const void *acc_s32;
+    size_t kd_padding;
+    size_t kd_padding_prf;
     size_t kh_padding;
     size_t kh_padding_prf;
     size_t kw_padding;
@@ -202,12 +264,30 @@ struct jit_conv_call_s {
 #endif
 
 #ifndef TARGET_VANILLA
+struct jit_wino_transform_call_s {
+    size_t tile_block;
+    size_t tile_block_ur;
+    size_t nb_tile_block_ur;
+    size_t tile_count;
+    size_t tj;
+    size_t ti;
+    void *src;
+    void *dst;
+    void *Mw;
+    void *M;
+    void *T;
+    void *G;
+    void *bias;
+};
+#endif
+
+#ifndef TARGET_VANILLA
 struct jit_1x1_conv_conf_t {
     prop_kind_t prop_kind;
     conv_version_t ver;
 
     int mb;
-    int ngroups, ic, oc;
+    int ngroups, ic, oc, oc_without_padding, ic_without_padding;
     int iw, ih, ow, oh;
     int l_pad, t_pad;
     int kh, kw;
@@ -260,18 +340,21 @@ struct jit_gemm_conv_conf_t {
 
     int mb;
     int ngroups, ic, oc;
-    int iw, ih, ow, oh;
-    int l_pad, t_pad;
-    int kh, kw;
-    int stride_h, stride_w;
-    int dilate_h, dilate_w;
+    int iw, ih, id, ow, oh, od;
+    int l_pad, t_pad, f_pad;
+    int kh, kw, kd;
+    int stride_h, stride_w, stride_d;
+    int dilate_h, dilate_w, dilate_d;
     memory_format_t src_fmt;
     bool with_bias, with_relu;
     float relu_negative_slope;
 
     int is, os, ks;
     int ic_block, oc_block;
-    bool need_im2col;
+
+    int nthr;
+    ptrdiff_t im2col_sz;
+    bool need_wei_reduction;
 };
 #endif
 
@@ -290,22 +373,24 @@ struct jit_1x1_conv_call_s {
 
     size_t output_stride; // used in backward_weights only
 
-    size_t reduce_pos_flag;
+    size_t first_last_flag;
 };
 #endif
 
 #ifndef TARGET_VANILLA
 /* pooling */
 struct jit_pool_conf_t {
+    int ndims;
     int mb, c;
-    int ih, iw, oh, ow;
-    int stride_h, stride_w;
-    int kh, kw;
-    int t_pad, l_pad;
+    int id, ih, iw, od, oh, ow;
+    int stride_d, stride_h, stride_w;
+    int kd, kh, kw;
+    int f_pad, t_pad, l_pad;
     alg_kind_t alg;
     bool is_training;
     bool pad_w_is_null;
     bool is_backward;
+    bool simple_alg;
     data_type_t ind_dt;
 
     int c_block, c_tail, nb_c;
@@ -327,8 +412,10 @@ struct jit_pool_call_s {
     const float *dst_prf;
     const void *indices_prf;
     size_t oh;
+    size_t kd_padding;
     size_t kh_padding;
     size_t kh_padding_shift;
+    size_t kd_padding_shift;
     size_t kw_padding;
     const float* init_value;
     float ker_area_h;

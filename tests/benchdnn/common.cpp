@@ -18,53 +18,25 @@
 #include <limits.h>
 #include <assert.h>
 
+#include "mkldnn.h"
+
 #include "common.hpp"
-
-static const char *modes[] = { "CORR", "PERF", "TEST", "ALL" };
-static int const lenmax = sizeof "CORR+PERF+TEST+ALL"; // max-length result
-static char bench_mode_string[lenmax];
-
 const char *bench_mode2str(bench_mode_t mode) {
-    assert( (int)mode < 2*(int)ALL );
-    if(mode==MODE_UNDEF)
-        return "MODE_UNDEF";
-    bench_mode_string[0] = '\0';
-
-    char *b = &bench_mode_string[0];
-    int len = lenmax;
-    char const* sep = "";
-    auto add_mode = [&](char const* m) {
-        int const n = snprintf(b, len, "%s%s",sep,m);
-        assert(n>0);
-        if( n>len ){ /*b[len-1]='\0';*/ len=0;}
-        else {b+=n; len-=n;}
-        sep="+";
+    const char *modes[] = {
+        "MODE_UNDEF", "CORR", "PERF", "CORR+PERF"
     };
-    if ((mode & CORR)) {add_mode(modes[0]); }
-    if ((mode & PERF)) {add_mode(modes[1]); }
-    if ((mode & TEST)) {add_mode(modes[2]); }
-    if ((mode & ALL )) {add_mode(modes[3]); }
-    return const_cast<const char*>(&bench_mode_string[0]);
+    assert((int)mode < 4);
+    return modes[(int)mode];
 }
 
 bench_mode_t str2bench_mode(const char *str) {
-    /* corr perf all test : c p a t each occur in exactly 1 position (good) */
     bench_mode_t mode = MODE_UNDEF;
     if (strchr(str, 'c') || strchr(str, 'C'))
         mode = (bench_mode_t)((int)mode | (int)CORR);
     if (strchr(str, 'p') || strchr(str, 'P'))
         mode = (bench_mode_t)((int)mode | (int)PERF);
-    if (strchr(str, 'a') || strchr(str, 'A'))
-        mode = (bench_mode_t)((int)mode | (int)ALL);
-    if (strchr(str, 't') || strchr(str, 'T') )
-        mode = (bench_mode_t)((int)mode | (int)TEST);
-    if (mode == MODE_UNDEF){
-        print(0," bad mode: %s\n", str);
+    if (mode == MODE_UNDEF)
         []() { SAFE(FAIL, CRIT); return 0; }();
-    }
-    /* ALL implies CORR if neither CORR nor PERF is specified */
-    if ( (mode & ALL) && ! (mode & PERF || mode & CORR) )
-        mode = (bench_mode_t)((int)mode | (int)CORR);
     return mode;
 }
 
@@ -192,7 +164,7 @@ void parse_result(res_t &res, bool &want_perf_report, bool allow_unimpl,
         assert(status == OK);
         print(0, "%d:%s __REPRO: %s\n", bs.tests, state, pstr);
         want_perf_report = true;
-        //bs.passed++;
+        bs.passed++;
         break;
     default:
         assert(!"unknown state");
@@ -207,7 +179,6 @@ void parse_result(res_t &res, bool &want_perf_report, bool allow_unimpl,
 }
 
 /* misc */
-#if ! defined(_SX)
 void *zmalloc(size_t size, size_t align) {
     void *ptr;
 #ifdef _WIN32
@@ -222,6 +193,7 @@ void *zmalloc(size_t size, size_t align) {
 #endif /* _WIN32 */
     return rc == 0 ? ptr : 0;
 }
+
 void zfree(void *ptr) {
 #ifdef _WIN32
     _aligned_free(ptr);
@@ -229,13 +201,6 @@ void zfree(void *ptr) {
     return ::free(ptr);
 #endif /* _WIN32 */
 }
-
-#else // SX architecture does not have/need posix_memalign
-inline void *zmalloc(size_t size, size_t align) {
-    return ::malloc(size);
-}
-inline void zfree(void *ptr) { return ::free(ptr); }
-#endif
 
 bool str2bool(const char *str) {
     return !strcasecmp("true", str) || !strcasecmp("1", str);
@@ -314,7 +279,7 @@ bool maybe_skip(const char *skip_impl, const char *impl_str) {
     return false;
 }
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__GNUC__)
 #include <windows.h>
 #define PATH_MAX MAX_PATH
 static char *dirname(char *path) {
@@ -329,7 +294,7 @@ static char *dirname(char *path) {
 }
 #else
 #include <libgen.h>
-#endif /* WIN32 */
+#endif /* _WIN32 */
 
 FILE *open_batch_file(const char *fname) {
     const int max_paths = 4;
@@ -340,7 +305,8 @@ FILE *open_batch_file(const char *fname) {
     char *fdir = NULL;
     {
         char fname_copy[PATH_MAX];
-        strncpy(fname_copy, fname, PATH_MAX);
+        strncpy(fname_copy, fname, PATH_MAX - 1);
+        fname_copy[PATH_MAX - 1] = '\0';
         fdir = dirname(fname_copy);
     }
 
@@ -350,15 +316,17 @@ FILE *open_batch_file(const char *fname) {
             dir_found = true;
             break;
         }
-    if (!dir_found)
+    if (!dir_found) {
+        SAFE_V(n_paths < max_paths ? OK : FAIL);
         strcpy(search_paths[n_paths++], fdir);
+    }
 
     FILE *fp = fopen(fname, "r");
     if (fp) return fp;
 
     for (int n = 0; n < n_paths; ++n) {
-        char fullname[PATH_MAX];
-        snprintf(fullname, PATH_MAX, "%s/%s", search_paths[n], fname);
+        char fullname[PATH_MAX + 2];
+        snprintf(fullname, PATH_MAX + 2, "%s/%s", search_paths[n], fname);
         fp = fopen(fullname, "r");
         print(50, "batch file used: %s\n", fullname);
         if (fp) break;
@@ -399,4 +367,34 @@ int batch(const char *fname, bench_f bench) {
     fclose(fp);
 
     return OK;
+}
+
+int flip_coin(ptrdiff_t seed, float probability) {
+    const ptrdiff_t big_prime = 1000003;
+    const ptrdiff_t prime = 753737;
+    seed *= prime;
+    return (seed % big_prime) < (probability * big_prime);
+}
+
+int div_up(const int a, const int b){
+    SAFE_V(b != 0 ? OK : FAIL);
+    return (a + b - 1) / b;
+}
+
+void array_set(char *arr, size_t size) {
+    for (size_t i = 0; i < size; ++i)
+        arr[i] = 0;
+}
+
+void gemm(const char *layout, const char *transa, const char *transb,
+        int m, int n, int k, const float alpha, const float *a, const int lda,
+        const float *b, const int ldb, const float beta, float *c,
+        const int ldc ) {
+    if (*layout == 'F') {
+        mkldnn_sgemm(transa, transb, &m, &n, &k, &alpha, a, &lda, b, &ldb,
+                &beta, c, &ldc);
+    } else {
+        mkldnn_sgemm(transb, transa, &n, &m, &k, &alpha, b, &ldb, a, &lda,
+                &beta, c, &ldc);
+    }
 }

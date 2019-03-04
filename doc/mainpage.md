@@ -5,47 +5,48 @@ The Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN) is 
 open source performance library for Deep Learning (DL) applications intended
 for acceleration of DL frameworks on Intel(R) architecture. Intel MKL-DNN
 includes highly vectorized and threaded building blocks for implementation of
-convolutional neural networks (CNN) and reccurent neural networks (RNN) with
+convolutional neural networks (CNNs) and reccurent neural networks (RNNs) with
 C and C++ interfaces. This project is created to help the DL community innovate
 on the Intel(R) processor family.
 
-The library supports the most commonly used primitives necessary to accelerate
-bleeding edge image recognition topologies, including Cifar*, AlexNet*, VGG*,
-GoogleNet*, and ResNet*. The primitives include convolution, inner product,
-pooling, normalization, and activation with support for inference
-operations. The library includes the following classes of functions:
+The library provides optimized implementations for the most common
+computational functions (also called primitives) used in deep neural
+networks covering a wide range of applications, including image recognition,
+object detection, semantic segmentation, neural machine translation,
+and speech recognition.
+The table below summarizes the list of supported functions and their variants.
 
-* Convolution
-    - direct batched convolution
-* Inner Product
-* Pooling
-    - maximum
-    - average
-* Normalization
-    - local response normalization (LRN) across channels and within channel
-    - batch normalization
-
-* Activation
-    - rectified linear unit neuron activation (ReLU)
-    - softmax
-
-* Data manipulation
-    - reorder (multi-dimensional transposition/conversion),
-    - sum,
-    - concat
-    - view
-
-Also the library contains experimental support of RNN primitives to accelerate
-speech recognition and neural machine translation topologies. The experemental
-support includes the following classes of functions:
-
-* RNN
-    - RNN cell
-    - LSTM cell
-
-Intel MKL DNN primitives implement a plain C/C++ application programming
-interface (API) that can be used in the existing C/C++ DNN frameworks, as well
-as in custom DNN applications.
+| Primitive class   | Primitive                | fp32 training | fp32 inference | int8 inference |
+| :---------------- | :----------------------- | :-----------: | :------------: | :------------: |
+| Convolution       | 2D direct convolution    | x             | x              | x              |
+|                   | 2D direct deconvolution  | x             | x              | x              |
+|                   | 2D winograd convolution  | x             | x              | x              |
+|                   | 3D direct convolution    | x             | x              |                |
+|                   | 3D direct deconvolution  | x             | x              |                |
+| Inner Product     | 2D inner product         | x             | x              |                |
+|                   | 3D inner product         | x             | x              |                |
+| RNN (experimental)| Vanilla RNN cell         | x             | x              |                |
+|                   | LSTM cell                | x             | x              |                |
+|                   | GRU cell                 | x             | x              |                |
+| Pooling           | 2D maximum pooling       | x             | x              | x              |
+|                   | 2D average pooling       | x             | x              | x              |
+|                   | 3D maximum pooling       | x             | x              |                |
+|                   | 3D average pooling       | x             | x              |                |
+| Normalization     | 2D LRN (within channel)  | x             | x              |                |
+|                   | 2D LRN (across channels) | x             | x              |                |
+|                   | 2D batch normalization   | x             | x              |                |
+|                   | 3D Batch Normalization   | x             | x              |                |
+| Activation        | ReLU                     | x             | x              | x              |
+|                   | Tanh                     |               | x              |                |
+|                   | ELU                      |               | x              |                |
+|                   | Bounded ReLU             |               | x              |                |
+|                   | Soft ReLU                |               | x              |                |
+|                   | Logistic regression      |               | x              |                |
+|                   | Softmax                  | x             | x              |                |
+| Data manipulation | Reorder/quantization     | x             | x              | x              |
+|                   | Sum                      | x             | x              | x              |
+|                   | Concat                   | x             | x              | x              |
+|                   | Elementwise operations   |               | x              |                |
 
 ## Programming Model
 
@@ -112,7 +113,7 @@ To create an operation primitive:
 
 1. Create a logical description of the operation. For example, the description
    of a convolution operation contains parameters such as sizes, strides, and
-   propagation type. It also contains the input and outpumemory descriptors.
+   propagation type. It also contains the input and output memory descriptors.
 2. Create a primitive descriptor by attaching the target engine to the logical
    description.
 3. Create an instance of the primitive and specify the input and output
@@ -139,6 +140,9 @@ The following examples are available in the /examples directory and provide more
 
 * Creation of forward propagation of GNMT topology (experimental support)
     - C++: simple_rnn.cpp
+
+* Training RNN with sequences of variable length
+    - C++: simple_rnn_training.cpp
 
 ### Performance Considerations
 
@@ -173,10 +177,11 @@ The following link provides a guide to MKLDNN verbose mode for profiling executi
    tells the backward operation what exact implementation is chosen for
    the primitive on forward propagation. This in turn helps the backward operation
    to decode the workspace memory correctly.
-*  You should always check the correspondance between current data format and
+*  You should always check the correspondence between current data format and
    the format that is required by a primitive. For instance, forward convolution
    and backward convolution with respect to source might choose different memory
-   formats for weights (if created with `any`). In this case, you should create a reorder primitive for weights. 
+   formats for weights (if created with `any`). In this case, you should create
+   a reorder primitive for weights.
    Similarly, a reorder primitive might be required for a source data between
    forward convolution and backward convolution with respect to weights.
 
@@ -188,6 +193,16 @@ The following link provides a guide to MKLDNN verbose mode for profiling executi
   structure specifies which output of the primitive to use as an input for
   another primitive. For a memory primitive the index is always `0`
   because it does not have a output.
+
+
+## Architecture and design of Intel MKL-DNN
+
+For better understanding the architecture and design of Intel MKL-DNN
+as well as the concepts used in the library please read the following
+topics:
+
+[Understanding Memory Formats](@ref understanding_memory_formats)
+
 
 --------
 

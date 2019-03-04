@@ -27,6 +27,7 @@ INST_TEST_CASE(AlexNet_NCHW,
         2, 2, 384, 13, 13, 256, 13, 13, 3, 3, 1, 1, 1, 1)
 );
 
+#if MKLDNN_JIT_TYPES > 0
 INST_TEST_CASE(AlexNet_Blocked,
     PARAMS(nchw, Ohwi8o, FMT_BIAS, FMT_DATA_BLOCKED,
         2, 1, 3, 227, 227, 96, 55, 55, 11, 11, 0, 0, 4, 4),
@@ -41,7 +42,9 @@ INST_TEST_CASE(AlexNet_Blocked,
     PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_G, FMT_BIAS, FMT_DATA_BLOCKED,
         2, 2, 384, 13, 13, 256, 13, 13, 3, 3, 1, 1, 1, 1)
 );
+#endif
 
+#if MKLDNN_JIT_TYPES > 0
 INST_TEST_CASE(AlexNet_Blocked16,
     PARAMS(nchw, Ohwi16o, FMT_BIAS, FMT_DATA_BLOCKED16,
         2, 1, 3, 227, 227, 96, 55, 55, 11, 11, 0, 0, 4, 4),
@@ -56,3 +59,4 @@ INST_TEST_CASE(AlexNet_Blocked16,
     PARAMS(FMT_DATA_BLOCKED16, FMT_WEIGHTS_BLOCKED16_G, FMT_BIAS, FMT_DATA_BLOCKED16,
         2, 2, 384, 13, 13, 256, 13, 13, 3, 3, 1, 1, 1, 1)
 );
+#endif
