@@ -187,10 +187,14 @@ endmacro()
 #     If so, this might be better than any hard-wired path we might wish to use.
 # [a] if $CC is some ncc, use that; else use 'ncc'
 set(_compiler FALSE)
+set(_need_musl FALSE)
 if(EXISTS "$ENV{CC}")
     execute_process(COMMAND $ENV{CC} --version OUTPUT_VARIABLE _cLangVersion ERROR_VARIABLE _ccVersion)
     if(${_ccVersion} MATCHES "^ncc")
         set(_compiler $ENV{CC})
+        if(${_ccVersion} MATCHES ".NCC. 1")
+            set(_need_musl TRUE)
+        endif()
     elseif(${_cLangVersion} MATCHES "^clang")
         set(_compiler $ENV{CC})
         set(CMAKE_C_FLAGS "--target=ve-linux -fno-vectorize -fno-slp-vectorize -fno-crash-diagnostics")
@@ -203,6 +207,9 @@ if(NOT _compiler) # OK, CC is not an ncc.  Is there an 'ncc' in current path?
     execute_process(COMMAND ncc --version OUTPUT_QUIET ERROR_VARIABLE _ccVersion)
     if(${_ccVersion} MATCHES "^ncc")
         set(_compiler "ncc")
+        if(${_ccVersion} MATCHES ".NCC. 1")
+            set(_need_musl TRUE)
+        endif()
     endif()
 endif()
 if(_compiler)
@@ -214,8 +221,8 @@ if(_compiler)
           MESSAGE(STATUS "CMAKE_C_FLAGS ${CMAKE_C_FLAGS}")
         endforeach()
     else()
-      MESSAGE(STATUS "Determining clang system include directories")
-      DETERMINE_NCC_SYSTEM_INCLUDES_DIRS(ncc "-pthread" VE_C_SYSINC VE_C_PREINC)
+      MESSAGE(STATUS "Determining system include directories")
+      DETERMINE_NCC_SYSTEM_INCLUDES_DIRS(${_compiler} "-pthread" VE_C_SYSINC VE_C_PREINC)
     endif()
     message(STATUS "ve.cmake [test]:  C pre-inc dirs  : ${VE_C_PREINC}")
     message(STATUS "ve.cmake [test]:  C sys-inc dirs  : ${VE_C_SYSINC}")
@@ -341,24 +348,29 @@ message(STATUS "VE_EXEC ends up as ${VE_EXEC}")
 
 # VE libc and other libs
 # ? find_library c ... ?
-set(VE_MUSL_DIR "${VE_OPT}/musl" CACHE PATH "Aurora musl directory")
-set(VE_MUSL_FLAGS " -I${VE_MUSL_DIR}/include -L${VE_MUSL_DIR}/lib" CACHE STRING "Aurora C/CXX compile/link options. ncc/nc++ auto uses the include path!")
-if(NOT EXISTS ${VE_MUSL_DIR})
-    message(WARNING "ve.cmake: VE musl directory not found")
-endif()
-message(STATUS "VE_MUSL_DIR [libc]          : ${VE_MUSL_DIR}")
-message(STATUS "VE_MUSL_FLAGS               : ${VE_MUSL_FLAGS}")
-# VE_MUSL_DIR seems OK
-# Note: MUSL is **always** included for you by ncc/nc++
-
-if(VE_MUSL_DIR)
-    list(APPEND CMAKE_FIND_ROOT_PATH ${VE_MUSL_DIR})
-    list(APPEND CMAKE_SYSTEM_PREFIX_PATH ${VE_MUSL_DIR})
-    message(STATUS "CMAKE_SYSTEM_PREFIX_PATH -> ${CMAKE_SYSTEM_PREFIX_PATH}")
-    # TODO actually check that the function 'dlopen' is there
-    # Note: linker is auto-supplied ld-musl-ve via ncc/nc++ [I think]
-    find_library(VE_DL_LIBRARY NAMES ld-musl-ve c dl# there is no libdl.a for dlopen,...
-        NO_DEFAULT_PATH HINTS ${VE_MUSL_DIR}/lib)
+if(${_need_musl})
+    set(VE_MUSL_DIR "${VE_OPT}/musl" CACHE PATH "Aurora musl directory")
+    set(VE_MUSL_FLAGS " -I${VE_MUSL_DIR}/include -L${VE_MUSL_DIR}/lib" CACHE STRING "Aurora C/CXX compile/link options. ncc/nc++ auto uses the include path!")
+    if(NOT EXISTS ${VE_MUSL_DIR})
+        message(WARNING "ve.cmake: VE musl directory not found")
+    endif()
+    message(STATUS "VE_MUSL_DIR [libc]          : ${VE_MUSL_DIR}")
+    message(STATUS "VE_MUSL_FLAGS               : ${VE_MUSL_FLAGS}")
+    # VE_MUSL_DIR seems OK
+    # Note: MUSL is **always** included for you by ncc/nc++
+    
+    if(VE_MUSL_DIR)
+        list(APPEND CMAKE_FIND_ROOT_PATH ${VE_MUSL_DIR})
+        list(APPEND CMAKE_SYSTEM_PREFIX_PATH ${VE_MUSL_DIR})
+        message(STATUS "CMAKE_SYSTEM_PREFIX_PATH -> ${CMAKE_SYSTEM_PREFIX_PATH}")
+        # TODO actually check that the function 'dlopen' is there
+        # Note: linker is auto-supplied ld-musl-ve via ncc/nc++ [I think]
+        find_library(VE_DL_LIBRARY NAMES ld-musl-ve c dl# there is no libdl.a for dlopen,...
+            NO_DEFAULT_PATH HINTS ${VE_MUSL_DIR}/lib)
+        set(VE_DL_LIBRARY ${VE_DL_LIBRARY} CACHE PATH "Library that may contain a dlopen function")
+    endif()
+else()
+    find_library(VE_DL_LIBRARY NAMES dl)
     set(VE_DL_LIBRARY ${VE_DL_LIBRARY} CACHE PATH "Library that may contain a dlopen function")
 endif()
 
@@ -400,7 +412,7 @@ function(NLC_PRELIM_SETTINGS)
             message(STATUS "  using NLC_HOME from environment: ${NLC_HOME} (assuming nlcvar.{sh|csh} has been sourced)")
             set(NLC_VERSION "$ENV{NLC_VERSION}")
             set(NLC_HOME "$ENV{NLC_HOME}")
-            set(ASL_HOME "$ENV{ASL_HOME")
+            set(ASL_HOME "$ENV{ASL_HOME}")
             set(NLC_LIB_I64 "$ENV{NLC_LIB_I64}")
             set(ASL_LIB_I64 "$ENV{ASL_LIB_I64}")
             set(NLC_LIB_MPI "$ENV{NLC_LIB_MPI}")
