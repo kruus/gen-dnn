@@ -314,9 +314,9 @@ void vednnx_convolution_bwd_data_t
     // mkl-dnn uses bias, but just for sanity checking
     vednnError_t const status
         = vednnConvolutionBackwardData(
-                &tpGradIn , diff_dst,
+                &tpGradOut , diff_dst,
                 &tpKrn    , weights,
-                &tpGradOut, diff_src,
+                &tpGradIn, diff_src,
                 &parm, VEDNN_CONV_ALGORITHM_DIRECT );
     assert(status == VEDNN_SUCCESS);
     //Consistency ok("vednn-bkwd"); SHCKV(ok,status==VEDNN_SUCCESS); //?
@@ -482,7 +482,7 @@ void vednnx_convolution_bwd_weights_t
                         //    mb, g*OC + oc, oh, ow)];
                         // libvednn supports only nchw ...
                         d += (acc_data_t)diff_dst[ mb*G*OC*OH*OW
-                            + (g*OC*oc)*OH*OW + oh*OW + ow ];
+                            + (g*OC+oc)*OH*OW + oh*OW + ow ];
                     }
                 }
             //}
