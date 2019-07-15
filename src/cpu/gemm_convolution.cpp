@@ -333,35 +333,35 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() {
     }
 }
 #endif
-#if 1 // ncc has issues here.
+#if VE_OPENMP_BUG
 void gemm_convolution_bwd_weights_t::execute_backward_weights_bias() {
-    auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
+    //auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
-    auto diff_weights = reinterpret_cast<data_t*>(this->memory(0));
+    //auto diff_weights = reinterpret_cast<data_t*>(this->memory(0));
     auto diff_bias = reinterpret_cast<data_t *>(this->memory(1));
 
     jit_gemm_conv_conf_t &jcp = this->conf_.jcp_;
     const int K = jcp.os * jcp.od;
-    const size_t src_step = jcp.ic * jcp.ih * jcp.iw * jcp.id;
+    //const size_t src_step = jcp.ic * jcp.ih * jcp.iw * jcp.id;
     const size_t dst_step = jcp.oc * K;
-    const size_t weights_g_size = jcp.ic * jcp.oc * jcp.ks;
+    //const size_t weights_g_size = jcp.ic * jcp.oc * jcp.ks;
 
-    const int k = jcp.os;
-    const int N = jcp.oc;
-    const int M = jcp.ic * jcp.ks;
-    const int LDA = jcp.im2col_sz ? k : K;
-    const data_t zero = 0.0, one = 1.0;
+    //const int k = jcp.os;
+    //const int N = jcp.oc;
+    //const int M = jcp.ic * jcp.ks;
+    //const int LDA = jcp.im2col_sz ? k : K;
+    //const data_t zero = 0.0, one = 1.0;
 
-    data_t *col = nullptr, *wei_reduction = nullptr;
-    ptrdiff_t wei_offset = 0;
-    if (jcp.im2col_sz) {
-        col = (data_t *)this->scratchpad_->get();
-        wei_offset = jcp.im2col_sz * jcp.nthr;
-    }
-    if (jcp.need_wei_reduction)
-        wei_reduction = (data_t *)this->scratchpad_->get() + wei_offset;
+    //data_t *col = nullptr, *wei_reduction = nullptr;
+    //ptrdiff_t wei_offset = 0;
+    //if (jcp.im2col_sz) {
+    //    col = (data_t *)this->scratchpad_->get();
+    //    wei_offset = jcp.im2col_sz * jcp.nthr;
+    //}
+    //if (jcp.need_wei_reduction)
+    //    wei_reduction = (data_t *)this->scratchpad_->get() + wei_offset;
 #if 0
-    // weights update, omp loop
+    // weights update, omp loop -- see 
 #endif
 #if 1
     if (jcp.with_bias) {

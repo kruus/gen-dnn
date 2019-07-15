@@ -42,7 +42,9 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
     auto diff_weights = reinterpret_cast<data_t*>(this->memory(0));
+#if ! VE_OPENMP_BUG
     auto diff_bias = reinterpret_cast<data_t *>(this->memory(1));
+#endif
 
     jit_gemm_conv_conf_t &jcp = this->conf_.jcp_;
     const int K = jcp.os * jcp.od;
@@ -132,7 +134,11 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() {
             }
     }
     }while(0);
-#if 0
+#if VE_OPENMP_BUG
+    if (jcp.with_bias) {
+        execute_backward_weights_bias();
+    }
+#else
     if (jcp.with_bias) {
         const size_t work_amount = jcp.ngroups * jcp.oc;
         OMP(parallel)//;
@@ -164,10 +170,6 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() {
                 nd_iterator_step(g, jcp.ngroups, oc, jcp.oc);
             }
         }
-    }
-#else
-    if (jcp.with_bias) {
-        execute_backward_weights_bias();
     }
 #endif
 }

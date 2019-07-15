@@ -393,7 +393,8 @@ struct gemm_convolution_bwd_weights_t: public cpu_primitive_t {
 
 private:
     void execute_backward_weights();
-#if defined(__ve) // workaround openmp issues?
+#define VE_OPENMP_BUG (defined(__ve) && 1)
+#if VE_OPENMP_BUG
     void execute_backward_weights_bias();
 #endif
     pd_t conf_;
