@@ -14,65 +14,27 @@
 # limitations under the License.
 #===============================================================================
 
-set(TARGET_NAME ${LIB_NAME})
-
 file(GLOB_RECURSE HEADERS
+    ${PROJECT_BINARY_DIR}/include/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.hpp
     )
-file(GLOB_RECURSE SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/common/*.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/common/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/common/*.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/common/*.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/io/*.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/io/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/io/*.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/io/*.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/${CPU_DIR}/*.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/${CPU_DIR}/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/${CPU_DIR}/*.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/${CPU_DIR}/*.hpp
-    )
-
-set(CPU_INCLUDE_DIRS)
-set(CPU_INCLUDE_SRC_SUBDIRS) # this can be a list of subdirectories of src/
-if(TARGET_JIT)
-	if(NOT TARGET_VANILLA)
-		set(CPU_INCLUDE_SRC_SUBDIRS cpu/xbyak) # this can be a list of subdirectories of src/
-	endif()
-endif()
-# prefix any directories in CPU_INCLUDE_SRC_SUBDIRS with ${CMAKE_CURRENT_SOURCE_DIR}
-string(REGEX REPLACE "([^;]+)" "${CMAKE_CURRENT_SOURCE_DIR}/\\1" CPU_INCLUDE_DIRS "${CPU_INCLUDE_SRC_SUBDIRS}")
-if(NECVE) # AND TARGET_VANILLA?
-    list(APPEND CPU_INCLUDE_DIRS
-        ${PROJECT_SOURCE_DIR}/vejit/include
-        ${PROJECT_SOURCE_DIR}/vednnx/include)
-    file(GLOB VEJIT_LIBS ${PROJECT_SOURCE_DIR}/vejit/bin/*.a)
-    if(USE_OPENMP)
-        file(GLOB VEDNNX_LIBS ${PROJECT_SOURCE_DIR}/vednnx/lib/*openmp.a)
-    else()
-        file(GLOB VEDNNX_LIBS ${PROJECT_SOURCE_DIR}/vednnx/lib/*sequential.a)
-    endif()
-    list(APPEND EXTRA_LIBS ${VEJIT_LIBS} ${VEDNNX_LIBS})
-endif()
-message(STATUS " original CPU_INCLUDE_SRC_SUBDIRS : ${CPU_INCLUDE_SRC_SUBDIRS}")
-message(STATUS " extra CPU include directories    : ${CPU_INCLUDE_DIRS}")
-message(STATUS " extra libs                       : ${EXTRA_LIBS}")
-
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/common
-    ${CPU_INCLUDE_DIRS}
     )
 
 # propagate SRC specific flags
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_SRC_CCXX_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_SRC_CCXX_FLAGS}")
+append(CMAKE_C_FLAGS "${CMAKE_SRC_CCXX_FLAGS}")
+append(CMAKE_CXX_FLAGS "${CMAKE_SRC_CCXX_FLAGS}")
 
 # propagate no warning flags
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_NOWARN_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_NOWARN_FLAGS}")
+append(CMAKE_C_FLAGS "${CMAKE_CCXX_NOWARN_FLAGS}")
+append(CMAKE_CXX_FLAGS "${CMAKE_CCXX_NOWARN_FLAGS}")
+
+# propagate sanitizer flags
+append(CMAKE_C_FLAGS "${CMAKE_CCXX_SANITIZER_FLAGS}")
+append(CMAKE_CXX_FLAGS "${CMAKE_CCXX_SANITIZER_FLAGS}")
 
 if(NOT MKLDNN_VERBOSE)
     add_definitions(-DDISABLE_VERBOSE)
@@ -82,9 +44,14 @@ if(MKLDNN_ENABLE_CONCURRENT_EXEC)
     add_definitions(-DMKLDNN_ENABLE_CONCURRENT_EXEC)
 endif()
 
-if(VTUNEROOT)
-    include_directories(${VTUNEROOT}/include)
-    add_definitions(-DJIT_PROFILING_VTUNE)
+if(NOT MKLDNN_ENABLE_JIT_PROFILING)
+    # XXX: the profiling interface will still be built and present in the
+    # library
+    message(STATUS "Intel\r VTune\t Amplifier JIT profiling disabled")
+    add_definitions(-DMKLDNN_ENABLE_JIT_PROFILING=0)
+elseif(UNIX AND NOT APPLE)
+    # Not every compiler adds -ldl automatically
+    list(APPEND EXTRA_SHARED_LIBS "${CMAKE_DL_LIBS}")
 endif()
 
 if(WIN32)
@@ -92,65 +59,99 @@ if(WIN32)
     add_definitions(-DNOMINMAX)
     # Correct 'jnl' macro/jit issue
     if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Qlong-double")
+        append(CMAKE_CXX_FLAGS "/Qlong-double")
     endif()
 endif()
 
-#if(NECSX)
-#    add_library(${TARGET_NAME}        ${HEADERS} ${SOURCES})
-#else()
-#    if(USE_SHAREDLIB)
-#        add_library(${TARGET_NAME} SHARED ${HEADERS} ${SOURCES})
-#    else()
-#        add_library(${TARGET_NAME} STATIC ${HEADERS} ${SOURCES})
-#    endif()
-#endif()
+add_subdirectory(common)
+add_subdirectory(cpu)
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-    # to make computations more stable and to align the jitted code
-    # with the reference one use precise division and square root
-    # by default
-    file(GLOB FILES_REQUIRED_PREC_DIV_SQRT
-        ${CMAKE_CURRENT_SOURCE_DIR}/cpu/*normalization*.cpp)
-    if(WIN32)
-        set_source_files_properties(${FILES_REQUIRED_PREC_DIV_SQRT}
-            PROPERTIES COMPILE_FLAGS "/Qprec-div /Qprec-sqrt")
-    else()
-        set_source_files_properties(${FILES_REQUIRED_PREC_DIV_SQRT}
-            PROPERTIES COMPILE_FLAGS "-prec-div -prec-sqrt")
-    endif()
+if(MKLDNN_GPU_RUNTIME STREQUAL "OCL")
+    add_subdirectory(ocl)
 endif()
 
-add_library(${TARGET_NAME} ${MKLDNN_LIBRARY_TYPE} ${HEADERS} ${SOURCES})
-if(NECSX)
-    message(STATUS "${TARGET_NAME}_LINKER_LIBS = ${${TARGET_NAME}_LINKER_LIBS}")
-endif()
+add_library(${LIB_NAME}
+    ${MKLDNN_LIBRARY_TYPE} ${HEADERS} ${${LIB_NAME}_SUB_OBJS})
 
-#Add mkldnn.dll to execution PATH
-if(NOT(MINGW))
-    set(CTESTCONFIG_PATH "${CTESTCONFIG_PATH}\;${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}" PARENT_SCOPE)
-else()
-    # CMake with "MSYS Makefiles" generator seems to build libmkldnn.dll in a directory without build type.
-    set(CTESTCONFIG_PATH "${CTESTCONFIG_PATH}\;${CMAKE_CURRENT_BINARY_DIR}" PARENT_SCOPE)
-endif()
-target_link_libraries(${TARGET_NAME} ${${TARGET_NAME}_LINKER_LIBS} ${EXTRA_LIBS})
-set_property(TARGET ${TARGET_NAME} PROPERTY CXX_STANDARD 11)
-set_property(TARGET ${TARGET_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
-#if(NECSX)
-#    set_target_properties(${LIB_NAME} PROPERTIES LINKER_LANGUAGE CXX)
-#    message(STATUS "src/ CMAKE_CXX_COMPILER = ${CMAKE_CXX_COMPILER}")
-#endif()
-set_property(TARGET ${TARGET_NAME} PROPERTY VERSION "${PROJECT_VERSION}.0")
-set_property(TARGET ${TARGET_NAME} PROPERTY SOVERSION "0")
+set_property(TARGET ${LIB_NAME} PROPERTY VERSION "${PROJECT_VERSION}.0")
+set_property(TARGET ${LIB_NAME} PROPERTY SOVERSION "0")
+set_property(TARGET ${LIB_NAME} PROPERTY PUBLIC_HEADER ${HEADERS})
 
-if(MINGW)
-    # We need to install *.dll into bin/ and *.a into lib/. 
-    install(TARGETS ${TARGET_NAME}
-        RUNTIME DESTINATION bin
-        ARCHIVE DESTINATION lib${LIB_SUFFIX}
+target_include_directories(${LIB_NAME} PUBLIC
+    $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../include>
+    # $<INSTALL_PREFIX> is required for compatibility with cmake 2.8
+    $<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}>
     )
-else()
-    install(TARGETS ${TARGET_NAME} DESTINATION lib${LIB_SUFFIX} COMPONENT bin)
+
+target_link_libraries_build(${LIB_NAME}
+    "${EXTRA_SHARED_LIBS};${EXTRA_STATIC_LIBS}")
+target_link_libraries_install(${LIB_NAME} "${EXTRA_SHARED_LIBS}")
+if(MKLDNN_LIBRARY_TYPE STREQUAL "STATIC")
+    target_link_libraries_install(${LIB_NAME} "${EXTRA_STATIC_LIBS}")
 endif()
-install(FILES ${HEADERS} DESTINATION include COMPONENT dev)
-# vim: et ts=4 sw=4 ai ft=cmake
+
+set(LIB_EXPORT_NAME "${LIB_NAME}-targets")
+install(TARGETS ${LIB_NAME}
+    EXPORT "${LIB_EXPORT_NAME}"
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+
+# Write version and package config files
+set(LIB_CONFIG_GENERATE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+set(LIB_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/${LIB_NAME}")
+set(LIB_VERSION_FILE
+    "${LIB_CONFIG_GENERATE_DIR}/${LIB_NAME}-config-version.cmake")
+set(LIB_CONFIG_FILE
+    "${LIB_CONFIG_GENERATE_DIR}/${LIB_NAME}-config.cmake")
+write_basic_package_version_file(
+    "${LIB_VERSION_FILE}"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion)
+configure_package_config_file(
+    "../cmake/config.cmake.in"
+    "${LIB_CONFIG_FILE}"
+    INSTALL_DESTINATION ${LIB_CONFIG_INSTALL_DIR})
+install(FILES ${LIB_CONFIG_FILE} ${LIB_VERSION_FILE}
+    DESTINATION ${LIB_CONFIG_INSTALL_DIR})
+string(TOUPPER "${LIB_NAME}::" LIB_NAMESPACE)
+install(EXPORT ${LIB_EXPORT_NAME}
+    NAMESPACE ${LIB_NAMESPACE}
+    DESTINATION ${LIB_CONFIG_INSTALL_DIR})
+
+# Install custom find modules for transitive dependencies
+if(MKLDNN_CPU_RUNTIME STREQUAL "TBB")
+    if(WIN32)
+        install(FILES "../cmake/win/TBBConfig.cmake" RENAME "FindTBB.cmake"
+            DESTINATION ${LIB_CONFIG_INSTALL_DIR})
+    elseif(APPLE)
+        install(FILES "../cmake/mac/TBBConfig.cmake" RENAME "FindTBB.cmake"
+            DESTINATION ${LIB_CONFIG_INSTALL_DIR})
+    elseif(UNIX)
+        install(FILES "../cmake/lnx/TBBConfig.cmake" RENAME "FindTBB.cmake"
+            DESTINATION ${LIB_CONFIG_INSTALL_DIR})
+    endif()
+endif()
+
+if(MKLDNN_GPU_RUNTIME STREQUAL "OCL")
+    install(FILES
+        "../cmake/FindOpenCL.cmake"
+        DESTINATION ${LIB_CONFIG_INSTALL_DIR})
+endif()
+
+# On Windows we need to add mkldnn.dll path to CTESTCONFIG_PATH which is later
+# passed to ctest and Visual Studio solutions
+if(WIN32)
+    if(NOT(MINGW))
+        foreach(BUILD_TYPE Release Debug RelWithDebInfo MinSizeRel)
+            append_to_windows_path_list(CTESTCONFIG_PATH
+                "${CMAKE_CURRENT_BINARY_DIR}/${BUILD_TYPE}")
+        endforeach()
+    else()
+        append_to_windows_path_list(CTESTCONFIG_PATH
+            "${CMAKE_CURRENT_BINARY_DIR}")
+    endif()
+    set(CTESTCONFIG_PATH "${CTESTCONFIG_PATH}" PARENT_SCOPE)
+endif()

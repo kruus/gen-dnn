@@ -20,29 +20,41 @@
 #include "mkldnn.h"
 
 #include "c_types_map.hpp"
-#include "memory_pd.hpp"
 #include "primitive_desc.hpp"
+#include "type_helpers.hpp"
+#include "rnn.hpp"
 
 namespace mkldnn {
 namespace impl {
 
-// struct rnn_fwd_pd_t;
+struct rnn_fwd_pd_t;
 
 struct rnn_pd_t : public primitive_desc_t {
     static constexpr auto base_pkind = primitive_kind::rnn;
 
-    rnn_pd_t(mkldnn::impl::engine_t *engine, const rnn_desc_t *adesc,
-            const primitive_attr_t *attr, const rnn_pd_t *hint_pd)
-        : primitive_desc_t(engine, attr, primitive_kind::rnn)
+    rnn_pd_t(engine_t *engine,
+            const rnn_desc_t *adesc,
+            const primitive_attr_t *attr,
+            const rnn_fwd_pd_t *hint_fwd_pd)
+        : primitive_desc_t(engine, attr, base_pkind)
         , desc_(*adesc)
-        , hint_pd_(hint_pd) {}
-    virtual ~rnn_pd_t() {}
+        , hint_fwd_pd_(hint_fwd_pd)
+        , src_layer_md_(desc_.src_layer_desc)
+        , src_iter_md_(desc_.src_iter_desc)
+        , src_iter_c_md_(desc_.src_iter_c_desc)
+        , weights_layer_md_(desc_.weights_layer_desc)
+        , weights_iter_md_(desc_.weights_iter_desc)
+        , bias_md_(desc_.bias_desc)
+        , dst_layer_md_(desc_.dst_layer_desc)
+        , dst_iter_md_(desc_.dst_iter_desc)
+        , dst_iter_c_md_(desc_.dst_iter_c_desc)
+        , ws_md_()
+    {}
 
     const rnn_desc_t *desc() const { return &desc_; }
-    virtual const op_desc_t *op_desc() const override {
-        return reinterpret_cast<const op_desc_t *>(this->desc());
-    }
-    virtual void init_info() override { init_info_rnn(this, this->info_); }
+    virtual const op_desc_t *op_desc() const override
+    { return reinterpret_cast<const op_desc_t *>(this->desc()); }
+    virtual void init_info() override { impl::init_info(this, this->info_); }
 
     virtual status_t query(query_t what, int idx, void *result) const override {
         switch (what) {
@@ -52,227 +64,256 @@ struct rnn_pd_t : public primitive_desc_t {
         return status::success;
     }
 
-    inline bool is_training() const {
+    virtual const memory_desc_t *src_md(int index = 0) const override {
+        if (index == 0) return &src_layer_md_;
+        if (index == 1 && with_src_iter()) return &src_iter_md_;
+        if (index == 2 && with_src_iter_c()) return &src_iter_c_md_;
+        return &glob_zero_md;
+    }
+    virtual const memory_desc_t *weights_md(int index = 0) const override {
+        if (index == 0) return &weights_layer_md_;
+        if (index == 1) return &weights_iter_md_;
+        if (index == 2 && with_bias()) return &bias_md_;
+        return &glob_zero_md;
+    }
+    virtual const memory_desc_t *dst_md(int index = 0) const override {
+        if (index == 0) return &dst_layer_md_;
+        if (index == 1 && with_dst_iter()) return &dst_iter_md_;
+        if (index == 2 && with_dst_iter_c()) return &dst_iter_c_md_;
+        return &glob_zero_md;
+    }
+    virtual const memory_desc_t *workspace_md(int index = 0) const override
+        { return (index == 0) ?  &ws_md_ : &glob_zero_md;}
+
+    /* common aux functions */
+
+    bool is_training() const {
         return utils::one_of(desc_.prop_kind, prop_kind::forward_training,
                 prop_kind::backward);
     }
 
-    inline size_t ws_states_size() {
-        int wic = nstl::max(SLC(), nstl::max(SIC(), DIC()));
-        return (size_t)(L() + 1) * D() * (T() + 1) * S() * MB() * wic;
+    bool is_fwd() const {
+        return utils::one_of(desc_.prop_kind, prop_kind::forward_training,
+                prop_kind::forward_inference);
     }
 
-    inline size_t ws_diff_states_size() {
-        int wic = nstl::max(SLC(), nstl::max(SIC(), DIC()));
-        return (size_t)(L() + 1) * D() * (T() + 1) * (S() + 1) * MB() * wic;
-    }
+    dim_t T() const { return desc_.src_layer_desc.dims[0]; }
+    dim_t MB() const { return desc_.src_layer_desc.dims[1]; }
 
-    inline size_t ws_gates_size() {
-        int n_layer = L();
-        int n_direction = D();
-        int n_iter = T();
-        int n_gates = G();
-        int batch = MB();
-        int s_size = DIC();
+    dim_t L() const { return desc_.weights_layer_desc.dims[0]; }
+    dim_t D() const { return desc_.weights_layer_desc.dims[1]; }
 
-        return (size_t)n_layer * n_direction * n_iter * batch * n_gates
-                * s_size;
-    }
+    dim_t SIC() const { return desc_.weights_iter_desc.dims[2]; }
 
-    inline size_t ws_cell_comp_size() {
-        int n_gates = G();
-        int batch = MB();
-        int s_size = DIC();
-        return (size_t)is_lbr() * n_gates * batch * s_size;
-    }
+    dim_t SLC() const { return desc_.weights_layer_desc.dims[2]; }
+    dim_t G() const { return desc_.weights_layer_desc.dims[3]; }
+    dim_t DIC() const { return desc_.weights_layer_desc.dims[4]; }
 
-    inline size_t ws_grid_comp_size() {
-        int n_layer = L();
-        int n_direction = D();
-        int n_iter = T();
-        int batch = MB();
-        int s_size = DIC();
-        return (size_t)is_lbr() * is_training() * n_layer * n_direction * n_iter
-                * batch * s_size;
-    }
+    dim_t DLC() const { return desc_.dst_layer_desc.dims[2]; }
 
-    inline int ws_per_cell() {
-        int batch = MB();
-        int s_size = DIC();
-        return is_lbr() * is_training() * batch * s_size;
-    }
+    bool with_bias() const
+    { return !memory_desc_wrapper(desc_.bias_desc).is_zero(); }
 
-    inline void set_offsets(size_t &ws_gates_offset, size_t &ws_states_offset,
-            size_t &ws_diff_states_offset, size_t &ws_grid_comp_offset,
-            size_t &ws_cell_comp_offset) {
-        const size_t page_size = 4096; // 2097152;
-        ws_gates_offset
-                = 0; // assumes the workspace base pointer is page aligned
-        ws_states_offset = utils::rnd_up(ws_gates_size(), page_size);
-        ws_diff_states_offset
-                = utils::rnd_up(ws_states_offset + ws_states_size(), page_size);
-        ws_grid_comp_offset = utils::rnd_up(ws_diff_states_offset
-                + ws_diff_states_size(), page_size);
+    bool with_src_iter() const
+    { return !(memory_desc_wrapper(desc_.src_iter_desc).is_zero()); }
 
-        ws_cell_comp_offset = utils::rnd_up(ws_grid_comp_offset
-                + ws_grid_comp_size(), page_size);
-    }
+    bool with_src_iter_c() const
+    { return is_lstm()
+               && !(memory_desc_wrapper(desc_.src_iter_desc).is_zero()); }
 
-    inline size_t get_ws_size() {
-        size_t ws_gates_offset, ws_states_offset, ws_diff_states_offset,
-            ws_grid_comp_offset, ws_cell_comp_offset;
-        set_offsets(
-                ws_gates_offset, ws_states_offset, ws_diff_states_offset,
-                ws_grid_comp_offset, ws_cell_comp_offset);
-        return ws_grid_comp_offset + ws_grid_comp_size();
-    }
+    bool with_dst_iter() const
+    { return !memory_desc_wrapper(desc_.dst_iter_desc).is_zero(); }
 
-    inline size_t get_scratchpad_size() {
-        size_t ws_gates_offset, ws_states_offset, ws_diff_states_offset,
-            ws_grid_comp_offset, ws_cell_comp_offset;
-        set_offsets(
-                ws_gates_offset, ws_states_offset, ws_diff_states_offset,
-                ws_grid_comp_offset, ws_cell_comp_offset);
-        if (desc_.prop_kind == prop_kind::forward_inference)
-            return ws_cell_comp_offset + ws_cell_comp_size();
-        else
-            return ws_cell_comp_size();
-    }
+    bool with_dst_iter_c() const
+    { return is_lstm() &&!memory_desc_wrapper(desc_.dst_iter_desc).is_zero(); }
 
-    int T() const { return desc_.src_layer_desc.dims[0]; }
-    int MB() const { return desc_.src_layer_desc.dims[1]; }
+    mkldnn::impl::alg_kind_t cell_kind() const
+    { return desc_.cell_kind; }
+    mkldnn::impl::alg_kind_t activation_kind() const
+    { return desc_.activation_kind; }
 
-    int L() const { return desc_.weights_layer_desc.dims[0]; }
-    int D() const { return desc_.weights_layer_desc.dims[1]; }
+    bool is_lbr() const
+    { return cell_kind() == mkldnn_lbr_gru; }
 
-    int SIC() const { return desc_.weights_iter_desc.dims[2]; }
-
-    int SLC() const { return desc_.weights_layer_desc.dims[2]; }
-    int G() const { return desc_.weights_layer_desc.dims[3]; }
-    int DIC() const { return desc_.weights_layer_desc.dims[4]; }
-
-    int DLC() const { return desc_.dst_layer_desc.dims[2]; }
-
-    int S() const { return mkldnn_rnn_cell_get_states_count(&desc_.cell_desc); }
-
-    bool with_bias() const {
-        return !memory_desc_wrapper(desc_.bias_desc).is_zero();
-    }
-
-    bool with_src_iter() const {
-        return !(memory_desc_wrapper(desc_.src_iter_desc).is_zero());
-    }
-
-    bool with_dst_iter() const {
-        return !memory_desc_wrapper(desc_.dst_iter_desc).is_zero();
-    }
-
-    mkldnn::impl::alg_kind_t cell_kind() const {
-        return desc_.cell_desc.cell_kind;
-    }
-    mkldnn::impl::alg_kind_t activation_kind() const {
-        return desc_.cell_desc.activation_kind;
-    }
-
-    bool is_lbr() const {
-        return cell_kind() == mkldnn_gru_linear_before_reset;
-    }
+    bool is_lstm() const
+    { return cell_kind() == mkldnn_vanilla_lstm; }
 
     mkldnn_rnn_direction_t direction() const { return desc_.direction; }
 
 protected:
     rnn_desc_t desc_;
-    const rnn_pd_t *hint_pd_;
+    const rnn_fwd_pd_t *hint_fwd_pd_;
+
+    memory_desc_t src_layer_md_;
+    memory_desc_t src_iter_md_;
+    memory_desc_t src_iter_c_md_;
+    memory_desc_t weights_layer_md_;
+    memory_desc_t weights_iter_md_;
+    memory_desc_t bias_md_;
+    memory_desc_t dst_layer_md_;
+    memory_desc_t dst_iter_md_;
+    memory_desc_t dst_iter_c_md_;
+
+    memory_desc_t ws_md_;
 };
 
-struct rnn_fwd_pd_t : public rnn_pd_t {
+struct rnn_fwd_pd_t: public rnn_pd_t {
     typedef rnn_fwd_pd_t base_class;
     typedef rnn_fwd_pd_t hint_class;
 
-    using rnn_pd_t::rnn_pd_t;
-    virtual ~rnn_fwd_pd_t() {}
+    rnn_fwd_pd_t(engine_t *engine,
+            const rnn_desc_t *adesc,
+            const primitive_attr_t *attr,
+            const rnn_fwd_pd_t *hint_fwd_pd)
+        : rnn_pd_t(engine, adesc, attr, hint_fwd_pd)
+    {}
 
-    virtual const memory_pd_t *input_pd(int index = 0) const override {
-        if (index == 0) return src_pd(0);
-        if (with_src_iter() && index == 1) return src_pd(1);
-        index = index - 1 - with_src_iter();
+    virtual arg_usage_t arg_usage(int arg) const override {
+        if (arg == MKLDNN_ARG_SRC_LAYER)
+            return arg_usage_t::input;
 
-        if (index < 3) return weights_pd(index);
+        if (arg == MKLDNN_ARG_SRC_ITER && with_src_iter())
+            return arg_usage_t::input;
 
-        return nullptr;
+        if (arg == MKLDNN_ARG_SRC_ITER_C && with_src_iter_c())
+            return arg_usage_t::input;
+
+        if (utils::one_of(arg, MKLDNN_ARG_WEIGHTS_LAYER,
+                    MKLDNN_ARG_WEIGHTS_ITER))
+            return arg_usage_t::input;
+
+        if (arg == MKLDNN_ARG_BIAS && with_bias())
+            return arg_usage_t::input;
+
+        if (arg == MKLDNN_ARG_DST_LAYER)
+            return arg_usage_t::output;
+
+        if (arg == MKLDNN_ARG_DST_ITER && with_dst_iter())
+            return arg_usage_t::output;
+
+        if (arg == MKLDNN_ARG_DST_ITER_C && with_dst_iter() && is_lstm())
+            return arg_usage_t::output;
+
+        if (arg == MKLDNN_ARG_WORKSPACE && is_training())
+            return arg_usage_t::output;
+
+        return primitive_desc_t::arg_usage(arg);
     }
 
-    virtual const memory_pd_t *output_pd(int index = 0) const override {
-        if (index == 0) return dst_pd(0);
-        if (with_dst_iter() && index == 1) return dst_pd(1);
-        index = index - 1 - with_dst_iter();
-
-        if (is_training() && index == 0) return workspace_pd();
-
-        return nullptr;
-    }
-
-    virtual int n_inputs() const override {
-        return 3 + with_bias() + with_src_iter();
-    }
-
-    virtual int n_outputs() const override {
-        return 1 + with_dst_iter() + is_training();
-    }
-
-    int ws_idx() const { return 1 + with_dst_iter(); }
+    virtual int n_inputs() const override
+    { return 3 + with_bias() +  with_src_iter() +  with_src_iter_c();}
+    virtual int n_outputs() const override
+    { return 1 + with_dst_iter() + with_dst_iter_c() + is_training(); }
 };
 
 struct rnn_bwd_pd_t : public rnn_pd_t {
     typedef rnn_bwd_pd_t base_class;
-    typedef rnn_bwd_pd_t hint_class;
+    typedef rnn_fwd_pd_t hint_class;
 
-    using rnn_pd_t::rnn_pd_t;
-    virtual ~rnn_bwd_pd_t() {}
+    rnn_bwd_pd_t(engine_t *engine,
+            const rnn_desc_t *adesc,
+            const primitive_attr_t *attr,
+            const rnn_fwd_pd_t *hint_fwd_pd)
+        : rnn_pd_t(engine, adesc, attr, hint_fwd_pd)
+        , diff_src_layer_md_(desc_.diff_src_layer_desc)
+        , diff_src_iter_md_(desc_.diff_src_iter_desc)
+        , diff_src_iter_c_md_(desc_.diff_src_iter_c_desc)
+        , diff_weights_layer_md_(desc_.diff_weights_layer_desc)
+        , diff_weights_iter_md_(desc_.diff_weights_iter_desc)
+        , diff_bias_md_(desc_.diff_bias_desc)
+        , diff_dst_layer_md_(desc_.diff_dst_layer_desc)
+        , diff_dst_iter_md_(desc_.diff_dst_iter_desc)
+        , diff_dst_iter_c_md_(desc_.diff_dst_iter_c_desc)
+    {}
 
-    virtual const memory_pd_t *input_pd(int index = 0) const override {
-        if (index == 0) return src_pd(0);
-        if (with_src_iter() && index == 1) return src_pd(1);
-        index = index - 1 - with_src_iter();
+    virtual arg_usage_t arg_usage(int arg) const override {
+        if (utils::one_of(arg, MKLDNN_ARG_SRC_LAYER, MKLDNN_ARG_DST_LAYER,
+                    MKLDNN_ARG_DIFF_DST_LAYER, MKLDNN_ARG_WEIGHTS_LAYER,
+                    MKLDNN_ARG_WEIGHTS_ITER))
+            return arg_usage_t::input;
 
-        if (index < 2) return weights_pd(index);
-        if (with_bias() && index == 2) return weights_pd(2);
-        index = index - 2 - with_bias();
+        if (utils::one_of(arg, MKLDNN_ARG_DIFF_SRC_LAYER,
+                    MKLDNN_ARG_DIFF_WEIGHTS_LAYER,
+                    MKLDNN_ARG_DIFF_WEIGHTS_ITER))
+            return arg_usage_t::output;
 
-        if (index == 0) return dst_pd(0);
-        if (with_dst_iter() && index == 1) return dst_pd(1);
-        index = index - 1 - with_dst_iter();
+        if (with_bias()) {
+            if (arg == MKLDNN_ARG_BIAS)
+                return arg_usage_t::input;
 
-        if (index == 0) return diff_dst_pd(0);
-        if (with_dst_iter() && index == 1) return diff_dst_pd(1);
-        index = index - 1 - with_dst_iter();
+            if (arg == MKLDNN_ARG_DIFF_BIAS)
+                return arg_usage_t::output;
+        }
 
-        if (index == 0) return workspace_pd();
+        if (with_src_iter()) {
+            if (arg == MKLDNN_ARG_SRC_ITER)
+                return arg_usage_t::input;
 
-        return nullptr;
+            if (arg == MKLDNN_ARG_DIFF_SRC_ITER)
+                return arg_usage_t::output;
+        }
+
+        if(with_src_iter_c()){
+            if (arg == MKLDNN_ARG_SRC_ITER_C)
+                return arg_usage_t::input;
+
+            if (arg == MKLDNN_ARG_DIFF_SRC_ITER_C)
+                return arg_usage_t::output;
+        }
+
+        if (with_dst_iter() && utils::one_of(arg, MKLDNN_ARG_DST_ITER,
+                    MKLDNN_ARG_DIFF_DST_ITER))
+            return arg_usage_t::input;
+
+        if (with_dst_iter_c() && utils::one_of(arg,  MKLDNN_ARG_DST_ITER_C,
+                    MKLDNN_ARG_DIFF_DST_ITER_C))
+            return arg_usage_t::input;
+
+        if (arg == MKLDNN_ARG_WORKSPACE)
+            return arg_usage_t::input;
+
+        return primitive_desc_t::arg_usage(arg);
     }
 
-    virtual const memory_pd_t *output_pd(int index = 0) const override {
-        if (index == 0) return diff_src_pd(0);
-        if (with_src_iter() && index == 1) return diff_src_pd(1);
-        index = index - 1 - with_src_iter();
-
-        if (index < 3) return diff_weights_pd(index);
-
-        return nullptr;
+    virtual const memory_desc_t *diff_src_md(int index = 0) const override {
+        if (index == 0) return &diff_src_layer_md_;
+        if (index == 1 && with_src_iter()) return &diff_src_iter_md_;
+        if (index == 2 && with_src_iter_c()) return &diff_src_iter_c_md_;
+        return &glob_zero_md;
+    }
+    virtual const memory_desc_t *diff_weights_md(
+            int index = 0) const override {
+        if (index == 0) return &diff_weights_layer_md_;
+        if (index == 1) return &diff_weights_iter_md_;
+        if (index == 2 && with_bias()) return &diff_bias_md_;
+        return &glob_zero_md;
+    }
+    virtual const memory_desc_t *diff_dst_md(int index = 0) const override {
+        if (index == 0) return &diff_dst_layer_md_;
+        if (index == 1 && with_dst_iter()) return &diff_dst_iter_md_;
+        if (index == 2 && with_dst_iter_c()) return &diff_dst_iter_c_md_;
+        return &glob_zero_md;
     }
 
-    virtual int n_inputs() const override {
-        return 6 + with_src_iter() + with_bias() + 2 * with_dst_iter();
-    }
-    virtual int n_outputs() const override {
-        return 3 + with_src_iter() + with_bias();
-    }
+    virtual int n_inputs() const override
+    { return 6 +  with_src_iter() +  with_src_iter_c()
+            + 2 * (with_dst_iter() + with_dst_iter_c())
+            + with_bias(); }
+    virtual int n_outputs() const override
+    { return 3 + with_src_iter() + with_src_iter_c() + with_bias(); }
 
-    int ws_idx() const {
-        return 5 + with_src_iter() + with_bias() + 2 * with_dst_iter();
-    }
+protected:
+    memory_desc_t diff_src_layer_md_;
+    memory_desc_t diff_src_iter_md_;
+    memory_desc_t diff_src_iter_c_md_;
+    memory_desc_t diff_weights_layer_md_;
+    memory_desc_t diff_weights_iter_md_;
+    memory_desc_t diff_bias_md_;
+    memory_desc_t diff_dst_layer_md_;
+    memory_desc_t diff_dst_iter_md_;
+    memory_desc_t diff_dst_iter_c_md_;
 };
+
 }
 }
 

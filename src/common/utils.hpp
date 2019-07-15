@@ -21,15 +21,38 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <stdint.h>
+
+#if defined(__x86_64__) || defined(_M_X64)
+#define MKLDNN_X86_64
+#endif
+
+#define MSAN_ENABLED 0
+#if defined(__has_feature)
+#if __has_feature(memory_sanitizer)
+#undef MSAN_ENABLED
+#define MSAN_ENABLED 1
+#include <sanitizer/msan_interface.h>
+#endif
+#endif
 
 #include "c_types_map.hpp"
-#include "mkldnn_os.h"
+#include "nstl.hpp"
+#include "z_magic.hpp"
 
 namespace mkldnn {
 namespace impl {
 
-#define UNUSED(x) ((void)x)
-#define MAYBE_UNUSED(x) UNUSED(x)
+#define MKLDNN_SHORT_CIRCUIT_SELF_ASSIGN(other) do { \
+        if (this == &other) return *this; \
+    } while (0)
+
+#define MKLDNN_DISALLOW_COPY_AND_ASSIGN(T) \
+    T(const T&) = delete; \
+    T &operator=(const T&) = delete;
+
+// Sanity check for 64 bits
+static_assert(sizeof(void*) == 8, "Intel(R) MKL-DNN supports 64 bit only");
 
 #define CHECK(f) do { \
     status_t status = f; \
@@ -37,16 +60,7 @@ namespace impl {
     return status; \
 } while (0)
 
-#ifdef _WIN32
-#define __PRETTY_FUNCTION__ __FUNCSIG__
-#endif
-
-#ifdef __APPLE__
-// older XCode doesn't support thread_local
-#define THREAD_LOCAL __thread
-#else
-#define THREAD_LOCAL thread_local
-#endif
+#define IMPLICATION(cause, effect) (!(cause) || !!(effect))
 
 namespace utils {
 
@@ -106,16 +120,14 @@ inline bool everyone_is(T val, P item, Args... item_others) {
 }
 
 template <typename T, typename P>
-inline bool one_of(T val, P item) { return val == item; }
+constexpr bool one_of(T val, P item) { return val == item; }
 template <typename T, typename P, typename... Args>
-inline bool one_of(T val, P item, Args... item_others) {
+constexpr bool one_of(T val, P item, Args... item_others) {
     return val == item || one_of(val, item_others...);
 }
 
 template <typename... Args>
 inline bool any_null(Args... ptrs) { return one_of(nullptr, ptrs...); }
-
-inline bool implication(bool cause, bool effect) { return !cause || effect; }
 
 template<typename T>
 inline void array_copy(T *dst, const T *src, size_t size) {
@@ -160,21 +172,60 @@ inline R array_product(const T *arr, size_t size) {
     return prod;
 }
 
+/** sorts an array of values using @p comparator. While sorting the array
+ * of value, the function permutes an array of @p keys accordingly.
+ *
+ * @note The arrays of @p keys can be omitted. In this case the function
+ *       sorts the array of @vals only.
+ */
+template <typename T, typename U, typename F>
+inline void simultaneous_sort(T *vals, U *keys, size_t size, F comparator) {
+    if (size == 0) return;
+
+    for (size_t i = 0; i < size - 1; ++i) {
+        bool swapped = false;
+
+        for (size_t j = 0; j < size - i - 1; j++) {
+            if (comparator(vals[j], vals[j + 1]) > 0) {
+                nstl::swap(vals[j], vals[j + 1]);
+                if (keys) nstl::swap(keys[j], keys[j + 1]);
+                swapped = true;
+            }
+        }
+
+        if (swapped == false) break;
+    }
+}
+
 template <typename T, typename U>
 inline typename remove_reference<T>::type div_up(const T a, const U b) {
     assert(b);
-    return (a + b - 1) / b;
+    return static_cast<typename remove_reference<T>::type>((a + b - 1) / b);
 }
 
 template <typename T, typename U>
 inline typename remove_reference<T>::type rnd_up(const T a, const U b) {
-    return div_up(a, b) * b;
+    return static_cast<typename remove_reference<T>::type>(div_up(a, b) * b);
 }
 
 template <typename T, typename U>
 inline typename remove_reference<T>::type rnd_dn(const T a, const U b) {
-    return (a / b) * b;
+    return static_cast<typename remove_reference<T>::type>((a / b) * b);
 }
+
+template <typename T, typename U>
+inline typename remove_reference<T>::type max_div(const T a, const U b) {
+    U div = b;
+    while (div > 1) {
+        if (a % div == 0)
+            return div;
+        div--;
+    }
+    return static_cast<typename remove_reference<T>::type>(div);
+}
+
+template <typename T> T *align_ptr(T *ptr, uintptr_t alignment)
+{ return (T *)(((uintptr_t)ptr + alignment - 1) & ~(alignment - 1)); }
 
 template <typename T, typename U, typename V>
 inline U this_block_size(const T offset, const U max, const V block_size) {
@@ -239,6 +290,31 @@ inline bool nd_iterator_jump(U &cur, const U end, W &x, const Y &X,
     return false;
 }
 
+template <typename T>
+inline T pick(size_t i, const T &x0) { return x0; }
+template <typename T, typename ...Args>
+inline T pick(size_t i, const T &x0, Args &&... args) {
+    return i == 0 ? x0 : pick(i - 1, utils::forward<Args>(args)...);
+}
+
+template <typename T>
+T pick_by_prop_kind(prop_kind_t prop_kind, const T &val_fwd_inference,
+        const T &val_fwd_training, const T &val_bwd_d, const T &val_bwd_w) {
+    switch (prop_kind) {
+    case prop_kind::forward_inference: return val_fwd_inference;
+    case prop_kind::forward_training: return val_fwd_training;
+    case prop_kind::backward_data: return val_bwd_d;
+    case prop_kind::backward_weights: return val_bwd_w;
+    default: assert(!"unsupported prop_kind");
+    }
+    return T();
+}
+
+template <typename T>
+T pick_by_prop_kind(prop_kind_t prop_kind,
+        const T &val_fwd, const T &val_bwd_d, const T &val_bwd_w)
+{ return pick_by_prop_kind(prop_kind, val_fwd, val_fwd, val_bwd_d, val_bwd_w); }
+
 template <typename Telem, size_t Tdims>
 struct array_offset_calculator {
     template <typename... Targs>
@@ -277,45 +353,52 @@ private:
     const int _dims[Tdims];
 };
 
+template <typename derived_type, typename base_type>
+inline derived_type downcast(base_type *base) {
+    assert(dynamic_cast<derived_type>(base) == base);
+    return static_cast<derived_type>(base);
 }
 
-#if !defined(_SX)
-void *malloc(size_t size, int alignment);
-void free(void *p);
-#else
-/** SX -> std malloc and free, instead of aligning pointers.
- * Until I am sure that we do not use these pointers in mkldnn.hpp
- * shared pointers, we had better err on side of compatibility.
- *
- * (i.e. match with _malloc/_free lambdas in mkldnn.hpp)
- *
- * \p alignment arg ignored.
- */
-inline void* malloc(size_t size, int /*alignment*/) { return ::malloc(size); }
-inline void free(void *p) { ::free(p); }
+}
+
+int32_t fetch_and_add(int32_t *dst, int32_t val);
+inline void yield_thread() {}
+
+// Reads an environment variable 'name' and stores its string value in the
+// 'buffer' of 'buffer_size' bytes (including the terminating zero) on
+// success.
+//
+// - Returns the length of the environment variable string value (excluding
+// the terminating 0) if it is set and its contents (including the terminating
+// 0) can be stored in the 'buffer' without truncation.
+//
+// - Returns negated length of environment variable string value and writes
+// "\0" to the buffer (if it is not NULL) if the 'buffer_size' is to small to
+// store the value (including the terminating 0) without truncation.
+//
+// - Returns 0 and writes "\0" to the buffer (if not NULL) if the environment
+// variable is not set.
+//
+// - Returns INT_MIN if the 'name' is NULL.
+//
+// - Returns INT_MIN if the 'buffer_size' is negative.
+//
+// - Returns INT_MIN if the 'buffer' is NULL and 'buffer_size' is greater than
+// zero. Passing NULL 'buffer' with 'buffer_size' set to 0 can be used to
+// retrieve the length of the environment variable value string.
+//
+int getenv(const char *name, char *buffer, int buffer_size);
+// Reads an integer from the environment
+int getenv_int(const char *name, int default_value = 0);
+bool jit_dump_enabled();
+FILE *fopen(const char *filename, const char *mode);
+
+constexpr int msan_enabled = MSAN_ENABLED;
+inline void msan_unpoison(void *ptr, size_t size) {
+#if MSAN_ENABLED
+    __msan_unpoison(ptr, size);
 #endif
-
-struct c_compatible {
-    enum { default_alignment = 64 };
-    static void *operator new(size_t sz) {
-        return malloc(sz, default_alignment);
-    }
-    static void *operator new(size_t sz, void *p) { UNUSED(sz); return p; }
-    static void *operator new[](size_t sz) {
-        return malloc(sz, default_alignment);
-    }
-    static void operator delete(void *p) { free(p); }
-    static void operator delete[](void *p) { free(p); }
-};
-
-inline void yield_thread() { }
-
-int mkldnn_getenv(char *value, const char *name, int len);
-bool mkldnn_jit_dump();
-FILE *mkldnn_fopen(const char *filename, const char *mode);
-
-void set_rnd_mode(round_mode_t rnd_mode);
-void restore_rnd_mode();
+}
 
 }
 }

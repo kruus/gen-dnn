@@ -1,6 +1,6 @@
 # vim: et ts=4 sw=4
 #===============================================================================
-# Copyright 2016-2018 Intel Corporation
+# Copyright 2016-2019 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,16 +15,14 @@
 # limitations under the License.
 #===============================================================================
 
-if(CMAKE_TOOLCHAIN_FILE)
-    cmake_minimum_required(VERSION 3.6)
-else()
-    cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.11)
+
+if(POLICY CMP0022)
+    cmake_policy(SET CMP0022 NEW)
 endif()
 
-# Use old-style version handling
-if(POLICY CMP0048)
-    cmake_policy(SET CMP0048 OLD)
-    cmake_policy(SET CMP0054 OLD)
+if(POLICY CMP0054)
+    cmake_policy(SET CMP0054 NEW)
 endif()
 
 # Enable RPATH on MacOS/OSX
@@ -45,26 +43,22 @@ if(POLICY CMP0066)
     cmake_policy(SET CMP0066 NEW)
 endif()
 
-# use full pathnames on libs (now auto-discovered from compiler frontends)
-if(POLICY CMP0060)
-    cmake_policy(SET CMP0060 NEW)
-endif()
-
-set(PROJECT_NAME "GEN-DNN generic MKL-DNN)")
-set(PROJECT_FULL_NAME "Generic (Intel(R) MKL-DNN)")
-set(PROJECT_VERSION "0.16")
+set(PROJECT_NAME "Intel(R) MKL-DNN")
+set(PROJECT_FULL_NAME "Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)")
+set(PROJECT_VERSION "1.0.0")
 
 set(LIB_NAME mkldnn)
 
-project(${PROJECT_NAME} C CXX) # This runs any CMAKE_TOOLCHAIN_FILE (twice)
-if(NECSX)
-    cmake_minimum_required(VERSION 3.8) # allow nicer Platform/SX-* files
-    # Want -lcblas *after* -lmkldnn ... How?
-    #set(LINK_LIBRARIES "${LINK_LIBRARIES} ${SX_LINK_LIBRARIES}" CACHE STRING "will this go after -lmkldnn?")
+if (CMAKE_VERSION VERSION_LESS 3.0)
+    project(${PROJECT_NAME} C CXX)
+else()
+    cmake_policy(SET CMP0048 NEW)
+    project(${PROJECT_NAME} VERSION "${PROJECT_VERSION}" LANGUAGES C CXX)
 endif()
-# If enabled, generate a compile_commands.json file of the exact compiler
-# commands (for Makefile and Ninja generators)
-add_definitions(-DCMAKE_EXPORT_COMPILE_COMMANDS=1)
+
+if (NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+    message(FATAL_ERROR "Intel(R) MKL-DNN supports 64 bit platforms only")
+endif()
 
 message(STATUS "CMAKE_TOOLCHAIN_PREFIX = ${CMAKE_TOOLCHAIN_PREFIX}")
 if("${CMAKE_BUILD_TYPE}" STREQUAL "")
@@ -72,25 +66,53 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
 
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+
 set(CMAKE_SRC_CCXX_FLAGS)       # SRC specifics
 set(CMAKE_EXAMPLE_CCXX_FLAGS)   # EXAMPLE specifics
 set(CMAKE_TEST_CCXX_FLAGS)      # TESTS specifics
 
-include("cmake/options.cmake")
-include("cmake/platform.cmake")
-include("cmake/asm.cmake")
-if(TRUE AND NECVE)
-    set(CMAKE_THREAD_PREFER_PTHREAD 1)
-    set(THREADS_PREFER_PTHREAD_FLAG 1)
-    set(Threads_FIND_QUIETLY FALSE)
-    find_package(Threads REQUIRED)
+if(UNIX OR MINGW)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
-include("cmake/MKL.cmake")
+
+# Tentative remapping of old options to the new one.
+# CAUTION: The old options will soon be removed.
+
+if(MKLDNN_THREADING)
+    set(MKLDNN_CPU_RUNTIME "${MKLDNN_THREADING}" CACHE STRING "" FORCE)
+    message(STATUS "Using the obsolete way to specify the CPU runtime. "
+        "Use MKLDNN_CPU_RUNTIME=${MKLDNN_CPU_RUNTIME} instead.")
+endif()
+
+if(MKLDNN_GPU_BACKEND)
+    if (MKLDNN_GPU_BACKEND STREQUAL "OPENCL")
+        set(MKLDNN_GPU_BACKEND "OCL" CACHE STRING "" FORCE)
+        message(STATUS "Using the obsolete way to specify the OpenCL runtime. "
+            "Use MKLDNN_GPU_RUNTIME=OCL instead.")
+    endif()
+    set(MKLDNN_GPU_RUNTIME "${MKLDNN_GPU_BACKEND}" CACHE STRING "" FORCE)
+    message(STATUS "Using the obsolete way to specify the GPU runtime. "
+        "Use MKLDNN_GPU_RUNTME=${MKLDNN_GPU_RUNTIME} instead.")
+endif()
+
+if (MKLDNN_GPU_RUNTIME STREQUAL "OPENCL")
+    set(MKLDNN_GPU_RUNTIME "OCL" CACHE STRING "" FORCE)
+    message(STATUS "Using the obsolete way to specify the OpenCL runtime. "
+        "Use MKLDNN_GPU_RUNTIME=OCL instead.")
+endif()
+
+include("cmake/utils.cmake")
+include("cmake/options.cmake")
 include("cmake/OpenMP.cmake")
+include("cmake/TBB.cmake")
+include("cmake/OpenCL.cmake")
+include("cmake/platform.cmake")
 include("cmake/SDL.cmake")
 include("cmake/NLC.cmake")
 include("cmake/Doxygen.cmake")
-include("cmake/profiling.cmake")
+include("cmake/version.cmake")
 
 # XXX hack
 include("Platform/SX-util.cmake")
@@ -99,16 +121,28 @@ enable_testing()
 
 include_directories(include)
 
+configure_file(
+    "${PROJECT_SOURCE_DIR}/include/mkldnn_config.h.in"
+    "${PROJECT_BINARY_DIR}/include/mkldnn_config.h"
+)
+include_directories(${PROJECT_BINARY_DIR}/include)
+
+if(MKLDNN_INSTALL_MODE STREQUAL "BUNDLE" AND NOT DEFINED CMAKE_INSTALL_LIBDIR)
+    # define CMAKE_INSTALL_LIBDIR as "lib" in the case of bundle
+    set(CMAKE_INSTALL_LIBDIR "lib")
+endif()
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
 add_subdirectory(src)
 add_subdirectory(examples)
 add_subdirectory(tests)
 
-install(FILES LICENSE DESTINATION share/doc/${LIB_NAME} COMPONENT doc)
-message(STATUS "CMAKE_CXX_COMPILER = ${CMAKE_CXX_COMPILER}")
-if(1 OR NECVE)
-    show_cmake_stuff("After cmake/*.cmake includes ...")
-    configure_file(${CMAKE_SOURCE_DIR}/cmake/bash_help.inc.in
-        ${PROJECT_BINARY_DIR}/bash_help.inc)
+if(MKLDNN_INSTALL_MODE STREQUAL "BUNDLE")
+    install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_PREFIX})
+    install(FILES README.md DESTINATION ${CMAKE_INSTALL_PREFIX})
+else()
+    # Cannot use CMAKE_INSTALL_DOCDIR since it uses PROJECT_NAME and not LIB_NAME
+    install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${LIB_NAME})
 endif()
-message(STATUS "CMakeLists.txt DONE!")
-# vim: et ts=4 sw=4 ai :

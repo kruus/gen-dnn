@@ -19,18 +19,25 @@
 
 #include <stdint.h>
 
+#include "common/primitive_attr.hpp"
+#include "cpu_isa_traits.hpp"
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
 #ifndef TARGET_VANILLA
 /* convolution */
-enum conv_version_t {ver_unused, ver_fma, ver_avx512_core, ver_4fma, ver_4vnni,
-                     ver_vnni};
-enum conv_loop_order_t {loop_cgn, loop_gnc, loop_ngc};
+enum conv_version_t {ver_unused, ver_fma, ver_avx512_core, ver_4fma, ver_vnni};
+enum conv_loop_order_t {loop_cgn, loop_gnc, loop_ngc, loop_gncw, loop_cwgn,
+                            loop_ngcw, loop_nhwcg, loop_nwcg};
 enum conv_1x1_loop_order_t {loop_rbl, loop_rlb, loop_lbr, loop_lrb, loop_blr,
                             loop_brl};
+enum conv_gemm_loop_order_t { gemm_loop_rlb, gemm_loop_lrb };
+
 enum conv_kernel_kind_t {embd_bcast, expl_bcast};
+enum conv_harness_t {harness_2d_reduction, harness_3d_reduction,
+                     harness_mb_reduction};
 
 enum {
     FLAG_MB_FIRST = 1 << 0, FLAG_MB_LAST = 1 << 1,
@@ -38,6 +45,14 @@ enum {
     FLAG_IC_FIRST = 1 << 4, FLAG_IC_LAST = 1 << 5,
     FLAG_SP_FIRST = 1 << 6, FLAG_SP_LAST = 1 << 7,
     FLAG_REDUCE_FIRST = 1<<8, FLAG_REDUCE_LAST = 1<<9,
+    FLAG_ZERO_FILTER = 1 << 0, /* Controls whether the inner kernel skips
+                                   loading weights-data from memory; this
+                                   needs to happen on the first Group/16
+                                   iteration. */
+    FLAG_ZERO_BIAS = 1 << 1, /* Controls whether the inner kernel skip
+                               loading bias data from memory */
+    FLAG_COMPUTE_BIAS = 1 << 2, /* Controls bias computation during execution
+                                    pass */
 };
 #endif
 
@@ -46,8 +61,9 @@ struct jit_conv_conf_t {
 #ifndef TARGET_VANILLA
     conv_version_t ver;
     conv_loop_order_t loop_order;
-#endif
+    conv_harness_t harness;
 
+    int simd_w;
     int ndims;
     int mb;
     int ngroups, ic, oc, oc_without_padding, ic_without_padding;
@@ -57,22 +73,31 @@ struct jit_conv_conf_t {
     int kd, kh, kw;
     int stride_d, stride_h, stride_w;
     int dilate_d, dilate_h, dilate_w;
-    memory_format_t src_fmt;
-    bool with_bias, with_relu;
-    float relu_negative_slope;
+    format_tag_t src_tag, wei_tag, dst_tag; // temporary workaround
+    bool with_bias;
     bool with_sum;
+    bool with_eltwise;
+
+    post_ops_t::entry_t::eltwise_t eltwise;
+
+    int nthr, nthr_mb, nthr_g, nthr_oc_b, nthr_ic_b;
 
     int idp, ihp, iwp, ohp, owp;
     int nb_ic, ic_block;
     int nb_oc, oc_block;
-    int nb_ic_blocking, nb_oc_blocking; // blocking of nb_ic and nb_ic
-    int nb_ic_blocking_max;
+    int nb_ow, ow_block;
+    int nb_oc_blocking; /* used in jit kernels for nb_oc work bloking taking
+                           into account vector registers distribution */
+    int nb_oc_blocking_thr_chunk; /* used for distibution of nb_oc work
+                                      within threads */
+    int nb_ic_blocking, nb_ic_blocking_max; // blocking of nb_ic work
     int nb_ic_L2;
+    int h_blocking;
     int nb_oc_L2;
     int ur_h, ur_w;
     int ur_w_tail;
     bool is_1stconv;
-#ifndef TARGET_VANILLA
+    int nonblk_group_off;
     /* fma avx512_core */
     conv_kernel_kind_t kernel_kind;
     /* 4fma */
@@ -86,26 +111,38 @@ struct jit_conv_conf_t {
     int typesize_out;
     int typesize_bia;
     int typesize_acc;
-    int tr_ow;
     /* avx512_u8s8u8 */
     int ic_nb1, ic_nb2;
     int oc_nb1;
     int ur_ow_max, ur_ow, ur_ow_tail;
     int ur_ow_nsteps;
     data_type_t bia_dt;
+    /* bf16 data-type for output */
     data_type_t dst_dt;
+    /* bf16 weights update */
+    data_type_t wei_dt;
+    data_type_t dsrc_dt;
+    data_type_t dwei_dt;
     /* avx512: max possible value is nregs(32) - aux_regs(4) */
     int src_offsets[28];
     int src_count;
     bool expl_bcast;
     bool large_spatial;
     int is_oc_scale;
+    int max_regs_ur; // maximum accumulation registers
     // dw conv
     int nb_ch, ch_block, nb_ch_blocking;
-    // [ejk] check...
-    bool is_depthwise;
+    bool is_depthwise, is_fast_depthwise, is_resrc_depthwise;
     int aligned_threads;
-#endif
+    // large spatial
+    int oh_blk_size;
+    // s8s8 convolution
+    bool signed_input;
+    float wei_adj_scale;
+
+    cpu_isa_t isa;
+    // bf16 bwdw conv
+    int tr_ow;
 };
 
 struct jit_conv_conf_2x3_wino_t {
@@ -119,7 +156,7 @@ struct jit_conv_conf_2x3_wino_t {
     int tile_h, tile_w;
 
     int mb;
-    int ngroups, ic, oc;
+    int ngroups, ic, oc, oc_without_padding;
     int ih, iw, oh, ow;
     int l_pad, t_pad;
     int r_pad, b_pad;
@@ -141,10 +178,8 @@ struct jit_conv_conf_2x3_wino_t {
     int typesize_bia;
     int typesize_acc;
 
-    memory_format_t src_fmt;
-    bool with_bias, with_relu;
-    float relu_negative_slope;
-    bool with_sum;
+    format_tag_t src_tag, dst_tag; // temporary workaround
+    bool with_bias;
     bool small_mb;
 
     int xb, yb;
@@ -157,6 +192,12 @@ struct jit_conv_conf_2x3_wino_t {
     int m_block, n_block, k_block;
     int n2_block, n_chunks;
     int k2_block, k_chunks;
+
+    int mb_block, nb_mb;
+
+    size_t size_wino_src, size_wino_wei, size_wino_dst;
+
+    int nthr;
 };
 
 /*
@@ -248,10 +289,21 @@ struct jit_conv_call_s {
     const void *bias_prf;
     const void *scales;
     const void *acc_s32;
+    const void *compensation;
+    size_t kd_offset;
+    size_t kd_offset_prf;
+    size_t kh_offset;
+    size_t kh_offset_prf;
+    size_t os_index_begin;
+    size_t os_index_begin_prf;
+    size_t os_index_end;
+    size_t os_index_end_prf;
     size_t kd_padding;
     size_t kd_padding_prf;
     size_t kh_padding;
     size_t kh_padding_prf;
+    size_t owb;
+    size_t owb_prf;
     size_t kw_padding;
     size_t channel;
     size_t channel_prf;
@@ -259,11 +311,38 @@ struct jit_conv_call_s {
     size_t ur_w;
     size_t ur_str_w;
     size_t ch_blocks;
+    size_t t_overflow;
+    size_t b_overflow;
     int flags;
 };
 #endif
 
-#ifndef TARGET_VANILLA
+struct jit_deconv_call_s {
+    const void *src; /* hack, non-const for backward_data */
+    const void *dst; /* hack, non-const for forward */
+    const void *filt; /* hack, non-const for backward_weights */
+    const void *bias; /* hack, non-const for backward_bias */
+    const void *scales;
+    const void *compensation;
+    size_t t_overflow;
+    size_t b_overflow;
+    size_t kh_padding;
+    size_t oc_blocks;
+};
+
+struct jit_dw_conv_call_s {
+    const void *input;
+    const void *output;
+    const void *filter;
+    const void *bias;
+    size_t kh_count;
+    size_t oh_count;
+    size_t oh_index;
+    size_t filter_pad_off;
+    unsigned char
+            exec_flags; /* Flags passed by driver execution to inner kernel */
+};
+
 struct jit_wino_transform_call_s {
     size_t tile_block;
     size_t tile_block_ur;
@@ -292,10 +371,12 @@ struct jit_1x1_conv_conf_t {
     int l_pad, t_pad;
     int kh, kw;
     int stride_h, stride_w;
-    memory_format_t src_fmt;
-    bool with_bias, with_relu;
-    float relu_negative_slope;
+    format_tag_t src_tag, wei_tag, dst_tag; // temporary workaround
+    bool with_bias;
     bool with_sum;
+    bool with_eltwise;
+
+    post_ops_t::entry_t::eltwise_t eltwise;
 
     int is, os;
     int ic_block, oc_block;
@@ -305,7 +386,7 @@ struct jit_1x1_conv_conf_t {
     int reduce_dim, reduce_block, nb_reduce,
         nb_reduce_blocking, nb_reduce_blocking_max;
     int load_dim, load_block, nb_load,
-        nb_load_blocking, nb_load_blocking_max;
+        nb_load_blocking, nb_load_blocking_max, nb_load_chunk;
     int bcast_dim, bcast_block, nb_bcast,
         nb_bcast_blocking, nb_bcast_blocking_max;
 
@@ -331,6 +412,10 @@ struct jit_1x1_conv_conf_t {
     int is_oc_scale;
     data_type_t bia_dt;
     data_type_t dst_dt;
+    bool signed_input;
+    float wei_adj_scale;
+
+    cpu_isa_t isa;
 };
 #endif
 
@@ -345,9 +430,7 @@ struct jit_gemm_conv_conf_t {
     int kh, kw, kd;
     int stride_h, stride_w, stride_d;
     int dilate_h, dilate_w, dilate_d;
-    memory_format_t src_fmt;
-    bool with_bias, with_relu;
-    float relu_negative_slope;
+    bool with_bias;
 
     int is, os, ks;
     int ic_block, oc_block;
@@ -355,6 +438,13 @@ struct jit_gemm_conv_conf_t {
     int nthr;
     ptrdiff_t im2col_sz;
     bool need_wei_reduction;
+    bool signed_input;
+    int oh_block;
+    int ow_block;
+    int os_block;
+    bool outer_threading;
+    conv_gemm_loop_order_t loop_order;
+    int nthr_oc;
 };
 #endif
 
@@ -366,6 +456,7 @@ struct jit_1x1_conv_call_s {
     const void *bias_data; // used in forward and backward_weights only
     const void *acc_s32;
     const void *scales;
+    const void *compensation;
 
     size_t load_dim;
     size_t bcast_dim;
@@ -377,8 +468,6 @@ struct jit_1x1_conv_call_s {
 };
 #endif
 
-#ifndef TARGET_VANILLA
-/* pooling */
 struct jit_pool_conf_t {
     int ndims;
     int mb, c;
@@ -400,16 +489,21 @@ struct jit_pool_conf_t {
     size_t tail[4];
     data_type_t src_dt;
     data_type_t dst_dt;
+
+    int dt_size;
+    bool is_bf16;
+
+    cpu_isa_t isa;
 };
 #endif
 
 #ifndef TARGET_VANILLA
 struct jit_pool_call_s {
-    const float *src;
-    const float *dst;
+    const void *src;
+    const void *dst;
     const void *indices;
-    const float *src_prf;
-    const float *dst_prf;
+    const void *src_prf;
+    const void *dst_prf;
     const void *indices_prf;
     size_t oh;
     size_t kd_padding;
@@ -417,7 +511,7 @@ struct jit_pool_call_s {
     size_t kh_padding_shift;
     size_t kd_padding_shift;
     size_t kw_padding;
-    const float* init_value;
+    const void *init_value;
     float ker_area_h;
 };
 #endif

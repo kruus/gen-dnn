@@ -22,6 +22,8 @@ if(platform_cmake_included)
 endif()
 set(platform_cmake_included true)
 
+include("cmake/utils.cmake")
+
 add_definitions(-DMKLDNN_DLL -DMKLDNN_DLL_EXPORTS)
 
 # UNIT8_MAX-like macros are a part of the C99 standard and not a part of the
@@ -32,86 +34,50 @@ set(CMAKE_CCXX_FLAGS)
 set(CMAKE_CCXX_NOWARN_FLAGS)
 set(DEF_ARCH_OPT_FLAGS)
 
-function(error_if_SX)
-    if(NECSX)
-        message(WARNING "Error: should not be here for NECSX")
-    endif()
-endfunction()
+if($ENV{MKLDNN_WERROR})
+    set(MKLDNN_WERROR $ENV{MKLDNN_WERROR})
+endif()
 
-message(STATUS " WIN32 : ${WIN32}")
-message(STATUS " NECSX : ${NECSX}")
-message(STATUS " APPLE : ${APPLE}")
-message(STATUS " UNIX  : ${UNIX}")
-message(STATUS " begin platform.cmake with CMAKE_CXX_FLAGS =${CMAKE_CXX_FLAGS}")
 if(MSVC)
     message(STATUS "cmake/platform.cmake MSVC branch")
     set(USERCONFIG_PLATFORM "x64")
+    append_if(MKLDNN_WERROR CMAKE_CCXX_FLAGS "/WX")
     if(${CMAKE_CXX_COMPILER_ID} STREQUAL MSVC)
-        set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} /MP")
+        append(CMAKE_CCXX_FLAGS "/MP")
         # int -> bool
-        set(CMAKE_CCXX_NOWARN_FLAGS "${CMAKE_CCXX_NOWARN_FLAGS} /wd4800")
+        append(CMAKE_CCXX_NOWARN_FLAGS "/wd4800")
         # unknown pragma
-        set(CMAKE_CCXX_NOWARN_FLAGS "${CMAKE_CCXX_NOWARN_FLAGS} /wd4068")
+        append(CMAKE_CCXX_NOWARN_FLAGS "/wd4068")
         # double -> float
-        set(CMAKE_CCXX_NOWARN_FLAGS "${CMAKE_CCXX_NOWARN_FLAGS} /wd4305")
+        append(CMAKE_CCXX_NOWARN_FLAGS "/wd4305")
         # UNUSED(func)
-        set(CMAKE_CCXX_NOWARN_FLAGS "${CMAKE_CCXX_NOWARN_FLAGS} /wd4551")
+        append(CMAKE_CCXX_NOWARN_FLAGS "/wd4551")
+        # int64_t -> int (tent)
+        append(CMAKE_CCXX_NOWARN_FLAGS "/wd4244")
     endif()
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-        set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} /MP")
+        append(CMAKE_CCXX_FLAGS "/MP")
         set(DEF_ARCH_OPT_FLAGS "-QxHOST")
         # disable: loop was not vectorized with "simd"
-        set(CMAKE_CCXX_NOWARN_FLAGS
-            "${CMAKE_CCXX_NOWARN_FLAGS} -Qdiag-disable:15552")
+        append(CMAKE_CCXX_NOWARN_FLAGS "-Qdiag-disable:15552")
+        # disable: unknown pragma
+        append(CMAKE_CCXX_NOWARN_FLAGS "-Qdiag-disable:3180")
+        # disable: foo has been targeted for automatic cpu dispatch
+        append(CMAKE_CCXX_NOWARN_FLAGS "-Qdiag-disable:15009")
     endif()
     #set(CTESTCONFIG_PATH "$ENV{PATH}")
     #string(REPLACE ";" "\;" CTESTCONFIG_PATH "${CTESTCONFIG_PATH}")
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         # Clang cannot vectorize some loops with #pragma omp simd and gets
         # very upset. Tell it that it's okay and that we love it
-        # unconditionnaly.
-        set(CMAKE_CCXX_NOWARN_FLAGS
-            "${CMAKE_CCXX_NOWARN_FLAGS} -Wno-pass-failed")
+        # unconditionally.
+        append(CMAKE_CCXX_FLAGS "-Wno-pass-failed")
     endif()
-elseif(NECSX)
-    message(STATUS "cmake/platform.cmake NECSX branch")
-    #show_cmake_stuff("NECSX, after project(... C CXX)")
-    message(STATUS "Other NEC SX options here ...")
-    # OHOH. this appear *before* -lmkldnn, and we want it to appear *after*
-    #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${SX_LINK_LIBRARIES}")
-    #set(CMAKE_STATIC_LINKER_FLAGS "${CMAKE_STATIC_LINKER_FLAGS} ${SX_LINK_LIBRARIES}")
-    #
-    # -----------------------------------------------------------------------
-    # These changes may eventually percolate into dev-cmake-sx and Platform/
-    #
-    #   override to better run SX dbx debugger ... (was with -Cvopt)
-    #   Original: -g -ftrace -Cvopt
-    #       (should be -gv -ftrace -CVopt ???)
-    #
-    # Note: do not use -Cdbeug or -Cnoopt (semantics of language changes?)
-    set(CMAKE_C_FLAGS_DEBUG "-g2 -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,fullmsg")
-    set(CMAKE_CXX_FLAGS_DEBUG "-g2 -traceback -Nipa -Nv -pi,noinline -math,inline,scalar -dir,noopt,nopar,novec -pvctl,fullmsg")
-    #set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-g") # should NOT conflict (but did!)
-    # -----------------------------------------------------------------------
-    show_cmake_stuff("NECSX, after project(... C CXX)")
-    #else()
-    #  project(${PROJECT_NAME} C CXX)
-    #  include("cmake/MKL.cmake")
-    #  set(CMAKE_C_FLAGS_DEBUG "-g -O0")
-    #  set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
-elseif(UNIX OR APPLE OR MINGW)
-    set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Wall")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
-
-    if(NECVE)
-        add_definitions(-DSXAURORA -D_GNU_SOURCE)
-        set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -finline -finline-functions -pthread")
-        # Kudoh-san gave internal option for recursive function limit (formal option coming soon)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -We,--pending_instantiations=100")
-    else()
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fvisibility-inlines-hidden")
-	set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -Werror -fvisibility=internal -Wno-unknown-pragmas")
-    endif()
+elseif(UNIX OR MINGW)
+    append(CMAKE_CCXX_FLAGS "-Wall -Wno-unknown-pragmas")
+    append_if(MKLDNN_WERROR CMAKE_CCXX_FLAGS "-Werror")
+    append(CMAKE_CCXX_FLAGS "-fvisibility=internal")
+    append(CMAKE_CXX_FLAGS "-fvisibility-inlines-hidden")
     # compiler specific settings
     if(NECVE) # masquerades as GNU 6.0.0, but does not quite support all the flags
         set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -fdiag-parallel=2 -ffast-math")
@@ -123,55 +89,82 @@ elseif(UNIX OR APPLE OR MINGW)
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         # Clang cannot vectorize some loops with #pragma omp simd and gets
         # very upset. Tell it that it's okay and that we love it
-        # unconditionnaly.
-        set(CMAKE_CCXX_NOWARN_FLAGS
-            "${CMAKE_CCXX_NOWARN_FLAGS} -Wno-pass-failed")
+        # unconditionally.
+        append(CMAKE_CCXX_NOWARN_FLAGS "-Wno-pass-failed")
+        if(MKLDNN_USE_CLANG_SANITIZER MATCHES "Memory(WithOrigin)?")
+            if(NOT MKLDNN_CPU_RUNTIME STREQUAL "SEQ")
+                message(WARNING "Clang OpenMP is not compatible with MSan! "
+                    "Expect a lot of false positives!")
+            endif()
+            append(CMAKE_CCXX_SANITIZER_FLAGS "-fsanitize=memory")
+            if(MKLDNN_USE_CLANG_SANITIZER STREQUAL "MemoryWithOrigin")
+                append(CMAKE_CCXX_SANITIZER_FLAGS
+                    "-fsanitize-memory-track-origins=2")
+                append(CMAKE_CCXX_SANITIZER_FLAGS
+                    "-fno-omit-frame-pointer")
+            endif()
+            set(MKLDNN_ENABLED_CLANG_SANITIZER "${MKLDNN_USE_CLANG_SANITIZER}")
+        elseif(MKLDNN_USE_CLANG_SANITIZER STREQUAL "Undefined")
+            append(CMAKE_CCXX_SANITIZER_FLAGS "-fsanitize=undefined")
+            append(CMAKE_CCXX_SANITIZER_FLAGS
+                "-fno-sanitize=function,vptr")  # work around linking problems
+            append(CMAKE_CCXX_SANITIZER_FLAGS "-fno-omit-frame-pointer")
+            set(MKLDNN_ENABLED_CLANG_SANITIZER "${MKLDNN_USE_CLANG_SANITIZER}")
+        elseif(MKLDNN_USE_CLANG_SANITIZER STREQUAL "Address")
+            append(CMAKE_CCXX_SANITIZER_FLAGS "-fsanitize=address")
+            set(MKLDNN_ENABLED_CLANG_SANITIZER "${MKLDNN_USE_CLANG_SANITIZER}")
+        elseif(MKLDNN_USE_CLANG_SANITIZER STREQUAL "Thread")
+            append(CMAKE_CCXX_SANITIZER_FLAGS "-fsanitize=thread")
+            set(MKLDNN_ENABLED_CLANG_SANITIZER "${MKLDNN_USE_CLANG_SANITIZER}")
+        elseif(MKLDNN_USE_CLANG_SANITIZER STREQUAL "Leak")
+            append(CMAKE_CCXX_SANITIZER_FLAGS "-fsanitize=leak")
+            set(MKLDNN_ENABLED_CLANG_SANITIZER "${MKLDNN_USE_CLANG_SANITIZER}")
+        elseif(NOT MKLDNN_USE_CLANG_SANITIZER STREQUAL "")
+            message(FATAL_ERROR
+                "Unsupported Clang sanitizer '${MKLDNN_USE_CLANG_SANITIZER}'")
+        endif()
+        if(MKLDNN_ENABLED_CLANG_SANITIZER)
+            message(STATUS
+                "Using Clang ${MKLDNN_ENABLED_CLANG_SANITIZER} "
+                "sanitizer (experimental!)")
+            append(CMAKE_CCXX_SANITIZER_FLAGS "-g -fno-omit-frame-pointer")
+        endif()
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         if(NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5.0)
             set(DEF_ARCH_OPT_FLAGS "-march=native -mtune=native")
         endif()
-        if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 6.0)
             # suppress warning on assumptions made regarding overflow (#146)
-            set(CMAKE_CCXX_NOWARN_FLAGS
-                "${CMAKE_CCXX_NOWARN_FLAGS} -Wno-strict-overflow")
-	    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -ffast-math")
-	    # maybe also -ffinite-math or -funsafe-math-optimizations ?
-	else()
-	    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -ffast-math -fbuiltin")
-        endif()
+        append(CMAKE_CCXX_NOWARN_FLAGS "-Wno-strict-overflow")
     elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
         set(DEF_ARCH_OPT_FLAGS "-xHOST")
         # workaround for Intel Compiler 16.0 that produces error caused
         # by pragma omp simd collapse(..)
         if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "17.0")
-            set(CMAKE_CCXX_NOWARN_FLAGS
-                "${CMAKE_CCXX_NOWARN_FLAGS} -diag-disable:13379")
+            append(CMAKE_CCXX_NOWARN_FLAGS "-diag-disable:13379")
         endif()
-        set(CMAKE_CCXX_NOWARN_FLAGS
-            "${CMAKE_CCXX_NOWARN_FLAGS} -diag-disable:15552")
+        append(CMAKE_CCXX_NOWARN_FLAGS "-diag-disable:15552")
+        # disable `was not vectorized: vectorization seems inefficient` remark
+        append(CMAKE_CCXX_NOWARN_FLAGS "-diag-disable:15335")
+        # disable: foo has been targeted for automatic cpu dispatch
+        append(CMAKE_CCXX_NOWARN_FLAGS "-diag-disable:15009")
     endif()
 endif()
 
-if(WIN32)
-    set(CTESTCONFIG_PATH "$ENV{PATH}")
-    string(REPLACE ";" "\;" CTESTCONFIG_PATH "${CTESTCONFIG_PATH}")
-endif()
-
-if(UNIX OR APPLE OR MINGW)
+if(UNIX OR MINGW)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
         # Link Intel libraries statically (except for iomp5)
-        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -liomp5 -static-intel")
+        append(CMAKE_SHARED_LINKER_FLAGS "-liomp5 -static-intel")
         # Tell linker to not complain about missing static libraries
-        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -diag-disable:10237")
+        append(CMAKE_SHARED_LINKER_FLAGS "-diag-disable:10237")
     endif()
 endif()
 
-if(ARCH_OPT_FLAGS STREQUAL "HostOpts")
-    set(ARCH_OPT_FLAGS "${DEF_ARCH_OPT_FLAGS}")
+if(MKLDNN_ARCH_OPT_FLAGS STREQUAL "HostOpts")
+    set(MKLDNN_ARCH_OPT_FLAGS "${DEF_ARCH_OPT_FLAGS}")
 endif()
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_CCXX_FLAGS} ${ARCH_OPT_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_CCXX_FLAGS} ${ARCH_OPT_FLAGS}")
+append(CMAKE_C_FLAGS "${CMAKE_CCXX_FLAGS} ${MKLDNN_ARCH_OPT_FLAGS}")
+append(CMAKE_CXX_FLAGS "${CMAKE_CCXX_FLAGS} ${MKLDNN_ARCH_OPT_FLAGS}")
 
 if(APPLE)
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
@@ -179,7 +172,7 @@ if(APPLE)
     # paths to rpath (like Intel compiler...)
     foreach(_ ${CMAKE_C_IMPLICIT_LINK_DIRECTORIES})
         set(_rpath "-Wl,-rpath,${_}")
-        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${_rpath}")
+        append(CMAKE_SHARED_LINKER_FLAGS "${_rpath}")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${_rpath}")
     endforeach()
 endif()

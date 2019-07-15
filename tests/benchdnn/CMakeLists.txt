@@ -20,24 +20,12 @@ file(GLOB_RECURSE HEADERS
     )
 file(GLOB SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/conv/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/conv/*.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/ip/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/ip/*.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/bnorm/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/bnorm/*.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/rnn/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/rnn/*.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/reorder/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/reorder/*.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/self/*.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/self/*.hpp
     )
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/conv
     ${CMAKE_CURRENT_SOURCE_DIR}/ip
+    ${CMAKE_CURRENT_SOURCE_DIR}/shuffle
     ${CMAKE_CURRENT_SOURCE_DIR}/reorder
     )
 
@@ -46,118 +34,152 @@ if(BENCHDNN_USE_RDPMC)
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-    if(WIN32)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Qprec-div")
-    elseif(UNIX OR APPLE)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -prec-div")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fp-model precise")
-    endif()
+    append_if(WIN32 CMAKE_CXX_FLAGS "-Qprec-div -Qprec-sqrt")
+    append_if(UNIX  CMAKE_CXX_FLAGS "-prec-div -prec-sqrt -fp-model precise")
 endif()
 
-add_executable(benchdnn ${SOURCES})
-if(WIN32)
-    configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-        benchdnn.vcxproj.user @ONLY)
-    set_property(TARGET benchdnn PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
-endif()
-set_property(TARGET benchdnn PROPERTY CXX_STANDARD 11)
-target_link_libraries(benchdnn ${LIB_NAME} ${EXTRA_LIBS})
 if(UNIX AND NOT APPLE)
     find_library(LIBRT rt)
-    if(LIBRT)
-        target_link_libraries(benchdnn ${LIBRT})
-    endif()
 endif()
-# add_test(benchdnn benchdnn)
+register_exe(benchdnn "${SOURCES}" "" "${LIBRT}")
 
 file(COPY inputs DESTINATION .)
-add_custom_target(test_conv
-    COMMAND benchdnn -v1 --conv --batch=inputs/test_conv_all
-    DEPENDS benchdnn
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-)
-if(WIN32)
-    configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-        test_conv.vcxproj.user @ONLY)
-    set_property(TARGET test_conv PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
+
+if(WIN32 AND (NOT MKLDNN_BUILD_FOR_CI))
+    string(REPLACE  ";" "\;" PATH "${CTESTCONFIG_PATH};$ENV{PATH}")
+    configure_file(
+        "${PROJECT_SOURCE_DIR}/cmake/run_with_env.bat.in"
+        "${PROJECT_BINARY_DIR}/run_with_env.bat"
+    )
 endif()
 
-add_custom_target(test_benchdnn_conv
-    COMMAND benchdnn -v1 --conv --batch=inputs/test_conv_all
+# register benchdnn test case
+function(register_benchdnn_test name engine cmd)
+    set(benchdnn_target ${name}_${engine})
+
+    if(MKLDNN_BUILD_FOR_CI)
+       string(REPLACE " " ";" cmd
+            "benchdnn --engine=${engine} ${cmd}")
+        if (ARGC GREATER 3)
+            string(REPLACE " " ";" cmd2
+                "benchdnn --engine=${engine} ${ARGV3}")
+        endif()
+
+        add_test(${benchdnn_target} ${cmd})
+        if (DEFINED cmd2)
+            set(second_target_name "${benchdnn_target}2")
+            add_test(${second_target_name} ${cmd2})
+        endif()
+    else()
+        string(REPLACE " " ";" cmd
+            "$<TARGET_FILE:benchdnn> --engine=${engine} ${cmd}")
+        if (ARGC GREATER 3)
+            string(REPLACE " " ";" cmd2
+                "$<TARGET_FILE:benchdnn> --engine=${engine} ${ARGV3}")
+        endif()
+
+        if(WIN32)
+            set(cmd "cmd;/c;${PROJECT_BINARY_DIR}/run_with_env.bat;${cmd}")
+            set(ARGV2 "cmd;/c;${PROJECT_BINARY_DIR}/run_with_env.bat;${ARGV2}")
+        endif()
+
+        add_custom_target(${benchdnn_target}
+            COMMAND ${cmd}
+            COMMAND ${cmd2} # if any
     DEPENDS benchdnn
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-)
-if(WIN32)
-    configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-        test_benchdnn_conv.vcxproj.user @ONLY)
-    set_property(TARGET test_benchdnn_conv PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
-endif()
+        )
 
-add_custom_target(test_benchdnn_deconv
-    COMMAND benchdnn -v1 --deconv --batch=inputs/test_deconv_all
-    DEPENDS benchdnn
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-)
-if(WIN32)
-    configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-        test_benchdnn_deconv.vcxproj.user @ONLY)
-    set_property(TARGET test_benchdnn_deconv PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
-endif()
+        set_target_properties(${benchdnn_target} PROPERTIES
+            EXCLUDE_FROM_DEFAULT_BUILD TRUE)
+        maybe_configure_windows_test(${benchdnn_target} TARGET)
 
-add_custom_target(test_benchdnn_rnn
-    COMMAND benchdnn -v1 --rnn
-    DEPENDS benchdnn
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-)
-if(WIN32)
-    configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-        test_benchdnn_rnn.vcxproj.user @ONLY)
-    set_property(TARGET test_benchdnn_rnn PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
-endif()
+        # Create non-suffixed target for compatibility
+        if (engine STREQUAL "cpu")
+            add_custom_target(${name} DEPENDS ${benchdnn_target})
+        endif()
+    endif()
+endfunction()
 
-add_custom_target(test_benchdnn_reorder
-    COMMAND benchdnn --reorder --batch=inputs/reorder/test_default
-    DEPENDS benchdnn
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-)
-if(WIN32)
-    configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-        test_benchdnn_reorder.vcxproj.user @ONLY)
-    set_property(TARGET test_benchdnn_reorder PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
-endif()
+register_benchdnn_test(test_benchdnn_conv
+    cpu "-v1 --conv --batch=inputs/conv/test_conv_all")
+register_benchdnn_test(test_benchdnn_conv_bf16
+    cpu "-v1 --conv --batch=inputs/conv/test_conv_bfloat16")
+register_benchdnn_test(test_benchdnn_deconv
+    cpu "-v1 --deconv --batch=inputs/deconv/test_deconv_all")
+register_benchdnn_test(test_benchdnn_deconv_bf16
+    cpu "-v1 --deconv --batch=inputs/deconv/test_deconv_bfloat16")
+register_benchdnn_test(test_benchdnn_rnn
+    cpu "-v1 --rnn --batch=inputs/rnn/test_rnn_small")
+register_benchdnn_test(test_benchdnn_reorder
+    cpu "-v1 --reorder --batch=inputs/reorder/test_reorder_all")
+register_benchdnn_test(test_benchdnn_reorder_bf16
+    cpu "-v1 --reorder --batch=inputs/reorder/test_reorder_bfloat16")
+register_benchdnn_test(test_benchdnn_bnorm
+    cpu "-v1 --bnorm  --batch=inputs/bnorm/test_bnorm_all")
+register_benchdnn_test(test_benchdnn_bnorm_bf16
+    cpu "-v1 --bnorm  --batch=inputs/bnorm/test_bnorm_bfloat16")
+register_benchdnn_test(test_benchdnn_ip
+    cpu "-v1 --ip --batch=inputs/ip/test_ip_all")
+register_benchdnn_test(test_benchdnn_ip_bf16
+    cpu "-v1 --ip --batch=inputs/ip/test_ip_bfloat16")
+register_benchdnn_test(test_benchdnn_shuffle
+    cpu "-v1 --shuffle --batch=inputs/shuffle/test_shuffle_all")
+register_benchdnn_test(test_benchdnn_shuffle_bf16
+    cpu "-v1 --shuffle --batch=inputs/shuffle/test_shuffle_bfloat16")
+register_benchdnn_test(test_benchdnn_softmax
+    cpu "-v1 --softmax --batch=inputs/softmax/test_softmax_all")
+register_benchdnn_test(test_benchdnn_pool
+    cpu "-v1 --pool --batch=inputs/pool/test_pool_all")
+register_benchdnn_test(test_benchdnn_pool_bf16
+    cpu "-v1 --pool --batch=inputs/pool/test_pool_bfloat16")
+register_benchdnn_test(test_benchdnn_sum
+    cpu "-v1 --sum --batch=inputs/sum/test_sum_all")
+register_benchdnn_test(test_benchdnn_sum_bf16
+    cpu "-v1 --sum --batch=inputs/sum/test_sum_bfloat16")
+register_benchdnn_test(test_benchdnn_eltwise
+    cpu "-v1 --eltwise --batch=inputs/eltwise/test_eltwise_all")
+register_benchdnn_test(test_benchdnn_eltwise_bf16
+    cpu "-v1 --eltwise --batch=inputs/eltwise/test_eltwise_bfloat16")
+register_benchdnn_test(test_benchdnn_concat
+    cpu "-v1 --concat --batch=inputs/concat/test_concat_all")
+register_benchdnn_test(test_benchdnn_concat_bf16
+    cpu "-v1 --concat --batch=inputs/concat/test_concat_bfloat16")
+register_benchdnn_test(test_benchdnn_lrn
+    cpu "-v1 --lrn --batch=inputs/lrn/test_lrn_all")
+register_benchdnn_test(test_benchdnn_lrn_bf16
+    cpu "-v1 --lrn --batch=inputs/lrn/test_lrn_bfloat16")
+register_benchdnn_test(test_benchdnn_regression
+    cpu
+    "-v1 --conv --batch=inputs/conv/test_conv_regression"
+    "-v1 --bnorm --batch=inputs/bnorm/test_bnorm_regressions"
+    )
+register_benchdnn_test(test_benchdnn_regression_large
+    cpu
+    "-v1 --bnorm --batch=inputs/bnorm/test_bnorm_regressions_large"
+    )
 
-add_custom_target(test_benchdnn_bnorm
-    COMMAND benchdnn --bnorm --batch=inputs/bnorm/test_bnorm_topo
-    DEPENDS benchdnn
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-)
-
-if(WIN32)
-    configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-        test_benchdnn_bnorm.vcxproj.user @ONLY)
-    set_property(TARGET test_benchdnn_bnorm PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
-endif()
-
-add_custom_target(test_benchdnn_inner_product
-    COMMAND benchdnn --ip --batch=inputs/ip/test_ip_all
-    DEPENDS benchdnn
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-)
-
-if(WIN32)
-    configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-        test_benchdnn_inner_product.vcxproj.user @ONLY)
-    set_property(TARGET test_benchdnn_inner_product PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
-endif()
-
-add_custom_target(test_benchdnn_regression
-    COMMAND benchdnn --conv --batch=inputs/test_conv_regression
-    COMMAND benchdnn --bnorm --batch=inputs/bnorm/test_bnorm_regressions
-    DEPENDS benchdnn
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-)
-if(WIN32)
-    configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-        test_benchdnn_regression.vcxproj.user @ONLY)
-    set_property(TARGET test_benchdnn_regression PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
+if(NOT MKLDNN_GPU_RUNTIME STREQUAL "NONE")
+    register_benchdnn_test(test_benchdnn_conv
+        gpu "-v1 --conv --batch=inputs/conv/test_conv_gpu")
+    register_benchdnn_test(test_benchdnn_deconv
+        gpu "-v1 --deconv --batch=inputs/deconv/test_deconv_gpu")
+    register_benchdnn_test(test_benchdnn_bnorm
+        gpu "-v1 --bnorm --batch=inputs/bnorm/test_bnorm_gpu")
+    register_benchdnn_test(test_benchdnn_ip
+        gpu "-v1 --ip --batch=inputs/ip/test_ip_gpu")
+    register_benchdnn_test(test_benchdnn_rnn
+        gpu "-v1 --rnn --batch=inputs/rnn/test_rnn_gpu")
+    register_benchdnn_test(test_benchdnn_pool
+        gpu "-v1 --pool --batch=inputs/pool/test_pool_gpu")
+    register_benchdnn_test(test_benchdnn_shuffle
+        gpu "-v1 --shuffle --batch=inputs/shuffle/test_shuffle_gpu")
+    register_benchdnn_test(test_benchdnn_softmax
+        gpu "-v1 --softmax --batch=inputs/softmax/test_softmax_gpu")
+    register_benchdnn_test(test_benchdnn_sum
+        gpu "-v1 --sum --batch=inputs/sum/test_sum_gpu")
+    register_benchdnn_test(test_benchdnn_concat
+        gpu "-v1 --concat --batch=inputs/concat/test_concat_gpu")
+    register_benchdnn_test(test_benchdnn_lrn
+        gpu "-v1 --lrn --batch=inputs/lrn/test_lrn_gpu")
 endif()

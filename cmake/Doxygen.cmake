@@ -1,5 +1,5 @@
 #===============================================================================
-# Copyright 2016-2018 Intel Corporation
+# Copyright 2016-2019 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,45 +39,33 @@ if(DOXYGEN_FOUND)
         ${CMAKE_CURRENT_SOURCE_DIR}/doc/header.html.in
         ${CMAKE_CURRENT_BINARY_DIR}/header.html
         @ONLY)
+    file(COPY
+        ${CMAKE_CURRENT_SOURCE_DIR}/doc/footer.html
+        DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
+        )
     file(GLOB_RECURSE HEADERS
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/gtests/*.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/gtests/*.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/gtests/in/*.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/gtests/in/*.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/gtests/gtest/*.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/gtests/gtest/*.hpp
+        ${PROJECT_SOURCE_DIR}/include/*.h
+        ${PROJECT_SOURCE_DIR}/include/*.hpp
         )
     file(GLOB_RECURSE DOX
-        ${CMAKE_SOURCE_DIR}/doc/*
+        ${PROJECT_SOURCE_DIR}/doc/*
+        )
+    file(GLOB_RECURSE EXAMPLES
+        ${PROJECT_SOURCE_DIR}/examples/*
         )
     add_custom_command(
         OUTPUT ${DOXYGEN_STAMP_FILE}
-        DEPENDS ${HEADERS} ${DOX}
+        DEPENDS ${HEADERS} ${DOX} ${EXAMPLES}
         COMMAND ${DOXYGEN_EXECUTABLE} Doxyfile
-        COMMAND cmake -E touch ${DOXYGEN_STAMP_FILE}
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/doc/assets ${DOXYGEN_OUTPUT_DIR}/html/assets
+        COMMAND ${CMAKE_COMMAND} -E touch ${DOXYGEN_STAMP_FILE}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        COMMENT "Generating vanilla documentation with Doxygen" VERBATIM)
-    add_custom_command(
-        OUTPUT ${DOXYGEN_STAMP_FILE2}
-        DEPENDS ${HEADERS} ${DOX}
-        COMMAND ${DOXYGEN_EXECUTABLE} Doxyfile-cpu
-        COMMAND cmake -E touch ${DOXYGEN_STAMP_FILE2}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        COMMENT "Generating jit documentation with Doxygen" VERBATIM)
-    add_custom_target(doc DEPENDS ${DOXYGEN_STAMP_FILE} ${DOXYGEN_STAMP_FILE2})
-    #install( DIRECTORY DESTINATION share/doc/${LIB_NAME} COMPONENT doc)
-    install(
-        DIRECTORY ${DOXYGEN_OUTPUT_DIR}
-        DESTINATION share/doc/${LIB_NAME} # OPTIONAL is an error in [too old] cmake 2.6.4
-        COMPONENT doc
-	OPTIONAL)
-    # convenience target, so 'make install-doc' does just the doxygen and doc install
-    add_custom_target(install-doc
-        DEPENDS doc
-        COMMAND ${CMAKE_COMMAND} -DCMAKE_INSTALL_COMPONENT=doc -P ${CMAKE_BINARY_DIR}/cmake_install.cmake
-        )
+        COMMENT "Generating API documentation with Doxygen" VERBATIM)
+    add_custom_target(doc DEPENDS ${DOXYGEN_STAMP_FILE})
+
+    if(NOT MKLDNN_INSTALL_MODE STREQUAL "BUNDLE")
+        install(
+            DIRECTORY ${DOXYGEN_OUTPUT_DIR}
+            DESTINATION share/doc/${LIB_NAME} OPTIONAL)
+    endif()
 endif(DOXYGEN_FOUND)
-
-

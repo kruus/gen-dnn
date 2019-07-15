@@ -54,44 +54,35 @@ namespace cpu {
 
 class cpu_engine_t: public engine_t {
 public:
-    cpu_engine_t(): engine_t(engine_kind::cpu) {
-#if 0 && !defined(NDEBUG) // use env variable MKLDNN_VERBOSE to debug specific tests
-        mkldnn_verbose_set(2);
-#endif
-    }
-
-    virtual status_t submit(primitive_t *p, event_t *e,
-            event_vector &prerequisites);
+    cpu_engine_t() : engine_t(engine_kind::cpu, backend_kind::native) {}
 
     /* implementation part */
 
-    virtual status_t memory_primitive_desc_create(memory_pd_t **memory_pd,
-            const memory_desc_t *memory_d);
-    virtual status_t view_primitive_desc_create(view_pd_t **view_pd,
-            const memory_pd_t *memory_pd, const dims_t dims,
-            const dims_t offsets);
+    virtual status_t create_memory_storage(memory_storage_t **storage,
+            unsigned flags, size_t size, void *handle) override;
+
+    virtual status_t create_stream(stream_t **stream, unsigned flags) override;
 
     virtual const concat_primitive_desc_create_f*
-        get_concat_implementation_list() const;
+        get_concat_implementation_list() const override;
     virtual const reorder_primitive_desc_create_f*
-        get_reorder_implementation_list() const;
+        get_reorder_implementation_list() const override;
     virtual const sum_primitive_desc_create_f*
-        get_sum_implementation_list() const;
-    virtual const primitive_desc_create_f* get_implementation_list() const;
+        get_sum_implementation_list() const override;
+    virtual const primitive_desc_create_f*
+        get_implementation_list() const override;
 };
 
 class cpu_engine_factory_t: public engine_factory_t {
 public:
-    virtual size_t count() const { return 1; }
-    virtual engine_kind_t kind() const { return engine_kind::cpu; }
-    virtual status_t engine_create(engine_t **engine, size_t index) const {
+    virtual size_t count() const override { return 1; }
+    virtual status_t engine_create(engine_t **engine,
+            size_t index) const override {
         assert(index == 0);
         *engine = new cpu_engine_t();
         return status::success;
     };
 };
-
-extern cpu_engine_factory_t engine_factory;
 
 }
 }

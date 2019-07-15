@@ -19,17 +19,18 @@
 #include "mkldnn.hpp"
 
 #define EXPAND_FORMATS(src, weights, bias, dst) \
-    { mkldnn::memory::format::src, mkldnn::memory::format::weights, \
-    mkldnn::memory::format::bias, mkldnn::memory::format::dst }
+    { mkldnn::memory::format_tag::src, mkldnn::memory::format_tag::weights, \
+    mkldnn::memory::format_tag::bias, mkldnn::memory::format_tag::dst }
 
-#define ENGINE mkldnn::engine::kind::cpu
-#define ALGORITHM mkldnn::convolution_direct
+#define ALGORITHM mkldnn::algorithm::convolution_direct
 
 // Note: these are geared for testing JIT implementations.
 //       should these change for TARGET_VANILLA compile?
 #ifdef DIRECTION_FORWARD
 #define FMT_WEIGHTS_BLOCKED OIhw8i8o
 #define FMT_WEIGHTS_BLOCKED_G gOIhw8i8o
+#define FMT_WEIGHTS_GPU_BLOCKED16x16 IOhw16i16o
+#define FMT_WEIGHTS_GPU_BLOCKED16 OIhw16i16o
 #if defined(FP32)
 #define FMT_WEIGHTS_BLOCKED16 OIhw16i16o
 #define FMT_WEIGHTS_BLOCKED16_G gOIhw16i16o
@@ -45,6 +46,8 @@
 #elif defined DIRECTION_BACKWARD_DATA
 #define FMT_WEIGHTS_BLOCKED OIhw8o8i
 #define FMT_WEIGHTS_BLOCKED_G gOIhw8o8i
+#define FMT_WEIGHTS_GPU_BLOCKED16x16 OIhw16o16i
+#define FMT_WEIGHTS_GPU_BLOCKED16 OIhw16o16i
 #if defined(FP32)
 #define FMT_WEIGHTS_BLOCKED16 OIhw16o16i
 #define FMT_WEIGHTS_BLOCKED16_G gOIhw16o16i
@@ -64,54 +67,51 @@
 #define FMT_WEIGHTS_BLOCKED16_G gOIhw16i16o
 #define FMT_WEIGHTS_BLOCKED16_IOhw16o16i FMT_WEIGHTS_BLOCKED16
 #define FMT_WEIGHTS_BLOCKED16_G_IOhw16o16i FMT_WEIGHTS_BLOCKED16_G
+#define FMT_WEIGHTS_GPU_BLOCKED16x16 IOhw16i16o
+#define FMT_WEIGHTS_GPU_BLOCKED16 IOhw16i16o
 #define TEST_CASE_NAME_PREFIX BackwardWeights
 #endif
 
 #define FMT_BIAS x
-#define FMT_NO_BIAS format_undef
+#define FMT_NO_BIAS undef
 #define FMT_DATA_BLOCKED nChw8c
 #define FMT_DATA_BLOCKED16 nChw16c
 
 #define CONCAT_WITH_UNDERSCORE_(a,b) a ## _ ## b
 #define CONCAT_WITH_UNDERSCORE(a,b) CONCAT_WITH_UNDERSCORE_(a,b)
 
-#define INST_TEST_CASE_(str, ...) INSTANTIATE_TEST_CASE_P( \
+#define CPU_INST_TEST_CASE_(str, ...) CPU_INSTANTIATE_TEST_SUITE_P( \
         str, convolution_test, ::testing::Values(__VA_ARGS__))
-#define INST_TEST_CASE(str, ...) INST_TEST_CASE_( \
+#define CPU_INST_TEST_CASE(str, ...) CPU_INST_TEST_CASE_( \
         CONCAT_WITH_UNDERSCORE(TEST_CASE_NAME_PREFIX, str), __VA_ARGS__)
 
-#ifndef NEGATIVE_SLOPE
-#define NEGATIVE_SLOPE 0.0f
-#else
-#undef INST_TEST_CASE
-#define INST_TEST_CASE(str, ...) INST_TEST_CASE_( \
-        CONCAT_WITH_UNDERSCORE(CONCAT_WITH_UNDERSCORE(TEST_CASE_NAME_PREFIX, \
-        str), neg_slope),  __VA_ARGS__)
-#endif
+#define GPU_INST_TEST_CASE_(str, ...) GPU_INSTANTIATE_TEST_SUITE_P( \
+        str, convolution_test, ::testing::Values(__VA_ARGS__))
+#define GPU_INST_TEST_CASE(str, ...) GPU_INST_TEST_CASE_( \
+        CONCAT_WITH_UNDERSCORE(TEST_CASE_NAME_PREFIX, str), __VA_ARGS__)
+
+#define INST_TEST_CASE(str, ...) \
+        CPU_INST_TEST_CASE(str, __VA_ARGS__); \
+        GPU_INST_TEST_CASE(str, __VA_ARGS__)
 
 #define PARAMS(src, weights, bias, dst, ...) \
-    test_convolution_params_t { ENGINE, ALGORITHM, NEGATIVE_SLOPE, \
+    test_convolution_params_t { ALGORITHM, \
     EXPAND_FORMATS(src, weights, bias, dst), /* empty attributes */ {}, \
     {__VA_ARGS__} }
 
 #define PARAMS_EXPECT_FAIL(src, weights, bias, dst, code, ...) \
-    test_convolution_params_t { ENGINE, ALGORITHM, NEGATIVE_SLOPE, \
+    test_convolution_params_t { ALGORITHM, \
     EXPAND_FORMATS(src, weights, bias, dst), /* empty attributes */ {}, \
     {__VA_ARGS__}, true, code }
 
-#define PARAMS_ATTR(src, weights, bias, dst, round_mode, scale, policy, ...) \
-    test_convolution_params_t { ENGINE, ALGORITHM, NEGATIVE_SLOPE, \
+#define PARAMS_ATTR(src, weights, bias, dst, scale, policy, ...) \
+    test_convolution_params_t { ALGORITHM, \
     EXPAND_FORMATS(src, weights, bias, dst), \
-    {mkldnn::round_mode, scale, test_convolution_attr_t::scale_t::policy}, \
+    {scale, test_convolution_attr_t::scale_t::policy}, \
     {__VA_ARGS__} }
 
 #ifdef TEST_PARAM_ATTR
 #include "convolution_attr.h"
 #else
-#include "convolution_simple_small.h"
+#include "convolution_simple.h"
 #endif
-//#include "convolution_alexnet.h"
-//#include "convolution_googlenet_v1.h"
-//#include "convolution_googlenet_v2.h"
-//#include "convolution_resnet.h"
-//#include "convolution_cifar10.h"

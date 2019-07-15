@@ -17,7 +17,7 @@
 add_subdirectory (gtest)
 
 set(APP_NAME "gtest")
-set(MAIN_SRC_GTEST main.cpp)
+set(MAIN_SRC_GTEST ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${CMAKE_CURRENT_SOURCE_DIR}/gtest
@@ -28,75 +28,82 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
 if(WIN32)
     # Correct 'jnl' macro/jit issue
     if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Qlong-double")
+        append(CMAKE_CXX_FLAGS "/Qlong-double")
     endif()
 endif()
 
 # TODO: enable me!
-#file(GLOB API_TEST_CASES_SRC api_tests/*.cpp)
-#file(GLOB PRIM_TEST_CASES_SRC test_*.cpp)
 file(GLOB PRIM_TEST_CASES_SRC
                               test_iface_pd_iter.cpp
                               test_iface_attr.cpp
+                              test_mkldnn_threading.cpp
                               test_memory.cpp
                               test_sum.cpp
                               test_reorder.cpp
+                              test_cross_engine_reorder.cpp
                               test_concat.cpp
                               test_ve_bwd_d_nans.cpp
                               test_softmax_forward.cpp
                               test_softmax_backward.cpp
                               test_eltwise.cpp
-                              test_relu.cpp
                               test_lrn_forward.cpp
                               test_lrn_backward.cpp
                               test_pooling_forward.cpp
                               test_pooling_backward.cpp
-                              test_batch_normalization.cpp
+                              test_batch_normalization_f32.cpp
+                              test_batch_normalization_s8.cpp
                               test_inner_product_forward.cpp
                               test_inner_product_backward_data.cpp
                               test_inner_product_backward_weights.cpp
+                              test_shuffle.cpp
                               test_convolution_format_any.cpp
                               test_convolution_forward_f32.cpp
-                              test_convolution_forward_s16s16s32.cpp
                               test_convolution_forward_u8s8s32.cpp
                               test_convolution_forward_u8s8fp.cpp
-                              test_convolution_relu_forward_f32.cpp
-                              test_convolution_relu_forward_neg_slope_f32.cpp
-                              test_convolution_relu_forward_s16s16s32.cpp
+                              test_convolution_eltwise_forward_f32.cpp
+                              test_convolution_eltwise_forward_x8s8f32s32.cpp
                               test_convolution_backward_data_f32.cpp
-                              test_convolution_backward_data_s16s16s32.cpp
                               test_convolution_backward_weights_f32.cpp
-                              test_convolution_backward_weights_s16s16s32.cpp
                               test_deconvolution.cpp
-                              test_gemm.cpp
-                              ) #temporary
+                              test_gemm_f16.cpp
+                              test_gemm_f32.cpp
+                              test_gemm_u8s8s32.cpp
+                              test_gemm_s8s8s32.cpp
+                              test_gemm_bf16bf16f32.cpp
+                              test_rnn_forward.cpp
+                              )
+
+# Workaround for an Intel compiler bug: stack unwinding does not restore
+# some of the nonvolatile registers with /O2 optimization
+if(WIN32 AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
+    set_source_files_properties(
+            test_convolution_eltwise_forward_x8s8f32s32.cpp
+            PROPERTIES COMPILE_FLAGS "/O1")
+endif()
 
 foreach(TEST_FILE ${PRIM_TEST_CASES_SRC})
-    get_filename_component (TEST_FILE_WE ${TEST_FILE} NAME_WE)
-    set(CURR_APP_NAME ${TEST_FILE_WE})
-    add_executable(${CURR_APP_NAME} ${MAIN_SRC_GTEST} ${TEST_FILE})
-    if(NECSX)
-        #set_target_properties(${CURR_APP_NAME} PROPERTIES
-        #    LINK_FLAGS -prelink)
-        set_target_properties(${CURR_APP_NAME} PROPERTIES
-            LINK_FLAGS -Wl,-h,muldefs,-h,lib_cyclic)
-        #list(APPEND EXTRA_LIBS mkldnn)
-    endif(NECSX)
-    #target_link_libraries(${CURR_APP_NAME} mkldnn mkldnn_gtest)
-    target_link_libraries(${CURR_APP_NAME}
-        ${LIB_NAME} mkldnn_gtest ${EXTRA_LIBS})
-    add_test(NAME ${CURR_APP_NAME} COMMAND ${CURR_APP_NAME})
-    if(WIN32)
-        set_property(TEST ${CURR_APP_NAME} PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
-        configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-            ${CURR_APP_NAME}.vcxproj.user @ONLY)
+    get_filename_component(exe ${TEST_FILE} NAME_WE)
+
+    add_executable(${exe} ${MAIN_SRC_GTEST} ${TEST_FILE})
+    target_link_libraries(${exe} ${LIB_NAME} mkldnn_gtest ${EXTRA_SHARED_LIBS})
+    target_compile_definitions(${exe} PUBLIC -DMKLDNN_TEST_WITH_ENGINE_PARAM)
+
+    if(NOT MKLDNN_GPU_RUNTIME STREQUAL "NONE")
+        add_test(${exe}_cpu ${exe} COMMAND ${exe} --engine=cpu)
+        maybe_configure_windows_test(${exe}_cpu TEST)
+
+        add_test(${exe}_gpu ${exe} COMMAND ${exe} --engine=gpu)
+        maybe_configure_windows_test(${exe}_gpu TEST)
+    else()
+        add_test(${exe} ${exe})
+        maybe_configure_windows_test(${exe} TEST)
     endif()
 endforeach()
 
-# we need to have either this or the add_test above; disabling for now...
-# add_custom_command(TARGET ${APP_NAME}
-#                   POST_BUILD
-#                   WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-#                   COMMAND ${APP_NAME} )
+add_subdirectory(api)
+
+if(MKLDNN_GPU_RUNTIME STREQUAL "OCL")
+    add_subdirectory(ocl)
+endif()
 
 # vim: et ts=4 sw=4

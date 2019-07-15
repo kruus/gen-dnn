@@ -48,7 +48,8 @@ status_t ip_desc_init(inner_product_desc_t *ip_desc, prop_kind_t prop_kind,
     id.diff_bias_desc = id.bias_desc = zero_md();
 
     const bool is_fwd = one_of(prop_kind, forward_training, forward_inference);
-    const bool with_bias = bias_desc && bias_desc->format != memory_format::undef;
+    const bool with_bias =
+        bias_desc && bias_desc->format_kind != format_kind::undef;
 
     (prop_kind == backward_data ? id.diff_src_desc : id.src_desc) = *src_desc;
     (is_fwd ? id.dst_desc : id.diff_dst_desc)  = *dst_desc;
@@ -61,22 +62,18 @@ status_t ip_desc_init(inner_product_desc_t *ip_desc, prop_kind_t prop_kind,
     id.accum_data_type = types::default_accum_data_type(src_desc->data_type,
             weights_desc->data_type, dst_desc->data_type, prop_kind);
 
-    // Note: ncc compiler bug in evaluating logic in original version
-    //       of these checks ...
-    Consistency ok("ip_desc_init"); // default here is never-verbose, SCHK
-#define AND_(...) SCHKV(ok,__VA_ARGS__)
-        AND_(memory_desc_wrapper(weights_desc).nelems());
-        AND_(one_of(src_desc->ndims, 2, 4, 5));
-        AND_(dst_desc->ndims == 2);
-        AND_(weights_desc->ndims == src_desc->ndims);
-        AND_((with_bias ? bias_desc->ndims == 1 : true));
-        AND_((with_bias ? bias_desc->dims[0] == dst_desc->dims[1] : true));
-        AND_(src_desc->dims[0] == dst_desc->dims[0]);
-        AND_(array_cmp(&src_desc->dims[1], &weights_desc->dims[1],
-            src_desc->ndims - 1));
-        AND_(dst_desc->dims[1] == weights_desc->dims[0]);
-#undef AND_
-    if (!ok) return invalid_arguments;
+    bool consistency = true
+        && memory_desc_wrapper(weights_desc).nelems()
+        && one_of(src_desc->ndims, 2, 3, 4, 5)
+        && dst_desc->ndims == 2
+        && weights_desc->ndims == src_desc->ndims
+        && (with_bias ? bias_desc->ndims == 1 : true)
+        && (with_bias ? bias_desc->dims[0] == dst_desc->dims[1] : true)
+        && src_desc->dims[0] == dst_desc->dims[0]
+        && array_cmp(&src_desc->dims[1], &weights_desc->dims[1],
+                src_desc->ndims - 1)
+        && dst_desc->dims[1] == weights_desc->dims[0];
+    if (!consistency) return invalid_arguments;
 
     *ip_desc = id;
     return success;

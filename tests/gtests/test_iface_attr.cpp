@@ -26,12 +26,39 @@ protected:
     virtual void SetUp() {}
 };
 
-TEST_F(attr_test, TestIntOutputRoundMode) {
+TEST_F(attr_test, TestScratchpadMode) {
     mkldnn::primitive_attr attr;
-    for (auto r: {round_nearest, round_down})
-    {
-        attr.set_int_output_round_mode(r);
-        EXPECT_EQ(r, attr.get_int_output_round_mode());
+    for (auto m: {scratchpad_mode::library, scratchpad_mode::user}) {
+        attr.set_scratchpad_mode(m);
+        ASSERT_EQ(m, attr.get_scratchpad_mode());
+    }
+}
+
+TEST_F(attr_test, TestScratchpadModeEx) {
+    engine eng(get_test_engine_kind(), 0);
+
+    const memory::dim N = 2, C = 2, W = 2;
+
+    memory::desc data_md(
+            { N, C, W }, memory::data_type::f32, memory::format_tag::ncw);
+
+    mkldnn::primitive_attr attr;
+    auto softmax_d = softmax_forward::desc(prop_kind::forward_inference, data_md, 1);
+    for (auto m: {scratchpad_mode::library, scratchpad_mode::user}) {
+        attr.set_scratchpad_mode(m);
+        auto softmax_pd = softmax_forward::primitive_desc(
+                softmax_d, attr, eng);
+        auto scratchpad_size = (long)softmax_pd.scratchpad_desc().get_size();
+        auto mem_consumption = (long)softmax_pd.query_s64(query::memory_consumption_s64);
+
+        // printf("scratchpad_size: %ld\n", scratchpad_size);
+        // printf("mem consumption: %ld\n", mem_consumption);
+
+        if (m == scratchpad_mode::library) {
+            ASSERT_EQ(scratchpad_size, 0L);
+        } else {
+            ASSERT_EQ(mem_consumption, 0L);
+        }
     }
 }
 
@@ -43,25 +70,25 @@ TEST_F(attr_test, TestIntOutputScales) {
 
     // default scales
     attr.get_output_scales(mask, scales);
-    EXPECT_EQ(mask, 0);
-    EXPECT_EQ(scales.size(), 1U);
-    EXPECT_EQ(scales[0], 1.);
+    ASSERT_EQ(mask, 0);
+    ASSERT_EQ(scales.size(), 1U);
+    ASSERT_EQ(scales[0], 1.);
 
     // single non-default scale
     attr.set_output_scales(0, {2.});
     attr.get_output_scales(mask, scales);
-    EXPECT_EQ(mask, 0);
-    EXPECT_EQ(scales.size(), 1U);
-    EXPECT_EQ(scales[0], 2.);
+    ASSERT_EQ(mask, 0);
+    ASSERT_EQ(scales.size(), 1U);
+    ASSERT_EQ(scales[0], 2.);
 
     // multiple scales
     attr.set_output_scales(1 << 1, {1., 2., 3.});
     attr.get_output_scales(mask, scales);
-    EXPECT_EQ(mask, 1 << 1);
-    EXPECT_EQ(scales.size(), 3U);
-    EXPECT_EQ(scales[0], 1.);
-    EXPECT_EQ(scales[1], 2.);
-    EXPECT_EQ(scales[2], 3.);
+    ASSERT_EQ(mask, 1 << 1);
+    ASSERT_EQ(scales.size(), 3U);
+    ASSERT_EQ(scales[0], 1.);
+    ASSERT_EQ(scales[1], 2.);
+    ASSERT_EQ(scales[2], 3.);
 }
 
 TEST_F(attr_test, TestPostOps) {
@@ -71,28 +98,28 @@ TEST_F(attr_test, TestPostOps) {
     algorithm alg;
     float scale, alpha, beta;
 
-    EXPECT_EQ(ops.len(), 0);
-    EXPECT_EQ(attr.get_post_ops().len(), 0);
+    ASSERT_EQ(ops.len(), 0);
+    ASSERT_EQ(attr.get_post_ops().len(), 0);
 
     ops.append_sum(1.1f);
     attr.set_post_ops(ops);
 
-    EXPECT_EQ(attr.get_post_ops().len(), 1);
-    EXPECT_EQ(attr.get_post_ops().kind(0), primitive::kind::sum);
+    ASSERT_EQ(attr.get_post_ops().len(), 1);
+    ASSERT_EQ(attr.get_post_ops().kind(0), primitive::kind::sum);
     attr.get_post_ops().get_params_sum(0, scale);
-    EXPECT_FLOAT_EQ(scale, 1.1f);
+    ASSERT_FLOAT_EQ(scale, 1.1f);
 
     ops.append_eltwise(2.2f, algorithm::eltwise_bounded_relu, 3.3f, 4.4f);
     attr.set_post_ops(ops);
 
-    EXPECT_EQ(attr.get_post_ops().len(), 2);
-    EXPECT_EQ(attr.get_post_ops().kind(0), primitive::kind::sum);
-    EXPECT_EQ(attr.get_post_ops().kind(1), primitive::kind::eltwise);
+    ASSERT_EQ(attr.get_post_ops().len(), 2);
+    ASSERT_EQ(attr.get_post_ops().kind(0), primitive::kind::sum);
+    ASSERT_EQ(attr.get_post_ops().kind(1), primitive::kind::eltwise);
     attr.get_post_ops().get_params_eltwise(1, scale, alg, alpha, beta);
-    EXPECT_FLOAT_EQ(scale, 2.2f);
-    EXPECT_EQ(alg, algorithm::eltwise_bounded_relu);
-    EXPECT_FLOAT_EQ(alpha, 3.3f);
-    EXPECT_FLOAT_EQ(beta, 4.4f);
+    ASSERT_FLOAT_EQ(scale, 2.2f);
+    ASSERT_EQ(alg, algorithm::eltwise_bounded_relu);
+    ASSERT_FLOAT_EQ(alpha, 3.3f);
+    ASSERT_FLOAT_EQ(beta, 4.4f);
 }
 
 }

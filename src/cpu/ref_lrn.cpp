@@ -27,40 +27,51 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-static inline float fast_negative_powf(float omega, float beta) {
-    float Y;
+
+namespace {
+
+typedef float acc_data_t;
+
+static inline acc_data_t fast_negative_powf(
+            acc_data_t omega, acc_data_t beta) {
+        acc_data_t Y;
+        /*
+         * Y = omega^(-3/4) =
+         * = 1.0f / sqrtf(omega) * sqrtf(1.0f / sqrtf(omega))
+         * = sqrtf(1.0f / sqrtf(omega)) * 1.0f / sqrtf(omega)
+         * = sqrtf(1.0f / sqrtf(omega)) / sqrtf(omega)
+         * = sqrtf(1.0f / sqrtf(omega) / omega)
+         * = sqrtf(1.0f / (sqrtf(omega) * omega))
+         */
     if (beta == 0.75f) {
-        Y = 1.0f / sqrtf(omega);
-        Y *= sqrtf(Y);
+            Y = sqrtf(1.0f / (sqrtf(omega) * omega));
     } else {
-        Y = 1.0f /powf(omega, beta);
+            Y = 1.0f / powf(omega, beta);
     }
     return Y;
-};
+    };
+}
 
-template <impl::data_type_t data_type>
-template <mkldnn_memory_format_t fmt>
-void ref_lrn_fwd_t<data_type>::execute_forward() {
+template <impl::data_type_t d_type>
+template <impl::format_tag_t tag>
+void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
     using namespace alg_kind;
-    using namespace memory_format;
+    using namespace format_tag;
 
-    auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
-    auto dst = reinterpret_cast<data_t*>(this->memory(0));
-    auto ws = reinterpret_cast<data_t*>(this->memory(1));
+    auto src = CTX_IN_MEM(const data_t *, MKLDNN_ARG_SRC);
+    auto dst = CTX_OUT_MEM(data_t *, MKLDNN_ARG_DST);
 
-    const memory_desc_wrapper data_d(conf_.src_pd());
-    const memory_desc_wrapper ws_d(conf_.workspace_pd());
-    MAYBE_UNUSED(ws_d);
+    const memory_desc_wrapper data_d(pd()->src_md());
 
-    const int C = conf_.C();
-    const int H = conf_.H();
-    const int W = conf_.W();
-    const size_t stride_mb = data_d.blocking_desc().strides[0][0];
-    const bool across_channels = conf_.desc()->alg_kind == lrn_across_channels;
-    constexpr int blksize = fmt == nChw16c ? 16 : 8;
+    const int C = pd()->C();
+    const int H = pd()->H();
+    const int W = pd()->W();
+    const size_t stride_mb = data_d.blocking_desc().strides[0];
+    const bool across_channels = pd()->desc()->alg_kind == lrn_across_channels;
+    constexpr int blksize = tag == nChw16c ? 16 : 8;
 
     auto data_off = [&](int mb, int c, int h, int w) -> size_t {
-        switch (fmt) {
+        switch (tag) {
         case nChw16c:
         case nChw8c: return mb * stride_mb + c / blksize * H * W * blksize
                      + h * W * blksize + w * blksize + c % blksize;
@@ -71,20 +82,21 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
     };
 
     auto ker = [=](data_t *d, int mb, int oc, int oh, int ow) {
-        const float alpha = static_cast<float>(conf_.desc()->lrn_alpha);
-        const float beta = static_cast<float>(conf_.desc()->lrn_beta);
-        const float k = static_cast<float>(conf_.desc()->lrn_k);
+        const acc_data_t alpha
+                = static_cast<acc_data_t>(pd()->desc()->lrn_alpha);
+        const acc_data_t beta = static_cast<acc_data_t>(pd()->desc()->lrn_beta);
+        const acc_data_t k = static_cast<acc_data_t>(pd()->desc()->lrn_k);
 
-        const int size = conf_.desc()->local_size;
+        const int size = pd()->desc()->local_size;
         const int half_size = (size - 1) / 2;
 
-        float sum = 0;
+        acc_data_t sum = 0;
         if (across_channels) {
             const int c_st = nstl::max(oc - half_size + 0, 0);
             const int c_en = nstl::min(oc + half_size + 1, C);
 
             for (int c = c_st; c < c_en; ++c) {
-                const float s = src[data_off(mb, c, oh, ow)];
+                const acc_data_t s = src[data_off(mb, c, oh, ow)];
                 sum += s * s;
             }
         } else {
@@ -94,7 +106,7 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
             int w_en = nstl::min(ow + half_size + 1, W);
             for (int h = h_st; h < h_en; ++h) {
                 for (int w = w_st; w < w_en; ++w) {
-                    const float s = src[data_off(mb, oc, h, w)];
+                    const acc_data_t s = src[data_off(mb, oc, h, w)];
                     sum += s * s;
                 }
             }
@@ -102,25 +114,11 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
         const int summands = across_channels ? size : size * size;
         sum = k + alpha * sum / summands;
         size_t off = data_off(mb, oc, oh, ow);
-        if (ws)
-            ws[off] = static_cast<data_t>(sum);
-        d[0] = static_cast<data_t>(src[off] * fast_negative_powf(sum, beta));
+        d[0] = static_cast<data_t>((acc_data_t)src[off] * fast_negative_powf(sum, beta));
     };
 
-    const int MB = conf_.MB();
-#if 0
-    OMP(parallel for collapse(4) schedule(static))//;
-    for (int mb = 0; mb < MB; ++mb) {
-        for (int c = 0; c < C; ++c) {
-            for (int h = 0; h < H; ++h) {
-                for (int w = 0; w < W; ++w) {
-                    ker(&dst[data_d.off(mb, c, h, w)], mb, c, h, w);
-                }
-            }
-        }
-    }
-#else
-    if (fmt == nChw16c || fmt == nChw8c) {
+    const int MB = pd()->MB();
+    if (tag == nChw16c || tag == nChw8c) {
         parallel_nd(MB, utils::div_up(C, blksize), H, W,
             [&](int mb, int c_blk, int h, int w) {
             int c = c_blk * blksize;
@@ -130,7 +128,7 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
             for (int cc = 0; cc < nstl::min(blksize, C - c); ++cc)
                 ker(&dst[off + cc], mb, c + cc, h, w);
         });
-    } else if (fmt == nhwc) {
+    } else if (tag == nhwc) {
         parallel_nd(MB, H, W, C,
             [&](int mb, int h, int w, int c) {
             const size_t off = mb * stride_mb + h * W * C + w * C + c;
@@ -146,35 +144,33 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
 #endif
 }
 
-template <impl::data_type_t data_type>
-template <mkldnn_memory_format_t fmt>
-void ref_lrn_bwd_t<data_type>::execute_backward() {
+template <impl::data_type_t d_type>
+template <mkldnn_format_tag_t tag>
+void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
     using namespace alg_kind;
-    using namespace memory_format;
+    using namespace format_tag;
 
-    auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
-    auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
-    auto diff_src = reinterpret_cast<data_t*>(this->memory(0));
+    auto src = CTX_IN_MEM(const data_t *, MKLDNN_ARG_SRC);
+    auto diff_dst = CTX_IN_MEM(const data_t *, MKLDNN_ARG_DIFF_DST);
+    auto diff_src = CTX_OUT_MEM(data_t *, MKLDNN_ARG_DIFF_SRC);
 
-    const memory_desc_wrapper data_d(conf_.src_pd());
-    const memory_desc_wrapper diff_data_d(conf_.diff_dst_pd());
-    MAYBE_UNUSED(diff_data_d);
+    const memory_desc_wrapper data_d(pd()->src_md());
 
-    const int MB = conf_.MB();
-    const int C = conf_.C();
-    const int H = conf_.H();
-    const int W = conf_.W();
-    const size_t stride_mb = data_d.blocking_desc().strides[0][0];
-    constexpr int blksize = fmt == nChw16c ? 16 : 8;
+    const int MB = pd()->MB();
+    const int C = pd()->C();
+    const int H = pd()->H();
+    const int W = pd()->W();
+    const size_t stride_mb = data_d.blocking_desc().strides[0];
+    constexpr int blksize = tag == nChw16c ? 16 : 8;
 
-    const float alpha = static_cast<float>(conf_.desc()->lrn_alpha);
-    const float beta = static_cast<float>(conf_.desc()->lrn_beta);
-    const float k = static_cast<float>(conf_.desc()->lrn_k);
-    const int kernel_size = conf_.desc()->local_size;
+    const acc_data_t alpha = static_cast<acc_data_t>(pd()->desc()->lrn_alpha);
+    const acc_data_t beta = static_cast<acc_data_t>(pd()->desc()->lrn_beta);
+    const acc_data_t k = static_cast<acc_data_t>(pd()->desc()->lrn_k);
+    const int kernel_size = pd()->desc()->local_size;
     const int half_ksize = (kernel_size - 1) / 2;
 
     auto data_off = [&](int mb, int c, int h, int w) -> size_t {
-        switch (fmt) {
+        switch (tag) {
         case nChw16c:
         case nChw8c: return mb * stride_mb + c/blksize * H * W * blksize
                      + h * W * blksize + w * blksize + c%blksize;
@@ -188,43 +184,32 @@ void ref_lrn_bwd_t<data_type>::execute_backward() {
         const int c_st = nstl::max(oc - half_ksize + 0, 0);
         const int c_en = nstl::min(oc + half_ksize + 1, C);
 
-        float A = 0, B = 0, omega_mid = 0;
+        acc_data_t A = 0, B = 0, omega_mid = 0;
         for (int c = c_st; c < c_en; c++) {
-            float sum = 0.0;
+            acc_data_t sum = 0.0;
             const int i_st = nstl::max(c - half_ksize, 0);
             const int i_en = nstl::min(c + kernel_size - half_ksize, C);
 
             for (int i = i_st; i < i_en; ++i) {
-                const float value = src[data_off(mb, i, oh, ow)];
+                const acc_data_t value = src[data_off(mb, i, oh, ow)];
                 sum += value * value;
             }
-            const float omega = static_cast<float>(k + sum * alpha / kernel_size);
+            const acc_data_t omega
+                    = static_cast<acc_data_t>(k + sum * alpha / kernel_size);
             if (c == oc) omega_mid = omega;
-            float t = src[data_off(mb, c, oh, ow)]
+            acc_data_t t = src[data_off(mb, c, oh, ow)]
                    * fast_negative_powf(omega, beta);
-            B += 1.0f / omega * t * diff_dst[data_off(mb, c, oh, ow)];
+            B += 1.0f / omega * t * (acc_data_t)diff_dst[data_off(mb, c, oh, ow)];
         }
 
         const size_t off = data_off(mb, oc, oh, ow);
-        A = fast_negative_powf(omega_mid, beta) * diff_dst[off];
+        A = fast_negative_powf(omega_mid, beta) * (acc_data_t)diff_dst[off];
         B *= src[off];
         B *= (2.0f * alpha * beta) / kernel_size;
         *d = static_cast<data_t>(A - B); // final cast down to data_t
     };
 
-#if 0
-    OMP(parallel for collapse(4) schedule(static))//;
-    for (int mb = 0; mb < MB; ++mb) {
-        for (int c = 0; c < C; ++c) {
-            for (int h = 0; h < H; ++h) {
-                for (int w = 0; w < W; ++w) {
-                    ker(&diff_src[diff_data_d.off(mb, c, h, w)], mb, c, h, w);
-                }
-            }
-        }
-    }
-#else
-    if (fmt == nChw16c || fmt == nChw8c) {
+    if (tag == nChw16c || tag == nChw8c) {
         parallel_nd(MB, utils::div_up(C, blksize), H, W,
             [&](int mb, int c_blk, int h, int w) {
             int c = c_blk * blksize;
@@ -234,7 +219,7 @@ void ref_lrn_bwd_t<data_type>::execute_backward() {
             for (int cc = 0; cc < nstl::min(blksize, C - c); ++cc)
                 ker(&diff_src[off + cc], mb, c + cc, h, w);
         });
-    } else if (fmt == nhwc) {
+    } else if (tag == nhwc) {
         parallel_nd(MB, H, W, C,
             [&](int mb, int h, int w, int c) {
             const size_t off = mb * stride_mb + h * W * C + w * C + c;
@@ -250,16 +235,47 @@ void ref_lrn_bwd_t<data_type>::execute_backward() {
 #endif
 }
 
-template void ref_lrn_fwd_t<data_type::f32>::execute_forward<memory_format::nChw16c>();
-template void ref_lrn_fwd_t<data_type::f32>::execute_forward<memory_format::nChw8c>();
-template void ref_lrn_fwd_t<data_type::f32>::execute_forward<memory_format::nchw>();
-template void ref_lrn_fwd_t<data_type::f32>::execute_forward<memory_format::nhwc>();
-template void ref_lrn_fwd_t<data_type::f32>::execute_forward<memory_format::any>();
-template void ref_lrn_bwd_t<data_type::f32>::execute_backward<memory_format::nChw16c>();
-template void ref_lrn_bwd_t<data_type::f32>::execute_backward<memory_format::nChw8c>();
-template void ref_lrn_bwd_t<data_type::f32>::execute_backward<memory_format::nchw>();
-template void ref_lrn_bwd_t<data_type::f32>::execute_backward<memory_format::nhwc>();
-template void ref_lrn_bwd_t<data_type::f32>::execute_backward<memory_format::any>();
+template void ref_lrn_fwd_t<data_type::f32>::
+execute_forward<format_tag::nChw16c>(const exec_ctx_t &ctx) const;
+template void ref_lrn_fwd_t<data_type::f32>::
+execute_forward<format_tag::nChw8c>(const exec_ctx_t &ctx) const;
+template void ref_lrn_fwd_t<data_type::f32>::
+execute_forward<format_tag::nchw>(const exec_ctx_t &ctx) const;
+template void ref_lrn_fwd_t<data_type::f32>::
+execute_forward<format_tag::nhwc>(const exec_ctx_t &ctx) const;
+template void ref_lrn_fwd_t<data_type::f32>::
+execute_forward<format_tag::any>(const exec_ctx_t &ctx) const;
+template void ref_lrn_bwd_t<data_type::f32>::
+execute_backward<format_tag::nChw16c>(const exec_ctx_t &ctx) const;
+template void ref_lrn_bwd_t<data_type::f32>::
+execute_backward<format_tag::nChw8c>(const exec_ctx_t &ctx) const;
+template void ref_lrn_bwd_t<data_type::f32>::
+execute_backward<format_tag::nchw>(const exec_ctx_t &ctx) const;
+template void ref_lrn_bwd_t<data_type::f32>::
+execute_backward<format_tag::nhwc>(const exec_ctx_t &ctx) const;
+template void ref_lrn_bwd_t<data_type::f32>::
+execute_backward<format_tag::any>(const exec_ctx_t &ctx) const;
+
+template void ref_lrn_fwd_t<data_type::bf16>::
+execute_forward<format_tag::nChw16c>(const exec_ctx_t &ctx) const;
+template void ref_lrn_fwd_t<data_type::bf16>::
+execute_forward<format_tag::nChw8c>(const exec_ctx_t &ctx) const;
+template void ref_lrn_fwd_t<data_type::bf16>::
+execute_forward<format_tag::nchw>(const exec_ctx_t &ctx) const;
+template void ref_lrn_fwd_t<data_type::bf16>::
+execute_forward<format_tag::nhwc>(const exec_ctx_t &ctx) const;
+template void ref_lrn_fwd_t<data_type::bf16>::
+execute_forward<format_tag::any>(const exec_ctx_t &ctx) const;
+template void ref_lrn_bwd_t<data_type::bf16>::
+execute_backward<format_tag::nChw16c>(const exec_ctx_t &ctx) const;
+template void ref_lrn_bwd_t<data_type::bf16>::
+execute_backward<format_tag::nChw8c>(const exec_ctx_t &ctx) const;
+template void ref_lrn_bwd_t<data_type::bf16>::
+execute_backward<format_tag::nchw>(const exec_ctx_t &ctx) const;
+template void ref_lrn_bwd_t<data_type::bf16>::
+execute_backward<format_tag::nhwc>(const exec_ctx_t &ctx) const;
+template void ref_lrn_bwd_t<data_type::bf16>::
+execute_backward<format_tag::any>(const exec_ctx_t &ctx) const;
 
 }
 }

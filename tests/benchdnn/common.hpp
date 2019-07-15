@@ -14,8 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef _COMMON_HPP
-#define _COMMON_HPP
+#ifndef COMMON_HPP
+#define COMMON_HPP
 
 #include <assert.h>
 #include <stdlib.h>
@@ -25,12 +25,7 @@
 #include <float.h>
 #include <math.h>
 
-#ifndef strnlen_s
-#define strnlen_s(x,y) ((x) ? ((strlen(x) < (size_t)y) ? strlen(x) : (size_t)y) : (size_t)0)
-#endif
-#ifndef strnlen
-#define strnlen strnlen_s
-#endif
+#include <cinttypes>
 
 #define ABS(a) ((a)>0?(a):(-(a)))
 
@@ -42,6 +37,9 @@
 
 #define STRINGIFy(s) #s
 #define STRINGIFY(s) STRINGIFy(s)
+
+#define CHAIn2(a,b) a b
+#define CHAIN2(a,b) CHAIn2(a,b)
 
 #define CONCAt2(a,b) a ## b
 #define CONCAT2(a,b) CONCAt2(a,b)
@@ -55,6 +53,8 @@
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
 #define collapse(x)
 #endif
+
+#define IFMT "%" PRId64
 
 #define OK 0
 #define FAIL 1
@@ -94,7 +94,27 @@ extern int verbose;
     } \
 } while (0)
 
-enum prim_t { SELF, CONV, DECONV, IP, REORDER, BNORM, RNN, DEF = CONV, };
+#define BENCHDNN_DISALLOW_COPY_AND_ASSIGN(T) \
+    T(const T&) = delete; \
+    T &operator=(const T&) = delete;
+
+enum prim_t {
+    SELF,
+    CONV,
+    DECONV,
+    IP,
+    SHUFFLE,
+    REORDER,
+    BNORM,
+    RNN,
+    SOFTMAX,
+    POOL,
+    SUM,
+    ELTWISE,
+    CONCAT,
+    LRN,
+    DEF = CONV,
+};
 
 enum bench_mode_t { MODE_UNDEF = 0x0, CORR = 0x1, PERF = 0x2, };
 const char *bench_mode2str(bench_mode_t mode);
@@ -105,6 +125,8 @@ extern bench_mode_t bench_mode;
 extern double max_ms_per_prb; /** maximum time spends per prb in ms */
 extern int min_times_per_prb; /** minimal amount of runs per prb */
 extern int fix_times_per_prb; /** if non-zero run prb that many times */
+
+extern prim_t prim;
 
 struct benchdnn_timer_t {
     enum mode_t { min = 0, avg = 1, max = 2, n_modes };
@@ -122,11 +144,17 @@ struct benchdnn_timer_t {
 
     double total_ms() const { return ms_[avg]; }
 
-    double ms(mode_t mode = benchdnn_timer_t::min) const
-    { return ms_[mode] / (mode == avg ? times_ : 1); }
+    double ms(mode_t mode = min) const {
+        if (!times()) return 0; // nothing to report
+        return ms_[mode] / (mode == avg ? times() : 1);
+    }
 
-    long long ticks(mode_t mode = min) const
-    { return ticks_[mode] / (mode == avg ? times_ : 1); }
+    double sec(mode_t mode = min) const { return ms(mode) / 1e3; }
+
+    long long ticks(mode_t mode = min) const {
+        if (!times()) return 0; // nothing to report
+        return ticks_[mode] / (mode == avg ? times() : 1);
+    }
 
     benchdnn_timer_t &operator=(const benchdnn_timer_t &rhs);
 
@@ -150,7 +178,7 @@ extern stat_t benchdnn_stat;
 /* result structure */
 enum res_state_t { UNTESTED = 0, PASSED, SKIPPED, MISTRUSTED, UNIMPLEMENTED,
     FAILED };
-const char *state2str(res_state_t state);
+const char *state2str(res_state_t state, bool allow_unimpl);
 
 struct res_t {
     res_state_t state;
@@ -159,9 +187,11 @@ struct res_t {
 };
 
 void parse_result(res_t &res, bool &want_perf_report, bool allow_unimpl,
-        int status, char *pstr);
+        int status, const char *pstr);
 
 /* misc */
+void init_fp_mode();
+
 void *zmalloc(size_t size, size_t align);
 void zfree(void *ptr);
 
@@ -172,24 +202,14 @@ const char *bool2str(bool value);
 bool match_regex(const char *str, const char *pattern);
 bool maybe_skip(const char *skip_impl, const char *impl_str);
 
-template <typename B, typename F>
-void read_csv(const char *csv, B b, F f, const char *delim = ",") {
-    char csv_copy[128];
-    strncpy(csv_copy, csv, sizeof(csv_copy) - 1);
-    csv_copy[sizeof(csv_copy) - 1] = '\0';
-
-    b();
-    const char *s = strtok(csv_copy, delim);
-    for (; s && *s; s = strtok(NULL, delim)) f(s);
-}
-
-typedef int (*bench_f)(int argc, char **argv, bool main_bench);
+typedef int (*bench_f)(int argc, char **argv);
 int batch(const char *fname, bench_f bench);
 
 /* returns 1 with given probability */
 int flip_coin(ptrdiff_t seed, float probability);
 
-int div_up(const int a, const int b);
+int64_t div_up(const int64_t a, const int64_t b);
+int mxcsr_round(float f);
 
 /* set '0' across *arr:+size */
 void array_set(char *arr, size_t size);
@@ -198,7 +218,8 @@ void array_set(char *arr, size_t size);
  * layout = 'F' - column major
  * layout = 'C' - row major*/
 void gemm(const char *layout, const char *transa, const char *transb,
-        int m, int n, int k, const float alpha, const float *a, const int lda,
-        const float *b, const int ldb, const float beta, float *c,
-        const int ldc );
+        int64_t m, int64_t n, int64_t k,
+        const float alpha, const float *a, const int64_t lda,
+        const float *b, const int64_t ldb,
+        const float beta, float *c, const int64_t ldc);
 #endif

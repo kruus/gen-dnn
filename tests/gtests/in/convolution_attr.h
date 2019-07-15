@@ -14,19 +14,26 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef TARGET_VANILLA
-INST_TEST_CASE(SimpleSmall_Blocked_Attributes,
+CPU_INST_TEST_CASE(SimpleSmall_Blocked_Attributes,
     PARAMS_ATTR(nhwc, FMT_WEIGHTS_BLOCKED16, FMT_BIAS, nhwc,
-        round_nearest, 0.3f, COMMON,
+        0.3f, COMMON,
         2, 1, 32, 13, 13, 32, 12, 12, 3, 3, 0, 0, 1, 1),
     PARAMS_ATTR(nhwc, FMT_WEIGHTS_BLOCKED16, FMT_BIAS, nhwc,
-        round_down, 0.3f, COMMON,
+        0.3f, COMMON,
         2, 1, 32, 13, 13, 32, 12, 12, 3, 3, 0, 0, 1, 1),
     PARAMS_ATTR(nhwc, FMT_WEIGHTS_BLOCKED16, FMT_BIAS, nhwc,
-        round_nearest, 0.5f, COMMON,
+        0.5f, COMMON,
         2, 1, 32, 13, 13, 32, 12, 12, 3, 3, 0, 0, 1, 1),
     PARAMS_ATTR(nhwc, FMT_WEIGHTS_BLOCKED16, FMT_BIAS, nhwc,
-        round_nearest, 0.5f, COMMON,
+        0.5f, COMMON,
         2, 1, 32, 13, 13, 32, 12, 12, 3, 3, 0, 0, 1, 1)
 );
-#endif
+
+GPU_INST_TEST_CASE(SimpleSmall_Plain_Attributes,
+    PARAMS_ATTR(nhwc, oihw, FMT_NO_BIAS, nchw,
+        0.3f, COMMON,
+        2, 1, 2, 1, 1, 2, 1, 1, 1, 1, 0, 0, 1, 1),
+    PARAMS_ATTR(nhwc, oihw, FMT_BIAS, nchw,
+        0.3f, COMMON,
+        2, 1, 2, 1, 1, 2, 1, 1, 1, 1, 0, 0, 1, 1)
+);

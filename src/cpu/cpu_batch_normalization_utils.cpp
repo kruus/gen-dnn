@@ -14,22 +14,21 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "mkldnn_types.h"
-
 #include "c_types_map.hpp"
 #include "utils.hpp"
-#include "cpu_batch_normalization_pd.hpp"
-//#include "jit_generator.hpp"
-#include "mkldnn_thread.hpp"
+
+#include "jit_generator.hpp"
+
+#include "cpu_batch_normalization_utils.hpp"
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
-
 namespace bnorm_utils {
-    void cache_balance(size_t working_set_size, int C_blks, int &C_blks_per_iter,
-            int &iters) {
-        int nthrs = omp_get_max_threads();
+
+void cache_balance(size_t working_set_size, dim_t C_blks,
+        dim_t &C_blks_per_iter, int64_t &iters) {
+    int nthrs = mkldnn_get_max_threads();
         int l3_size = get_cache_size(3, true) * nthrs / 2;
 
         C_blks_per_iter = l3_size / working_set_size;
@@ -40,13 +39,13 @@ namespace bnorm_utils {
             C_blks_per_iter = C_blks;
 
         iters = (C_blks + C_blks_per_iter - 1) / C_blks_per_iter;
-    }
+}
 
-    bool thread_balance(bool do_blocking, bool spatial_thr_allowed, int ithr,
-            int nthr, int N, int C_blks, int SP, int &C_ithr, int &C_nthr,
-            int &C_blk_s, int &C_blk_e, int &N_ithr, int &N_nthr, int &N_s,
-            int &N_e, int &S_ithr, int &S_nthr, int &S_s, int &S_e) {
-        if (nthr <= C_blks) {
+bool thread_balance(bool do_blocking, bool spatial_thr_allowed, int ithr,
+        int nthr, dim_t N, dim_t C_blks, dim_t SP, int &C_ithr, int &C_nthr,
+        dim_t &C_blk_s, dim_t &C_blk_e, int &N_ithr, int &N_nthr, dim_t &N_s,
+        dim_t &N_e, int &S_ithr, int &S_nthr, dim_t &S_s, dim_t &S_e) {
+    if (nthr <= C_blks || !mkldnn_thr_syncable()) {
             C_ithr = ithr; C_nthr = nthr;
             N_ithr = 0; N_nthr = 1;
             S_ithr = 0; S_nthr = 1;
@@ -54,13 +53,13 @@ namespace bnorm_utils {
             balance211(C_blks, C_nthr, C_ithr, C_blk_s, C_blk_e);
         } else {
             if (do_blocking) {
-                N_nthr = nstl::min(N, nthr);
-                C_nthr = nstl::min(C_blks, nthr / N_nthr);
-                S_nthr = nstl::min(SP, nthr / (C_nthr * N_nthr));
+            N_nthr = (int)nstl::min<dim_t>(N, nthr);
+            C_nthr = (int)nstl::min<dim_t>(C_blks, nthr / N_nthr);
+            S_nthr = (int)nstl::min<dim_t>(SP, nthr / (C_nthr * N_nthr));
             } else {
-                C_nthr = math::gcd(nthr, C_blks);
-                N_nthr = nstl::min(N, nthr / C_nthr);
-                S_nthr = nstl::min(SP, nthr / (C_nthr * N_nthr));
+            C_nthr = (int)math::gcd((dim_t)nthr, C_blks);
+            N_nthr = (int)nstl::min<dim_t>(N, nthr / C_nthr);
+            S_nthr = (int)nstl::min<dim_t>(SP, nthr / (C_nthr * N_nthr));
             }
 
             if (!spatial_thr_allowed)
@@ -90,22 +89,23 @@ namespace bnorm_utils {
             spatial_thr_allowed = false;
 
         return spatial_thr_allowed;
-    }
+}
 
-    void set_spatial_thr(const batch_normalization_pd_t *bdesc,
-        const int simd_w, const int data_size, int &is_spatial_thr) {
+bool is_spatial_thr(const batch_normalization_pd_t *bdesc, int simd_w,
+        int data_size) {
+    if (!mkldnn_thr_syncable()) return false;
 
-        int nthr = omp_get_max_threads();
-        int SP = bdesc->W() * bdesc->D() * bdesc->H();
-        int C_PADDED = memory_desc_wrapper(bdesc->src_pd())
-            .blocking_desc().padding_dims[1];
+    dim_t nthr = mkldnn_get_max_threads();
+    dim_t SP = bdesc->W() * bdesc->D() * bdesc->H();
+    dim_t C_PADDED = memory_desc_wrapper(bdesc->src_md())
+        .padded_dims()[1];
         assert(C_PADDED % simd_w == 0);
 
         size_t data = bdesc->MB() * C_PADDED * SP * data_size;
         size_t l3_size_ = get_cache_size(3, true) * nthr / 2;
         bool do_blocking = (data >= l3_size_ / 2 && l3_size_ > 0);
-        int C_blks_per_iter{ 1 }, iters{ 1 };
-        int C_blks = C_PADDED / simd_w;
+    dim_t C_blks_per_iter{ 1 }, iters{ 1 };
+    dim_t C_blks = C_PADDED / simd_w;
 
         if (do_blocking) {
             int num_tensors = bdesc->is_fwd() ? 1 : 2;
@@ -118,25 +118,23 @@ namespace bnorm_utils {
         // with thread_balance() behavior.
         C_blks = do_blocking ? C_blks_per_iter : C_blks;
 
-        if (nthr <= C_blks) {
-            is_spatial_thr = 0;
-        } else {
-            int S_nthr = 1;
+    if (nthr <= C_blks) return false;
+
+    dim_t S_nthr = 1;
             if (do_blocking) {
-                int N_nthr = nstl::min(bdesc->MB(), nthr);
-                int C_nthr = nstl::min(C_blks, nthr / N_nthr);
+        dim_t N_nthr = nstl::min(bdesc->MB(), nthr);
+        dim_t C_nthr = nstl::min(C_blks, nthr / N_nthr);
                 S_nthr = nstl::min(SP, nthr / (C_nthr * N_nthr));
             } else {
-                int C_nthr = math::gcd(nthr, C_blks);
-                int N_nthr = nstl::min(bdesc->MB(), nthr / C_nthr);
+        dim_t C_nthr = math::gcd(nthr, C_blks);
+        dim_t N_nthr = nstl::min(bdesc->MB(), nthr / C_nthr);
                 S_nthr = nstl::min(SP, nthr / (C_nthr * N_nthr));
             }
-            if (S_nthr < 1) S_nthr = 1;
-            is_spatial_thr = (S_nthr > 1) ? 1 : 0;
-        }
-    }
 
-};
+    return S_nthr > 1;
+}
+
+}
 }
 }
 }

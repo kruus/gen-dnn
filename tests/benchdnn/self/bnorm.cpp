@@ -28,36 +28,33 @@ static int check_flags() {
     CHECK_CASE_STR_EQ(flags2str((flags_t)0), "");
     CHECK_CASE_STR_EQ(flags2str(GLOB_STATS), "G");
     CHECK_CASE_STR_EQ(flags2str(USE_SCALESHIFT), "S");
-    CHECK_CASE_STR_EQ(flags2str(FUSE_BN_RELU), "R");
+    CHECK_CASE_STR_EQ(flags2str(FUSE_NORM_RELU), "R");
     CHECK_CASE_STR_EQ(flags2str(GLOB_STATS | USE_SCALESHIFT), "GS");
-    CHECK_CASE_STR_EQ(flags2str(GLOB_STATS | FUSE_BN_RELU), "GR");
-    CHECK_CASE_STR_EQ(flags2str(USE_SCALESHIFT | FUSE_BN_RELU), "SR");
-    CHECK_CASE_STR_EQ(flags2str(GLOB_STATS | USE_SCALESHIFT | FUSE_BN_RELU),
+    CHECK_CASE_STR_EQ(flags2str(GLOB_STATS | FUSE_NORM_RELU), "GR");
+    CHECK_CASE_STR_EQ(flags2str(USE_SCALESHIFT | FUSE_NORM_RELU), "SR");
+    CHECK_CASE_STR_EQ(flags2str(GLOB_STATS | USE_SCALESHIFT | FUSE_NORM_RELU),
             "GSR");
 
     CHECK_EQ(str2flags(""), 0);
     CHECK_EQ(str2flags("G"), GLOB_STATS);
     CHECK_EQ(str2flags("S"), USE_SCALESHIFT);
-    CHECK_EQ(str2flags("R"), FUSE_BN_RELU);
+    CHECK_EQ(str2flags("R"), FUSE_NORM_RELU);
     CHECK_EQ(str2flags("GS"), GLOB_STATS | USE_SCALESHIFT);
-    CHECK_EQ(str2flags("GR"), GLOB_STATS | FUSE_BN_RELU);
-    CHECK_EQ(str2flags("RSG"), GLOB_STATS | USE_SCALESHIFT | FUSE_BN_RELU);
+    CHECK_EQ(str2flags("GR"), GLOB_STATS | FUSE_NORM_RELU);
+    CHECK_EQ(str2flags("RSG"), GLOB_STATS | USE_SCALESHIFT | FUSE_NORM_RELU);
     return OK;
 }
 
 static int check_desc() {
-    char str[max_desc_len];
     desc_t d{0};
     d.mb = 3; d.ic = 4; d.ih = 5; d.iw = 6; d.eps = 7.; d.name = "test";
 
-    desc2str(&d, str);
-    CHECK_CASE_STR_EQ(str, "mb3ic4ih5iw6eps7ntest");
+    CHECK_PRINT_EQ(d, "mb3ic4ih5iw6eps7ntest");
 
     d.mb = 2;
     d.iw = d.ih;
     d.eps = 1.f / 16;
-    desc2str(&d, str);
-    CHECK_CASE_STR_EQ(str, "ic4ih5ntest");
+    CHECK_PRINT_EQ(d, "ic4ih5ntest");
 
 #   define CHECK_D(_mb, _ic, _ih, _iw, _eps, _name) \
     CHECK_EQ(d.mb, _mb); CHECK_EQ(d.ic, _ic); CHECK_EQ(d.ih, _ih); \
@@ -68,7 +65,7 @@ static int check_desc() {
     CHECK_EQ(str2desc(&d, "ic8ih9ntest3"), OK);
     CHECK_D(2, 8, 9, 9, 1.f / 16, "test3");
     CHECK_EQ(str2desc(&d, "ic8iw9ntest3"), OK);
-    CHECK_D(2, 8, 9, 9, 1.f / 16, "test3");
+    CHECK_D(2, 8, 1, 9, 1.f / 16, "test3");
 #   undef CHECK_D
     return OK;
 }

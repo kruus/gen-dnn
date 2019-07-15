@@ -14,7 +14,7 @@
 # limitations under the License.
 #===============================================================================
 
-if (NOT WITH_TEST)
+if (NOT MKLDNN_BUILD_TESTS)
     return()
 endif()
 
@@ -26,81 +26,59 @@ if(POLICY CMP0060)
 endif()
 
 # propagate TEST specific flags
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_TEST_CCXX_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_TEST_CCXX_FLAGS}")
+append(CMAKE_C_FLAGS "${CMAKE_TEST_CCXX_FLAGS}")
+append(CMAKE_CXX_FLAGS "${CMAKE_TEST_CCXX_FLAGS}")
 
 set(CMAKE_TEST_CCXX_NOWARN_FLAGS)
 
 # propagate no warning flags
-set(CMAKE_TEST_CCXX_NOWARN_FLAGS
-    "${CMAKE_TEST_CCXX_NOWARN_FLAGS} ${CMAKE_CCXX_NOWARN_FLAGS}")
+append(CMAKE_TEST_CCXX_NOWARN_FLAGS "${CMAKE_CCXX_NOWARN_FLAGS}")
 
-# adjust no warning flags
-if((UNIX OR APPLE OR MINGW) AND NOT NECSX)
+# propagate sanitizer flags
+append(CMAKE_C_FLAGS "${CMAKE_CCXX_SANITIZER_FLAGS}")
+append(CMAKE_CXX_FLAGS "${CMAKE_CCXX_SANITIZER_FLAGS}")
+
+# allow tests to include internal header files with, e.g.
+# include "src/common/mkldnn_thread.hpp"
+include_directories(${PROJECT_SOURCE_DIR})
+
+if(UNIX OR MINGW)
     # workaround for Intel Compiler 16.0 that doesn't suppress warning on
     # deprecation with "-Wno-deprecated" compiler flag
-    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel" AND
-            CMAKE_CXX_COMPILER_VERSION VERSION_LESS "17.0")
-        set(CMAKE_TEST_CCXX_NOWARN_FLAGS
-            "${CMAKE_TEST_CCXX_NOWARN_FLAGS} -diag-disable:1478")
-    elseif(NOT NECVE)
-        set(CMAKE_TEST_CCXX_NOWARN_FLAGS
-            "${CMAKE_TEST_CCXX_NOWARN_FLAGS} -Wno-deprecated-declarations")
+    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel"
+            AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "17.0")
+        append(CMAKE_TEST_CCXX_NOWARN_FLAGS "-diag-disable:1478")
+    else()
+        append(CMAKE_TEST_CCXX_NOWARN_FLAGS "-Wno-deprecated-declarations")
     endif()
 elseif(WIN32 AND NOT MINGW)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
-        # 1478: deprecated functions
-        set(CMAKE_TEST_CCXX_NOWARN_FLAGS
-            "${CMAKE_TEST_CCXX_NOWARN_FLAGS} /Qdiag-disable:1478")
+        # 1478, 1786: deprecated functions
+        append(CMAKE_TEST_CCXX_NOWARN_FLAGS "/Qdiag-disable:1478")
+        append(CMAKE_TEST_CCXX_NOWARN_FLAGS "/Qdiag-disable:1786")
+        # 2415: unused variable
+        append(CMAKE_TEST_CCXX_NOWARN_FLAGS "/Qdiag-disable:2415")
     else()
         # c4244: conversion with possible loss of data
         # c4996: unsafe / deprecated functions
-        set(CMAKE_TEST_CCXX_NOWARN_FLAGS
-            "${CMAKE_TEST_CCXX_NOWARN_FLAGS} /wd4996 /wd4244")
+        append(CMAKE_TEST_CCXX_NOWARN_FLAGS "/wd4996 /wd4244")
     endif()
 endif()
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_TEST_CCXX_NOWARN_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_TEST_CCXX_NOWARN_FLAGS}")
 
-#add_executable(api-check-c api_check.c)
-#target_link_libraries(api-check-c ${LIB_NAME} ${EXTRA_LIBS})
-#add_test(api-check-c api-check-c)
+append(CMAKE_C_FLAGS "${CMAKE_TEST_CCXX_NOWARN_FLAGS}")
+append(CMAKE_CXX_FLAGS "${CMAKE_TEST_CCXX_NOWARN_FLAGS}")
 
-# add_executable(simple_convolution-c simple_convolution.c)
-# set_property(TARGET simple_convolution-c PROPERTY C_STANDARD 99)
-# target_link_libraries(simple_convolution-c ${LIB_NAME} ${EXTRA_LIBS})
-# add_test(simple_convolution-c simple_convolution-c)
+register_exe(api-c api.c "test")
 
-add_executable(api-c api.c)
-set_property(TARGET api-c PROPERTY C_STANDARD 99)
-target_link_libraries(api-c ${LIB_NAME} ${EXTRA_LIBS})
-add_test(NAME api-c COMMAND api-c)
-
-if(WIN32)
-    set_property(TEST api-c PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
-    configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-        api-c.vcxproj.user @ONLY)
-endif()
-
-if(UNIX OR APPLE OR MINGW) # Is NECSX a UNIX ?
+if(UNIX OR MINGW)
+    get_directory_property(include_dirs INCLUDE_DIRECTORIES)
     set(test_c_symbols "${CMAKE_CURRENT_BINARY_DIR}/test_c_symbols.c")
-    add_executable(test_c_symbols-c ${test_c_symbols})
     add_custom_command(
         OUTPUT ${test_c_symbols}
         COMMAND /bin/bash ${CMAKE_CURRENT_SOURCE_DIR}/generate_c_symbols_refs.sh
-        ${CMAKE_CURRENT_SOURCE_DIR}/.. ${test_c_symbols}
+        ${CMAKE_CURRENT_SOURCE_DIR}/.. ${test_c_symbols} ${include_dirs}
     )
-    target_link_libraries(test_c_symbols-c ${LIB_NAME} ${EXTRA_LIBS})
-    add_test(NAME test_c_symbols-c COMMAND test_c_symbols-c)
-    add_executable(api-io-c api-io.c)
-    set_property(TARGET api-io-c PROPERTY C_STANDARD 99)
-    target_link_libraries(api-io-c ${LIB_NAME})
-    add_test(NAME api-io-c COMMAND api-io-c)
-    if(MINGW)
-        configure_file(${CMAKE_SOURCE_DIR}/config_template.vcxproj.user
-            test_c_symbols-c.vcxproj.user @ONLY)
-        set_property(TEST test_c_symbols-c PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")
-    endif()
+    register_exe(test_c_symbols-c ${test_c_symbols} "test")
 # elseif(WIN32)
 # No Windows support for: test_c_symbols.c
 endif()

@@ -20,11 +20,12 @@
 #include <assert.h>
 
 #include "c_types_map.hpp"
-#include "cpu_inner_product_pd.hpp"
-#include "cpu_engine.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
 #include "consistency.hpp"
+
+#include "cpu_inner_product_pd.hpp"
+#include "cpu_primitive.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -35,66 +36,45 @@ template <impl::data_type_t src_type, impl::data_type_t wei_type = src_type,
          impl::data_type_t acc_type = dst_type>
 struct ref_inner_product_fwd_t: public cpu_primitive_t {
     struct pd_t: public cpu_inner_product_fwd_pd_t {
-        pd_t(engine_t *engine, const inner_product_desc_t *adesc,
-                const primitive_attr_t *attr,
-                const inner_product_fwd_pd_t *hint_fwd_pd)
-            : cpu_inner_product_fwd_pd_t(engine, adesc, attr, hint_fwd_pd){
-                //printf("ref_inner_product_fwd_t::pd_t "); fflush(stdout);
-            }
+        using cpu_inner_product_fwd_pd_t::cpu_inner_product_fwd_pd_t;
 
         DECLARE_COMMON_PD_T("ref:any", ref_inner_product_fwd_t);
 
-        virtual status_t init() override {
-            using namespace prop_kind;
+        status_t init() {
             using namespace data_type;
-            assert(engine()->kind() == engine_kind::cpu);
-            Consistency ok("ref_ip init"); // default here is never-verbose, SCHK
-#define AND_(...) SCHKV(ok,__VA_ARGS__)
-                AND_(this->set_default_params() == status::success);
-                AND_(utils::one_of(desc()->prop_kind, forward_training,
-                    forward_inference));
-                AND_(desc()->src_desc.data_type == src_type);
-                AND_(desc()->weights_desc.data_type == wei_type);
-                AND_(desc()->accum_data_type == acc_type);
-                AND_(desc()->dst_desc.data_type == dst_type);
-                AND_(utils::implication(with_bias(),
-                        utils::one_of(desc()->bias_desc.data_type,
-                            f32, s32, s8, u8)));
-                AND_(attr()->output_scales_.has_default_values());
-                AND_(attr()->post_ops_.len_ <= 1);
-                AND_(utils::implication(attr()->post_ops_.len_ == 1,
-                    attr()->post_ops_.entry_[0].is_relu(true, false)));
-#undef AND_
+
+            bool ok = true
+                && is_fwd()
+                && src_md()->data_type == src_type
+                && weights_md()->data_type == wei_type
+                && desc()->accum_data_type == acc_type
+                && dst_md()->data_type == dst_type
+                && IMPLICATION(with_bias(), utils::one_of(
+                            weights_md(1)->data_type, f32, s32, s8, u8))
+                && attr()->output_scales_.has_default_values()
+                && attr()->post_ops_.len_ <= 1
+                && IMPLICATION(attr()->post_ops_.len_ == 1,
+                        attr()->post_ops_.entry_[0].is_relu(true, false))
+                && set_default_params() == status::success;
             return ok ? status::success : status::unimplemented;
         }
     };
 
-    ref_inner_product_fwd_t(const pd_t *pd, const input_vector &inputs,
-            const output_vector &outputs)
-        : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {
-            //printf("ref_inner_product_fwd_t(pd,...)"); fflush(stdout);
-        }
+    ref_inner_product_fwd_t(const pd_t *apd): cpu_primitive_t(apd) {}
 
     typedef typename prec_traits<src_type>::type src_data_t;
     typedef typename prec_traits<wei_type>::type wei_data_t;
     typedef typename prec_traits<dst_type>::type dst_data_t;
     typedef typename prec_traits<acc_type>::type acc_data_t;
 
-    virtual void execute(event_t *e) {
-        switch (conf_.desc()->prop_kind) {
-        case prop_kind::forward_training:
-        case prop_kind::forward_inference:
-            execute_forward();
-            break;
-        default:
-            assert(!"invalid prop_kind");
-        }
-        e->set_state(event_t::ready);
+    virtual status_t execute(const exec_ctx_t &ctx) const override {
+        execute_forward(ctx);
+        return status::success;
     }
 
 private:
-    void execute_forward();
-    pd_t conf_;
+    void execute_forward(const exec_ctx_t &ctx) const;
+    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 };
 
 template <impl::data_type_t diff_src_type, impl::data_type_t wei_type,
@@ -102,105 +82,73 @@ template <impl::data_type_t diff_src_type, impl::data_type_t wei_type,
          impl::data_type_t acc_type = diff_src_type>
 struct ref_inner_product_bwd_data_t: public cpu_primitive_t {
     struct pd_t: public cpu_inner_product_bwd_data_pd_t {
-        pd_t(engine_t *engine, const inner_product_desc_t *adesc,
-                const primitive_attr_t *attr,
-                const inner_product_fwd_pd_t *hint_fwd_pd)
-            : cpu_inner_product_bwd_data_pd_t(engine, adesc, attr, hint_fwd_pd)
-        {}
+        using cpu_inner_product_bwd_data_pd_t::cpu_inner_product_bwd_data_pd_t;
 
         DECLARE_COMMON_PD_T("ref:any", ref_inner_product_bwd_data_t);
 
-        virtual status_t init() override {
-            using namespace prop_kind;
-            assert(engine()->kind() == engine_kind::cpu);
+        status_t init() {
             bool ok = true
-                && this->set_default_params() == status::success
-                && utils::one_of(this->desc()->prop_kind, backward,
-                        backward_data)
-                && desc()->diff_src_desc.data_type == diff_src_type
-                && desc()->weights_desc.data_type == wei_type
+                && desc()->prop_kind == prop_kind::backward_data
+                && diff_src_md()->data_type == diff_src_type
+                && weights_md()->data_type == wei_type
                 && desc()->accum_data_type == acc_type
-                && desc()->diff_dst_desc.data_type == diff_dst_type
-                && attr()->has_default_values();
+                && diff_dst_md()->data_type == diff_dst_type
+                && attr()->has_default_values()
+                && set_default_params() == status::success;
             return ok ? status::success : status::unimplemented;
         }
     };
 
-    ref_inner_product_bwd_data_t(const pd_t *pd, const input_vector &inputs,
-            const output_vector &outputs)
-        : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {}
+    ref_inner_product_bwd_data_t(const pd_t *apd): cpu_primitive_t(apd) {}
 
     typedef typename prec_traits<diff_src_type>::type diff_src_data_t;
     typedef typename prec_traits<wei_type>::type wei_data_t;
     typedef typename prec_traits<diff_dst_type>::type diff_dst_data_t;
     typedef typename prec_traits<acc_type>::type acc_data_t;
 
-    virtual void execute(event_t *e) {
-        switch (conf_.desc()->prop_kind) {
-        case prop_kind::backward:
-        case prop_kind::backward_data:
-            execute_backward_data();
-            break;
-        default:
-            assert(!"invalid prop_kind");
-        }
-        e->set_state(event_t::ready);
+    virtual status_t execute(const exec_ctx_t &ctx) const override {
+        execute_backward_data(ctx);
+        return status::success;
     }
 
 private:
-    void execute_backward_data();
-    pd_t conf_;
+    void execute_backward_data(const exec_ctx_t &ctx) const;
+    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 };
 
 template <impl::data_type_t data_type>
 struct ref_inner_product_bwd_weights_t: public cpu_primitive_t {
     struct pd_t: public cpu_inner_product_bwd_weights_pd_t {
-        pd_t(engine_t *engine, const inner_product_desc_t *adesc,
-                const primitive_attr_t *attr,
-                const inner_product_fwd_pd_t *hint_fwd_pd)
-            : cpu_inner_product_bwd_weights_pd_t(engine, adesc, attr,
-                    hint_fwd_pd) {}
+        using cpu_inner_product_bwd_weights_pd_t::cpu_inner_product_bwd_weights_pd_t;
 
         DECLARE_COMMON_PD_T("ref:any", ref_inner_product_bwd_weights_t);
 
-        virtual status_t init() override {
-            using namespace prop_kind;
-            assert(engine()->kind() == engine_kind::cpu);
+        status_t init() {
             bool ok = true
-                && this->set_default_params() == status::success
-                && utils::one_of(this->desc()->prop_kind, backward,
-                        backward_weights)
+                && desc()->prop_kind == prop_kind::backward_weights
                 && utils::everyone_is(data_type,
-                        this->desc()->src_desc.data_type,
-                        this->desc()->diff_dst_desc.data_type,
-                        this->desc()->diff_weights_desc.data_type)
-                && utils::implication(this->with_bias(),
-                        data_type == this->desc()->diff_bias_desc.data_type)
-                && attr()->has_default_values();
+                        src_md()->data_type,
+                        diff_dst_md()->data_type,
+                        diff_weights_md()->data_type)
+                && IMPLICATION(with_bias(),
+                        data_type == diff_weights_md(1)->data_type)
+                && attr()->has_default_values()
+                && set_default_params() == status::success;
             return ok ? status::success : status::unimplemented;
         }
     };
 
-    ref_inner_product_bwd_weights_t(const pd_t *pd, const input_vector &inputs,
-            const output_vector &outputs)
-        : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {}
+    ref_inner_product_bwd_weights_t(const pd_t *apd): cpu_primitive_t(apd) {}
     typedef typename prec_traits<data_type>::type data_t;
 
-    virtual void execute(event_t *e) {
-        switch (conf_.desc()->prop_kind) {
-        case prop_kind::backward:
-        case prop_kind::backward_weights:
-            execute_backward_weights();
-            break;
-        default:
-            assert(!"invalid prop_kind");
-        }
-        e->set_state(event_t::ready);
+    virtual status_t execute(const exec_ctx_t &ctx) const override {
+        execute_backward_weights(ctx);
+        return status::success;
     }
 
 private:
-    void execute_backward_weights();
-    pd_t conf_;
+    void execute_backward_weights(const exec_ctx_t &ctx) const;
+    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 };
 
 }

@@ -17,120 +17,138 @@
 #ifndef REF_SUM_HPP
 #define REF_SUM_HPP
 
-#include "cpu_sum.hpp"
+#include "memory_tracking.hpp"
 #include "reorder_pd.hpp"
+
+#include "cpu_sum_pd.hpp"
+#include "cpu_primitive.hpp"
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
 struct ref_sum_t: public cpu_primitive_t {
-    using cpu_memory_pd_t = cpu_memory_t::pd_t;
-
     struct pd_t: public cpu_sum_pd_t {
-        pd_t(const memory_desc_t *output_d, int n, const float *scales,
-                const cpu_memory_pd_t **input_pds, const primitive_attr_t *attr)
-            : cpu_sum_pd_t(output_d, n, scales, input_pds, attr) {}
-        pd_t(const pd_t &rhs): cpu_sum_pd_t(rhs) {
-            for (size_t i = 0; i < rhs.scales_.size(); ++i) {
-                scales_.push_back(rhs.scales_[i]);
-            }
-            for (size_t i = 0; i < rhs.reorder_pds_.size(); ++i) {
-                reorder_pds_.push_back(
-                       (const reorder_pd_t *)rhs.reorder_pds_[i]->clone());
-            }
+        using cpu_sum_pd_t::cpu_sum_pd_t;
+
+        pd_t(const pd_t &rhs): cpu_sum_pd_t(rhs) { clone_reorder_pds(rhs); }
+
+        ~pd_t() { clear(); }
+
+        pd_t &operator=(const pd_t &rhs) {
+            MKLDNN_SHORT_CIRCUIT_SELF_ASSIGN(rhs);
+            cpu_sum_pd_t::operator=(rhs);
+            clear();
+            clone_reorder_pds(rhs);
+            return *this;
         }
 
-        ~pd_t() {
-            for (size_t i = 0; i < reorder_pds_.size(); ++i) {
-                delete reorder_pds_[i];
-            }
-        }
+        DECLARE_SUM_PD_T("ref:any", ref_sum_t);
 
-        static status_t create(sum_pd_t **sum_pd,
-                const memory_desc_t *output_d, int n, const float *scales,
-                const memory_pd_t **input_pds, const primitive_attr_t *attr) {
-            auto _pd = new pd_t(output_d, n, scales,
-                    (const cpu_memory_pd_t **)input_pds, attr);
-            if (_pd == nullptr) return out_of_memory;
-            if (_pd->init() != success) { delete _pd; return unimplemented; }
-            return safe_ptr_assign<sum_pd_t>(*sum_pd, _pd);
-        }
+        status_t init() {
+            bool ok = cpu_sum_pd_t::init() == status::success;
+            if (!ok) return status::unimplemented;
 
-        virtual status_t create_primitive(primitive_t **primitive,
-                const primitive_at_t *inputs, const primitive_t **outputs)
-                const override {
-            double ms = get_msec();
-            nstl::vector<primitive_t *> reorders;
-            reorders.resize(n_);
-            for (int i = 0; i < n_; ++i)
-                CHECK(reorder_pds_[i]->create_primitive(&reorders[i],
-                            &inputs[i], outputs));
-
-            primitive_t::input_vector ins(inputs, inputs + n_);
-            primitive_t::output_vector outs(outputs, outputs + 1);
-            auto ret = safe_ptr_assign<primitive_t>(*primitive,
-                     new ref_sum_t(this, ins, outs, reorders));
-            ms = get_msec() - ms;
-            if (mkldnn_verbose()->level >= 2) {
-                printf("mkldnn_verbose,create,%s,%g\n", this->info(), ms);
-                fflush(0);
-            }
-            return ret;
-        }
-        virtual pd_t *clone() const override { return nullptr; /* FIXME */ }
-       virtual const char *name() const override { return "ref:any"; }
-
-        virtual status_t init() override {
-            bool ok = cpu_sum_pd_t::init() == success;
-            if (!ok) return unimplemented;
-
+            auto r_impls = engine_->get_reorder_implementation_list();
             for (int i = 0; i < n_; ++i) {
-                auto r_impls = engine_->get_reorder_implementation_list();
                 for (auto r = r_impls; *r; ++r) {
-                    primitive_attr_t dummy_attr;
-                    dummy_attr.output_scales_.set(scales_[i]);
+                    primitive_attr_t attr;
+                    attr.output_scales_.set(scales_[i]);
+                    if (i != 0) attr.post_ops_.append_sum(1.0);
+
                     reorder_pd_t *r_pd;
-                    if (i != 0) {
-                        dummy_attr.post_ops_.append_sum(1.0);
-                    }
-                    if ((*r)(&r_pd, &src_pds_[i], &dst_pd_, &dummy_attr)
-                            == status::success) {
+                    if ((*r)(&r_pd, engine_, &attr, engine_, src_md(i),
+                                engine_, dst_acc_md()) == status::success) {
                         r_pd->init_info();
                         reorder_pds_.push_back(r_pd);
                         break;
                     }
                 }
             }
-            ok = utils::everyone_is(reorder_pds_.size(), scales_.size());
-            return ok ? success : unimplemented;
+
+            if (need_output_reorder()) {
+                for (auto r = r_impls; *r; ++r) {
+                    primitive_attr_t attr;
+
+                    reorder_pd_t *r_pd;
+                    if ((*r)(&r_pd, engine_, &attr, engine_, dst_acc_md(),
+                                engine_, dst_md()) == status::success) {
+                        r_pd->init_info();
+                        reorder_pds_.push_back(r_pd);
+                        break;
+                    }
+                }
+            }
+
+            ok = reorder_pds_.size() == (size_t)n_ + need_output_reorder();
+            if (!ok) return status::unimplemented;
+
+            if (need_output_reorder())
+                init_scratchpad();
+
+            return status::success;
         }
+
+        void clone_reorder_pds(const pd_t &rhs) {
+            for (size_t i = 0; i < rhs.reorder_pds_.size(); ++i)
+                reorder_pds_.push_back(
+                       (const reorder_pd_t *)rhs.reorder_pds_[i]->clone());
+        }
+
+        void clear() { for (auto &rpd: reorder_pds_) delete rpd; }
 
         nstl::vector<const reorder_pd_t *> reorder_pds_;
+
+    private:
+        void init_scratchpad() {
+            using namespace memory_tracking::names;
+            auto scratchpad = scratchpad_registry().registrar();
+            const memory_desc_wrapper dst_acc_d(dst_acc_md());
+            scratchpad.book(key_sum_reduction, dst_acc_d.size());
+        };
     };
 
-    ref_sum_t(const pd_t *conf, const input_vector &inputs,
-            const output_vector &outputs, nstl::vector<primitive_t *> reorders)
-        : cpu_primitive_t(&conf_, inputs, outputs), conf_(*conf),
-        reorders_(reorders) {}
-
-    ~ref_sum_t() {
-        const auto n = reorders_.size();
-        for (size_t i = 0; i < n; ++i)
-            delete reorders_[i];
+    ref_sum_t(const pd_t *apd): cpu_primitive_t(apd) {
+        const int n = pd()->n_inputs() + pd()->need_output_reorder();
+        reorders_.resize(n);
+        for (int i = 0; i < n; ++i)
+            pd()->reorder_pds_[i]->create_primitive(&reorders_[i]);
     }
 
-    virtual void execute(event_t *e) {
-        const auto n = reorders_.size();
-        for (size_t i = 0; i < n; ++i) {
-            event_t ei;
-            reorders_[i]->execute(&ei);
+    ~ref_sum_t() { for (auto &r: reorders_) delete r; }
+
+    virtual status_t execute(const exec_ctx_t &ctx) const override {
+        using namespace memory_tracking::names;
+        const auto n = pd()->n_inputs();
+        exec_args_t r_args;
+        auto *sum_reduce = pd()->need_output_reorder()
+            ? this->scratchpad(ctx).get<float>(key_sum_reduction)
+            : nullptr;
+        auto dst = ctx.args().at(MKLDNN_ARG_DST);
+        memory_t acc(dst.mem->engine(), pd()->dst_acc_md(),
+                memory_flags_t::use_backend_ptr, sum_reduce);
+        memory_arg_t dst_acc = {&acc, false};
+
+        for (int i = 0; i < n; ++i) {
+            r_args[MKLDNN_ARG_SRC] = ctx.args().at(MKLDNN_ARG_MULTIPLE_SRC + i);
+            r_args[MKLDNN_ARG_DST] = pd()->need_output_reorder() ? dst_acc : dst;
+            exec_ctx_t r_ctx(ctx.stream(), std::move(r_args));
+            reorders_[i]->execute(r_ctx);
         }
-        e->set_state(event_t::ready);
+
+        if (pd()->need_output_reorder()) {
+            dst_acc = {&acc, true};
+            r_args[MKLDNN_ARG_SRC] = dst_acc;
+            r_args[MKLDNN_ARG_DST] = dst;
+            exec_ctx_t r_ctx(ctx.stream(), std::move(r_args));
+            reorders_[n]->execute(r_ctx);
+        }
+
+        return status::success;
     }
 
 private:
-    pd_t conf_;
+    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
     nstl::vector<primitive_t *> reorders_;
 };
 

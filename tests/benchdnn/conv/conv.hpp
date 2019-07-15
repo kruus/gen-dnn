@@ -14,8 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef _CONV_HPP
-#define _CONV_HPP
+#ifndef CONV_HPP
+#define CONV_HPP
 
 #include <stdint.h>
 #include <limits.h>
@@ -30,7 +30,7 @@
 namespace conv {
 
 int doit(const prb_t *p, res_t *res);
-int bench(int argc, char **argv, bool main_bench = true);
+int bench(int argc, char **argv);
 
 }
 

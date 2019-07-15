@@ -65,7 +65,7 @@ BraceWrapping: {
 }
 
 BreakBeforeBinaryOperators: 'All'
-BreakBeforeTernaryOperators: 'false'
+BreakBeforeTernaryOperators: 'true'
 
 BreakConstructorInitializersBeforeComma: 'true'
 ConstructorInitializerAllOnOneLineOrOnePerLine: 'true'
@@ -83,6 +83,8 @@ KeepEmptyLinesAtTheStartOfBlocks: 'true'
 MaxEmptyLinesToKeep: 1
 
 NamespaceIndentation: 'None'
+
+ReflowComments: 'false'
 
 SpaceAfterCStyleCast: 'false'
 SpaceBeforeAssignmentOperators: 'true'

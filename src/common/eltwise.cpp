@@ -39,8 +39,11 @@ status_t eltwise_desc_init(eltwise_desc_t *eltwise_desc, prop_kind_t prop_kind,
                 backward_data)
         && one_of(alg_kind, eltwise_relu, eltwise_tanh, eltwise_elu,
                   eltwise_square, eltwise_abs, eltwise_sqrt, eltwise_linear,
-                  eltwise_bounded_relu, eltwise_soft_relu, eltwise_logistic)
-        && implication(prop_kind == backward_data, diff_data_desc != nullptr);
+                  eltwise_bounded_relu, eltwise_soft_relu, eltwise_logistic,
+                  eltwise_exp, eltwise_gelu, eltwise_swish)
+        && IMPLICATION(prop_kind == backward_data, diff_data_desc != nullptr)
+        && IMPLICATION(one_of(data_desc->data_type, mkldnn_s32, mkldnn_s8,
+                    mkldnn_u8), alg_kind == eltwise_relu && alpha == 0);
     if (!args_ok) return invalid_arguments;
 
     auto ed = eltwise_desc_t();
@@ -64,22 +67,9 @@ status_t eltwise_desc_init(eltwise_desc_t *eltwise_desc, prop_kind_t prop_kind,
 
     ed.alpha = alpha;
     ed.beta = beta;
-    ed.negative_slope = ed.alpha;
-    // Good. all struct values initialized
-
-#if 0 && defined(__ve) // ve debug
-    {
-        using namespace std;
-        using mkldnn::operator<<; //(std::ostream& os, mkldnn_memory_desc_t const& md);
-        cout<<" "<<__FILE__<<":"<<__LINE__<<" memory_desc_wrapper(ed.data_desc).nelems() = "
-            <<memory_desc_wrapper(ed.data_desc).nelems()<<endl;
-        cout<<" eltwise data_desc = "<<ed.data_desc<<endl;
-        cout<<" eltwise diff_data_desc = "<<ed.diff_data_desc<<endl;
-    }
-#endif
 
     bool consistency = true
-        && implication(ed.prop_kind == backward_data,
+        && IMPLICATION(ed.prop_kind == backward_data,
                 array_cmp(ed.diff_data_desc.dims, ed.data_desc.dims,
                     ed.diff_data_desc.ndims));
     if (!consistency) return invalid_arguments;
@@ -105,19 +95,4 @@ status_t mkldnn_eltwise_backward_desc_init(eltwise_desc_t *eltwise_desc,
             diff_data_desc, alpha, beta);
 }
 
-status_t mkldnn_relu_forward_desc_init(eltwise_desc_t *relu_desc,
-        prop_kind_t prop_kind, const memory_desc_t *data_desc,
-        float negative_slope) {
-    return mkldnn_eltwise_forward_desc_init(relu_desc, prop_kind, eltwise_relu,
-            data_desc, negative_slope, 0.);
-}
-
-status_t mkldnn_relu_backward_desc_init(eltwise_desc_t *relu_desc,
-        const memory_desc_t *diff_data_desc, const memory_desc_t *data_desc,
-        float negative_slope) {
-    return mkldnn_eltwise_backward_desc_init(relu_desc, eltwise_relu,
-            diff_data_desc, data_desc, negative_slope, 0.);
-}
-
-
-// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

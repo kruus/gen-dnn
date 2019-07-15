@@ -20,11 +20,14 @@
 #include <assert.h>
 
 #include "c_types_map.hpp"
-#include "cpu_inner_product_pd.hpp"
-#include "cpu_engine.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+
 #include "gemm/gemm.hpp"
+#include "gemm_inner_product_utils.hpp"
+
+#include "cpu_inner_product_pd.hpp"
+#include "cpu_primitive.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -33,138 +36,151 @@ namespace cpu {
 template <impl::data_type_t data_type>
 struct gemm_inner_product_fwd_t: public cpu_primitive_t {
     struct pd_t: public cpu_inner_product_fwd_pd_t {
-        pd_t(engine_t *engine, const inner_product_desc_t *adesc,
-                const primitive_attr_t *attr,
-                const inner_product_fwd_pd_t *hint_fwd_pd)
-            : cpu_inner_product_fwd_pd_t(engine, adesc, attr, hint_fwd_pd) {}
+        using cpu_inner_product_fwd_pd_t::cpu_inner_product_fwd_pd_t;
 
         DECLARE_COMMON_PD_T(GEMM_IMPL_STR, gemm_inner_product_fwd_t);
 
-        virtual status_t init() override {
+        status_t init() {
             using namespace utils;
-            assert(engine()->kind() == engine_kind::cpu);
 
             bool ok = true
-                && this->set_default_params() == status::success
-                && one_of(desc()->prop_kind, prop_kind::forward_training,
-                        prop_kind::forward_inference)
+                && is_fwd()
                 && !has_zero_dim_memory()
-                && everyone_is(data_type, desc()->src_desc.data_type,
-                        desc()->weights_desc.data_type,
-                        desc()->dst_desc.data_type)
-                && implication(this->with_bias(),
-                        data_type == desc()->bias_desc.data_type)
+                && everyone_is(data_type,
+                        src_md()->data_type,
+                        weights_md()->data_type,
+                        dst_md()->data_type,
+                        with_bias() ? weights_md(1)->data_type : data_type)
                 && attr()->output_scales_.has_default_values()
-                && attr()->post_ops_.len_ <= 1
-                && utils::implication(attr()->post_ops_.len_ == 1,
-                        attr()->post_ops_.entry_[0].is_relu(true, false))
-                && dense_gemm_consitency_check(src_pd(), weights_pd(),
-                        dst_pd());
+                && post_ops_ok()
+                && set_default_params() == status::success
+                && dense_gemm_consitency_check(src_md(), weights_md(),
+                        dst_md());
             return ok ? status::success : status::unimplemented;
+        }
+
+    protected:
+        bool post_ops_ok() const {
+            auto const &po = attr()->post_ops_;
+            auto is_eltwise
+                    = [&](int idx) { return po.entry_[idx].is_eltwise(false); };
+            auto is_sum = [&](int idx) { return po.entry_[idx].is_sum(false); };
+            switch (po.len_) {
+            case 0:
+                return true; // no post_ops
+            case 1:
+                return is_eltwise(0) || is_sum(0); // sum OR eltwise
+            case 2:
+                return is_sum(0) && is_eltwise(1); // sum -> eltwise
+            default: return false;
+            }
+            return false;
         }
     };
 
-    gemm_inner_product_fwd_t(const pd_t *pd, const input_vector &inputs,
-            const output_vector &outputs)
-        : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {}
+    gemm_inner_product_fwd_t(const pd_t *apd)
+        : cpu_primitive_t(apd), pp_kernel_(nullptr), postops_in_ip_(false) {
+        bool has_bias = pd()->with_bias(), has_eltwise
+                = pd()->attr()->post_ops_.find(primitive_kind::eltwise) >= 0;
+        postops_in_ip_ = has_bias || has_eltwise;
+
+        pp_kernel_ = new inner_product_utils::pp_kernel_t<data_type, data_type>(
+                apd, true);
+
+        auto sum_idx = pd()->attr()->post_ops_.find(primitive_kind::sum);
+        beta_ = sum_idx >= 0 ? pd()->attr()->post_ops_.entry_[sum_idx].sum.scale
+                             : 0.0;
+    }
+    ~gemm_inner_product_fwd_t() { delete pp_kernel_; }
+
     typedef typename prec_traits<data_type>::type data_t;
 
-    virtual void execute(event_t *e) {
-        execute_forward();
-        e->set_state(event_t::ready);
+    virtual status_t execute(const exec_ctx_t &ctx) const override {
+        execute_forward(ctx);
+        return status::success;
     }
 
 private:
-    void execute_forward();
-    pd_t conf_;
+    void execute_forward(const exec_ctx_t &ctx) const;
+    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
+
+    inner_product_utils::pp_kernel_t<data_type, data_type> *pp_kernel_;
+    bool postops_in_ip_;
+    float beta_;
 };
 
 template <impl::data_type_t data_type>
 struct gemm_inner_product_bwd_data_t: public cpu_primitive_t {
     struct pd_t: public cpu_inner_product_bwd_data_pd_t {
-        pd_t(engine_t *engine, const inner_product_desc_t *adesc,
-                const primitive_attr_t *attr,
-                const inner_product_fwd_pd_t *hint_fwd_pd)
-            : cpu_inner_product_bwd_data_pd_t(engine, adesc, attr,
-                    hint_fwd_pd) {}
+        using cpu_inner_product_bwd_data_pd_t::cpu_inner_product_bwd_data_pd_t;
 
         DECLARE_COMMON_PD_T(GEMM_IMPL_STR, gemm_inner_product_bwd_data_t);
 
-        virtual status_t init() override {
-            using namespace utils;
-            assert(engine()->kind() == engine_kind::cpu);
-
+        status_t init() {
             bool ok = true
-                && this->set_default_params() == status::success
                 && desc()->prop_kind == prop_kind::backward_data
                 && !has_zero_dim_memory()
-                && everyone_is(data_type, desc()->diff_src_desc.data_type,
-                        desc()->weights_desc.data_type,
-                        desc()->diff_dst_desc.data_type)
+                && utils::everyone_is(data_type,
+                        diff_src_md()->data_type,
+                        weights_md()->data_type,
+                        diff_dst_md()->data_type)
                 && attr()->has_default_values()
-                && dense_gemm_consitency_check(diff_src_pd(), weights_pd(),
-                        diff_dst_pd());
+                && set_default_params() == status::success
+                && dense_gemm_consitency_check(diff_src_md(), weights_md(),
+                        diff_dst_md());
             return ok ? status::success : status::unimplemented;
         }
     };
 
-    gemm_inner_product_bwd_data_t(const pd_t *pd, const input_vector &inputs,
-            const output_vector &outputs)
-        : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {}
+    gemm_inner_product_bwd_data_t(const pd_t *apd): cpu_primitive_t(apd) {}
     typedef typename prec_traits<data_type>::type data_t;
 
-    virtual void execute(event_t *e) {
-        execute_backward_data();
-        e->set_state(event_t::ready);
+    virtual status_t execute(const exec_ctx_t &ctx) const override {
+        execute_backward_data(ctx);
+        return status::success;
     }
 
 private:
-    void execute_backward_data();
-    pd_t conf_;
+    void execute_backward_data(const exec_ctx_t &ctx) const;
+    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 };
 
 template <impl::data_type_t data_type>
 struct gemm_inner_product_bwd_weights_t: public cpu_primitive_t {
     struct pd_t: public cpu_inner_product_bwd_weights_pd_t {
-        pd_t(engine_t *engine, const inner_product_desc_t *adesc,
-                const primitive_attr_t *attr,
-                const inner_product_fwd_pd_t *hint_fwd_pd)
-            : cpu_inner_product_bwd_weights_pd_t(engine, adesc, attr,
-                    hint_fwd_pd) {}
+        using cpu_inner_product_bwd_weights_pd_t::cpu_inner_product_bwd_weights_pd_t;
 
         DECLARE_COMMON_PD_T(GEMM_IMPL_STR, gemm_inner_product_bwd_weights_t);
 
-        virtual status_t init() override {
-            using namespace utils;
-            assert(engine()->kind() == engine_kind::cpu);
+        status_t init() {
             bool ok = true
-                && this->set_default_params() == status::success
                 && desc()->prop_kind == prop_kind::backward_weights
                 && !has_zero_dim_memory()
-                && everyone_is(data_type, desc()->src_desc.data_type,
-                        desc()->diff_weights_desc.data_type,
-                        desc()->diff_dst_desc.data_type)
+                && utils::everyone_is(data_type,
+                        src_md()->data_type,
+                        diff_weights_md()->data_type,
+                        diff_dst_md()->data_type,
+                        with_bias() ? diff_weights_md(1)->data_type : data_type)
                 && attr()->has_default_values()
-                && dense_gemm_consitency_check(src_pd(), diff_weights_pd(),
-                        diff_dst_pd());
+                && set_default_params() == status::success
+                && dense_gemm_consitency_check(src_md(), diff_weights_md(),
+                        diff_dst_md());
 
             return ok ? status::success : status::unimplemented;
         }
     };
 
-    gemm_inner_product_bwd_weights_t(const pd_t *pd, const input_vector &inputs,
-            const output_vector &outputs)
-        : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {}
+    gemm_inner_product_bwd_weights_t(const pd_t *apd): cpu_primitive_t(apd) {}
     typedef typename prec_traits<data_type>::type data_t;
 
-    virtual void execute(event_t *e) {
-        execute_backward_weights();
-        e->set_state(event_t::ready);
+    virtual status_t execute(const exec_ctx_t &ctx) const override {
+        execute_backward_weights(ctx);
+        return status::success;
     }
 
 private:
-    void execute_backward_weights();
-    pd_t conf_;
+    void execute_backward_weights(const exec_ctx_t &ctx) const;
+    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 };
 
 }

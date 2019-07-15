@@ -26,8 +26,20 @@
 #define STRINGIFy(s) #s
 #define STRINGIFY(s) STRINGIFy(s)
 
-#define PRAGMA_MACRo(x) _Pragma(#x)
-#define PRAGMA_MACRO(x) PRAGMA_MACRo(x)
+#ifdef _MSC_VER
+#   define PRAGMA_MACRo(x) __pragma(x)
+#   define PRAGMA_MACRO(x) PRAGMA_MACRo(x)
+#else
+#   define PRAGMA_MACRo(x) _Pragma(#x)
+#   define PRAGMA_MACRO(x) PRAGMA_MACRo(x)
+#endif
+
+#define UNUSED(x) ((void)x)
+#define MAYBE_UNUSED(x) UNUSED(x)
+
+#if defined(_WIN32) && !defined(__GNUC__)
+#define __PRETTY_FUNCTION__ __FUNCSIG__
+#endif
 
 #endif
 

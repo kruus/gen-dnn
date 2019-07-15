@@ -18,7 +18,7 @@
 #define JIT_AVX512_COMMON_CONV_WINOGRAD_KERNEL_F32_HPP
 
 #include "c_types_map.hpp"
-#include "cpu_memory.hpp"
+#include "memory.hpp"
 
 #include "jit_generator.hpp"
 #include "jit_primitive_conf.hpp"
@@ -91,8 +91,7 @@ struct jit_avx512_common_conv_winograd_fwd_kernel_f32
     static status_t init_conf(jit_conv_winograd_conf_t &jcp,
             const convolution_desc_t &cd, const memory_desc_wrapper &src_d,
             const memory_desc_wrapper &weights_d,
-            const memory_desc_wrapper &dst_d, const primitive_attr_t &attr,
-            bool with_relu = false, float relu_negative_slope = 0.);
+            const memory_desc_wrapper &dst_d, const primitive_attr_t &attr);
 };
 
 struct jit_avx512_common_conv_winograd_bwd_data_kernel_f32

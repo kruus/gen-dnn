@@ -14,13 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include <assert.h>
-
 #include "cpu_engine.hpp"
-#include "cpu_memory.hpp"
-#include "type_helpers.hpp"
 
-#include "cpu/cpu_concat.hpp"
 #include "cpu/ref_concat.hpp"
 #include "cpu/simple_concat.hpp"
 
@@ -37,6 +32,7 @@ static const cpd_create_f cpu_concat_impl_list[] = {
     INSTANCE(simple_concat_t<data_type::u8>),
     INSTANCE(simple_concat_t<data_type::s8>),
     INSTANCE(simple_concat_t<data_type::s32>),
+    INSTANCE(simple_concat_t<data_type::bf16>),
     INSTANCE(ref_concat_t),
     nullptr,
 };

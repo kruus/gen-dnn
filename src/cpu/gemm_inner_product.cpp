@@ -28,52 +28,53 @@ namespace cpu {
 using namespace mkldnn::impl::status;
 using namespace mkldnn::impl::prop_kind;
 using namespace mkldnn::impl::data_type;
-using namespace mkldnn::impl::memory_format;
+using namespace mkldnn::impl::format_tag;
 using namespace mkldnn::impl::primitive_kind;
 
 template <impl::data_type_t data_type>
-void gemm_inner_product_fwd_t<data_type>::execute_forward() {
-    auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
-    auto weights = reinterpret_cast<const data_t *>(this->input_memory(1));
-    auto bias = reinterpret_cast<const data_t *>(this->input_memory(2));
-    auto dst = reinterpret_cast<data_t*>(this->memory());
+void gemm_inner_product_fwd_t<data_type>::execute_forward(
+        const exec_ctx_t &ctx) const {
+    auto src = CTX_IN_MEM(const data_t *, MKLDNN_ARG_SRC);
+    auto weights = CTX_IN_MEM(const data_t *, MKLDNN_ARG_WEIGHTS);
+    auto bias = CTX_IN_MEM(const data_t *, MKLDNN_ARG_BIAS);
+    auto dst = CTX_OUT_MEM(data_t *, MKLDNN_ARG_DST);
 
-    const int MB = conf_.MB();
-    const int OC = conf_.OC();
-    const int IC = conf_.IC_total_padded();
+    const int MB = pd()->MB();
+    const int OC = pd()->OC();
+    const int IC = pd()->IC_total_padded();
 
-    bool wei_tr = !utils::one_of(conf_.weights_pd()->desc()->format,
-             hwio, dhwio, io);
+    const auto &wmd = *pd()->weights_md();
+    bool wei_tr = wmd.format_desc.blocking.strides[0] != 1;
 
-    const auto &post_ops = conf_.attr()->post_ops_;
-    const bool do_relu = post_ops.len_ == 1;
+    const float *scales = pd()->attr()->output_scales_.scales_;
 
-    float alpha = 1.0, beta = 0.0;
+    float alpha = 1.;
     extended_sgemm(wei_tr ? "T" : "N", "N", &OC, &MB, &IC, &alpha, weights,
-            wei_tr ? &IC : &OC, src, &IC, &beta, dst, &OC, bias);
+            wei_tr ? &IC : &OC, src, &IC, &beta_, dst, &OC,
+            postops_in_ip_ ? nullptr : bias);
 
-    if (do_relu) {
-        float nslope = post_ops.entry_[0].eltwise.alpha;
-        parallel_nd(MB, OC, [&](int mb, int oc) {
-            size_t dst_off = mb * OC + oc;
-            if (dst[dst_off] < 0)
-                dst[dst_off] *= nslope;
+    if (postops_in_ip_) {
+        parallel(0, [&](int ithr, int nthr) {
+            size_t start, end;
+            balance211((size_t)OC * MB, nthr, ithr, start, end);
+            (*pp_kernel_)(dst, dst, (char *)bias, scales, start, end);
         });
     }
 }
 
 template <impl::data_type_t data_type>
-void gemm_inner_product_bwd_data_t<data_type>::execute_backward_data() {
-    auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(0));
-    auto weights = reinterpret_cast<const data_t *>(this->input_memory(1));
-    auto diff_src = reinterpret_cast<data_t*>(this->memory());
+void gemm_inner_product_bwd_data_t<data_type>::execute_backward_data(
+        const exec_ctx_t &ctx) const {
+    auto diff_dst = CTX_IN_MEM(const data_t *, MKLDNN_ARG_DIFF_DST);
+    auto weights = CTX_IN_MEM(const data_t *, MKLDNN_ARG_WEIGHTS);
+    auto diff_src = CTX_OUT_MEM(data_t *, MKLDNN_ARG_DIFF_SRC);
 
-    const int MB = conf_.MB();
-    const int OC = conf_.OC();
-    const int IC = conf_.IC_total_padded();
+    const int MB = pd()->MB();
+    const int OC = pd()->OC();
+    const int IC = pd()->IC_total_padded();
 
-    bool wei_tr = utils::one_of(conf_.weights_pd()->desc()->format,
-             hwio, dhwio, io);
+    const auto &wmd = *pd()->weights_md();
+    bool wei_tr = wmd.format_desc.blocking.strides[0] == 1;
 
     float alpha = 1.0, beta = 0.0;
     extended_sgemm(wei_tr ? "T" : "N", "N", &IC, &MB, &OC, &alpha, weights,
@@ -81,23 +82,24 @@ void gemm_inner_product_bwd_data_t<data_type>::execute_backward_data() {
 }
 
 template <impl::data_type_t data_type>
-void gemm_inner_product_bwd_weights_t<data_type>::execute_backward_weights() {
-    auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
-    auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
-    auto diff_weights = reinterpret_cast<data_t *>(this->memory(0));
-    auto diff_bias = reinterpret_cast<data_t *>(this->memory(1));
+void gemm_inner_product_bwd_weights_t<data_type>::execute_backward_weights(
+        const exec_ctx_t &ctx) const {
+    auto diff_dst = CTX_IN_MEM(const data_t *, MKLDNN_ARG_DIFF_DST);
+    auto src = CTX_IN_MEM(const data_t *, MKLDNN_ARG_SRC);
+    auto diff_weights = CTX_OUT_MEM(data_t *, MKLDNN_ARG_DIFF_WEIGHTS);
+    auto diff_bias = CTX_OUT_MEM(data_t *, MKLDNN_ARG_DIFF_BIAS);
 
-    const memory_desc_wrapper diff_dst_d(conf_.diff_dst_pd());
-    const memory_desc_wrapper diff_bias_d(conf_.diff_weights_pd(1));
+    const memory_desc_wrapper diff_dst_d(pd()->diff_dst_md());
+    const memory_desc_wrapper diff_bias_d(pd()->diff_weights_md(1));
 
-    diff_dst += diff_dst_d.blocking_desc().offset_padding;
+    diff_dst += diff_dst_d.offset0();
 
-    const int MB = conf_.MB();
-    const int OC = conf_.OC();
-    const int IC = conf_.IC_total_padded();
+    const int MB = pd()->MB();
+    const int OC = pd()->OC();
+    const int IC = pd()->IC_total_padded();
 
-    bool wei_tr = utils::one_of(conf_.diff_weights_pd()->desc()->format,
-             hwio, dhwio, io);
+    const auto &wmd = *pd()->diff_weights_md();
+    bool wei_tr = wmd.format_desc.blocking.strides[0] == 1;
 
     float alpha = 1.0, beta = 0.0;
     if (wei_tr)
@@ -108,14 +110,11 @@ void gemm_inner_product_bwd_weights_t<data_type>::execute_backward_weights() {
                 &beta, diff_weights, &IC);
 
     if (diff_bias) {
-        diff_bias += diff_bias_d.blocking_desc().offset_padding;
+        diff_bias += diff_bias_d.offset0();
         constexpr int blksize = 8;
-        int OC_blocks = OC / blksize;
-        int rem_OC = OC % blksize;
-        OMP(parallel)//;
-        {
-            const int ithr = omp_get_thread_num();
-            const int nthr = omp_get_num_threads();
+        const int OC_blocks = OC / blksize;
+        const int rem_OC = OC % blksize;
+        parallel(0, [&](const int ithr, const int nthr) {
             int oc_st{0}, oc_e{0};
             balance211(OC_blocks, nthr, ithr, oc_st, oc_e);
             oc_st = oc_st * blksize;
@@ -142,7 +141,7 @@ void gemm_inner_product_bwd_weights_t<data_type>::execute_backward_weights() {
                     }
                 }
             }
-        }
+        });
     }
 }
 

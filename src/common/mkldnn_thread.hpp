@@ -20,23 +20,47 @@
 #include "utils.hpp"
 #include "z_magic.hpp"
 
-#if defined(_OPENMP)
-#   include <omp.h>
-#   if defined(SXAURORA) // strange headers and missing function...
-#      include <stdlib.h>
-inline int omp_get_max_threads()
-{
-    char *e = getenv("OMP_NUM_THREADS");
-    if (e)
-        return atoi(e);
-    return 1;
+#if MKLDNN_CPU_RUNTIME == MKLDNN_RUNTIME_SEQ
+#define MKLDNN_THR_SYNC 1
+inline int mkldnn_get_max_threads() { return 1; }
+inline int mkldnn_get_num_threads() { return 1; }
+inline int mkldnn_get_thread_num() { return 0; }
+inline int mkldnn_in_parallel() { return 0; }
+inline void mkldnn_thr_barrier() {}
+
+#define PRAGMA_OMP(...)
+
+#elif MKLDNN_CPU_RUNTIME == MKLDNN_RUNTIME_OMP
+#include <omp.h>
+#define MKLDNN_THR_SYNC 1
+
+inline int mkldnn_get_max_threads() { return omp_get_max_threads(); }
+inline int mkldnn_get_num_threads() { return omp_get_num_threads(); }
+inline int mkldnn_get_thread_num() { return omp_get_thread_num(); }
+inline int mkldnn_in_parallel() { return omp_in_parallel(); }
+inline void mkldnn_thr_barrier() {
+#   pragma omp barrier
 }
-#   endif // SXAURORA
-#else // not defined(_OPENMP)
-inline int omp_get_max_threads() { return 1; }
-inline int omp_get_num_threads() { return 1; }
-inline int omp_get_thread_num() { return 0; }
-inline int omp_in_parallel() { return 0; }
+
+#define PRAGMA_OMP(...) PRAGMA_MACRO(CHAIN2(omp, __VA_ARGS__))
+
+#elif MKLDNN_CPU_RUNTIME == MKLDNN_RUNTIME_TBB
+#include "tbb/task_arena.h"
+#include "tbb/parallel_for.h"
+#define MKLDNN_THR_SYNC 0
+
+inline int mkldnn_get_max_threads()
+{ return tbb::this_task_arena::max_concurrency(); }
+inline int mkldnn_get_num_threads() { return mkldnn_get_max_threads(); }
+inline int mkldnn_get_thread_num()
+{ return tbb::this_task_arena::current_thread_index(); }
+inline int mkldnn_in_parallel() { return 0; }
+inline void mkldnn_thr_barrier() { assert(!"no barrier in TBB"); }
+inline tbb::static_partitioner mkldnn_tbb_partitioner()
+{ return tbb::static_partitioner(); }
+
+#define PRAGMA_OMP(...)
+
 #endif
 
 #ifndef PRAGMA_OMP_SIMD // [ejk] pragma macros moved upward to include/mkldnn_os.h
@@ -51,6 +75,8 @@ inline int omp_in_parallel() { return 0; }
 
 namespace mkldnn {
 namespace impl {
+
+inline bool mkldnn_thr_syncable() { return MKLDNN_THR_SYNC == 1; }
 
 template <typename T, typename U>
 inline void balance211(T n, U team, U tid, T &n_start, T &n_end) {
@@ -72,213 +98,36 @@ inline void balance211(T n, U team, U tid, T &n_start, T &n_end) {
     n_end += n_start;
 }
 
-/*
-Threading based on nd_iterator.
-"Copy-paste" approach because of performance issues under Intel Compiler:
-More aggressive usage of templates/lambda usually causes performance degradation
-on Intel(R) Xeon Phi(TM).
-In particular, #pagma opm parallel if(cond) may bring significant performance
-issue on Intel Xeon Phi.
-*/
-template <typename T0, typename T1, typename F>
-void parallel_nd(const T0 D0, const T1 D1, F f) {
-    const size_t work_amount = (size_t)D0 * D1;
-    if (work_amount == 0) return;
+template <typename T, typename U>
+void balance2D(U nthr, U ithr, T ny, T &ny_start, T &ny_end,
+    T nx, T &nx_start, T &nx_end, T nx_divider)
+{
+    const int grp_count = nstl::min(nx_divider, nthr);
+    const int grp_size_big = nthr / grp_count + 1;
+    const int grp_size_small = nthr / grp_count;
+    const int n_grp_big = nthr % grp_count;
+    const int threads_in_big_groups = n_grp_big * grp_size_big;
 
-#   pragma omp parallel
-    {
-        const int ithr = omp_get_thread_num();
-        const int nthr = omp_get_num_threads();
-        size_t start{0}, end{0};
-        balance211(work_amount, nthr, ithr, start, end);
-        T0 d0{0}; T1 d1{0};
-        utils::nd_iterator_init(start, d0, D0, d1, D1);
-        for (size_t iwork = start; iwork < end; ++iwork) {
-            f(d0, d1);
-            utils::nd_iterator_step(d0, D0, d1, D1);
-        }
+    const int ithr_bound_distance = ithr - threads_in_big_groups;
+    T grp, grp_ithr, grp_nthr;
+    if (ithr_bound_distance < 0) { // ithr in first groups
+        grp = ithr / grp_size_big;
+        grp_ithr = ithr % grp_size_big;
+        grp_nthr = grp_size_big;
+    } else { // ithr in last groups
+        grp = n_grp_big + ithr_bound_distance / grp_size_small;
+        grp_ithr = ithr_bound_distance % grp_size_small;
+        grp_nthr = grp_size_small;
     }
-}
 
-template <typename T0, typename T1, typename T2, typename F>
-void parallel_nd(const T0 D0, const T1 D1, const T2 D2, F f) {
-    const size_t work_amount = (size_t)D0 * D1 * D2;
-    if (work_amount == 0) return;
-
-#   pragma omp parallel
-    {
-        const int ithr = omp_get_thread_num();
-        const int nthr = omp_get_num_threads();
-        size_t start{0}, end{0};
-        balance211(work_amount, nthr, ithr, start, end);
-        T0 d0{0}; T1 d1{0}; T2 d2{0};
-        utils::nd_iterator_init(start, d0, D0, d1, D1, d2, D2);
-        for (size_t iwork = start; iwork < end; ++iwork) {
-            f(d0, d1, d2);
-            utils::nd_iterator_step(d0, D0, d1, D1, d2, D2);
-        }
-    }
-}
-
-template <typename T0, typename T1, typename T2, typename T3, typename F>
-void parallel_nd(const T0 D0, const T1 D1, const T2 D2, const T3 D3, F f) {
-    const size_t work_amount = (size_t)D0 * D1 * D2 * D3;
-    if (work_amount == 0) return;
-
-#   pragma omp parallel
-    {
-        const int ithr = omp_get_thread_num();
-        const int nthr = omp_get_num_threads();
-        size_t start{0}, end{0};
-        balance211(work_amount, nthr, ithr, start, end);
-        T0 d0{0}; T1 d1{0}; T2 d2{0}; T3 d3{0};
-        utils::nd_iterator_init(start, d0, D0, d1, D1, d2, D2, d3, D3);
-        for (size_t iwork = start; iwork < end; ++iwork) {
-            f(d0, d1, d2, d3);
-            utils::nd_iterator_step(d0, D0, d1, D1, d2, D2, d3, D3);
-        }
-    }
-}
-
-template <typename T0, typename T1, typename T2, typename T3, typename T4,
-    typename F>
-void parallel_nd(const T0 D0, const T1 D1, const T2 D2, const T3 D3,
-        const T4 D4, F f) {
-    const size_t work_amount = (size_t)D0 * D1 * D2 * D3 * D4;
-    if (work_amount == 0) return;
-
-#   pragma omp parallel
-    {
-        const int ithr = omp_get_thread_num();
-        const int nthr = omp_get_num_threads();
-        size_t start{0}, end{0};
-        balance211(work_amount, nthr, ithr, start, end);
-        T0 d0{0}; T1 d1{0}; T2 d2{0}; T3 d3{0}; T4 d4{0};
-        utils::nd_iterator_init(start, d0, D0, d1, D1, d2, D2, d3, D3, d4, D4);
-        for (size_t iwork = start; iwork < end; ++iwork) {
-            f(d0, d1, d2, d3, d4);
-            utils::nd_iterator_step(d0, D0, d1, D1, d2, D2, d3, D3, d4, D4);
-        }
-    }
-}
-
-template <typename T0, typename T1, typename T2, typename T3, typename T4,
-    typename T5, typename F>
-void parallel_nd(const T0 D0, const T1 D1, const T2 D2, const T3 D3,
-        const T4 D4, const T5 D5, F f) {
-    const size_t work_amount = (size_t)D0 * D1 * D2 * D3 * D4 * D5;
-    if (work_amount == 0) return;
-
-#   pragma omp parallel
-    {
-        const int ithr = omp_get_thread_num();
-        const int nthr = omp_get_num_threads();
-        size_t start{0}, end{0};
-        balance211(work_amount, nthr, ithr, start, end);
-        T0 d0{0}; T1 d1{0}; T2 d2{0}; T3 d3{0}; T4 d4{0}; T5 d5{0};
-        utils::nd_iterator_init(start, d0, D0, d1, D1, d2, D2, d3, D3, d4, D4,
-            d5, D5);
-        for (size_t iwork = start; iwork < end; ++iwork) {
-            f(d0, d1, d2, d3, d4, d5);
-            utils::nd_iterator_step(d0, D0, d1, D1, d2, D2, d3, D3, d4, D4,
-                d5, D5);
-        }
-    }
-}
-
-/* For use inside of parallel section */
-
-template <typename T0, typename T1, typename F>
-void parallel_nd_in_omp(const T0 D0, const T1 D1, F f) {
-    const size_t work_amount = (size_t)D0 * D1;
-    if (work_amount == 0) return;
-
-    const int ithr = omp_get_thread_num();
-    const int nthr = omp_get_num_threads();
-    size_t start{0}, end{0};
-    balance211(work_amount, nthr, ithr, start, end);
-    T0 d0{0}; T1 d1{0};
-    utils::nd_iterator_init(start, d0, D0, d1, D1);
-    for (size_t iwork = start; iwork < end; ++iwork) {
-        f(d0, d1);
-        utils::nd_iterator_step(d0, D0, d1, D1);
-    }
-}
-template <typename T0, typename T1, typename T2, typename F>
-void parallel_nd_in_omp(const T0 D0, const T1 D1, const T2 D2, F f) {
-    const size_t work_amount = (size_t)D0 * D1 * D2;
-    if (work_amount == 0) return;
-
-    const int ithr = omp_get_thread_num();
-    const int nthr = omp_get_num_threads();
-    size_t start{0}, end{0};
-    balance211(work_amount, nthr, ithr, start, end);
-    T0 d0{0}; T1 d1{0}; T2 d2{0};
-    utils::nd_iterator_init(start, d0, D0, d1, D1, d2, D2);
-    for (size_t iwork = start; iwork < end; ++iwork) {
-        f(d0, d1, d2);
-        utils::nd_iterator_step(d0, D0, d1, D1, d2, D2);
-    }
-}
-template <typename T0, typename T1, typename T2, typename T3, typename F>
-void parallel_nd_in_omp(const T0 D0, const T1 D1, const T2 D2, const T3 D3,
-    F f) {
-    const size_t work_amount = (size_t)D0 * D1 * D2 * D3;
-    if (work_amount == 0) return;
-
-    const int ithr = omp_get_thread_num();
-    const int nthr = omp_get_num_threads();
-    size_t start{0}, end{0};
-    balance211(work_amount, nthr, ithr, start, end);
-    T0 d0{0}; T1 d1{0}; T2 d2{0}; T3 d3{0};
-    utils::nd_iterator_init(start, d0, D0, d1, D1, d2, D2, d3, D3);
-    for (size_t iwork = start; iwork < end; ++iwork) {
-        f(d0, d1, d2, d3);
-        utils::nd_iterator_step(d0, D0, d1, D1, d2, D2, d3, D3);
-    }
-}
-
-template <typename T0, typename T1, typename T2, typename T3, typename T4,
-    typename F>
-void parallel_nd_in_omp(const T0 D0, const T1 D1, const T2 D2, const T3 D3,
-    const T4 D4, F f) {
-    const size_t work_amount = (size_t)D0 * D1 * D2 * D3 * D4;
-    if (work_amount == 0) return;
-
-    const int ithr = omp_get_thread_num();
-    const int nthr = omp_get_num_threads();
-    size_t start{0}, end{0};
-    balance211(work_amount, nthr, ithr, start, end);
-    T0 d0{0}; T1 d1{0}; T2 d2{0}; T3 d3{0}; T4 d4{0};
-    utils::nd_iterator_init(start, d0, D0, d1, D1, d2, D2, d3, D3, d4, D4);
-    for (size_t iwork = start; iwork < end; ++iwork) {
-        f(d0, d1, d2, d3, d4);
-        utils::nd_iterator_step(d0, D0, d1, D1, d2, D2, d3, D3, d4, D4);
-    }
-}
-
-template <typename T0, typename T1, typename T2, typename T3, typename T4,
-    typename T5, typename F>
-void parallel_nd_in_omp(const T0 D0, const T1 D1, const T2 D2, const T3 D3,
-    const T4 D4, const T5 D5, F f) {
-    const size_t work_amount = (size_t)D0 * D1 * D2 * D3 * D4 * D5;
-    if (work_amount == 0) return;
-
-    const int ithr = omp_get_thread_num();
-    const int nthr = omp_get_num_threads();
-    size_t start{0}, end{0};
-    balance211(work_amount, nthr, ithr, start, end);
-    T0 d0{0}; T1 d1{0}; T2 d2{0}; T3 d3{0}; T4 d4{0}; T5 d5{0};
-    utils::nd_iterator_init(start, d0, D0, d1, D1, d2, D2, d3, D3, d4, D4,
-        d5, D5);
-    for (size_t iwork = start; iwork < end; ++iwork) {
-        f(d0, d1, d2, d3, d4, d5);
-        utils::nd_iterator_step(d0, D0, d1, D1, d2, D2, d3, D3, d4, D4, d5, D5);
-    }
+    balance211(nx, grp_count, grp, nx_start, nx_end);
+    balance211(ny, grp_nthr, grp_ithr, ny_start, ny_end);
 }
 
 } // namespace impl
 } // namespace mkldnn
+
+#include "mkldnn_thread_parallel_nd.hpp"
 
 #endif
 

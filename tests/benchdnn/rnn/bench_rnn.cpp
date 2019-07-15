@@ -14,64 +14,117 @@
  * limitations under the License.
  *******************************************************************************/
 
-#include <float.h>
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <sstream>
+
 #include "mkldnn.h"
 
 #include "mkldnn_common.hpp"
-#include "mkldnn_debug.hpp"
 #include "mkldnn_memory.hpp"
+#include "parser.hpp"
 
-#include "rnn/input_rnn.hpp"
 #include "rnn/rnn.hpp"
 
 namespace rnn {
 
-int bench(int argc, char **argv) {
-    // !!?? TODO: check consistence of direction, dir ...
-    mkldnn_prop_kind_t direction = mkldnn_forward;
-    dir_t dir = FWD_D;
-    for (int arg = 0; arg < argc; ++arg) {
-        if (!strncmp("--dir=", argv[arg], 6)) {
-            dir = str2dir(argv[arg] + 6);
-            if (dir == FWD_D)
-                direction = mkldnn_forward;
-            else if (dir == BWD_D)
-                direction = mkldnn_backward;
-            else
-                assert("unknown dir");
-        }
-    }
-    const int num_r = sizeof(rnns) / sizeof(rnns[0]);
+std::vector<dir_t> prop {FWD_D};
+std::vector<const dt_conf_t *> cfg {conf_f32};
+std::vector<alg_t> alg {VANILLA_RNN};
+std::vector<mkldnn_rnn_direction_t> direction {mkldnn_unidirectional_left2right};
+std::vector<activation_t> activation {RELU};
+std::vector<int64_t> mb {0};
 
-    for (int r = 0; r < num_r; ++r) {
-        const rnn_prb_t p(rnns[r], conf_f32, direction);
-        check(&p);
-    }
+attr_t attr;
+policy_t scale_policy = NONE;
+bool allow_unimpl = false;
+unsigned int flags = 0x0;
+float alpha = 0.0f;
+float beta = 0.0f;
+const char *perf_template_csv =
+    "perf,%engine%,%name%,%prop%,%DESC%,"
+    "%Gops%,%Gfreq%,%-time%,%-Gflops%,%0time%,%0Gflops%";
+const char *perf_template_def = perf_template_csv;
+const char *perf_template = perf_template_def;
 
-    return OK;
+void reset_parameters() {
+    prop = {FWD_D};
+    cfg = {conf_f32};
+    alg = {VANILLA_RNN};
+    direction = {mkldnn_unidirectional_left2right};
+    activation = {RELU};
+    mb = {0};
+    attr = attr_t();
+    scale_policy = NONE;
+    allow_unimpl = false;
 }
 
-void check(const rnn_prb_t *p) {
-    res_t res{};
-    char pstr[max_prb_len];
-    prb2str(p, &res, pstr);
+void check_correctness(const desc_t *c) {
+    for (const auto &i_prop: prop)
+    for (const auto &i_cfg: cfg)
+    for (const auto &i_alg: alg)
+    for (const auto &i_direction: direction)
+    for (const auto &i_activation: activation)
+    for (const auto &i_mb: mb) {
+        check_case_validity(i_cfg, scale_policy);
+        mkldnn_prop_kind_t prop_kind = prop2prop_kind(i_prop);
 
-    int status = rnn::doit(p, &res);
+        const prb_t p(*c, i_cfg, prop_kind, i_alg, i_direction, attr, scale_policy,
+                flags, i_activation, alpha, beta, i_mb);
+        std::stringstream ss;
+        ss << p;
+        const std::string cpp_pstr = ss.str();
+        const char *pstr = cpp_pstr.c_str();
+        print(1, "run: %s\n", pstr);
 
-    prb2str(p, &res, pstr);
-    bool want_perf_report = false;
+        res_t res{};
+        const int status = doit(&p, &res);
 
-    parse_result(res, want_perf_report, false, status, pstr);
+        bool want_perf_report = false;
+        parse_result(res, want_perf_report, allow_unimpl, status, pstr);
 
-    if (bench_mode & PERF)
-        perf_report(p, &res, pstr);
+        if (want_perf_report && bench_mode & PERF) {
+            perf_report_t pr(perf_template);
+            pr.report(&p, &res, pstr);
+        }
 
-    benchdnn_stat.tests++;
+        benchdnn_stat.tests++;
+    }
+}
+
+int bench(int argc, char **argv) {
+    using namespace parser;
+    for (; argc > 0; --argc, ++argv) {
+        const bool parsed_options = false
+            || parse_bench_settings(argv[0])
+            || parse_batch(bench, argv[0])
+            || parse_dir(prop, argv[0], "prop")
+            || parse_cfg(cfg, str2cfg, argv[0])
+            || parse_vector_option(alg, str2alg, argv[0], "alg")
+            || parse_vector_option(direction, str2direction, argv[0],
+                    "direction")
+            || parse_vector_option(activation, str2activation, argv[0],
+                    "activation")
+            || parse_single_value_option(scale_policy, str2policy, argv[0],
+                    "scaling")
+            || parse_mb(mb, argv[0])
+            || parse_attr(attr, argv[0])
+            || parse_allow_unimpl(allow_unimpl, argv[0])
+            || parse_perf_template(perf_template, perf_template_def,
+                    perf_template_csv, argv[0])
+            || parse_reset(reset_parameters, argv[0]);
+        if (!parsed_options) {
+            catch_unknown_options(argv[0], "rnn");
+
+            desc_t c;
+            SAFE_V(str2desc(&c, argv[0]));
+            check_correctness(&c);
+        }
+    }
+
+    return parse_last_argument();
 }
 
 } // namespace rnn

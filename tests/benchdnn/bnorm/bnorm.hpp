@@ -14,18 +14,21 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef _BNORM_HPP
-#define _BNORM_HPP
+#ifndef BNORM_HPP
+#define BNORM_HPP
 
 #include <stdint.h>
 #include <limits.h>
 #include <assert.h>
+
+#include <iostream>
 
 #include "common.hpp"
 #include "dnn_types.hpp"
 #include "mkldnn_common.hpp"
 #include "mkldnn_memory.hpp"
 #include "mkldnn_debug.hpp"
+#include "perf_report.hpp"
 
 namespace bnorm {
 
@@ -36,25 +39,24 @@ const char* check_alg2str(check_alg_t alg);
 using flags_t = unsigned;
 const flags_t GLOB_STATS = mkldnn_use_global_stats;
 const flags_t USE_SCALESHIFT = mkldnn_use_scaleshift;
-const flags_t FUSE_BN_RELU = mkldnn_fuse_bn_relu;
+const flags_t FUSE_NORM_RELU = mkldnn_fuse_norm_relu;
 flags_t str2flags(const char *str);
 const char *flags2str(flags_t flags);
 
 struct desc_t {
-    int mb, ic, id, ih, iw;
+    int64_t mb, ic, id, ih, iw;
     float eps;
     const char *name;
 };
-const size_t max_desc_len = 196;
 int str2desc(desc_t *desc, const char *str);
-void desc2str(const desc_t *d, char *buffer, bool canonical = false);
+std::ostream &operator<<(std::ostream &s, const desc_t &d);
 
 struct prb_t: public desc_t {
-    prb_t(const desc_t &desc, int mb, dir_t dir, mkldnn_data_type_t dt,
-            mkldnn_memory_format_t fmt, flags_t flags, const attr_t &attr,
-            check_alg_t check_alg)
-        : desc_t(desc), check_alg(check_alg), dir(dir), dt(dt), fmt(fmt)
-        , flags(flags), attr(attr)
+    prb_t(const desc_t &desc, int64_t mb, dir_t dir, mkldnn_data_type_t dt,
+            mkldnn_format_tag_t tag, flags_t flags, bool inplace,
+            const attr_t &attr, check_alg_t check_alg)
+        : desc_t(desc), check_alg(check_alg), dir(dir), dt(dt), tag(tag)
+        , flags(flags), inplace(inplace), attr(attr)
     { if (mb) this->mb = mb; }
     ~prb_t() {}
 
@@ -62,36 +64,60 @@ struct prb_t: public desc_t {
 
     dir_t dir;
     mkldnn_data_type_t dt;
-    mkldnn_memory_format_t fmt;
+    mkldnn_format_tag_t tag;
     flags_t flags;
+    bool inplace;
     attr_t attr;
 };
-const size_t max_prb_len = max_attr_len + max_desc_len + 196;
-void prb2str(const prb_t *p, char *buffer, bool canonical = false);
+std::ostream &operator<<(std::ostream &s, const prb_t &p);
+
+struct perf_report_t: public base_perf_report_t {
+    using base_perf_report_t::base_perf_report_t;
+
+    void report(const prb_t *p, const res_t *r, const char *prb_str) {
+        p_ = p;
+        base_report(r, prb_str);
+    }
+
+    virtual void dump_desc_csv(std::ostream &s) const override {
+        s << p_->mb << ','
+          << p_->ic << ','
+          << p_->id << ','
+          << p_->ih << ','
+          << p_->iw << ','
+          << p_->eps;
+    }
+
+    virtual void dump_flags(std::ostream &s) const override {
+        s << flags2str(p_->flags);
+    }
+
+    virtual const attr_t *attr() const override { return &p_->attr; }
+    virtual const char *name() const override { return p_->name; }
+    virtual const dir_t *dir() const override { return &p_->dir; }
+    virtual const mkldnn_data_type_t *dt() const override { return &p_->dt; }
+    virtual const mkldnn_format_tag_t *tag() const override { return &p_->tag; }
+
+private:
+    const prb_t *p_ = NULL;
+};
 
 /* some extra control parameters which shouldn't be placed in prb_t */
 extern const char *skip_impl; /* NULL or "" means do not skip anything */
 
-extern const char *perf_template; /* performance output template */
-void perf_report(const prb_t *p, const res_t *r, const char *pstr);
-
-inline size_t data_off(const prb_t *p, int mb, int c, int d, int h, int w) {
-    return ((((size_t)mb * p->ic + c) * p->id + d) * p->ih + h) * p->iw + w;
+inline size_t data_off(const prb_t *p,
+        int64_t mb, int64_t c, int64_t d, int64_t h, int64_t w) {
+    return (((mb * p->ic + c) * p->id + d) * p->ih + h) * p->iw + w;
 }
 
-inline void inv_data_off(const prb_t *p, size_t off, int &mb, int &c, int &d,
-        int &h, int &w) {
+inline void inv_data_off(const prb_t *p, size_t off,
+        int64_t &mb, int64_t &c, int64_t &d, int64_t &h, int64_t &w) {
     w = off % p->iw; off /= p->iw;
     h = off % p->ih; off /= p->ih;
     d = off % p->id; off /= p->id;
     c = off % p->ic; off /= p->ic;
     mb = off % p->mb; off /= p->mb;
     assert(off == 0);
-}
-
-inline bool is_bnorm_3d(const prb_t *p)
-{
-    return (p->id > 1) ? 1 : 0;
 }
 
 void compute_ref_fwd(const prb_t *p, const dnn_mem_t &src, dnn_mem_t &mean,
@@ -102,7 +128,7 @@ void compute_ref_bwd(const prb_t *p, const dnn_mem_t &src,
         dnn_mem_t &d_ss);
 
 int doit(const prb_t *p, res_t *res);
-int bench(int argc, char **argv, bool main_bench = true);
+int bench(int argc, char **argv);
 
 }
 

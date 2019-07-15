@@ -18,273 +18,168 @@
 #define CPU_JIT_GEMM_CONVOLUTION_HPP
 
 #include "c_types_map.hpp"
-#include "cpu_convolution_pd.hpp"
-#include "cpu_engine.hpp"
-#include "cpu_isa_traits.hpp"
+#include "memory_tracking.hpp"
+
 #include "gemm_convolution_utils.hpp"
 #include "gemm/gemm.hpp"
-#include "scratchpad.hpp"
-#include "consistency.hpp"
+#include "ref_eltwise.hpp"
 
-#if !defined(MKLDNN_GEMM_CONV_DBG)
-#if !defined(NDEBUG)
-#define MKLDNN_GEMM_CONV_DBG 1
-#else
-#define MKLDNN_GEMM_CONV_DBG 1
-#endif
-#endif
+#include "cpu_convolution_pd.hpp"
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-// OLD: template <bool with_relu, bool run_jit, cpu_isa_t isa>
-template <bool with_relu>
-struct _gemm_convolution_fwd_t: public cpu_primitive_t {
-    struct pd_t: public _cpu_convolution_fwd_pd_t<with_relu> {
+struct gemm_convolution_fwd_t: public cpu_primitive_t {
+    struct pd_t: public cpu_convolution_fwd_pd_t {
         pd_t(engine_t *engine,
-                const typename pd_t::base_desc_t *adesc,
-                const primitive_attr_t *attr,
+                const convolution_desc_t *adesc, const primitive_attr_t *attr,
                 const typename pd_t::base_class *hint_fwd_pd)
-            : _cpu_convolution_fwd_pd_t<with_relu>(engine, adesc, attr,
-                    hint_fwd_pd)
+            : cpu_convolution_fwd_pd_t(engine, adesc, attr, hint_fwd_pd)
             , jcp_() {}
 
-        DECLARE_COMMON_PD_T(GEMM_IMPL_STR, _gemm_convolution_fwd_t<with_relu>);
+        DECLARE_COMMON_PD_T(GEMM_IMPL_STR, gemm_convolution_fwd_t);
 
-        inline memory_format_t src_format()
-        {
-            using namespace memory_format;
-            return (this->cdesc_().src_desc.ndims == 4) ? nchw : ncdhw;
-        }
-        inline memory_format_t wei_format()
-        {
-            using namespace memory_format;
-            return (this->cdesc_().src_desc.ndims == 4)
-                ? this->with_groups() ? goihw : oihw
-                : this->with_groups() ? goidhw : oidhw;
-        }
+        status_t init() {
+            bool ok = true
+                && is_fwd()
+                && set_default_alg_kind(alg_kind::convolution_direct)
+                && expect_data_types(data_type::f32, data_type::f32,
+                        data_type::f32, data_type::f32, data_type::f32)
+                && !has_zero_dim_memory()
+                && set_default_formats_common(dat_tag(), wei_tag(), dat_tag())
+                && post_ops_ok()
+                && memory_desc_matches_tag(*src_md(), dat_tag())
+                && memory_desc_matches_tag(*dst_md(), dat_tag())
+                && memory_desc_matches_tag(*weights_md(), wei_tag());
+            if (!ok) return status::unimplemented;
 
-        virtual status_t init() override {
-            using namespace prop_kind;
-            using namespace memory_format;
-
-            assert(this->engine()->kind() == engine_kind::cpu);
-
-            Consistency ok; // default never-verbose SCHK
-#ifdef MKLDNN_GEMM_CONV_DBG
-            {
-                char const* result;
-                mkldnn_primitive_desc_query( this, mkldnn_query_impl_info_str, 0, &result );
-                printf(" conv-fwd:%s:", result);
-                fflush(stdout);
-            }
-#endif
-#define AND_(...) SCHKV(ok,__VA_ARGS__)
-            AND_(this->set_default_params() == status::success);
-            AND_(utils::one_of(this->cdesc_().prop_kind, forward_training,
-                        forward_inference));
-            AND_(this->cdesc_().alg_kind == alg_kind::convolution_direct);
-            AND_(!this->has_zero_dim_memory());
-            AND_(utils::everyone_is(data_type::f32,
-                        this->cdesc_().src_desc.data_type,
-                        this->cdesc_().weights_desc.data_type,
-                        this->cdesc_().dst_desc.data_type));
-            AND_(utils::implication(this->with_bias(), data_type::f32
-                        == this->cdesc_().bias_desc.data_type));
-            AND_(this->src_pd_.desc()->format == src_format());
-            AND_(this->dst_pd_.desc()->format == src_format());
-            AND_(this->weights_pd_.desc()->format == wei_format());
-            AND_(this->is_gemm_conv_format());
-#undef AND_
-#ifdef MKLDNN_REF_CONV_DBG
-            if(ok){ printf("init-ok "); fflush(stdout); }
-#endif
-            return ok ? status::success : status::unimplemented;
+            auto scratchpad = scratchpad_registry().registrar();
+            return jit_gemm_convolution_utils::init_conf(jcp_, scratchpad,
+                    *desc(), src_md(), weights_md(0), dst_md(),
+                    mkldnn_get_max_threads());
         }
 
         jit_gemm_conv_conf_t jcp_;
 
     protected:
-        virtual status_t set_default_params() override {
-            using namespace memory_format;
-            if (this->src_pd_.desc()->format == any)
-                CHECK(this->src_pd_.set_format(src_format()));
-            if (this->dst_pd_.desc()->format == any)
-                CHECK(this->dst_pd_.set_format(src_format()));
-            if (this->weights_pd_.desc()->format == any)
-                CHECK(this->weights_pd_.set_format(wei_format()));
-            if (this->bias_pd_.desc()->format == any)
-                CHECK(this->bias_pd_.set_format(x));
-            return status::success;
+        format_tag_t dat_tag() const {
+            using namespace format_tag;
+            return utils::pick(ndims() - 3, ncw, nchw, ncdhw);
         }
 
-        virtual bool is_gemm_conv_format() const {
-            bool ok = true;
-            auto const &po = this->attr()->post_ops_;
+        format_tag_t wei_tag() const {
+            using namespace format_tag;
+            return with_groups()
+                ? utils::pick(ndims() - 3, goiw, goihw, goidhw)
+                : utils::pick(ndims() - 3, oiw, oihw, oidhw);
+        }
+
+        bool post_ops_ok() const {
+            auto const &po = attr()->post_ops_;
+            auto is_eltwise = [&](int idx)
+            { return po.entry_[idx].is_eltwise(); };
+            auto is_sum = [&](int idx) { return po.entry_[idx].is_sum(); };
+
             switch (po.len_) {
-                using namespace mkldnn::impl::primitive_kind;
-            case 0: // no post_ops
-                break;
-            case 1:
-                ok = ok && // sum OR relu
-                        (po.entry_[0].is_relu() || po.entry_[0].is_sum());
-                break;
-            case 2:
-                ok = ok && // sum->relu
-                        (po.entry_[0].is_sum() && po.entry_[1].is_relu());
-                break;
-            default: ok = false;
+            case 0: return true; // no post_ops
+            case 1: return is_eltwise(0) || is_sum(0); // sum OR eltwise
+            case 2: return is_sum(0) && is_eltwise(1); // sum -> eltwise
+            default: return false;
             }
-            return ok;
+            return false;
         }
     };
 
-    _gemm_convolution_fwd_t(const pd_t *pd, const input_vector &inputs,
-           const output_vector &outputs)
-        : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
-        , scratchpad_(nullptr)
+    gemm_convolution_fwd_t(const pd_t *apd)
+        : cpu_primitive_t(apd, true)
+        , eltwise_(nullptr)
     {
-        using namespace prop_kind;
-
-        const auto &post_ops = conf_.attr()->post_ops_;
+        const auto &post_ops = pd()->attr()->post_ops_;
         const data_t one = 1.0, zero = 0.0;
         beta_ = post_ops.find(primitive_kind::sum) >= 0 ? one : zero;
 
-        jit_gemm_convolution_utils::init_conf(conf_.jcp_,
-            *(conf_.cdesc()), conf_.src_pd(), conf_.weights_pd(0),
-            conf_.dst_pd(), omp_get_max_threads(), with_relu,
-            conf_.negative_slope());
-
-        size_t size = (size_t)conf_.jcp_.im2col_sz * sizeof(data_t);
-        jit_gemm_convolution_utils::prepare_scratchpad(this->conf_.jcp_,
-                &this->scratchpad_, size, this->conf_.jcp_.nthr);
+        const int entry_idx = post_ops.find(primitive_kind::eltwise);
+        if (entry_idx != -1) eltwise_ = new ref_eltwise_scalar_fwd_t(
+                post_ops.entry_[entry_idx].eltwise);
     }
 
-    ~_gemm_convolution_fwd_t() {
-        delete this->scratchpad_;
-    };
+    ~gemm_convolution_fwd_t() { delete eltwise_; }
 
     typedef typename prec_traits<data_type::f32>::type data_t;
 
-    virtual void execute(event_t *e) {
-        execute_forward();
-        e->set_state(event_t::ready);
+    virtual status_t execute(const exec_ctx_t &ctx) const override {
+        execute_forward(ctx);
+        return status::success;
     }
 
 private:
-    void execute_forward();
-    pd_t conf_;
-    scratchpad_t *scratchpad_;
-    data_t beta_;
-};
+    void execute_forward(const exec_ctx_t &ctx) const;
+    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 
-using gemm_convolution_fwd_t =
-                         _gemm_convolution_fwd_t<false>;
-using gemm_convolution_relu_t =
-                         _gemm_convolution_fwd_t<true>;
+    data_t beta_;
+
+    ref_eltwise_scalar_fwd_t* eltwise_;
+};
 
 struct gemm_convolution_bwd_data_t: public cpu_primitive_t {
     struct pd_t: public cpu_convolution_bwd_data_pd_t {
         pd_t(engine_t *engine,
-                const convolution_desc_t *adesc,
-                const primitive_attr_t *attr,
+                const convolution_desc_t *adesc, const primitive_attr_t *attr,
                 const convolution_fwd_pd_t *hint_fwd_pd)
             : cpu_convolution_bwd_data_pd_t(engine, adesc, attr, hint_fwd_pd)
-            , jcp_()
-        {}
+            , jcp_() {}
 
         DECLARE_COMMON_PD_T(GEMM_IMPL_STR, gemm_convolution_bwd_data_t);
 
-        inline memory_format_t src_format()
-        {
-            using namespace memory_format;
-            return (this->desc()->diff_src_desc.ndims == 4) ? nchw : ncdhw;
-        }
-        inline memory_format_t wei_format()
-        {
-            using namespace memory_format;
-            return (this->desc()->diff_src_desc.ndims == 4)
-                ? this->with_groups() ? goihw : oihw
-                : this->with_groups() ? goidhw : oidhw;
-        }
+        status_t init() {
+            bool ok = true
+                && desc()->prop_kind == prop_kind::backward_data
+                && set_default_alg_kind(alg_kind::convolution_direct)
+                && expect_data_types(data_type::f32, data_type::f32,
+                        data_type::undef, data_type::f32, data_type::f32)
+                && !has_zero_dim_memory()
+                && set_default_formats_common(dat_tag(), wei_tag(), dat_tag())
+                && memory_desc_matches_tag(*diff_src_md(), dat_tag())
+                && memory_desc_matches_tag(*diff_dst_md(), dat_tag())
+                && memory_desc_matches_tag(*weights_md(), wei_tag());
+            if (!ok) return status::unimplemented;
 
-        virtual status_t init() override {
-            using namespace prop_kind;
-            using namespace memory_format;
-
-            assert(this->engine()->kind() == engine_kind::cpu);
-
-            //bool ok = true
-            Consistency ok; // default here is never-verbose
-#define AND_(...) SCHKV(ok,__VA_ARGS__)
-            AND_(this->set_default_params() == status::success);
-            AND_(this->desc()->prop_kind == backward_data);
-            AND_(this->desc()->alg_kind == alg_kind::convolution_direct);
-            AND_(!this->has_zero_dim_memory());
-            AND_(utils::everyone_is(data_type::f32,
-                        this->desc()->diff_src_desc.data_type,
-                        this->desc()->weights_desc.data_type,
-                        this->desc()->diff_dst_desc.data_type));
-            AND_(this->diff_src_pd_.desc()->format == src_format());
-            AND_(this->diff_dst_pd_.desc()->format == src_format());
-            AND_(this->weights_pd_.desc()->format == wei_format());
-#undef AND_
-            return ok ? status::success : status::unimplemented;
+            auto scratchpad = scratchpad_registry().registrar();
+            return jit_gemm_convolution_utils::init_conf(jcp_, scratchpad,
+                    *desc(), diff_src_md(), weights_md(0), diff_dst_md(),
+                    mkldnn_get_max_threads());
         }
 
         jit_gemm_conv_conf_t jcp_;
 
     protected:
-        virtual status_t set_default_params() override {
-            using namespace memory_format;
-            if (this->diff_src_pd_.desc()->format == any)
-                CHECK(this->diff_src_pd_.set_format(src_format()));
-            if (this->diff_dst_pd_.desc()->format == any)
-                CHECK(this->diff_dst_pd_.set_format(src_format()));
-            if (this->weights_pd_.desc()->format == any)
-                CHECK(this->weights_pd_.set_format(wei_format()));
-            return status::success;
+        format_tag_t dat_tag() const {
+            using namespace format_tag;
+            return utils::pick(ndims() - 3, ncw, nchw, ncdhw);
         }
-    };
 
-    gemm_convolution_bwd_data_t(const pd_t *pd, const input_vector &inputs,
-              const output_vector &outputs)
-        : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
-        , scratchpad_(nullptr)
-    {
-        using namespace prop_kind;
-
-        jit_gemm_convolution_utils::init_conf(conf_.jcp_,
-            *(conf_.desc()), conf_.diff_src_pd(), conf_.weights_pd(0),
-            conf_.diff_dst_pd(), omp_get_max_threads());
-
-        size_t size = (size_t)conf_.jcp_.im2col_sz * sizeof(data_t);
-        jit_gemm_convolution_utils::prepare_scratchpad(this->conf_.jcp_,
-                &this->scratchpad_, size, this->conf_.jcp_.nthr);
+        format_tag_t wei_tag() const {
+            using namespace format_tag;
+            return with_groups()
+                ? utils::pick(ndims() - 3, goiw, goihw, goidhw)
+                : utils::pick(ndims() - 3, oiw, oihw, oidhw);
     }
-
-    ~gemm_convolution_bwd_data_t() {
-        delete this->scratchpad_;
     };
+
+    gemm_convolution_bwd_data_t(const pd_t *apd)
+        : cpu_primitive_t(apd, true) {}
 
     typedef typename prec_traits<data_type::f32>::type data_t;
 
-    virtual void execute(event_t *e) {
-        switch (conf_.desc()->prop_kind) {
-        case prop_kind::backward_data:
-            execute_backward_data();
-            break;
-        default:
-            assert(!"invalid prop_kind");
-        }
-        e->set_state(event_t::ready);
+    virtual status_t execute(const exec_ctx_t &ctx) const override {
+        execute_backward_data(ctx);
+        return status::success;
     }
 
 private:
-    void execute_backward_data();
-    pd_t conf_;
-    scratchpad_t *scratchpad_;
+    void execute_backward_data(const exec_ctx_t &ctx) const;
+    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 };
 
 struct gemm_convolution_bwd_weights_t: public cpu_primitive_t {
@@ -294,111 +189,58 @@ struct gemm_convolution_bwd_weights_t: public cpu_primitive_t {
                 const primitive_attr_t *attr,
                 const convolution_fwd_pd_t *hint_fwd_pd)
             : cpu_convolution_bwd_weights_pd_t(engine, adesc, attr, hint_fwd_pd)
-            , jcp_()
-        {}
+            , jcp_() {}
 
         DECLARE_COMMON_PD_T(GEMM_IMPL_STR, gemm_convolution_bwd_weights_t);
 
-        inline memory_format_t src_format()
-        {
-            using namespace memory_format;
-            return (this->desc()->src_desc.ndims == 4) ? nchw : ncdhw;
-        }
-        inline memory_format_t wei_format()
-        {
-            using namespace memory_format;
-            return (this->desc()->src_desc.ndims == 4)
-                ? this->with_groups() ? goihw : oihw
-                : this->with_groups() ? goidhw : oidhw;
-        }
+        status_t init() {
+            bool ok = true
+                && desc()->prop_kind == prop_kind::backward_weights
+                && set_default_alg_kind(alg_kind::convolution_direct)
+                && expect_data_types(data_type::f32, data_type::f32,
+                        data_type::f32, data_type::f32, data_type::f32)
+                && !has_zero_dim_memory()
+                && set_default_formats_common(dat_tag(), wei_tag(), dat_tag())
+                && memory_desc_matches_tag(*src_md(), dat_tag())
+                && memory_desc_matches_tag(*diff_dst_md(), dat_tag())
+                && memory_desc_matches_tag(*diff_weights_md(), wei_tag());
+            if (!ok) return status::unimplemented;
 
-        virtual status_t init() override {
-            using namespace prop_kind;
-            using namespace memory_format;
-
-            assert(this->engine()->kind() == engine_kind::cpu);
-
-            Consistency ok; // default here is never-verbose
-#define AND_(...) SCHKV(ok,__VA_ARGS__)
-            AND_(this->set_default_params() == status::success);
-            AND_(this->desc()->prop_kind == backward_weights);
-            AND_(this->desc()->alg_kind == alg_kind::convolution_direct);
-            AND_(!this->has_zero_dim_memory());
-            AND_(utils::everyone_is(data_type::f32,
-                        this->desc()->src_desc.data_type,
-                        this->desc()->diff_weights_desc.data_type,
-                        this->desc()->diff_dst_desc.data_type));
-            AND_(utils::implication(this->with_bias(),
-                        data_type::f32 == this->desc()->diff_bias_desc.data_type));
-            AND_(this->src_pd_.desc()->format == src_format());
-            AND_(this->diff_dst_pd_.desc()->format == src_format());
-            AND_(this->diff_weights_pd_.desc()->format == wei_format());
-#undef AND_
-            return ok ? status::success : status::unimplemented;
+            auto scratchpad = scratchpad_registry().registrar();
+            return jit_gemm_convolution_utils::init_conf(jcp_, scratchpad,
+                    *desc(), src_md(), diff_weights_md(0), diff_dst_md(),
+                    mkldnn_get_max_threads());
         }
 
         jit_gemm_conv_conf_t jcp_;
 
     protected:
-        virtual status_t set_default_params() override {
-            using namespace memory_format;
-            if (this->src_pd_.desc()->format == any)
-                CHECK(this->src_pd_.set_format(src_format()));
-            if (this->diff_dst_pd_.desc()->format == any)
-                CHECK(this->diff_dst_pd_.set_format(src_format()));
-            if (this->diff_weights_pd_.desc()->format == any)
-                CHECK(this->diff_weights_pd_.set_format(wei_format()));
-            if (this->diff_bias_pd_.desc()->format == any)
-                CHECK(this->diff_bias_pd_.set_format(x));
-            return status::success;
+        format_tag_t dat_tag() const {
+            using namespace format_tag;
+            return utils::pick(ndims() - 3, ncw, nchw, ncdhw);
         }
-    };
 
-    gemm_convolution_bwd_weights_t(const pd_t *pd, const input_vector &inputs,
-              const output_vector &outputs)
-        : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
-        , scratchpad_(nullptr)
-    {
-        using namespace prop_kind;
-
-        jit_gemm_convolution_utils::init_conf(conf_.jcp_,
-            *(conf_.desc()), conf_.src_pd(), conf_.diff_weights_pd(0),
-            conf_.diff_dst_pd(), omp_get_max_threads());
-        const memory_desc_wrapper weights_d(conf_.diff_weights_pd(0));
-
-        size_t size = (size_t)conf_.jcp_.im2col_sz  * sizeof(data_t);
-        if (conf_.jcp_.need_wei_reduction)
-            size += (size_t)conf_.jcp_.ngroups * weights_d.size();
-
-        jit_gemm_convolution_utils::prepare_scratchpad(this->conf_.jcp_,
-                &this->scratchpad_, size, conf_.jcp_.nthr);
+        format_tag_t wei_tag() const {
+            using namespace format_tag;
+            return with_groups()
+                ? utils::pick(ndims() - 3, goiw, goihw, goidhw)
+                : utils::pick(ndims() - 3, oiw, oihw, oidhw);
     }
-
-    ~gemm_convolution_bwd_weights_t() {
-        delete this->scratchpad_;
      };
+
+    gemm_convolution_bwd_weights_t(const pd_t *apd)
+        : cpu_primitive_t(apd, true) {}
 
     typedef typename prec_traits<data_type::f32>::type data_t;
 
-    virtual void execute(event_t *e) {
-        switch (conf_.desc()->prop_kind) {
-        case prop_kind::backward_weights:
-            execute_backward_weights();
-            break;
-        default:
-            assert(!"invalid prop_kind");
-        }
-        e->set_state(event_t::ready);
+    virtual status_t execute(const exec_ctx_t &ctx) const override {
+        execute_backward_weights(ctx);
+        return status::success;
     }
 
 private:
-    void execute_backward_weights();
-#define VE_OPENMP_BUG (defined(__ve) && 1)
-#if VE_OPENMP_BUG
-    void execute_backward_weights_bias();
-#endif
-    pd_t conf_;
-    scratchpad_t *scratchpad_;
+    void execute_backward_weights(const exec_ctx_t &ctx) const;
+    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 };
 
 }

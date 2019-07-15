@@ -22,12 +22,7 @@
 using namespace mkldnn::impl;
 using namespace mkldnn::impl::status;
 
-/** Constructor with attributes.
- * - op_desc lifetime must exceed iterator lifetime
- * - attr is copied into iterator
- * - hint_fwd_pd must be nullptr, or lifetime must exceed iterator lifetime
- */
-status_t mkldnn_primitive_desc_iterator_create_v2(
+status_t mkldnn_primitive_desc_iterator_create(
         primitive_desc_iterator_t **iterator, const_c_op_desc_t c_op_desc,
         const primitive_attr_t *attr, engine_t *engine,
         const primitive_desc_t *hint_fwd_pd) {
@@ -44,18 +39,6 @@ status_t mkldnn_primitive_desc_iterator_create_v2(
 
     *iterator = it;
     return success;
-}
-
-/** Constructor with default attributes, for backwards compatibility.
- * - hint may be nullptr or lifetime must exceed iterator scope
- * - c_op_desc should be non-NULL and lifetime must exceed iterator scope
- */
-status_t mkldnn_primitive_desc_iterator_create(
-        primitive_desc_iterator_t **iterator,
-        const_c_op_desc_t c_op_desc, engine_t *engine,
-        const primitive_desc_t *hint_fwd_pd) {
-    return mkldnn_primitive_desc_iterator_create_v2(iterator, c_op_desc,
-            nullptr, engine, hint_fwd_pd);
 }
 
 status_t mkldnn_primitive_desc_iterator_next(
@@ -86,7 +69,7 @@ status_t mkldnn_primitive_desc_iterator_destroy(
     return success;
 }
 
-status_t mkldnn_primitive_desc_create_v2(primitive_desc_t **primitive_desc,
+status_t mkldnn_primitive_desc_create(primitive_desc_t **primitive_desc,
         const_c_op_desc_t c_op_desc, const primitive_attr_t *attr,
         engine_t *engine, const primitive_desc_t *hint_fwd_pd) {
     const op_desc_t *op_desc = (const op_desc_t *)c_op_desc;
@@ -102,13 +85,6 @@ status_t mkldnn_primitive_desc_create_v2(primitive_desc_t **primitive_desc,
     }
 
     return safe_ptr_assign<primitive_desc_t>(*primitive_desc, *it);
-}
-
-status_t mkldnn_primitive_desc_create(primitive_desc_t **primitive_desc,
-        const_c_op_desc_t c_op_desc, engine_t *engine,
-        const primitive_desc_t *hint_fwd_pd) {
-    return mkldnn_primitive_desc_create_v2(primitive_desc, c_op_desc, nullptr,
-            engine, hint_fwd_pd);
 }
 
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

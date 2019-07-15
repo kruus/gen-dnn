@@ -20,8 +20,21 @@
 #include "mkldnn.h"
 
 #include "c_types_map.hpp"
-#include "event.hpp"
+#include "memory_tracking.hpp"
 #include "primitive.hpp"
+#include "primitive_exec_types.hpp"
+#include "scratchpad.hpp"
+
+#include <type_traits>
+
+#define ARG_TYPE(t) \
+    typename std::remove_cv<typename std::remove_pointer<t>::type>::type
+
+#define CTX_IN_MEM(type, arg) \
+    static_cast<const ARG_TYPE(type) *>(CTX_IN_STORAGE(arg).data_handle())
+
+#define CTX_OUT_MEM(type, arg) \
+    static_cast<ARG_TYPE(type) *>(CTX_OUT_STORAGE(arg).data_handle())
 
 #define CPU_PRIMITIVE_HPP_DBG 0
 
@@ -34,49 +47,44 @@ namespace impl {
 namespace cpu {
 
 struct cpu_primitive_t: public primitive_t {
-    cpu_primitive_t(const primitive_desc_t *pd, const input_vector &inputs,
-            const output_vector &outputs)
-        : primitive_t(pd, inputs, outputs)
-    {}
-    virtual ~cpu_primitive_t() {}
+    cpu_primitive_t(const primitive_desc_t *pd,
+            bool use_global_scratchpad = false)
+        : primitive_t(pd)
+        , scratchpad_buffer_(nullptr)
+        , global_scratchpad_(nullptr)
+    {
+        const size_t scratchpad_size =
+            this->pd()->scratchpad_size(scratchpad_mode::library);
 
-    virtual char *memory(size_t output_index = 0) const {
-        if (output_index >= this->outputs().size()) return nullptr;
-        auto p = static_cast<const cpu_primitive_t *>(
-                this->outputs()[output_index]);
-        return p->memory();
+        if (scratchpad_size) {
+            if (use_global_scratchpad)
+                global_scratchpad_ = create_scratchpad(scratchpad_size);
+            else
+                scratchpad_buffer_ = malloc(scratchpad_size, 64);
     }
-    virtual const char *const_memory(size_t output_index = 0) const {
-        if (output_index >= this->outputs().size()) return nullptr;
-        auto p = static_cast<const cpu_primitive_t *>(
-                this->outputs()[output_index]);
-        return p->const_memory();
     }
 
-    const char *input_memory(size_t index = 0) const {
-        //if (index >= this->inputs().size()) return nullptr;
-        if (index >= this->inputs().size()) {
-#if CPU_PRIMITIVE_HPP_DBG
-            printf(" No cpu_primitive.hpp input_memory(index=%lu) --> nullptr",
-                   (long unsigned)index);
-            fflush(stdout);
-#endif
-            return nullptr;
+    virtual ~cpu_primitive_t() {
+        delete global_scratchpad_;
+        free(scratchpad_buffer_);
+    }
+
+protected:
+    memory_tracking::grantor_t scratchpad(const exec_ctx_t &ctx) const {
+        void *ptr = nullptr;
+        if (pd()->attr()->scratchpad_mode_ == scratchpad_mode::user) {
+            ptr = CTX_OUT_MEM(void *, MKLDNN_ARG_SCRATCHPAD);
+        } else {
+            ptr = global_scratchpad_
+                ? global_scratchpad_->get() : scratchpad_buffer_;
         }
-#if CPU_PRIMITIVE_HPP_DBG
-        char buf[500];
-        mkldnn_name_primitive_at( &this->inputs()[index], buf, 500 );
-        printf(" cpu_primitive.hpp input_memory(index=%lu) :\n"
-               "    this->inputs()[index] = %s\n",
-               (long unsigned)index, &buf[0]);
-        fflush(stdout);
-#endif
 
-        const size_t oi = this->inputs()[index].output_index;
-        auto p = static_cast<const cpu_primitive_t *>(
-                this->inputs()[index].primitive);
-        return p->const_memory(oi);
+        return pd()->scratchpad_registry().grantor(ptr);
     }
+
+private:
+    void *scratchpad_buffer_;
+    scratchpad_t *global_scratchpad_;
 };
 
 }

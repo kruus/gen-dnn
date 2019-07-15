@@ -36,7 +36,7 @@ status_t bnrm_desc_init(batch_normalization_desc_t *bnrm_desc,
         && !any_null(bnrm_desc, data_desc)
         && one_of(prop_kind, forward_training, forward_inference,
                 backward_data, backward)
-        && implication(prop_kind & backward, diff_data_desc != nullptr);
+        && IMPLICATION(prop_kind & backward, diff_data_desc != nullptr);
     if (!args_ok) return invalid_arguments;
 
     auto bd = batch_normalization_desc_t();
@@ -49,33 +49,29 @@ status_t bnrm_desc_init(batch_normalization_desc_t *bnrm_desc,
         bd.diff_data_desc = *diff_data_desc;
 
     dims_t scaleshift_dims = { 2, data_desc->dims[1] };
-    mkldnn_memory_desc_init(&bd.data_scaleshift_desc, 2, scaleshift_dims,
-            data_desc->data_type, mkldnn_nc);
+    mkldnn_memory_desc_init_by_tag(&bd.data_scaleshift_desc, 2,
+            scaleshift_dims, data_type::f32, mkldnn_nc);
     bd.diff_data_scaleshift_desc = zero_md();
     if (bd.prop_kind == backward) {
-        mkldnn_memory_desc_init(&bd.diff_data_scaleshift_desc, 2,
-                scaleshift_dims, data_desc->data_type, mkldnn_nc);
+        bd.diff_data_scaleshift_desc = bd.data_scaleshift_desc;
     }
 
     dims_t stats_dims = { data_desc->dims[1] };
-    mkldnn_memory_desc_init(&bd.mean_desc, 1, stats_dims,
-            data_desc->data_type, mkldnn_x);
-    mkldnn_memory_desc_init(&bd.variance_desc, 1, stats_dims,
-            data_desc->data_type, mkldnn_x);
-
+    mkldnn_memory_desc_init_by_tag(&bd.stat_desc, 1, stats_dims,
+            data_type::f32, mkldnn_x);
     bd.batch_norm_epsilon = epsilon;
 
     unsigned bnorm_flags =
-        mkldnn_use_global_stats | mkldnn_use_scaleshift | mkldnn_fuse_bn_relu;
+        mkldnn_use_global_stats | mkldnn_use_scaleshift | mkldnn_fuse_norm_relu;
     if ((~bnorm_flags & flags) != 0) return invalid_arguments;
 
     bd.flags = flags;
 
     bool consistency = true
-        && utils::one_of(bd.data_desc.ndims, 2, 4, 5);
+        && utils::one_of(bd.data_desc.ndims, 2, 3, 4, 5);
     if (bd.prop_kind == backward_data)
         consistency = consistency
-            && utils::one_of(bd.diff_data_desc.ndims, 2, 4, 5)
+            && utils::one_of(bd.diff_data_desc.ndims, 2, 3, 4, 5)
             && array_cmp(bd.diff_data_desc.dims, bd.data_desc.dims,
                     bd.diff_data_desc.ndims);
     if (!consistency) return invalid_arguments;

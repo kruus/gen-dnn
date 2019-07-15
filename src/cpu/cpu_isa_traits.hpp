@@ -110,7 +110,7 @@ namespace cpu {
 
 typedef enum {
     isa_any,
-    sse42,
+    sse41,
     avx,
     avx2,
     avx512_common,
@@ -118,6 +118,7 @@ typedef enum {
     avx512_core_vnni,
     avx512_mic,
     avx512_mic_4ops,
+    avx512_core_bf16,
 } cpu_isa_t;
 
 // generic, from jit_generator.hpp
@@ -133,8 +134,8 @@ typedef enum {
 #endif
 
 template <cpu_isa_t> struct cpu_isa_traits {}; /* ::vlen -> 32 (for avx2) */
-#if !defined(TARGET_VANILLA)
-template <> struct cpu_isa_traits<sse42> {
+
+template <> struct cpu_isa_traits<sse41> {
     typedef Xbyak::Xmm Vmm;
     static constexpr int vlen_shift = 4;
     static constexpr int vlen = 16;
@@ -172,14 +173,17 @@ static inline constexpr bool mayiuse(const cpu_isa_t /*cpu_isa*/) {
 }
 #else
 
+template <> struct cpu_isa_traits<avx512_core_bf16>:
+    public cpu_isa_traits<avx512_common> {};
+
 namespace {
 static Xbyak::util::Cpu cpu;
 static inline bool mayiuse(const cpu_isa_t cpu_isa) {
     using namespace Xbyak::util;
 
     switch (cpu_isa) {
-    case sse42:
-        return cpu.has(Cpu::tSSE42);
+    case sse41:
+        return cpu.has(Cpu::tSSE41);
     case avx:
         return cpu.has(Cpu::tAVX);
     case avx2:
@@ -210,61 +214,36 @@ static inline bool mayiuse(const cpu_isa_t cpu_isa) {
             && mayiuse(avx512_mic)
             && cpu.has(Cpu::tAVX512_4FMAPS)
             && cpu.has(Cpu::tAVX512_4VNNIW);
+    case avx512_core_bf16:
+        return true
+            && mayiuse(avx512_core_vnni)
+            && cpu.has(Cpu::tAVX512_BF16);
     case isa_any:
         return true;
     }
     return false;
 }
-}//anon::
-#endif // mayiuse
 
-namespace {
-/** To avoid pulling in Xbyak, we \em guess the cache sizes for TARGET_VANILLA.
- * \sa jit_generator.hpp for a more informed version.
- * TODO: think about whether this can be done better, or maybe
- *       disconnected from Xbyak a bit more.
- * For now, the only non-jit files using cache info are the
- * batch normalization routines in {cpu,ncsp}_batch_normalization.cpp
- */
-inline unsigned int get_cache_size(int level, bool per_core = true){
-    unsigned int l = level - 1;
-#if !defined(TARGET_VANILLA)
-    // Currently, if XByak is not able to fetch the cache topology
-    // we default to 32KB of L1, 512KB of L2 and 1MB of L3 per core.
-    if (cpu.data_cache_levels == 0){
-#endif
-        const int L1_cache_per_core = 32000;
-        const int L2_cache_per_core = 512000;
-        const int L3_cache_per_core = 1024000;
-        int num_cores = per_core ? 1 : omp_get_max_threads();
-        switch(l){
-        case(0): return L1_cache_per_core * num_cores;
-        case(1): return L2_cache_per_core * num_cores;
-        case(2): return L3_cache_per_core * num_cores;
-        default: return 0;
-        }
-#if !defined(TARGET_VANILLA)
-    }
-    if (l < cpu.data_cache_levels) {
-        return cpu.data_cache_size[l]
-            / (per_core ? cpu.cores_sharing_data_cache[l] : 1);
-    } else
-        return 0;
-#endif
+inline bool isa_has_bf16(cpu_isa_t isa) {
+    return isa == avx512_core_bf16;
+}
+
 }
 }//anon::
 
 /* whatever is required to generate string literals... */
 #include "z_magic.hpp"
 #define JIT_IMPL_NAME_HELPER(prefix, isa, suffix_if_any) \
-    (isa == sse42 ? prefix STRINGIFY(sse42) : \
+    (isa == sse41 ? prefix STRINGIFY(sse41) : \
     (isa == avx ? prefix STRINGIFY(avx) : \
     (isa == avx2 ? prefix STRINGIFY(avx2) : \
     (isa == avx512_common ? prefix STRINGIFY(avx512_common) : \
     (isa == avx512_core ? prefix STRINGIFY(avx512_core) : \
+    (isa == avx512_core_vnni ? prefix STRINGIFY(avx512_core_vnni) : \
     (isa == avx512_mic ? prefix STRINGIFY(avx512_mic) : \
     (isa == avx512_mic_4ops ? prefix STRINGIFY(avx512_mic_4ops) : \
-    prefix suffix_if_any)))))))
+    (isa == avx512_core_bf16 ? prefix STRINGIFY(avx512_core_bf16) : \
+    prefix suffix_if_any)))))))))
 
 }
 }
