@@ -10,6 +10,16 @@ usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
     awk '/getopts/{flag=1;next} /done/{flag=0} flag&&/^[^#]+\) #/; flag&&/^ *# /' $0
+    echo " This runs a default set of tests, typically some large convolutions"
+    echo " from some real deep neural nets."
+    echo " Examples:"
+    echo "   ./bench.sh -v -t 4 -D 'BWD_D BWD_B'"
+    echo "       # vanilla build, 4 threads, some BWD tests of default convolutions"
+    echo "   ./bench.sh -q"
+    echo "       # quick test only, FWD_B direction, debug jit build"
+    echo "   ./bench.sh -v -t 6 -D 'FWD_B FWD_D BWD_D BWD_W BWD_WB'"
+    echo "       # Long vanilla build test, 6 threads, all directions"
+    echo "       # about 10 hours or so on x86"
     echo ""
     exit 0
 }
@@ -63,7 +73,7 @@ while getopts ":hqvjdm:t:V:s:B:" arg; do
         v) # [yes] (if available, vanilla C/C++ only: no JIT)
             if [ -d src/vanilla ]; then BUILDDIR='build'; DOTARGET='v'; fi
             ;;
-        j) # force Intel JIT (src/cpu/ JIT assembly code)
+        j) # force Intel JIT (src/cpu/ JIT assembly code) (aurora build -aj probably wrong)
             if [ -d build-jit ]; then BUILDDIR='build-jit'; DOTARGET='j';
             else                      BUILDDIR='build';     DOTARGET=''; fi
             ;;

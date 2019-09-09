@@ -22,6 +22,10 @@
 #include "type_helpers.hpp"
 #include "mkldnn_thread.hpp"
 
+#if !defined(TARGET_VANILLA)
+#error "this file should is specific to TARGET_VANILLA compilation"
+#endif
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -29,7 +33,7 @@ namespace cpu {
 #if ! USE_MKL && ! USE_CBLAS // provide empty stubs (init always will say "NO")
 #pragma warning "gemm_convolution stubs only -- (no MKL or CBLAS)"
 
-void gemm_convolution_bwd_weights_t::execute_backward_weights() {}
+//void gemm_convolution_bwd_weights_t::execute_backward_weights() {}
 
 #else // some sort of gemm (jit? cblas?) is available
 
@@ -42,7 +46,8 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
     auto diff_weights = reinterpret_cast<data_t*>(this->memory(0));
-    auto diff_bias = reinterpret_cast<data_t *>(this->memory(1));
+    // moved to execute_backward_weights_bias VE workaround...
+    //auto diff_bias = reinterpret_cast<data_t *>(this->memory(1));
 
     jit_gemm_conv_conf_t &jcp = this->conf_.jcp_;
     const int K = jcp.os * jcp.od;

@@ -34,7 +34,7 @@ void _gemm_convolution_fwd_t<with_relu>::execute_forward() {}
 
 void gemm_convolution_bwd_data_t::execute_backward_data() {}
 
-//void gemm_convolution_bwd_weights_t::execute_backward_weights() {}
+void gemm_convolution_bwd_weights_t::execute_backward_weights() {}
 
 #else // some sort of gemm (jit? cblas?) is available
 
@@ -206,7 +206,8 @@ void gemm_convolution_bwd_data_t::execute_backward_data() {
     }
 }
 #endif
-#if 0 // ncc has issues here. The FIRST omp loop goes in a separate FILE (WORKAROUND XXX !!!)
+#if !defined(TARGET_VANILLA)
+// ncc issue with multiple OMP clauses in same function :(
 void gemm_convolution_bwd_weights_t::execute_backward_weights() {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
@@ -333,7 +334,7 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() {
     }
 }
 #endif
-#if 1 // ncc has issues here.
+#if 0 // ncc has issues here.
 void gemm_convolution_bwd_weights_t::execute_backward_weights_bias() {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
