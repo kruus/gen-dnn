@@ -19,8 +19,6 @@ usage() {
     echo "       # quick test only, FWD_B direction, debug jit build"
     echo "   ./bench.sh -v -t 6 -D 'FWD_B FWD_D BWD_D BWD_W BWD_WB'"
     echo "       # Long vanilla build test, 6 threads, all directions"
-    echo "       # about 10 hours or so on x86"
-    echo ""
     exit 0
 }
 ################# LOGDIR
@@ -67,7 +65,7 @@ SKIP=""
 MODE="--mode=P"
 DIRS=(FWD_B) # FWD_D FWD_B BWD_D BWD_W BWD_WB
 # TODO: add batch file selection for some long tests examples [other than the default list]
-while getopts ":hqvjdm:t:V:s:B:" arg; do
+while getopts ":hqvjdD:m:t:V:s:B:" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         v) # [yes] (if available, vanilla C/C++ only: no JIT)

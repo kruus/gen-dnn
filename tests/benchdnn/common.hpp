@@ -25,6 +25,13 @@
 #include <float.h>
 #include <math.h>
 
+#ifndef strnlen_s
+#define strnlen_s(x,y) ((x) ? ((strlen(x) < (size_t)y) ? strlen(x) : (size_t)y) : (size_t)0)
+#endif
+#ifndef strnlen
+#define strnlen strnlen_s
+#endif
+
 #define ABS(a) ((a)>0?(a):(-(a)))
 
 #define MIN2(a,b) ((a)<(b)?(a):(b))
