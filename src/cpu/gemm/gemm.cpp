@@ -160,7 +160,7 @@ mkldnn_status_t extended_sgemm(const char *transa, const char *transb,
     //Add bias if necessary (bias is applied to columns of C)
     if (bias) {
         cblas_int incx = 1, incy = 1;
-#       pragma omp parallel for schedule(static)
+        OMP(parallel for schedule(static))//;
         for (int i = 0; i < *N; i++)
             cblas_saxpy(*M, 1.0, bias, incx, C + i*(*ldc), incy);
     }

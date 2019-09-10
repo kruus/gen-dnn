@@ -83,13 +83,16 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights_bias() {
                     size_t offset = offset_ + (size_t)mb*jcp.ngroups*dst_step;
                     for (int od = 0; od < jcp.od; ++od)
                         for (int oh = 0; oh < jcp.oh; ++oh)
-                            //OMPSIMD(reduction(+:db))//;
-                            PRAGMA_OMP_SIMD(reduction(+:db))
-                                for (int ow = 0; ow < jcp.ow; ++ow)
-                                {
-                                    db += diff_dst[offset];
-                                    offset ++;
-                                }
+#if defined(__ve)
+                            _Pragma("_NEC shortloop_reduction")// not this is compelely orthogonal to omp reduce;
+#else
+                            PRAGMA_OMP_SIMD(reduction(+:db))//;
+#endif
+                            for (int ow = 0; ow < jcp.ow; ++ow)
+                            {
+                                db += diff_dst[offset];
+                                offset ++;
+                            }
                 }
                 //diff_bias[diff_bias_d.off(g*jcp.oc+oc)] = db;
                 diff_bias[g*jcp.oc+oc] = db;

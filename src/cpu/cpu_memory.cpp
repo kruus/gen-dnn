@@ -240,7 +240,7 @@ typed_zero_pad_weights(const memory_desc_wrapper &m_d,
 
     auto *d = &data[m_d.blk_off(G)];
 
-#   pragma omp parallel for schedule(static)
+    OMP(parallel for schedule(static))//;
     for (ptrdiff_t s = 0; s < sz_rest; ++s) {
         for (int g = g_tail_start; g < blksize; ++g)
             d[s * blksize + g] = 0;
@@ -276,7 +276,7 @@ void typed_zero_pad_generic_blocked(const memory_desc_wrapper &m_d,
     assert(step_dim >= 0 && "no zero padding is required");
     if (step_dim < 0) return;
 
-#   pragma omp parallel for
+    OMP(parallel for)//;
     for (ptrdiff_t e = 0; e < nelems; e += step) {
         bool need_zero = false;
 

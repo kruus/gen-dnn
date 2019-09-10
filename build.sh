@@ -357,6 +357,10 @@ echo "PATH $PATH"
             # ?? -mparallel and -fopenmp both => -pthread
             export CFLAGS="${CFLAGS} -fopenmp"
             export CXXFLAGS="${CFLAGS} -fopenmp"
+            #export CFLAGS="${CFLAGS} -mparallel -mparallel-outerloop-strip-mine -mparallel-sections"
+            #export CXXFLAGS="${CFLAGS} -mparallel -mparallel-outerloop-strip-mine -mparallel-sections"
+            #export CFLAGS="${CFLAGS} -mparallel-threshold=4096"
+            #export CXXFLAGS="${CFLAGS} -mparallel-threshold=4096"
         fi
         # TODO proginf is not working automatically any more?
         # -proginf  : Run with 'export VE_PROGINF=YES' to get some stats output
@@ -380,6 +384,19 @@ echo "PATH $PATH"
         CMAKEOPT="${CMAKEOPT} -DVEJIT=${VEJIT}"
         #export CFLAGS="${CFLAGS} -DVEJIT=${VEJIT}"
         #export CXXFLAGS="${CXXFLAGS} -DVEJIT=${VEJIT}"
+        #export CFLAGS="${CFLAGS} -floop-normalize"
+        #export CXXFLAGS="${CXXFLAGS} -floop-normalize"
+        # other options:
+        export CFLAGS="${CFLAGS} -report-all"
+        export CXXFLAGS="${CXXFLAGS} -report-all"
+        export CFLAGS="${CFLAGS} -fcse-after-vectorization"
+        export CXXFLAGS="${CXXFLAGS} -fcse-after-vectorization"
+        export CFLAGS="${CFLAGS} -msched-block"
+        export CXXFLAGS="${CXXFLAGS} -msched-block"
+        export CFLAGS="${CFLAGS} -mvector-loop-count-test"
+        export CXXFLAGS="${CXXFLAGS} -mvector-loop-count-test"
+        export CFLAGS="${CFLAGS} -mvector-packed"
+        export CXXFLAGS="${CXXFLAGS} -mvector-packed"
         echo "Aurora CMAKEOPT = ${CMAKEOPT}"
     fi
     if [ ${DOWARN} == 'y' ]; then

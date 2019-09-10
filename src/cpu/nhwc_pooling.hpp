@@ -112,7 +112,11 @@ private:
             unsigned char *ws, const size_t ws_offset, const data_type_t ws_dt,
             const int index) {
         assert(!((use_workspace == false) ^ (!ws))); // ensure ws pointer exists
-        PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
         for (int oc = 0; oc < n; ++oc) {
             auto s = src[oc];
             data_t mv = dst[oc];

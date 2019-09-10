@@ -110,5 +110,11 @@ if(1 OR NECVE)
     configure_file(${CMAKE_SOURCE_DIR}/cmake/bash_help.inc.in
         ${PROJECT_BINARY_DIR}/bash_help.inc)
 endif()
+
+get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
+foreach(dir ${dirs})
+    message(STATUS "include_directories: '${dir}'")
+endforeach()
+
 message(STATUS "CMakeLists.txt DONE!")
 # vim: et ts=4 sw=4 ai :

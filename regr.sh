@@ -200,7 +200,10 @@ echo "LOGFILE : $LOGFILE"
 COLUMN="column -t"
 if [ "`uname -m`" = "SX-ACE" ]; then COLUMN='cat'; fi # I could not put spaces here, for SX-ACE (so no awk/sed)
 echo "COLUMN  : $COLUMN"
-TIME="/usr/bin/time -v"
+# following does not exist on some systems
+#TIME="/usr/bin/time -v"
+#TIME="time"
+TIME=""
 if [ "`uname -m`" = "SX-ACE" ]; then TIME="time"; fi # just use the bash builtin
 set +x
 (

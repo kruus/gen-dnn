@@ -80,7 +80,7 @@ elemwise_sig(_ref_rnn_common_t<prop_kind::forward>::rnn_elemwise) {
     AOC<float, 3> ws_gates(ws_gates_, batch, n_gates, dic);
     AOC<const float, 2> bias(bias_, n_gates, dic);
     AOC<float, 3> states_t_l(states_t_l_, n_states, batch, wic);
-#pragma omp parallel for
+    OMP(parallel for)//;
     for (int i = 0; i < batch; i++) {
         for (int j = 0; j < dic; j++) {
             const float h
@@ -97,7 +97,7 @@ elemwise_sig(_ref_rnn_common_t<prop_kind::backward>::rnn_elemwise) {
             diff_states_tp1_l_, n_states + 1, batch, wic);
     AOC<float, 3> diff_states_t_lp1(
             diff_states_t_lp1_, n_states + 1, batch, wic);
-#pragma omp parallel for
+    OMP(parallel for)//;
     for (int i = 0; i < batch; ++i) {
         for (int j = 0; j < dic; ++j) {
             const float dH = diff_states_t_lp1(n_states, i, j)
@@ -115,9 +115,13 @@ elemwise_sig(_ref_rnn_common_t<prop_kind::forward>::lstm_elemwise) {
     AOC<float, 3> states_t_l(states_t_l_, n_states, batch, wic);
     AOC<float, 3> states_tm1_l(states_tm1_l_, n_states, batch, wic);
 
-#pragma omp parallel for
+    OMP(parallel for)//;
     for (int i = 0; i < batch; i++) {
-        PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
         for (int j = 0; j < dic; j++) {
             ws_gates(i, 0, j) = logistic_fwd(ws_gates(i, 0, j) + bias(0, j));
             ws_gates(i, 1, j) = logistic_fwd(ws_gates(i, 1, j) + bias(1, j));
@@ -146,9 +150,13 @@ elemwise_sig(_ref_rnn_common_t<prop_kind::backward>::lstm_elemwise) {
 
     auto one_m_square = [](float a) -> float { return 1.0f - a * a; };
 
-#pragma omp parallel for
+    OMP(parallel for)//;
     for (int i = 0; i < batch; i++) {
-        PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
         for (int j = 0; j < dic; j++) {
             float Ct = states_t_l(1, i, j);
             /// @todo save it in the workspace in fwd pass or recompute it to
@@ -209,10 +217,11 @@ void _ref_rnn_common_t<aprop>::gates_reduction(int n_gates, int dic, int batch,
         const float *ws_gates_, float *diff_bias_) {
 #if (_OPENMP >= 201307) \
     /* icc 17.0 has a problem with simd collapse */ \
-    && !((defined __INTEL_COMPILER) && (__INTEL_COMPILER == 1700))
-#pragma omp parallel for simd collapse(2)
+    && !((defined __INTEL_COMPILER) && (__INTEL_COMPILER == 1700)) \
+    && !defined(__ve)
+    OMP(parallel for simd collapse(2))//;
 #else
-#pragma omp parallel for collapse(2) ///@todo block k on simd-width
+    OMP(parallel for collapse(2))//@todo block k on simd-width);
 #endif
     for (int i = 0; i < n_gates; i++)
         for (int k = 0; k < dic; k++)
@@ -279,9 +288,13 @@ cell_execution_sig(_ref_rnn_common_t<prop_kind::forward>::cell_execution_gru) {
             ws_gates_, false, 1.0f);
 
     // 3. activation zt and rt + elemwise multiplication rt,ht-1
-#pragma omp parallel for
+    OMP(parallel for)//;
     for (int i = 0; i < batch; i++) {
-        PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
         for (int j = 0; j < dic; j++) {
             ws_gates(i, 0, j) = logistic_fwd(ws_gates(i, 0, j) + bias(0, j));
             ws_gates(i, 1, j) = logistic_fwd(ws_gates(i, 1, j) + bias(1, j));
@@ -295,9 +308,13 @@ cell_execution_sig(_ref_rnn_common_t<prop_kind::forward>::cell_execution_gru) {
             &(ws_gates(0, 2, 0)), false, 1.0f);
 
     // 5. activation h~t + calculate ht
-#pragma omp parallel for
+    OMP(parallel for)//;
     for (int i = 0; i < batch; i++) {
-        PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
         for (int j = 0; j < dic; j++) {
             ws_gates(i, 2, j) = tanh_fwd(ws_gates(i, 2, j) + bias(2, j));
             states_t_l(i, j) = states_tm1_l(i, j) * ws_gates(i, 0, j) +
@@ -315,9 +332,13 @@ elemwise_sig(_ref_rnn_common_t<prop_kind::forward>::gru_lbr_elemwise) {
     AOC<float, 2> states_t_l(states_t_l_, batch, wic);
     AOC<float, 2> states_tm1_l(states_tm1_l_, batch, wic);
     AOC<float, 3> ws_gemm_state(ws_cell_, batch, n_gates, dic);
-#pragma omp parallel for
+    OMP(parallel for)//;
     for (int i = 0; i < batch; i++) {
-        PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
         for (int j = 0; j < dic; j++) {
             float Wh_b = ws_gemm_state(i, 2, j) + bias(3, j);
             ws_gates(i, 0, j) = logistic_fwd(ws_gates(i, 0, j) +
@@ -362,9 +383,13 @@ elemwise_sig(_ref_rnn_common_t<prop_kind::backward>::gru_lbr_elemwise) {
     // dG0 = (dht - G2) * dht * (1 - G0) * G0
     // dG1 = (W*h + b) * dG2 * (1 - G1) * G1
     // dG2 = (1 - G0) * dht * (1 - G2*G2)
-#pragma omp parallel for
+    OMP(parallel for)//;
     for (int i = 0; i < batch; i++) {
-        PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
         for (int j = 0; j < dic; j++) {
             float h = states_tm1_l(i, j);
             float dHt = diff_states_tp1_l(0, i, j)
@@ -415,7 +440,7 @@ cell_execution_sig(_ref_rnn_common_t<prop_kind::backward>::cell_execution_gru_lb
     // db4 += e * (r * dG2)
     gates_reduction(n_gates, dic, batch, ws_gates_, diff_bias_);
 
-#pragma omp parallel for
+    OMP(parallel for)//;
     for (int j = 0; j < dic; j++) {
         for (int i = 0; i < batch; i++) {
             diff_bias_[3 * dic + j] += ws_gates_r(i, 2, j);
@@ -443,9 +468,13 @@ cell_execution_sig(_ref_rnn_common_t<prop_kind::backward>::cell_execution_gru) {
     // dG2^ = dh * (1 - G0) * (1 - G2^2)
     // dG0^ = dh * (ht-1 - G2) * u * (1 - G0)
     // dht-1 (part) = dh * G0
-#pragma omp parallel for
+    OMP(parallel for)//;
     for (int i = 0; i < batch; i++) {
-        PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
         for (int j = 0; j < dic; j++) {
             float h = states_tm1_l(i, j);
             float dHt = diff_states_tp1_l(0, i, j)
@@ -471,9 +500,13 @@ cell_execution_sig(_ref_rnn_common_t<prop_kind::backward>::cell_execution_gru) {
     //dG1^ = d(hG1) * h * G1 * (1 - G1)
     //dht-1 (part) += d(hG1) * G1
     //h * G1 (required for dWh)
-#pragma omp parallel for
+    OMP(parallel for)//;
     for (int i = 0; i < batch; i++) {
-        PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
         for (int j = 0; j < dic; j++) {
             float h = states_tm1_l(i, j);
             float G1 =  ws_gates(i, 1, j);
@@ -737,7 +770,7 @@ void _ref_rnn_common_t<prop_kind::forward>::copy_init_layer(bool lr, bool rl,
             ws_states_, n_direction, n_iter + 1, n_states, batch, wic);
     auto xt_d = memory_desc_wrapper(conf_.src_pd(0));
 
-#pragma omp parallel for
+    OMP(parallel for)//;
     for (int it = 0; it < n_iter; it++) {
         auto xxt = xt_ + xt_d.blk_off(it);
         if (lr)
@@ -1186,3 +1219,4 @@ template struct _ref_rnn_common_t<prop_kind::backward>;
 }
 }
 }
+// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

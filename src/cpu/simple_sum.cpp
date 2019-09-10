@@ -49,16 +49,21 @@ void simple_sum_t<data_type>::execute() {
         size_t start{0}, end{0};
         balance211(blocks_number, nthr, ithr, start, end);
 
+#if defined(__ve)
+#define MY_OMP_SIMD() _Pragma("_NEC shortloop_reduction")
+#else
+#define MY_OMP_SIMD() PRAGMA_OMP_SIMD()
+#endif
         for (size_t nb = start; nb < end; ++nb) {
             size_t start_e = nb * block_size;
             size_t end_e = start_e + block_size;
 
-            PRAGMA_OMP_SIMD()
+            MY_OMP_SIMD()
             for (size_t e = start_e; e < end_e; e++) {
                 output[e] = data_t(scales[0] * input_ptrs[0][e]);
             }
             for (int a = 1; a < num_arrs; a++) {
-                PRAGMA_OMP_SIMD()
+                MY_OMP_SIMD()
                 for (size_t e = start_e; e < end_e; e++) {
                     output[e] += data_t(scales[a] * input_ptrs[a][e]);
                 }
@@ -69,17 +74,18 @@ void simple_sum_t<data_type>::execute() {
             size_t start_e = nelems - tail;
             size_t end_e = nelems;
 
-            PRAGMA_OMP_SIMD()
+            MY_OMP_SIMD()
             for (size_t e = start_e; e < end_e; e++) {
                 output[e] = data_t(scales[0] * input_ptrs[0][e]);
             }
             for (int a = 1; a < num_arrs; a++) {
-                PRAGMA_OMP_SIMD()
+                MY_OMP_SIMD()
                 for (size_t e = start_e; e < end_e; e++) {
                     output[e] += data_t(scales[a] * input_ptrs[a][e]);
                 }
             }
         }
+#undef MY_OMP_SIMD
     }
 }
 

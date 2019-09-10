@@ -722,7 +722,7 @@ message(STATUS "ve.cmake              - VE_NLC_HET_LIBS   ${VE_NLC_HET_LIBS}")
 message(STATUS "ve.cmake   VE_NLC_LIBS         ${VE_NLC_LIBS}") # cache force
 message(STATUS "ve.cmake   VE_NLC_C_INCFLAGS   ${VE_NLC_C_INCFLAGS}") # cache force
 message(STATUS "ve.cmake   VE_NLC_CXX_INCFLAGS ${VE_NLC_CXX_INCFLAGS}") # cache force
-message(STATUS "ve.cmake   VE_NLC_C_LDFLAGS    ${VE_NLC_C_LDCFLAGS}") # cache force
+message(STATUS "ve.cmake   VE_NLC_C_LDFLAGS    ${VE_NLC_C_LDCLAGS}") # cache force
 message(STATUS "ve.cmake   VE_NLC_CXX_LDFLAGS  ${VE_NLC_CXX_LDFLAGS}") # cache force
 message(STATUS " ...... end test code ......")
 

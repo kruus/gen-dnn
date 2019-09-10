@@ -90,7 +90,7 @@ void _gemm_convolution_fwd_t<with_relu>::execute_forward() {
 
         data_t *_col = col + (ptrdiff_t)ithr * jcp.im2col_sz;
 
-        # pragma omp parallel for if(jcp.nthr == 1)
+        OMP(parallel for if(jcp.nthr == 1))
         for (ptrdiff_t i = 0; i < jcp.im2col_sz; ++i) _col[i] = (data_t)0;
 
         int g{0}, n{0}, od{0};
@@ -166,12 +166,12 @@ void gemm_convolution_bwd_data_t::execute_backward_data() {
 
         data_t *_col = col + (ptrdiff_t)ithr * jcp.im2col_sz;
 
-        # pragma omp parallel for if(jcp.nthr == 1)
+        OMP(parallel for if(jcp.nthr == 1))//;
         for (ptrdiff_t i = 0; i < jcp.im2col_sz; ++i) _col[i] = (data_t)0;
 
         if (jcp.id > 1) {
             ptrdiff_t diff_src_sz = (ptrdiff_t)(work_amount * src_step);
-            #pragma omp for
+            OMP(for)//;
             for (ptrdiff_t i = 0; i < diff_src_sz; ++i)
                 diff_src[i] = 0.;
         }
@@ -260,7 +260,7 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() {
             data_t *weights_reduce = weights_reduce_base
                     + ithr_mb * weights_g_size;
 
-            # pragma omp parallel for if(jcp.nthr == 1)
+            OMP(parallel for if(jcp.nthr == 1))//;
             for (ptrdiff_t i = 0; i < jcp.im2col_sz; ++i) _col[i] = (data_t)0;
 
             for (size_t g = g_start; g < g_end; ++g) {
@@ -318,8 +318,12 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() {
                     size_t offset = offset_ + (size_t)mb*jcp.ngroups*dst_step;
                     for (int od = 0; od < jcp.od; ++od)
                     for (int oh = 0; oh < jcp.oh; ++oh)
-                    //OMPSIMD(reduction(+:db))//;
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")// not this is compelely orthogonal to omp reduce;
+#else
+                    // actually this is a thread local reduction, so why is omp reduction even used?
                     PRAGMA_OMP_SIMD(reduction(+:db))
+#endif
                     for (int ow = 0; ow < jcp.ow; ++ow)
                     {
                         db += diff_dst[offset];
@@ -383,8 +387,12 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights_bias() {
                     size_t offset = offset_ + (size_t)mb*jcp.ngroups*dst_step;
                     for (int od = 0; od < jcp.od; ++od)
                     for (int oh = 0; oh < jcp.oh; ++oh)
-                    //OMPSIMD(reduction(+:db))//;
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")// not this is compelely orthogonal to omp reduce;
+#else
+                    // actually this is a thread local reduction, so why is omp reduction even used?
                     PRAGMA_OMP_SIMD(reduction(+:db))
+#endif
                     for (int ow = 0; ow < jcp.ow; ++ow)
                     {
                         db += diff_dst[offset];

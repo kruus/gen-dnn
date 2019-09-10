@@ -85,7 +85,7 @@ void parallel_nd(const T0 D0, const T1 D1, F f) {
     const size_t work_amount = (size_t)D0 * D1;
     if (work_amount == 0) return;
 
-#   pragma omp parallel
+    OMP(parallel) //#   pragma omp parallel;
     {
         const int ithr = omp_get_thread_num();
         const int nthr = omp_get_num_threads();
@@ -105,7 +105,7 @@ void parallel_nd(const T0 D0, const T1 D1, const T2 D2, F f) {
     const size_t work_amount = (size_t)D0 * D1 * D2;
     if (work_amount == 0) return;
 
-#   pragma omp parallel
+    OMP(parallel) //#   pragma omp parallel;
     {
         const int ithr = omp_get_thread_num();
         const int nthr = omp_get_num_threads();
@@ -125,7 +125,7 @@ void parallel_nd(const T0 D0, const T1 D1, const T2 D2, const T3 D3, F f) {
     const size_t work_amount = (size_t)D0 * D1 * D2 * D3;
     if (work_amount == 0) return;
 
-#   pragma omp parallel
+    OMP(parallel) //#   pragma omp parallel;
     {
         const int ithr = omp_get_thread_num();
         const int nthr = omp_get_num_threads();
@@ -147,7 +147,7 @@ void parallel_nd(const T0 D0, const T1 D1, const T2 D2, const T3 D3,
     const size_t work_amount = (size_t)D0 * D1 * D2 * D3 * D4;
     if (work_amount == 0) return;
 
-#   pragma omp parallel
+    OMP(parallel) //#   pragma omp parallel;
     {
         const int ithr = omp_get_thread_num();
         const int nthr = omp_get_num_threads();
@@ -169,7 +169,7 @@ void parallel_nd(const T0 D0, const T1 D1, const T2 D2, const T3 D3,
     const size_t work_amount = (size_t)D0 * D1 * D2 * D3 * D4 * D5;
     if (work_amount == 0) return;
 
-#   pragma omp parallel
+    OMP(parallel) //#   pragma omp parallel;
     {
         const int ithr = omp_get_thread_num();
         const int nthr = omp_get_num_threads();

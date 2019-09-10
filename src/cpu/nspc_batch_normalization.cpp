@@ -96,7 +96,7 @@ void nspc_batch_normalization_fwd_t::execute_forward() {
     ;
     auto maybe_post_op
             = [&](data_t res) { return (with_relu && res < 0) ? 0 : res; };
-#pragma omp parallel
+    OMP(parallel)//;
     {
         int nthr = omp_get_max_threads(), ithr = omp_get_thread_num();
         int N_s = 0, N_e = 0, C_s = 0, C_e = 0;
@@ -111,19 +111,23 @@ void nspc_batch_normalization_fwd_t::execute_forward() {
 
             for (int n = N_s; n < N_e; n++)
                 for (int sp = 0; sp < SP; sp++)
-                    PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
                     for (int c = 0; c < C; c++)
                         ws_reduce[C * ithr + c] += src[(size_t)n * SP * C
                             + sp * C + c];
 
-#pragma omp barrier
+            OMP(barrier)//;
             for (int c = C_s; c < C_e; c++) {
                 mean[c] = 0;
                 for (int n = 0; n < nthr; n++)
                     mean[c] += ws_reduce[C * n + c];
                 mean[c] /= SP * N;
             }
-#pragma omp barrier
+            OMP(barrier)//;
             for (int c = 0; c < C; c++) {
                 mean_loc[c] = mean[c];
                 ws_reduce[C * ithr + c] = 0.;
@@ -131,20 +135,24 @@ void nspc_batch_normalization_fwd_t::execute_forward() {
 
             for (int n = N_s; n < N_e; n++)
                 for (int sp = 0; sp < SP; sp++)
-                    PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
                     for (int c = 0; c < C; c++) {
                         data_t m = src[(size_t)n * SP * C + sp * C + c]
                             - mean_loc[c];
                         ws_reduce[C * ithr + c] += m * m;
                     }
-#pragma omp barrier
+                    OMP(barrier)//;
             for (int c = C_s; c < C_e; c++) {
                 variance[c] = 0;
                 for (int n = 0; n < nthr; n++)
                     variance[c] += ws_reduce[C * n + c];
                 variance[c] /= SP * N;
             }
-#pragma omp barrier
+            OMP(barrier)//;
             for (int c = 0; c < C; c++)
                 variance_loc[c] = variance[c];
         } else {
@@ -155,7 +163,11 @@ void nspc_batch_normalization_fwd_t::execute_forward() {
         for (int n = N_s; n < N_e; n++) {
             for (int sp = 0; sp < SP; sp++) {
 #if SAFE_TO_USE_OMP_SIMD
-                PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                _Pragma("_NEC shortloop_reduction")//;
+#else
+                PRAGMA_OMP_SIMD()//;
+#endif
 #endif
                 for (int c = 0; c < C; c++) {
                     data_t sqrt_variance = static_cast<data_t>(
@@ -222,7 +234,7 @@ void nspc_batch_normalization_bwd_t::execute_backward() {
     const bool use_scaleshift = conf_.use_scaleshift();
     const bool calculate_diff_stats = !conf_.omit_stats();
     const bool fuse_bn_relu = conf_.fuse_bn_relu();
-#pragma omp parallel
+    OMP(parallel)//;
     {
         int ithr = omp_get_thread_num();
         int N_s = 0, N_e = 0, C_s = 0, C_e = 0;
@@ -241,7 +253,11 @@ void nspc_batch_normalization_bwd_t::execute_backward() {
         for (int n = N_s; n < N_e; n++)
             for (int sp = 0; sp < SP; sp++)
 #if SAFE_TO_USE_OMP_SIMD
-                PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
 #endif
                 for (int c = 0; c < C; c++) {
                     const size_t d_off = (size_t)n * SP * C + sp * C + c;
@@ -254,7 +270,7 @@ void nspc_batch_normalization_bwd_t::execute_backward() {
                     ws_reduce[C * nthr + C * ithr + c] += dd;
                 }
 
-#pragma omp barrier
+        OMP(barrier)//;
         for (int c = C_s; c < C_e; c++) {
             data_t sqrt_variance
                     = static_cast<data_t>(1.0f / sqrtf(variance[c] + eps));
@@ -266,7 +282,7 @@ void nspc_batch_normalization_bwd_t::execute_backward() {
             }
             diff_gamma[c] *= sqrt_variance;
         }
-#pragma omp barrier
+        OMP(barrier)//;
         for (int c = 0; c < C; c++) {
             diff_gamma_loc[c] = diff_gamma[c];
             diff_beta_loc[c] = diff_beta[c];
@@ -275,7 +291,11 @@ void nspc_batch_normalization_bwd_t::execute_backward() {
         for (int n = N_s; n < N_e; n++) {
             for (int sp = 0; sp < SP; sp++) {
 #if SAFE_TO_USE_OMP_SIMD
-                PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                _Pragma("_NEC shortloop_reduction")//;
+#else
+                PRAGMA_OMP_SIMD()//;
+#endif
 #endif
                 for (int c = 0; c < C; c++) {
                     const size_t d_off = (size_t)n * SP * C + sp * C + c;

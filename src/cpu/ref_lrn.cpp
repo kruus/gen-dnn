@@ -126,7 +126,11 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
             int c = c_blk * blksize;
             const size_t off = mb * stride_mb + c * H * W
                 + (h * W + w) * blksize;
-            PRAGMA_OMP_SIMD()
+#if defined(__ve)
+            ShortLoop()//;
+#else
+            PRAGMA_OMP_SIMD()//;
+#endif
             for (int cc = 0; cc < nstl::min(blksize, C - c); ++cc)
                 ker(&dst[off + cc], mb, c + cc, h, w);
         });
@@ -230,7 +234,11 @@ void ref_lrn_bwd_t<data_type>::execute_backward() {
             int c = c_blk * blksize;
             const size_t off = mb * stride_mb + c * H * W +
                 (h * W + w) * blksize;
-            PRAGMA_OMP_SIMD()
+#if defined(__ve)
+            ShortLoop()//;
+#else
+            PRAGMA_OMP_SIMD()//;
+#endif
             for (int cc = 0; cc < nstl::min(blksize, C - c); ++cc)
                 ker(&diff_src[off + cc], mb, c + cc, h, w);
         });
