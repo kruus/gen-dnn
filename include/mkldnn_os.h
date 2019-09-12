@@ -189,13 +189,13 @@
 #if ENABLE_OMP
 #   define OMP(...) PragmaQuote(omp __VA_ARGS__)
 #   if defined(__ve)
-#      warning "__ve enabling #pragma omp"
+//#      warning "__ve enabling #pragma omp"
 #   endif
 #   if defined(_SX) // no support for "simd" pragmas
 #   elif defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
 #   elif defined(__ve)
 #      define PRAGMASIMD(...) PragmaQuote(simd __VA_ARGS__)
-#      warning "__ve (ncc) ignores simd directive in PRAGMA_OMP_SIMD(...)
+//#      warning "__ve (ncc) ignores simd directive in PRAGMA_OMP_SIMD(...)
 #      define OMPSIMD(...) PragmaQuote(omp __VA_ARGS__)
 #      define PRAGMA_OMP_SIMD(...) PragmaQuote(omp __VA_ARGS__)
 #   else // defined(__GNUC) or intel or ...

@@ -17,6 +17,7 @@ DOGCC_VER=0
 NEC_FTRACE=0
 DOTARGET="x"
 VEJIT=0
+BUILDDIR_SUFFIX=""
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -36,7 +37,7 @@ usage() {
     echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
 }
-while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
+while getopts ":hatvjdDqQpsSTwWbF1567iB:" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
@@ -47,6 +48,9 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
             DOTARGET="a"; SIZE_T=64; DONEEDMKL="n"
             JOBS="-j1" # -j1 to avoid SIGSEGV in ccom
             if [ `uname -n` = "zoro" ]; then JOBS="-j8"; fi
+            ;;
+        B) # suffix for BUILDDIR
+            BUILDDIR_SUFFIX=${OPTARG}
             ;;
         F) # NEC Aurora VE or SX : add ftrace support (generate ftrace.out)
             NEC_FTRACE=1
@@ -218,6 +222,8 @@ fi
 
 #if [ "$DOTARGET" == "v" ]; then ; fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; BUILDDIR="${BUILDDIR}d"; fi
+if [ $NEC_FTRACE -gt 0 ]; then BUILDDIR="${BUILDDIR}F"; fi
+if [ "$BUILDDIR_SUFFIX" ]; then BUILDDIR="${BUILDDIR}${BUILDDIR_SUFFIX}"; fi
 
 if [ "$DOJUSTDOC" == "y" ]; then
     (
@@ -298,9 +304,9 @@ if [ "" ]; then
 fi
 #if [ "$NEC_FTRACE" -gt 0 ]; then
 if [ "$DOTARGET" = "a" -o "$DOTARGET" = "s" ]; then
-    #TESTRUNNER="VE_PROGINF=YES ${TESTRUNNER}" #works if used as bash -c ${TESTRUNNER}
-    export VE_PROGINF=YES;
-    export C_PROGINF=YES;
+    #TESTRUNNER="VE_PROGINF=DETAIL ${TESTRUNNER}" #works if used as bash -c ${TESTRUNNER}
+    export VE_PROGINF=DETAIL;
+    export C_PROGINF=DETAIL;
 else
     unset VE_PROGINF
     unset C_PROGINF
@@ -322,6 +328,7 @@ echo "PATH $PATH"
     echo "DODOC      $DODOC"
     echo "QUICK      $QUICK"
     echo "BUILDDIR   ${BUILDDIR}"
+    echo "BUILDDIR_SUFFIX ${BUILDDIR_SUFFIX}"
     echo "INSTALLDIR ${INSTALLDIR}"
     if [ $QUICK -lt 2 ]; then
         mkdir "${BUILDDIR}"
@@ -363,7 +370,7 @@ echo "PATH $PATH"
             #export CXXFLAGS="${CFLAGS} -mparallel-threshold=4096"
         fi
         # TODO proginf is not working automatically any more?
-        # -proginf  : Run with 'export VE_PROGINF=YES' to get some stats output
+        # -proginf  : Run with 'export VE_PROGINF=DETAIL' [or YES] to get some stats output
         # export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
         # export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
         export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
@@ -373,7 +380,7 @@ echo "PATH $PATH"
             #export CXXFLAGS="${CXXFLAGS} -ftrace"
             # at some point above was sufficent (ve.cmake) set things
             # TODO have ve.cmake etc do this NICELY with a cmake option...
-            VEPERF_DIR="/usr/uhome/aurora/mpc/pub/veperf/180218-ELF"
+            VEPERF_DIR="/usr/uhome/aurora/mpc/pub/veperf/latest"
             VEPERF_INC_DIR="${VEPERF_DIR}/include"
             VEPERF_LIB_DIR="${VEPERF_DIR}/lib"
             export CFLAGS="${CFLAGS} -I${VEPERF_INC_DIR} -DFTRACE -ftrace"
@@ -596,7 +603,7 @@ if [ "$BUILDOK" == "y" ]; then
         fi
         if [ $DOTEST -ge 3 ]; then
             if [ -x ./bench.sh ]; then
-                MKLDNN_VERBOSE=2 ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
+                MKLDNN_VERBOSE=2 ${TESTRUNNER} ./bench.sh -q${DOTARGET} -B${BUILDDIR} 2>&1 | tee "${BUILDDIR}/test3.log" || true
             fi
         fi
         echo "Tests done"
