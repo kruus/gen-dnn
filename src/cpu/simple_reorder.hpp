@@ -924,7 +924,6 @@ typename utils::enable_if<tag_i == any
         return success;
     }
 };
-#endif
 
 /* generic and direct-copy reorders */
 

@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 /*
   General architecture
@@ -754,3 +755,4 @@ template struct _ref_rnn_common_t<prop_kind::backward, data_type::f32, data_type
 }
 }
 }
+#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

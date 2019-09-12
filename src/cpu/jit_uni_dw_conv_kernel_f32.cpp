@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 #include "c_types_map.hpp"
 #include "nstl.hpp"
@@ -969,3 +970,4 @@ template struct jit_uni_dw_conv_bwd_weights_kernel_f32<sse41>;
 }
 }
 }
+#endif //!(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

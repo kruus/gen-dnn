@@ -19,7 +19,7 @@
 #include "simple_gemm_s8s8s32.hpp"
 
 #include "../gemm.hpp"
-#include "jit_generator.hpp"
+//#include "jit_generator.hpp"
 #include "math_utils.hpp"
 #include "mkldnn_thread.hpp"
 #include "mkldnn_types.h"

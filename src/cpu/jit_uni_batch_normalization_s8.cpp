@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 #include <assert.h>
 
@@ -579,3 +580,4 @@ template struct jit_uni_batch_normalization_s8_fwd_t<avx2>;
 }
 }
 }
+#endif //!(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

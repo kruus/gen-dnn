@@ -22,6 +22,12 @@ if(Threading_cmake_included)
 endif()
 set(Threading_cmake_included true)
 
+if(TRUE AND NECVE)
+    set(CMAKE_THREAD_PREFER_PTHREAD 1)
+    set(THREADS_PREFER_PTHREAD_FLAG 1)
+    set(Threads_FIND_QUIETLY FALSE)
+endif()    
+
 # Always require pthreads even for sequential threading (required for e.g.
 # std::call_once that relies on mutexes)
 find_package(Threads REQUIRED)

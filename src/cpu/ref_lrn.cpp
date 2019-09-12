@@ -43,12 +43,12 @@ static inline acc_data_t fast_negative_powf(
          * = sqrtf(1.0f / sqrtf(omega) / omega)
          * = sqrtf(1.0f / (sqrtf(omega) * omega))
          */
-    if (beta == 0.75f) {
+        if (beta == 0.75f) {
             Y = sqrtf(1.0f / (sqrtf(omega) * omega));
-    } else {
+        } else {
             Y = 1.0f / powf(omega, beta);
-    }
-    return Y;
+        }
+        return Y;
     };
 }
 
@@ -141,7 +141,6 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
             ker(&dst[off], mb, c, h, w);
         });
     }
-#endif
 }
 
 template <impl::data_type_t d_type>
@@ -232,7 +231,6 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
             ker(&diff_src[off], mb, c, h, w);
         });
     }
-#endif
 }
 
 template void ref_lrn_fwd_t<data_type::f32>::
@@ -280,4 +278,5 @@ execute_backward<format_tag::any>(const exec_ctx_t &ctx) const;
 }
 }
 }
-// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
+
+// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

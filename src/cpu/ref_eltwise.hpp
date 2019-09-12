@@ -140,15 +140,8 @@ struct ref_eltwise_bwd_t: public cpu_primitive_t {
                 && !has_zero_dim_memory();
             const bool use_generic = !use_dense_;
 
-#if 0
             if (use_generic && !one_of(diff_dst_d.ndims(), 4, 5))
                 return status::unimplemented;
-#else
-            // oops: following would FORCE all nondense to be jit impls !
-            //OK_AND(use_generic && !one_of(diff_dst_d.ndims(), 4, 5));
-            OK_AND(implication(use_generic, one_of(diff_dst_d.ndims(), 4, 5)));
-            if (!ok) return status::unimplemented;
-#endif
 
             return status::success;
         }

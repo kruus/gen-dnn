@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 #include <assert.h>
 
@@ -311,3 +312,4 @@ void prb_dump(const prb_t &p) {
 }
 }
 }
+#endif //!(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

@@ -20,12 +20,18 @@
 #include "nstl.hpp"
 #include "utils.hpp"
 
+#include "cpu_isa_traits.hpp"
+
+#if MKLDNN_CPU_GEMM_JIT
 #include "jit_generator.hpp"
+#endif // MKLDNN_CPU_GEMM_JIT
 
 #include "gemm.hpp"
 
+#if MKLDNN_CPU_GEMM_JIT
 #include "f32/jit_avx512_common_gemm_f32.hpp"
 #include "f32/jit_avx_gemm_f32.hpp"
+#endif // MKLDNN_CPU_GEMM_JIT
 #include "f32/ref_gemm_f32.hpp"
 
 #include "gemm_driver.hpp"
@@ -34,6 +40,11 @@
 
 #include "os_blas.hpp"
 #include "common/bfloat16.hpp"
+
+#define MKLDNN_TRACE_EXTENDED_SGEMM 1
+#if MKLDNN_TRACE_EXTENDED_SGEMM
+#include <stdio.h>
+#endif
 
 namespace mkldnn {
 namespace impl {
@@ -83,7 +94,7 @@ mkldnn_status_t check_gemm_input(const char *transa, const char *transb,
     if (!consistency)
         return mkldnn_invalid_arguments;
 
-        return mkldnn_success;
+    return mkldnn_success;
 }
 
 mkldnn_status_t check_gemm_x8x8x32_input(const char *offsetc,
@@ -98,7 +109,6 @@ mkldnn_status_t check_gemm_x8x8x32_input(const char *offsetc,
     return check_gemm_input(transa, transb, M, N, K, lda, ldb, ldc, alpha,
         beta, with_bias);
 }
-#endif
 
 mkldnn_status_t extended_sgemm(const char *transa, const char *transb,
         const int *M, const int *N, const int *K, const float *alpha,
@@ -111,35 +121,56 @@ mkldnn_status_t extended_sgemm(const char *transa, const char *transb,
         return status;
 
 #ifdef USE_CBLAS
-    if (!force_jit_nocopy_gemm) {
+    auto packed_A = *transa == 'p' || *transa == 'P';
+    auto packed_B = *transb == 'p' || *transb == 'P';
+    if (!force_jit_nocopy_gemm && !(packed_A || packed_B)) {
         bool trA = *transa == 't' || *transa == 'T';
         bool trB = *transb == 't' || *transb == 'T';
-    CBLAS_TRANSPOSE Cblas_trA = trA ? CblasTrans : CblasNoTrans;
-    CBLAS_TRANSPOSE Cblas_trB = trB ? CblasTrans : CblasNoTrans;
-    cblas_sgemm(CblasColMajor, Cblas_trA, Cblas_trB,
-            *M, *N, *K, *alpha, A, *lda, B, *ldb, *beta, C, *ldc);
+        CBLAS_TRANSPOSE Cblas_trA = trA ? CblasTrans : CblasNoTrans;
+        CBLAS_TRANSPOSE Cblas_trB = trB ? CblasTrans : CblasNoTrans;
+#if MKLDNN_TRACE_EXTENDED_SGEMM
+        printf("cblas_sgemm(%d,%c,%c;MNK=%d,%d,%d;alpha=%f"
+               ",A@ld=%d,B@ld=%d,beta=%f,C@ld=%d)\n",
+               CblasColMajor,*transa,*transb, *M,*N,*K, *alpha,
+               *lda,*ldb, *beta, *ldc);
+#endif
+        cblas_sgemm(CblasColMajor, Cblas_trA, Cblas_trB,
+                *M, *N, *K, *alpha, A, *lda, B, *ldb, *beta, C, *ldc);
+        //cblas_sgemm(CblasRowMajor, Cblas_trA, Cblas_trB,
+        //        *M, *N, *K, *alpha, A, *lda, B, *ldb, *beta, C, *ldc);
 
-    if (bias) {
+        if (bias) {
             // Add bias if necessary (bias is applied to columns of C)
             int incx = 1, incy = 1;
             parallel_nd(*N, [&](int n) {
                 ptrdiff_t offset = (ptrdiff_t)n * (*ldc);
                 cblas_saxpy(*M, 1.0, bias, incx, C + offset, incy);
             });
-    }
+        }
         status = mkldnn_success;
     }
     else
 #endif
     {
-    if (mayiuse(sse41)) {
+    if (JITFUNCS>=0 && mayiuse(sse41)) {
         float *dummy_ao = NULL;
         float *dummy_bo = NULL;
 
+#if MKLDNN_TRACE_EXTENDED_SGEMM
+        printf("gemm_driver(%c,%c,%s;MNK=%d,%d,%d;alpha=%f"
+               ",A@ld=%dx,B@ld=%dx,beta=%f,C@ld=%d,bias%s)\n",
+               *transa,*transb,(bias?"C":"x"), *M,*N,*K, *alpha,
+               *lda,*ldb, *beta, *ldc, (force_jit_nocopy_gemm?"(nocopy)":""));
+#endif
         status = gemm_driver(transa, transb, bias ? "C" : NULL, M, N, K, alpha,
                 A, lda, dummy_ao, B, ldb, dummy_bo, beta, C, ldc, bias,
                 force_jit_nocopy_gemm);
     } else {
+#if MKLDNN_TRACE_EXTENDED_SGEMM
+        printf("ref_gemm<float>(%c,%c;MNK=%d,%d,%d;alpha=%f"
+               ",A@ld=%d,B@ld=%d,beta=%f,C@ld=%d,bias)\n",
+               *transa,*transb, *M,*N,*K, *alpha, *lda,*ldb, *beta, *ldc);
+#endif
         status = ref_gemm<float>(transa, transb,
                 M, N, K, alpha, A, lda, B, ldb, beta, C, ldc, bias);
     }

@@ -21,7 +21,9 @@
 #include "common/bfloat16.hpp"
 #include "cpu_isa_traits.hpp"
 #include "gemm_info.hpp"
+#if MKLDNN_CPU_GEMM_JIT
 #include "jit_generator.hpp"
+#endif // MKLDNN_CPU_GEMM_JIT
 #include "mkldnn_thread.hpp"
 #include "mkldnn_types.h"
 #include "nstl.hpp"

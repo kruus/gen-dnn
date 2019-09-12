@@ -48,6 +48,9 @@
 using mkldnn::impl::f16_support::float16_t;
 using mkldnn::impl::bfloat16_t;
 
+/* Allow tests with certain generic properties */
+#define MKLDNN_TEST_BLOCKED_FORMATS 1
+
 #define MKLDNN_CHECK(f)               \
     do {                              \
         mkldnn_status_t s = (f);      \

@@ -241,7 +241,6 @@ CPU_INSTANTIATE_TEST_SUITE_P(Weights_1, reorder_simple_test_f32_f32,
             cfg_f32{fmt::giohw, fmt::goihw, {2, 32, 32, 3, 3}}
             )
         );
-#endif
 
 CPU_INSTANTIATE_TEST_SUITE_P(Weights_IOhw16o16i, reorder_simple_test_f32_f32,
         ::testing::Values(
@@ -255,7 +254,6 @@ CPU_INSTANTIATE_TEST_SUITE_P(Weights_IOhw16o16i, reorder_simple_test_f32_f32,
             cfg_f32{fmt::gIOhw16o16i, fmt::gOIhw16i16o, {2, 64, 64, 3, 3}}
             )
         );
-#endif
 
 
 CPU_INSTANTIATE_TEST_SUITE_P(Simple, reorder_simple_test_s32_s32,
@@ -264,7 +262,6 @@ CPU_INSTANTIATE_TEST_SUITE_P(Simple, reorder_simple_test_s32_s32,
             cfg_s32{fmt::nChw16c, fmt::nchw, {2, 64, 4, 4}}
             )
         );
-#endif
 
 CPU_INSTANTIATE_TEST_SUITE_P(Simple, reorder_simple_test_s8_s8,
         ::testing::Values(
@@ -274,7 +271,6 @@ CPU_INSTANTIATE_TEST_SUITE_P(Simple, reorder_simple_test_s8_s8,
             cfg_s8{fmt::gOIhw4i16o4i, fmt::goihw, {2, 64, 64, 3, 3}}
             )
         );
-#endif
 
 GPU_INSTANTIATE_TEST_SUITE_P(Data, reorder_simple_test_f32_f32,
         ::testing::Values(

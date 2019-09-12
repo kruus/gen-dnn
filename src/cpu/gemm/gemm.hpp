@@ -50,6 +50,8 @@ mkldnn_status_t gemm_bf16bf16f32(
 
 #ifdef USE_CBLAS
 #define GEMM_IMPL_STR "gemm:blas"
+#elif defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS==JITFUNCS_NONE)
+#define GEMM_IMPL_STR "gemm:nojit"
 #else
 #define GEMM_IMPL_STR "gemm:jit"
 #endif

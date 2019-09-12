@@ -18,14 +18,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <math.h>
-#include <string.h>     /* strstr */
 
 #include "mkldnn.h"
-
-/** Set nonzero if you want to run valgrind.
- * Some things valgrind will not handle -- attempt to skip them
- * so you can still run under valgrind --lead-check=full ... */
-static int const want_valgrind = 1;
 
 #define CHECK(f) do { \
     mkldnn_status_t s = f; \
@@ -54,7 +48,6 @@ typedef float real_t;
 #define LENGTH_100 100
 
 void test1() {
-    TRACE("+test1");
     mkldnn_engine_t engine;
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0));
 
@@ -84,11 +77,9 @@ void test1() {
     CHECK(mkldnn_memory_destroy(m));
 
     CHECK(mkldnn_engine_destroy(engine));
-    TRACE("-test1");
 }
 
 void test2() {
-    TRACE("+test2");
     /* AlexNet: c3
      * {2, 256, 13, 13} (x) {384, 256, 3, 3} -> {2, 384, 13, 13}
      * pad: {1, 1}
@@ -116,7 +107,6 @@ void test2() {
 
     for (mkldnn_dim_t i = 0; i < c3_bias_sizes[0]; ++i) bias[i] = i;
 
-    TRACE("2:engine");
     mkldnn_engine_t engine;
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0));
 
@@ -128,20 +118,10 @@ void test2() {
     mkldnn_memory_desc_t c3_src_md, c3_weights_md, c3_bias_md, c3_dst_md, out_md;
     mkldnn_memory_t c3_src, c3_weights, c3_bias, c3_dst, out;
 
-#if MKLDNN_JIT_TYPES > 0
-    mkldnn_memory_format_t lay_src     = mkldnn_nChw8c;
-    mkldnn_memory_format_t lay_weights = (groups == 1 ? mkldnn_OIhw8i8o : mkldnn_gOIhw8i8o);
-    mkldnn_memory_format_t lay_bias    = mkldnn_x;
-    mkldnn_memory_format_t lay_c3dst   = mkldnn_nChw8c;
-    mkldnn_memory_format_t lay_out     = mkldnn_nchw;
-#else
-    mkldnn_memory_format_t lay_src     = mkldnn_nchw;
-    mkldnn_memory_format_t lay_weights = (groups == 1 ? mkldnn_oihw : mkldnn_goihw);
-    mkldnn_memory_format_t lay_bias    = mkldnn_x;
-    mkldnn_memory_format_t lay_c3dst   = mkldnn_nchw;
-    mkldnn_memory_format_t lay_out     = mkldnn_nchw;
-#endif
-
+    // No JIT types? perhaps should use:
+    // mkldnn_nChw8c            --> mkldnn_nchw
+    // mkldnn_[g]OIhw*          --> mkldnn_[g]oihw
+    //
     // src
     {
         CHECK(mkldnn_memory_desc_init_by_tag(&c3_src_md, 4, c3_src_sizes, mkldnn_f32, mkldnn_nChw8c));
@@ -244,13 +224,11 @@ void test2() {
         CHECK_TRUE(out_mem[off] == bias[c]);
     }
 
-    TRACE("-test2-a");
     free(src);
     free(weights);
     free(bias);
     free(dst);
     free(out_mem);
-    TRACE("-test2");
 }
 
 void test3() {
@@ -262,9 +240,8 @@ void test3() {
     CHECK_TRUE(src && dst);
 
     for (size_t i = 0; i < product(l2_data_sizes, 4); ++i)
-        src[i] = (real_t)((i % 13) + 1);
+        src[i] = (i % 13) + 1;
 
-    TRACE("3:engine");
     mkldnn_engine_t engine;
     CHECK(mkldnn_engine_create(&engine, mkldnn_cpu, 0));
 
@@ -283,7 +260,6 @@ void test3() {
     }
 
     /* create an lrn */
-    TRACE("3:lrn");
     mkldnn_lrn_desc_t l2_desc;
     mkldnn_primitive_desc_t l2_pd;
     mkldnn_primitive_t l2;
@@ -333,15 +309,13 @@ void test3() {
         CHECK_TRUE(diff/fabs(e) < 0.0125);
     }
 
-    TRACE("-test3-a");
     free(src);
     free(dst);
 }
 
 int main() {
     test1();
-    if (!want_valgrind) test2();
+    test2();
     test3();
-    test4();
     return 0;
 }

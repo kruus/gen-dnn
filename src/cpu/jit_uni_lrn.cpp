@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 #include "c_types_map.hpp"
 #include "type_helpers.hpp"
@@ -303,3 +304,4 @@ template struct jit_uni_lrn_bwd_t<avx2>;
 }
 
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+#endif //!(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

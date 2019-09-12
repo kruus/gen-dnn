@@ -1,1 +1,0 @@
-../cpu/gemm_u8s8s32x_inner_product.cpp

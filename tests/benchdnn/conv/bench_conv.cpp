@@ -27,7 +27,6 @@
 #include "parser.hpp"
 
 #include "conv/conv.hpp"
-#include "conv/input_conv.hpp"
 
 namespace conv {
 
@@ -79,22 +78,22 @@ void check_correctness(const desc_t *c) {
         const std::string cpp_pstr = ss.str();
         const char *pstr = cpp_pstr.c_str();
 
-    if (pattern && !match_regex(pstr, pattern))
-        return;
-    print(1, "run: %s\n", pstr);
+        if (pattern && !match_regex(pstr, pattern))
+            return;
+        print(1, "run: %s\n", pstr);
 
-    res_t res{};
+        res_t res{};
         const int status = doit(&p, &res);
 
-    bool want_perf_report = false;
-    parse_result(res, want_perf_report, allow_unimpl, status, pstr);
+        bool want_perf_report = false;
+        parse_result(res, want_perf_report, allow_unimpl, status, pstr);
 
         if (want_perf_report && bench_mode & PERF) {
             perf_report_t pr(perf_template);
             pr.report(&p, &res, pstr);
         }
 
-    benchdnn_stat.tests++;
+        benchdnn_stat.tests++;
     }
 }
 

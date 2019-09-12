@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 #include "mkldnn_types.h"
 
@@ -132,3 +133,4 @@ void jit_sse41_1x1_convolution_fwd_t::execute_forward(
 }
 }
 }
+#endif //!(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

@@ -1,1 +1,0 @@
-../cpu/ref_rnn.cpp

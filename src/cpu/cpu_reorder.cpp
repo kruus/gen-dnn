@@ -24,6 +24,7 @@
 
 #ifndef TARGET_VANILLA
 #include "cpu/jit_uni_reorder.hpp"
+#endif
 #include "cpu/simple_reorder.hpp"
 #include "cpu/wino_reorder.hpp"
 #include "cpu/rnn/rnn_reorders.hpp"
@@ -272,6 +273,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     REG_SR(u8, any, s32, any, fmt_order::any, spec::reference),
     REG_SR(u8, any, u8, any, fmt_order::any, spec::reference),
     REG_SR(u8, any, s8, any, fmt_order::any, spec::reference),
+#endif
 
     /* eol */
     nullptr,

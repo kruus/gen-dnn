@@ -16,6 +16,9 @@
 
 #ifndef CPU_JIT_GEMM_BF16_CONVOLUTION_HPP
 #define CPU_JIT_GEMM_BF16_CONVOLUTION_HPP
+#include "cpu_isa_traits.hpp"
+#if defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS==JITFUNCS_NONE)
+#else // assume x86 with bf16 support
 
 #include "c_types_map.hpp"
 #include "memory_tracking.hpp"
@@ -23,7 +26,6 @@
 #include "cpu_convolution_pd.hpp"
 #include "cpu_engine.hpp"
 #include "gemm_convolution_utils.hpp"
-#include "gemm/gemm.hpp"
 #include "jit_avx512_core_bf16cvt.hpp"
 #include "jit_uni_eltwise.hpp"
 #include "cpu_reducer.hpp"
@@ -398,4 +400,5 @@ private:
 }
 }
 
+#endif // defined(JITFUNCS) && JITFUNCS>=0
 #endif

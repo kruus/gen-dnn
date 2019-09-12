@@ -24,7 +24,9 @@
 #include "utils.hpp"
 
 #include "gemm/gemm.hpp"
-#include "gemm_inner_product_utils.hpp"
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#include "gemm_inner_product_utils.hpp" // provides pp_kernel
+#endif
 
 #include "cpu_inner_product_pd.hpp"
 #include "cpu_primitive.hpp"
@@ -104,6 +106,7 @@ private:
     void execute_forward(const exec_ctx_t &ctx) const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 
+    // Note: pp_kernel REQUIRES jit
     inner_product_utils::pp_kernel_t<data_type, data_type> *pp_kernel_;
     bool postops_in_ip_;
     float beta_;

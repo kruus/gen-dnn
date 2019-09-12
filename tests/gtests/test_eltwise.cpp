@@ -298,7 +298,13 @@ private:
 protected:
     virtual void SetUp() {
         data_type = data_traits<data_t>::data_type;
-
+#if ! MKLDNN_TEST_BLOCKED_FORMATS
+        auto constexpr blk = [](memory::format_tag const mft){
+            return mft > mkldnn_decab;
+        };
+        SKIP_IF(blk(p.data_format), "data_format is blocked");
+        SKIP_IF(blk(p.diff_format), "diff_format is blocked");
+#endif
         SKIP_IF(data_type == memory::data_type::f16
                 && get_test_engine_kind() == engine::kind::cpu,
                 "CPU does not support f16 data type.");
@@ -553,7 +559,6 @@ CPU_INST_TEST_CASE(Simple,
     PARAMS_ALL_ALG(nChw8c, nchw, 0.1f, 0.f, 2, 16, 4, 4),
     PARAMS_ALL_ALG(nchw, nchw, 0.1f, 0.f, 2, 16, 8, 8),
     PARAMS_ALL_ALG(nChw8c, nChw8c, 0.1f, 0.f, 2, 16, 16, 8),
-#endif
     PARAMS_ALL_ALG(nhwc, nchw, 0.1f, 0.f, 2, 16, 10, 8),
     PARAMS_ALL_ALG(nchw, nhwc, 0.1f, 0.f, 10, 10, 10, 10)
 );
@@ -563,7 +568,6 @@ CPU_INST_TEST_CASE(Simple_SDPART,
     PARAMS_ALL_ALG_SDPART(nChw8c, nchw, 0.1f, 0.f, 2, 16, 4, 4),
     PARAMS_ALL_ALG_SDPART(nchw, nchw, 0.1f, 0.f, 2, 16, 8, 8),
     PARAMS_ALL_ALG_SDPART(nChw8c, nChw8c, 0.1f, 0.f, 2, 16, 16, 8),
-#endif
     PARAMS_ALL_ALG_SDPART(nhwc, nchw, 0.1f, 0.f, 2, 16, 10, 8),
     PARAMS_ALL_ALG_SDPART(nchw, nhwc, 0.1f, 0.f, 10, 10, 10, 10)
 );

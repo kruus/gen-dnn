@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 #include "jit_avx512_core_x8s8s32x_deconvolution.hpp"
 
@@ -1032,3 +1033,4 @@ template struct _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<data_type::s8,
 }
 }
 }
+#endif //!(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

@@ -26,6 +26,7 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
+enum conv_gemm_loop_order_t { gemm_loop_rlb, gemm_loop_lrb };
 #ifndef TARGET_VANILLA
 /* convolution */
 enum conv_version_t {ver_unused, ver_fma, ver_avx512_core, ver_4fma, ver_vnni};
@@ -33,7 +34,6 @@ enum conv_loop_order_t {loop_cgn, loop_gnc, loop_ngc, loop_gncw, loop_cwgn,
                             loop_ngcw, loop_nhwcg, loop_nwcg};
 enum conv_1x1_loop_order_t {loop_rbl, loop_rlb, loop_lbr, loop_lrb, loop_blr,
                             loop_brl};
-enum conv_gemm_loop_order_t { gemm_loop_rlb, gemm_loop_lrb };
 
 enum conv_kernel_kind_t {embd_bcast, expl_bcast};
 enum conv_harness_t {harness_2d_reduction, harness_3d_reduction,
@@ -56,9 +56,9 @@ enum {
 };
 #endif
 
+#ifndef TARGET_VANILLA
 struct jit_conv_conf_t {
     prop_kind_t prop_kind;
-#ifndef TARGET_VANILLA
     conv_version_t ver;
     conv_loop_order_t loop_order;
     conv_harness_t harness;
@@ -468,6 +468,7 @@ struct jit_1x1_conv_call_s {
 };
 #endif
 
+#ifndef TARGET_VANILLA
 struct jit_pool_conf_t {
     int ndims;
     int mb, c;

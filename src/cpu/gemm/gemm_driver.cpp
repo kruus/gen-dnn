@@ -23,13 +23,15 @@
 
 #include "common/bfloat16.hpp"
 #include "f32/gemm_utils_f32.hpp"
+#if MKLDNN_CPU_GEMM_JIT
 #include "f32/jit_avx512_common_gemm_f32.hpp"
 #include "f32/jit_avx_gemm_f32.hpp"
+#include "jit_generator.hpp"
+#endif // MKLDNN_CPU_GEMM_JIT
 #include "gemm_info.hpp"
 #include "gemm_threading.hpp"
 #include "gemm_partition.hpp"
 #include "gemv_driver.hpp"
-#include "jit_generator.hpp"
 #include "mkldnn_traits.hpp"
 #include "mkldnn_types.h"
 #include "nstl.hpp"
@@ -1474,6 +1476,7 @@ template <typename a_type, typename b_type, typename c_type>
 static mkldnn_status_t call_no_copy_sgemm(
         gemm_info_t<a_type, b_type, c_type> *arg) {
 
+#if MKLDNN_CPU_GEMM_JIT
     if (arg->packing == pack_type::none) {
         int m_s32 = (int) arg->m;
         int n_s32 = (int) arg->n;
@@ -1498,8 +1501,9 @@ static mkldnn_status_t call_no_copy_sgemm(
                     (float *) arg->a, &lda_s32,
                     (float *) arg->b, &ldb_s32,
                     &arg->beta, (float *) arg->c, &ldc_s32, (float *) arg->co);
-    } else
-        return pack_no_copy(arg);
+    }
+#endif // MKLDNN_CPU_GEMM_JIT
+    return pack_no_copy(arg);
 }
 
 template <typename a_type, typename b_type, typename c_type>
@@ -1660,6 +1664,7 @@ static mkldnn_status_t gemm_threading_driver(
     // OMP overhead that can occur due to changing thread counts.
     int nthr_spawn = (is_a_packed || is_b_packed) ? nthr_max : nthr_goal;
 
+    // THIS ALWAYS INVOKES a JIT impl
     parallel(nthr_spawn, [&](int ithr, int nthr) {
         int nthr_eff = force_threading ? nthr_goal : nstl::min(nthr_goal, nthr);
 
@@ -1726,7 +1731,7 @@ static mkldnn_status_t gemm_threading_driver(
                     //  threads being spawned than expected.
                     assert(data_traits<a_type>::data_type == data_type::f32);
                     assert(arg->packing == pack_type::none);
-
+#if MKLDNN_CPU_GEMM_JIT
                     if (mayiuse(avx512_core)) {
                         avx512_common_gemm_f32::sgemm_nocopy_driver(
                                 arg->transa == no_trans ? "N" : "T",
@@ -1747,6 +1752,9 @@ static mkldnn_status_t gemm_threading_driver(
                                 NULL, NULL);
                     }
                     thread_arg[ithr].result = mkldnn_success;
+#else
+                    thread_arg[ithr].result = mkldnn_invalid_arguments;;
+#endif // MKLDNN_CPU_GEMM_JIT
                     break;
                 }
 

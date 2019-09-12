@@ -182,8 +182,8 @@ struct ref_deconvolution_fwd_t: public cpu_primitive_t {
                 && is_fwd()
                 && utils::one_of(desc()->alg_kind,
                                  alg_kind::deconvolution_direct,
-                                 alg_kind::deconvolution_winograd));
-            OK_AND(attr()->post_ops_.has_default_values());
+                                 alg_kind::deconvolution_winograd)
+                && attr()->post_ops_.has_default_values();
 
             if (ok) {
                 CHECK(init_convolution());

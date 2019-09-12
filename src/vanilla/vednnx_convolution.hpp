@@ -83,12 +83,12 @@ struct vednnx_convolution_fwd_t: public cpu_primitive_t {
                         this->cdesc_().src_desc.data_type,
                         this->cdesc_().weights_desc.data_type,
                         this->cdesc_().dst_desc.data_type));
-            AND_(utils::implication(this->with_bias(), data_type::f32
+            AND_(IMPLICATION(this->with_bias(), data_type::f32
                         == this->cdesc_().bias_desc.data_type));
             AND_(this->src_pd_.desc()->format == src_format());
             AND_(this->dst_pd_.desc()->format == src_format());
             AND_(this->weights_pd_.desc()->format == wei_format());
-            AND_(utils::implication(this->with_bias(), data_type::f32
+            AND_(IMPLICATION(this->with_bias(), data_type::f32
                         == this->cdesc_().bias_desc.data_type));
             // libvednn convolution ONLY supports nchw memory format
             // TODO: add aligned-pointers new format to allow fast VE impls
@@ -312,7 +312,7 @@ struct vednnx_convolution_bwd_weights_t: public cpu_primitive_t {
                         this->desc()->src_desc.data_type,
                         this->desc()->diff_weights_desc.data_type,
                         this->desc()->diff_dst_desc.data_type));
-            AND_(utils::implication(this->with_bias(),
+            AND_(IMPLICATION(this->with_bias(),
                         data_type::f32 == this->desc()->diff_bias_desc.data_type));
             AND_(this->src_pd_.desc()->format == src_format());
             AND_(this->diff_dst_pd_.desc()->format == src_format());

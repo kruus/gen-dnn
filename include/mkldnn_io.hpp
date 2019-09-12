@@ -25,19 +25,14 @@ namespace mkldnn {
 
     CIO_OP(status)
         CIO_OP(data_type)
-        CIO_OP(memory_format)
-        CIO_OP(padding_kind)
         CIO_OP(prop_kind)
         CIO_OP(primitive_kind)
         CIO_OP(alg_kind)
-        CIO_OP(batch_normalization_flag)
         CIO_OP(engine_kind)
-        CIO_OP(stream_kind)
         CIO_OP(query)
 #undef CIO_OP
     // ------------- more complex types ------------------
     std::ostream& operator<<(std::ostream& os, mkldnn_dims_t const dims) MKLDNN_API;
-    std::ostream& operator<<(std::ostream& os, mkldnn_strides_t const strides) MKLDNN_API;
     std::ostream& operator<<(std::ostream& os, mkldnn_blocking_desc_t const& bd) MKLDNN_API;
     std::ostream& operator<<(std::ostream& os, mkldnn_memory_desc_t const& md) MKLDNN_API;
 
@@ -46,7 +41,7 @@ namespace mkldnn {
     std::ostream& operator<<(std::ostream& os, mkldnn_primitive const& prim) MKLDNN_API;
     /** print a 'typedef mkldnn_primitive* mkldn_primitive_t' */
     std::ostream& operator<<(std::ostream& os, mkldnn_primitive_t const prim) MKLDNN_API;
-    std::ostream& operator<<(std::ostream& os, mkldnn_primitive_at_t const& prim) MKLDNN_API;
+    //std::ostream& operator<<(std::ostream& os, mkldnn_primitive_at_t const& prim) MKLDNN_API;
 }//mkldnn::
 #endif // MKLDNN_IO
 #endif // MKLDNN_IO_HPP

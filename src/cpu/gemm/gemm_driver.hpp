@@ -17,9 +17,22 @@
 #ifndef GEMM_DRIVER_HPP
 #define GEMM_DRIVER_HPP
 
+#include "cpu_isa_traits.hpp"
 #include "gemm_info.hpp"
 #include "gemm_pack_storage.hpp"
 #include "mkldnn_types.h"
+
+#if defined(MKLDNN_CPU_GEMM_JIT)
+#undef MKLDNN_CPU_GEMM_JIT
+#define MKLDNN_CPU_GEMM_JIT 1
+#elif defined(TARGET_VANILLA)
+#define MKLDNN_CPU_GEMM_JIT 0
+#else
+#define MKLDNN_CPU_GEMM_JIT 1
+#endif
+
+#define ASSERT_MKLDNN_CPU_GEMM_JIT static_assert \
+    ( MKLDNN_CPU_GEMM_JIT, "MKLDNN_CPU_GEMM_JIT required here" )
 
 namespace mkldnn {
 namespace impl {

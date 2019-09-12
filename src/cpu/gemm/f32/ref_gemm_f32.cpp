@@ -20,7 +20,10 @@
 #include "nstl.hpp"
 #include "utils.hpp"
 
+#include "cpu_isa_traits.hpp"
+#if !defined(TARGET_VANILLA) && !(defined(JITFUNCS) && JITFUNCS==JITFUNCS_VANILLA)
 #include "jit_generator.hpp"
+#endif
 
 #include "gemm_utils_f32.hpp"
 #include "ref_gemm_f32.hpp"
@@ -184,6 +187,10 @@ mkldnn_status_t ref_gemm(
         const int *N_, const int *K_, const data_t *alpha_, const data_t *A,
         const int *lda_, const data_t *B, const int *ldb_, const data_t *beta_,
         data_t *C, const int *ldc_, const data_t *bias) {
+
+    if (!( utils::one_of(*transa_, 'n', 'N', 't', 'T')
+           && utils::one_of(*transb_, 'n', 'N', 't', 'T')))
+        return mkldnn_unimplemented;
 
     bool isTransA = (*transa_ == 'T' || *transa_ == 't');
     bool isTransB = (*transb_ == 'T' || *transb_ == 't');

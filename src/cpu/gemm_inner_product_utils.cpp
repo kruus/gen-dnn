@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 #include "math_utils.hpp"
 #include "mkldnn_thread.hpp"
@@ -487,3 +488,4 @@ template class pp_kernel_t<f32, bf16>;
 }
 }
 }
+#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

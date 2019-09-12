@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 #include "c_types_map.hpp"
 #include "mkldnn_thread.hpp"
@@ -1426,3 +1427,4 @@ template struct jit_uni_eltwise_bwd_t<avx512_core, data_type::bf16>;
 }
 }
 }
+#endif //!(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

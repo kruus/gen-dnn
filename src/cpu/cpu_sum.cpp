@@ -18,7 +18,9 @@
 
 #include "cpu/ref_sum.hpp"
 #include "cpu/simple_sum.hpp"
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 #include "jit_avx512_core_bf16_sum.hpp"
+#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 namespace mkldnn {
 namespace impl {
@@ -29,8 +31,10 @@ using spd_create_f = mkldnn::impl::engine_t::sum_primitive_desc_create_f;
 namespace {
 #define INSTANCE(...) __VA_ARGS__::pd_t::create
 static const spd_create_f cpu_sum_impl_list[] = {
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     INSTANCE(jit_bf16_sum_t<data_type::bf16, data_type::bf16>),
     INSTANCE(jit_bf16_sum_t<data_type::bf16, data_type::f32>),
+#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     INSTANCE(simple_sum_t<data_type::bf16>),
     INSTANCE(simple_sum_t<data_type::bf16, data_type::f32>),
     INSTANCE(simple_sum_t<data_type::f32>),

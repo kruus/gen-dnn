@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2019 Intel Corporation
+* Copyright 2017-2018 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -17,29 +17,29 @@
 #ifndef OS_BLAS_HPP
 #define OS_BLAS_HPP
 
-/* Intel MKL-DNN provides gemm functionality on its own using jit generated
- * kernels. This is the only official supported option.
+/** \file
+ * Common stuff respecting USE_MKL and USE_CBLAS compile flags
  *
- * However, for the debugging purposes we keep (internally) an ability
- * to use cblas functions from the other libraries. The following macros
- * affect the behavior:
- * - USE_CBLAS allow using sgemm and other regular BLAS functionality
- * - USE_MKL (implies USE_CBLAS) same as above + allow using igemm and
- *   packed gemm from Intel MKL library.
+ *  USE_MKL  USE_CBLAS effect
+ *  -------  --------- ------
+ *  yes      yes       normal compile: jit *may* be preferred over Intel(R) MKL CBLAS
+ *  yes      no        jit calls OK; assert if cblas is ever called
+ *  no       yes       system-dependent CBLAS
+ *  no       no        gemm convolution (or other blas) N/A; create stubs
  */
 
 #if defined(USE_MKL)
 
-#if !defined(USE_CBLAS)
-#define USE_CBLAS
-#endif
-
-#include "mkl_cblas.h"
 #include "mkl_version.h"
 
-#define USE_MKL_PACKED_GEMM (INTEL_MKL_VERSION >= 20190001)
+#define USE_MKL_PACKED_GEMM (INTEL_MKL_VERSION >= 20170000)
 #define USE_MKL_IGEMM \
     (INTEL_MKL_VERSION >= 20180000 && __INTEL_MKL_BUILD_DATE >= 20170628)
+
+#include "mkl_cblas.h"
+#if !defined(USE_CBLAS)
+#define cblas_sgemm(...) assert(!"CBLAS is unavailable")
+#endif
 
 #else /* defined(USE_MKL) */
 
@@ -52,14 +52,39 @@
 extern "C" {
 #endif
 
-#include "cblas.h"
+#include "cblas.h" /* Maybe a system/cmake cblas works for you? */
 
 #if defined(_SX)
 }
 #endif
 
+#else /* defined(USE_CBLAS) */
+
+/* put the stubs to make a code compilable but not workable */
+#define cblas_sgemm(...) assert(!"CBLAS is unavailable")
+
 #endif /* defined(USE_CBLAS) */
 #endif /* defined(USE_MKL) */
+
+namespace mkldnn {
+namespace impl {
+namespace cpu {
+
+#if defined(USE_MKL) && defined(USE_CBLAS)
+typedef MKL_INT cblas_int;
+
+#elif defined(USE_CBLAS)
+typedef int cblas_int;
+
+#if defined(_SX)
+/* this cblas.h is peculiar... */
+typedef CBLAS_ORDER CBLAS_LAYOUT;
+#endif
+#endif
+
+}
+}
+}
 
 #endif /* OS_BLAS_HPP */
 

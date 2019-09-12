@@ -14,6 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
+#if defined(JITFUNCS) && JITFUNCS>0
 #include "mkldnn_types.h"
 
 #include "c_types_map.hpp"
@@ -696,3 +697,4 @@ template struct gemm_bf16_convolution_bwd_weights_t<data_type::bf16>;
 }
 }
 }
+#endif // defined(JITFUNCS) && JITFUNCS>=0

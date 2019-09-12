@@ -24,8 +24,11 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
+#include "cpu_isa_traits.hpp"
 #include "gemm/gemm.hpp"
+#if !defined(TARGET_VANILLA) && !(defined(JITFUNCS) && JITFUNCS==JITFUNCS_VANILLA)
 #include "jit_generator.hpp"
+#endif
 #include "gemm_inner_product_utils.hpp"
 
 #include "cpu_inner_product_pd.hpp"

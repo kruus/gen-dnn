@@ -1,4 +1,3 @@
-# vim: et ts=4 sw=4
 #===============================================================================
 # Copyright 2016-2019 Intel Corporation
 #
@@ -15,7 +14,13 @@
 # limitations under the License.
 #===============================================================================
 
-cmake_minimum_required(VERSION 2.8.11)
+if (CMAKE_TOOLCHAIN_FILE)
+    cmake_minimum_required(VERSION 3.6)
+elseif (NECSX)
+    cmake_minimum_required(VERSION 3.8) # allow nicer Platform/SX-* files
+else()
+    cmake_minimum_required(VERSION 2.8.11)
+endif()
 
 if(POLICY CMP0022)
     cmake_policy(SET CMP0022 NEW)
@@ -43,8 +48,8 @@ if(POLICY CMP0066)
     cmake_policy(SET CMP0066 NEW)
 endif()
 
-set(PROJECT_NAME "Intel(R) MKL-DNN")
-set(PROJECT_FULL_NAME "Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)")
+set(PROJECT_NAME "GEN-DNN generic MKL-DNN)")
+set(PROJECT_FULL_NAME "Generic (Intel(R) MKL-DNN)")
 set(PROJECT_VERSION "1.0.0")
 
 set(LIB_NAME mkldnn)
@@ -59,6 +64,10 @@ endif()
 if (NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "Intel(R) MKL-DNN supports 64 bit platforms only")
 endif()
+
+# If enabled, generate a compile_commands.json file of the exact compiler
+# commands (for Makefile and Ninja generators)
+add_definitions(-DCMAKE_EXPORT_COMPILE_COMMANDS=1)
 
 message(STATUS "CMAKE_TOOLCHAIN_PREFIX = ${CMAKE_TOOLCHAIN_PREFIX}")
 if("${CMAKE_BUILD_TYPE}" STREQUAL "")
@@ -105,16 +114,18 @@ endif()
 
 include("cmake/utils.cmake")
 include("cmake/options.cmake")
+include("cmake/asm.cmake")
 include("cmake/OpenMP.cmake")
 include("cmake/TBB.cmake")
 include("cmake/OpenCL.cmake")
 include("cmake/platform.cmake")
 include("cmake/SDL.cmake")
-include("cmake/NLC.cmake")
+include("cmake/MKL.cmake")
+include("cmake/cblas.cmake")
+#include("cmake/NLC.cmake")
 include("cmake/Doxygen.cmake")
 include("cmake/version.cmake")
-
-# XXX hack
+# XXX hack (debug function to print various cmake things)
 include("Platform/SX-util.cmake")
 
 enable_testing()

@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0)) // difficult JIT entanglement
 
 /*
  * Cell execution of Vanilla RNN
@@ -21,7 +22,9 @@
 #include "math_utils.hpp"
 #include "mkldnn_thread.hpp"
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 #include "jit_uni_rnn_common_postgemm_dispatcher.hpp"
+#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 namespace mkldnn {
 namespace impl {
@@ -29,7 +32,9 @@ namespace cpu {
 
 using namespace mkldnn::impl::utils;
 using namespace mkldnn::impl::math;
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 using namespace rnn_utils;
+#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 template <>
 float activation<alg_kind::eltwise_relu, prop_kind::forward>(
@@ -111,3 +116,4 @@ rnn_postgemm_sig(rnn_postgemm_bwd_f32_t::rnn_postgemm) {
 }
 }
 }
+#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

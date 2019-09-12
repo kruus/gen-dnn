@@ -64,7 +64,11 @@ if(WIN32)
 endif()
 
 add_subdirectory(common)
-add_subdirectory(cpu)
+
+#add_subdirectory(cpu)
+# cpu/ or vanilla/ ?
+message(STATUS "CPU_DIR=${CPU_DIR}")
+add_subdirectory(${CPU_DIR})
 
 if(MKLDNN_GPU_RUNTIME STREQUAL "OCL")
     add_subdirectory(ocl)

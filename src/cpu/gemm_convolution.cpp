@@ -27,18 +27,6 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-#if ! USE_MKL && ! USE_CBLAS // provide empty stubs (init always will say "NO")
-#pragma warning "gemm_convolution stubs only -- (no MKL or CBLAS)"
-
-template <bool with_relu>
-void _gemm_convolution_fwd_t<with_relu>::execute_forward() {}
-
-void gemm_convolution_bwd_data_t::execute_backward_data() {}
-
-//void gemm_convolution_bwd_weights_t::execute_backward_weights() {}
-
-#else // some sort of gemm (jit? cblas?) is available
-
 using namespace mkldnn::impl::status;
 using namespace mkldnn::impl::memory_tracking::names;
 using namespace mkldnn::impl::utils;
@@ -100,7 +88,7 @@ void gemm_convolution_fwd_t::execute_forward(const exec_ctx_t &ctx) const {
                     jit_gemm_convolution_utils::im2col_3d<float>(
                             jcp, _src, _col, curr.od);
             }
-    const data_t one = 1.0;
+            const data_t one = 1.0;
 
             const int M = jcp.os * jcp.od;
             const size_t dst_step = jcp.oc * M;
@@ -204,13 +192,10 @@ void gemm_convolution_fwd_t::execute_forward(const exec_ctx_t &ctx) const {
                             curr.oc += step.oc)
                         inner_ker(spatial, curr, prev, step, end);
             }
-                else
+        else
             assert("Unknown loop order");
     });
 }
-template struct _gemm_convolution_fwd_t<true>;
-template struct _gemm_convolution_fwd_t<false>;
-#endif
 
 void gemm_convolution_bwd_data_t::execute_backward_data(
         const exec_ctx_t &ctx) const {
@@ -234,10 +219,10 @@ void gemm_convolution_bwd_data_t::execute_backward_data(
 
     const size_t work_amount = (size_t)jcp.ngroups * jcp.mb;
 
-        if (jcp.id > 1) {
+    if (jcp.id > 1) {
         const ptrdiff_t diff_src_sz = (ptrdiff_t)(work_amount * src_step);
         parallel_nd(diff_src_sz, [&](ptrdiff_t i) { diff_src[i] = (data_t)0; });
-        }
+    }
 
     parallel(jcp.nthr, [&](const int ithr, const int nthr) {
         data_t *_col = col + (ptrdiff_t)ithr * jcp.im2col_sz;
@@ -357,7 +342,7 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights(
             }
         } else {
             if (need_reduction && mkldnn_thr_syncable()) mkldnn_thr_barrier();
-            }
+        }
     });
 
     if (jcp.need_wei_reduction && !mkldnn_thr_syncable()) {
@@ -389,95 +374,24 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights(
 
     if (jcp.with_bias) {
         parallel_nd(jcp.ngroups, jcp.oc, [&](int g, int oc) {
-                data_t db = 0;
+            data_t db = 0;
             size_t offset_ = (size_t)g * dst_step + (size_t)oc * K;
-                for (int mb = 0; mb < jcp.mb; ++mb)
-                {
+            for (int mb = 0; mb < jcp.mb; ++mb)
+            {
                 size_t offset = offset_ + (size_t)mb * jcp.ngroups * dst_step;
-                    for (int od = 0; od < jcp.od; ++od)
-                    for (int oh = 0; oh < jcp.oh; ++oh)
-                    //OMPSIMD(reduction(+:db))//;
-                    PRAGMA_OMP_SIMD(reduction(+:db))
+                for (int od = 0; od < jcp.od; ++od)
+                for (int oh = 0; oh < jcp.oh; ++oh)
+                PRAGMA_OMP_SIMD(reduction(+:db))
                 for (int ow = 0; ow < jcp.ow; ++ow) {
-                        db += diff_dst[offset];
+                    db += diff_dst[offset];
                     offset++;
-                    }
                 }
-                //diff_bias[diff_bias_d.off(g*jcp.oc+oc)] = db;
-                diff_bias[g*jcp.oc+oc] = db;
+            }
+            diff_bias[g*jcp.oc+oc] = db;
         });
     }
 }
-#endif
-#if VE_OPENMP_BUG
-void gemm_convolution_bwd_weights_t::execute_backward_weights_bias() {
-    //auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
-    auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
-    //auto diff_weights = reinterpret_cast<data_t*>(this->memory(0));
-    auto diff_bias = reinterpret_cast<data_t *>(this->memory(1));
-
-    jit_gemm_conv_conf_t &jcp = this->conf_.jcp_;
-    const int K = jcp.os * jcp.od;
-    //const size_t src_step = jcp.ic * jcp.ih * jcp.iw * jcp.id;
-    const size_t dst_step = jcp.oc * K;
-    //const size_t weights_g_size = jcp.ic * jcp.oc * jcp.ks;
-
-    //const int k = jcp.os;
-    //const int N = jcp.oc;
-    //const int M = jcp.ic * jcp.ks;
-    //const int LDA = jcp.im2col_sz ? k : K;
-    //const data_t zero = 0.0, one = 1.0;
-
-    //data_t *col = nullptr, *wei_reduction = nullptr;
-    //ptrdiff_t wei_offset = 0;
-    //if (jcp.im2col_sz) {
-    //    col = (data_t *)this->scratchpad_->get();
-    //    wei_offset = jcp.im2col_sz * jcp.nthr;
-    //}
-    //if (jcp.need_wei_reduction)
-    //    wei_reduction = (data_t *)this->scratchpad_->get() + wei_offset;
-#if 0
-    // weights update, omp loop -- see 
-#endif
-#if 1
-    if (jcp.with_bias) {
-        const size_t work_amount = jcp.ngroups * jcp.oc;
-        OMP(parallel)//;
-        {
-            const int ithr = omp_get_thread_num();
-            const int nthr = omp_get_num_threads();
-            int g{0}, oc{0};
-            size_t start = 0, end = 0;
-            balance211(work_amount, nthr, ithr, start, end);
-            nd_iterator_init(start, g, jcp.ngroups, oc, jcp.oc);
-            for (size_t iwork = start; iwork < end; ++iwork) {
-                data_t db = 0;
-                size_t offset_ = (size_t)g*dst_step + (size_t)oc * K;
-                for (int mb = 0; mb < jcp.mb; ++mb)
-                {
-                    size_t offset = offset_ + (size_t)mb*jcp.ngroups*dst_step;
-                    for (int od = 0; od < jcp.od; ++od)
-                    for (int oh = 0; oh < jcp.oh; ++oh)
-                    //OMPSIMD(reduction(+:db))//;
-                    PRAGMA_OMP_SIMD(reduction(+:db))
-                    for (int ow = 0; ow < jcp.ow; ++ow)
-                    {
-                        db += diff_dst[offset];
-                        offset ++;
-                    }
-                }
-                //diff_bias[diff_bias_d.off(g*jcp.oc+oc)] = db;
-                diff_bias[g*jcp.oc+oc] = db;
-                nd_iterator_step(g, jcp.ngroups, oc, jcp.oc);
-            }
-        }
-    }
-#endif
-}
-#endif
-#endif
 
 }
 }
 }
-// vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s

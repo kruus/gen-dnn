@@ -195,20 +195,6 @@ int str2desc(desc_t *desc, const char *str, bool is_deconv) {
         d.dd = 0;
     }
 
-    // There are still some the have outsize < required [ejk]
-    // and we also have to avoid the output size being < 1
-    // (not sure if pad<0 every happened)
-#define CHK_Ox_Px(oh, ih,kh,sh,ph,dh) do \
-    { \
-        if( d.oh != compute_out(is_deconv, d.ih, d.kh, d.sh, d.ph, d.dh)) \
-        while( d.ph < 0 || (d.oh = \
-                    compute_out(is_deconv, d.ih, d.kh, d.sh, d.ph, d.dh)) < 1) \
-        ++d.ph; \
-    }while(0)
-    CHK_Ox_Px(oh, ih,kh,sh,ph,dh);
-    CHK_Ox_Px(ow, iw,kw,sw,pw,dw);
-    CHK_Ox_Px(od, id,kd,sd,pd,dd);
-
     *desc = d;
 
     return OK;
@@ -328,4 +314,3 @@ std::ostream &operator<<(std::ostream &s, const prb_t &p) {
 }
 
 }
-// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

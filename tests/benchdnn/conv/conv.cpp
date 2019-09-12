@@ -283,9 +283,9 @@ int fill_src(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
         res_t *r) {
     const bool extra_mem = mem_dt.dt() != mem_fp.dt();
     dnn_mem_t *p_mem_00 = extra_mem
-        ? new dnn_mem_t(mem_dt.md_, mkldnn_f32,
+            ? new dnn_mem_t(mem_dt.md_, mkldnn_f32,
                       get_default_tag(mem_dt.md_.ndims), engine_ref)
-        : &mem_fp;
+            : &mem_fp;
     dnn_mem_t &mem_00 = *p_mem_00;
 
     const auto &c = p->cfg[SRC];
@@ -319,9 +319,9 @@ int fill_wei(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
     const bool check_reorder = diff_data_type && !wino_s8 && !s8_s8;
 
     dnn_mem_t *p_mem_00 = check_reorder
-        ? new dnn_mem_t(mem_dt.md_, mkldnn_f32,
+            ? new dnn_mem_t(mem_dt.md_, mkldnn_f32,
                       get_default_tag(mem_dt.md_.ndims), engine_ref)
-        : &mem_fp;
+            : &mem_fp;
     dnn_mem_t &mem_00 = *p_mem_00;
 
     const auto &c = p->cfg[WEI];
@@ -353,7 +353,7 @@ int fill_bia(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
     const bool extra_mem = mem_dt.dt() != mem_fp.dt();
     dnn_mem_t *p_mem_00 = extra_mem
             ? new dnn_mem_t(mem_dt.md_, mkldnn_f32, mkldnn_x, engine_ref)
-        : &mem_fp;
+            : &mem_fp;
     dnn_mem_t &mem_00 = *p_mem_00;
 
     const auto &c = p->cfg[BIA];
@@ -383,9 +383,9 @@ int fill_dst(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
         res_t *r) {
     const bool extra_mem = mem_dt.dt() != mem_fp.dt();
     dnn_mem_t *p_mem_00 = extra_mem
-        ? new dnn_mem_t(mem_dt.md_, mkldnn_f32,
+            ? new dnn_mem_t(mem_dt.md_, mkldnn_f32,
                       get_default_tag(mem_dt.md_.ndims), engine_ref)
-        : &mem_fp;
+            : &mem_fp;
     dnn_mem_t &mem_00 = *p_mem_00;
 
     const auto &c = p->cfg[DST];
@@ -634,13 +634,10 @@ int doit(const prb_t *p, res_t *r) {
         DNN_SAFE(execute_and_wait(c, stream_tgt, args.size(), args), WARN);
 
         if (bench_mode & CORR) {
-            print(55,"%s", "BWD_D CORR...");
             compute_ref_bwd_d(p, src_fp, wei_fp, bia_fp, dst_fp);
             dnn_mem_t src(src_dt, fp, src_tag, engine_ref);
             SAFE(compare_src(p, src, src_fp, r, true), WARN);
-            print(5,"%s", "BWD_D CORR...DONE");
         }
-        print(55,"%s", "BWD_D...DONE");
     } else if (p->dir & FLAG_BWD && p->dir & FLAG_WEI) {
         args.set(MKLDNN_ARG_SRC, src_dt.m_);
         args.set(MKLDNN_ARG_DIFF_DST, dst_dt.m_);
@@ -678,4 +675,3 @@ int doit(const prb_t *p, res_t *r) {
 }
 
 }
-// vim: et ts=4 sw=4 cindent cino=^l0,\:0,N-s

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 #include <assert.h>
 
@@ -1101,3 +1102,4 @@ void jit_avx512_core_f32_wino_conv_2x3_fwd_t::execute_forward_small_mb(
 } // namespace cpu
 } // namespace impl
 } // namespace mkldnn
+#endif //!(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

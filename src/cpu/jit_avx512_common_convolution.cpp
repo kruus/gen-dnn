@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 #include "c_types_map.hpp"
 #include "mkldnn_thread.hpp"
@@ -1729,3 +1730,4 @@ template struct jit_avx512_common_convolution_bwd_weights_t<data_type::f32>;
 }
 
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+#endif //!(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

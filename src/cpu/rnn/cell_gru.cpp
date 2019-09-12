@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 /*
  * Cell execution GRU
@@ -146,3 +147,4 @@ rnn_cell_execution_sig(ref_rnn_bwd_f32_t::cell_execution_gru) {
 }
 }
 }
+#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

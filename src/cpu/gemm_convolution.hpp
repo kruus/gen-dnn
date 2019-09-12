@@ -164,7 +164,7 @@ struct gemm_convolution_bwd_data_t: public cpu_primitive_t {
             return with_groups()
                 ? utils::pick(ndims() - 3, goiw, goihw, goidhw)
                 : utils::pick(ndims() - 3, oiw, oihw, oidhw);
-    }
+        }
     };
 
     gemm_convolution_bwd_data_t(const pd_t *apd)
@@ -225,8 +225,8 @@ struct gemm_convolution_bwd_weights_t: public cpu_primitive_t {
             return with_groups()
                 ? utils::pick(ndims() - 3, goiw, goihw, goidhw)
                 : utils::pick(ndims() - 3, oiw, oihw, oidhw);
-    }
-     };
+        }
+    };
 
     gemm_convolution_bwd_weights_t(const pd_t *apd)
         : cpu_primitive_t(apd, true) {}
@@ -247,5 +247,4 @@ private:
 }
 }
 
-// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
 #endif

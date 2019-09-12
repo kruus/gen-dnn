@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 #include "c_types_map.hpp"
 #include "math_utils.hpp"
@@ -419,3 +420,4 @@ status_t rnn_utils::set_expected_desc(rnn_conf_t &rnn,
 }
 }
 }
+#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

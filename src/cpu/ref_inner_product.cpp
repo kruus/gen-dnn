@@ -71,17 +71,17 @@ execute_forward(const exec_ctx_t &ctx) const {
                             break;
                         case 2:
                             d += (acc_data_t)src[src_d.off(mb, ic, kh, kw)]
-                                * weights[weights_d.off(oc, ic, kh, kw)];
+                                    * weights[weights_d.off(oc, ic, kh, kw)];
                             break;
                         case 1:
                             d += (acc_data_t)src[src_d.off(mb, ic, kw)]
                                     * weights[weights_d.off(oc, ic, kw)];
                             break;
                         default: assert(!"unsupported ndims size");
+                        }
                     }
                 }
             }
-        }
         }
         return d;
     };
@@ -105,9 +105,8 @@ execute_forward(const exec_ctx_t &ctx) const {
             a += ker_no_spatial(mb, oc);
         if (do_relu && a < (acc_data_t)0)
             a *= nslope;
-            dst[dst_d.off(mb, oc)] = saturate<dst_data_t>(a);
+        dst[dst_d.off(mb, oc)] = saturate<dst_data_t>(a);
     });
-#endif
 }
 
 using namespace data_type;
@@ -137,56 +136,6 @@ void ref_inner_product_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
             = utils::one_of(diff_src_d.ndims(), 3, 4, 5);
     const int ndims = diff_src_d.ndims() - 2;
 
-#if 0
-    OMP(parallel for collapse(2) schedule(static))//;
-    for (int mb = 0; mb < MB; ++mb) {
-        for (int ic = 0; ic < IC; ++ic) {
-            if (diff_src_has_spatial) {
-                const int KD = conf_.KD();
-                const int KH = conf_.KH();
-                const int KW = conf_.KW();
-                for (int kd = 0; kd < KD; ++kd)
-                for (int kh = 0; kh < KH; ++kh)
-                for (int kw = 0; kw < KW; ++kw) {
-                    acc_data_t ds = acc_data_t(0);
-                    for (int oc = 0; oc < OC; ++oc) {
-                        if (is_3d)
-                            ds += (acc_data_t)(diff_dst[diff_dst_d.off(mb, oc)]
-                                * weights[weights_d.off(oc, ic, kd, kh, kw)]);
-                        else
-                            ds += (acc_data_t)(diff_dst[diff_dst_d.off(mb, oc)]
-                                * weights[weights_d.off(oc, ic, kh, kw)]);
-                    }
-                    if (is_3d) diff_src[diff_src_d.off(mb, ic, kd, kh, kw)] =
-                        (diff_src_data_t)ds;
-                    else diff_src[diff_src_d.off(mb, ic, kh, kw)] =
-                        (diff_src_data_t)ds;
-                }
-            } else {
-                acc_data_t ds = acc_data_t(0);
-                for (int oc = 0; oc < OC; ++oc) {
-                    if (is_3d)
-                        ds += (acc_data_t)(diff_dst[diff_dst_d.off(mb, oc)]
-                            * weights[weights_d.off(oc, ic, kd, kh, kw)]);
-                    else
-                        ds += (acc_data_t)(diff_dst[diff_dst_d.off(mb, oc)]
-                            * weights[weights_d.off(oc, ic, kh, kw)]);
-                }
-                if (is_3d) diff_src[diff_src_d.off(mb, ic, kd, kh, kw)] =
-                    (diff_src_data_t)ds;
-                else diff_src[diff_src_d.off(mb, ic, kh, kw)] =
-                    (diff_src_data_t)ds;
-            }
-        } else {
-            acc_data_t ds = acc_data_t(0);
-            for (int oc = 0; oc < OC; ++oc) {
-                ds += (acc_data_t)(diff_dst[diff_dst_d.off(mb, oc)] *
-                    weights[weights_d.off(oc, ic)]);
-            }
-            diff_src[diff_src_d.off(mb, ic)] = (diff_src_data_t)ds;
-        }
-    }
-#else
     parallel_nd(MB, IC, [&](int mb, int ic) {
         if (diff_src_has_spatial) {
             const int KD = pd()->KD();
@@ -200,11 +149,11 @@ void ref_inner_product_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
                     switch (ndims) {
                     case 3:
                         ds += (acc_data_t)(diff_dst[diff_dst_d.off(mb, oc)]
-                            * weights[weights_d.off(oc, ic, kd, kh, kw)]);
+                                * weights[weights_d.off(oc, ic, kd, kh, kw)]);
                         break;
                     case 2:
                         ds += (acc_data_t)(diff_dst[diff_dst_d.off(mb, oc)]
-                            * weights[weights_d.off(oc, ic, kh, kw)]);
+                                * weights[weights_d.off(oc, ic, kh, kw)]);
                         break;
                     case 1:
                         ds += (acc_data_t)(diff_dst[diff_dst_d.off(mb, oc)]
@@ -237,7 +186,6 @@ void ref_inner_product_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
             diff_src[diff_src_d.off(mb, ic)] = (diff_src_data_t)ds;
         }
     });
-#endif
 }
 
 template struct ref_inner_product_bwd_data_t<f32, f32, f32, f32>;
@@ -262,45 +210,6 @@ void ref_inner_product_bwd_weights_t<data_type>::execute_backward_weights(
     const bool src_has_spatial = utils::one_of(src_d.ndims(), 3, 4 ,5);
     const int ndims = src_d.ndims() - 2;
 
-#if 0
-    OMP(parallel for collapse(2) schedule(static))//;
-    for (int oc = 0; oc < OC; ++oc) {
-        for (int ic = 0; ic < IC; ++ic) {
-            if (src_has_spatial) {
-                const int KD = conf_.KD();
-                const int KH = conf_.KH();
-                const int KW = conf_.KW();
-                for (int kd = 0; kd < KD; ++kd) {
-                    for (int kh = 0; kh < KH; ++kh) {
-                        for (int kw = 0; kw < KW; ++kw) {
-                            data_t *dw = is_3d
-                                ? &diff_weights[
-                                diff_weights_d.off(oc, ic, kd, kh, kw)]
-                                : &diff_weights[
-                                diff_weights_d.off(oc, ic, kh, kw)];
-                            *dw = data_t(0);
-                            for (int mb = 0; mb < MB; ++mb) {
-                                if (is_3d)
-                                    *dw += diff_dst[diff_dst_d.off(mb, oc)] *
-                                        src[src_d.off(mb, ic, kd, kh, kw)];
-                                else
-                                    *dw += diff_dst[diff_dst_d.off(mb, oc)] *
-                                        src[src_d.off(mb, ic, kh, kw)];
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            data_t *dw = &diff_weights[diff_weights_d.off(oc, ic)];
-            *dw = data_t(0);
-            for (int mb = 0; mb < MB; ++mb) {
-                *dw += diff_dst[diff_dst_d.off(mb, oc)] *
-                    src[src_d.off(mb, ic)];
-            }
-        }
-    }
-#else
     parallel_nd(OC, IC, [&](int oc, int ic) {
         if (src_has_spatial) {
             const int KD = pd()->KD();
@@ -354,7 +263,6 @@ void ref_inner_product_bwd_weights_t<data_type>::execute_backward_weights(
             }
         }
     });
-#endif
 
     if (diff_bias) {
         diff_bias += diff_bias_d.offset0();
@@ -373,4 +281,5 @@ template struct ref_inner_product_bwd_weights_t<data_type::f32>;
 }
 }
 }
+
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

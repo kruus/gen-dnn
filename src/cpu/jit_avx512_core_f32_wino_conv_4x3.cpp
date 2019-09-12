@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 #ifdef __INTEL_COMPILER
 #include <immintrin.h>
@@ -1028,3 +1029,4 @@ PRAGMA_OMP(parallel firstprivate(trans_ker_p))
 }
 }
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+#endif //!(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

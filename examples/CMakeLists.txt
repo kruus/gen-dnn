@@ -18,6 +18,8 @@ if (NOT MKLDNN_BUILD_EXAMPLES)
     return()
 endif()
 
+message(STATUS "examples CMAKE_EXE_LINKER_FLAGS = ${CMAKE_EXE_LINKER_FLAGS}")
+
 # propagate EXAMPLE specific flags
 append(CMAKE_C_FLAGS "${CMAKE_EXAMPLE_CCXX_FLAGS}")
 append(CMAKE_CXX_FLAGS "${CMAKE_EXAMPLE_CCXX_FLAGS}")

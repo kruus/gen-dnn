@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 /*
  * Cell execution LSTM
@@ -102,3 +103,4 @@ rnn_postgemm_sig(rnn_postgemm_bwd_f32_t::gru_lbr_postgemm) {
 }
 }
 }
+#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

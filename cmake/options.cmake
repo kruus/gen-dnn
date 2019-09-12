@@ -201,3 +201,9 @@ set(MKLDNN_USE_CLANG_SANITIZER "" CACHE STRING
     This feature is experimental and is only available on Linux.")
 
 option(_MKLDNN_USE_MKL "use BLAS functions from Intel MKL" OFF)
+
+option(MKLDNN_USE_CBLAS
+    "Use system cblas libraries.  This replaces many calls to mkl-dnns
+    built-in gemm_driver with calls to cblas_sgemm."
+    OFF)
+# vim: sw=4 ts=4 et

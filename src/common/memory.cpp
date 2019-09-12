@@ -107,10 +107,7 @@ status_t mkldnn_memory_desc_init_by_tag(memory_desc_t *memory_desc, int ndims,
     } else if (format_kind == format_kind::blocked) {
         status = memory_desc_wrapper::compute_blocking(md, tag);
     } else {
-#ifndef NDEBUG
-        printf("memory_desc_init: unhandled format %s\n",mkldnn_fmt2str(format));
         assert(!"unreachable");
-#endif
         status = invalid_arguments;
     }
 
@@ -118,7 +115,6 @@ status_t mkldnn_memory_desc_init_by_tag(memory_desc_t *memory_desc, int ndims,
         *memory_desc = md;
 
     return status;
-#undef AND_
 }
 
 status_t mkldnn_memory_desc_init_by_strides(memory_desc_t *memory_desc,

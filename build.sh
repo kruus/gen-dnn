@@ -4,14 +4,14 @@ ORIGINAL_CMD="$0 $*"
 DOTEST=0
 DODEBUG="n"
 DODOC="y"
-DONEEDMKL="y"
 DOJUSTDOC="n"
 DOWARN="y"
 BUILDOK="y"
 SIZE_T=32 # or 64, for -s or -S SX compile
 JOBS="-j8"
 CMAKETRACE=""
-USE_CBLAS=1
+USE_MKL="n" # _MKLDNN_USE_MKL is deprecated in v1.0, -M to try it anyway
+USE_CBLAS=0
 QUICK=0
 DOGCC_VER=0
 NEC_FTRACE=0
@@ -36,17 +36,34 @@ usage() {
     echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
 }
-while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
+while getopts ":hjgaSstvPdDqQTwWbF1567iMC" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
+        j) # force Intel x86 compile JIT (src/cpu/ JIT assembly code)
+            if [ ! "${DOTARGET}" == "x" ]; then echo "-j no good: already have -${DOTARGET}"; usage; fi
+            DOTARGET="j"
+            ;;
+        g) # force Intel x86 JIT compile for generic architecture
+            if [ ! "${DOTARGET}" == "x" ]; then echo "-g no good: already have -${DOTARGET}"; usage; fi
+            DOTARGET="g"
+            ;;
         a) # NEC Aurora VE
-            if [ "${DOTARGET}" == "j" ]; then VEJIT=100; else
-                if [ ! "${DOTARGET}" == "x" ]; then echo "-a no good: already have -${DOTARGET}"; usage; fi
-                VEJIT=0; # use something like #if DOJIT > 0 && defined(__ve) ...
-            fi
-            DOTARGET="a"; SIZE_T=64; DONEEDMKL="n"
+            if [ ! "${DOTARGET}" == "x" ]; then echo "-a no good: already have -${DOTARGET}"; usage; fi
+            DOTARGET="a"; SIZE_T=64;
             JOBS="-j1" # -j1 to avoid SIGSEGV in ccom
             if [ `uname -n` = "zoro" ]; then JOBS="-j8"; fi
+            ;;
+        S) # SX cross-compile (size_t=64, built in build-sx/, NEW: default if $CC==sxcc)
+            if [ ! "${DOTARGET}" == "x" ]; then echo "-S no good: already have -${DOTARGET}"; usage; fi
+            DOTARGET="s"; SIZE_T=64; JOBS="-j4"
+            ;;
+        s) # SX cross-compile (size_t=32, built in build-sx/) DISCOURAGED
+            if [ ! "${DOTARGET}" == "x" ]; then echo "-s no good: already have -${DOTARGET}"; usage; fi
+            # -s is NOT GOOD: sizeof(ptrdiff_t) is still 8 bytes!
+            DOTARGET="s"; SIZE_T=32; JOBS="-j4"
+            echo "*** WARNING ***"
+            echo "-s --> -size_t32 compilation NOT SUPPORTED (-S is recommended)"
+            echo "***************"
             ;;
         F) # NEC Aurora VE or SX : add ftrace support (generate ftrace.out)
             NEC_FTRACE=1
@@ -63,11 +80,8 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
             if [ ! "${DOTARGET}" == "x" ]; then echo "-v no good: already have -${DOTARGET}"; usage; fi
             if [ -d src/vanilla ]; then DOTARGET="v"; fi
             ;;
-        j) # force Intel [or Aurora libvednnx] JIT (src/cpu/ JIT assembly code)
-            if [ "${DOTARGET}" == "a" ]; then VEJIT=100; else
-                if [ ! "${DOTARGET}" == "x" ]; then echo "-j no good: already have -${DOTARGET}"; usage; fi
-                DOTARGET="j"; VEJIT=0; #DOJIT=100 # 100 means all JIT funcs enabled
-            fi
+        P) # Primitive extra tracing: VERBOSE_PRIMITIVE_CREATE, etc
+            VERBOSE_PRIMITIVE_CREATE=y
             ;;
         d) # [no] debug release
             DODEBUG="y"
@@ -81,32 +95,14 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
         Q) # really quick: skip build and doxygen docs [JUST run cmake and stop]
             BUILDOK="n"; DODOC="n"
             ;;
-        T) # cmake --trace
-            CMAKETRACE="--trace"
-            ;;
-        p) # permissive: disable the FAIL_WITHOUT_MKL switch
-            DONEEDMKL="n"
-            ;;
-        S) # SX cross-compile (size_t=64, built in build-sx/, NEW: default if $CC==sxcc)
-            if [ ! "${DOTARGET}" == "x" ]; then echo "-S no good: already have -${DOTARGET}"; usage; fi
-            DOTARGET="s"; DOJIT=0; SIZE_T=64; JOBS="-j4"
-            ;;
-        s) # SX cross-compile (size_t=32, built in build-sx/) DISCOURAGED
-            if [ ! "${DOTARGET}" == "x" ]; then echo "-s no good: already have -${DOTARGET}"; usage; fi
-            # -s is NOT GOOD: sizeof(ptrdiff_t) is still 8 bytes!
-            DOTARGET="s"; DOJIT=0; SIZE_T=32; JOBS="-j4"
-            echo "*** WARNING ***"
-            echo "-s --> -size_t32 compilation NOT SUPPORTED (-S is recommended)"
-            echo "***************"
-            ;;
-        r) # reference impls only: no -DUSE_CBLAS compile flag (->no im2col gemm)
-            USE_CBLAS=0
-            ;;
         w) # reduce compiler warnings
             DOWARN=0
             ;;
         W) # lots of compiler warnings (default)
             DOWARN=1
+            ;;
+        T) # cmake --trace
+            CMAKETRACE="--trace"
             ;;
         1) # make -j1
             JOBS="-j1"
@@ -123,18 +119,27 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
         i) # try using icc
             DOGCC_VER=icc
             ;;
+        M) # try _MKLDNN_USE_MKL [deprecated] option
+            USE_MKL="y"
+            ;;
+        C) # force -DUSE_CBLAS compile flag
+            USE_CBLAS=1
+            ;;
     h | *) # help
             usage
             ;;
     esac
 done
+# DOJIT, if defined, controls -DJITFUNCS_ANY=?? compile flag
+#      if undefined, default is set in cpu_isa_traits.hpp
+DOJIT=0
 # if unspecified, autodetect target via $CC compiler variable
 if [ "${DOTARGET}" == "x" ]; then
     if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
         DOTARGET="s" # s for SX (C/C++ code, cross-compile)
     elif [ "${CC}" == "ncc" -a "${CXX}" == "nc++" ]; then
         echo "auto-detected '-a' Aurora compiler (ncc, nc++)"
-        DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
+        DOTARGET="a"; DOJIT=-1; SIZE_T=64
         if [ `uname -n` = "zoro" ]; then JOBS="-j8"; else JOBS="-j1"; fi
         if [ -f vejit/include/vednn.h ]; then VEJIT=100; echo "auto-detected libvednn"; fi
     elif [ -d src/vanilla ]; then
@@ -146,30 +151,26 @@ fi
 if [ "${DOTARGET}" == "x" ]; then
     usage
 fi
-DOJIT=0
 INSTALLDIR=install
 BUILDDIR=build
-#if [ "`echo ${CC}`" == 'sxcc' -a ! "$DOTARGET" == "s" ]; then
-#    echo 'Detected $CC == sxcc --> SX compilation with 64-bit size_t'
-#    DOTARGET="s"; DOJIT=0; SIZE_T=64; JOBS="-j4"
-#fi
 #
 # I have not yet tried icc.
 # we MUST avoid the full MKL (omp issues) (mkldnn uses the mkl subset in external/)
 #
-if [ "${MKLROOT}" != "" ]; then
-	module unload icc >& /dev/null || echo "module icc unloaded"
-	if [ "${MKLROOT}" != "" ]; then
-		echo "Please compile in an environment without MKLROOT"
-		exit -1;
-	fi
-	# export -n MKLROOT
-	# export MKL_THREADING_LAYER=INTEL # maybe ???
-fi
+#if [ "${MKLROOT}" != "" ]; then
+#	module unload icc >& /dev/null || echo "module icc unloaded"
+#	if [ "${MKLROOT}" != "" ]; then
+#		echo "Please compile in an environment without MKLROOT"
+#		exit -1;
+#	fi
+#	# export -n MKLROOT
+#	# export MKL_THREADING_LAYER=INTEL # maybe ???
+#fi
+#     Now Ubuntu can install libmkl "somewhere" in your /opt/intel, and the FOOvar.sh script will set MKLROOT
 #
 #
 #
-if [ "$DOTARGET" == "s" ]; then DONEEDMKL="n"; DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx';
+if [ "$DOTARGET" == "s" ]; then DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx';
 elif [ "$DOTARGET" == "a" ]; then
     if [ "$VEJIT" -gt 0 ]; then
         INSTALLDIR="${INSTALLDIR}-vej"; BUILDDIR="${BUILDDIR}-vej";
@@ -204,8 +205,17 @@ else #if [ "$DOTARGET" != "a" ]; then
         if $(gcc-${DOGCC_VER} -v); then export CXX=g++-${DOGCC_VER}; export CC=gcc-${DOGCC_VER}; fi
     fi
     if [ "$DOTARGET" == "j" ]; then
-        DOJIT=100; INSTALLDIR="${INSTALLDIR}-jit"; BUILDDIR="${BUILDDIR}-jit";
+        DOJIT=0; INSTALLDIR="${INSTALLDIR}-jit"; BUILDDIR="${BUILDDIR}-jit";
     fi
+    if [ "$DOTARGET" == "g" ]; then
+        DOJIT=5;
+        INSTALLDIR="${INSTALLDIR}-gen"; BUILDDIR="${BUILDDIR}-gen";
+        DOTARGET="j" # we have DOJIT=0, but henceforth identical to -j
+    fi
+    if [ $USE_CBLAS -eq 1 ]; then
+        INSTALLDIR="${INSTALLDIR}-cblas"; BUILDDIR="${BUILDDIR}-cblas";
+    fi
+
 fi
 if [ ! "x${CC}" == "x" -a ! "`which ${CC}`" ]; then
     if [ -x ${CC} ]; then
@@ -316,33 +326,69 @@ echo "PATH $PATH"
     echo "# vim: set ro ft=log:"
     echo "DOTARGET   $DOTARGET"
     echo "DOJIT      $DOJIT"
-    echo "VEJIT      $VEJIT"
+    echo "USE_CBLAS  $USE_CBLAS"
+    echo "USE_MKL    $USE_MKL"
+    echo "VERBOSE_PRIMITIVE_CREATE $VERBOSE_PRIMITIVE_CREATE"
     echo "DOTEST     $DOTEST"
     echo "DODEBUG    $DODEBUG"
     echo "DODOC      $DODOC"
     echo "QUICK      $QUICK"
     echo "BUILDDIR   ${BUILDDIR}"
     echo "INSTALLDIR ${INSTALLDIR}"
+    echo "JOBS       ${JOBS}"
     if [ $QUICK -lt 2 ]; then
         mkdir "${BUILDDIR}"
     fi
     cd "${BUILDDIR}"
+    function ccxx_flags {                                                                                                                                          
+        export CFLAGS="${CFLAGS} $*"
+        export CXXFLAGS="${CXXFLAGS} $*"
+        echo "ccxx_flags CFLAGS --> ${CFLAGS}"
+    }
+    # iterator debug code ?
+    #ccxx_flags -DVERBOSE_PRIMITIVE_CREATE=1
+    if [ "VERBOSE_PRIMITIVE_CREATE" == "y" ]; then
+        ccxx_flags -DVERBOSE_PRIMITIVE_CREATE=1
+    fi
+
+    # NO! this is mkl-dnn "internal" from cmake/platform.cmake
+    #    CMAKEOPT="${CMAKEOPT} -DCMAKE_CCXX_FLAGS=-DJITFUNCS=${DOJIT}"                                      
+    ccxx_flags -DJITFUNCS=${DOJIT}
+
     # iterator debug code ?
     #export CFLAGS="${CFLAGS} -DVERBOSE_PRIMITIVE_CREATE=1"
     #export CXXFLAGS="${CXXFLAGS} -DVERBOSE_PRIMITIVE_CREATE=1"
 
     #
     # CMAKEOPT="" # allow user to pass flag, ex. CMAKEOPT='--trace -LAH' ./build.sh
-    CMAKEOPT="${CMAKEOPT} -DCMAKE_CCXX_FLAGS=-DJITFUNCS=${DOJIT}"
+    #CMAKEOPT="${CMAKEOPT} -DCMAKE_SRC_CCXX_FLAGS"
+    #CMAKEOPT="${CMAKEOPT} -DCMAKE_EXAMPLE_CCXX_FLAGS"
+    #CMAKEOPT="${CMAKEOPT} -DCMAKE_TEST_CCXX_FLAGS"
+    #CMAKEOPT="${CMAKEOPT} -DMKLDNN_=ON"  # def ON
+    #CMAKEOPT="${CMAKEOPT} -DMKLDNN_BUILD_EXAMPLES=ON"  # def ON
+    #CMAKEOPT="${CMAKEOPT} -DMKLDNN_BUILD_TESTS=ON"     # def ON
+    #CMAKEOPT="${CMAKEOPT} -DMKLDNN_BUILD_FOR_CI=OFF"   # def OFF
+    #CMAKEOPT="${CMAKEOPT} -DMKLDNN_CPU_RUNTIME=OMP"    # def [OMP] TBB
+    #CMAKEOPT="${CMAKEOPT} -DMKLDNN_GPU_RUNTIME=OCL"    # def [] OCL
+    CMAKEOPT="${CMAKEOPT} -DMKLDNN_WERROR=ON" # default OFF
     if [ $USE_CBLAS -ne 0 ]; then
-        export CFLAGS="${CFLAGS} -DUSE_CBLAS"
-        export CXXFLAGS="${CXXFLAGS} -DUSE_CBLAS"
+        CMAKEOPT="${CMAKEOPT} -DMKLDNN_USE_CBLAS=ON" # default OFF
     fi
-    if [ ! "$DOTARGET" == "j" ]; then
+    if [ $USE_MKL == "y" ]; then # deprecated in v1.0
+        CMAKEOPT="${CMAKEOPT} -D_MKLDNN_USE_MKL=ON"
+    fi
+    if [ "$DOJIT" == "0" ]; then
+        # this would NOT affect the jit generator
+        #CMAKEOPT="${CMAKEOPT} -DMKLDN_ARCH_OPT_FLAGS=\"\""
         CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
-        export CFLAGS="${CFLAGS} -DTARGET_VANILLA"
-        export CXXFLAGS="${CXXFLAGS} -DTARGET_VANILLA"
+        # TODO add an option for target CPU, 'NONE' ~ 'TARGET_VANILLA'
+        ccxx_flags -DTARGET_VANILLA
     fi
+    #if [ ! "$DOTARGET" == "j" ]; then
+    #    CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
+    #    export CFLAGS="${CFLAGS} -DTARGET_VANILLA"
+    #    export CXXFLAGS="${CXXFLAGS} -DTARGET_VANILLA"
+    #fi
     if [ "$DOTARGET" == "a" ]; then
         TOOLCHAIN=../cmake/ve.cmake
         if [ ! -f "${TOOLCHAIN}" ]; then echo "Ohoh. ${TOOLCHAIN} not found?"; BUILDOK="n"; fi
@@ -436,18 +482,15 @@ echo "PATH $PATH"
         CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=Release"
         #CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=RelWithDebInfo"
     fi
-    if [ "$DONEEDMKL" == "y" ]; then
-        CMAKEOPT="${CMAKEOPT} -DFAIL_WITHOUT_MKL=ON"
-    fi
-    #echo "DONEEDMKL = ${DONEEDMKL}"
-    #echo "CMAKEOPT  = ${CMAKEOPT}"
     # Remove leading whitespace from CMAKEENV (bash magic)
     shopt -s extglob; CMAKEENV=\""${CMAKEENV##*([[:space:]])}"\"; shopt -u extglob
     # Without MKL, unit tests take **forever**
     #    TODO: cblas / mathkeisan alternatives?
     if [ "$BUILDOK" == "y" ]; then
         BUILDOK="n"
-        if [ $QUICK -gt 1 ]; then # rebuild in existing directory, WITHOUT rerunning cmake
+        if [ $QUICK -gt 1 ]; then
+            rm -f ./stamp-BUILDOK
+            echo '# rebuild in existing directory, WITHOUT rerunning cmake'
             pwd
             { { make VERBOSE=1 ${JOBS} || make VERBOSE=1; } \
                 && BUILDOK="y" || echo "build failed: ret code $?"; }
@@ -465,12 +508,14 @@ echo "PATH $PATH"
                 && BUILDOK="y" || echo "build failed: ret code $?"; }
             set +x
         fi
-        # Make some assembly-source translations automatically...
-        #cxxfiles=`(cd ../tests/benchdnn && ls -1 conv/*conv?.cpp conv/*.cxx)`
-        #echo "cxxfiles = $cxxfiles"
-        (cd tests/benchdnn && { for f in conv/*conv?.cpp conv/*.cxx; do if -f "${f}"; then echo $f.s; make -j1 VERBOSE=1 $f.s; fi; done; }) || true
-        pwd
-        ls -l asm || true
+        if [ "$BUILDOK" == "y" ]; then
+            # Make some assembly-source translations automatically...
+            #cxxfiles=`(cd ../tests/benchdnn && ls -1 conv/*conv?.cpp conv/*.cxx)`
+            #echo "cxxfiles = $cxxfiles"
+            (cd tests/benchdnn && { for f in conv/*conv?.cpp conv/*.cxx; do if -f "${f}"; then echo $f.s; make -j1 VERBOSE=1 $f.s; fi; done; }) || true
+            pwd
+            ls -l asm || true
+        fi
 
     else # skip the build, just run cmake ...
         echo "CMAKEENV   <${CMAKEENV}>"
@@ -505,7 +550,7 @@ echo "PATH $PATH"
         #else
             { echo "api-c                ..."; ${TESTRUNNER} ${VE_EXEC} tests/api-c || BUILDOK="n"; }
         #fi
-        if [ $DOTEST -eq 0 -a $DOJIT -gt 0 ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
+        if [ $DOTEST -eq 0 -a $DOJIT -ge 0 ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
             { echo "simple-training-net-cpp ..."; ${TESTRUNNER}  ${VE_EXEC} examples/simple-training-net-cpp || BUILDOK="n"; }
         fi
     fi
@@ -514,13 +559,15 @@ echo "PATH $PATH"
         #find "${BUILDDIR}" -type d -exec chmod o+w {} \;
         { cd ..; find "${BUILDDIR}" -type d -exec chmod o+w {} \; ; }
     fi
-    if [ "$BUILDOK" == "y" ]; then
+    if [ "$BUILDOK" == "y" ]; then # communicate this to build.sh script
         touch ./stamp-BUILDOK
         sync ./stamp-BUILDOK
         if [ "$DODOC" == "y" ]; then
             echo "Build OK... Doxygen (please be patient)"
             make VERBOSE=1 doc >& ../doxygen.log
         fi
+    else
+        rm -f ./stamp-BUILDOK
     fi
     set +x
 ) 2>&1 | tee "${BUILDDIR}".log
@@ -552,8 +599,8 @@ echo "VE_EXEC    ${VE_EXEC}"
 
 echo "BUILDDIR   ${BUILDDIR}"
 echo "INSTALLDIR ${INSTALLDIR}"
-echo "DOTARGET=${DOTARGET}, DOJIT=${DOJIT}, DODEBUG=${DODEBUG}, DOTEST=${DOTEST}, DODOC=${DODOC}, DONEEDMKL=${DONEEDMKL}"
-LOGDIR="log-${DOTARGET}${DOJIT}${DODEBUG}${DOTEST}${DODOC}${DONEEDMKL}"
+echo "DOTARGET=${DOTARGET}, DOJIT=${DOJIT}, DODEBUG=${DODEBUG}, DOTEST=${DOTEST}, DODOC=${DODOC}"
+LOGDIR="log-${DOTARGET}${DOJIT}${DODEBUG}${DOTEST}${DODOC}"
 if [ "$BUILDOK" == "y" ]; then
     set -x
     echo "BUILDOK !    QUICK=$QUICK"
@@ -595,7 +642,7 @@ fi
 # maintain directories of "success" log files
 echo "BUILDDIR   ${BUILDDIR}"
 echo "INSTALLDIR ${INSTALLDIR}"
-echo "DOTARGET=${DOTARGET}, DOJIT=${DOJIT}, DODEBUG=${DODEBUG}, DOTEST=${DOTEST}, DODOC=${DODOC}, DONEEDMKL=${DONEEDMKL}"
+echo "DOTARGET=${DOTARGET}, DOJIT=${DOJIT}, DODEBUG=${DODEBUG}, DOTEST=${DOTEST}, DODOC=${DODOC}"
 if [ "${BUILDOK}" == "y" ]; then
     if [ $DOTEST -gt 0 ]; then
         echo "LOGDIR:       ${LOGDIR}" 2>&1 >> "${BUILDDIR}".log

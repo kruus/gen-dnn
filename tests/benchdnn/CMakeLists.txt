@@ -18,7 +18,7 @@ file(GLOB_RECURSE HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.hpp
     )
-file(GLOB SOURCES
+file(GLOB_RECURSE SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
     )
 include_directories(
@@ -86,8 +86,8 @@ function(register_benchdnn_test name engine cmd)
         add_custom_target(${benchdnn_target}
             COMMAND ${cmd}
             COMMAND ${cmd2} # if any
-    DEPENDS benchdnn
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+            DEPENDS benchdnn
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         )
 
         set_target_properties(${benchdnn_target} PROPERTIES

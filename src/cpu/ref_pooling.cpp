@@ -151,7 +151,6 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
             ker_avg(d, mb, oc, od, oh, ow);
         });
     }
-#endif
 }
 
 template <data_type_t data_type>
@@ -270,24 +269,7 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                 ker_max(d, mb, oc, od, oh, ow);
             }
         });
-#endif
     } else {
-#if 0
-        OMP(parallel for collapse(2) schedule(static))//;
-        for (int mb = 0; mb < MB; ++mb) {
-            for (int oc = 0; oc < OC; ++oc) {
-                if (is_3d) ker_zero_3d(mb, oc);
-                else ker_zero(mb, oc);
-                for (int od = 0; od < OD; ++od) {
-                    for (int oh = 0; oh < OH; ++oh) {
-                        for (int ow = 0; ow < OW; ++ow) {
-                            const data_t *d = is_3d
-                                ? &diff_dst[diff_dst_d.off(mb, oc, od, oh, ow)]
-                                : &diff_dst[diff_dst_d.off(mb, oc, oh, ow)];
-                            if (is_3d) ker_avg_3d(d, mb, oc, od, oh, ow);
-                            else ker_avg(d, mb, oc, oh, ow);
-                        }}}}}
-#else
         parallel_nd(MB, OC, [&](int mb, int oc) {
             ker_zero(mb, oc);
             for (int od = od_start; od < od_end; ++od)
@@ -299,7 +281,6 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                 ker_avg(d, mb, oc, od, oh, ow);
             }
         });
-#endif
     }
 }
 
@@ -315,4 +296,4 @@ template struct ref_pooling_bwd_t<data_type::bf16>;
 }
 }
 }
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
