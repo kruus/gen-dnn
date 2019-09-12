@@ -21,6 +21,13 @@
 
 #include "mkldnn.hpp"
 
+#if defined(GTEST_PERF) && !defined(LRN_CHECK)
+#define LRN_CHECK 0
+#endif
+#ifndef LRN_CHECK
+#define LRN_CHECK 1 /* Please leave at 1. 0 temporarily for performance test */
+#endif
+
 namespace mkldnn {
 
 enum {ACROSS=0,WITHIN=1};
@@ -141,8 +148,10 @@ protected:
                 (data_t *)l_src.get().get_data_handle());
         fill_data<data_t>(l_dst.get_size() / sizeof(data_t),
                 (data_t *)l_dst.get().get_data_handle());
+#if LRN_CHECK
         check_zero_tail<data_t>(1, l_src.get());
         check_zero_tail<data_t>(1, l_dst.get());
+#endif
 
         auto lrn_desc = lrn_forward::desc(p.aprop_kind, p.aalgorithm,
                 l_src_desc, ld.local_size, ld.alpha, ld.beta, ld.k);
@@ -164,10 +173,12 @@ protected:
             pipeline.push_back(l);
             s.submit(pipeline).wait();
         }
+#if LRN_CHECK
         check_zero_tail<data_t>(0, l_dst.get());
 
         check_lrn_fwd<data_t>(ld, l_src_desc, l_dst_desc, l_src.get(),
                 l_dst.get());
+#endif
     }
 };
 

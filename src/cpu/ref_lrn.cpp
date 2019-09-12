@@ -23,6 +23,14 @@
 
 #include "ref_lrn.hpp"
 
+#ifndef likely
+# define likely(x)              __builtin_expect(!!(x), 1)
+#endif
+//
+#ifndef unlikely
+# define unlikely(x)            __builtin_expect(!!(x), 0)
+#endif
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -59,12 +67,18 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
     const bool across_channels = conf_.desc()->alg_kind == lrn_across_channels;
     constexpr int blksize = fmt == nChw16c ? 16 : 8;
 
+#define KER_OC 0 /* 1 vectorizes across 0..C (not size) **much** faster */
+
     /** VE_VEC should be left at zero --
      * LRN length is typically 5, so vectorizing along this loop is a bad choice.
      * Instead, the parallelization should be done over \c (mb,oh,ow) leaving
      * threads with \c +/-half loop and an oc loop in the kernel. */
-#define KER_OC 1 /* 1 vectorizes across 0..C (not size) **much** faster */
 #define VE_VEC 0 /* if KER_OC==0, original used another lambda */
+
+
+
+
+
 #if KER_OC==0 || !defined(__ve) // still used in one place (convenience)
     auto data_off = [&](int mb, int c, int h, int w) -> size_t {
         switch (fmt) {
@@ -284,16 +298,18 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
             //    const int64_t vl=(C-b_oc < 256? C-b_oc: 256);
             //}
 
-            asm("### ker_oc across channels");
-            int64_t doffs[C]; // central offsets
-            ShortLoop() for(int i_oc=0; i_oc<C; ++i_oc){
+            //asm("### ker_oc across channels");
+            //bool ok[2*half_size+1];
+            //asm("### KER_OC across channels");
+            // vectorize over i_oc (likely larger)
+            ShortLoopTest()//;
+#if 0 // snc--> 0.40s
+            int doffs[C]; // central offsets
+            ShortLoopTest() for(int i_oc=0; i_oc<C; ++i_oc){
                 doffs[i_oc] = DATA_OFF(mb,i_oc,oh,ow);
             }
-            // vectorize over i_oc (likely larger)
-            ShortLoop()//;
-            for(int i_oc=0; i_oc<C; ++i_oc){
+            ShortLoopTest() for(int i_oc=0; i_oc<C; ++i_oc){
                 float sum = 0;
-#if 1
                 const int c_st = (i_oc-half_size   > 0? i_oc-half_size: 0);
                 const int c_en = (i_oc+half_size+1 < C? i_oc+half_size+1: C);
                 _Pragma("_NEC novector") UNROLL(5)//;
@@ -301,17 +317,97 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
                     const float s = src[doffs[c]];
                     sum += s * s;
                 }
-#else
-#endif
                 sum = k + alpha * sum / summands;
                 const size_t off = doffs[i_oc];
-                //auto d = &dst[off];
-                //size_t off = data_off(mb, i_oc, oh, ow);
                 if (ws)
                     ws[off] = static_cast<data_t>(sum);
-                //d[0] = static_cast<data_t>(src[off] * fast_negative_powf(sum, beta));
                 dst[off] = static_cast<data_t>(src[off] * fast_negative_powf(sum, beta));
             }
+#elif 1
+            if(unlikely(C > 256)){
+                int doffs[C]; // central offsets
+                for(int i_oc=0; i_oc<C; ++i_oc){
+                    doffs[i_oc] = DATA_OFF(mb,i_oc,oh,ow);
+                }
+                for(int i_oc=0; i_oc<C; ++i_oc){
+                    float sum = 0;
+                    const int c_st = (i_oc-half_size   > 0? i_oc-half_size: 0);
+                    const int c_en = (i_oc+half_size+1 < C? i_oc+half_size+1: C);
+                    _Pragma("_NEC novector") UNROLL(5)//;
+                    for (int c = c_st; c < c_en; ++c) {
+                        const float s = src[doffs[c]];
+                        sum += s * s;
+                    }
+                    sum = k + alpha * sum / summands;
+                    const size_t off = doffs[i_oc];
+                    if (ws)
+                        ws[off] = static_cast<data_t>(sum);
+                    dst[off] = static_cast<data_t>(src[off] * fast_negative_powf(sum, beta));
+                }
+            }else{
+                // C <= 256 can force doffs into a vector register (no call to grow stack)
+                int64_t vr_offs[256]; // central offsets
+#pragma _NEC vreg(vr_offs)
+                ShortLoop() for(int i_oc=0; i_oc<C; ++i_oc){
+                    vr_offs[i_oc] = DATA_OFF(mb,i_oc,oh,ow);
+                }
+                ShortLoop() for(int i_oc=0; i_oc<C; ++i_oc){
+                    float sum = 0;
+                    const int c_st = (i_oc-half_size   > 0? i_oc-half_size: 0);
+                    const int c_en = (i_oc+half_size+1 < C? i_oc+half_size+1: C);
+                    _Pragma("_NEC novector") //;UNROLL(5)//;
+                    for (int c = c_st; c < c_en; ++c) {
+                        const float s = src[vr_offs[c]];
+                        sum += s * s;
+                    }
+                    sum = k + alpha * sum / summands;
+                    if (ws)
+                        ws[vr_offs[i_oc]] = static_cast<data_t>(sum);
+                    dst[vr_offs[i_oc]] = static_cast<data_t>(
+                            src[vr_offs[i_oc]] * fast_negative_powf(sum, beta));
+                }
+            }
+#elif 0 //  dev... fastest vectorizes outer, not inner loop [common case: size~5]
+            int doffs[C]; // central offsets
+            ShortLoop() for(int i_oc=0; i_oc<C; ++i_oc){
+                doffs[i_oc] = DATA_OFF(mb,i_oc,oh,ow);
+            }
+            for(int i_oc=0; i_oc<C; ++i_oc){
+                float sum = 0;
+#if 0 // adding this unlikely optimization INSIDE will slow down the common case
+                if(unlikely(size > 32)){
+                    ShortLoopTest()// simple-net-c-->0.85s;
+                    for (int c = i_oc-half_size; c < i_oc+half_size+1; ++c) {
+                        //ok[c-i_oc-half_size] = (c >= 0 && c < C);
+                        if(c >= 0 && c < C)
+                            sum +=  src[doffs[c]] * src[doffs[c]];
+                    }
+                }else
+#endif
+                {
+                    _Pragma("_NEC novector") UNROLL(5)//; snc-->0.38s;
+                    for (int c = i_oc-half_size; c < i_oc+half_size+1; ++c) {
+                        //ok[c-i_oc-half_size] = (c >= 0 && c < C);
+                        if(c >= 0 && c < C)
+                            sum +=  src[doffs[c]] * src[doffs[c]];
+                    }
+                }
+                //asm("### sum");
+                sum = k + alpha * sum / summands;
+#if 0 // dbg
+                if(i_oc==0){  // yes, with ic96 do have VL 96
+                    int64_t vlen;
+                    asm("svl %%0\n\t"
+                            : "=r"(vlen) : : );
+                    printf("LRN KER_OC vlen = %d\n", vlen);
+                }
+#endif
+                const size_t off = doffs[i_oc];
+                if (ws)
+                    ws[off] = static_cast<data_t>(sum);
+                dst[off] = static_cast<data_t>(src[off] * fast_negative_powf(sum, beta));
+            }
+#endif
         } else {
             asm("### ker_oc across H, W");
             //printf("##### LRN_ACROSS_HW ######\n");
