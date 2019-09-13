@@ -38,13 +38,18 @@ AS_OPT+=-report-all
 #CC_OPT+=-report-all
 endif
 
+CHEADERS:=mkldnn_types.h
+CXXHEADERS:=c_types_map.hpp consistency.hpp conv_primitive_conf.hpp \
+	gemm_convolution.hpp gemm_convolution_utils.hpp memory_desc_wrapper.hpp \
+	mkldnn_traits.hpp primitive_attr.hpp scratchpad.hpp type_helpers.hpp \
+	verbose.hpp
 # assembly outputs for non-PIC are sometimes easier to understand
-%.o: % $(CHEADERS) $(CXXHEADERS)
+%.o: % | $(CHEADERS) $(CXXHEADERS) libvgemm.a
 	@#echo  "($(patsubst ncc%,ncc,$(CC)),ncc)" $(AS_OPT)
 	$(CXX) $(CXXFLAGS) $(OPT) $(INC) $(AS_OPT) -o $*.s -S $<
 	$(CXX) $(CXXFLAGS) $(OPT) $(INC) $(CC_OPT) -o $@ -c $*.s
 	ls -l *.L
-%.lo: % $(CHEADERS) $(CXXHEADERS)
+%.lo: % | $(CHEADERS) $(CXXHEADERS) ../libvgemm.so
 	$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $*.s -S $<
 	$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $@ -c $*.s 
 
@@ -52,6 +57,8 @@ endif
 libvgemm.a: ../vgemm/libvgemm.a
 	$(MAKE) -C ../vgemm
 	cp ../vgemm/$@ ./$@
+../libvgemm.so:
+	$(MAKE) -C ../vgemm
 clean:
 	rm -f *.o *.lo *.L *.s *.log
 realclean: clean
