@@ -8,10 +8,10 @@ all: $(OBJECTS) libvconv.a libvconv.so
 	@echo "make all DONE"
 force: realclean
 	$(MAKE)
-
+# link with something like:
+#     -lcconv -L/opt/nec/ve/nlc/2.0.0/include -lcblas -lblas_openmp
 libvconv.so: $(patsubst %.o,%.lo,$(OBJECTS))
 	$(CXX) -shared $(CXXFLAGS) $(OPT) $(INC) $(LDFLAGS) $^ \
-		-L/opt/nec/ve/nlc/2.0.0/include -lcblas -lblas_openmp \
 		-o $@
 
 # libvconv.a will contain libvgemm as required
@@ -29,29 +29,29 @@ AS_OPT:=
 
 # order matters here
 INC+=-I. -I../vgemm
-
 OPT+=-fopenmp -finline -finline-functions -O3 -DNDEBUG
-ifeq ($(CC:ncc%=ncc),ncc)
+
+ifeq ($(patsubst ncc%,ncc,$(CC)),ncc)
+$(info ncc compiler detected)
 INC+=-I/opt/nec/ve/nlc/2.0.0/include
-AS_OPT+=-freport-all
+AS_OPT+=-report-all
+#CC_OPT+=-report-all
 endif
 
 # assembly outputs for non-PIC are sometimes easier to understand
 %.o: % $(CHEADERS) $(CXXHEADERS)
-	$(CXX) $(CXXFLAGS) $(OPT) $(INC) $(ASOPT) -o $*.s -S $<
-	$(CXX) $(CXXFLAGS) $(OPT) $(INC) -o $@ -c $<
+	@#echo  "($(patsubst ncc%,ncc,$(CC)),ncc)" $(AS_OPT)
+	$(CXX) $(CXXFLAGS) $(OPT) $(INC) $(AS_OPT) -o $*.s -S $<
+	$(CXX) $(CXXFLAGS) $(OPT) $(INC) $(CC_OPT) -o $@ -c $*.s
+	ls -l *.L
 %.lo: % $(CHEADERS) $(CXXHEADERS)
 	$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $*.s -S $<
-	$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $@ -c $<
+	$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $@ -c $*.s 
 
 .PHONY:all Makefile ../vgemm force
-libvgemm.a: ../vgemm
+libvgemm.a: ../vgemm/libvgemm.a
 	$(MAKE) -C ../vgemm
 	cp ../vgemm/$@ ./$@
-#libvgemm.so: ../vgemm
-#	$(MAKE) -C ../vgemm
-#	cp ../vgemm/$@ ./$@
-#	@echo "*** WHY DO I NEED THIS? ***"
 clean:
 	rm -f *.o *.lo *.L *.s *.log
 realclean: clean

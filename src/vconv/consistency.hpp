@@ -1,3 +1,8 @@
+/*******************************************************************************
+* Copyright 2019 NEC Labs America
+*
+* BSD 2-clause license (as in vednn project)
+*******************************************************************************/
 #ifndef CONSISTENCY_HPP
 #define CONSISTENCY_HPP
 /** \file
