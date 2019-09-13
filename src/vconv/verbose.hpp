@@ -17,12 +17,15 @@
 #ifndef VERBOSE_HPP
 #define VERBOSE_HPP
 
+#define DISABLE_VERBOSE /* we avoid pulling in mkldnn debug headers */
+
 #if !defined(DISABLE_VERBOSE)
 #include "mkldnn_debug.h"
 #endif
+
 #include "c_types_map.hpp"
 #include "utils.hpp"
-#include "z_magic.hpp"
+//#include "z_magic.hpp"
 
 namespace mkldnn {
 namespace impl {

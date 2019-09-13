@@ -1,0 +1,4 @@
+All files in this directory are based on mkl-dnn sources, and include
+modifications made by NEC Labs (America and Japan).
+
+These files are under Apache License, Version 2.0.
