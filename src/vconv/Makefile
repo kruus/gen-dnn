@@ -45,6 +45,9 @@ CXXHEADERS:=c_types_map.hpp consistency.hpp conv_primitive_conf.hpp \
 	gemm_convolution.hpp gemm_convolution_utils.hpp memory_desc_wrapper.hpp \
 	mkldnn_traits.hpp primitive_attr.hpp scratchpad.hpp type_helpers.hpp \
 	verbose.hpp
+hdrs.log:
+	{ for f in ${CHEADERS}; do echo $$f; gcc -std=c11 -DTARGET=VANILLA ${INC} $$f 2>&1; done; } >& hdrs.log
+	{ for f in ${CXXHEADERS}; do echo $$f; g++ -std=c++11 -DTARGET=VANILLA ${INC} $$f 2>&1; done; } 2>&1 >> hdrs.log
 install: all
 	rm -rf $(INSTALLDIR)
 	mkdir -p $(INSTALLDIR)/include/gen-dnn/vconv
@@ -55,6 +58,7 @@ install: all
 	cp $(OBJECTS:.o=) $(INSTALLDIR)/src/gen-dnn/vconv/
 	@echo 'vconv package --> $(INSTALLDIR)/'
 
+.PHONY:all Makefile ../vgemm force ${CHEADERS} ${CXXHEADERS}
 # assembly outputs for non-PIC are sometimes easier to understand
 %.o: % | $(CHEADERS) $(CXXHEADERS) libvgemm.a
 	@#echo  "($(patsubst ncc%,ncc,$(CC)),ncc)" $(AS_OPT)
@@ -65,14 +69,15 @@ install: all
 	$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $*.s -S $<
 	$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $@ -c $*.s 
 
-.PHONY:all Makefile ../vgemm force
 libvgemm.a: ../vgemm/libvgemm.a
 	$(MAKE) -C ../vgemm
 	cp ../vgemm/$@ ./$@
 ../libvgemm.so:
 	$(MAKE) -C ../vgemm
 clean:
-	rm -f *.o *.lo *.L *.s *.log
+	rm -f *.o *.lo *.L *.s *.gch *.log
 realclean: clean
 	$(MAKE) -C ../vgemm realclean
 	rm -f libvgemm.a libvconv.a libvconv.so
+	rm -rf install
+# last line

@@ -19,7 +19,6 @@
 
 #define PARTIAL 2 /*0:fwd 1:add bwd_w 2:add bwd_d*/
 
-#include "cpu_isa_traits.hpp"
 #include "c_types_map.hpp"
 //#include "cpu_convolution_pd.hpp"
 //#include "cpu_engine.hpp"
@@ -491,7 +490,7 @@ struct gemm_convolution_bwd_data_t //: public cpu_primitive_t
             using namespace prop_kind;
             using namespace memory_format;
 
-            assert(this->engine()->kind() == engine_kind::cpu);
+            //assert(this->engine()->kind() == engine_kind::cpu);
 
             //bool ok = true
             Consistency ok; // default here is never-verbose
@@ -700,7 +699,7 @@ struct gemm_convolution_bwd_weights_t //: public cpu_primitive_t
             using namespace prop_kind;
             using namespace memory_format;
 
-            assert(this->engine()->kind() == engine_kind::cpu);
+            //assert(this->engine()->kind() == engine_kind::cpu);
 
             Consistency ok; // default here is never-verbose
 #define AND_(...) SCHKV(ok,__VA_ARGS__)

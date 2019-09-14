@@ -16,6 +16,7 @@
 *******************************************************************************/
 #ifndef GEMM_HPP
 #define GEMM_HPP
+#include "mkldnn_subset.h"
 namespace mkldnn {
 namespace impl {
 namespace cpu {

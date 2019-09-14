@@ -21,6 +21,7 @@
 #endif
 
 #include "mkldnn_types.h"
+#include "cpu_isa_traits.hpp"
 
 namespace mkldnn {
 namespace impl {

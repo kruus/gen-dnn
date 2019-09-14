@@ -23,8 +23,9 @@ CHEADERS:=mkldnn_os.h mkldnn_subset.h
 CXXHEADERS:=gemm.hpp gemm_utils.hpp \
 	mkldnn_subset.hpp os_blas.hpp utils.hpp nstl.hpp \
 	mkldnn_thread.hpp cpu_isa_traits.hpp
-
-.PHONY: all Makefile $(CHEADERS) $(CXXHEADERS)
+hdrs.log:
+	{ for f in ${CHEADERS}; do echo $$f; gcc -std=c11 -DTARGET=VANILLA ${INC} $$f 2>&1; done; } >& hdrs.log
+	{ for f in ${CXXHEADERS}; do echo $$f; g++ -std=c++11 -DTARGET=VANILLA ${INC} $$f 2>&1; done; } 2>&1 >> hdrs.log
 install: all
 	rm -rf $(INSTALLDIR)
 	mkdir -p $(INSTALLDIR)/include/gen-dnn/vgemm
@@ -35,6 +36,7 @@ install: all
 	cp $(OBJECTS:.o=) $(INSTALLDIR)/src/gen-dnn/vgemm/
 	@echo 'vgemm package --> $(INSTALLDIR)/'
 
+.PHONY: all Makefile $(CHEADERS) $(CXXHEADERS)
 # assembly outputs for non-PIC are sometimes easier to understand
 %.o: % | $(CHEADERS) $(CXXHEADERS)
 	$(CXX) $(CXXFLAGS) $(OPT) $(INC) $(AS_OPT) -o $*.s -S $<
@@ -43,7 +45,7 @@ install: all
 	$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $*.s -S $<
 	$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $@ -c $*.s
 clean:
-	rm -f *.o *.lo *.L *.s *.log
+	rm -f *.o *.lo *.L *.s *.log *.gch *.log
 realclean: clean
 	rm -f libvgemm.so libvgemm.a
 	rm -rf install

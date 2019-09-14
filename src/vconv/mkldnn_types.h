@@ -78,30 +78,6 @@ typedef enum {
     mkldnn_u8 = 6,
 } mkldnn_data_type_t;
 
-//@{
-/** Some platforms do not need all memory layouts.
- *
- * Testing without a full spectrum of JIT support can be quite slow.
- * In such cases, it can be useful to cut down tests to a subset of layouts,
- * especially since many of the interleaved formats cater to specific
- * simd lengths important for JIT impls.
- *
- * - 0 : no blocked (8,16) or interleaved data layouts for mkldnn_memory_format_t
- * - 1 : (TBD) add nChw8c and nChw16c
- * - ...
- * - 100 : full spectrum of data layouts (jit expects this)
- *
- * Now we test for "not one of", so all data layouts need to be defined.
- * We can still check MKLDNN_JIT_TYPES to enable testing subsets of memory layouts
- * This will speed up the already-slow testing for -DTARGET_VANILLA.
- */
-#ifdef TARGET_VANILLA
-#define MKLDNN_JIT_TYPES 0
-#else
-#define MKLDNN_JIT_TYPES 9
-#endif
-//@}
-
 /** Rounding mode */
 typedef enum {
     /** Round nearest */

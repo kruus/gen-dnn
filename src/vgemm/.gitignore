@@ -5,3 +5,4 @@
 *.so
 *.L
 install
+**.gch

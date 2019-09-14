@@ -313,11 +313,12 @@ struct c_compatible {
 
 inline void yield_thread() { }
 
-#if UTILS_HPP_INLINE_ONLY
+#if !UTILS_HPP_INLINE_ONLY
 int mkldnn_getenv(char *value, const char *name, int len);
 bool mkldnn_jit_dump();
 FILE *mkldnn_fopen(const char *filename, const char *mode);
 
+// Note: round_mode_t is in c_types_map.hpp, not avail within vgemm subset
 void set_rnd_mode(round_mode_t rnd_mode);
 void restore_rnd_mode();
 #endif // UTILS_HPP_INLINE_ONLY
