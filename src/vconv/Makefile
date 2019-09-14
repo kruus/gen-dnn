@@ -4,8 +4,9 @@ OBJECTS:=scratchpad.cpp.o 		memory_desc_wrapper.cpp.o \
 	gemm_convolution.cpp.o
 # gemm_convolution.cpp.o  will NOT compile (pulls too many headers)
 #
-all: $(OBJECTS) libvconv.a libvconv.so
-	@echo "make all DONE"
+all: build install
+build: $(OBJECTS) libvconv.a libvconv.so
+	@echo "make build DONE"
 force: realclean
 	$(MAKE)
 # link with something like:
@@ -26,6 +27,7 @@ libvconv.a: $(OBJECTS) libvgemm.a
 INC:=
 OPT:=
 AS_OPT:=
+INSTALLDIR:=./install
 
 # order matters here
 INC+=-I. -I../vgemm
@@ -43,6 +45,16 @@ CXXHEADERS:=c_types_map.hpp consistency.hpp conv_primitive_conf.hpp \
 	gemm_convolution.hpp gemm_convolution_utils.hpp memory_desc_wrapper.hpp \
 	mkldnn_traits.hpp primitive_attr.hpp scratchpad.hpp type_helpers.hpp \
 	verbose.hpp
+install: all
+	rm -rf $(INSTALLDIR)
+	mkdir -p $(INSTALLDIR)/include/gen-dnn/vconv
+	cp ${CHEADERS} ${CXXHEADERS} $(INSTALLDIR)/include/gen-dnn/vconv/
+	mkdir -p $(INSTALLDIR)/lib
+	cp libvconv.so libvconv.a $(INSTALLDIR)/lib/
+	mkdir -p $(INSTALLDIR)/src/gen-dnn/vconv
+	cp $(OBJECTS:.o=) $(INSTALLDIR)/src/gen-dnn/vconv/
+	@echo 'vconv package --> $(INSTALLDIR)/'
+
 # assembly outputs for non-PIC are sometimes easier to understand
 %.o: % | $(CHEADERS) $(CXXHEADERS) libvgemm.a
 	@#echo  "($(patsubst ncc%,ncc,$(CC)),ncc)" $(AS_OPT)
