@@ -26,6 +26,7 @@
 //#include "c_types_map.hpp"
 //#include "mkldnn_os.h"
 #include "mkldnn_subset.hpp"
+#define UTILS_HPP_INLINE_ONLY 1
 
 namespace mkldnn {
 namespace impl {
@@ -312,12 +313,15 @@ struct c_compatible {
 
 inline void yield_thread() { }
 
+#if UTILS_HPP_INLINE_ONLY
 int mkldnn_getenv(char *value, const char *name, int len);
 bool mkldnn_jit_dump();
 FILE *mkldnn_fopen(const char *filename, const char *mode);
 
 void set_rnd_mode(round_mode_t rnd_mode);
 void restore_rnd_mode();
+#endif // UTILS_HPP_INLINE_ONLY
+#undef UTILS_HPP_INLINE_ONLY
 
 }
 }

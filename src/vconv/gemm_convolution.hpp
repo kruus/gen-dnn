@@ -37,6 +37,10 @@
 #endif
 #endif
 
+/** try for an "easy-call" version.
+ * Plan is to eventually make this the main
+ * version for vednn and mkl-dnn gemm convolutions) */
+#define VCONV_STANDALONE 1
 namespace mkldnn {
 namespace impl {
 
@@ -331,7 +335,43 @@ using gemm_convolution_fwd_t =
 using gemm_convolution_relu_t =
                          _gemm_convolution_fwd_t<true>;
 
-}//cpu::
+}}}//mkldnn::impl::cpu::
+
+// in global namespace ::
+
+#if VCONV_STANDALONE
+typedef mkldnn::impl::cpu::_gemm_convolution_fwd_t<false>::data_type data_t; // float
+/** a more standalone version of gemm-forward-convolution.
+ *
+ * \p jcp       mkldnn convolution parms
+ * \p src       input nchw tensor       [vednn pDataIn]
+ * \p weights   convolution kernels     [vednn pDataKernel]
+ * \p bias      optional bias           [vednn pDataBias]
+ * \p dst       output nchw tensor      [vednn pDataOut]
+ * \p scratchpad a thread-safe one from \c create_scratchpad(jcp.im2col_sz,true),
+ *               created during init so it gets re-used.
+ * \p post_ops_ optional mkldnn post-ops (can add 'sum' 'with_relu' etc.)
+ *              [no vednn equivalent]              
+ * 
+ * \c jcp is created from \c init_conf (\ref gemm_convolution_utils.hpp), but
+ * there should also be an \c init_conf that accepts default libvednn
+ * convolution and tensor descriptions. Such a version would be in libvednn
+ * code base (which can import the vconv+vgemm libraries and headers).
+ */
+void vconv_gemm_fwd(
+        mkldnn::impl::cpu::jit_gemm_conv_conf_t const& jcp,
+        data_t* src,     //pDataIn
+        data_t* weights, //pDataKernel
+        data_t* bias,    //pDataBias
+        data_t* dst,     //pDataOut
+        //data_t* scratchpad = nullptr, // [jcp.im2col_sz]
+        mkldnn::impl::scratchpad_t& scratchpad,
+        mkldnn::impl::post_ops_t const* const post_ops_ = nullptr // with_relu? sum?
+        );
+#endif // VCONV_STANDALONE
+
+namespace mkldnn {
+namespace impl {
 
 #if PARTIAL >= 1
 struct _vconv_bwd_data_pd_t{

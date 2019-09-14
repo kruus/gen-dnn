@@ -20,6 +20,11 @@
 #include "type_helpers.hpp"
 #include "mkldnn_thread.hpp"
 
+#ifndef MKLDNN_ENABLE_CONCURRENT_EXEC
+#define MKLDNN_ENABLE_CONCURRENT_EXEC
+#endif
+#include "scratchpad.hpp"
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -45,6 +50,116 @@ using namespace mkldnn::impl::memory_format;
 using namespace mkldnn::impl::utils;
 
 #if 1
+
+#if VCONV_STANDALONE
+typedef _gemm_convolution_fwd_t<false>::data_type data_t; // float
+vconv_gemm_fwd(
+        jit_gemm_conv_conf_t const& jcp,
+        data_t* src,     //pDataIn
+        data_t* weights, //pDataKernel
+        data_t* bias,    //pDataBias
+        data_t* dst,     //pDataOut
+        scratchpad_t& scratchpad, // from create_scratchpad(any_size,true/*per_thread*/)
+        post_ops_t const* const post_ops_ = nullptr
+        )
+{
+    //auto src    = pDataIn;
+    //auto weights= pDataKernel;
+    //auto bias   = pDataBias;
+    //auto dst    = pDataOut;
+
+    //jit_gemm_conv_conf_t const& jcp = this->conf_.jcp_;
+
+    const int M = jcp.os * jcp.od;
+    const size_t src_step = jcp.ic * jcp.ih * jcp.iw * jcp.id;
+    const size_t dst_step = jcp.oc * M;
+    const size_t weights_g_size = jcp.ic * jcp.oc * jcp.ks;
+
+    const int K = jcp.ic * jcp.ks;
+    const int N = jcp.oc;
+    const int m = jcp.os;
+    const int LDA = jcp.im2col_sz ? m : M;
+
+    float nslope = jcp.with_relu ? jcp.relu_negative_slope : 0.f;
+    const data_t one = 1.0, zero = 0.0;
+    data_t beta_ = zero;
+
+    int entry_idx = -1;
+    if(post_ops_){
+        //const auto &post_ops = conf_.attr()->post_ops_;
+        const auto& post_ops = *post_ops_;
+        for (int idx = 0; idx < post_ops.len_; ++idx) {
+            const auto &e = post_ops.entry_[idx];
+            if (e.is_relu(true, false)) {
+                entry_idx = idx;
+                nslope = post_ops.entry_[entry_idx].eltwise.alpha;
+                break;
+            }
+        }
+        if(post_ops.find(primitive_kind::sum) >= 0) // combine w/ prev loop?
+            beta_ = one;
+    }
+    const bool do_relu = jcp.with_relu || entry_idx >= 0;
+
+    //data_t *col = (jcp.im2col_sz)
+    //    ? (data_t *)this->scratchpad_->get()
+    //    : nullptr;
+    data_t *col = (jcp.im2col_sz
+            ? reinterpret_cast<data_t*>(scratchpad.get())
+            : nullptr);
+
+    const size_t work_amount = jcp.ngroups * jcp.mb * jcp.od;
+    OMP(parallel num_threads(jcp.nthr))//;
+    {
+        const int ithr = omp_get_thread_num();
+        const int nthr = omp_get_num_threads();
+
+        data_t *_col = col + (ptrdiff_t)ithr * jcp.im2col_sz;
+
+        OMP(parallel for if(jcp.nthr == 1))
+        for (ptrdiff_t i = 0; i < jcp.im2col_sz; ++i) _col[i] = (data_t)0;
+
+        int g{0}, n{0}, od{0};
+        size_t start = 0, end = 0;
+
+        balance211(work_amount, nthr, ithr, start, end); // sets start and end
+        nd_iterator_init(start, g, jcp.ngroups, n, jcp.mb, od, jcp.od);
+
+        for (size_t iwork = start; iwork < end; ++iwork) {
+            const data_t *_src = src + (n * jcp.ngroups + g) * src_step;
+            const data_t *_weights = weights + g * weights_g_size;
+            data_t *_dst = dst + (n * jcp.ngroups + g) * dst_step;
+
+            if (jcp.im2col_sz) {
+                if (jcp.id == 1)
+                    jit_gemm_convolution_utils::im2col(jcp, _src, _col);
+                else
+                    jit_gemm_convolution_utils::im2col_3d(jcp, _src, _col, od);
+            }
+
+            extended_sgemm("N", "N", &m, &N, &K, &one,
+                    jcp.im2col_sz ? _col : _src + od * m, &LDA, _weights, &K,
+                    &beta_, //&this->beta_,
+                    _dst + od * m, &M);
+
+            if (jcp.with_bias || do_relu) {
+                data_t *d = _dst + od * m, b = 0.0;
+                for (int oc = 0; oc < jcp.oc; ++oc) {
+                    if(jcp.with_bias) b = bias[g * jcp.oc + oc];
+                    for (int oS = 0; oS < m; ++oS) {
+                        if (jcp.with_bias) d[oS] += b;
+                        if (do_relu && d[oS] < 0)
+                            d[oS] *= nslope;
+                    }
+                    d += M;
+                }
+            }
+            nd_iterator_step(g, jcp.ngroups, n, jcp.mb, od, jcp.od);
+        }
+    }
+}
+#endif // VCONV_STANDALONE
+
 template <bool with_relu>
 void _gemm_convolution_fwd_t<with_relu>::execute_forward() {
     //auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
@@ -56,7 +171,7 @@ void _gemm_convolution_fwd_t<with_relu>::execute_forward() {
     auto bias   = pDataBias;
     auto dst    = pDataOut;
 
-    jit_gemm_conv_conf_t &jcp = this->conf_.jcp_;
+    jit_gemm_conv_conf_t const& jcp = this->conf_.jcp_;
 
     const int M = jcp.os * jcp.od;
     const size_t src_step = jcp.ic * jcp.ih * jcp.iw * jcp.id;
@@ -102,7 +217,7 @@ void _gemm_convolution_fwd_t<with_relu>::execute_forward() {
         int g{0}, n{0}, od{0};
         size_t start = 0, end = 0;
 
-        balance211(work_amount, nthr, ithr, start, end);
+        balance211(work_amount, nthr, ithr, start, end); // sets start and end
         nd_iterator_init(start, g, jcp.ngroups, n, jcp.mb, od, jcp.od);
 
         for (size_t iwork = start; iwork < end; ++iwork) {

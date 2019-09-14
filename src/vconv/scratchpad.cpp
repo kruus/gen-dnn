@@ -29,14 +29,14 @@ const size_t page_size = 2097152;
   Implementation of the scratchpad_t interface that is compatible with
   a concurrent execution
 */
-struct concurent_scratchpad_t : public scratchpad_t {
-    concurent_scratchpad_t(size_t size) {
+struct concurrent_scratchpad_t : public scratchpad_t {
+    concurrent_scratchpad_t(size_t size) {
         size_ = size;
         scratchpad_ = (char *) malloc(size, page_size);
         assert(scratchpad_ != nullptr);
     }
 
-    ~concurent_scratchpad_t() {
+    ~concurrent_scratchpad_t() {
         free(scratchpad_);
     }
 
@@ -93,12 +93,15 @@ THREAD_LOCAL unsigned int global_scratchpad_t::reference_count_ = 0;
 /*
    Scratchpad creation routine
 */
-scratchpad_t *create_scratchpad(size_t size) {
-#ifndef MKLDNN_ENABLE_CONCURRENT_EXEC
-    return new global_scratchpad_t(size);
-#else
-    return new concurent_scratchpad_t(size);
-#endif
+scratchpad_t *create_scratchpad(size_t size, bool per_thread) {
+//#ifndef MKLDNN_ENABLE_CONCURRENT_EXEC
+//    return new global_scratchpad_t(size);
+//#else
+//    return new concurrent_scratchpad_t(size);
+//#endif
+return per_thread
+    ? static_cast<scratchpad_t*>(new concurrent_scratchpad_t(size))
+    : static_cast<scratchpad_t*>(new global_scratchpad_t(size));
 }
 
 }

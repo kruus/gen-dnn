@@ -27,7 +27,27 @@ struct scratchpad_t {
     virtual char *get() const = 0;
 };
 
-scratchpad_t *create_scratchpad(size_t size);
+// /** use compiled-in default based on MKLDNN_ENABLE_CONCURRENT_EXEC */
+// scratchpad_t *create_scratchpad(size_t size);
+
+/** open up interface, so a client can optionally
+ * specify global / thread-local scratchpad,
+ * defaulting to MKLDNN_ENABLE_CONCURRENT_EXEC (like original).
+ *
+ * Perhaps best to set up a scratchpad once during init
+ * and re-use it (it will grow to max size without begin freed).
+ * O/w destructor decrements a ref count and frees the scratchpad,
+ * which could lead to lots of malloc calls.
+ */
+scratchpad_t *create_scratchpad(
+        size_t size,
+        bool per_thread =
+#ifdef MKLDNN_ENABLE_CONCURRENT_EXEC
+        true
+#else
+        false
+#endif
+        );
 
 }
 }

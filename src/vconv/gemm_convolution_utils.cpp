@@ -32,7 +32,7 @@ using namespace data_type;
 
 namespace jit_gemm_convolution_utils {
 
-void im2col_3d(jit_gemm_conv_conf_t &jcp, const float *im, float *col, int od) {
+void im2col_3d(jit_gemm_conv_conf_t const& jcp, const float *im, float *col, int od) {
     const size_t OHW = jcp.oh * jcp.ow;
     const size_t im_step = jcp.ih * jcp.iw * jcp.id;
     const size_t col_step = jcp.ks * OHW;
@@ -115,7 +115,7 @@ void im2col_3d(jit_gemm_conv_conf_t &jcp, const float *im, float *col, int od) {
 }
 
 void im2col(
-    jit_gemm_conv_conf_t &jcp, const float *im, float *col) {
+    jit_gemm_conv_conf_t const& jcp, const float *im, float *col) {
     const size_t im_step = jcp.ih * jcp.iw;
     const size_t col_step = jcp.ks * jcp.os;
 
@@ -454,7 +454,7 @@ void im2col(
 
 /* col[oh][ow][kh][kw][ic] <-- im2col_u8(im[ih][iw][ic]) */
 void im2col_u8(
-    jit_gemm_conv_conf_t &jcp, const uint8_t *im, uint8_t *col) {
+    jit_gemm_conv_conf_t const& jcp, const uint8_t *im, uint8_t *col) {
     int num_thr = (jcp.mb != 1) ? omp_get_max_threads() : 1;
     MAYBE_UNUSED(num_thr);
     OMP(parallel num_threads(num_thr))//;
@@ -539,7 +539,7 @@ void im2col_u8(
 
 /* im[ih][iw][ic] <-- col2im_s32(col[oh][ow][kh][kw][ic]) */
 void col2im_s32(
-    jit_gemm_conv_conf_t &jcp, const int32_t *col, int32_t *im) {
+    jit_gemm_conv_conf_t const& jcp, const int32_t *col, int32_t *im) {
     int num_thr = (jcp.mb != 1) ? omp_get_max_threads() : 1;
 
     OMP(parallel for num_threads(num_thr))//;
@@ -601,7 +601,7 @@ void col2im_s32(
 }
 
 void col2im_3d(
-    jit_gemm_conv_conf_t &jcp, const float *col, float *im, int od) {
+    jit_gemm_conv_conf_t const& jcp, const float *col, float *im, int od) {
     const size_t col_step = jcp.ks * jcp.os;
     const size_t im_step = jcp.ih * jcp.iw * jcp.id;
 
@@ -647,7 +647,7 @@ void col2im_3d(
 }
 
 void col2im(
-    jit_gemm_conv_conf_t &jcp, const float *col, float *im) {
+    jit_gemm_conv_conf_t const& jcp, const float *col, float *im) {
 
     const size_t col_step = jcp.ks * jcp.os;
     const size_t im_step = jcp.ih * jcp.iw;
@@ -791,6 +791,8 @@ void init_conf(
             do_outer_threading = jcp.os / max_threads < 256
                        && (jcp.mb != 1 || jcp.ngroups > 2);
     }
+    jcp.nthr = do_outer_threading ? max_threads : 1;
+    jcp.need_wei_reduction = (jcp.mb != 1 && jcp.nthr != 1);
 
 #if 0
     const size_t im2col_sz_per_thr = jcp.os * jcp.ks * jcp.ic;
@@ -804,11 +806,9 @@ void init_conf(
 
     return status::success;
 #endif
-    jcp.nthr = do_outer_threading ? max_threads : 1;
-    jcp.need_wei_reduction = (jcp.mb != 1 && jcp.nthr != 1);
 }
 
-status_t prepare_scratchpad(jit_gemm_conv_conf_t &jcp,
+status_t prepare_scratchpad(jit_gemm_conv_conf_t const& jcp,
                 scratchpad_t **scratchpad_, size_t size, const int nthr) {
     if (size > 0) {
         *scratchpad_ = create_scratchpad(nthr * size);
@@ -831,7 +831,8 @@ void bwd_weights_balance(int ithr, int nthr, int ngroups, int mb, int &ithr_g,
     }
 }
 
-void bwd_weights_reduction_par(int ithr, int nthr, const jit_gemm_conv_conf_t &jcp,
+void bwd_weights_reduction_par(int ithr, int nthr,
+        jit_gemm_conv_conf_t const& jcp,
         const float *weights_reduce_ws, float *weights) {
     const size_t weights_g_size = jcp.ic * jcp.oc * jcp.ks;
 
