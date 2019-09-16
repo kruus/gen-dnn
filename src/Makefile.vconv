@@ -1,0 +1,6 @@
+all:
+	$(MAKE) -C vgemm install
+	$(MAKE) -C vconv install
+	cp -uarv vgemm/install/* vconv/install/
+	(cd vconv/install && tar czf - *) >& vconv.tar.gz
+	tar tzf vconv.tar.gz

@@ -18,10 +18,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "mkldnn.h"
+//#include "mkldnn.h"
+#include "mkldnn_desc_init.h"
 
 #include "c_types_map.hpp"
-#include "engine.hpp"
+//#include "engine.hpp"
 //#include "memory_pd.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
@@ -116,7 +117,7 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     memory_desc_t md;
     md.ndims = ndims;
     array_copy(md.dims, dims, ndims);
-    md.primitive_kind = primitive_kind::memory;
+    //md.primitive_kind = primitive_kind::memory;
     md.data_type = data_type;
     md.format = format;
 
@@ -145,6 +146,7 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
 #undef AND_
 }
 
+#if 0
 status_t mkldnn_memory_primitive_desc_create(primitive_desc_t **memory_pd,
         const memory_desc_t *memory_desc, engine_t *engine) {
     bool args_ok = !any_null(memory_pd, memory_desc, engine)
@@ -345,5 +347,6 @@ status_t mkldnn_sum_primitive_desc_create(primitive_desc_t **sum_pd,
     return mkldnn_sum_primitive_desc_create_v2(sum_pd, output_d, n, scales,
             input_pds, nullptr);
 }
+#endif
 
 // vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

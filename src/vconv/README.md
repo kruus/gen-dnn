@@ -10,3 +10,7 @@ and with some support for VE Aurora chip.
 
 - still have issue of libvednn lacking bias update during backward pass.
 
+- some headers are not required for compile, but for completeness:
+  - mkldnn\_desc\_init.h declares some FOO\_desc\_init functions:
+    - convolution.cpp defines various *mkldnn\_convolution\_FOO\_desc_init* functions
+    - memory.cpp defines *mkldnn\_memory\_desc_init*

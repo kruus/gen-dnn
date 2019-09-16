@@ -1,7 +1,8 @@
 OBJECTS:=scratchpad.cpp.o 		memory_desc_wrapper.cpp.o \
 	primitive_attr.cpp.o \
 	gemm_convolution_utils.cpp.o \
-	gemm_convolution.cpp.o
+	gemm_convolution.cpp.o \
+	convolution.cpp.o memory.cpp
 # gemm_convolution.cpp.o  will NOT compile (pulls too many headers)
 #
 all: build install
