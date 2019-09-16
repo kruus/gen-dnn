@@ -398,7 +398,9 @@ protected:
 
 using eltwise_test_half = eltwise_test<float16_t>;
 using eltwise_test_float = eltwise_test<float>;
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 using eltwise_test_bfloat16 = eltwise_test<bfloat16_t>;
+#endif // !TARGET_VANILLA
 
 TEST_P(eltwise_test_half, TestsEltwise)
 {
@@ -406,9 +408,11 @@ TEST_P(eltwise_test_half, TestsEltwise)
 TEST_P(eltwise_test_float, TestsEltwise)
 {
 }
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 TEST_P(eltwise_test_bfloat16, TestsEltwise)
 {
 }
+#endif // !TARGET_VANILLA
 
 #define EXPAND(args) args
 
@@ -461,16 +465,22 @@ TEST_P(eltwise_test_bfloat16, TestsEltwise)
 #define CPU_INST_TEST_CASE(str, ...) \
     CPU_INSTANTIATE_TEST_SUITE_P( \
         TEST_CONCAT(str, _f32), eltwise_test_float, ::testing::Values(__VA_ARGS__)); \
+
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     CPU_INSTANTIATE_TEST_SUITE_P( \
         TEST_CONCAT(str, _bf16), eltwise_test_bfloat16, ::testing::Values(__VA_ARGS__))
+#endif // !TARGET_VANILLA
 
 #define INST_TEST_CASE(str, ...) \
     GPU_INSTANTIATE_TEST_SUITE_P_( \
         TEST_CONCAT(str, _f16), eltwise_test_half, ::testing::Values(__VA_ARGS__)); \
     INSTANTIATE_TEST_SUITE_P_( \
         TEST_CONCAT(str, _f32), eltwise_test_float, ::testing::Values(__VA_ARGS__)); \
+
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     CPU_INSTANTIATE_TEST_SUITE_P( \
         TEST_CONCAT(str, _bf16), eltwise_test_bfloat16, ::testing::Values(__VA_ARGS__))
+#endif // !TARGET_VANILLA
 
 INST_TEST_CASE(SimpleZeroDim,
     PARAMS_ALL_ALG(ncdhw, nCdhw8c, 0.1f, 0.f, 0, 2, 4, 4, 4),

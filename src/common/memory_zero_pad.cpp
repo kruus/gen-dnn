@@ -285,7 +285,9 @@ status_t memory_t::zero_pad() const {
 
     switch (mdw.data_type()) {
         case f16: return typed_zero_pad<f16>();
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
         case bf16: return typed_zero_pad<bf16>();
+#endif // !TARGET_VANILLA
         case f32: return typed_zero_pad<f32>();
         case s32: return typed_zero_pad<s32>();
         case s8: return typed_zero_pad<s8>();

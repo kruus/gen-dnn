@@ -15,9 +15,11 @@
 *******************************************************************************/
 
 #include <memory>
-#include "jit_avx512_core_bf16cvt.hpp"
-#include "bfloat16.hpp"
 #include "cpu_isa_traits.hpp"
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#include "jit_avx512_core_bf16cvt.hpp"
+#endif
+#include "bfloat16.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -31,13 +33,16 @@ union float_raw {
 };
 
 bfloat16_t &bfloat16_t::operator=(float f) {
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     if (cpu::mayiuse(cpu::cpu_isa_t::avx512_core)) {
         jit_call_t p;
         p.inp = (void *)&f;
         p.out = (void *)this;
         static const cpu::jit_avx512_core_cvt_ps_to_bf16_t cvt_one_ps_to_bf16(1);
         cvt_one_ps_to_bf16.jit_ker(&p);
-    } else {
+    } else
+#endif // !TARGET_VANILLA
+    {
         float_raw r = { f };
         switch (std::fpclassify(f)) {
         case FP_SUBNORMAL:
@@ -72,6 +77,7 @@ bfloat16_t::operator float() const {
     return r.fraw;
 }
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 void cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t size) {
     assert(cpu::mayiuse(cpu::cpu_isa_t::avx512_core));
     jit_call_t p_;
@@ -103,6 +109,7 @@ void add_floats_and_cvt_to_bfloat16(
     static const cpu::jit_avx512_core_add_cvt_ps_to_bf16_t add_cvt_ps_to_bf16;
     add_cvt_ps_to_bf16.jit_ker(&p_);
 }
+#endif // !TARGET_VANILLA
 
 } // namespace impl
 } // namespace mkldnn

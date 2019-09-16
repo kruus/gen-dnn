@@ -13,13 +13,14 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 
 #include "math_utils.hpp"
 #include "mkldnn_thread.hpp"
 #include "simple_q10n.hpp"
 #include "gemm_inner_product_utils.hpp"
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 #include "jit_uni_eltwise.hpp"
+#endif // !TARGET_VANILLA
 
 namespace mkldnn {
 namespace impl {
@@ -34,26 +35,32 @@ template <data_type_t acc_type, data_type_t dst_type>
 pp_kernel_t<acc_type, dst_type>::pp_kernel_t(
         const cpu_inner_product_fwd_pd_t *pd, bool skip_sum)
     : ker_(nullptr)
-    , eltwise_injector_(nullptr)
     , ref_eltwise_(nullptr)
-    , bf16_emu_(nullptr)
-    , OC_(pd->OC())
     , do_bias_(pd->with_bias())
     , bias_data_type_(data_type::undef)
     , bias_data_type_size_(0)
+    , do_eltwise_(false)
+    , eltwise_()
+    , OC_(pd->OC())
     , do_scale_(false)
     , scale_idx_mult_(0)
-    , do_eltwise_(false)
     , do_sum_(false)
     , sum_scale_(0)
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+    , eltwise_injector_(nullptr)
+    , bf16_emu_(nullptr)
     , isa_(isa_any)
     , max_OC_loop_unroll_(13)
     , idx_compute_vreg_start_(0)
     , idx_compute_vreg_max_(31)
     , compute_vregs_per_iter_(1)
     , compute_vreg_bias_shift_(0)
-    , compute_vreg_prev_dst_shift_(0) {
+    , compute_vreg_prev_dst_shift_(0)
+#endif // !TARGET_VANILLA
+    {
     using namespace types;
+
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     using namespace Xbyak;
 
     do_scale_ = !pd->attr()->output_scales_.has_default_values();
@@ -92,7 +99,6 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(
         if (do_eltwise_)
             ref_eltwise_ = new ref_eltwise_scalar_fwd_t(
                     eltwise_.alg, eltwise_.alpha, eltwise_.beta);
-        return;
     } else {
         isa_ = mayiuse(avx512_core_bf16) ? avx512_core_bf16 : avx512_core;
         if (dst_type == data_type::bf16 && isa_ != avx512_core_bf16) {
@@ -114,8 +120,15 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(
                     eltwise_reserved_2_);
         generate();
     }
+#else
+    if (do_eltwise_)
+        ref_eltwise_ = new ref_eltwise_scalar_fwd_t(
+                eltwise_.alg, eltwise_.alpha, eltwise_.beta);
+#endif //ASMFMT_USE_DEPRECATED
+    return;
 }
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 template<data_type_t acc_type, data_type_t dst_type>
 void pp_kernel_t<acc_type, dst_type>::generate()
 {
@@ -436,6 +449,7 @@ void pp_kernel_t<acc_type, dst_type>::generate()
 
     ker_ = getCode<decltype(ker_)>();
 }
+#endif //ASMFMT_USE_DEPRECATED
 
 template <data_type_t acc_type, data_type_t dst_type>
 void pp_kernel_t<acc_type, dst_type>::operator()(dst_data_t *dst,
@@ -446,6 +460,7 @@ void pp_kernel_t<acc_type, dst_type>::operator()(dst_data_t *dst,
     if (end <= start)
         return;
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     if (ker_) {
         // JIT
         ker_args args;
@@ -457,7 +472,9 @@ void pp_kernel_t<acc_type, dst_type>::operator()(dst_data_t *dst,
         args.len = end - start;
         args.oc_offset = oc_offset;
         ker_(&args);
-    } else {
+    } else
+#endif //ASMFMT_USE_DEPRECATED
+    {
         // Fallback
         size_t oc = start % OC_;
         for (size_t i = start; i < end; i++) {
@@ -482,10 +499,12 @@ template class pp_kernel_t<s32, f32>;
 template class pp_kernel_t<s32, s32>;
 template class pp_kernel_t<s32, s8>;
 template class pp_kernel_t<s32, u8>;
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 template class pp_kernel_t<f32, bf16>;
+#endif // !TARGET_VANILLA
 }
 
 }
 }
 }
-#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

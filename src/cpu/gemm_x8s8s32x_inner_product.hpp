@@ -17,6 +17,7 @@
 #ifndef GEMM_X8S8S32X_INNER_PRODUCT_HPP
 #define GEMM_X8S8S32X_INNER_PRODUCT_HPP
 
+#include "cpu_isa_traits.hpp"
 #include <assert.h>
 
 #include "c_types_map.hpp"
@@ -24,11 +25,10 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
-#include "cpu_isa_traits.hpp"
 #include "gemm/gemm.hpp"
 #if !defined(TARGET_VANILLA) && !(defined(JITFUNCS) && JITFUNCS==JITFUNCS_VANILLA)
 #include "jit_generator.hpp"
-#endif
+#endif // !TARGET_VANILLA
 #include "gemm_inner_product_utils.hpp"
 
 #include "cpu_inner_product_pd.hpp"
@@ -105,11 +105,13 @@ struct gemm_x8s8s32x_inner_product_fwd_t: public cpu_primitive_t {
     };
 
     gemm_x8s8s32x_inner_product_fwd_t(const pd_t *apd)
-        : cpu_primitive_t(apd, true) {
+        : cpu_primitive_t(apd, true){
         pp_kernel_ = new inner_product_utils::pp_kernel_t<data_type::s32,
                 dst_type>(apd, false);
     }
-    ~gemm_x8s8s32x_inner_product_fwd_t() { delete pp_kernel_; }
+    ~gemm_x8s8s32x_inner_product_fwd_t() {
+        delete pp_kernel_;
+    }
 
     typedef typename prec_traits<dst_type>::type data_t;
 
@@ -134,6 +136,5 @@ private:
 }
 }
 
-#endif
-
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+#endif

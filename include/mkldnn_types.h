@@ -180,7 +180,7 @@ typedef enum {
     // The physical order of dimensions is defined by the permutation of the
     // characters, assuming that ab..z defines the natural order.
 
-    // Plain formats
+    // Plain formats [2+]
 
     mkldnn_a, ///< plain 1D tensor
     mkldnn_ab, ///< plain 2D tensor
@@ -189,7 +189,7 @@ typedef enum {
     mkldnn_abcde, ///< plain 5D tensor
     mkldnn_abcdef, ///< plain 6D tensor
 
-    // Permuted plain formats
+    // Permuted plain formats [8+]
 
     mkldnn_abdec, ///< permuted 5D tensor
     mkldnn_acb, ///< permuted 3D tensor
@@ -207,21 +207,21 @@ typedef enum {
     mkldnn_cdeba, ///< permuted 5D tensor
     mkldnn_decab, ///< permuted 5D tensor
 
-    // Opaque blocked formats
+    // Opaque blocked formatsA [23+]
 
     mkldnn_Abc16a,
     mkldnn_ABc16a16b,
-    /// 3D tensor blocked by 2nd dimension with block size 16
+    /// 3D tensor blocked by 2nd dimension with block size 16 [25+]
     mkldnn_aBc16b,
     mkldnn_ABc16b16a,
     mkldnn_Abc4a,
-    /// 3D tensor blocked by 2nd dimension with block size 4
+    /// 3D tensor blocked by 2nd dimension with block size 4A [28+]
     mkldnn_aBc4b,
     mkldnn_ABc4b16a4b,
     mkldnn_ABc4b4a,
     mkldnn_ABc8a16b2a,
     mkldnn_ABc8a8b,
-    /// 3D tensor blocked by 2nd dimension with block size 8
+    /// 3D tensor blocked by 2nd dimension with block size 8 [33+]
     mkldnn_aBc8b,
     mkldnn_ABc8b16a2b,
     mkldnn_BAc8a16b2a,
@@ -229,13 +229,13 @@ typedef enum {
     mkldnn_Abcd16a,
     mkldnn_ABcd16a16b,
     mkldnn_ABcd32a32b,
-    /// 4D tensor blocked by 2nd dimension with block size 16
+    /// 4D tensor blocked by 2nd dimension with block size 16 [40+]
     mkldnn_aBcd16b,
     mkldnn_ABcd16b16a,
     mkldnn_aBCd16b16c,
     mkldnn_aBCd16c16b,
     mkldnn_Abcd4a,
-    /// 4D tensor blocked by 2nd dimension with block size 4
+    /// 4D tensor blocked by 2nd dimension with block size 4 [45+]
     mkldnn_aBcd4b,
     mkldnn_ABcd4b16a4b,
     mkldnn_ABcd4b4a,
@@ -243,12 +243,12 @@ typedef enum {
     mkldnn_aBCd4c4b,
     mkldnn_ABcd8a16b2a,
     mkldnn_ABcd8a8b,
-    /// 4D tensor blocked by 2nd dimension with block size 8
+    /// 4D tensor blocked by 2nd dimension with block size 8 [52+]
     mkldnn_aBcd8b,
     mkldnn_ABcd8b16a2b,
     mkldnn_aBCd8b16c2b,
     mkldnn_BAcd8a16b2a,
-    /// 4D tensor blocked by 1st and 2nd dimension with block size 8
+    /// 4D tensor blocked by 1st and 2nd dimension with block size 8 [56+]
     mkldnn_ABcd8b8a,
     mkldnn_aBCd8b8c,
     mkldnn_aBCd8c16b2c,
@@ -258,14 +258,14 @@ typedef enum {
     mkldnn_Abcde16a,
     mkldnn_ABcde16a16b,
     mkldnn_BAcde8a16b2a,
-    /// 5D tensor blocked by 2nd dimension with block size 16
+    /// 5D tensor blocked by 2nd dimension with block size 16 [65+]
     mkldnn_aBcde16b,
     mkldnn_ABcde16b16a,
     mkldnn_aBCde16b16c,
     mkldnn_aBCde16c16b,
     mkldnn_aBCde2c8b4c,
     mkldnn_Abcde4a,
-    /// 5D tensor blocked by 2nd dimension with block size 4
+    /// 5D tensor blocked by 2nd dimension with block size 4 [71+]
     mkldnn_aBcde4b,
     mkldnn_ABcde4b4a,
     mkldnn_aBCde4b4c,
@@ -274,7 +274,7 @@ typedef enum {
     mkldnn_Abcde8a,
     mkldnn_ABcde8a8b,
     mkldnn_BAcde16b16a,
-    /// 5D tensor blocked by 2nd dimension with block size 8
+    /// 5D tensor blocked by 2nd dimension with block size 8 [79+]
     mkldnn_aBcde8b,
     mkldnn_ABcde8b16a2b,
     mkldnn_aBCde8b16c2b,

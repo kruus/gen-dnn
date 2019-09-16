@@ -13,8 +13,6 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
-// TODO provide a non-JIT gemm_inner_product, like historical version
 
 #include "c_types_map.hpp"
 #include "type_helpers.hpp"
@@ -155,4 +153,3 @@ template struct gemm_inner_product_bwd_weights_t<data_type::f32>;
 }
 }
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
-#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))

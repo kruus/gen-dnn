@@ -588,8 +588,10 @@ struct gemm_info_t<int8_t, uint8_t, int32_t>;
 template // For gemm_s8s8s32
 struct gemm_info_t<int8_t, int8_t, int32_t>;
 
+#if MKLDNN_CPU_GEMM_JIT
 template // For gemm_bf16bf16f32
 struct gemm_info_t<bfloat16_t, bfloat16_t, float>;
+#endif // !TARGET_VANILLA
 
 template // For sgemm.
 struct gemm_info_t<float, float, float>;

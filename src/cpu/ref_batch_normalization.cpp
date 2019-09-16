@@ -22,7 +22,9 @@
 #include "type_helpers.hpp"
 #include "mkldnn_thread.hpp"
 #include "simple_q10n.hpp"
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 #include "bfloat16.hpp"
+#endif // !TARGET_VANILLA
 #include "ref_batch_normalization.hpp"
 
 #define DECLARE_DATA_OFFSET                                                 \
@@ -55,10 +57,12 @@ inline float maybe_up_convert(T x) {
     return x;
 }
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 template <>
 inline float maybe_up_convert<bfloat16_t>(bfloat16_t x) {
     return (float)x;
 }
+#endif // !TARGET_VANILLA
 
 } // namespace
 
@@ -179,7 +183,9 @@ void ref_batch_normalization_fwd_t<d_type>::execute_forward(
 
 template struct ref_batch_normalization_fwd_t<s8>;
 template struct ref_batch_normalization_fwd_t<f32>;
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 template struct ref_batch_normalization_fwd_t<bf16>;
+#endif // !TARGET_VANILLA
 
 template <impl::data_type_t d_type>
 void ref_batch_normalization_bwd_t<d_type>::execute_backward(
@@ -289,7 +295,9 @@ void ref_batch_normalization_bwd_t<d_type>::execute_backward(
 }
 
 template struct ref_batch_normalization_bwd_t<f32>;
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 template struct ref_batch_normalization_bwd_t<bf16>;
+#endif // !TARGET_VANILLA
 
 }
 }

@@ -220,6 +220,7 @@ static auto simple_test_cases = [](bool omit_output) {
                     { 2, 16, 3, 3 }, { 2.0f, 3.0f }, omit_output });
 };
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 static auto simple_test_cases_bf16 = [](bool omit_output) {
     return ::testing::Values(
             sum_test_params{ { fmt::nChw16c, fmt::nChw16c }, fmt::nChw16c,
@@ -253,6 +254,7 @@ static auto simple_test_cases_bf16 = [](bool omit_output) {
             sum_test_params{ { fmt::nChw16c, fmt::nChw16c }, fmt::nChw16c,
                     { 2, 128, 23, 15 }, { 2.5f, 0.125f }, omit_output });
 };
+#endif // !TARGET_VANILLA
 
 static auto special_test_cases = []() {
     return ::testing::Values(
@@ -289,6 +291,7 @@ static auto corner_test_cases = []() {
             TestSum, test, simple_test_cases(omit_output)); \
     CPU_INSTANTIATE_TEST_SUITE_P(TestSumEF, test, special_test_cases());
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 #define INST_TEST_CASE_BF16(test, omit_output)                          \
     CPU_TEST_P(test, TestsSum) {}                                   \
     CPU_INSTANTIATE_TEST_SUITE_P(                                       \
@@ -296,6 +299,7 @@ static auto corner_test_cases = []() {
     CPU_INSTANTIATE_TEST_SUITE_P(                                       \
             TestSumBf16, test, simple_test_cases_bf16(omit_output)); \
     CPU_INSTANTIATE_TEST_SUITE_P(TestSumEF, test, special_test_cases());
+#endif // !TARGET_VANILLA
 
 #define GPU_INST_TEST_CASE(test, omit_output)               \
     GPU_TEST_P(test, TestsSum) {}                           \
@@ -312,16 +316,20 @@ using sum_test_u8_omit_output = sum_test<uint8_t, int32_t>;
 using sum_test_s8_omit_output = sum_test<int8_t, int32_t>;
 using sum_test_s32_omit_output = sum_test<int32_t, float>;
 using sum_test_f16_omit_output = sum_test<float16_t, float>;
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 using sum_test_bf16bf16_omit_output = sum_test<bfloat16_t, float>;
 using sum_test_bf16f32_omit_output = sum_test<bfloat16_t, float, float>;
+#endif // !TARGET_VANILLA
 
 using sum_test_float = sum_test<float, float>;
 using sum_test_u8 = sum_test<uint8_t, int32_t>;
 using sum_test_s8 = sum_test<int8_t, int32_t>;
 using sum_test_s32 = sum_test<int32_t, float>;
 using sum_test_f16 = sum_test<float16_t, float>;
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 using sum_test_bf16bf16 = sum_test<bfloat16_t, float>;
 using sum_test_bf16f32 = sum_test<bfloat16_t, float, float>;
+#endif // !TARGET_VANILLA
 
 using sum_cc_f32 = sum_test<float, float>;
 
@@ -332,7 +340,9 @@ INST_TEST_CASE(sum_test_float_omit_output, 1)
 INST_TEST_CASE(sum_test_u8_omit_output, 1)
 INST_TEST_CASE(sum_test_s8_omit_output, 1)
 INST_TEST_CASE(sum_test_s32_omit_output, 1)
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 INST_TEST_CASE_BF16(sum_test_bf16bf16_omit_output, 1)
+#endif // !TARGET_VANILLA
 // Automatically created dst descriptor has bf16 data type so this test is not
 // valid: INST_TEST_CASE(sum_test_bf16f32_omit_output, 1)
 GPU_INST_TEST_CASE(sum_test_f16_omit_output, 1)
@@ -341,8 +351,10 @@ INST_TEST_CASE(sum_test_float, 0)
 INST_TEST_CASE(sum_test_u8, 0)
 INST_TEST_CASE(sum_test_s8, 0)
 INST_TEST_CASE(sum_test_s32, 0)
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 INST_TEST_CASE_BF16(sum_test_bf16bf16, 0)
 INST_TEST_CASE_BF16(sum_test_bf16f32, 0)
+#endif // !TARGET_VANILLA
 GPU_INST_TEST_CASE(sum_test_f16, 0)
 
 #undef CPU_INST_TEST_CASE

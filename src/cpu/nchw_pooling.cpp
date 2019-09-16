@@ -160,6 +160,7 @@ void nchw_pooling_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
     }
 }
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 template <>
 void nchw_pooling_fwd_t<data_type::bf16>::execute_forward(
         const exec_ctx_t &ctx) const {
@@ -316,6 +317,7 @@ void nchw_pooling_fwd_t<data_type::bf16>::execute_forward(
         });
     }
 }
+#endif // !TARGET_VANILLA
 
 template <data_type_t d_type>
 void nchw_pooling_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
@@ -458,6 +460,7 @@ void nchw_pooling_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
     }
 }
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 template <>
 void nchw_pooling_bwd_t<data_type::bf16>::execute_backward(
         const exec_ctx_t &ctx) const {
@@ -633,10 +636,14 @@ void nchw_pooling_bwd_t<data_type::bf16>::execute_backward(
         });
     }
 }
+#endif // !TARGET_VANILLA
+
 template struct nchw_pooling_fwd_t<data_type::f32>;
 template struct nchw_pooling_bwd_t<data_type::f32>;
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 template struct nchw_pooling_fwd_t<data_type::bf16>;
 template struct nchw_pooling_bwd_t<data_type::bf16>;
+#endif // !TARGET_VANILLA
 }
 }
 }

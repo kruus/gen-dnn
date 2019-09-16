@@ -20,6 +20,8 @@
 #include <cstdint>
 #include <limits>
 #include "mkldnn_config.h"
+
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 namespace mkldnn {
 namespace impl {
 
@@ -41,6 +43,7 @@ struct bfloat16_t {
 
 static_assert(sizeof(bfloat16_t) == 2, "bfloat16_t must be 2 bytes");
 
+// the following depend on JIT
 void cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t size);
 void cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t size);
 
@@ -51,6 +54,7 @@ void add_floats_and_cvt_to_bfloat16(bfloat16_t *out, const float *inp0,
 
 }
 }
-
+#endif // !TARGET_VANILLA
+// vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s
 #endif
 

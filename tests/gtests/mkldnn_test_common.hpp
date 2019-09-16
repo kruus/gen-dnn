@@ -42,11 +42,15 @@
 #include "src/common/mkldnn_thread.hpp"
 #include "src/common/memory_desc_wrapper.hpp"
 #include "src/common/float16.hpp"
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 #include "src/common/bfloat16.hpp"
+#endif // !TARGET_VANILLA
 #include "src/common/nstl.hpp"
 
 using mkldnn::impl::f16_support::float16_t;
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 using mkldnn::impl::bfloat16_t;
+#endif // !TARGET_VANILLA
 
 /* Allow tests with certain generic properties */
 #define MKLDNN_TEST_BLOCKED_FORMATS 1
@@ -68,11 +72,13 @@ template <> struct data_traits<float16_t> {
 
     using uint_type = uint16_t;
 };
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 template <> struct data_traits<bfloat16_t> {
     static const auto data_type = memory::data_type::bf16;
 
     using uint_type = uint16_t;
 };
+#endif // !TARGET_VANILLA
 template <> struct data_traits<float> {
     static const auto data_type = memory::data_type::f32;
 

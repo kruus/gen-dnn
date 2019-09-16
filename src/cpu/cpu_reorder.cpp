@@ -211,6 +211,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     REG_SR_BIDIR(f32, nCdhw4c, f32, nCdhw16c),
     REG_SR_BIDIR(f32, nCdhw8c, f32, nCdhw16c),
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     /* bf16 */
     REG_SR(f32, nchw, bf16, nChw16c, fmt_order::keep),
 
@@ -226,6 +227,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     REG_SR(bf16, any, bf16, any, fmt_order::any, spec::reference),
     REG_SR(bf16, any, f32, any, fmt_order::any, spec::reference),
     REG_SR(f32, any, bf16, any, fmt_order::any, spec::reference),
+#endif // !TARGET_VANILLA
 
     /* int: flat <-> blocked with tail */
     REG_SR_BIDIR(f32, any, s32, nChw16c),

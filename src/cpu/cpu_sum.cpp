@@ -35,8 +35,10 @@ static const spd_create_f cpu_sum_impl_list[] = {
     INSTANCE(jit_bf16_sum_t<data_type::bf16, data_type::bf16>),
     INSTANCE(jit_bf16_sum_t<data_type::bf16, data_type::f32>),
 #endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     INSTANCE(simple_sum_t<data_type::bf16>),
     INSTANCE(simple_sum_t<data_type::bf16, data_type::f32>),
+#endif // !TARGET_VANILLA
     INSTANCE(simple_sum_t<data_type::f32>),
     INSTANCE(ref_sum_t),
     nullptr,

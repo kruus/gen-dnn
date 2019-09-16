@@ -132,7 +132,7 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMC" arg; do
 done
 # DOJIT, if defined, controls -DJITFUNCS_ANY=?? compile flag
 #      if undefined, default is set in cpu_isa_traits.hpp
-DOJIT=0
+#DOJIT=0
 # if unspecified, autodetect target via $CC compiler variable
 if [ "${DOTARGET}" == "x" ]; then
     if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
@@ -172,6 +172,7 @@ BUILDDIR=build
 #
 if [ "$DOTARGET" == "s" ]; then DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx';
 elif [ "$DOTARGET" == "a" ]; then
+ 
     if [ "$VEJIT" -gt 0 ]; then
         INSTALLDIR="${INSTALLDIR}-vej"; BUILDDIR="${BUILDDIR}-vej";
     fi
@@ -226,7 +227,9 @@ if [ ! "x${CC}" == "x" -a ! "`which ${CC}`" ]; then
     fi
 fi
 
-#if [ "$DOTARGET" == "v" ]; then ; fi
+if [ "$DOTARGET" == "v" ]; then
+    DOJIT=-1
+fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; BUILDDIR="${BUILDDIR}d"; fi
 
 if [ "$DOJUSTDOC" == "y" ]; then
@@ -377,7 +380,7 @@ echo "PATH $PATH"
     if [ $USE_MKL == "y" ]; then # deprecated in v1.0
         CMAKEOPT="${CMAKEOPT} -D_MKLDNN_USE_MKL=ON"
     fi
-    if [ "$DOJIT" == "0" ]; then
+    if [ "$DOJIT" -lt 0 ]; then
         # this would NOT affect the jit generator
         #CMAKEOPT="${CMAKEOPT} -DMKLDN_ARCH_OPT_FLAGS=\"\""
         CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"

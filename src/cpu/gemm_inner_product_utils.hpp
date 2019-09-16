@@ -17,15 +17,18 @@
 #ifndef CPU_GEMM_INNER_PRODUCT_UTILS_HPP
 #define CPU_GEMM_INNER_PRODUCT_UTILS_HPP
 
+#include "cpu_isa_traits.hpp"
 #include "c_types_map.hpp"
 #include "cpu_inner_product_pd.hpp"
 #include "cpu_engine.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 #include "jit_generator.hpp"
 #include "jit_uni_eltwise.hpp"
-#include "ref_eltwise.hpp"
 #include "jit_avx512_core_bf16cvt.hpp"
+#endif // !TARGET_VANILLA
+#include "ref_eltwise.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -34,16 +37,23 @@ namespace cpu {
 namespace inner_product_utils {
 
 template <impl::data_type_t acc_type, impl::data_type_t dst_type>
-class pp_kernel_t : jit_generator
+class pp_kernel_t
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+: jit_generator
+#endif // !TARGET_VANILLA
 {
 public:
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     DECLARE_CPU_JIT_AUX_FUNCTIONS(gemm_x8s8s32x_inner_product_fwd_t::pp_kernel);
+#endif // !TARGET_VANILLA
     pp_kernel_t(const cpu_inner_product_fwd_pd_t *pd, bool skip_sum);
     ~pp_kernel_t() {
-        if (do_eltwise_) {
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+        if (eltwise_injector_)
             delete eltwise_injector_;
+#endif // !TARGET_VANILLA
+        if (ref_eltwise_)
             delete ref_eltwise_;
-        }
     }
 
     typedef typename prec_traits<acc_type>::type acc_data_t;
@@ -53,7 +63,9 @@ public:
             const float *scales, size_t start, size_t end);
 
 private:
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     void generate();
+#endif // !TARGET_VANILLA
 
     struct ker_args {
         dst_data_t *dst;
@@ -70,8 +82,10 @@ private:
     };
 
     void (*ker_)(const ker_args *args);
-    jit_uni_eltwise_injector_f32<avx512_core> *eltwise_injector_;
     ref_eltwise_scalar_fwd_t *ref_eltwise_;
+
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+    jit_uni_eltwise_injector_f32<avx512_core> *eltwise_injector_;
     bf16_emulation_t *bf16_emu_;
 
     Xbyak::Reg64 reg_param = abi_param1;
@@ -97,24 +111,28 @@ private:
     Xbyak::Zmm bf16_emu_reserv_3 = Xbyak::Zmm(30);
     Xbyak::Reg64 bf16_emu_reserv_4 = r12;
     Xbyak::Zmm bf16_emu_reserv_5 = Xbyak::Zmm(31);
+#endif // !TARGET_VANILLA
 
-    size_t OC_;
     bool do_bias_;
     data_type_t bias_data_type_;
     size_t bias_data_type_size_;
-    bool do_scale_;
-    size_t scale_idx_mult_;
     bool do_eltwise_;
     post_ops_t::entry_t::eltwise_t eltwise_;
+    size_t OC_;
+    bool do_scale_;
+    size_t scale_idx_mult_;
     bool do_sum_;
     float sum_scale_;
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     cpu_isa_t isa_;
     int max_OC_loop_unroll_;
     int idx_compute_vreg_start_;
     int idx_compute_vreg_max_;
     int compute_vregs_per_iter_;
     int compute_vreg_bias_shift_, compute_vreg_prev_dst_shift_;
+#endif // !TARGET_VANILLA
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     Xbyak::Zmm vreg_dst(int iter) {
         int idx = idx_compute_vreg_start_ + iter * compute_vregs_per_iter_;
         assert(idx <= idx_compute_vreg_max_);
@@ -134,6 +152,7 @@ private:
         assert(idx <= idx_compute_vreg_max_);
         return Xbyak::Zmm(idx);
     };
+#endif // !TARGET_VANILLA
 };
 
 }
@@ -141,5 +160,5 @@ private:
 }
 }
 }
-
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
 #endif

@@ -254,6 +254,7 @@ execute_backward<format_tag::nhwc>(const exec_ctx_t &ctx) const;
 template void ref_lrn_bwd_t<data_type::f32>::
 execute_backward<format_tag::any>(const exec_ctx_t &ctx) const;
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 template void ref_lrn_fwd_t<data_type::bf16>::
 execute_forward<format_tag::nChw16c>(const exec_ctx_t &ctx) const;
 template void ref_lrn_fwd_t<data_type::bf16>::
@@ -274,6 +275,7 @@ template void ref_lrn_bwd_t<data_type::bf16>::
 execute_backward<format_tag::nhwc>(const exec_ctx_t &ctx) const;
 template void ref_lrn_bwd_t<data_type::bf16>::
 execute_backward<format_tag::any>(const exec_ctx_t &ctx) const;
+#endif // !TARGET_VANILLA
 
 }
 }

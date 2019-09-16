@@ -15,9 +15,13 @@
 *******************************************************************************/
 
 #include "c_types_map.hpp"
+#include "mkldnn_thread.hpp"
 #include "utils.hpp"
 
+#include "cpu_isa_traits.hpp"
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 #include "jit_generator.hpp"
+#endif // !TARGET_VANILLA
 
 #include "cpu_batch_normalization_utils.hpp"
 

@@ -22,7 +22,9 @@
 #include <vector>
 
 #include "mkldnn.h"
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 #include "src/common/bfloat16.hpp"
+#endif // !TARGET_VANILLA
 #include "src/common/float16.hpp"
 #include "src/common/nstl.hpp"
 
@@ -56,16 +58,21 @@
 } while(0)
 
 /* aux */
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 using bfloat16_t = mkldnn::impl::bfloat16_t;
+#endif // !TARGET_VANILLA
 using float16_t = mkldnn::impl::float16_t;
 template <mkldnn_data_type_t> struct prec_traits;
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 template <> struct prec_traits<mkldnn_bf16> { typedef bfloat16_t type; };
+#endif // !TARGET_VANILLA
 template <> struct prec_traits<mkldnn_f16> { typedef float16_t type; };
 template <> struct prec_traits<mkldnn_f32> { typedef float type; };
 template <> struct prec_traits<mkldnn_s32> { typedef int32_t type; };
 template <> struct prec_traits<mkldnn_s8> { typedef int8_t type; };
 template <> struct prec_traits<mkldnn_u8> { typedef uint8_t type; };
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 #define CASE_ALL(dt)                   \
     switch (dt) {                      \
         CASE(mkldnn_bf16);             \
@@ -76,6 +83,18 @@ template <> struct prec_traits<mkldnn_u8> { typedef uint8_t type; };
         CASE(mkldnn_u8);               \
     default: assert(!"bad data_type"); \
     }
+#else
+#define CASE_ALL(dt)                   \
+    switch (dt) {                      \
+        /*CASE(mkldnn_bf16);*/         \
+        CASE(mkldnn_f16);              \
+        CASE(mkldnn_f32);              \
+        CASE(mkldnn_s32);              \
+        CASE(mkldnn_s8);               \
+        CASE(mkldnn_u8);               \
+    default: assert(!"bad data_type"); \
+    }
+#endif
 
 inline size_t sizeof_dt(mkldnn_data_type_t dt) {
 #   define CASE(dt) \

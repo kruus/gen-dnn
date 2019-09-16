@@ -16,6 +16,7 @@
 
 #include <assert.h>
 
+#include "cpu_isa_traits.hpp"
 #include "type_helpers.hpp"
 #include "verbose.hpp"
 
@@ -24,9 +25,8 @@
 #include "cpu_stream.hpp"
 #include "memory.hpp"
 
-#include "cpu/rnn/ref_rnn.hpp"
-
-#if JITFUNCS > 0
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#include "cpu/rnn/ref_rnn.hpp" // now requires jit
 #include "cpu/jit_avx512_core_x8s8s32x_1x1_convolution.hpp"
 #include "cpu/jit_avx512_common_1x1_convolution.hpp"
 #include "cpu/jit_avx512_core_f32_wino_conv_4x3.hpp"
@@ -52,10 +52,11 @@
 #include "cpu/jit_uni_batch_normalization.hpp"
 #include "cpu/jit_uni_batch_normalization_s8.hpp"
 #include "cpu/jit_uni_softmax.hpp"
+#include "cpu/gemm_bf16_convolution.hpp"
+#include "cpu/gemm_bf16_inner_product.hpp"
 #endif
 
 #include "cpu/gemm_convolution.hpp"
-#include "cpu/gemm_bf16_convolution.hpp"
 #include "cpu/gemm_x8s8s32x_convolution.hpp"
 #include "cpu/ref_convolution.hpp"
 #include "cpu/ref_deconvolution.hpp"
@@ -71,7 +72,6 @@
 #include "cpu/nspc_batch_normalization.hpp"
 #include "cpu/ref_inner_product.hpp"
 #include "cpu/gemm_inner_product.hpp"
-#include "cpu/gemm_bf16_inner_product.hpp"
 #include "cpu/gemm_x8s8s32x_inner_product.hpp"
 
 
@@ -211,7 +211,13 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
 #define INSTANCE_uni(...)
 #endif
 
-#if VEJIT > 0
+#if JITFUNCS >= JITFUNCS_ANY // i.e. any x86 cpu
+#define INSTANCE_any(...) &INSTANCE_CREATOR(__VA_ARGS__),
+#else
+#define INSTANCE_any(...)
+#endif
+
+#if VEJIT > 0 // an implementation ONLY working for VE
 #define INSTANCE_ve(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
 #define INSTANCE_ve(...)
@@ -223,9 +229,9 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
 
 static const pd_create_f cpu_impl_list[] = {
     /* RNN */
-    INSTANCE(ref_rnn_fwd_f32_t)
-    INSTANCE(ref_rnn_fwd_u8s8_t)
-    INSTANCE(ref_rnn_bwd_f32_t)
+    INSTANCE_any(ref_rnn_fwd_f32_t)
+    INSTANCE_any(ref_rnn_fwd_u8s8_t)
+    INSTANCE_any(ref_rnn_bwd_f32_t)
     /* conv */
     INSTANCE_avx512(jit_avx512_common_dw_convolution_fwd_t)
     INSTANCE_avx512(jit_avx512_common_dw_convolution_bwd_data_t)
@@ -282,12 +288,12 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE_avx512(jit_avx512_core_bf16_convolution_fwd_t)
     INSTANCE_avx512(jit_avx512_core_bf16_convolution_bwd_data_t)
     INSTANCE_avx512(jit_avx512_core_bf16_convolution_bwd_weights_t)
-    INSTANCE(gemm_bf16_convolution_fwd_t<f32>)
-    INSTANCE(gemm_bf16_convolution_fwd_t<bf16>)
-    INSTANCE(gemm_bf16_convolution_bwd_data_t<f32>)
-    INSTANCE(gemm_bf16_convolution_bwd_data_t<bf16>)
-    INSTANCE(gemm_bf16_convolution_bwd_weights_t<f32>)
-    INSTANCE(gemm_bf16_convolution_bwd_weights_t<bf16>)
+    INSTANCE_sse41(gemm_bf16_convolution_fwd_t<f32>)
+    INSTANCE_sse41(gemm_bf16_convolution_fwd_t<bf16>)
+    INSTANCE_sse41(gemm_bf16_convolution_bwd_data_t<f32>)
+    INSTANCE_sse41(gemm_bf16_convolution_bwd_data_t<bf16>)
+    INSTANCE_sse41(gemm_bf16_convolution_bwd_weights_t<f32>)
+    INSTANCE_sse41(gemm_bf16_convolution_bwd_weights_t<bf16>)
     /* conv (int) */
     INSTANCE_avx512(jit_avx512_core_u8s8s32x_wino_convolution_fwd_t<f32>)
     INSTANCE_avx512(jit_avx512_core_u8s8s32x_wino_convolution_fwd_t<s32>)
@@ -364,8 +370,8 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE_uni(jit_uni_eltwise_bwd_t<sse41, f32>)
     INSTANCE(ref_eltwise_fwd_t<f32>)
     INSTANCE(ref_eltwise_bwd_t<f32>)
-    INSTANCE(ref_eltwise_fwd_t<bf16>)
-    INSTANCE(ref_eltwise_bwd_t<bf16>)
+    INSTANCE_sse41(ref_eltwise_fwd_t<bf16>)
+    INSTANCE_sse41(ref_eltwise_bwd_t<bf16>)
     /* eltwise (int) */
     INSTANCE(ref_eltwise_fwd_t<s32>)
     INSTANCE(ref_eltwise_fwd_t<s8>)
@@ -387,20 +393,20 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE_uni(jit_uni_pooling_fwd_t<sse41, f32>)
     INSTANCE_uni(jit_uni_pooling_bwd_t<sse41, f32>)
 
-    INSTANCE(nchw_pooling_fwd_t<bf16>)
-    INSTANCE(nchw_pooling_bwd_t<bf16>)
+    INSTANCE_sse41(nchw_pooling_fwd_t<bf16>)
+    INSTANCE_sse41(nchw_pooling_bwd_t<bf16>)
     INSTANCE(nchw_pooling_fwd_t<f32>)
     INSTANCE(nchw_pooling_bwd_t<f32>)
 
-    INSTANCE(nhwc_pooling_fwd_t<bf16>)
-    INSTANCE(nhwc_pooling_bwd_t<bf16>)
+    INSTANCE_sse41(nhwc_pooling_fwd_t<bf16>)
+    INSTANCE_sse41(nhwc_pooling_bwd_t<bf16>)
     INSTANCE(nhwc_pooling_fwd_t<f32>)
     INSTANCE(nhwc_pooling_bwd_t<f32>)
 
     INSTANCE(ref_pooling_fwd_t<f32>)
-    INSTANCE(ref_pooling_fwd_t<bf16, f32>)
     INSTANCE(ref_pooling_bwd_t<f32>)
-    INSTANCE(ref_pooling_bwd_t<bf16>)
+    INSTANCE_sse41(ref_pooling_fwd_t<bf16, f32>)
+    INSTANCE_sse41(ref_pooling_bwd_t<bf16>)
 
     /* pool (int) */
     INSTANCE_uni(jit_uni_i8i8_pooling_fwd_t<avx512_core>)
@@ -419,27 +425,27 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE_uni(jit_uni_lrn_fwd_t<sse41>)
     INSTANCE(ref_lrn_fwd_t<f32>)
     INSTANCE(ref_lrn_bwd_t<f32>)
-    INSTANCE(ref_lrn_fwd_t<bf16>)
-    INSTANCE(ref_lrn_bwd_t<bf16>)
+    INSTANCE_sse41(ref_lrn_fwd_t<bf16>)
+    INSTANCE_sse41(ref_lrn_bwd_t<bf16>)
     /* batch normalization */
-    INSTANCE(jit_uni_batch_normalization_fwd_t<avx512_common>)
-    INSTANCE(jit_uni_batch_normalization_bwd_t<avx512_common>)
-    INSTANCE(jit_uni_batch_normalization_fwd_t<avx2>)
-    INSTANCE(jit_uni_batch_normalization_bwd_t<avx2>)
-    INSTANCE(jit_uni_batch_normalization_fwd_t<sse41>)
-    INSTANCE(jit_uni_batch_normalization_bwd_t<sse41>)
+    INSTANCE_uni(jit_uni_batch_normalization_fwd_t<avx512_common>)
+    INSTANCE_uni(jit_uni_batch_normalization_bwd_t<avx512_common>)
+    INSTANCE_uni(jit_uni_batch_normalization_fwd_t<avx2>)
+    INSTANCE_uni(jit_uni_batch_normalization_bwd_t<avx2>)
+    INSTANCE_uni(jit_uni_batch_normalization_fwd_t<sse41>)
+    INSTANCE_uni(jit_uni_batch_normalization_bwd_t<sse41>)
     INSTANCE(ncsp_batch_normalization_fwd_t<f32>)
     INSTANCE(ncsp_batch_normalization_bwd_t<f32>)
-    INSTANCE(ncsp_batch_normalization_fwd_t<bf16>)
-    INSTANCE(ncsp_batch_normalization_bwd_t<bf16>)
+    INSTANCE_sse41(ncsp_batch_normalization_fwd_t<bf16>)
+    INSTANCE_sse41(ncsp_batch_normalization_bwd_t<bf16>)
     INSTANCE(nspc_batch_normalization_fwd_t<f32>)
     INSTANCE(nspc_batch_normalization_bwd_t<f32>)
-    INSTANCE(nspc_batch_normalization_fwd_t<bf16>)
-    INSTANCE(nspc_batch_normalization_bwd_t<bf16>)
+    INSTANCE_sse41(nspc_batch_normalization_fwd_t<bf16>)
+    INSTANCE_sse41(nspc_batch_normalization_bwd_t<bf16>)
     INSTANCE(ref_batch_normalization_fwd_t<f32>)
     INSTANCE(ref_batch_normalization_bwd_t<f32>)
-    INSTANCE(ref_batch_normalization_fwd_t<bf16>)
-    INSTANCE(ref_batch_normalization_bwd_t<bf16>)
+    INSTANCE_sse41(ref_batch_normalization_fwd_t<bf16>)
+    INSTANCE_sse41(ref_batch_normalization_bwd_t<bf16>)
     /* batch normalization (int) */
     INSTANCE_uni(jit_uni_batch_normalization_s8_fwd_t<avx512_core>)
     INSTANCE_uni(jit_uni_batch_normalization_s8_fwd_t<avx2>)
@@ -452,12 +458,12 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(ref_inner_product_bwd_data_t<f32, f32, f32, f32>)
     INSTANCE(ref_inner_product_bwd_weights_t<f32>)
     /* inner product (bfloat16) */
-    INSTANCE(gemm_bf16_inner_product_fwd_t<f32>)
-    INSTANCE(gemm_bf16_inner_product_fwd_t<bf16>)
-    INSTANCE(gemm_bf16_inner_product_bwd_data_t<f32>)
-    INSTANCE(gemm_bf16_inner_product_bwd_data_t<bf16>)
-    INSTANCE(gemm_bf16_inner_product_bwd_weights_t<f32>)
-    INSTANCE(gemm_bf16_inner_product_bwd_weights_t<bf16>)
+    INSTANCE_sse41(gemm_bf16_inner_product_fwd_t<f32>)
+    INSTANCE_sse41(gemm_bf16_inner_product_fwd_t<bf16>)
+    INSTANCE_sse41(gemm_bf16_inner_product_bwd_data_t<f32>)
+    INSTANCE_sse41(gemm_bf16_inner_product_bwd_data_t<bf16>)
+    INSTANCE_sse41(gemm_bf16_inner_product_bwd_weights_t<f32>)
+    INSTANCE_sse41(gemm_bf16_inner_product_bwd_weights_t<bf16>)
     /* inner product (int) */
     INSTANCE(gemm_x8s8s32x_inner_product_fwd_t<u8, u8>)
     INSTANCE(gemm_x8s8s32x_inner_product_fwd_t<u8, s8>)

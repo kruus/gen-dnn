@@ -21,9 +21,10 @@
 
 #include "gemm_driver.hpp"
 
-#include "common/bfloat16.hpp"
 #include "f32/gemm_utils_f32.hpp"
 #if MKLDNN_CPU_GEMM_JIT
+#warning "gemm WITH jit..."
+#include "common/bfloat16.hpp"
 #include "f32/jit_avx512_common_gemm_f32.hpp"
 #include "f32/jit_avx_gemm_f32.hpp"
 #include "jit_generator.hpp"
@@ -1518,6 +1519,7 @@ static mkldnn_status_t gemm_threading_driver(
     if ((arg->m <= 0) || (arg->n <= 0))
         return mkldnn_success;
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     if (!is_a_packed && !is_b_packed && (arg->packing == pack_type::none)
             && gemm_s8u8s32_jump_to_gemv_s8u8s32(arg))
         return mkldnn_success;
@@ -1525,6 +1527,7 @@ static mkldnn_status_t gemm_threading_driver(
     if (!is_a_packed && !is_b_packed && (arg->packing == pack_type::none)
             && jump_to_gemv(arg) == mkldnn_success)
         return mkldnn_success;
+#endif // !TARGET_VANILLA
 
     if (is_a_packed && arg->bo != 0)
         if (!arg->a_packed->has_row_sums())
@@ -1805,10 +1808,12 @@ mkldnn_status_t gemm_driver(
         const bool force_nocopy, pack_type packing,
         gemm_pack_storage_t *pack_dst, bool measure_only) {
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     // gemm_driver supports bfloat16 gemm for Intel AVX512 and
     // Intel AVX512 BF16.
     assert(IMPLICATION(data_traits<a_type>::data_type == data_type::bf16,
                 mayiuse(avx512_core) && !force_nocopy));
+#endif // !TARGET_VANILLA
 
     // gemm_driver supports 8-bit integer Intel AVX512 and Intel DL Boost.
     assert(IMPLICATION(data_traits<a_type>::data_type == data_type::s8,
@@ -1836,6 +1841,7 @@ mkldnn_status_t gemm_driver(
     return gemm_threading_driver(&args);
 }
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 template // Instantiate gemm_bf16bf16f32
 mkldnn_status_t gemm_driver<bfloat16_t, bfloat16_t, float>(
         const char *transA, const char *transB, const char *offsetC,
@@ -1845,6 +1851,7 @@ mkldnn_status_t gemm_driver<bfloat16_t, bfloat16_t, float>(
         const float *beta, float *c, const int *ldc, const float *oc,
         const bool force_nocopy, pack_type packing,
         gemm_pack_storage_t *pack_dst, bool measure_only);
+#endif // !TARGET_VANILLA
 
 template // Instantiate gemm_s8s8s32
 mkldnn_status_t gemm_driver<int8_t, int8_t, int32_t>(

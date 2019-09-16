@@ -398,6 +398,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     }
 };
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 /* bf16 reorders */
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
@@ -577,6 +578,7 @@ typename utils::enable_if<
     }
 
 };
+#endif // !TARGET_VANILLA
 
 /* reorders with tail support */
 

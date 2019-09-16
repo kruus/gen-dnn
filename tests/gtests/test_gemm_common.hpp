@@ -60,6 +60,7 @@ mkldnn_status_t mkldnn_ocl_hgemm(cl_command_queue queue, char transa,
 }
 #endif
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 // Declare bfloat16 GEMM interfaces for testing
 extern "C" {
 mkldnn_status_t mkldnn_gemm_bf16bf16f32(
@@ -70,6 +71,7 @@ mkldnn_status_t mkldnn_gemm_bf16bf16f32(
         const bfloat16_t *B, mkldnn_dim_t ldb,
         float beta, float *C, mkldnn_dim_t ldc);
 }
+#endif // !TARGET_VANILLA
 
 // Declare packed GEMM interfaces for testing
 namespace mkldnn {
@@ -761,6 +763,7 @@ struct mkldnn_gemm<uint8_t, int8_t, int32_t> {
     }
 };
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 template <>
 struct mkldnn_gemm<bfloat16_t, bfloat16_t, float> {
     static mkldnn_status_t call(const test_params &p, const test_memory &a_mem,
@@ -773,6 +776,7 @@ struct mkldnn_gemm<bfloat16_t, bfloat16_t, float> {
                 p.alpha, A, p.lda, B, p.ldb, p.beta, C, p.ldc);
     }
 };
+#endif // !TARGET_VANILLA
 
 template <typename a_dt, typename b_dt, typename c_dt>
 struct run_test_gemm {

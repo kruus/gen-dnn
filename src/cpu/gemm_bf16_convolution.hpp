@@ -16,18 +16,19 @@
 
 #ifndef CPU_JIT_GEMM_BF16_CONVOLUTION_HPP
 #define CPU_JIT_GEMM_BF16_CONVOLUTION_HPP
-#include "cpu_isa_traits.hpp"
-#if defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS==JITFUNCS_NONE)
-#else // assume x86 with bf16 support
-
+//
+// while header can compile for vanilla, impl REQUIRES jit
+//
 #include "c_types_map.hpp"
 #include "memory_tracking.hpp"
 
 #include "cpu_convolution_pd.hpp"
 #include "cpu_engine.hpp"
 #include "gemm_convolution_utils.hpp"
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 #include "jit_avx512_core_bf16cvt.hpp"
 #include "jit_uni_eltwise.hpp"
+#endif // !TARGET_VANILLA
 #include "cpu_reducer.hpp"
 #include "cpu_convolution_pd.hpp"
 
@@ -123,12 +124,16 @@ struct gemm_bf16_convolution_fwd_t: public cpu_primitive_t {
                 ? one
                 : zero;
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
         if (this->pd()->is_postprocess_required())
             pp_ker_ = new pp_ker_t(this->pd());
+#endif // !TARGET_VANILLA
     }
 
     ~gemm_bf16_convolution_fwd_t() {
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
         delete pp_ker_;
+#endif // !TARGET_VANILLA
     }
 
     typedef typename prec_traits<dst_data_type>::type dst_data_t;
@@ -145,6 +150,7 @@ private:
     void execute_forward(const exec_ctx_t &ctx) const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     class pp_ker_t : jit_generator {
     public:
         DECLARE_CPU_JIT_AUX_FUNCTIONS(
@@ -245,9 +251,14 @@ private:
             return Xbyak::Ymm(vreg_prev_dst_idx(iter));
         };
     };
+#else
+    void* pp_ker_;
+#endif // !TARGET_VANILLA
 
     acc_data_t beta_;
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
     pp_ker_t *pp_ker_;
+#endif // !TARGET_VANILLA
 };
 
 template <data_type_t diff_src_data_type>
@@ -400,5 +411,5 @@ private:
 }
 }
 
-#endif // defined(JITFUNCS) && JITFUNCS>=0
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
 #endif

@@ -17,15 +17,17 @@
 #ifndef GEMM_X8S8S32X_CONVOLUTION_HPP
 #define GEMM_X8S8S32X_CONVOLUTION_HPP
 
+#include "cpu_isa_traits.hpp"
 #include "c_types_map.hpp"
 #include "memory_tracking.hpp"
 
 #include "cpu_convolution_pd.hpp"
 #include "cpu_primitive.hpp"
-
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 #include "jit_primitive_conf.hpp"
 #include "jit_generator.hpp"
 #include "jit_uni_eltwise.hpp"
+#endif // !TARGET_VANILLA
 #include "ref_eltwise.hpp"
 #include "gemm_convolution_utils.hpp"
 
@@ -122,7 +124,11 @@ struct _gemm_x8s8s32x_convolution_fwd_t: public cpu_primitive_t {
 
     _gemm_x8s8s32x_convolution_fwd_t(const pd_t *apd)
         : cpu_primitive_t(apd, true), pp_ker_(nullptr)
-    { pp_ker_ = new pp_ker_t(pd()); }
+    {
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+        pp_ker_ = new pp_ker_t(pd());
+#endif // !TARGET_VANILLA
+    }
     ~_gemm_x8s8s32x_convolution_fwd_t() { delete pp_ker_; }
 
     typedef typename prec_traits<src_type>::type src_data_t;
@@ -139,18 +145,25 @@ private:
     // XXX: this is throwaway code that will become unnecessary when we have a
     // sufficiently advanced igemm jit generator that supports quantization,
     // relu, and whatnot
-    class pp_ker_t : jit_generator {
+    class pp_ker_t
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+        : jit_generator
+#endif // !TARGET_VANILLA
+    {
     public:
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
         DECLARE_CPU_JIT_AUX_FUNCTIONS(
         _gemm_x8s8s32x_convolution_fwd_t::pp_kernel);
+#endif // !TARGET_VANILLA
         pp_ker_t(const pd_t *pd);
         ~pp_ker_t() {
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
             if (eltwise_injector_)
                 delete eltwise_injector_;
+#endif // !TARGET_VANILLA
             if (eltwise_)
                 delete eltwise_;
         }
-
 
         void operator()(dst_data_t *dst, const acc_data_t *acc,
             const char *bias, const float *scales,
@@ -160,7 +173,9 @@ private:
         size_t dst_os_stride_;
 
     private:
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
         void generate();
+#endif // !TARGET_VANILLA
 
         struct ker_args {
             dst_data_t *dst;
@@ -186,7 +201,9 @@ private:
         bool do_sum_;
         bool do_signed_scaling_;
         size_t vlen_;
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
         jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
+#endif // !TARGET_VANILLA
         ref_eltwise_scalar_fwd_t *eltwise_;
 
     };
@@ -275,5 +292,5 @@ private:
 }
 }
 }
-
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
 #endif

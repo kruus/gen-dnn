@@ -14,6 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 #include "mkldnn_test_common.hpp"
 #include "gtest/gtest.h"
 
@@ -32,3 +33,4 @@ TEST_P(gemm_test, TestGEMM)
 #include "gemm_in.h"
 }
 // vim: et ts=4 sw=4 cindent cino=^l0,\:0,N-s
+#endif // !TARGET_VANILLA

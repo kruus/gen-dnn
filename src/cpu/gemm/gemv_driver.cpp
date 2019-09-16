@@ -18,10 +18,10 @@
 
 #include "gemv_driver.hpp"
 
-#include "common/bfloat16.hpp"
 #include "cpu_isa_traits.hpp"
 #include "gemm_info.hpp"
 #if MKLDNN_CPU_GEMM_JIT
+#include "common/bfloat16.hpp"
 #include "jit_generator.hpp"
 #endif // MKLDNN_CPU_GEMM_JIT
 #include "mkldnn_thread.hpp"
@@ -377,11 +377,13 @@ mkldnn_status_t jump_to_gemv(
     return mkldnn_unimplemented;
 }
 
+#if MKLDNN_CPU_GEMM_JIT
 template <>
 mkldnn_status_t jump_to_gemv(
         const gemm_info_t<bfloat16_t, bfloat16_t, float> *arg) {
     return mkldnn_unimplemented;
 }
+#endif
 
 template <typename a_t, typename b_t, typename c_t>
 mkldnn_status_t jump_to_gemv(const gemm_info_t<a_t, b_t, c_t> *arg) {

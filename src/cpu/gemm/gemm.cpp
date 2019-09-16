@@ -286,6 +286,7 @@ mkldnn_status_t gemm_s8x8s32(const char *transa, const char *transb,
     return status;
 }
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 mkldnn_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
         const int64_t *M, const int64_t *N, const int64_t *K,
         const float *alpha,
@@ -318,6 +319,7 @@ mkldnn_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
         return mkldnn_unimplemented;
     }
 }
+#endif // !TARGET_VANILLA
 
 }
 }
@@ -389,6 +391,7 @@ mkldnn_status_t mkldnn_gemm_s8s8s32(
             &alpha, B, &ldb_s32, &bo, A, &lda_s32, &ao, &beta, C, &ldc_s32, co);
 }
 
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 extern "C" {
 mkldnn_status_t MKLDNN_API mkldnn_gemm_bf16bf16f32(
         char transa, char transb,
@@ -402,5 +405,6 @@ mkldnn_status_t MKLDNN_API mkldnn_gemm_bf16bf16f32(
     return gemm_bf16bf16f32(&transb, &transa, &N, &M, &K,
             &alpha, B, &ldb, A, &lda, &beta, C, &ldc);
 }
+}//"C"
+#endif // !TARGET_VANILLA
 
-}

@@ -24,9 +24,7 @@
 #include "utils.hpp"
 
 #include "gemm/gemm.hpp"
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
 #include "gemm_inner_product_utils.hpp" // provides pp_kernel
-#endif
 
 #include "cpu_inner_product_pd.hpp"
 #include "cpu_primitive.hpp"
@@ -190,7 +188,6 @@ private:
 }
 }
 
-#endif
-
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+#endif
 
