@@ -19,10 +19,49 @@
 #include "mkldnn_thread.hpp"
 #include "utils.hpp"
 
+#define LIBRARY_COMPILE
+#include "gemm_utils.hpp"
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 namespace gemm_utils {
+
+#ifdef LIBRARY_COMPILE
+/** Partition \c n values as equally as possible among \c nthr threads
+ * and set the offset \c t_offset and number of values \c t_block for
+ * \c ithr.
+ * \pre 0 <= ithr < nthr. */
+void partition_unit_diff(
+        int ithr, int nthr, int n, int *t_offset, int *t_block)
+{
+    int band = n / nthr;
+    if (band == 0)
+        band = 1;
+    int tail = n - band * nthr;
+    if (tail < 0)
+        tail = 0;
+
+    if (ithr < tail) {
+        band++;
+        *t_offset = band * ithr;
+        *t_block = band;
+    } else {
+        *t_offset = band * ithr + tail;
+        *t_block = band;
+    }
+
+    if (*t_offset >= n) {
+        *t_offset = 0;
+        *t_block = 0;
+    }
+
+    if (*t_offset + *t_block > n) {
+        *t_block = n - *t_offset;
+    }
+}
+#endif // LIBRARY_COMPILE
+
 #if !defined(__ve)
 
 #define BM_NOCOPY_AVX 64
@@ -488,3 +527,4 @@ void calc_nthr_nocopy_ve(int m,
 }
 }
 }
+/* vim: set et ts=4 sw=4 cino=^=l0,\:0,N-s: */

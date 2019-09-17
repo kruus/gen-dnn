@@ -25,8 +25,8 @@
 
 //#include "c_types_map.hpp"
 //#include "mkldnn_os.h"
-#include "mkldnn_subset.hpp"
-#define UTILS_HPP_INLINE_ONLY 1
+#include "mkldnn_subset.hpp" // vgemm only needs very few types from mkldnn_types.h
+#define UTILS_HPP_SMALLER 1  // we'll declare mkldnn malloc/free (vconv scratchpad (at least) will supply utils.cpp)
 
 namespace mkldnn {
 namespace impl {
@@ -280,11 +280,32 @@ private:
     const int _dims[Tdims];
 };
 
-}
+}//utils::
 
 #if !defined(_SX)
-void *malloc(size_t size, int alignment);
-void free(void *p);
+//void *malloc(size_t size, int alignment);
+//void free(void *p);
+inline void *malloc(size_t size, int alignment) {
+    void *ptr;
+
+#ifdef _WIN32
+    ptr = _aligned_malloc(size, alignment);
+    int rc = ptr ? 0 : -1;
+#else
+    int rc = ::posix_memalign(&ptr, alignment, size);
+#endif
+
+    return (rc == 0) ? ptr : 0;
+}
+
+inline void free(void *p) {
+#ifdef _WIN32
+    _aligned_free(p);
+#else
+    ::free(p);
+#endif
+}
+
 #else
 /** SX -> std malloc and free, instead of aligning pointers.
  * Until I am sure that we do not use these pointers in mkldnn.hpp
@@ -313,7 +334,7 @@ struct c_compatible {
 
 inline void yield_thread() { }
 
-#if !UTILS_HPP_INLINE_ONLY
+#if !UTILS_HPP_SMALLER
 int mkldnn_getenv(char *value, const char *name, int len);
 bool mkldnn_jit_dump();
 FILE *mkldnn_fopen(const char *filename, const char *mode);
@@ -321,11 +342,9 @@ FILE *mkldnn_fopen(const char *filename, const char *mode);
 // Note: round_mode_t is in c_types_map.hpp, not avail within vgemm subset
 void set_rnd_mode(round_mode_t rnd_mode);
 void restore_rnd_mode();
-#endif // UTILS_HPP_INLINE_ONLY
-#undef UTILS_HPP_INLINE_ONLY
+#endif // UTILS_HPP_SMALLER
+#undef UTILS_HPP_SMALLER
 
-}
-}
-
-#endif
+}}//mkldnn::impl::
 // vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
+#endif // UTILS_HPP

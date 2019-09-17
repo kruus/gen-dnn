@@ -49,10 +49,11 @@ void calc_nthr_nocopy_avx(int m, int n, int k,
         int nthrs, int *nthrs_m, int *nthrs_n, int *nthrs_k, int *BM, int *BN,
         int *BK);
 #endif
+
+#ifdef LIBRARY_COMPILE
 void partition_unit_diff(
         int ithr, int nthr, int n, int *t_offset, int *t_block);
-};
-
+#else
 /** Partition \c n values as equally as possible among \c nthr threads
  * and set the offset \c t_offset and number of values \c t_block for
  * \c ithr.
@@ -85,7 +86,8 @@ inline void partition_unit_diff(
         *t_block = n - *t_offset;
     }
 }
-}
-}
-}
+#endif
+}//gemm_utils::
+}}}//mkldnn::impl::cpu::
+/* vim: set et ts=4 sw=4 cino=^=l0,\:0,N-s: */
 #endif

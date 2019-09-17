@@ -58,14 +58,9 @@ bool memory_desc_sanity_check(int ndims,const dims_t dims,
 
     return ok;
 }
+}//anon::
 
-bool memory_desc_sanity_check(const memory_desc_t *md) {
-    if (md == nullptr) return false;
-    return memory_desc_sanity_check(md->ndims, md->dims, md->data_type,
-            md->format);
-}
-}
-
+extern "C" {
 status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
         const dims_t dims, data_type_t data_type, memory_format_t format) {
 #ifndef NDEBUG
@@ -145,8 +140,18 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     return status;
 #undef AND_
 }
+}//extern "C"
 
 #if 0
+namespace {
+
+bool memory_desc_sanity_check(const memory_desc_t *md) {
+    if (md == nullptr) return false;
+    return memory_desc_sanity_check(md->ndims, md->dims, md->data_type,
+            md->format);
+}
+}//anon::
+
 status_t mkldnn_memory_primitive_desc_create(primitive_desc_t **memory_pd,
         const memory_desc_t *memory_desc, engine_t *engine) {
     bool args_ok = !any_null(memory_pd, memory_desc, engine)
