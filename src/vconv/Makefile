@@ -2,7 +2,7 @@ OBJECTS:=scratchpad.cpp.o 		memory_desc_wrapper.cpp.o \
 	primitive_attr.cpp.o \
 	gemm_convolution_utils.cpp.o \
 	gemm_convolution.cpp.o \
-	convolution.cpp.o memory.cpp utils.cpp
+	convolution.cpp.o memory.cpp.o utils.cpp.o
 # gemm_convolution.cpp.o  pulls too many headers, so memory and primitive API simplified
 # convolution.cpp and memory.cpp proved FOO_desc_init functions (helper functions)
 #      to initialize memory and convolution descriptors
@@ -15,14 +15,17 @@ CXXHEADERS:=c_types_map.hpp consistency.hpp conv_primitive_conf.hpp \
 
 # Optionally, try to force -ve or -x86 library
 ifeq ($(TARGET),-x86)
-CC=gcc
-CXX=g++
+CC=gcc-7
+CXX=g++-7
+NM=nm
 endif
 ifeq ($(TARGET),-ve)
 CC=ncc
 CXX=nc++
+NM=nnm
 endif
 
+SHELL:=bash
 INC:=-I.
 OPT:=
 AS_OPT:=
@@ -51,6 +54,11 @@ endif
 INSTALLDIR:=./install${TARGET}
 OBJECTS:=${patsubst %.o,%${TARGET}.o,${OBJECTS}}
 
+ifeq ($(TARGET),-x86) # override gcc compiler version (testing...)
+CC=gcc-7
+CXX=g++-7
+endif
+
 LIBS:=-L. -L../vgemm -lvconv${TARGET} -lvgemm{TARGET} -Wl,-rpath,./ -Wl,-rpath,../vgemm
 
 all: build install${TARGET}
@@ -74,13 +82,12 @@ libvconv${TARGET}.so: $(patsubst %.o,%.lo,$(OBJECTS))
 		-o $@
 # libvconv${TARGET}.a will contain libvgemm as required
 libvconv${TARGET}.a: $(OBJECTS) libvgemm${TARGET}.a
-	#$(CXX) -static $(CXXFLAGS) $(OPT) $(INC) $(LDFLAGS) $^ libvgemm.a \
-	#		-L/opt/nec/ve/nlc/2.0.0/lib -lcblas -lblas_openmp -o $@
 	rm -rf tmp_obj; mkdir tmp_obj
 	(cd tmp_obj && $(AR) -x ../libvgemm${TARGET}.a)
 	$(AR) qc $@ $(filter %.o,$^) `ls -rt1 tmp_obj/*`
 	rm -rf tmp_obj
-	$(NM) -C $@ >& $@.nm
+	ls -l $@
+	#$(NM) -C $@ >& $@.nm
 
 test_md: test_md.c | libvconv${TARGET}.so libvgemm${TARGET}.so
 	$(CC) $(CFLAGS) $(INC) -o $@.o -c $(filter %.c,$^)

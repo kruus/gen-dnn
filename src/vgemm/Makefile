@@ -4,10 +4,12 @@ OBJECTS:=gemm.cpp.o ref_gemm.cpp.o gemm_utils.cpp.o
 ifeq ($(TARGET),-x86) # unfortunately some Aurora machines do not seem to have a cblas :-/
 CC=gcc
 CXX=g++
+NM=nm
 endif
 ifeq ($(TARGET),-ve)
 CC=ncc
 CXX=nc++
+NM=nnm
 endif
 
 INC:=-I.
@@ -40,9 +42,10 @@ build: $(OBJECTS) libvgemm${TARGET}.a libvgemm${TARGET}.so
 	echo 'make build DONE'
 libvgemm${TARGET}.so: $(patsubst %.o,%.lo,$(OBJECTS))
 	$(CXX) -shared $(CXXFLAGS) $(OPT) $(INC) $(LDFLAGS) $^ -o $@
+SHELL:=bash	
 libvgemm${TARGET}.a: $(OBJECTS)
 	$(AR) crs $@ $^
-	$(NM) -C $@ >& $@.nm
+	#$(NM) -C $@ >& $@.nm
 
 CHEADERS:=mkldnn_os.h mkldnn_subset.h
 CXXHEADERS:=gemm.hpp gemm_utils.hpp \

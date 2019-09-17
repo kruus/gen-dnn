@@ -274,11 +274,7 @@ struct _gemm_convolution_fwd_t
         }
     };
 
-    typedef float data_type;
-    data_type const * pDataIn;
-    data_type const * pDataKernel;
-    data_type const * pDataBias;
-    data_type       * pDataOut;
+    typedef float dtype;
     _gemm_convolution_fwd_t(const pd_t *pd,
             //const input_vector &inputs, const output_vector &outputs
             const void* pDataIn,
@@ -288,10 +284,10 @@ struct _gemm_convolution_fwd_t
             )
         //: cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
         : conf_(*pd)
-        , pDataIn(      (data_type const *)pDataIn)
-        , pDataKernel(  (data_type const *)pDataKernel)
-        , pDataBias(    (data_type const *)pDataBias)
-        , pDataOut(     (data_type       *)pDataOut)
+        , pDataIn(      (dtype const *)pDataIn)
+        , pDataKernel(  (dtype const *)pDataKernel)
+        , pDataBias(    (dtype const *)pDataBias)
+        , pDataOut(     (dtype       *)pDataOut)
         , scratchpad_(nullptr)
     {
         using namespace prop_kind;
@@ -325,6 +321,10 @@ struct _gemm_convolution_fwd_t
 private:
     void execute_forward();
     pd_t conf_;
+    dtype const * pDataIn;
+    dtype const * pDataKernel;
+    dtype const * pDataBias;
+    dtype       * pDataOut;
     scratchpad_t *scratchpad_;
     data_t beta_;
 };
@@ -339,7 +339,7 @@ using gemm_convolution_relu_t =
 // in global namespace ::
 
 #if VCONV_STANDALONE
-typedef mkldnn::impl::cpu::_gemm_convolution_fwd_t<false>::data_type data_t; // float
+typedef mkldnn::impl::cpu::_gemm_convolution_fwd_t<false>::dtype data_t; // float
 /** a more standalone version of gemm-forward-convolution.
  *
  * \p jcp       mkldnn convolution parms
@@ -529,11 +529,7 @@ struct gemm_convolution_bwd_data_t //: public cpu_primitive_t
         }
     };
 
-    // all data types equal (and init() checks they're f32)
-    typedef float data_type;
-    data_type const* restrict pDataGradOut;
-    data_type const* restrict pDataKernel;
-    data_type      * restrict pDataGradIn;
+    typedef float dtype;
     gemm_convolution_bwd_data_t(
             const pd_t *pd,
             //const input_vector &inputs, const output_vector &outputs
@@ -543,9 +539,9 @@ struct gemm_convolution_bwd_data_t //: public cpu_primitive_t
             )
         //: cpu_primitive_t(&conf_, inputs, outputs)
         : conf_(*pd)
-        , pDataGradOut(     (data_type const*)pDataGradOut)
-        , pDataKernel(      (data_type const*)pDataKernel)
-        , pDataGradIn(      (data_type      *)pDataGradIn)
+        , pDataGradOut(     (dtype const*)pDataGradOut)
+        , pDataKernel(      (dtype const*)pDataKernel)
+        , pDataGradIn(      (dtype      *)pDataGradIn)
         , scratchpad_(nullptr)
     {
         using namespace prop_kind;
@@ -579,6 +575,10 @@ struct gemm_convolution_bwd_data_t //: public cpu_primitive_t
 private:
     void execute_backward_data();
     pd_t conf_;
+    // all data types equal (and init() checks they're f32)
+    dtype const* restrict pDataGradOut;
+    dtype const* restrict pDataKernel;
+    dtype      * restrict pDataGradIn;
     scratchpad_t *scratchpad_;
 };
 #endif // PARTIAL>=1 (include bwd_d)
@@ -738,11 +738,7 @@ struct gemm_convolution_bwd_weights_t //: public cpu_primitive_t
         }
     };
 
-    typedef float data_type;
-    data_type const* restrict pDataIn;
-    data_type const* restrict pDataGradOut;
-    data_type      * restrict pDataGradKernel;
-    data_type      * restrict pDataGradBias;
+    typedef float dtype;
     gemm_convolution_bwd_weights_t(
             const pd_t *pd,
             //const input_vector &inputs, const output_vector &outputs
@@ -753,10 +749,10 @@ struct gemm_convolution_bwd_weights_t //: public cpu_primitive_t
             )
         //: cpu_primitive_t(&conf_, inputs, outputs)
         : conf_(*pd)
-        , pDataIn(          (data_type const*)pDataIn)
-        , pDataGradOut(     (data_type const*)pDataGradOut)
-        , pDataGradKernel(  (data_type      *)pDataGradKernel)
-        , pDataGradBias(    (data_type      *)pDataGradBias)
+        , pDataIn(          (dtype const*)pDataIn)
+        , pDataGradOut(     (dtype const*)pDataGradOut)
+        , pDataGradKernel(  (dtype      *)pDataGradKernel)
+        , pDataGradBias(    (dtype      *)pDataGradBias)
         , scratchpad_(nullptr)
     {
         using namespace prop_kind;
@@ -798,6 +794,10 @@ private:
     void execute_backward_weights_bias();
 #endif
     pd_t conf_;
+    dtype const* restrict pDataIn;
+    dtype const* restrict pDataGradOut;
+    dtype      * restrict pDataGradKernel;
+    dtype      * restrict pDataGradBias;
     scratchpad_t *scratchpad_;
 };
 #endif // PARTIAL >=2 (incl bwd_d)

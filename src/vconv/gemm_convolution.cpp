@@ -52,7 +52,7 @@ using namespace mkldnn::impl::utils;
 #if 1
 
 #if VCONV_STANDALONE
-typedef _gemm_convolution_fwd_t<false>::data_type data_t; // float
+typedef _gemm_convolution_fwd_t<false>::dtype data_t; // float
 
 void vconv_gemm_fwd(
         jit_gemm_conv_conf_t const& jcp,
@@ -341,7 +341,9 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() {
     auto src            = pDataIn;
     auto diff_dst       = pDataGradOut;
     auto diff_weights   = pDataGradKernel;
-    //auto diff_bias      = pDataGradBias; // can be null (libvednn API does not support)
+#if !VE_OPENMP_BUG
+    auto diff_bias      = pDataGradBias; // can be null (libvednn API does not support)
+#endif
 
     jit_gemm_conv_conf_t &jcp = this->conf_.jcp_;
     const int K = jcp.os * jcp.od;

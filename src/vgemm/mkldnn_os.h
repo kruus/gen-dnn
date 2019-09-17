@@ -169,8 +169,13 @@
 #   define ShortLoop()
 #   define ShortLoopTest()
 #   define IVDEP() _Pragma("GCC ivdep")
+#if __GNUC__ >= 8
 #   define UNROLL(x) PragmaQuote(GCC unroll x)
-#   define PRAGMA_UNROLL PragmaQuote(GCC unroll(4))
+#   define PRAGMA_UNROLL PragmaQuote(GCC unroll 4)
+#else
+#   define UNROLL(x)
+#   define PRAGMA_UNROLL
+#endif
 
 #else /* A new system might begin by ignoring the optimization pragmas */
 #   warning "Please check if _Pragma macros can be defined for this platorm"

@@ -1,4 +1,5 @@
 # Optionally, try to force -ve or -x86 library
+SHELL:=bash
 ifeq ($(TARGET),-x86)
 CC:=gcc
 CXX:=g++
@@ -20,6 +21,7 @@ all:
 	cp -uarv vgemm/install${TARGET}/* vconv/install${TARGET}/
 	(cd vconv/install${TARGET} && tar czf - *) >& vconv${TARGET}.tar.gz
 	tar tzf vconv${TARGET}.tar.gz
+	echo "GOOD: vconv${TARGET}.tar.gz has been built"
 clean:
 	$(MAKE) -C vgemm $@
 	$(MAKE) -C vconv $@

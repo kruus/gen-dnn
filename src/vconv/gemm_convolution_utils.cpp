@@ -524,8 +524,10 @@ void im2col_u8(
                         = (ih * jcp.iw + iw) * jcp.ngroups * jcp.ic;
 #if defined(__ve)
                     _Pragma("_NEC shortloop_reduction")//;
+#elif __GNUC__ < 8
+                    OMP(parallel)
 #else
-                    PRAGMA_OMP_SIMD()//;
+                    PRAGMA_OMP_SIMD()//; // maybe OK for icc? not good for g++-7
 #endif
                     for (int ic = 0; ic < jcp.ic; ++ic) {
                         col[col_idx + ic] = im[im_idx + ic];
