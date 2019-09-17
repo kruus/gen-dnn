@@ -26,6 +26,8 @@
 #include "scratchpad.hpp"
 #include "consistency.hpp"
 
+#define VE_OPENMP_BUG (defined(__ve) && 1)
+
 #if !defined(MKLDNN_GEMM_CONV_DBG)
 #if !defined(NDEBUG)
 #define MKLDNN_GEMM_CONV_DBG 1
@@ -393,10 +395,10 @@ struct gemm_convolution_bwd_weights_t: public cpu_primitive_t {
 
 private:
     void execute_backward_weights();
-#define VE_OPENMP_BUG (defined(__ve) && 1)
-#if VE_OPENMP_BUG
+#if VE_OPENMP_BUG // introduces a new "helper" function in a separate file
     void execute_backward_weights_bias();
 #endif
+
     pd_t conf_;
     scratchpad_t *scratchpad_;
 };

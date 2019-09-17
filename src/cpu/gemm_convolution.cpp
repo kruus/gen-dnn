@@ -14,6 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include "mkldnn_os.h"
 #include "mkldnn_types.h"
 
 #include "c_types_map.hpp"
@@ -206,7 +207,7 @@ void gemm_convolution_bwd_data_t::execute_backward_data() {
     }
 }
 #endif
-#if !defined(TARGET_VANILLA)
+#if 0
 // ncc issue with multiple OMP clauses in same function :(
 void gemm_convolution_bwd_weights_t::execute_backward_weights() {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
@@ -301,6 +302,9 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() {
             }
     }
     if (jcp.with_bias) {
+#if VE_OPENMP_BUG
+        execute_backward_weights_bias();
+#else // !VE_OPENMP_BUG
         const size_t work_amount = jcp.ngroups * jcp.oc;
         OMP(parallel)//;
         {
@@ -335,10 +339,13 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() {
                 nd_iterator_step(g, jcp.ngroups, oc, jcp.oc);
             }
         }
+#endif // !VE_OPENMP_BUG
     }
 }
 #endif
-#if VE_OPENMP_BUG
+#if !defined(TARGET_VANILLA)
+        // !TARGET_VANILLA splits this function into 2 files.  gemm_convolution_bwd_w{,_bias}.cpp
+        // VE_OPENMP_BUG moves this function to gemm_convolution_bwd_w_bias.cpp
 void gemm_convolution_bwd_weights_t::execute_backward_weights_bias() {
     //auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
@@ -368,7 +375,6 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights_bias() {
 #if 0
     // weights update, omp loop -- see 
 #endif
-#if 1
     if (jcp.with_bias) {
         const size_t work_amount = jcp.ngroups * jcp.oc;
         OMP(parallel)//;
@@ -405,9 +411,8 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights_bias() {
             }
         }
     }
-#endif
 }
-#endif
+#endif // !TARGET_VANILLA
 #endif
 
 }

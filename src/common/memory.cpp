@@ -22,7 +22,7 @@
 
 #include "c_types_map.hpp"
 #include "engine.hpp"
-//#include "memory_pd.hpp"
+#include "memory_pd.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
 #include "consistency.hpp"

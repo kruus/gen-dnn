@@ -342,9 +342,13 @@ echo "PATH $PATH"
     # CMAKEOPT="" # allow user to pass flag, ex. CMAKEOPT='--trace -LAH' ./build.sh
     CMAKEOPT="${CMAKEOPT} -DCMAKE_CCXX_FLAGS=-DJITFUNCS=${DOJIT}"
     if [ $USE_CBLAS -ne 0 ]; then
-        export CFLAGS="${CFLAGS} -DUSE_CBLAS"
-        export CXXFLAGS="${CXXFLAGS} -DUSE_CBLAS"
+        #export CFLAGS="${CFLAGS} -DUSE_CBLAS"
+        #export CXXFLAGS="${CXXFLAGS} -DUSE_CBLAS"
+        CMAKEOPT="${CMAKEOPT} -DMKLDNN_USE_CBLAS=ON" # default OFF
     fi
+    #if [ $USE_MKL == "y" ]; then # deprecated in v1.0
+    #    CMAKEOPT="${CMAKEOPT} -D_MKLDNN_USE_MKL=ON"
+    #fi
     if [ ! "$DOTARGET" == "j" ]; then
         CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
         export CFLAGS="${CFLAGS} -DTARGET_VANILLA"

@@ -72,6 +72,8 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
 
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+
 set(CMAKE_SRC_CCXX_FLAGS)       # SRC specifics
 set(CMAKE_EXAMPLE_CCXX_FLAGS)   # EXAMPLE specifics
 set(CMAKE_TEST_CCXX_FLAGS)      # TESTS specifics
@@ -86,6 +88,7 @@ if(TRUE AND NECVE)
     find_package(Threads REQUIRED)
 endif()
 include("cmake/MKL.cmake")
+include("cmake/cblas.cmake")
 include("cmake/OpenMP.cmake")
 include("cmake/SDL.cmake")
 include("cmake/NLC.cmake")

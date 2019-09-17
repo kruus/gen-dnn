@@ -14,10 +14,13 @@
  * limitations under the License.
  *******************************************************************************/
 
+#include "gemm_convolution.hpp"
+#if VE_OPENMP_BUG
+// ncc has issues here. One loop was split from src/vanilla/gemm_convolution_bwd_w.cpp
+
 #include "mkldnn_types.h"
 
 #include "c_types_map.hpp"
-#include "gemm_convolution.hpp"
 #include "utils.hpp"
 #include "type_helpers.hpp"
 #include "mkldnn_thread.hpp"
@@ -34,7 +37,6 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-#if 1 // ncc has issues here. This loop was split from src/vanilla/gemm_convolution_bwd_w.cpp
 void gemm_convolution_bwd_weights_t::execute_backward_weights_bias() {
     //auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
@@ -102,8 +104,6 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights_bias() {
     }
 #endif
 }
-#endif
-}
-}
-}
+}}}//mkldnn::impl::cpu
 // vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s
+#endif //defined(VE_OPENMP_BUG)
