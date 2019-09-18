@@ -25,10 +25,13 @@
 #include "jit_avx_gemm_f32.hpp"
 #include "jit_avx512_common_gemm_f32.hpp"
 #endif
+
 #include "gemm.hpp"
+
 #if !defined(TARGET_VANILLA)
 #include "../jit_generator.hpp"
 #endif
+
 #include "nstl.hpp"
 #include "os_blas.hpp"
 

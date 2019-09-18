@@ -162,6 +162,7 @@ status_t conv_desc_init(convolution_desc_t *conv_desc,
 }
 }
 
+// mkldnn_convolution_FOO_desc_init declared in mkldnn.h
 status_t mkldnn_convolution_forward_desc_init(convolution_desc_t *conv_desc,
         prop_kind_t prop_kind, alg_kind_t alg_kind,
         const memory_desc_t *src_desc, const memory_desc_t *weights_desc,

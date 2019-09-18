@@ -18,6 +18,9 @@
 namespace mkldnn {
 namespace impl {
 namespace cpu {
+    /** gemm with optional bias.
+     * - additive \c bias adds a \c cblas_saxpy(*M,1.0,bias,incx=1,C + i*(*ldc),incy=1) for i=0..N
+     */
 mkldnn_status_t extended_sgemm(const char *transa, const char *transb,
         const int *M, const int *N, const int *K, const float *alpha,
         const float *A, const int *lda, const float *B, const int *ldb,

@@ -65,13 +65,13 @@ struct jit_conv_conf_t {
     int idp, ihp, iwp, ohp, owp;
     int nb_ic, ic_block;
     int nb_oc, oc_block;
-    int nb_ic_blocking, nb_oc_blocking; // blocking of nb_ic and nb_ic
-    int nb_ic_blocking_max;
-    int nb_ic_L2;
-    int nb_oc_L2;
-    int ur_h, ur_w;
-    int ur_w_tail;
-    bool is_1stconv;
+    int nb_ic_blocking, nb_oc_blocking; // blocking of nb_ic and nb_ic (only jit)
+    int nb_ic_blocking_max; // only jit
+    int nb_ic_L2; // only jit
+    int nb_oc_L2; // only jit
+    int ur_h, ur_w; // only jit
+    int ur_w_tail; // only jit
+    bool is_1stconv; // only jit
 #ifndef TARGET_VANILLA
     /* fma avx512_core */
     conv_kernel_kind_t kernel_kind;
