@@ -73,6 +73,9 @@ endif
 ##################################### all #####################################
 #
 all: build install${TARGET}
+test: build test_md
+	{ ./test_md; } 2>&1 | tee test.log
+	@echo "make test DONE -- see test.log"
 build: $(OBJECTS) libvconv${TARGET}.a libvconv${TARGET}.so
 	@echo "make build DONE"
 force: realclean
@@ -104,7 +107,8 @@ libvconv${TARGET}.a: $(OBJECTS) libvgemm${TARGET}.a
 	#$(NM) -C $@ >& $@.nm
 
 test_md: test_md.c build
-	$(CC) $(CFLAGS) $(INC) -o $@ $(filter %.c,$^) $(LIBS)
+	$(CC) $(CFLAGS) $(OPT) $(INC) -o $@.s -S $(filter %.c,$^)
+	$(CXX) $(CXXFLAGS) $(OPT) -o $@ $@.s $(LIBS)
 %: %.c libvconv${TARGET}.so libvgemm${TARGET}.so
 	$(CC) $(CFLAGS) $(INC) -o $@.o -c $(filter %.c,$^)
 	$(CXX) $(CXXFLAGS) -o $@ $@.o $(LIBS)
