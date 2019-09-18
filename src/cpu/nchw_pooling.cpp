@@ -90,6 +90,7 @@ void nchw_pooling_fwd_t<data_type>::execute_forward() {
                     const int ih = oh * SH - padT + kh;
                     const int iw = ow * SW - padL + kw;
 
+                    // ??? (id|ih|iw) < 0 (but nonportable)
                     if (id < 0 || id >= ID) continue;
                     if (ih < 0 || ih >= IH) continue;
                     if (iw < 0 || iw >= IW) continue;
@@ -103,6 +104,7 @@ void nchw_pooling_fwd_t<data_type>::execute_forward() {
                     auto s = src[src_offset];
                     if (s > d[0]) {
                         d[0] = s;
+                        // XXX remember kd,kh,kw and call this once, after loops
                         set_ws(mb, c, od, oh, ow, kd*KH*KW + kh*KW + kw);
                     }
                 }

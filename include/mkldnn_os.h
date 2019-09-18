@@ -114,6 +114,7 @@
 #   define ShortLoopTest() /*?*/
 #   define IVDEP() _Pragma("cdir nodep")
 #   define UNROLL(x)
+#   define PRAGMA_UNROLL
 
 #elif ENABLE_OPT_PRAGMAS && defined(__ve)
 //#   warning "__ve optimization pragmas IN EFFECT"
@@ -126,12 +127,14 @@
 #   define ShortLoopTest() _Pragma("_NEC shortloop_reduction")
 #   define IVDEP() _Pragma("_NEC ivdep")
 #   define UNROLL(x) PragmaQuote(_NEC unroll(x))
+#   define PRAGMA_UNROLL PragmaQuote(_NEC unroll(4))
 
 #elif ENABLE_OPT_PRAGMAS && defined(__INTEL_COMPILER)
 // restrict keyword requires the "-restrict" CFLAG; __restrict__ works anyway
 #   define restrict __restrict__
 #   define IVDEP() _Pragma("ivdep")
 #   define UNROLL(x) PragmaQuote(unroll(x))
+#   define PRAGMA_UNROLL PragmaQuote(unroll)
 //  TODO:
 #   define VREG(...)
 #   define ALLOC_ON_VREG(...)
@@ -147,6 +150,8 @@
 #   define collapse(x)
 //#  define PRAGMA_OMP_SIMD(...) ... below
 //--------------------------------------------
+#   define UNROLL(x)
+#   define PRAGMA_UNROLL 
 #   define VREG(...)
 #   define ALLOC_ON_VREG(...)
 #   define ALLOC_ON_ADB(...)
@@ -164,6 +169,7 @@
 #   define ShortLoopTest()
 #   define IVDEP() _Pragma("GCC ivdep")
 #   define UNROLL(x) PragmaQuote(GCC unroll x)
+#   define PRAGMA_UNROLL PragmaQuote(GCC unroll(4))
 
 #else /* A new system might begin by ignoring the optimization pragmas */
 #   warning "Please check if _Pragma macros can be defined for this platorm"
@@ -175,6 +181,7 @@
 #   define ShortLoopTest()
 #   define IVDEP()
 #   define UNROLL(x)
+#   define PRAGMA_UNROLL
 
 #endif
 
@@ -182,19 +189,19 @@
 #if ENABLE_OMP
 #   define OMP(...) PragmaQuote(omp __VA_ARGS__)
 #   if defined(__ve)
-#      warning "__ve enabling #pragma omp"
+//#      warning "__ve enabling #pragma omp"
 #   endif
 #   if defined(_SX) // no support for "simd" pragmas
 #   elif defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+#   elif defined(__ve)
+#      define PRAGMASIMD(...) PragmaQuote(simd __VA_ARGS__)
+//#      warning "__ve (ncc) ignores simd directive in PRAGMA_OMP_SIMD(...)
+#      define OMPSIMD(...) PragmaQuote(omp __VA_ARGS__)
+#      define PRAGMA_OMP_SIMD(...) PragmaQuote(omp __VA_ARGS__)
 #   else // defined(__GNUC) or intel or ...
-#      if defined(__ve)
-#         warning "__ve enabling #pragma [omp] simd"
-#      endif
 #      define PRAGMASIMD(...) PragmaQuote(simd __VA_ARGS__)
 #      define OMPSIMD(...) PragmaQuote(omp simd __VA_ARGS__)
-#      ifndef PRAGMA_OMP_SIMD // original was in mkldnn_thread.hpp
-#         define PRAGMA_OMP_SIMD(...) PragmaQuote(omp simd __VA_ARGS__)
-#      endif
+#      define PRAGMA_OMP_SIMD(...) PragmaQuote(omp simd __VA_ARGS__)
 #   endif
 #endif
 

@@ -26,7 +26,7 @@
 #include <math.h>
 
 #ifndef strnlen_s
-#define strnlen_s(x,y) ((x) ? ((strlen(x) < (size_t)y) ? strlen(x) : (size_t)y) : (size_t)0)
+#define strnlen_s(x,y) ((x!=nullptr) ? ((strlen(x) < (size_t)y) ? strlen(x) : (size_t)y) : (size_t)0)
 #endif
 #ifndef strnlen
 #define strnlen strnlen_s

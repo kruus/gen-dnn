@@ -34,6 +34,8 @@ file(GLOB SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/self/*.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/self/*.hpp
     )
+
+set(EXTRA_LIBS "${EXTRA_LIBS};${EXTRA_SHARED_LIBS}")
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/conv

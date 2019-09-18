@@ -14,6 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include "mkldnn_os.h"
 #include "mkldnn_types.h"
 
 #include "c_types_map.hpp"
@@ -34,7 +35,7 @@ void _gemm_convolution_fwd_t<with_relu>::execute_forward() {}
 
 void gemm_convolution_bwd_data_t::execute_backward_data() {}
 
-//void gemm_convolution_bwd_weights_t::execute_backward_weights() {}
+void gemm_convolution_bwd_weights_t::execute_backward_weights() {}
 
 #else // some sort of gemm (jit? cblas?) is available
 
@@ -90,7 +91,7 @@ void _gemm_convolution_fwd_t<with_relu>::execute_forward() {
 
         data_t *_col = col + (ptrdiff_t)ithr * jcp.im2col_sz;
 
-        # pragma omp parallel for if(jcp.nthr == 1)
+        OMP(parallel for if(jcp.nthr == 1))
         for (ptrdiff_t i = 0; i < jcp.im2col_sz; ++i) _col[i] = (data_t)0;
 
         int g{0}, n{0}, od{0};
@@ -166,12 +167,12 @@ void gemm_convolution_bwd_data_t::execute_backward_data() {
 
         data_t *_col = col + (ptrdiff_t)ithr * jcp.im2col_sz;
 
-        # pragma omp parallel for if(jcp.nthr == 1)
+        OMP(parallel for if(jcp.nthr == 1))//;
         for (ptrdiff_t i = 0; i < jcp.im2col_sz; ++i) _col[i] = (data_t)0;
 
         if (jcp.id > 1) {
             ptrdiff_t diff_src_sz = (ptrdiff_t)(work_amount * src_step);
-            #pragma omp for
+            OMP(for)//;
             for (ptrdiff_t i = 0; i < diff_src_sz; ++i)
                 diff_src[i] = 0.;
         }
@@ -206,7 +207,8 @@ void gemm_convolution_bwd_data_t::execute_backward_data() {
     }
 }
 #endif
-#if 0 // ncc has issues here. The FIRST omp loop goes in a separate FILE (WORKAROUND XXX !!!)
+#if 0
+// ncc issue with multiple OMP clauses in same function :(
 void gemm_convolution_bwd_weights_t::execute_backward_weights() {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
@@ -259,7 +261,7 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() {
             data_t *weights_reduce = weights_reduce_base
                     + ithr_mb * weights_g_size;
 
-            # pragma omp parallel for if(jcp.nthr == 1)
+            OMP(parallel for if(jcp.nthr == 1))//;
             for (ptrdiff_t i = 0; i < jcp.im2col_sz; ++i) _col[i] = (data_t)0;
 
             for (size_t g = g_start; g < g_end; ++g) {
@@ -300,6 +302,9 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() {
             }
     }
     if (jcp.with_bias) {
+#if VE_OPENMP_BUG
+        execute_backward_weights_bias();
+#else // !VE_OPENMP_BUG
         const size_t work_amount = jcp.ngroups * jcp.oc;
         OMP(parallel)//;
         {
@@ -317,8 +322,12 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() {
                     size_t offset = offset_ + (size_t)mb*jcp.ngroups*dst_step;
                     for (int od = 0; od < jcp.od; ++od)
                     for (int oh = 0; oh < jcp.oh; ++oh)
-                    //OMPSIMD(reduction(+:db))//;
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")// not this is compelely orthogonal to omp reduce;
+#else
+                    // actually this is a thread local reduction, so why is omp reduction even used?
                     PRAGMA_OMP_SIMD(reduction(+:db))
+#endif
                     for (int ow = 0; ow < jcp.ow; ++ow)
                     {
                         db += diff_dst[offset];
@@ -330,10 +339,13 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() {
                 nd_iterator_step(g, jcp.ngroups, oc, jcp.oc);
             }
         }
+#endif // !VE_OPENMP_BUG
     }
 }
 #endif
-#if VE_OPENMP_BUG
+#if !defined(TARGET_VANILLA)
+        // !TARGET_VANILLA splits this function into 2 files.  gemm_convolution_bwd_w{,_bias}.cpp
+        // VE_OPENMP_BUG moves this function to gemm_convolution_bwd_w_bias.cpp
 void gemm_convolution_bwd_weights_t::execute_backward_weights_bias() {
     //auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
@@ -363,7 +375,6 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights_bias() {
 #if 0
     // weights update, omp loop -- see 
 #endif
-#if 1
     if (jcp.with_bias) {
         const size_t work_amount = jcp.ngroups * jcp.oc;
         OMP(parallel)//;
@@ -382,8 +393,12 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights_bias() {
                     size_t offset = offset_ + (size_t)mb*jcp.ngroups*dst_step;
                     for (int od = 0; od < jcp.od; ++od)
                     for (int oh = 0; oh < jcp.oh; ++oh)
-                    //OMPSIMD(reduction(+:db))//;
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")// not this is compelely orthogonal to omp reduce;
+#else
+                    // actually this is a thread local reduction, so why is omp reduction even used?
                     PRAGMA_OMP_SIMD(reduction(+:db))
+#endif
                     for (int ow = 0; ow < jcp.ow; ++ow)
                     {
                         db += diff_dst[offset];
@@ -396,9 +411,8 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights_bias() {
             }
         }
     }
-#endif
 }
-#endif
+#endif // !TARGET_VANILLA
 #endif
 
 }

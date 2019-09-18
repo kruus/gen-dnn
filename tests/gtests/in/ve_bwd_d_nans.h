@@ -14,8 +14,15 @@
 * limitations under the License.
 *******************************************************************************/
 
+#if 0 // runs a long time on Aurora
 INST_TEST_CASE(NCHW_Dilation_ve_nans,
     PARAMS(nchw, oihw, FMT_BIAS, nchw,
         2, 1, 3, 227, 227, 96, 111, 111, 5, 5, 1, 1, 2, 2, 1, 1)
 );
 
+#else
+INST_TEST_CASE(NCHW_Dilation_ve_nans,
+    PARAMS(nchw, oihw, FMT_BIAS, nchw,
+        2, 1, 3, 127, 127, 96, 61, 61, 5, 5, 1, 1, 2, 2, 1, 1)
+);
+#endif

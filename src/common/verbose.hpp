@@ -17,7 +17,9 @@
 #ifndef VERBOSE_HPP
 #define VERBOSE_HPP
 
+#if !defined(DISABLE_VERBOSE)
 #include "mkldnn_debug.h"
+#endif
 #include "c_types_map.hpp"
 #include "utils.hpp"
 #include "z_magic.hpp"

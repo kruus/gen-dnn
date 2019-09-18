@@ -1,0 +1,31 @@
+# Optionally, try to force -ve or -x86 library
+SHELL:=bash
+ifeq ($(TARGET),-x86)
+CC:=gcc
+CXX:=g++
+endif
+ifeq ($(TARGET),-ve)
+CC:=ncc
+CXX:=nc++
+endif
+
+ifeq ($(patsubst ncc%,ncc,$(CC)),ncc) # if $(CC) begins with 'ncc'
+TARGET:=-ve
+else
+TARGET:=-x86
+endif
+
+all:
+	TARGET=${TARGET} $(MAKE) -C vgemm install${TARGET}
+	TARGET=${TARGET} $(MAKE) -C vconv install${TARGET}
+	cp -uarv vgemm/install${TARGET}/* vconv/install${TARGET}/
+	(cd vconv/install${TARGET} && tar czf - *) >& vconv${TARGET}.tar.gz
+	tar tzf vconv${TARGET}.tar.gz
+	echo "GOOD: vconv${TARGET}.tar.gz has been built"
+clean:
+	$(MAKE) -C vgemm $@
+	$(MAKE) -C vconv $@
+realclean:
+	$(MAKE) -C vgemm $@
+	$(MAKE) -C vconv $@
+	rm -f vconv-x86.tar.gz vconv-ve.tar.gz

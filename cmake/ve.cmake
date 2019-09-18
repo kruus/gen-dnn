@@ -112,6 +112,71 @@ macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS _compiler _flags _incVar _preincVar)
     endif()
 endmacro()
 
+macro(DETERMINE_CLANG_SYSTEM_INCLUDES_DIRS _compiler _isCpp _flags _incVar _preincVar _moreFlags)
+    #
+    # Input:
+    #           _compiler  : clang or clang++
+    #           _flags     : compiler flags
+    #           _isCpp     : isCpp
+    # Output:
+    #           _incVar    : list of compiler include paths (-isystem)
+    #           _preincVar : list of compiler pre-include paths
+    # Modifies CMAKE_C_FLAGS or CMAKE_CXX_FLAGS
+    #
+    set(_verbose 1)
+    # Oh, CMAKE_C/CXX_foo might not be set yet.
+    #if(_verbose GREATER 0)
+    #    message(STATUS "  CMAKE_C_COMPILER_ID           : ${CMAKE_C_COMPILER_ID}")
+    #    message(STATUS "  CMAKE_CXX_COMPILER_ID           : ${CMAKE_CXX_COMPILER_ID}")
+    #endif()
+    #if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
+    #    message(WARNING "CXX compiler not GNU, so may not be able to determine CXX sys includes")
+    #endif()
+    file(WRITE "${CMAKE_BINARY_DIR}/CMakeFiles/dummy" "\n")
+    separate_arguments(_buildFlags UNIX_COMMAND "${_flags}")
+    #execute_process(COMMAND ${_compiler} ${_buildFlags} -v -E dummy
+    set(_cmd ${_compiler} -v --target=ve-linux -c dummy)
+    execute_process(COMMAND ${_cmd}
+        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/CMakeFiles"
+        OUTPUT_QUIET
+        OUTPUT_VARIABLE _compOut0 # could be useful if use -dM
+        ERROR_VARIABLE _compOut)
+    file(REMOVE "${CMAKE_BINARY_DIR}/CMakeFiles/dummy")
+    separate_arguments(_compArgs UNIX_COMMAND "${_compOut}")
+    if(_verbose GREATER 1)
+        message(STATUS "_compiler   : ${_compiler}")
+        message(STATUS "_flags      : ${_flags}")
+        message(STATUS "_buildflags : ${_buildflags}")
+        message(STATUS "_compOut0   : ${_compOut0}")
+        message(STATUS "_compOut    : ${_compOut}")
+        message(STATUS "_compArgs   : ${_compArgs}")
+    endif()
+    set(_nextType "boring")
+    foreach(_compArg ${_compArgs})
+        if(_verbose GREATER 2)
+            message(STATUS "_nextType=${nextType}, _compArg=${_compArg}")
+        endif()
+        if(${_nextType} STREQUAL "InstalledDir:")
+            set(_install_dir ${_compArg})
+            set(_nextType "boring")
+        elseif(${_compArg} STREQUAL "InstalledDir:")
+            set(_nextType ${_compArg})
+        endif()
+    endforeach()
+    list(APPEND ${_moreFlags} "-idirafter${_install_dir}/../include")
+    if(${_isCpp} STREQUAL "clang++")
+      list(APPEND ${_incVar} "${_install_dir}/../lib/clang/${_compiler_version}/include/c++/v1")
+      list(APPEND ${_moreFlags} "-idirafter${_install_dir}/../include/c++/v1")
+    endif()
+    list(APPEND ${_incVar} "${_install_dir}/../lib/clang/${_compiler_version}/include")
+    if(1)
+        message(STATUS "Compiler       : ${_compiler}")
+        message(STATUS "  Flags        : ${_compiler}")
+        message(STATUS "  pre-includes : ${${_preincVar}}")
+        message(STATUS "  sys-includes : ${${_incVar}}")
+    endif()
+endmacro()
+
 # specify the cross compiler
 # Output:
 #      CMAKE_C_COMPILER    CMAKE_CXX_COMPILER   [ex. ncc nc++]
@@ -122,9 +187,17 @@ endmacro()
 # [a] if $CC is some ncc, use that; else use 'ncc'
 set(_compiler FALSE)
 if(EXISTS "$ENV{CC}")
-    execute_process(COMMAND $ENV{CC} --version OUTPUT_QUIET ERROR_VARIABLE _ccVersion)
+    execute_process(COMMAND $ENV{CC} --version OUTPUT_VARIABLE _cLangVersion ERROR_VARIABLE _ccVersion)
     if(${_ccVersion} MATCHES "^ncc")
         set(_compiler $ENV{CC})
+    elseif(${_cLangVersion} MATCHES "^clang")
+        set(_compiler $ENV{CC})
+        set(CMAKE_C_FLAGS "--target=ve-linux -fno-vectorize -fno-slp-vectorize -fno-crash-diagnostics -frtlib-add-rpath")
+        set(CMAKE_C_FLAGS_INIT "--target=ve-linux -fno-vectorize -fno-slp-vectorize -fno-crash-diagnostics -frtlib-add-rpath")
+        set(CMAKE_C_FLAGS_RELEASE "-DNDEBUG")
+
+        set(CMAKE_EXE_LINKER_FLAGS_INIT "-v -Wl,--verbose -Wl,-z,-origin -frtlib-add-rpath")
+        set(CMAKE_SHARED_LINKER_FLAGS_INIT "-v -Wl,--verbose -Wl,-z,-origin -frtlib-add-rpath")
     endif()
 endif()
 if(NOT _compiler) # OK, CC is not an ncc.  Is there an 'ncc' in current path?
@@ -135,9 +208,20 @@ if(NOT _compiler) # OK, CC is not an ncc.  Is there an 'ncc' in current path?
     endif()
 endif()
 if(_compiler)
-    DETERMINE_NCC_SYSTEM_INCLUDES_DIRS(ncc "-pthread" VE_C_SYSINC VE_C_PREINC)
+    if(${_compiler} MATCHES "clang")
+        DETERMINE_CLANG_SYSTEM_INCLUDES_DIRS(${_compiler} "clang" "-pthread" VE_C_SYSINC VE_C_PREINC _moreCFlags)
+        foreach(_newFlag ${_moreCFlags})
+          MESSAGE(STATUS "Adding flag ${_newFlag}")
+          SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${_newFlag}")
+          MESSAGE(STATUS "CMAKE_C_FLAGS ${CMAKE_C_FLAGS}")
+        endforeach()
+    else()
+      MESSAGE(STATUS "Determining clang system include directories")
+      DETERMINE_NCC_SYSTEM_INCLUDES_DIRS(ncc "-pthread" VE_C_SYSINC VE_C_PREINC)
+    endif()
     message(STATUS "ve.cmake [test]:  C pre-inc dirs  : ${VE_C_PREINC}")
     message(STATUS "ve.cmake [test]:  C sys-inc dirs  : ${VE_C_SYSINC}")
+    message(STATUS "ve.cmake [test]:  C CMAKE_C_FLAGS : ${CMAKE_C_FLAGS}")
     set(VE_C_PREINC ${VE_C_PREINC} CACHE INTERNAL "ncc pre-include directory[ies]")
     set(VE_C_SYSINC ${VE_C_SYSINC} CACHE INTERNAL "ncc sys-include directory[ies]")
     # oh, next 2 do not exist yet, so this must be done in Linux-GNU-<lang>-aurora.cmake files
@@ -151,9 +235,16 @@ else()
 endif()
 set(_compiler FALSE)
 if(EXISTS "$ENV{CXX}")
-    execute_process(COMMAND $ENV{CXX} --version OUTPUT_QUIET ERROR_VARIABLE _ccVersion)
+    execute_process(COMMAND $ENV{CXX} --version OUTPUT_VARIABLE _cLangVersion ERROR_VARIABLE _ccVersion)
     if(${_ccVersion} MATCHES "^nc\\+\\+")
         set(_compiler $ENV{CXX})
+    elseif(${_cLangVersion} MATCHES "^clang version ([0-9]+\.[0-9]+\.[0-9]+)")
+        set(_compiler $ENV{CXX})
+        set(_compiler_version "${CMAKE_MATCH_1}")
+        message(STATUS "ve.cmake [test]:  Clang version: ${_compiler_version}")
+        set(CMAKE_CXX_FLAGS "--target=ve-linux -fno-vectorize -fno-slp-vectorize -fno-crash-diagnostics -frtlib-add-rpath")
+        set(CMAKE_CXX_FLAGS_INIT "--target=ve-linux -fno-vectorize -fno-slp-vectorize -fno-crash-diagnostics -frtlib-add-rpath")
+        set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG")
     endif()
 endif()
 if(NOT _compiler) # OK, CC is not an ncc.  Is there an 'ncc' in current path?
@@ -164,16 +255,29 @@ if(NOT _compiler) # OK, CC is not an ncc.  Is there an 'ncc' in current path?
     endif()
 endif()
 if(_compiler)
-    DETERMINE_NCC_SYSTEM_INCLUDES_DIRS(nc++ "-pthread" VE_CXX_SYSINC VE_CXX_PREINC)
-    message(STATUS "ve.cmake [test]:  C pre-inc dirs  : ${VE_CXX_PREINC}")
-    message(STATUS "ve.cmake [test]:  C sys-inc dirs  : ${VE_CXX_SYSINC}")
+    if(${_compiler} MATCHES "clang")
+      MESSAGE(STATUS "Determining clang++ system include directories")
+      DETERMINE_CLANG_SYSTEM_INCLUDES_DIRS(${_compiler} "clang++" "-pthread" VE_CXX_SYSINC VE_CXX_PREINC _moreCxxFlags)
+      foreach(_newFlag ${_moreCxxFlags})
+        MESSAGE(STATUS "Adding flag ${_newFlag}")
+        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${_newFlag}")
+        MESSAGE(STATUS "CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS}")
+      endforeach()
+    else()
+      MESSAGE(STATUS "Determining nc++ system include directories")
+      DETERMINE_NCC_SYSTEM_INCLUDES_DIRS(nc++ "-pthread" VE_CXX_SYSINC VE_CXX_PREINC)
+    endif()
+    message(STATUS "ve.cmake [test]:  C++ pre-inc dirs  : ${VE_CXX_PREINC}")
+    message(STATUS "ve.cmake [test]:  C++ sys-inc dirs  : ${VE_CXX_SYSINC}")
+    message(STATUS "ve.cmake [test]:  CMAKE_CXX_FLAGS : ${CMAKE_CXX_FLAGS}")
     set(VE_CXX_PREINC ${VE_CXX_PREINC} CACHE INTERNAL "nc++ pre-include directory[ies]")
     set(VE_CXX_SYSINC ${VE_CXX_SYSINC} CACHE INTERNAL "nc++ sys-include directory[ies]")
-    message(STATUS "ve.cmake [test]:  C pre-inc dirs  : ${VE_CXX_PREINC}")
-    message(STATUS "ve.cmake [test]:  C sys-inc dirs  : ${VE_CXX_SYSINC}")
+    message(STATUS "ve.cmake [test]:  C++ pre-inc dirs  : ${VE_CXX_PREINC}")
+    message(STATUS "ve.cmake [test]:  C++ sys-inc dirs  : ${VE_CXX_SYSINC}")
+    message(STATUS "ve.cmake [test]:  CMAKE_CXX_FLAGS : ${CMAKE_CXX_FLAGS}")
     set(CMAKE_CXX_COMPILER   ${_compiler})
 else()
-    set(CMAKE_CXX_COMPILER   ncc)
+    set(CMAKE_CXX_COMPILER   nc++)
 endif()
 unset(_compiler)
 
@@ -183,7 +287,7 @@ unset(_compiler)
 #   [2] if 'ncc' can be executed in current environment, grab paths directly from
 #       execute_process(... ncc ...)
 # TODO [2] is above, but can that optional info help us in what follows?
-set(CMAKE_CXX_COMPILER nc++)
+# set(CMAKE_CXX_COMPILER nc++)
 # [1] determine important VE cross-compiler dirs
 #  TODO update dir determination if VE
 if(NOT VE_OPT)
@@ -191,7 +295,8 @@ if(NOT VE_OPT)
 endif()
 # TODO if already know full compiler path from [2], then VE_ROOT must be in some parent dir
 # TODO ncc gives us MUSL_DIR (and we probably do not need it)
-find_program(VE_NCC NAMES ${CMAKE_C_COMPILER} NO_DEFAULT_PATH
+# find_program(VE_NCC NAMES ${CMAKE_C_COMPILER} NO_DEFAULT_PATH
+find_program(VE_NCC NAMES ncc NO_DEFAULT_PATH
     PATHS ${VE_OPT} /opt/nec/ve
     PATH_SUFFIXES bin)
 if(NOT VE_NCC)
@@ -199,15 +304,15 @@ if(NOT VE_NCC)
 endif()
 get_filename_component(VE_OPT ${VE_NCC} DIRECTORY) # VE_OPT/bin 
 get_filename_component(VE_OPT ${VE_OPT} DIRECTORY) # VE_OPT 
-# final check on VE_OPT
-find_program(VE_NCC NAMES ${CMAKE_C_COMPILER} PATHS ${VE_OPT} PATH_SUFFIXES bin)
-if(NOT VE_NCC)
-    message(FATAL_ERROR "ve.cmake: VE cross-compiler ${CMAKE_C_COMPILER} not found under ${VE_OPT}")
-endif()
-find_program(VE_NCXX NAMES ${CMAKE_CXX_COMPILER} PATHS ${VE_OPT} PATH_SUFFIXES bin)
-if(NOT VE_NCXX)
-    message(FATAL_ERROR "ve.cmake: VE cross-compiler ${CMAKE_CXX_COMPILER} not found under ${VE_OPT}")
-endif()
+# # final check on VE_OPT
+# find_program(VE_NCC NAMES ${CMAKE_C_COMPILER} PATHS ${VE_OPT} PATH_SUFFIXES bin)
+# if(NOT VE_NCC)
+#     message(FATAL_ERROR "ve.cmake: VE cross-compiler ${CMAKE_C_COMPILER} not found under ${VE_OPT}")
+# endif()
+# find_program(VE_NCXX NAMES ${CMAKE_CXX_COMPILER} PATHS ${VE_OPT} PATH_SUFFIXES bin)
+# if(NOT VE_NCXX)
+#     message(FATAL_ERROR "ve.cmake: VE cross-compiler ${CMAKE_CXX_COMPILER} not found under ${VE_OPT}")
+# endif()
 set(VE_OPT ${VE_OPT} CACHE PATH "Aurora cross compiler root")
 # VE_OPT seems OK
 
@@ -220,7 +325,7 @@ set(CMAKE_SYSTEM_PREFIX_PATH ${CMAKE_SYSTEM_PREFIX_PATH} ${VE_OPT} ${CMAKE_INSTA
 list(REMOVE_DUPLICATES CMAKE_SYSTEM_PREFIX_PATH)
 message(STATUS "CMAKE_SYSTEM_PREFIX_PATH -> ${CMAKE_SYSTEM_PREFIX_PATH}")
 
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH "cmake additional Module/Platform path")
+# set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH "cmake additional Module/Platform path")
 set(_CMAKE_TOOLCHAIN_PREFIX n)		# nar, nld, nFOO binaries XXX handy, but undocumented
 #set(CMAKE_CROSSCOMPILING ON)		# auto, if used as TOOCLCHAIN file
 set(VE_EXEC ve_exec)
@@ -238,28 +343,28 @@ else()
 endif()
 message(STATUS "VE_EXEC ends up as ${VE_EXEC}")
 
-# VE libc and other libs
-# ? find_library c ... ?
-set(VE_MUSL_DIR "${VE_OPT}/musl" CACHE PATH "Aurora musl directory")
-set(VE_MUSL_FLAGS " -I${VE_MUSL_DIR}/include -L${VE_MUSL_DIR}/lib" CACHE STRING "Aurora C/CXX compile/link options. ncc/nc++ auto uses the include path!")
-if(NOT EXISTS ${VE_MUSL_DIR})
-    message(WARNING "ve.cmake: VE musl directory not found")
-endif()
-message(STATUS "VE_MUSL_DIR [libc]          : ${VE_MUSL_DIR}")
-message(STATUS "VE_MUSL_FLAGS               : ${VE_MUSL_FLAGS}")
-# VE_MUSL_DIR seems OK
-# Note: MUSL is **always** included for you by ncc/nc++
-
-if(VE_MUSL_DIR)
-    list(APPEND CMAKE_FIND_ROOT_PATH ${VE_MUSL_DIR})
-    list(APPEND CMAKE_SYSTEM_PREFIX_PATH ${VE_MUSL_DIR})
-    message(STATUS "CMAKE_SYSTEM_PREFIX_PATH -> ${CMAKE_SYSTEM_PREFIX_PATH}")
-    # TODO actually check that the function 'dlopen' is there
-    # Note: linker is auto-supplied ld-musl-ve via ncc/nc++ [I think]
-    find_library(VE_DL_LIBRARY NAMES ld-musl-ve c dl# there is no libdl.a for dlopen,...
-        NO_DEFAULT_PATH HINTS ${VE_MUSL_DIR}/lib)
-    set(VE_DL_LIBRARY ${VE_DL_LIBRARY} CACHE PATH "Library that may contain a dlopen function")
-endif()
+# # VE libc and other libs
+# # ? find_library c ... ?
+# set(VE_MUSL_DIR "${VE_OPT}/musl" CACHE PATH "Aurora musl directory")
+# set(VE_MUSL_FLAGS " -I${VE_MUSL_DIR}/include -L${VE_MUSL_DIR}/lib" CACHE STRING "Aurora C/CXX compile/link options. ncc/nc++ auto uses the include path!")
+# if(NOT EXISTS ${VE_MUSL_DIR})
+#     message(WARNING "ve.cmake: VE musl directory not found")
+# endif()
+# message(STATUS "VE_MUSL_DIR [libc]          : ${VE_MUSL_DIR}")
+# message(STATUS "VE_MUSL_FLAGS               : ${VE_MUSL_FLAGS}")
+# # VE_MUSL_DIR seems OK
+# # Note: MUSL is **always** included for you by ncc/nc++
+# 
+# if(VE_MUSL_DIR)
+#     list(APPEND CMAKE_FIND_ROOT_PATH ${VE_MUSL_DIR})
+#     list(APPEND CMAKE_SYSTEM_PREFIX_PATH ${VE_MUSL_DIR})
+#     message(STATUS "CMAKE_SYSTEM_PREFIX_PATH -> ${CMAKE_SYSTEM_PREFIX_PATH}")
+#     # TODO actually check that the function 'dlopen' is there
+#     # Note: linker is auto-supplied ld-musl-ve via ncc/nc++ [I think]
+#     find_library(VE_DL_LIBRARY NAMES ld-musl-ve c dl# there is no libdl.a for dlopen,...
+#         NO_DEFAULT_PATH HINTS ${VE_MUSL_DIR}/lib)
+#     set(VE_DL_LIBRARY ${VE_DL_LIBRARY} CACHE PATH "Library that may contain a dlopen function")
+# endif()
 
 # For reference, from nlc 1.0.0 docs ............
 # Various NLC options ...........................
@@ -286,6 +391,7 @@ endfunction()
 ######## find a VE_CBLAS_INCLUDE_DIR, that contains cblas.h
 # blas location : IF you have sourced nlcvars.sh, we try to match those settings exactly
 #   otherwise, look in ENV{NLC_BASE}/include or ${VE_OPT}/nlc/**/include for cblas.h
+
 function(NLC_PRELIM_SETTINGS)
     cmake_parse_arguments(_prelim "INIT" "I64;MPI" "" ${ARGN})
     if(NOT _prelim_INIT)
@@ -299,42 +405,18 @@ function(NLC_PRELIM_SETTINGS)
             message(STATUS "  using NLC_HOME from environment: ${NLC_HOME} (assuming nlcvar.{sh|csh} has been sourced)")
             set(NLC_VERSION "$ENV{NLC_VERSION}")
             set(NLC_HOME "$ENV{NLC_HOME}")
-            set(ASL_HOME "$ENV{ASL_HOME")
-            set(NLC_LIB_I64 "$ENV{NLC_LIB_I64}")
-            set(ASL_LIB_I64 "$ENV{ASL_LIB_I64}")
-            set(NLC_LIB_MPI "$ENV{NLC_LIB_MPI}")
-            set(ASL_LIB_MPI "$ENV{ASL_LIB_MPI}")
-            set(NCC_INCLUDE_PATH "$ENV{NCC_INCLUDE_PATH}")
-            set(NFORT_INCLUDE_PATH "$ENV{NFORT_INCLUDE_PATH}")
-            set(VE_LIBRARY_PATH "$ENV{VE_LIBRARY_PATH}")
-
+            set(ASL_HOME "$ENV{NLC_HOME}")
+            set(NLC_LIB_I64 "")
+            set(ASL_LIB_I64 "")
+            set(NLC_LIB_MPI "")
+            set(ASL_LIB_MPI "")
             if(EXISTS "${NLC_HOME}/include/cblas.h")
+                set(VE_NLC_INCLUDE_CBLAS_H "include/cblas.h")
                 set(VE_CBLAS_INCLUDE_DIR "${NLC_HOME}/include")
+                set(VE_CBLAS_DIR "${NLC_HOME}")
             endif()
         else()
-            foreach(_ve_nlc_root "$ENV{NLC_BASE}" "${VE_OPT}/nlc")
-                if(IS_DIRECTORY "${_ve_nlc_root}")
-                    message(STATUS "glob relative to ${_ve_nlc_root} directory")
-                    file(GLOB_RECURSE glbCBLAS LIST_DIRECTORIES false RELATIVE "${_ve_nlc_root}" "${_ve_nlc_root}/cblas.h")
-                    # if nlc/V.M.m/...cblas.h, alphabetic sort should return the "latest version"
-                    message(STATUS "glbCBLAS : ${glbCBLAS}")
-                    list(LENGTH glbCBLAS _nglob)
-                    if(_nglob)
-                        message(STATUS "sort,reverse,head...")
-                        list(SORT glbCBLAS)
-                        list(REVERSE glbCBLAS)
-                        list(GET glbCBLAS 0 VE_NLC_INCLUDE_CBLAS_H)
-                        message(STATUS "Possible cblas.h locations: ${glbCBLAS}")
-                        message(STATUS "BEST cblas.h location     : ${VE_NLC_INCLUDE_CBLAS_H}")
-                        # double-check
-                        if(NOT EXISTS "${_ve_nlc_root}/${VE_NLC_INCLUDE_CBLAS_H}")
-                            message(FATAL_ERROR "ve.cmake Ooops [programmer error]")
-                        endif()
-                        get_filename_component(VE_CBLAS_INCLUDE_DIR "${_ve_nlc_root}/${VE_NLC_INCLUDE_CBLAS_H}" DIRECTORY)
-                        break()
-                    endif()
-                endif()
-            endforeach()
+            message(FATAL_ERROR "environment variable NLC_HOME not set")
         endif()
     endif()
     set(VE_CBLAS_INCLUDE_DIR "${VE_CBLAS_INCLUDE_DIR}" CACHE STRING "VE_CBLAS_INCLUDE_DIR")
@@ -424,7 +506,7 @@ function(NLC_PRELIM_SETTINGS)
     endforeach()
     unset(NLC__dir_lib)
     set(VE_NLC_LIBRARY_PATH "${VE_NLC_LIBRARY_PATH}")  #VE NLC ;-separated library paths to prepend to VE_NLC_LIBRARY_PATH")
-    message(STATUS "  VE_NLC_LIBRARY_PATH       : ${VE_NFORT_INCLUDES}")
+    message(STATUS "  VE_NLC_LIBRARY_PATH       : ${VE_NLC_LIBRARY_PATH}")
 
     # These values are not meant to be modified, so returned as CACHE values
     set(NLC_LIB_I64 "${NLC_LIB_I64}" CACHE BOOL "NLC 1/0 64-bit integer?" FORCE)
@@ -501,8 +583,13 @@ function(VE_NLC_SETUP)
     set(VE_NLC_FFT_LIBS -laslfftw3${_ve_mpi}${_ve_i64} -lasl${_ve_mpi}${_ve_openmp_or_sequential}${_ve_i64} ${_ve_fopenmp})
     if(_nlc_I64)
         set(VE_NLC_CBLAS_LIBS "") # I64 ==> cblas N/A
+        set(VE_NLC_CBLAS_LIB_PATHS "")
     else()
         set(VE_NLC_CBLAS_LIBS -lcblas -lblas${_ve_openmp_or_sequential} ${ve_fopenmp})
+        set(VE_NLC_CBLAS_LIB_PATHS ${VE_NLC_LIBRARY_PATH}/libcblas.a ${VE_NLC_LIBRARY_PATH}/libblas${_ve_openmp_or_sequential}.a)
+        if(ve_fopenmp)
+            list(APPEND VE_NLC_CBLAS_LIB_PATHS ${VE_NLC_LIBRARY_PATH}/lib${ve_fopenmp}.a)
+        endif()
     endif()
     if(_nlc_SEQ OR _nlc_I64)                   # SEQ or I64 ==> het N/A
         set(VE_NLC_HET_LIBS "")
@@ -544,6 +631,7 @@ function(VE_NLC_SETUP)
     set(VE_NLC_FFT_LIBS "${VE_NLC_FFT_LIBS}" PARENT_SCOPE)
     set(VE_NLC_ASL_LIBS "${VE_NLC_ASL_LIBS}" PARENT_SCOPE)
     set(VE_NLC_CBLAS_LIBS "${VE_NLC_CBLAS_LIBS}" PARENT_SCOPE)
+    set(VE_NLC_CBLAS_LIB_PATHS "${VE_NLC_CBLAS_LIB_PATHS}" PARENT_SCOPE)
     set(VE_NLC_HET_LIBS "${VE_NLC_HET_LIBS}" PARENT_SCOPE)
     set(VE_NLC_LIBS "${VE_NLC_LIBS}" CACHE STRING "NLC C/C++ link libraries" FORCE)
     set(VE_NLC_C_INCFLAGS "${VE_NLC_C_INCFLAGS}" CACHE STRING "NLC C include flags" FORCE) 
@@ -617,6 +705,7 @@ VE_NLC_SETUP(I64 ${NLC_LIB_I64} MPI ${NLC_LIB_MPI} SEQ ${VE_SEQ}  FFT ${VE_FFT} 
 #set(VE_NLC_FFT_LIBS "${VE_NLC_FFT_LIBS}" PARENT_SCOPE)
 #set(VE_NLC_ASL_LIBS "${VE_NLC_ASL_LIBS}" PARENT_SCOPE)
 #set(VE_NLC_CBLAS_LIBS "${VE_NLC_CBLAS_LIBS}" PARENT_SCOPE)
+#set(VE_NLC_CBLAS_LIB_PATHS "${VE_NLC_CBLAS_LIB_PATHS}" PARENT_SCOPE)
 #set(VE_NLC_HET_LIBS "${VE_NLC_HET_LIBS}" PARENT_SCOPE)
 #set(VE_NLC_LIBS "${VE_NLC_LIBS}" CACHE STRING "NLC C/C++ link libraries" FORCE)
 #set(VE_NLC_C_INCFLAGS "${VE_NLC_C_INCFLAGS}" CACHE STRING "NLC C include flags" FORCE) 
@@ -628,98 +717,14 @@ message(STATUS "ve.cmake                VE_FFT ${VE_FFT} VE_ASL ${VE_ASL} VE_CBL
 message(STATUS "ve.cmake              - VE_NLC_FFT_LIBS   ${VE_NLC_FFT_LIBS}")
 message(STATUS "ve.cmake              - VE_NLC_ASL_LIBS   ${VE_NLC_ASL_LIBS}")
 message(STATUS "ve.cmake              - VE_NLC_CBLAS_LIBS ${VE_NLC_CBLAS_LIBS}")
+message(STATUS "ve.cmake              - VE_NLC_CBLAS_LIB_PATHS ${VE_NLC_CBLAS_LIB_PATHS}")
 message(STATUS "ve.cmake              - VE_NLC_HET_LIBS   ${VE_NLC_HET_LIBS}")
 message(STATUS "ve.cmake   VE_NLC_LIBS         ${VE_NLC_LIBS}") # cache force
 message(STATUS "ve.cmake   VE_NLC_C_INCFLAGS   ${VE_NLC_C_INCFLAGS}") # cache force
 message(STATUS "ve.cmake   VE_NLC_CXX_INCFLAGS ${VE_NLC_CXX_INCFLAGS}") # cache force
-message(STATUS "ve.cmake   VE_NLC_C_LDFLAGS    ${VE_NLC_C_LDCFLAGS}") # cache force
+message(STATUS "ve.cmake   VE_NLC_C_LDFLAGS    ${VE_NLC_C_LDCLAGS}") # cache force
 message(STATUS "ve.cmake   VE_NLC_CXX_LDFLAGS  ${VE_NLC_CXX_LDFLAGS}") # cache force
 message(STATUS " ...... end test code ......")
-
-if(0)
-    # old code REMOVE !!! XXX
-    set(VE_I64 0 CACHE BOOL "VE Compile with i64 integers [TBD]")
-    set(VE_MPI 0 CACHE BOOL "VE Compile for mpi [TBD]")
-    set(VE_SEQ 1 CACHE BOOL "VE with OpenMP")
-    # Various NLC component libraries ...............
-    set(VE_FFT 0 CACHE BOOL "VE with FFTW3 Interface")
-    set(VE_ASL 0 CACHE BOOL "VE with ASL Unified Interface")
-    set(VE_CBLAS 1 CACHE BOOL "VE with CBLAS Interface")
-    set(VE_HET 0 CACHE BOOL "VE with HeteroSolver Interface")
-    # ...............................................
-    if(VE_I64)
-        set(VE_CBLAS 0) # not available
-        set(VE_HET 0)   # not available
-    endif()
-    if(VE_HET)
-        set(VE_SEQ 0)
-    endif()
-
-    set(_ve_sequential "_sequential")
-    set(_ve_openmp "_openmp")
-    if(VE_SEQ)
-        set(_ve_fopenmp "")
-        set(_ve_openmp_or_sequential "${_ve_sequential}")
-    else()
-        #set(VE_NLC_C_FLAGS "-fopenmp" CACHE STRING "VE OpenMP compiler flag")
-        set(_ve_fopenmp "-fopenmp")
-        set(_ve_openmp_or_sequential "${_ve_openmap}")
-    endif()
-    if(VE_MPI)
-        set(_ve_mpi "_mpi")
-    else()
-        set(_ve_mpi "")
-    endif()
-    if(VE_I64)
-        set(_ve_i64 "_i64")
-    else()
-        set(_ve_i64 "")
-    endif()
-    # TODO find_library each required lib (or check library exists)
-    set(VE_NLC_ASL_LIBS -lasl${_ve_mpi}${_ve_openmp_or_sequential}${_ve_i64} ${_ve_fopenmp}
-        CACHE STRING "VE NLC ASL unified link libs (;-separated list)")
-    set(VE_NLC_FFT_LIBS -laslfftw3${_ve_mpi}${_ve_i64} -lasl${_ve_mpi}${_ve_openmp_or_sequential}${_ve_i64} ${_ve_fopenmp}
-        CACHE STRING "VE NLC FFTW3 link libs (;-separated list)")
-    set(VE_NLC_CBLAS_LIBS -lcblas -lblas${_ve_openmp_or_sequential} ${ve_fopenmp}
-        CACHE STRING "VE NLC CBLAS link libs (;-separated list)")
-    set(VE_NLC_HET_LIBS -lheterosolver${_ve_mpi}${_ve_openmp} ${_ve_fopenmp}
-        CACHE STRING "VE NLC HET libs (;-separated list)")
-    mark_as_advanced(VE_NLC_ASL_LIBS VE_NLC_CBLAS_LIBS VE_NLC_HET_LIBS)
-
-
-    VE_PREPEND_EACH("${VE_NCC_INCLUDES}" " -I" _tmp)
-    set(VE_NLC_C_INCFLAGS "${_ve_fopenmp} ${_tmp}" CACHE STRING "NLC C include flags") 
-    set(VE_NLC_CXX_INCFLAGS "${_ve_fopenmp} ${_tmp}" CACHE STRING "NLC C++ include flags")
-    VE_PREPEND_EACH("${VE_NLC_LIBRARY_PATH}" " -L" _tmp)
-    set(VE_NLC_C_LDFLAGS "${_ve_fopenmp} ${_tmp}" CACHE STRING "NLC C LDFLAGS")
-    set(VE_NLC_CXX_LDFLAGS "${_ve_fopenmp} ${_tmp}" CACHE STRING "NLC C++ LDFLAGS")
-    string(STRIP "${VE_NLC_CXX_LDFLAGS}" VE_NLC_CXX_LDFLAGS)
-    message(STATUS "VE_NLC_C_INCFLAGS           : ${VE_NLC_C_INCFLAGS}")
-    message(STATUS "VE_NLC_C_LDFLAGS            : ${VE_NLC_C_LDFLAGS}")
-    message(STATUS "ve.cmake TODO: C/CXX RPATH linker options to NLC library directories (in case shared libs are used)")
-    set(VE_NLC_LIBS "")
-    if(VE_FFT)
-        list(INSERT VE_NLC_LIBS 0 "${VE_NLC_FFT_LIBS}")
-    endif()
-    if(VE_ASL)
-        list(INSERT VE_NLC_LIBS 0 "${VE_NLC_ASL_LIBS}")
-    endif()
-    if(VE_CBLAS)
-        list(INSERT VE_NLC_LIBS 0 "${VE_NLC_CBLAS_LIBS}")
-    endif()
-    if(VE_HET)
-        list(INSERT VE_NLC_LIBS 0 "${VE_NLC_HET_LIBS}")
-    endif()
-    list(REMOVE_DUPLICATES VE_NLC_LIBS)
-    VE_JOIN("${VE_NLC_LIBS}" " " VE_NLC_LIBS)
-    set(VE_NLC_LIBS "${VE_NLC_LIBS}" CACHE STRING "NLC C/C++ link libraries")
-    message(STATUS "Enabled NLC components: ASL=${VE_ASL} FFT=${VE_FFT} CBLAS=${VE_CBLAS} HET=${VE_HET} LAPACK=[tbd] SBLAS=[tbd], ...")
-    message(STATUS "VE_NLC_LIBS                 : ${VE_NLC_LIBS}")
-    set(VE_NLC_C_FLAGS "" CACHE STRING "VE nlc flags")
-    # NOTE: CMAKE_SYSTEM_XXX_PATH are cleaned up for VE inside
-    #       Platform/Linux-GNU-{C|CXX}-aurora.cmake
-    ############################################ end DEMO NLC library settings ####
-endif()
 
 # ftrace/veperf location
 find_file(found_VEPERF_H NAME veperf.h
@@ -970,95 +975,6 @@ function(show_cmake_stuff MSG)
     message(STATUS "    CMAKE_CXX_CREATE_ASSEMBLY_SOURCE     ${CMAKE_CXX_CREATE_ASSEMBLY_SOURCE}")
     message(STATUS "    -------------------------------")
 endfunction()
-
-macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS _compiler _flags _incVar _preincVar)
-    # Input:
-    #           _compiler  : ncc or nc++ [or nfort?]
-    #           _flags     : compiler flags
-    # Output:
-    #           _incVar    : list of compiler include paths (-isystem)
-    #           _preincVar : list of compiler pre-include paths
-    #
-    #    ncc -v -E -x c++ dummy 1>/dev/null
-    #       /opt/nec/ve/ncc/0.0.28/libexec/ccom -cpp -v -E -dD
-    #         -isystem /opt/nec/ve/ncc/0.0.28/include
-    #         -isystem /opt/nec/ve/musl/include
-    #         --preinclude-path /opt/nec/ve/ncc/0.0.28/include
-    #         -x c++ dummy
-    # or [TODO] nfort -v -E dummy 1>/dev/null
-    #       /opt/nec/ve/nfort/0.0.28/libexec/fpp -I. -p
-    #         -I/opt/nec/ve/nfort/0.0.28/include
-    #         -I/opt/nec/ve/musl/include
-    #         dummy
-    set(_verbose 1)
-    if(_verbose GREATER 0)
-        message(STATUS "  CMAKE_C_COMPILER_ID           : ${CMAKE_C_COMPILER_ID}")
-        message(STATUS "  CMAKE_CXX_COMPILER_ID           : ${CMAKE_CXX_COMPILER_ID}")
-    endif()
-    if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
-        message(WARNING "CXX compiler not GNU, so may not be able to determine CXX sys includes")
-    endif()
-    file(WRITE "${CMAKE_BINARY_DIR}/CMakeFiles/dummy" "\n")
-    separate_arguments(_buildFlags UNIX_COMMAND "${_flags}")
-    #execute_process(COMMAND ${_compiler} ${_buildFlags} -v -E dummy
-    set(_cmd ${CMAKE_C_COMPILER} -v -E dummy)
-    execute_process(COMMAND ${_cmd}
-        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/CMakeFiles"
-        OUTPUT_QUIET
-        #OUTPUT_VARIABLE _compOut0 # could be useful if use -dM
-        ERROR_VARIABLE _compOut)
-    file(REMOVE "${CMAKE_BINARY_DIR}/CMakeFiles/dummy")
-    separate_arguments(_compArgs UNIX_COMMAND "${_compOut}")
-    if(_verbose GREATER 1)
-        message(STATUS "_compiler   : ${_compiler}")
-        message(STATUS "_flags      : ${_flags}")
-        message(STATUS "_buildflags : ${_buildflags}")
-        #message(STATUS "_compOut0   : ${_compOut0}")
-        message(STATUS "_compOut    : ${_compOut}")
-        message(STATUS "_compArgs   : ${_compArgs}")
-    endif()
-    set(_nextType "boring")
-    list(GET _compArgs 0 _ccom) # e.g. /opt/nec/ve/ncc/0.0.28/libexec/ccom
-    message(STATUS "_ccom ${_ccom}")
-    get_filename_component(_compRoot ${_ccom} DIRECTORY)
-    get_filename_component(_compRoot ${_compRoot} DIRECTORY)
-    message(STATUS "_compRoot ${_compRoot}")
-    if(_verbose GREATER 0)
-        if(EXISTS ${_compRoot}/etc/ncc.conf)
-            file(READ ${_compRoot}/etc/ncc.conf _etc_ncc_conf)
-            message(STATUS "${_compRoot}/etc/ncc.conf\n${_etc_ncc_conf}")
-        endif()
-    endif()
-    foreach(_compArg ${_compArgs})
-        if(_verbose GREATER 2)
-            message(STATUS "_nextType=${nextType}, _compArg=${_compArg}")
-        endif()
-        if(${_nextType} STREQUAL "-isystem")
-            list(APPEND ${_incVar} ${_compArg})
-            set(_nextType "boring")
-        elseif(${_compArg} STREQUAL "-isystem")
-            set(_nextType ${_compArg})
-        endif()
-    endforeach()
-    foreach(_compArg ${_compArgs})
-        if(_verbose GREATER 2)
-            message(STATUS "_nextType=${nextType}, _compArg=${_compArg}")
-        endif()
-        if(${_nextType} STREQUAL "--preinclude-path")
-            list(REMOVE_ITEM ${_incVar} ${_compArg})
-            list(APPEND ${_preincVar} ${_compArg})
-            set(_nextType "boring")
-        elseif(${_compArg} STREQUAL "--preinclude-path")
-            set(_nextType ${_compArg})
-        endif()
-    endforeach()
-    if(_verbose GREATER 0)
-        message(STATUS "Compiler       : ${_compiler}")
-        message(STATUS "  Flags        : ${_compiler}")
-        message(STATUS "  pre-includes : ${${_preincVar}}")
-        message(STATUS "  sys-includes : ${${_incVar}}")
-    endif()
-endmacro()
 
 show_cmake_stuff("End of ve.cmake")
 

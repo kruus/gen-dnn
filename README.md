@@ -32,13 +32,13 @@ tar xvfz vejit.tar.gz
 ```
 
 Before building, make sure `CC` and `CXX` are set to `ncc` and `nc++`
-and that they are in your path.  Also, `NLC_BASE` must be set
+and that they are in your path.  Also, `NLC_HOME` must be set
 to the base directory of the NEC Numeric Library Collection (for BLAS).
 For example:
 
 ```
 export PATH=/opt/nec/ve/bin:$PATH
-export NLC_BASE=/opt/nec/ve/nlc/1.0.0
+export NLC_HOME=/opt/nec/ve/nlc/1.0.0
 export CC=ncc
 export CXX=nc++
 ```

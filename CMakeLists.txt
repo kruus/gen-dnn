@@ -72,6 +72,8 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
 
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+
 set(CMAKE_SRC_CCXX_FLAGS)       # SRC specifics
 set(CMAKE_EXAMPLE_CCXX_FLAGS)   # EXAMPLE specifics
 set(CMAKE_TEST_CCXX_FLAGS)      # TESTS specifics
@@ -86,6 +88,7 @@ if(TRUE AND NECVE)
     find_package(Threads REQUIRED)
 endif()
 include("cmake/MKL.cmake")
+include("cmake/cblas.cmake")
 include("cmake/OpenMP.cmake")
 include("cmake/SDL.cmake")
 include("cmake/NLC.cmake")
@@ -110,5 +113,11 @@ if(1 OR NECVE)
     configure_file(${CMAKE_SOURCE_DIR}/cmake/bash_help.inc.in
         ${PROJECT_BINARY_DIR}/bash_help.inc)
 endif()
+
+get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
+foreach(dir ${dirs})
+    message(STATUS "include_directories: '${dir}'")
+endforeach()
+
 message(STATUS "CMakeLists.txt DONE!")
 # vim: et ts=4 sw=4 ai :

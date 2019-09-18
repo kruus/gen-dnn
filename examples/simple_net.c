@@ -369,6 +369,7 @@ mkldnn_status_t simple_net(){
      * beta: 0.75
      */
     uint32_t local_size = 5;
+    //local_size = 32;
     float alpha = 0.0001f;
     float beta = 0.75f;
     float k = 1.0f;

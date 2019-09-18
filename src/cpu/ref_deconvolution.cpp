@@ -62,7 +62,11 @@ void ref_deconvolution_fwd_t::compute_fwd_bias_ncdhw() {
     const int SP = conf_.OW()*conf_.OH()*conf_.OD();
 
     parallel_nd(MB, OC, [&](int mb, int oc) {
-        PRAGMA_OMP_SIMD()
+#if defined(__ve)
+            _Pragma("_NEC shortloop_reduction")//;
+#else
+            PRAGMA_OMP_SIMD()//;
+#endif
         for (int sp = 0; sp < SP; ++sp) {
             auto offset = (size_t)(mb * OC + oc) * SP + sp;
             dst[offset] += bias[oc];
@@ -89,7 +93,11 @@ void ref_deconvolution_fwd_t::compute_fwd_bias_nCdhwXc() {
         auto offset = mb * stride_mb + oc * SP + sp * blksize;
         const int blk = nstl::min(blksize, OC - oc);
 
-        PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
         for (int i = 0; i < blk; ++i)
             dst[offset + i] += bias[oc + i];
     });
@@ -138,11 +146,15 @@ void ref_deconvolution_bwd_weights_t::compute_bwd_bias_ncdhw() {
     const int MB = conf_.MB();
     const int SP = conf_.OH()*conf_.OW()*conf_.OD();
 
-#   pragma omp parallel for schedule(static)
+    OMP(parallel for schedule(static))//;
     for (int oc = 0; oc < OC; ++oc) {
         data_t db = 0;
         for (int mb = 0; mb < MB; ++mb) {
-            PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
             for (int sp = 0; sp < SP; ++sp) {
                 auto offset = (size_t)(mb * OC + oc) * SP + sp;
                 db += diff_dst[offset];
@@ -165,7 +177,7 @@ void ref_deconvolution_bwd_weights_t::compute_bwd_bias_nCdhwXc() {
 
     const ptrdiff_t stride_mb = diff_dst_d.blocking_desc().strides[0][0];
 
-#   pragma omp parallel for schedule(static)
+    OMP(parallel for schedule(static))//;
     for (int oc = 0; oc < OC; oc += blksize) {
         data_t db[blksize] = {0};
 
@@ -173,7 +185,11 @@ void ref_deconvolution_bwd_weights_t::compute_bwd_bias_nCdhwXc() {
             for (int sp = 0; sp < SP; ++sp) {
                 auto offset = mb * stride_mb + oc * SP + sp * blksize;
 
-                PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
                 for (int i = 0; i < blksize; ++i)
                     db[i] += diff_dst[offset+i];
             }
@@ -181,7 +197,11 @@ void ref_deconvolution_bwd_weights_t::compute_bwd_bias_nCdhwXc() {
 
         const int blk = nstl::min(blksize, OC - oc);
 
-        PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
         for (int i = 0; i < blk; ++i)
             diff_bias[oc + i] = db[i];
     }

@@ -17,6 +17,7 @@ DOGCC_VER=0
 NEC_FTRACE=0
 DOTARGET="x"
 VEJIT=0
+BUILDDIR_SUFFIX=""
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -36,7 +37,7 @@ usage() {
     echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
 }
-while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
+while getopts ":hatvjdDqQpsSTwWbF1567iB:" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
@@ -47,6 +48,9 @@ while getopts ":hatvjdDqQpsSTwWbF1567i" arg; do
             DOTARGET="a"; SIZE_T=64; DONEEDMKL="n"
             JOBS="-j1" # -j1 to avoid SIGSEGV in ccom
             if [ `uname -n` = "zoro" ]; then JOBS="-j8"; fi
+            ;;
+        B) # suffix for BUILDDIR
+            BUILDDIR_SUFFIX=${OPTARG}
             ;;
         F) # NEC Aurora VE or SX : add ftrace support (generate ftrace.out)
             NEC_FTRACE=1
@@ -218,6 +222,8 @@ fi
 
 #if [ "$DOTARGET" == "v" ]; then ; fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; BUILDDIR="${BUILDDIR}d"; fi
+if [ $NEC_FTRACE -gt 0 ]; then BUILDDIR="${BUILDDIR}F"; fi
+if [ "$BUILDDIR_SUFFIX" ]; then BUILDDIR="${BUILDDIR}${BUILDDIR_SUFFIX}"; fi
 
 if [ "$DOJUSTDOC" == "y" ]; then
     (
@@ -298,9 +304,9 @@ if [ "" ]; then
 fi
 #if [ "$NEC_FTRACE" -gt 0 ]; then
 if [ "$DOTARGET" = "a" -o "$DOTARGET" = "s" ]; then
-    #TESTRUNNER="VE_PROGINF=YES ${TESTRUNNER}" #works if used as bash -c ${TESTRUNNER}
-    export VE_PROGINF=YES;
-    export C_PROGINF=YES;
+    #TESTRUNNER="VE_PROGINF=DETAIL ${TESTRUNNER}" #works if used as bash -c ${TESTRUNNER}
+    export VE_PROGINF=DETAIL;
+    export C_PROGINF=DETAIL;
 else
     unset VE_PROGINF
     unset C_PROGINF
@@ -322,6 +328,7 @@ echo "PATH $PATH"
     echo "DODOC      $DODOC"
     echo "QUICK      $QUICK"
     echo "BUILDDIR   ${BUILDDIR}"
+    echo "BUILDDIR_SUFFIX ${BUILDDIR_SUFFIX}"
     echo "INSTALLDIR ${INSTALLDIR}"
     if [ $QUICK -lt 2 ]; then
         mkdir "${BUILDDIR}"
@@ -335,9 +342,13 @@ echo "PATH $PATH"
     # CMAKEOPT="" # allow user to pass flag, ex. CMAKEOPT='--trace -LAH' ./build.sh
     CMAKEOPT="${CMAKEOPT} -DCMAKE_CCXX_FLAGS=-DJITFUNCS=${DOJIT}"
     if [ $USE_CBLAS -ne 0 ]; then
-        export CFLAGS="${CFLAGS} -DUSE_CBLAS"
-        export CXXFLAGS="${CXXFLAGS} -DUSE_CBLAS"
+        #export CFLAGS="${CFLAGS} -DUSE_CBLAS"
+        #export CXXFLAGS="${CXXFLAGS} -DUSE_CBLAS"
+        CMAKEOPT="${CMAKEOPT} -DMKLDNN_USE_CBLAS=ON" # default OFF
     fi
+    #if [ $USE_MKL == "y" ]; then # deprecated in v1.0
+    #    CMAKEOPT="${CMAKEOPT} -D_MKLDNN_USE_MKL=ON"
+    #fi
     if [ ! "$DOTARGET" == "j" ]; then
         CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
         export CFLAGS="${CFLAGS} -DTARGET_VANILLA"
@@ -357,9 +368,13 @@ echo "PATH $PATH"
             # ?? -mparallel and -fopenmp both => -pthread
             export CFLAGS="${CFLAGS} -fopenmp"
             export CXXFLAGS="${CFLAGS} -fopenmp"
+            #export CFLAGS="${CFLAGS} -mparallel -mparallel-outerloop-strip-mine -mparallel-sections"
+            #export CXXFLAGS="${CFLAGS} -mparallel -mparallel-outerloop-strip-mine -mparallel-sections"
+            #export CFLAGS="${CFLAGS} -mparallel-threshold=4096"
+            #export CXXFLAGS="${CFLAGS} -mparallel-threshold=4096"
         fi
         # TODO proginf is not working automatically any more?
-        # -proginf  : Run with 'export VE_PROGINF=YES' to get some stats output
+        # -proginf  : Run with 'export VE_PROGINF=DETAIL' [or YES] to get some stats output
         # export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
         # export CXXFLAGS="${CXXFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER -proginf"
         export CFLAGS="${CFLAGS} -DCBLAS_LAYOUT=CBLAS_ORDER"
@@ -369,7 +384,7 @@ echo "PATH $PATH"
             #export CXXFLAGS="${CXXFLAGS} -ftrace"
             # at some point above was sufficent (ve.cmake) set things
             # TODO have ve.cmake etc do this NICELY with a cmake option...
-            VEPERF_DIR="/usr/uhome/aurora/mpc/pub/veperf/180218-ELF"
+            VEPERF_DIR="/usr/uhome/aurora/mpc/pub/veperf/latest"
             VEPERF_INC_DIR="${VEPERF_DIR}/include"
             VEPERF_LIB_DIR="${VEPERF_DIR}/lib"
             export CFLAGS="${CFLAGS} -I${VEPERF_INC_DIR} -DFTRACE -ftrace"
@@ -380,6 +395,19 @@ echo "PATH $PATH"
         CMAKEOPT="${CMAKEOPT} -DVEJIT=${VEJIT}"
         #export CFLAGS="${CFLAGS} -DVEJIT=${VEJIT}"
         #export CXXFLAGS="${CXXFLAGS} -DVEJIT=${VEJIT}"
+        #export CFLAGS="${CFLAGS} -floop-normalize"
+        #export CXXFLAGS="${CXXFLAGS} -floop-normalize"
+        # other options:
+        export CFLAGS="${CFLAGS} -report-all"
+        export CXXFLAGS="${CXXFLAGS} -report-all"
+        export CFLAGS="${CFLAGS} -fcse-after-vectorization"
+        export CXXFLAGS="${CXXFLAGS} -fcse-after-vectorization"
+        export CFLAGS="${CFLAGS} -msched-block"
+        export CXXFLAGS="${CXXFLAGS} -msched-block"
+        export CFLAGS="${CFLAGS} -mvector-loop-count-test"
+        export CXXFLAGS="${CXXFLAGS} -mvector-loop-count-test"
+        export CFLAGS="${CFLAGS} -mvector-packed"
+        export CXXFLAGS="${CXXFLAGS} -mvector-packed"
         echo "Aurora CMAKEOPT = ${CMAKEOPT}"
     fi
     if [ ${DOWARN} == 'y' ]; then
@@ -579,7 +607,7 @@ if [ "$BUILDOK" == "y" ]; then
         fi
         if [ $DOTEST -ge 3 ]; then
             if [ -x ./bench.sh ]; then
-                MKLDNN_VERBOSE=2 ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
+                MKLDNN_VERBOSE=2 ${TESTRUNNER} ./bench.sh -q${DOTARGET} -B${BUILDDIR} 2>&1 | tee "${BUILDDIR}/test3.log" || true
             fi
         fi
         echo "Tests done"

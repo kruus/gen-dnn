@@ -146,7 +146,7 @@ void ref_softmax_bwd_t<data_type>::execute_backward_dense() {
     auto diff_dst = reinterpret_cast<const data_t *>(this->input_memory(1));
     auto diff_src = reinterpret_cast<data_t *>(this->memory(0));
 
-#   pragma omp parallel for schedule(static)
+    OMP(parallel for schedule(static))//;
     for (int ou = 0; ou < outer_size_; ou++) {
         data_t sbr = 0;
         size_t off = channels_*ou;

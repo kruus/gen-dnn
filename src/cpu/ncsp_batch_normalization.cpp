@@ -104,7 +104,7 @@ void ncsp_batch_normalization_fwd_t::execute_forward() {
     size_t l3_size_ = get_cache_size(3, true) * nthr / 2;
     size_t data_size = N * C * SP * sizeof(data_t);
     bool do_blocking = (data_size >= l3_size_ / 2 && l3_size_ > 0);
-#pragma omp parallel
+    OMP(parallel)//;
     {
         int C_blks_per_iter = 1, iters = 1, ithr = omp_get_thread_num();
         int C_ithr = 0, C_nthr = 0, N_ithr = 0, N_nthr = 0, N_s = 0, N_e = 0;
@@ -143,25 +143,29 @@ void ncsp_batch_normalization_fwd_t::execute_forward() {
                     size_t off = (c + C_off) * SP;
                     data_t sum = 0;
                     for (int n = N_s; n < N_e; ++n)
+#if !defined(__ve) // actually why does anyone need an omp reduction here?
                         PRAGMA_OMP_SIMD(reduction(+ : sum))
+#endif
                         for (int sp = S_s; sp < S_e; ++sp) {
                             sum += src[off + n * C * SP + sp];
                         }
                     ws_reduce[SP_N_ithr * C_blks_per_iter + c] = sum;
                 }
-#pragma omp barrier
+                OMP(barrier)//;
                 for (int c = C_blk_gl_s; c < C_blk_gl_e; c++) {
                     mean_blk[c] = 0.;
                     for (int n = 0; n < SP_N_nthr; n++)
                         mean_blk[c] += ws_reduce[n * C_blks_per_iter + c];
                     mean_blk[c] /= (N * SP);
                 }
-#pragma omp barrier
+                OMP(barrier)//;
                 for (int c = C_blk_s; c < C_blk_e; c++) {
                     size_t off = c + C_off;
                     data_t sum = 0.;
                     for (int n = N_s; n < N_e; ++n)
+#if !defined(__ve) // actually why does anyone need an omp reduction here?
                         PRAGMA_OMP_SIMD(reduction(+ : sum))
+#endif
                         for (int sp = S_s; sp < S_e; ++sp) {
                             data_t m = src[off * SP + n * C * SP + sp]
                                     - mean[off];
@@ -169,14 +173,14 @@ void ncsp_batch_normalization_fwd_t::execute_forward() {
                         }
                     ws_reduce[SP_N_ithr * C_blks_per_iter + c] = sum;
                 }
-#pragma omp barrier
+                OMP(barrier)//;
                 for (int c = C_blk_gl_s; c < C_blk_gl_e; c++) {
                     variance_blk[c] = 0.;
                     for (int n = 0; n < SP_N_nthr; n++)
                         variance_blk[c] += ws_reduce[n * C_blks_per_iter + c];
                     variance_blk[c] /= (N * SP);
                 }
-#pragma omp barrier
+                OMP(barrier)//;
             }
             for (int c = C_blk_s; c < C_blk_e; c++) {
                 size_t off = c + C_off;
@@ -186,7 +190,11 @@ void ncsp_batch_normalization_fwd_t::execute_forward() {
                         = static_cast<data_t>(1.0f / sqrtf(variance[off] + eps));
                 for (int n = N_s; n < N_e; ++n)
 #if SAFE_TO_USE_OMP_SIMD
-                    PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    ShortLoopTest()//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
 #endif
                     for (int sp = S_s; sp < S_e; ++sp) {
                         size_t d_off = off * SP + n * C * SP + sp;
@@ -253,7 +261,7 @@ void ncsp_batch_normalization_bwd_t::execute_backward() {
     size_t l3_size_ = get_cache_size(3, true) * nthr / 2;
     size_t data_size = N * C * SP * sizeof(data_t);
     bool do_blocking = (data_size >= l3_size_ / 2 && l3_size_ > 0);
-#pragma omp parallel
+    OMP(parallel)//;
     {
         int C_blks_per_iter = 1, iters = 1, ithr = omp_get_thread_num();
         int C_ithr = 0, C_nthr = 0, N_ithr = 0, N_nthr = 0, N_s = 0, N_e = 0;
@@ -293,7 +301,9 @@ void ncsp_batch_normalization_bwd_t::execute_backward() {
                 data_t diff_gamma = 0.0, diff_beta = 0.0;
                 data_t v_mean = mean[off];
                 for (int n = N_s; n < N_e; ++n)
+#if !defined(__ve) // actually why does anyone need an omp reduction here?
                     PRAGMA_OMP_SIMD(reduction(+ : diff_gamma, diff_beta))
+#endif
                     for (int sp = S_s; sp < S_e; ++sp) {
                         const size_t d_off = off * SP + n * C * SP + sp;
                         data_t dd;
@@ -309,7 +319,7 @@ void ncsp_batch_normalization_bwd_t::execute_backward() {
                         + c]
                         = diff_beta;
             }
-#pragma omp barrier
+            OMP(barrier)//;
             for (int c = C_blk_gl_s; c < C_blk_gl_e; c++) {
                 data_t sqrt_variance = static_cast<data_t>(
                         1.0f / sqrtf(variance[c + C_off] + eps));
@@ -322,7 +332,7 @@ void ncsp_batch_normalization_bwd_t::execute_backward() {
                 }
                 diff_gamma_blk[c] *= sqrt_variance;
             }
-#pragma omp barrier
+            OMP(barrier)//;
             for (int c = C_blk_s; c < C_blk_e; c++) {
                 size_t off = c + C_off;
                 data_t gamma = use_scaleshift ? scaleshift[off] : 1;
@@ -331,7 +341,11 @@ void ncsp_batch_normalization_bwd_t::execute_backward() {
                 data_t v_mean = mean[off];
                 for (int n = N_s; n < N_e; ++n)
 #if SAFE_TO_USE_OMP_SIMD
-                    PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                    _Pragma("_NEC shortloop_reduction")//;
+#else
+                    PRAGMA_OMP_SIMD()//;
+#endif
 #endif
                     for (int sp = S_s; sp < S_e; ++sp) {
                         const size_t d_off = off * SP + n * C * SP + sp;

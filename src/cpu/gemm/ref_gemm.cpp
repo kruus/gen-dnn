@@ -25,12 +25,21 @@ namespace impl {
 namespace cpu {
 using namespace mkldnn::impl::utils;
 
+#if defined(__ve)
+constexpr int unroll_m = 16;
+constexpr int unroll_n = 16;
+#else
 constexpr int unroll_m = 16;
 constexpr int unroll_n = 6;
+#endif
 static void copy_A(
         bool isTransA, int K, const float *A, const int lda, float *ws) {
     for (int k = 0; k < K; k++) {
-        PRAGMA_OMP_SIMD()
+#if defined(__ve)
+        _Pragma("_NEC shortloop_reduction")//;
+#else
+        PRAGMA_OMP_SIMD()//;
+#endif
         for (int i = 0; i < unroll_m; i++) {
             ws[i] = isTransA ? A[i * lda + k] : A[i + k * lda];
         }
@@ -42,6 +51,26 @@ template <bool isTransA, bool isTransB>
 static void kernel_mxn(int K, const float *A, const int lda,
         const float *B, const int ldb, float *C, const int ldc,
         const float alpha, const float beta) {
+#if defined(__ve)
+    _Pragma("_NEC vreg(c)");
+    float c[unroll_m * unroll_n] = { 0. };
+    for (int k = 0; k < K; k++) {
+        for (int j = 0; j < unroll_n; j++) {
+            float b = isTransB ? B[j + k * ldb] : B[k + j * ldb];
+            for (int i = 0; i < unroll_m; i++) {
+                float a = isTransA ? A[i * lda + k] : A[i + lda * k];
+                c[i + unroll_m * j] += a * b;
+            }
+        }
+    }
+    for (int j = 0; j < unroll_n; j++) {
+        for (int i = 0; i < unroll_m; i++) {
+            C[i + j * ldc] = (beta == 0.0f)
+            ? alpha * c[i + unroll_m * j]
+            : alpha * c[i + unroll_m * j] + beta * C[i + j * ldc];
+        }
+    }
+#else
     float c[unroll_m * unroll_n] = { 0. };
     for (int k = 0; k < K; k++) {
         for (int j = 0; j < unroll_n; j++) {
@@ -61,6 +90,7 @@ static void kernel_mxn(int K, const float *A, const int lda,
             : alpha * c[i + unroll_m * j] + beta * C[i + j * ldc];
         }
     }
+#endif
 }
 
 template <bool isTransA, bool isTransB>
@@ -191,7 +221,7 @@ void ref_gemm(const char *transa_, const char *transb_, const int *M_,
         if (!ws_buffers)
             do_copy = false;
     }
-#   pragma omp parallel num_threads(nthr)
+    OMP(parallel num_threads(nthr))//;
     {
         int ithr_omp = omp_get_thread_num();
         int nthr_mn = nthr_m * nthr_n;
@@ -257,7 +287,7 @@ void ref_gemm(const char *transa_, const char *transb_, const int *M_,
             }
         }
         if (nthr_k > 1) {
-#           pragma omp barrier
+            OMP(barrier)//;
             // sum matrices partitioned along K dimension
             int offset = 0, block = 0;
             gemm_utils::partition_unit_diff(ithr_omp_k, nthr_k, myN, &offset,
@@ -281,3 +311,4 @@ void ref_gemm(const char *transa_, const char *transb_, const int *M_,
 }
 }
 }
+// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

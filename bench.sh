@@ -65,15 +65,18 @@ SKIP=""
 MODE="--mode=P"
 DIRS=(FWD_B) # FWD_D FWD_B BWD_D BWD_W BWD_WB
 # TODO: add batch file selection for some long tests examples [other than the default list]
-while getopts ":hqvjdD:m:t:V:s:" arg; do
+while getopts ":hqvjdD:m:t:V:s:B:" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         v) # [yes] (if available, vanilla C/C++ only: no JIT)
             if [ -d src/vanilla ]; then BUILDDIR='build'; DOTARGET='v'; fi
             ;;
-        j) # force Intel JIT (src/cpu/ JIT assembly code)
+        j) # force Intel JIT (src/cpu/ JIT assembly code) (aurora build -aj probably wrong)
             if [ -d build-jit ]; then BUILDDIR='build-jit'; DOTARGET='j';
             else                      BUILDDIR='build';     DOTARGET=''; fi
+            ;;
+        B) # specify build dir by hand (specify after v/j)
+            BUILDDIR=${OPTARG}
             ;;
         d) # [no] debug release
             DODEBUG="y"
@@ -93,7 +96,7 @@ while getopts ":hqvjdD:m:t:V:s:" arg; do
         V) # N [0] verbosity
             VERBOSITY=${OPTARG}
             ;;
-        s) # skip-impl string [""]
+        s) # skip-impl string [""] (removed in v0.16)
             SKIP="${OPTARG}"
             ;;
     h | *) # help
@@ -139,6 +142,7 @@ echo "V-erbosity         : ${VERBOSITY}"
 echo "m-ode              : ${MODE}"
 echo "s-kip              : ${SKIP}"
 echo "D-irections        : ${DIRS[@]}" # multiple, like "FWD_B BWD_D BWD_WB", OK
+echo "NEW: bench.sh -qvB build-vej     # for build.sh -aj build directory"
 if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
     echo "SX: cross-compiled benchdnn must be run on SX ACE/Aurora"
     exit 0
@@ -189,14 +193,17 @@ fi
 #(cd ${BENCHDIR} && ./benchdnn --conv --mode=AP -v${VERBOSITY} --cfg=f32 --dir=FWD_D --skip-impl="$SKIP" \
 #    mb12_ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_nalexnet:conv1 \
 #    ) || { echo "Ohoh"; }
-(cd ${BENCHDIR} && ./benchdnn --conv --mode=AC -v${VERBOSITY} --cfg=f32 --dir=FWD_D --skip-impl="$SKIP" \
+(cd ${BENCHDIR} && rm -f ftrace.out && \
+    ./benchdnn --conv --mode=AC -v${VERBOSITY} --cfg=f32 --dir=FWD_D --skip-impl="$SKIP" \
     mb32_ic3ih44iw44_oc7oh10_kh11kw11_sh4sw4ph0pw0_nsmall1 \
     mb32_ic3ih44kh3_oc7oh42_nsmall2 \
     ) || { echo "Ohoh"; }
+(cd ${BENCHDIR}; if [ -f ftrace.out ]; then ftrace; fi)
 (cd ${BENCHDIR} && ./benchdnn --conv --mode=AP -v${VERBOSITY} --cfg=f32 --dir=FWD_D --skip-impl="$SKIP" \
     mb32_ic3ih44iw44_oc7oh10_kh11kw11_sh4sw4ph0pw0_nsmall1 \
     mb32_ic3ih44kh3_oc7oh42_nsmall2 \
     ) || { echo "Ohoh"; }
+(cd ${BENCHDIR}; if [ -f ftrace.out ]; then ftrace; fi)
 } 2>&1 | tee ${LOGDIR}/bench-quick-t${THREADS}.log
 echo "bench.sh quick tests DONE -- logfile ${LOGDIR}/bench-quick-t${THREADS}.log"
 #################
@@ -210,10 +217,12 @@ else
         echo ""
         LGBASE="${LOGDIR}/bench-convP-${DOTARGET}t${THREADS}"
         echo "cmd: ./benchdnn --conv ${MODE} -v${VERBOSITY} --cfg=f32 --dir=${dir} --skip-impl=${SKIP}"
-        (cd ${BENCHDIR} && ./benchdnn --conv ${MODE} -v${VERBOSITY} --cfg=f32 --dir=${dir} --skip-impl="${SKIP}" \
+        (cd ${BENCHDIR} && rm -f ftrace.out && \
+            ./benchdnn --conv ${MODE} -v${VERBOSITY} --cfg=f32 --dir=${dir} --skip-impl="${SKIP}" \
             ) 2>&1 | tee ${LGBASE}-tmp.log \
             && mv ${LGBASE}-tmp.log ${LGBASE}.log && echo "${LGBASE}.log OK" \
             || { echo "${LGBASE}-tmp.log ERROR"; exit; };
+        (cd ${BENCHDIR}; if [ -f ftrace.out ]; then ftrace; fi) >> ${LGBASE}.log 2>&1
     done;
 fi
 #

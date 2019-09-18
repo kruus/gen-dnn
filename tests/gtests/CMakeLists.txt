@@ -84,7 +84,7 @@ foreach(TEST_FILE ${PRIM_TEST_CASES_SRC})
     endif(NECSX)
     #target_link_libraries(${CURR_APP_NAME} mkldnn mkldnn_gtest)
     target_link_libraries(${CURR_APP_NAME}
-        ${LIB_NAME} mkldnn_gtest ${EXTRA_LIBS})
+        ${LIB_NAME} mkldnn_gtest ${EXTRA_LIBS} ${EXTRA_SHARED_LIBS})
     add_test(NAME ${CURR_APP_NAME} COMMAND ${CURR_APP_NAME})
     if(WIN32)
         set_property(TEST ${CURR_APP_NAME} PROPERTY ENVIRONMENT "PATH=${CTESTCONFIG_PATH}")

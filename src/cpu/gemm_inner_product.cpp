@@ -121,13 +121,21 @@ void gemm_inner_product_bwd_weights_t<data_type>::execute_backward_weights() {
             oc_st = oc_st * blksize;
             oc_e = oc_e * blksize;
 
-            PRAGMA_OMP_SIMD()
+#if defined(__ve)
+            _Pragma("_NEC shortloop_reduction")//;
+#else
+            PRAGMA_OMP_SIMD()//;
+#endif
             for (int oc = oc_st; oc < oc_e; ++oc) {
                 diff_bias[oc] = diff_dst[oc];
             }
 
             for (int mb = 1; mb < MB; ++mb) {
-                PRAGMA_OMP_SIMD()
+#if defined(__ve)
+                _Pragma("_NEC shortloop_reduction")//;
+#else
+                PRAGMA_OMP_SIMD()//;
+#endif
                 for (int oc = oc_st; oc < oc_e; ++oc) {
                     diff_bias[oc] += diff_dst[mb * OC + oc];
                 }

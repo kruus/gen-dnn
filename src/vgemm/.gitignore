@@ -1,0 +1,8 @@
+*.o
+*.lo
+*.s
+*.a
+*.so
+*.L
+install
+**.gch

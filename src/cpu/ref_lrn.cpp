@@ -23,6 +23,14 @@
 
 #include "ref_lrn.hpp"
 
+#ifndef likely
+# define likely(x)              __builtin_expect(!!(x), 1)
+#endif
+//
+#ifndef unlikely
+# define unlikely(x)            __builtin_expect(!!(x), 0)
+#endif
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
@@ -59,6 +67,19 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
     const bool across_channels = conf_.desc()->alg_kind == lrn_across_channels;
     constexpr int blksize = fmt == nChw16c ? 16 : 8;
 
+#define KER_OC 0 /* 1 vectorizes across 0..C (not size) **much** faster */
+
+    /** VE_VEC should be left at zero --
+     * LRN length is typically 5, so vectorizing along this loop is a bad choice.
+     * Instead, the parallelization should be done over \c (mb,oh,ow) leaving
+     * threads with \c +/-half loop and an oc loop in the kernel. */
+#define VE_VEC 0 /* if KER_OC==0, original used another lambda */
+
+
+
+
+
+#if KER_OC==0 || !defined(__ve) // still used in one place (convenience)
     auto data_off = [&](int mb, int c, int h, int w) -> size_t {
         switch (fmt) {
         case nChw16c:
@@ -69,8 +90,25 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
         default: return data_d.off(mb, c, h, w);
         }
     };
+#endif
 
-    auto ker = [=](data_t *d, int mb, int oc, int oh, int ow) {
+#define DATA_OFF_NCHW(mb,c,h,w) ((uint64_t)mb * (uint64_t)stride_mb + (uint64_t)c * (uint64_t)H * (uint64_t)W + (uint64_t)h * (uint64_t)W + (uint64_t)w)
+#define DATA_OFF_NHWC(mb,c,h,w) (mb * stride_mb + h * W * C + w * C + c)
+#define DATA_OFF_nChwNc(mb,c,h,w) (mb * stride_mb + c / blksize * H * W * blksize \
+        + h * W * blksize + w * blksize + c % blksize)
+    // very slow -- function call prohibits vectorization
+#define DATA_OFF_ANY(mb,c,h,w) data_d.off(mb,c,h,w)
+
+#define DATA_OFF(mb,c,h,w) ( \
+        fmt==nchw?                      DATA_OFF_NCHW(mb,c,h,w) \
+        :fmt==nhwc?                     DATA_OFF_NHWC(mb,c,oh,ow) \
+        :fmt==nChw16c || fmt==nChw8c?   DATA_OFF_nChwNc(mb,c,oh,ow) \
+        :                               DATA_OFF_ANY(mb,c,oh,ow) \
+        )
+
+#if KER_OC==0 // original, and vectorization across 'size' (very bad)
+    // XXX pass off (not d), because d and ws can both be calculated from off?
+    auto ker = [=](data_t *d, int const mb, int const oc, int const oh, int const ow) {
         const float alpha = static_cast<float>(conf_.desc()->lrn_alpha);
         const float beta = static_cast<float>(conf_.desc()->lrn_beta);
         const float k = static_cast<float>(conf_.desc()->lrn_k);
@@ -82,23 +120,154 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
         if (across_channels) {
             const int c_st = nstl::max(oc - half_size + 0, 0);
             const int c_en = nstl::min(oc + half_size + 1, C);
-
+#if VE_VEC==0 // original (never vectorizable)
+            _Pragma("_NEC novector")//;
             for (int c = c_st; c < c_en; ++c) {
-                const float s = src[data_off(mb, c, oh, ow)];
+                const float s = src[DATA_OFF(mb, c, oh, ow)];
                 sum += s * s;
             }
+#elif 1 // VE mods
+            if(0) for (int c = c_st; c < c_en; ++c) {
+                const float s = src[data_off(mb, c, oh, ow)];
+                sum += s * s;
+            }else if(fmt==nchw && 0){
+                uint64_t src_off[c_en-c_st];
+                // VE vectorizable
+                //asm("### nchw across channels");
+                for (int c = c_st; c < c_en; ++c) {
+                    src_off[c-c_st] = DATA_OFF_NCHW(mb,c,oh,ow);
+                    const float s = src[src_off[c-c_st]];
+                    sum += s * s;
+                }
+            }else if(fmt==nchw && 1){
+                //asm("### nchw across channels");
+                for (int c = c_st; c < c_en; ++c) {
+                    const float s = src[DATA_OFF_NCHW(mb,c,oh,ow)];
+                    sum += s * s;
+                }
+            }
+            else if(fmt==nhwc){
+                uint64_t src_off[c_en-c_st];
+                //asm("### nhwc across channels");
+                // "Unvectorized" (it is quite short)
+                for (int c = c_st; c < c_en; ++c) {
+                    src_off[c-c_st] = DATA_OFF_NHWC(mb,c,oh,ow);
+                    const float s = src[src_off[c-c_st]];
+                    sum += s * s;
+                }
+            }
+            else if(fmt==nChw16c || fmt==nChw8c){
+                uint64_t src_off[c_en-c_st];
+                // VE vectorizable
+                //asm("### nChwNc across channels");
+                for (int c = c_st; c < c_en; ++c) {
+                    src_off[c-c_st] = DATA_OFF_nChwNc(mb,c,oh,ow);
+                    const float s = src[src_off[c-c_st]];
+                    sum += s * s;
+                }
+            }
+            else{
+                uint64_t src_off[c_en-c_st];
+                //asm("### across channels");
+                // not vectorizable
+                for (int c = c_st; c < c_en; ++c) {
+                    src_off[c-c_st] = DATA_OFF_ANY(mb,c,oh,ow);
+                    const float s = src[src_off[c-c_st]];
+                    //const float s = src[DATA_OFF_ANY(mb,c,h,w)];
+                    sum += s * s;
+                }
+            }
+#else // not quite as good ??? (must compare)
+            if( fmt==nchw || fmt==nhwc || fmt==nChw16c || fmt==nChw8c ){
+                uint64_t src_off[c_en-c_st];
+                asm("###1");
+                if(fmt==nchw){
+                    for (int c = c_st; c < c_en; ++c) {
+                        src_off[c-c_st] = DATA_OFF_NCHW(mb,c,oh,ow);
+                    }
+                }else if(fmt==nhwc){
+                    for (int c = c_st; c < c_en; ++c) {
+                        src_off[c-c_st] = DATA_OFF_NHWC(mb,c,oh,ow);
+                    }
+                }else{ // (fmt==nChw16c || fmt==nChw8c)
+                    for (int c = c_st; c < c_en; ++c) {
+                        src_off[c-c_st] = DATA_OFF_nChwNc(mb,c,oh,ow);
+                    }
+                }
+                for (int c = c_st; c < c_en; ++c) {
+                    const float s = src[src_off[c-c_st]];
+                    sum += s * s;
+                }
+            }else{
+                asm("###2");
+                for (int c = c_st; c < c_en; ++c) {
+                    const float s = src[DATA_OFF_ANY(mb,c,oh,ow)];
+                    sum += s * s;
+                }
+            }
+#endif
+
+
         } else {
+            asm("### sum_oc");
             int h_st = nstl::max(oh - half_size + 0, 0);
             int h_en = nstl::min(oh + half_size + 1, H);
             int w_st = nstl::max(ow - half_size + 0, 0);
             int w_en = nstl::min(ow + half_size + 1, W);
+#if !VE_VEC
             for (int h = h_st; h < h_en; ++h) {
-                for (int w = w_st; w < w_en; ++w) {
-                    const float s = src[data_off(mb, oc, h, w)];
+                for (int w = w_st; w < w_en; ++w) { // vectorized (ohoh?)
+                    const float s = src[DATA_OFF(mb, oc, h, w)];
                     sum += s * s;
                 }
             }
+#else // VE mods (vectorization)
+            if(fmt==nchw){
+                uint64_t src_off[(h_en-h_st)*(w_en-w_st)];
+                for (uint64_t h = h_st; h < h_en; ++h) {
+                    for (uint64_t w = w_st; w < w_en; ++w) {
+                        uint64_t const hw_seq = (h-h_st)*(w_en-w_st)+(w-w_st);
+                        src_off[hw_seq] = DATA_OFF_NCHW(mb,oc,h,w);
+                        const float s = src[src_off[hw_seq]];
+                        sum += s * s;
+                    }
+                }
+                //for (int i=0; i<(h_en-h_st)*(w_en-w_st); ++i){
+                //    const float s = src[src_off[i]];
+                //    sum += s * s;
+                //}
+            }else if(fmt==nhwc){
+                uint64_t src_off[(h_en-h_st)*(w_en-w_st)];
+                for (uint64_t h = h_st; h < h_en; ++h) {
+                    for (uint64_t w = w_st; w < w_en; ++w) {
+                        uint64_t const hw_seq = (h-h_st)*(w_en-w_st)+(w-w_st);
+                        src_off[hw_seq] = DATA_OFF_NHWC(mb,oc,h,w);
+                        const float s = src[src_off[hw_seq]];
+                        sum += s * s;
+                    }
+                }
+            }else if(fmt==nChw16c || fmt==nChw8c){
+                uint64_t src_off[(h_en-h_st)*(w_en-w_st)];
+                for (uint64_t h = h_st; h < h_en; ++h) {
+                    for (uint64_t w = w_st; w < w_en; ++w) {
+                        uint64_t const hw_seq = (h-h_st)*(w_en-w_st)+(w-w_st);
+                        src_off[hw_seq] = DATA_OFF_nChwNc(mb,oc,h,w);
+                        const float s = src[src_off[hw_seq]];
+                        sum += s * s;
+                    }
+                }
+            }else{
+                // VE non-vectorizable
+                for (int h = h_st; h < h_en; ++h) {
+                    for (int w = w_st; w < w_en; ++w) {
+                        const float s = src[DATA_OFF_ANY(mb, oc, h, w)];
+                        sum += s * s;
+                    }
+                }
+            }
+#endif
         }
+        asm("### finish");
         const int summands = across_channels ? size : size * size;
         sum = k + alpha * sum / summands;
         size_t off = data_off(mb, oc, oh, ow);
@@ -106,9 +275,178 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
             ws[off] = static_cast<data_t>(sum);
         d[0] = static_cast<data_t>(src[off] * fast_negative_powf(sum, beta));
     };
+#endif // KER_OC==0
+
+#if KER_OC==1
+    auto ker_oc = [=](int const mb, int const oh, int const ow) {
+        const float alpha = static_cast<float>(conf_.desc()->lrn_alpha);
+        const float beta = static_cast<float>(conf_.desc()->lrn_beta);
+        const float k = static_cast<float>(conf_.desc()->lrn_k);
+
+        const int size = conf_.desc()->local_size;
+        const int half_size = (size - 1) / 2;
+        const int summands = across_channels ? size : size * size;
+
+        if (across_channels) {
+            //printf("##### LRN_ACROSS_C ######\n");
+            // blocking loop i_oc would require some overlap of doffs,
+            // (i.e. not 256, but blk_oc_max = 256-size)
+            //const int64_t blk_oc_max = 256U;
+            //const int64_t blk_oc = 256U; // XXX equipartition for VE
+            //for(int64_t b_oc=0; b_oc<C; b_oc+=blk_oc){ // oc blocking
+            //    int64_t doffs[blk_oc_max];
+            //    const int64_t vl=(C-b_oc < 256? C-b_oc: 256);
+            //}
+
+            //asm("### ker_oc across channels");
+            //bool ok[2*half_size+1];
+            //asm("### KER_OC across channels");
+            // vectorize over i_oc (likely larger)
+            ShortLoopTest()//;
+#if 0 // snc--> 0.40s
+            int doffs[C]; // central offsets
+            ShortLoopTest() for(int i_oc=0; i_oc<C; ++i_oc){
+                doffs[i_oc] = DATA_OFF(mb,i_oc,oh,ow);
+            }
+            ShortLoopTest() for(int i_oc=0; i_oc<C; ++i_oc){
+                float sum = 0;
+                const int c_st = (i_oc-half_size   > 0? i_oc-half_size: 0);
+                const int c_en = (i_oc+half_size+1 < C? i_oc+half_size+1: C);
+                _Pragma("_NEC novector") UNROLL(5)//;
+                for (int c = c_st; c < c_en; ++c) {
+                    const float s = src[doffs[c]];
+                    sum += s * s;
+                }
+                sum = k + alpha * sum / summands;
+                const size_t off = doffs[i_oc];
+                if (ws)
+                    ws[off] = static_cast<data_t>(sum);
+                dst[off] = static_cast<data_t>(src[off] * fast_negative_powf(sum, beta));
+            }
+#elif 1
+            if(unlikely(C > 256)){
+                int doffs[C]; // central offsets
+                for(int i_oc=0; i_oc<C; ++i_oc){
+                    doffs[i_oc] = DATA_OFF(mb,i_oc,oh,ow);
+                }
+                for(int i_oc=0; i_oc<C; ++i_oc){
+                    float sum = 0;
+                    const int c_st = (i_oc-half_size   > 0? i_oc-half_size: 0);
+                    const int c_en = (i_oc+half_size+1 < C? i_oc+half_size+1: C);
+                    _Pragma("_NEC novector") UNROLL(5)//;
+                    for (int c = c_st; c < c_en; ++c) {
+                        const float s = src[doffs[c]];
+                        sum += s * s;
+                    }
+                    sum = k + alpha * sum / summands;
+                    const size_t off = doffs[i_oc];
+                    if (ws)
+                        ws[off] = static_cast<data_t>(sum);
+                    dst[off] = static_cast<data_t>(src[off] * fast_negative_powf(sum, beta));
+                }
+            }else{
+                // C <= 256 can force doffs into a vector register (no call to grow stack)
+                int64_t vr_offs[256]; // central offsets
+#pragma _NEC vreg(vr_offs)
+                ShortLoop() for(int i_oc=0; i_oc<C; ++i_oc){
+                    vr_offs[i_oc] = DATA_OFF(mb,i_oc,oh,ow);
+                }
+                ShortLoop() for(int i_oc=0; i_oc<C; ++i_oc){
+                    float sum = 0;
+                    const int c_st = (i_oc-half_size   > 0? i_oc-half_size: 0);
+                    const int c_en = (i_oc+half_size+1 < C? i_oc+half_size+1: C);
+                    _Pragma("_NEC novector") //;UNROLL(5)//;
+                    for (int c = c_st; c < c_en; ++c) {
+                        const float s = src[vr_offs[c]];
+                        sum += s * s;
+                    }
+                    sum = k + alpha * sum / summands;
+                    if (ws)
+                        ws[vr_offs[i_oc]] = static_cast<data_t>(sum);
+                    dst[vr_offs[i_oc]] = static_cast<data_t>(
+                            src[vr_offs[i_oc]] * fast_negative_powf(sum, beta));
+                }
+            }
+#elif 0 //  dev... fastest vectorizes outer, not inner loop [common case: size~5]
+            int doffs[C]; // central offsets
+            ShortLoop() for(int i_oc=0; i_oc<C; ++i_oc){
+                doffs[i_oc] = DATA_OFF(mb,i_oc,oh,ow);
+            }
+            for(int i_oc=0; i_oc<C; ++i_oc){
+                float sum = 0;
+#if 0 // adding this unlikely optimization INSIDE will slow down the common case
+                if(unlikely(size > 32)){
+                    ShortLoopTest()// simple-net-c-->0.85s;
+                    for (int c = i_oc-half_size; c < i_oc+half_size+1; ++c) {
+                        //ok[c-i_oc-half_size] = (c >= 0 && c < C);
+                        if(c >= 0 && c < C)
+                            sum +=  src[doffs[c]] * src[doffs[c]];
+                    }
+                }else
+#endif
+                {
+                    _Pragma("_NEC novector") UNROLL(5)//; snc-->0.38s;
+                    for (int c = i_oc-half_size; c < i_oc+half_size+1; ++c) {
+                        //ok[c-i_oc-half_size] = (c >= 0 && c < C);
+                        if(c >= 0 && c < C)
+                            sum +=  src[doffs[c]] * src[doffs[c]];
+                    }
+                }
+                //asm("### sum");
+                sum = k + alpha * sum / summands;
+#if 0 // dbg
+                if(i_oc==0){  // yes, with ic96 do have VL 96
+                    int64_t vlen;
+                    asm("svl %%0\n\t"
+                            : "=r"(vlen) : : );
+                    printf("LRN KER_OC vlen = %d\n", vlen);
+                }
+#endif
+                const size_t off = doffs[i_oc];
+                if (ws)
+                    ws[off] = static_cast<data_t>(sum);
+                dst[off] = static_cast<data_t>(src[off] * fast_negative_powf(sum, beta));
+            }
+#endif
+        } else {
+            asm("### ker_oc across H, W");
+            //printf("##### LRN_ACROSS_HW ######\n");
+            // XXX if data_t is 32-bits or more, doffs[] can be stored into dst[off]
+            //     memory (avoid temporary buffer)
+            int doffs[2*half_size+1];
+            // vectorize over i_oc (likely larger)
+            ShortLoopTest()//;
+            for(int i_oc=0; i_oc<C; ++i_oc){
+                int h_st = nstl::max(oh - half_size + 0, 0);
+                int h_en = nstl::min(oh + half_size + 1, H);
+                int w_st = nstl::max(ow - half_size + 0, 0);
+                int w_en = nstl::min(ow + half_size + 1, W);
+                float sum = 0;
+                _Pragma("_NEC novector") UNROLL(5)//;
+                for (int h = h_st; h < h_en; ++h) {
+                    _Pragma("_NEC novector") UNROLL(5)//;
+                    for (int w = w_st; w < w_en; ++w) {
+                        doffs[(h-h_st) * (w_en-w_st) + (w-w_st)] = DATA_OFF(mb,i_oc,h,w);
+                    }
+                }
+                //ShortLoopTest()//;
+                _Pragma("_NEC novector") UNROLL(5)//;
+                for (int hw=0; hw<(h_en-h_st) * (w_en-w_st); ++hw){
+                        const float s = src[doffs[hw]];
+                        sum += s * s;
+                }
+                sum = k + alpha * sum / summands;
+                const size_t off = doffs[i_oc];
+                if (ws)
+                    ws[off] = static_cast<data_t>(sum);
+                dst[off] = static_cast<data_t>(src[off] * fast_negative_powf(sum, beta));
+            }
+        }
+    };
+#endif // KER_OC==1
 
     const int MB = conf_.MB();
-#if 0
+#if 0 // historical
     OMP(parallel for collapse(4) schedule(static))//;
     for (int mb = 0; mb < MB; ++mb) {
         for (int c = 0; c < C; ++c) {
@@ -119,27 +457,39 @@ void ref_lrn_fwd_t<data_type>::execute_forward() {
             }
         }
     }
-#else
-    if (fmt == nChw16c || fmt == nChw8c) {
+#elif KER_OC // vectorize over channels C --> simple-test-c over double speed
+    parallel_nd(MB, H, W, ker_oc );
+#else // novector gives fastest (hard to vectorize across 'size' channels)
+    if (fmt == nchw) {
+        parallel_nd(MB, H, W, C,
+            [&](int mb, int h, int w, int c) {
+            const size_t off = DATA_OFF_NCHW(mb,c,h,w);
+            ker(&dst[off], mb, c, h, w);
+        });
+    }else if (fmt == nhwc) {
+        parallel_nd(MB, H, W, C,
+            [&](int mb, int h, int w, int c) {
+            const size_t off = DATA_OFF_NHWC(mb,c,h,w);
+            ker(&dst[off], mb, c, h, w);
+        });
+    }else if (fmt == nChw16c || fmt == nChw8c) {
         parallel_nd(MB, utils::div_up(C, blksize), H, W,
             [&](int mb, int c_blk, int h, int w) {
             int c = c_blk * blksize;
-            const size_t off = mb * stride_mb + c * H * W
-                + (h * W + w) * blksize;
-            PRAGMA_OMP_SIMD()
+            const size_t off = DATA_OFF_nChwNc(mb,c,h,w);
+#if defined(__ve)
+            //ShortLoop()// short, but ker is internally vectorized;
+            _Pragma("_NEC novector");
+#else
+            PRAGMA_OMP_SIMD()//;
+#endif
             for (int cc = 0; cc < nstl::min(blksize, C - c); ++cc)
                 ker(&dst[off + cc], mb, c + cc, h, w);
-        });
-    } else if (fmt == nhwc) {
-        parallel_nd(MB, H, W, C,
-            [&](int mb, int h, int w, int c) {
-            const size_t off = mb * stride_mb + h * W * C + w * C + c;
-            ker(&dst[off], mb, c, h, w);
         });
     } else {
         parallel_nd(MB, C, H, W,
             [&](int mb, int c, int h, int w) {
-            const size_t off = data_off(mb, c, h, w);
+            const size_t off = DATA_OFF_ANY(mb, c, h, w);
             ker(&dst[off], mb, c, h, w);
         });
     }
@@ -230,7 +580,11 @@ void ref_lrn_bwd_t<data_type>::execute_backward() {
             int c = c_blk * blksize;
             const size_t off = mb * stride_mb + c * H * W +
                 (h * W + w) * blksize;
-            PRAGMA_OMP_SIMD()
+#if defined(__ve)
+            ShortLoop()//;
+#else
+            PRAGMA_OMP_SIMD()//;
+#endif
             for (int cc = 0; cc < nstl::min(blksize, C - c); ++cc)
                 ker(&diff_src[off + cc], mb, c + cc, h, w);
         });
