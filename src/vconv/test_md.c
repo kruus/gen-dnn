@@ -65,17 +65,20 @@ int main(int argc, char** argv){
         printf("\n=== md_0xFF, then 'x' 1D tensor\n");
         mkldnn_memory_desc_t md;
         md_0xFF(&md);
-        int ndims=1;
+        mkldnn_memory_format_t fmt = mkldnn_x;
+        int ndims=1; // note: fmt and ndims MUST be compatible
         int dims[12]={1,2,3,4,5,6,7,8,9,10,11,12};
         //int dims[12]={1,0};
         mkldnn_data_type_t dt=mkldnn_f32;
-        mkldnn_memory_format_t fmt = mkldnn_nchw;
         printf(" about to call memory_desc_init\n"); fflush(stdout);
-        mkldnn_memory_desc_init(&md, ndims, dims, dt, fmt );
+        mkldnn_status_t s = mkldnn_memory_desc_init(&md, ndims, dims, dt, fmt );
+        if(s != mkldnn_success){
+            printf("ERROR: status = %d\n",s);
+        }
         printf(" back from memory_desc_init\n"); fflush(stdout);
         print_md_full(&md);
     }
-    printf("/nGoodbye");
+    printf("\nGoodbye");
     return 0;
 }
 

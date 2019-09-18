@@ -1,13 +1,14 @@
 OBJECTS:=scratchpad.cpp.o 		memory_desc_wrapper.cpp.o \
-	primitive_attr.cpp.o \
+	mkldnn_debug.cpp.o 		primitive_attr.cpp.o \
 	gemm_convolution_utils.cpp.o \
 	gemm_convolution.cpp.o \
-	convolution.cpp.o memory.cpp.o utils.cpp.o
+	convolution.cpp.o \
+	memory.cpp.o utils.cpp.o
 # gemm_convolution.cpp.o  pulls too many headers, so memory and primitive API simplified
 # convolution.cpp and memory.cpp proved FOO_desc_init functions (helper functions)
 #      to initialize memory and convolution descriptors
 #
-CHEADERS:=mkldnn_types.h mkldnn_desc_init.h
+CHEADERS:=mkldnn_types.h mkldnn_desc_init.h mkldnn_debug.h
 CXXHEADERS:=c_types_map.hpp consistency.hpp conv_primitive_conf.hpp \
 	gemm_convolution.hpp gemm_convolution_utils.hpp memory_desc_wrapper.hpp \
 	mkldnn_traits.hpp primitive_attr.hpp scratchpad.hpp type_helpers.hpp \
@@ -36,20 +37,22 @@ CXXFLAGS+=-g
 INC+=-I. -I../vgemm
 
 INC+=-I../vgemm
-OPT+=-fopenmp -finline -finline-functions -O3 -DNDEBUG
+OPT+=-O3 -finline -finline-functions
+OPT+=-fopenmp
+#OPT+=-DNDEBUG
 
 TARGET:=-ve
 ifeq ($(patsubst ncc%,ncc,$(CC)),ncc) # if $(CC) begins with 'ncc'
 $(info ncc compiler detected)
 INC+=-I/opt/nec/ve/nlc/2.0.0/include
 AS_OPT+=-report-all
-LIBS+=-L/opt/nec/ve/nlc/2.0.0/lib -lcblas -lblas_openmp -Wl,-rpath,/opt/nec/ve/nlc/2.0.0/lib
 CXXFLAGS+=-std=gnu++14
 #CC_OPT+=-report-all
 else
 LIBS=-lcblas -lblas # system libs
 CXXFLAGS+=-std=c++17
 TARGET:=-x86
+AS_OPT+=-Wa,-adhln# -g
 endif
 INSTALLDIR:=./install${TARGET}
 OBJECTS:=${patsubst %.o,%${TARGET}.o,${OBJECTS}}
@@ -59,8 +62,16 @@ CC=gcc-7
 CXX=g++-7
 endif
 
-LIBS:=-L. -L../vgemm -lvconv${TARGET} -lvgemm{TARGET} -Wl,-rpath,./ -Wl,-rpath,../vgemm
+LIBS:=-L. -lvconv${TARGET} -Wl,-rpath,./ -L../vgemm -lvgemm${TARGET} -Wl,-rpath,../vgemm
+ifeq ($(patsubst ncc%,ncc,$(CC)),ncc) # if $(CC) begins with 'ncc'
+LIBS+=-L/opt/nec/ve/nlc/2.0.0/lib -lcblas -lblas_openmp -Wl,-rpath,/opt/nec/ve/nlc/2.0.0/lib
+else
+LIBS+=-lblas
+endif
 
+#
+##################################### all #####################################
+#
 all: build install${TARGET}
 build: $(OBJECTS) libvconv${TARGET}.a libvconv${TARGET}.so
 	@echo "make build DONE"
@@ -69,11 +80,14 @@ force: realclean
 
 # assembly outputs for non-PIC are sometimes easier to understand
 %${TARGET}.o: % | $(CHEADERS) $(CXXHEADERS)
+	@echo -e '\n    %%%% %%%% $* --> $@'
 	$(CXX) $(CXXFLAGS) $(OPT) $(INC) $(AS_OPT) -o $*${TARGET}.s -S $<
 	$(CXX) $(CXXFLAGS) $(OPT) $(INC) $(CC_OPT) -o $@ -c $*${TARGET}.s
 %${TARGET}.lo: % | $(CHEADERS) $(CXXHEADERS)
-	$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $*${TARGET}.s -S $<
-	$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $@ -c $*${TARGET}.s
+	@echo -e '\n    %%%% %%%% $* --> $@'
+	@#$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $*${TARGET}.s -S $<
+	@#$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $@ -c $*${TARGET}.s
+	$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $@ -c $*
 
 # link with something like:
 #     -lcconv -L/opt/nec/ve/nlc/2.0.0/include -lcblas -lblas_openmp
@@ -89,7 +103,9 @@ libvconv${TARGET}.a: $(OBJECTS) libvgemm${TARGET}.a
 	ls -l $@
 	#$(NM) -C $@ >& $@.nm
 
-test_md: test_md.c | libvconv${TARGET}.so libvgemm${TARGET}.so
+test_md: test_md.c build
+	$(CC) $(CFLAGS) $(INC) -o $@ $(filter %.c,$^) $(LIBS)
+%: %.c libvconv${TARGET}.so libvgemm${TARGET}.so
 	$(CC) $(CFLAGS) $(INC) -o $@.o -c $(filter %.c,$^)
 	$(CXX) $(CXXFLAGS) -o $@ $@.o $(LIBS)
 hdrs.log:
@@ -116,9 +132,9 @@ libvgemm${TARGET}.so: | libvgemm${TARGET}.a
 	#$(MAKE) -C ../vgemm
 	cp ../vgemm/$@ ./$@
 clean:
-	rm -f *.o *.lo *.L *.s *.gch *.log
+	rm -f *.o *.lo *.L *.s *.i *.gch *.log
 realclean: clean
 	$(MAKE) -C ../vgemm realclean
-	rm -f libvgemm.a libvconv.a libvconv.so
+	rm -f libvgemm${TARGET}* libvconv${TARGET}* test_md
 	rm -rf install*
 # last line

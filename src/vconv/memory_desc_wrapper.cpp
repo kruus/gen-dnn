@@ -22,6 +22,11 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
+#include "consistency.hpp"
+#ifndef NDEBUG
+#include <iostream>
+#endif
+
 namespace mkldnn {
 namespace impl {
 
@@ -701,7 +706,14 @@ status_t fill_ldgo(memory_desc_t &md) {
 
 status_t memory_desc_wrapper::compute_blocking(memory_desc_t &memory_desc)
 {
+#if 1//ndef NDEBUG
+    Consistency ok("memory_desc_wrapper::compute_blocking(memory_desc_t)");
+#define AND_(...) SCHKVV(ok,__VA_ARGS__)
+    AND_(memory_desc.ndims > 0);
+    if(!ok) return invalid_arguments;
+#else
     if (memory_desc.ndims == 0) return invalid_arguments;
+#endif
 
     switch (memory_desc.format) {
     case x: return fill_x(memory_desc);
@@ -775,6 +787,10 @@ status_t memory_desc_wrapper::compute_blocking(memory_desc_t &memory_desc)
     default: break;
     }
 
+#ifndef NDEBUG
+    std::cout<<"\ncompute_blocking: unknown format "<<memory_desc.format<<std::endl;
+#endif
+        
     return invalid_arguments;
 }
 

@@ -19,7 +19,9 @@ CFLAGS:=-fopenmp -std=c11 -Wall
 CXXFLAGS:=-fopenmp -Wall
 CFLAGS+=-g
 CXXFLAGS+=-g
-OPT+=-fopenmp -finline -finline-functions -O3 -DNDEBUG
+OPT+=-fopenmp
+OPT+=-finline -finline-functions -O3
+OPT+=-DNDEBUG
 
 TARGET:=-ve
 ifeq ($(patsubst ncc%,ncc,$(CC)),ncc)
@@ -31,6 +33,7 @@ else
 LIBS=-lcblas -lblas # system libs
 CXXFLAGS+=-std=c++11
 TARGET:=-x86
+AS_OPT+=-Wa,-adhln# -g
 endif
 INSTALLDIR:=./install${TARGET}
 OBJECTS:=${patsubst %.o,%${TARGET}.o,${OBJECTS}}
@@ -73,8 +76,8 @@ install${TARGET}: all
 	$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $*${TARGET}.s -S $<
 	$(CXX) $(CXXFLAGS) -fPIC $(OPT) $(INC) -o $@ -c $*${TARGET}.s
 clean:
-	rm -f *.o *.lo *.L *.s *.log *.gch *.log
+	rm -f *.o *.lo *.L *.s *.i *.gch *.log
 realclean: clean
-	rm -f libvgemm${TARGET}.so libvgemm${TARGET}.a
+	rm -f libvgemm${TARGET}*
 	rm -rf install*
 # last line

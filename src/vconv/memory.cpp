@@ -28,13 +28,17 @@
 #include "utils.hpp"
 #include "consistency.hpp"
 
+//#ifndef NDEBUG
+#include "mkldnn_debug.h"
+//#endif
+
 using namespace mkldnn::impl;
 using namespace mkldnn::impl::utils;
 using namespace mkldnn::impl::status;
 using namespace mkldnn::impl::memory_format;
 using namespace mkldnn::impl::data_type;
 
-#if defined(__ve) // there might be some debug code here, that should get cleaned up XXX
+#if 0 && defined(__ve) // there might be some debug code here, that should get cleaned up XXX
 #include <iostream>
 using std::cout;
 using std::endl;
@@ -115,6 +119,7 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     //md.primitive_kind = primitive_kind::memory;
     md.data_type = data_type;
     md.format = format;
+    printf(" md{ndims=%d,format=%d}",md.ndims,md.format);
 
     status_t status = success;
     if (one_of(format, memory_format::undef, blocked, ldigo_p, ldgoi_p,
@@ -124,6 +129,7 @@ status_t mkldnn_memory_desc_init(memory_desc_t *memory_desc, int ndims,
     } else if (format == any) {
         // nop
     } else if (types::format_normalize(format) == blocked) {
+        printf(" md{ndims=%d,format=%d}",md.ndims,md.format);
         status = memory_desc_wrapper::compute_blocking(md);
         AND_(status==success && "compute_blocking failed" );
     } else {
