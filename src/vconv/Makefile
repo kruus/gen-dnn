@@ -27,7 +27,7 @@ NM=nnm
 endif
 
 SHELL:=bash
-INC:=-I.
+INC:=
 OPT:=
 AS_OPT:=
 CFLAGS:=-fopenmp -std=c11 -Wall
@@ -36,7 +36,6 @@ CFLAGS+=-g
 CXXFLAGS+=-g
 INC+=-I. -I../vgemm
 
-INC+=-I../vgemm
 OPT+=-O3 -finline -finline-functions
 OPT+=-fopenmp
 #OPT+=-DNDEBUG
@@ -50,7 +49,7 @@ CXXFLAGS+=-std=gnu++14
 #CC_OPT+=-report-all
 else
 LIBS=-lcblas -lblas # system libs
-CXXFLAGS+=-std=c++17
+CXXFLAGS+=-std=c++11
 TARGET:=-x86
 AS_OPT+=-Wa,-adhln# -g
 endif
@@ -58,8 +57,8 @@ INSTALLDIR:=./install${TARGET}
 OBJECTS:=${patsubst %.o,%${TARGET}.o,${OBJECTS}}
 
 ifeq ($(TARGET),-x86) # override gcc compiler version (testing...)
-CC=gcc-7
-CXX=g++-7
+CC=gcc
+CXX=g++
 endif
 
 LIBS:=-L. -lvconv${TARGET} -Wl,-rpath,./ -L../vgemm -lvgemm${TARGET} -Wl,-rpath,../vgemm
