@@ -155,6 +155,5 @@ private:
 }
 }
 
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
 #endif
-
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

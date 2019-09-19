@@ -60,16 +60,15 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(
     {
     using namespace types;
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
-    using namespace Xbyak;
+    if (do_bias_) {
+        bias_data_type_ = pd->desc()->bias_desc.data_type;
+        assert(bias_data_type_ != data_type::undef);
+        bias_data_type_size_ = data_type_size(bias_data_type_);
+    }
 
     do_scale_ = !pd->attr()->output_scales_.has_default_values();
-    if (do_scale_) {
+    if (do_scale_)
         scale_idx_mult_ = (pd->attr()->output_scales_.mask_ == (1 << 1));
-        vreg_scale = Zmm(idx_compute_vreg_start_++);
-    }
-    if (dst_type == data_type::u8)
-       vreg_zero = Zmm(idx_compute_vreg_start_++);
 
     auto &p = pd->attr()->post_ops_;
     const int eltwise_ind = p.find(primitive_kind::eltwise);
@@ -79,16 +78,23 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(
 
     const int sum_ind = p.find(primitive_kind::sum);
     do_sum_ = sum_ind != -1 && !skip_sum;
-    if (do_sum_) {
+    if (do_sum_)
         sum_scale_ = p.entry_[sum_ind].sum.scale;
+#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+    using namespace Xbyak;
+
+    if (do_scale_) {
+        vreg_scale = Zmm(idx_compute_vreg_start_++);
+    }
+    if (dst_type == data_type::u8)
+       vreg_zero = Zmm(idx_compute_vreg_start_++);
+
+    if (do_sum_) {
         vreg_sum_scale = Zmm(idx_compute_vreg_start_++);
         compute_vreg_prev_dst_shift_ = compute_vregs_per_iter_++;
     }
 
     if (do_bias_) {
-        bias_data_type_ = pd->desc()->bias_desc.data_type;
-        assert(bias_data_type_ != data_type::undef);
-        bias_data_type_size_ = data_type_size(bias_data_type_);
         compute_vreg_bias_shift_ = compute_vregs_per_iter_++;
     }
 
@@ -479,8 +485,10 @@ void pp_kernel_t<acc_type, dst_type>::operator()(dst_data_t *dst,
         size_t oc = start % OC_;
         for (size_t i = start; i < end; i++) {
             float d = (float)acc[i];
-            if (do_bias_)
+            if (do_bias_){
+                //printf(" BBBBB ");
                 d += get_bias(bias, oc, bias_data_type_);
+            }
             if (do_scale_)
                 d *= scales[oc * scale_idx_mult_];
             if (do_sum_)

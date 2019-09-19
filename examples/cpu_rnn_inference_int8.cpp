@@ -898,8 +898,13 @@ void simple_net() {
 
 int main(int argc, char **argv) {
     try {
+#if defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0)
+        std::cerr << "vanilla/non-JIT compilation: skipping int8 rnn test" << std::endl;
+        throw;
+#else
         simple_net();
         std::cout << "ok\n";
+#endif
     } catch (error &e) {
         std::cerr << "status: " << e.status << std::endl;
         std::cerr << "message: " << e.message << std::endl;

@@ -54,6 +54,7 @@ CPU_INST_TEST_CASE(TestGEMV,
     test_params{'t', 't', 1, 3000, 2000, 1.0f, 1.0f, 1, 2000, 3000}
 );
 
+#if !defined(TARGET_VANILLA) && !(defined(JITFUNCS) && JITFUNCS<0) /* x86 JIT? */
 #if defined(FP32)
 INST_TEST_CASE(TestGEMM_packed,
     test_params{'t', 'n', 3, 2, 1, 1.0, 0.0, 2, 5, 8, {}, {false, true}, true, mkldnn_invalid_arguments},
@@ -92,7 +93,8 @@ INST_TEST_CASE(TestGEMM_packed,
     make_test_params_pack({true, true}, 'n', 't', 200, 200, 8000, 1.0f, 3.0f, 8000, 8000, 200),
     make_test_params_pack({false, true}, 't', 'n', 200, 300, 8000, 1.0f, 3.0f, 200, 300, 300)
 );
-#endif
+#endif // FP32
+#endif // !x86 JIT
 
 #else
 constexpr test_igemm_params fix_use_oc = {'F', false, false, true};

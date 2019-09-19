@@ -36,7 +36,7 @@ usage() {
     echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
 }
-while getopts ":hjgaSstvPdDqQTwWbF1567iMC" arg; do
+while getopts ":hjgaSstvPdDqQTwWbF1567iMrC" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         j) # force Intel x86 compile JIT (src/cpu/ JIT assembly code)
@@ -122,7 +122,11 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMC" arg; do
         M) # try _MKLDNN_USE_MKL [deprecated] option
             USE_MKL="y"
             ;;
+        r) # reference impls only: no -DUSE_CBLAS compile flag (->no im2col gemm)
+            USE_CBLAS=0
+            ;;
         C) # force -DUSE_CBLAS compile flag
+            # x86: expect errors if not very careful about omp libs (or set OMP_NUM_THREADS=1)
             USE_CBLAS=1
             ;;
     h | *) # help
@@ -211,12 +215,8 @@ else #if [ "$DOTARGET" != "a" ]; then
     if [ "$DOTARGET" == "g" ]; then
         DOJIT=5;
         INSTALLDIR="${INSTALLDIR}-gen"; BUILDDIR="${BUILDDIR}-gen";
-        DOTARGET="j" # we have DOJIT=0, but henceforth identical to -j
+        DOTARGET="j" # we have DOJIT=JIT_VE, but henceforth identical to -j fi
     fi
-    if [ $USE_CBLAS -eq 1 ]; then
-        INSTALLDIR="${INSTALLDIR}-cblas"; BUILDDIR="${BUILDDIR}-cblas";
-    fi
-
 fi
 if [ ! "x${CC}" == "x" -a ! "`which ${CC}`" ]; then
     if [ -x ${CC} ]; then
@@ -231,6 +231,9 @@ if [ "$DOTARGET" == "v" ]; then
     DOJIT=-1
 fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; BUILDDIR="${BUILDDIR}d"; fi
+if [ $NEC_FTRACE -gt 0 ]; then BUILDDIR="${BUILDDIR}F"; fi
+if [ $USE_CBLAS -gt 0 ]; then BUILDDIR="${BUILDDIR}C"; fi
+if [ "$BUILDDIR_SUFFIX" ]; then BUILDDIR="${BUILDDIR}${BUILDDIR_SUFFIX}"; fi
 
 if [ "$DOJUSTDOC" == "y" ]; then
     (

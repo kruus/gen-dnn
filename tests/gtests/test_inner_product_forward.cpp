@@ -367,6 +367,10 @@ INSTANTIATE_TEST_SUITE_P(
                         EXPAND_SIZES_2D( 2, 32, 48, 6, 6 ) },
                 inprod_test_params_float{ prop_kind::forward,
                         memory::format_tag::nhwc, memory::format_tag::hwio,
+                        memory::format_tag::undef, memory::format_tag::nc, // <-- new OK
+                        EXPAND_SIZES_2D( 2, 32, 48, 6, 6 ) },
+                inprod_test_params_float{ prop_kind::forward,
+                        memory::format_tag::nhwc, memory::format_tag::hwio,
                         memory::format_tag::x, memory::format_tag::nc,
                         EXPAND_SIZES_2D( 2, 32, 48, 6, 6 ) },
                 inprod_test_params_float{ prop_kind::forward,
@@ -392,5 +396,7 @@ INSTANTIATE_TEST_SUITE_P(
                 inprod_test_params_float{ prop_kind::forward,
                         memory::format_tag::nc, memory::format_tag::oi,
                         memory::format_tag::x, memory::format_tag::nc,
-                        EXPAND_SIZES_2D( 2, 8, 16, 1, 1 ) }));
+                        EXPAND_SIZES_2D( 2, 8, 16, 1, 1 ) }
+                 ));
 }
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
