@@ -38,7 +38,7 @@ For example:
 
 ```
 export PATH=/opt/nec/ve/bin:$PATH
-export NLC_HOME=/opt/nec/ve/nlc/1.0.0
+export NLC_HOME=/opt/nec/ve/nlc/2.0.0
 export CC=ncc
 export CXX=nc++
 ```

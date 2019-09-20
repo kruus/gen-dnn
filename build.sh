@@ -15,6 +15,7 @@ USE_CBLAS=1
 QUICK=0
 DOGCC_VER=0
 NEC_FTRACE=0
+USE_CBLAS=0
 DOTARGET="x"
 VEJIT=0
 BUILDDIR_SUFFIX=""
@@ -37,7 +38,7 @@ usage() {
     echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
 }
-while getopts ":hatvjdDqQpsSTwWbF1567iB:" arg; do
+while getopts ":hatvjdDqQpsSTwWbF1567iB:rC" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         a) # NEC Aurora VE
@@ -103,9 +104,6 @@ while getopts ":hatvjdDqQpsSTwWbF1567iB:" arg; do
             echo "-s --> -size_t32 compilation NOT SUPPORTED (-S is recommended)"
             echo "***************"
             ;;
-        r) # reference impls only: no -DUSE_CBLAS compile flag (->no im2col gemm)
-            USE_CBLAS=0
-            ;;
         w) # reduce compiler warnings
             DOWARN=0
             ;;
@@ -126,6 +124,12 @@ while getopts ":hatvjdDqQpsSTwWbF1567iB:" arg; do
             ;;
         i) # try using icc
             DOGCC_VER=icc
+            ;;
+        r) # reference impls only: no -DUSE_CBLAS compile flag (->no im2col gemm)
+            USE_CBLAS=0
+            ;;
+        C) # force -DUSE_CBLAS
+            USE_CBLAS=1
             ;;
     h | *) # help
             usage
@@ -223,6 +227,7 @@ fi
 #if [ "$DOTARGET" == "v" ]; then ; fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; BUILDDIR="${BUILDDIR}d"; fi
 if [ $NEC_FTRACE -gt 0 ]; then BUILDDIR="${BUILDDIR}F"; fi
+if [ $USE_CBLAS -gt 0 ]; then BUILDDIR="${BUILDDIR}C"; fi
 if [ "$BUILDDIR_SUFFIX" ]; then BUILDDIR="${BUILDDIR}${BUILDDIR_SUFFIX}"; fi
 
 if [ "$DOJUSTDOC" == "y" ]; then
