@@ -24,13 +24,13 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
+namespace jit_gemm_convolution_utils {
+
 using namespace mkldnn::impl::status;
 using namespace mkldnn::impl::memory_format;
 using namespace mkldnn::impl::utils;
 using namespace prop_kind;
 using namespace data_type;
-
-namespace jit_gemm_convolution_utils {
 
 void im2col_3d(jit_gemm_conv_conf_t const& jcp, const float *im, float *col, int od) {
     const size_t OHW = jcp.oh * jcp.ow;

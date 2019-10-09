@@ -46,7 +46,6 @@ $(info ncc compiler detected)
 INC+=-I/opt/nec/ve/nlc/2.0.0/include
 AS_OPT+=-report-all
 CXXFLAGS+=-std=gnu++14
-#CC_OPT+=-report-all
 else
 LIBS=-lcblas -lblas # system libs
 CXXFLAGS+=-std=c++11
@@ -72,6 +71,10 @@ endif
 ##################################### all #####################################
 #
 all: build install${TARGET}
+vconv${TARGET}.tar.gz: all
+	cd install${TARGET} && tar czf ../$@ *
+	@echo 'distribution tarball:'
+	-ls -ld $@
 test: build test_md
 	{ ./test_md; } 2>&1 | tee test.log
 	@echo "make test DONE -- see test.log"
@@ -80,10 +83,15 @@ build: $(OBJECTS) libvconv${TARGET}.a libvconv${TARGET}.so
 force: realclean
 	$(MAKE)
 
+# -report-all causes a failure sometimes (ncc-2.4.20 ccom SIGSEGV)
+gemm_convolution_utils.cpp${TARGET}.o: gemm_convolution_utils.cpp | $(CHEADERS) $(CXXHEADERS)
+	@echo -e '\n    %%%% %%%% $* --> $@'
+	$(CXX) $(CXXFLAGS) $(OPT) $(INC) $(CC_OPT) -o $*${TARGET}.s -S $<
+	$(CXX) $(CXXFLAGS) $(OPT) $(INC) $(CC_OPT) -o $@ -c $*${TARGET}.s
 # assembly outputs for non-PIC are sometimes easier to understand
 %${TARGET}.o: % | $(CHEADERS) $(CXXHEADERS)
 	@echo -e '\n    %%%% %%%% $* --> $@'
-	$(CXX) $(CXXFLAGS) $(OPT) $(INC) $(AS_OPT) -o $*${TARGET}.s -S $<
+	$(CXX) $(CXXFLAGS) $(OPT) $(INC) $(CC_OPT) $(AS_OPT) -o $*${TARGET}.s -S $<
 	$(CXX) $(CXXFLAGS) $(OPT) $(INC) $(CC_OPT) -o $@ -c $*${TARGET}.s
 %${TARGET}.lo: % | $(CHEADERS) $(CXXHEADERS)
 	@echo -e '\n    %%%% %%%% $* --> $@'
