@@ -137,10 +137,14 @@ while getopts ":hatvjdDqQpsSTwWbF1567iB:rC" arg; do
     esac
 done
 # if unspecified, autodetect target via $CC compiler variable
+
+# following handles ncc with version suffix, ncc via absolute path, gcc, etc.
+COMPILE_TYPE=`${CC} --version 2>&1 | awk '{print $$1; exit}'`
 if [ "${DOTARGET}" == "x" ]; then
     if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
         DOTARGET="s" # s for SX (C/C++ code, cross-compile)
-    elif [ "${CC}" == "ncc" -a "${CXX}" == "nc++" ]; then
+    elif [ "${COMPILE_TYPE}" == "ncc"]; then # -a "${CXX}" == "nc++" ]; then
+        # XXX fragile -- should use first word of $(CC) --version stderr
         echo "auto-detected '-a' Aurora compiler (ncc, nc++)"
         DOTARGET="a"; DOJIT=0; SIZE_T=64; DONEEDMKL="n"
         if [ `uname -n` = "zoro" ]; then JOBS="-j8"; else JOBS="-j1"; fi

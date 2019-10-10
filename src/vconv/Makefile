@@ -26,6 +26,10 @@ CXX=nc++
 NM=nnm
 endif
 
+# bash counterpart: COMPILE_TYPE=`${CC} --version 2>&1 | awk '{print $$1; exit}'`
+COMPILE_TYPE:=$(word 1,$(shell $(CC) --version 2>&1))
+$(if $(COMPILE_TYPE),,$(error could not determine C compiler type for CC=$(CC))) # VE(ncc) vs x86(gcc or ...)
+
 SHELL:=bash
 INC:=
 OPT:=
@@ -35,23 +39,25 @@ CXXFLAGS:=-fopenmp -Wall
 CFLAGS+=-g
 CXXFLAGS+=-g
 INC+=-I. -I../vgemm
+LIBS:=-L. -lvconv${TARGET} -Wl,-rpath,./ -L../vgemm -lvgemm${TARGET} -Wl,-rpath,../vgemm
 
 OPT+=-O3 -finline -finline-functions
 OPT+=-fopenmp
-#OPT+=-DNDEBUG
+OPT+=-DNDEBUG
 
+# TARGET might have been empty/unrecognized. set it for sure based on CC
+ifeq ($(COMPILE_TYPE),ncc)
 TARGET:=-ve
-ifeq ($(patsubst ncc%,ncc,$(CC)),ncc) # if $(CC) begins with 'ncc'
 $(info ncc compiler detected)
 INC+=-I/opt/nec/ve/nlc/2.0.0/include
 AS_OPT+=-report-all
 CXXFLAGS+=-std=gnu++14
 else
-LIBS=-lcblas -lblas # system libs
-CXXFLAGS+=-std=c++11
 TARGET:=-x86
+CXXFLAGS+=-std=c++11
 AS_OPT+=-Wa,-adhln# -g
 endif
+
 INSTALLDIR:=./install${TARGET}
 OBJECTS:=${patsubst %.o,%${TARGET}.o,${OBJECTS}}
 
@@ -60,11 +66,10 @@ CC=gcc
 CXX=g++
 endif
 
-LIBS:=-L. -lvconv${TARGET} -Wl,-rpath,./ -L../vgemm -lvgemm${TARGET} -Wl,-rpath,../vgemm
-ifeq ($(patsubst ncc%,ncc,$(CC)),ncc) # if $(CC) begins with 'ncc'
+ifeq ($(COMPILE_TYPE),ncc)
 LIBS+=-L/opt/nec/ve/nlc/2.0.0/lib -lcblas -lblas_openmp -Wl,-rpath,/opt/nec/ve/nlc/2.0.0/lib
 else
-LIBS+=-lblas
+LIBS+=-lcblas -lblas# system libs
 endif
 
 #
