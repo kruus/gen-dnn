@@ -424,6 +424,13 @@ using cfg_f32 = test_rnn_params_t;
 #define NOT_RNN {alg::undef, rnn_flags::undef, 0.0f, 0.0f}
 
 TEST_P(rnn_forward_test_f32, TestsRnn) { }
+#if !defined(TARGET_VANILLA)
+//
+// TODO: try to re-enable, since plain might not even need the jit kernel ??
+//
+// Currently I've disabled the primitive descriptor so get
+//     "could not create a primitive descriptor iterator" exception
+//
 CPU_INSTANTIATE_TEST_SUITE_P(TestRnn, rnn_forward_test_f32,
         ::testing::Values(
             cfg_f32{PLAIN_RNN(alg::eltwise_tanh), prop_kind::forward_inference, dir::unidirectional_left2right,
@@ -451,4 +458,5 @@ CPU_INSTANTIATE_TEST_SUITE_P(TestLSTM, lstm_forward_test_f32,
                     test_rnn_sizes_t(1, 1, 10, 16, 100, 100, 100, 100)}
             )
     );
-}
+#endif
+}//mkldnn::

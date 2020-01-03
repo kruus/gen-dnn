@@ -211,7 +211,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     REG_SR_BIDIR(f32, nCdhw4c, f32, nCdhw16c),
     REG_SR_BIDIR(f32, nCdhw8c, f32, nCdhw16c),
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     /* bf16 */
     REG_SR(f32, nchw, bf16, nChw16c, fmt_order::keep),
 

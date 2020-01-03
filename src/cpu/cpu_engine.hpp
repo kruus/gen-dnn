@@ -42,8 +42,8 @@
  */
 #define VERBOSE_PRIMITIVE_CREATE 1/*release mode compile*/
 #else
-// debug output here can be lengthy, ex. "no-FOO" for every impl in list
-#define VERBOSE_PRIMITIVE_CREATE 1
+// debug output here can be extremely lengthy for some tests, ex. "no-FOO" for every impl in cpu_engine list
+#define VERBOSE_PRIMITIVE_CREATE 0
 #endif
 #endif
 

@@ -25,7 +25,7 @@
 #include "cpu_stream.hpp"
 #include "memory.hpp"
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 #include "cpu/rnn/ref_rnn.hpp" // now requires jit
 #include "cpu/jit_avx512_core_x8s8s32x_1x1_convolution.hpp"
 #include "cpu/jit_avx512_common_1x1_convolution.hpp"
@@ -173,7 +173,7 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
 #endif
 
 
-#if JITFUNCS >= JITFUNCS_AVX512
+#if JITFUNCS >= JITFUNCS_AVX512 && JITFUNCS < JITFUNCS_VANILLA
 #define INSTANCE_avx512(...) &INSTANCE_CREATOR(__VA_ARGS__),
 //#warning "jit avx512 YES"
 #else
@@ -181,57 +181,61 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
 #define INSTANCE_avx512(...)
 #endif
 
-#if JITFUNCS >= JITFUNCS_AVX2
+#if JITFUNCS >= JITFUNCS_AVX2 && JITFUNCS < JITFUNCS_VANILLA
 #define INSTANCE_avx2(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
 #define INSTANCE_avx2(...)
 #endif
 
-#if JITFUNCS >= JITFUNCS_AVX
+#if JITFUNCS >= JITFUNCS_AVX && JITFUNCS < JITFUNCS_VANILLA
 #define INSTANCE_avx(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
 #define INSTANCE_avx(...)
 #endif
 
-#if JITFUNCS >= JITFUNCS_SSE42
+#if JITFUNCS >= JITFUNCS_SSE42 && JITFUNCS < JITFUNCS_VANILLA
 #define INSTANCE_sse42(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
 #define INSTANCE_sse42(...)
 #endif
 
-#if JITFUNCS >= JITFUNCS_SSE41
+#if JITFUNCS >= JITFUNCS_SSE41 && JITFUNCS < JITFUNCS_VANILLA
 #define INSTANCE_sse41(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
 #define INSTANCE_sse41(...)
 #endif
 
-#if JITFUNCS >= JITFUNCS_SSE41
+#if JITFUNCS >= JITFUNCS_ANY && JITFUNCS < JITFUNCS_VANILLA /* unified(?) x86 jit */
 #define INSTANCE_uni(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
 #define INSTANCE_uni(...)
 #endif
 
-#if JITFUNCS >= JITFUNCS_ANY // i.e. any x86 cpu
+#if JITFUNCS == JITFUNCS_VANILLA // portable non-jit (generic cpu)
 #define INSTANCE_any(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
 #define INSTANCE_any(...)
 #endif
 
-#if VEJIT > 0 // an implementation ONLY working for VE
+/** unmodified INSTANCE(...) macro works like JITFUNCS_VANILLA
+ * and should compile on x86 and non-x86 architectures. */
+#define INSTANCE(...) &INSTANCE_CREATOR(__VA_ARGS__),
+
+/** an implementation ONLY working for VE (Aurora) vector processor. */
+#if VEJIT > 0
 #define INSTANCE_ve(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
 #define INSTANCE_ve(...)
 #endif
 
-// JITFUNCS >= JIT_FUNCS_ANY (always include this impl)
-#define INSTANCE(...) &INSTANCE_CREATOR(__VA_ARGS__),
 //@}
 
 static const pd_create_f cpu_impl_list[] = {
     /* RNN */
-    INSTANCE_any(ref_rnn_fwd_f32_t)
-    INSTANCE_any(ref_rnn_fwd_u8s8_t)
-    INSTANCE_any(ref_rnn_bwd_f32_t)
+    /* TODO remove jit requirement cpu/rnn/ref_rnn.hpp (perhaps some postops stuff?) */
+    INSTANCE_uni(ref_rnn_fwd_f32_t)
+    INSTANCE_uni(ref_rnn_fwd_u8s8_t)
+    INSTANCE_uni(ref_rnn_bwd_f32_t)
     /* conv */
     INSTANCE_avx512(jit_avx512_common_dw_convolution_fwd_t)
     INSTANCE_avx512(jit_avx512_common_dw_convolution_bwd_data_t)

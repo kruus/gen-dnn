@@ -13,7 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 
 #include <assert.h>
 
@@ -1059,4 +1059,4 @@ status_t jit_uni_reorder_create(reorder_pd_t **reorder_pd,
 }
 }
 }
-#endif //!(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#endif // !defined(TARGET_VANILLA)

@@ -13,7 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 
 #include <assert.h>
 
@@ -500,4 +500,4 @@ template struct jit_uni_softmax_fwd_t<avx512_common>;
 }
 }
 }
-#endif //!(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#endif // !defined(TARGET_VANILLA)

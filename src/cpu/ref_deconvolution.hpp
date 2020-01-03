@@ -244,7 +244,7 @@ struct ref_deconvolution_fwd_t: public cpu_primitive_t {
             auto bia_type = pd()->weights_md(1)->data_type;
             if (utils::everyone_is(f32, dst_type, bia_type))
                 compute_bias<f32, f32>(ctx);
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
             else if (utils::everyone_is(bf16, dst_type, bia_type))
                 compute_bias<bf16, bf16>(ctx);
             else if (dst_type == f32 && bia_type == bf16)
@@ -506,7 +506,7 @@ struct ref_deconvolution_bwd_weights_t: public cpu_primitive_t {
             auto ddst_type = pd()->diff_dst_md()->data_type;
             if (utils::everyone_is(f32, dbia_type, ddst_type))
                 compute_bias<f32, f32>(ctx);
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
             else if (utils::everyone_is(bf16, dbia_type, ddst_type))
                 compute_bias<bf16, bf16>(ctx);
             else if (dbia_type == f32 && ddst_type == bf16) {

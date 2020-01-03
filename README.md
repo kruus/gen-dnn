@@ -136,6 +136,18 @@ on macOS\* 10.13 (High Sierra) with
 * [Intel C/C++ Compiler](https://software.intel.com/en-us/intel-parallel-studio-xe)
   18.0 and 19.0
 
+### VE (generic C / C++) support
+To compile and test for non-xbyak (generic C / C++ only), use `build.sh -h` to specify
+the compilation type.
+
+* src/vanilla mostly contains refs to lightly modified src/cpu codes
+* eventually should have a "vanilla" cpu\_engine
+* rnn support is currently disabled since there is some tricky x86 jit kernel
+  stuff going on.
+* extra debug flags:
+  * src/cpu/gemm/gemm.cpp extended\_sgemm debug
+  * debug mode compile is verbose about how implementation is selected by cpu\_engine
+
 ### GPU Support
 Intel Processor Graphics is supported by Intel MKL-DNNs GPU engine. GPU engine
 is disabled in the default build configuration. The following

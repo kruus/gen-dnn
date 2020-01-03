@@ -61,11 +61,12 @@
  */
 #define JITFUNCS_NONE -1
 #define JITFUNCS_ANY 0
-#define JITFUNCS_SSE42 1
-#define JITFUNCS_AVX 2
-#define JITFUNCS_AVX2 3
-#define JITFUNCS_AVX512 4
-#define JITFUNCS_VANILLA 5
+#define JITFUNCS_SSE41 1
+#define JITFUNCS_SSE42 2
+#define JITFUNCS_AVX 3
+#define JITFUNCS_AVX2 4
+#define JITFUNCS_AVX512 5
+#define JITFUNCS_VANILLA 6
 //@}
 
 #if defined(TARGET_VANILLA) && !defined(JITFUNCS)
@@ -75,16 +76,29 @@
  * These TARGETS can be set in cmake to generate reduced-functionality libmkldnn.
  * Which jit impls get included in the engine is capped by a single value.
  *
- *
  * For example, TARGET_VANILLA includes NO Intel JIT code at all, and is suitable
  * for [cross-]compiling for other platforms.
  *
- * \note TARGET_VANILLA impls are not *yet* optimized for speed! */
+ * This header guarantees that JITFUNCS is always defined, and ensures that
+ * whenever JITFUNCS is equal to JITFUNCS_NONE or JITFUNCS_VANILLA or ...,
+ * that TARGET_VANILLA is always defined.
+ * (TARGET_VANILLA is an easier-to-read check for "generic C or C++ code, no jit")
+ *
+ * \note TARGET_VANILLA impls are not *yet* optimized for speed!
+ */
 #define JITFUNCS JITFUNCS_NONE
+
 #elif defined(JITFUNCS) && (JITFUNCS <= 0 || JITFUNCS == JITFUNCS_VANILLA) && !defined(TARGET_VANILLA)
 /** synonom for JITFUNCS <= 0 */
 #define TARGET_VANILLA
 #endif
+
+#if defined(TARGET_VANILLA) && JITFUNCS != JITFUNCS_NONE && JITFUNCS != JITFUNCS_VANILLA /*&& JITFUNCS!=JITFUNCS_VE*/
+#error "TARGET_VANILLA requires JITFUNCS to be either JITFUNCS_NONE or JITFUNCS_VANILLA for now"
+#endif
+/* JITFUNCS is now always defined.
+ * TARGET_VANILLA is equivalent to (JITFUNCS==JITFUNCS_NONE || JITFUNCS==JITFUNCS_VANILLA)
+ */
 
 #ifndef JITFUNCS
 /* default mkl-dnn compile works as usual, JITFUNCS_ANY means include all impls,

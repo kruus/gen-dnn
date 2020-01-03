@@ -68,7 +68,7 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::pp_ker_t(
     , do_bias_(false)
     , do_eltwise_(false)
     , do_sum_(false)
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     , eltwise_injector_(nullptr)
 #endif // !TARGET_VANILLA
     , eltwise_(nullptr)
@@ -104,7 +104,7 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::pp_ker_t(
     const int eltwise_ind = post_ops.find(primitive_kind::eltwise);
     do_eltwise_ = eltwise_ind != -1;
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     if (!mayiuse(avx512_core)) {
         if (do_eltwise_) {
             eltwise_ = new ref_eltwise_scalar_fwd_t(
@@ -128,7 +128,7 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::pp_ker_t(
 
 }
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 template <data_type_t src_type, data_type_t dst_type>
 void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::generate()
 {
@@ -497,7 +497,7 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator ()
     if (end <= start)
         return;
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if defined(TARGET_VANILLA)
     if (ker_) {
         // JIT
         ker_args args;

@@ -1519,7 +1519,7 @@ static mkldnn_status_t gemm_threading_driver(
     if ((arg->m <= 0) || (arg->n <= 0))
         return mkldnn_success;
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     if (!is_a_packed && !is_b_packed && (arg->packing == pack_type::none)
             && gemm_s8u8s32_jump_to_gemv_s8u8s32(arg))
         return mkldnn_success;
@@ -1808,7 +1808,7 @@ mkldnn_status_t gemm_driver(
         const bool force_nocopy, pack_type packing,
         gemm_pack_storage_t *pack_dst, bool measure_only) {
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     // gemm_driver supports bfloat16 gemm for Intel AVX512 and
     // Intel AVX512 BF16.
     assert(IMPLICATION(data_traits<a_type>::data_type == data_type::bf16,
@@ -1841,7 +1841,7 @@ mkldnn_status_t gemm_driver(
     return gemm_threading_driver(&args);
 }
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 template // Instantiate gemm_bf16bf16f32
 mkldnn_status_t gemm_driver<bfloat16_t, bfloat16_t, float>(
         const char *transA, const char *transB, const char *offsetC,

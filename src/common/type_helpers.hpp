@@ -68,7 +68,7 @@ inline size_t data_type_size(data_type_t data_type) {
     using namespace data_type;
     switch (data_type) {
     case f16: return sizeof(prec_traits<f16>::type);
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     case bf16: return sizeof(prec_traits<bf16>::type);
 #endif // !TARGET_VANILLA
     case f32: return sizeof(prec_traits<f32>::type);
@@ -160,7 +160,7 @@ inline data_type_t default_accum_data_type(data_type_t src_dt,
     using namespace data_type;
 
     if (one_of(f16, src_dt, dst_dt)) return f16;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     if (one_of(bf16, src_dt, dst_dt)) return f32;
 #endif // !TARGET_VANILLA
     if (one_of(f32, src_dt, dst_dt)) return f32;
@@ -180,7 +180,7 @@ inline data_type_t default_accum_data_type(data_type_t src_dt,
 
     /* prop_kind doesn't matter */
     if (everyone_is(f16, src_dt, wei_dt, dst_dt)) return f16;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     if (one_of(bf16, src_dt, wei_dt, dst_dt)) return f32;
 #endif // !TARGET_VANILLA
     if (everyone_is(f32, src_dt, wei_dt, dst_dt)) return f32;

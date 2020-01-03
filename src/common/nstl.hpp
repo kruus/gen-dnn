@@ -90,7 +90,7 @@ struct numeric_limits<int8_t> : public std::numeric_limits<int8_t> {};
 template <>
 struct numeric_limits<uint8_t> : public std::numeric_limits<uint8_t> {};
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 template <> struct numeric_limits<bfloat16_t> {
     static constexpr bfloat16_t lowest() {
         return bfloat16_t(0xff7f, true);

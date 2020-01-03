@@ -248,7 +248,7 @@ using namespace data_type;
 template void ref_deconvolution_fwd_t::compute_bias<f32, f32>(const exec_ctx_t &ctx) const;
 template void ref_deconvolution_bwd_weights_t::compute_bias<f32, f32>(const exec_ctx_t &ctx) const;
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 template void ref_deconvolution_fwd_t::compute_bias<f32, bf16>(const exec_ctx_t &ctx) const;
 template void ref_deconvolution_fwd_t::compute_bias<bf16, f32>(const exec_ctx_t &ctx) const;
 template void ref_deconvolution_fwd_t::compute_bias<bf16, bf16>(const exec_ctx_t &ctx) const;

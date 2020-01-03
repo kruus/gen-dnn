@@ -13,7 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 
 #include "c_types_map.hpp"
 #include "nstl.hpp"
@@ -496,4 +496,4 @@ status_t jit_sse41_conv_fwd_kernel_f32::init_conf(jit_conv_conf_t &jcp,
 }
 }
 }
-#endif //!(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#endif // !defined(TARGET_VANILLA)

@@ -39,7 +39,7 @@ mkldnn_status_t gemm_s8x8s32(const char *transa, const char *transb,
         const b_dt *B, const int *ldb, const b_dt *bo, const float *beta,
         int32_t *c, const int *ldc, const int32_t *co);
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 mkldnn_status_t gemm_bf16bf16f32(
         const char *transa, const char *transb,
         const mkldnn_dim_t *M, const mkldnn_dim_t *N, const mkldnn_dim_t *K,
@@ -52,7 +52,7 @@ mkldnn_status_t gemm_bf16bf16f32(
 
 #ifdef USE_CBLAS
 #define GEMM_IMPL_STR "gemm:blas"
-#elif defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS==JITFUNCS_NONE)
+#elif defined(TARGET_VANILLA)
 #define GEMM_IMPL_STR "gemm:nojit"
 #else
 #define GEMM_IMPL_STR "gemm:jit"

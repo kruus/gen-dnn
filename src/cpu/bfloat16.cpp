@@ -16,7 +16,7 @@
 
 #include <memory>
 #include "cpu_isa_traits.hpp"
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 #include "jit_avx512_core_bf16cvt.hpp"
 #endif
 #include "bfloat16.hpp"
@@ -33,7 +33,7 @@ union float_raw {
 };
 
 bfloat16_t &bfloat16_t::operator=(float f) {
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     if (cpu::mayiuse(cpu::cpu_isa_t::avx512_core)) {
         jit_call_t p;
         p.inp = (void *)&f;
@@ -77,7 +77,7 @@ bfloat16_t::operator float() const {
     return r.fraw;
 }
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 void cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t size) {
     assert(cpu::mayiuse(cpu::cpu_isa_t::avx512_core));
     jit_call_t p_;

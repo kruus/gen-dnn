@@ -26,7 +26,7 @@
 #include "utils.hpp"
 
 #include "gemm/gemm.hpp"
-#if !defined(TARGET_VANILLA) && !(defined(JITFUNCS) && JITFUNCS==JITFUNCS_VANILLA)
+#if !defined(TARGET_VANILLA)
 #include "jit_generator.hpp"
 #endif // !TARGET_VANILLA
 #include "gemm_inner_product_utils.hpp"

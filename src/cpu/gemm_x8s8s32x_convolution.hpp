@@ -23,7 +23,7 @@
 
 #include "cpu_convolution_pd.hpp"
 #include "cpu_primitive.hpp"
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 #include "jit_primitive_conf.hpp"
 #include "jit_generator.hpp"
 #include "jit_uni_eltwise.hpp"
@@ -125,7 +125,7 @@ struct _gemm_x8s8s32x_convolution_fwd_t: public cpu_primitive_t {
     _gemm_x8s8s32x_convolution_fwd_t(const pd_t *apd)
         : cpu_primitive_t(apd, true), pp_ker_(nullptr)
     {
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
         pp_ker_ = new pp_ker_t(pd());
 #endif // !TARGET_VANILLA
     }
@@ -146,18 +146,18 @@ private:
     // sufficiently advanced igemm jit generator that supports quantization,
     // relu, and whatnot
     class pp_ker_t
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
         : jit_generator
 #endif // !TARGET_VANILLA
     {
     public:
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
         DECLARE_CPU_JIT_AUX_FUNCTIONS(
         _gemm_x8s8s32x_convolution_fwd_t::pp_kernel);
 #endif // !TARGET_VANILLA
         pp_ker_t(const pd_t *pd);
         ~pp_ker_t() {
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
             if (eltwise_injector_)
                 delete eltwise_injector_;
 #endif // !TARGET_VANILLA
@@ -173,7 +173,7 @@ private:
         size_t dst_os_stride_;
 
     private:
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
         void generate();
 #endif // !TARGET_VANILLA
 
@@ -201,7 +201,7 @@ private:
         bool do_sum_;
         bool do_signed_scaling_;
         size_t vlen_;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
         jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
 #endif // !TARGET_VANILLA
         ref_eltwise_scalar_fwd_t *eltwise_;

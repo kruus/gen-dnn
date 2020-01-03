@@ -13,7 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 
 #include "c_types_map.hpp"
 #include "mkldnn_thread.hpp"
@@ -271,4 +271,4 @@ template struct jit_avx512_core_x8s8s32x_1x1_convolution_fwd_t<s8, f32>;
 }
 }
 }
-#endif //!(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#endif // !defined(TARGET_VANILLA)

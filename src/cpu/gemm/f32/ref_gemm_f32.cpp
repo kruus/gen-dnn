@@ -21,7 +21,7 @@
 #include "utils.hpp"
 
 #include "cpu_isa_traits.hpp"
-#if !defined(TARGET_VANILLA) && !(defined(JITFUNCS) && JITFUNCS==JITFUNCS_VANILLA)
+#if !defined(TARGET_VANILLA)
 #include "jit_generator.hpp"
 #endif
 

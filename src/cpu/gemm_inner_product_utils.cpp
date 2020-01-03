@@ -18,7 +18,7 @@
 #include "mkldnn_thread.hpp"
 #include "simple_q10n.hpp"
 #include "gemm_inner_product_utils.hpp"
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 #include "jit_uni_eltwise.hpp"
 #endif // !TARGET_VANILLA
 
@@ -46,7 +46,7 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(
     , scale_idx_mult_(0)
     , do_sum_(false)
     , sum_scale_(0)
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     , eltwise_injector_(nullptr)
     , bf16_emu_(nullptr)
     , isa_(isa_any)
@@ -80,7 +80,7 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(
     do_sum_ = sum_ind != -1 && !skip_sum;
     if (do_sum_)
         sum_scale_ = p.entry_[sum_ind].sum.scale;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     using namespace Xbyak;
 
     if (do_scale_) {
@@ -134,7 +134,7 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(
     return;
 }
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 template<data_type_t acc_type, data_type_t dst_type>
 void pp_kernel_t<acc_type, dst_type>::generate()
 {
@@ -466,7 +466,7 @@ void pp_kernel_t<acc_type, dst_type>::operator()(dst_data_t *dst,
     if (end <= start)
         return;
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     if (ker_) {
         // JIT
         ker_args args;
@@ -485,6 +485,7 @@ void pp_kernel_t<acc_type, dst_type>::operator()(dst_data_t *dst,
         size_t oc = start % OC_;
         for (size_t i = start; i < end; i++) {
             float d = (float)acc[i];
+            // surprise, bias gets passed to both extended_sgemm AND here ?
             if (do_bias_){
                 //printf(" BBBBB ");
                 d += get_bias(bias, oc, bias_data_type_);
@@ -507,7 +508,7 @@ template class pp_kernel_t<s32, f32>;
 template class pp_kernel_t<s32, s32>;
 template class pp_kernel_t<s32, s8>;
 template class pp_kernel_t<s32, u8>;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 template class pp_kernel_t<f32, bf16>;
 #endif // !TARGET_VANILLA
 }

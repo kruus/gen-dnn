@@ -14,7 +14,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 
 #include "c_types_map.hpp"
 #include "nstl.hpp"
@@ -801,4 +801,4 @@ template struct jit_uni_pool_kernel<avx512_core>;
 }
 
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
-#endif //!(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#endif // !defined(TARGET_VANILLA)

@@ -31,31 +31,6 @@ else
     LOGDIR=.
 fi
 DOTARGET='v'
-################# BUILDDIR
-if [ `uname` == 'SUPER-UX' ]; then
-	# let's take the MOST RECENT of build-sx or build-sxd directories ...
-	BUILDDIR=`ls -ldst build-sx* | grep ' drwx' | head -1 | sed 's/.*\(build.*\)/\1/'`
-    DOTARGET='s'
-else
-    if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
-        BUILDDIR='build-sx'     # s for SX (C/C++ code, cross-compile)
-        mkdir -p guest/sx       # perhaps should be in build.sh too
-        chmod ugo+w guest
-        chmod ugo+w guest/sx
-    elif [ -d src/vanilla ]; then
-        BUILDDIR='build'        # v for vanilla (C/C++ code)
-        DOTARGET='v'
-    else
-        if [ -d build-jit ]; then
-            BUILDDIR='build-jit'    # j for JIT (Intel assembler)
-            DOTARGET='j'
-        else
-            BUILDDIR='build'
-            DOTARGET=''
-        fi
-    fi
-fi
-echo "build directory GUESS: ${BUILDDIR}"
 DOQUICK="n"
 THREADS=0
 BATCHDIR=tests/benchdnn/inputs
@@ -69,11 +44,13 @@ while getopts ":hqvjdD:m:t:V:s:" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         v) # [yes] (if available, vanilla C/C++ only: no JIT)
-            if [ -d src/vanilla ]; then BUILDDIR='build'; DOTARGET='v'; fi
+            if [ -d src/vanilla -a -z "$BUILDDIR" ]; then BUILDDIR='build'; DOTARGET='v'; fi
             ;;
         j) # force Intel JIT (src/cpu/ JIT assembly code)
-            if [ -d build-jit ]; then BUILDDIR='build-jit'; DOTARGET='j';
-            else                      BUILDDIR='build';     DOTARGET=''; fi
+            if [ -z $BUILDDIR ]; then
+                if [ -d build-jit ]; then BUILDDIR='build-jit'; DOTARGET='j';
+                else                      BUILDDIR='build';     DOTARGET=''; fi
+            fi
             ;;
         d) # [no] debug release
             DODEBUG="y"
@@ -101,6 +78,35 @@ while getopts ":hqvjdD:m:t:V:s:" arg; do
             ;;
     esac
 done
+################# BUILDDIR
+if [ -z "$BUILDDIR" ]; then
+    if [ `uname` == 'SUPER-UX' ]; then
+        # let's take the MOST RECENT of build-sx or build-sxd directories ...
+        BUILDDIR=`ls -ldst build-sx* | grep ' drwx' | head -1 | sed 's/.*\(build.*\)/\1/'`
+        DOTARGET='s'
+    else
+        if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
+            BUILDDIR='build-sx'     # s for SX (C/C++ code, cross-compile)
+            mkdir -p guest/sx       # perhaps should be in build.sh too
+            chmod ugo+w guest
+            chmod ugo+w guest/sx
+        elif [ -d src/vanilla ]; then
+            BUILDDIR='build'        # v for vanilla (C/C++ code)
+            DOTARGET='v'
+        else
+            if [ -d build-jit ]; then
+                BUILDDIR='build-jit'    # j for JIT (Intel assembler)
+                DOTARGET='j'
+            else
+                BUILDDIR='build'
+                DOTARGET=''
+            fi
+        fi
+    fi
+    echo "build directory GUESS: ${BUILDDIR}"
+else
+    echo "build directory GIVEN: ${BUILDDIR}"
+fi
 ################# check BUILDDIR exists
 if [ "$DODEBUG" == "y" ]; then
     if [ -d "${BUILDDIR}d" ]; then

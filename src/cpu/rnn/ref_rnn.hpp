@@ -30,9 +30,9 @@
 #include "cpu_rnn_pd.hpp"
 #include "../cpu_primitive.hpp"
 #include "rnn_utils.hpp"
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 #include "jit_uni_rnn_common_postgemm_dispatcher.hpp"
-#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#endif // !defined(TARGET_VANILLA)
 
 namespace mkldnn {
 namespace impl {
@@ -142,6 +142,9 @@ struct _ref_rnn_common_t : public cpu_primitive_t {
                         data_type::u8, format_tag::x);
             }
 
+#if defined(TARGET_VANILLA)
+            CHECK(nullptr == "TODO: write a JITFUNCS_VANILLA version for rnn");
+#endif
             init_scratchpad(scratchpad_sz);
 
             return status::success;
@@ -168,9 +171,9 @@ struct _ref_rnn_common_t : public cpu_primitive_t {
 
     _ref_rnn_common_t(const pd_t *apd)
         : cpu_primitive_t(apd, true)
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
           , rnn_postgemm_(nullptr) {
-#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#endif // !defined(TARGET_VANILLA)
         /// @todo set max_feature_size assuming that we limit the number of
         /// iterations and layer to one if slc != dic and sic != dic
         /// respectively
@@ -194,10 +197,10 @@ struct _ref_rnn_common_t : public cpu_primitive_t {
         set_gemm_funcs(pd()->rnn_.use_layer_packed_gemm, gemm_layer_func,
                 weights_layer_assign_func);
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
         rnn_postgemm_ = new rnn_postgemm_dispatcher<aprop, src_type>(pd()->rnn_, pd());
         assert(rnn_postgemm_ != nullptr);
-#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#endif // !defined(TARGET_VANILLA)
         switch (pd()->cell_kind()) {
         case alg_kind::vanilla_rnn:
         case alg_kind::vanilla_lstm:
@@ -222,9 +225,9 @@ struct _ref_rnn_common_t : public cpu_primitive_t {
     }
 
     ~_ref_rnn_common_t() {
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
         delete rnn_postgemm_;
-#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#endif // !defined(TARGET_VANILLA)
     }
 
     // typedef typename prec_traits::type data_t;
@@ -282,9 +285,9 @@ private:
     size_t ws_diff_states_offset_;
     size_t ws_grid_comp_offset_;
     size_t ws_cell_comp_offset_;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     rnn_postgemm_dispatcher<aprop,src_type> *rnn_postgemm_;
-#endif // !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#endif // !defined(TARGET_VANILLA)
 
     grid_execution_f grid_computation;
     cell_execution_f cell_func;

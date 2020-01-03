@@ -21,7 +21,7 @@
 #include <limits>
 #include "mkldnn_config.h"
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 namespace mkldnn {
 namespace impl {
 

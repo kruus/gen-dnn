@@ -23,7 +23,7 @@
 #include "cpu_isa_traits.hpp"
 
 #include "gemm_convolution_utils.hpp"
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 #include "jit_generator.hpp"
 #include "common/bfloat16.hpp"
 #endif // !TARGET_VANILLA
@@ -128,7 +128,7 @@ template
 void im2col_3d(const jit_gemm_conv_conf_t &jcp, const float *im, float *col,
         int od);
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 template
 void im2col_3d(const jit_gemm_conv_conf_t &jcp, const bfloat16_t *im,
          bfloat16_t *col, int od);
@@ -288,7 +288,7 @@ template
 void im2col(const jit_gemm_conv_conf_t &jcp, const float *__restrict im,
        float *__restrict col, int hs, int hb, int ws, int wb);
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 template
 void im2col(const jit_gemm_conv_conf_t &jcp,
        const bfloat16_t *__restrict im,
@@ -1072,7 +1072,7 @@ status_t init_conf(jit_gemm_conv_conf_t &jcp,
                        && (jcp.mb != 1 || jcp.ngroups > 2);
 
         jcp.nthr = jcp.outer_threading ? max_threads : 1;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
         const size_t gemm_col_datatype_size = is_bf16_conv && !is_bwd_d
             ? sizeof(bfloat16_t)
             : sizeof(float);

@@ -17,7 +17,7 @@
 #include "cpu_isa_traits.hpp"
 #include "mkldnn_thread.hpp"
 #include "simple_sum.hpp"
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 #include "bfloat16.hpp"
 #endif // !TARGET_VANILLA
 
@@ -49,7 +49,7 @@ status_t simple_sum_t<src_data_type, dst_data_type>::execute(
 
     const auto scales = pd()->scales();
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     auto sum_block_bf16 = [&](dim_t start, dim_t end, int ithr) {
         const bool is_dst_bf16 = dst_data_type == data_type::bf16;
 
@@ -102,7 +102,7 @@ status_t simple_sum_t<src_data_type, dst_data_type>::execute(
         for (dim_t nb = start; nb < end; ++nb) {
             dim_t start_e = nb * block_size;
             dim_t end_e = start_e + block_size;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
             if (src_data_type == data_type::bf16)
                 sum_block_bf16(start_e, end_e, ithr);
             else
@@ -113,7 +113,7 @@ status_t simple_sum_t<src_data_type, dst_data_type>::execute(
         if (tail != 0 && ithr == nthr - 1) {
             dim_t start_e = nelems - tail;
             dim_t end_e = nelems;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
             if (src_data_type == data_type::bf16)
                 sum_block_bf16(start_e, end_e, ithr);
             else
@@ -126,7 +126,7 @@ status_t simple_sum_t<src_data_type, dst_data_type>::execute(
 }
 
 template struct simple_sum_t<data_type::f32>;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 template struct simple_sum_t<data_type::bf16>;
 template struct simple_sum_t<data_type::bf16, data_type::f32>;
 #endif // !TARGET_VANILLA

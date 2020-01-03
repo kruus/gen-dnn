@@ -91,7 +91,7 @@ template <typename in_t> struct qz<in_t, float> {
     { return alpha * in + (beta ? beta * out : 0); }
 };
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 template <> struct qz<bfloat16_t, bfloat16_t> {
     float operator()(bfloat16_t in, bfloat16_t out, float alpha, float beta)
     { return (bfloat16_t)(alpha * (float)in + (beta ? beta * (float)out : 0)); }

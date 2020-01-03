@@ -25,7 +25,7 @@
 #include "cpu_convolution_pd.hpp"
 #include "cpu_engine.hpp"
 #include "gemm_convolution_utils.hpp"
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 #include "jit_avx512_core_bf16cvt.hpp"
 #include "jit_uni_eltwise.hpp"
 #endif // !TARGET_VANILLA
@@ -124,14 +124,14 @@ struct gemm_bf16_convolution_fwd_t: public cpu_primitive_t {
                 ? one
                 : zero;
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
         if (this->pd()->is_postprocess_required())
             pp_ker_ = new pp_ker_t(this->pd());
 #endif // !TARGET_VANILLA
     }
 
     ~gemm_bf16_convolution_fwd_t() {
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
         delete pp_ker_;
 #endif // !TARGET_VANILLA
     }
@@ -150,7 +150,7 @@ private:
     void execute_forward(const exec_ctx_t &ctx) const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     class pp_ker_t : jit_generator {
     public:
         DECLARE_CPU_JIT_AUX_FUNCTIONS(
@@ -256,7 +256,7 @@ private:
 #endif // !TARGET_VANILLA
 
     acc_data_t beta_;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     pp_ker_t *pp_ker_;
 #endif // !TARGET_VANILLA
 };

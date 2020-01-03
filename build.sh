@@ -17,6 +17,7 @@ DOGCC_VER=0
 NEC_FTRACE=0
 DOTARGET="x"
 VEJIT=0
+JITFUNCS_VANILLA=6 # agree with src/cpu/cpu_isa_traits.cpp
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -213,9 +214,10 @@ else #if [ "$DOTARGET" != "a" ]; then
         DOJIT=0; INSTALLDIR="${INSTALLDIR}-jit"; BUILDDIR="${BUILDDIR}-jit";
     fi
     if [ "$DOTARGET" == "g" ]; then
-        DOJIT=5;
+        DOJIT=$JITFUNCS_VANILLA
+        #DOJIT=-1; # JITFUNCS_NONE
         INSTALLDIR="${INSTALLDIR}-gen"; BUILDDIR="${BUILDDIR}-gen";
-        DOTARGET="j" # we have DOJIT=JIT_VE, but henceforth identical to -j fi
+        DOTARGET="j" # we have DOJIT=JITFUNCS_VANILLA, but henceforth identical to -j
     fi
 fi
 if [ ! "x${CC}" == "x" -a ! "`which ${CC}`" ]; then
@@ -383,7 +385,7 @@ echo "PATH $PATH"
     if [ $USE_MKL == "y" ]; then # deprecated in v1.0
         CMAKEOPT="${CMAKEOPT} -D_MKLDNN_USE_MKL=ON"
     fi
-    if [ "$DOJIT" -lt 0 ]; then
+    if [ "$DOJIT" -lt 0 -o "$DOJIT" -eq $JITFUNCS_VANILLA ]; then
         # this would NOT affect the jit generator
         #CMAKEOPT="${CMAKEOPT} -DMKLDN_ARCH_OPT_FLAGS=\"\""
         CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
@@ -632,7 +634,7 @@ if [ "$BUILDOK" == "y" ]; then
         fi
         if [ $DOTEST -ge 3 ]; then
             if [ -x ./bench.sh ]; then
-                MKLDNN_VERBOSE=2 ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
+                MKLDNN_VERBOSE=2 BUILDDIR=${BUILDDIR} ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
             fi
         fi
         echo "Tests done"

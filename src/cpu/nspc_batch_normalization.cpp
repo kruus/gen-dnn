@@ -74,7 +74,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
 
     auto dst = CTX_OUT_MEM(data_t *, MKLDNN_ARG_DST);
     auto ws = CTX_OUT_MEM(uint8_t *, MKLDNN_ARG_WORKSPACE);
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     acc_data_t *tmp_data_ = d_type == bf16
             ? scratchpad.template get<acc_data_t>(key_bnorm_bf16cvt)
             : nullptr;
@@ -82,7 +82,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
 
     const dim_t N = pd()->MB();
     const dim_t C = pd()->C();
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     const int simd_w = 16;
     const dim_t C_align = utils::rnd_up(C, simd_w);
 #endif // !TARGET_VANILLA
@@ -109,7 +109,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
                 for (dim_t sp = 0; sp < SP; sp++) {
                     const acc_data_t *_src;
                     const size_t s_off = (size_t)n * SP * C + sp * C;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
                     if (d_type == bf16) {
                         // convert src from b16 to f32
                         acc_data_t *tmp_src = tmp_data_ + ithr * C_align;
@@ -149,7 +149,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
                 for (dim_t sp = 0; sp < SP; sp++) {
                     const acc_data_t *_src;
                     const size_t s_off = (size_t)n * SP * C + sp * C;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
                     if (d_type == bf16) {
                         // convert src from b16 to f32
                         acc_data_t *tmp_src = tmp_data_ + ithr * C_align;
@@ -193,7 +193,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
                 acc_data_t *_dst;
                 const acc_data_t *_src;
                 const size_t s_off = (size_t)n * SP * C + sp * C;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
                 if (d_type == bf16) {
                     // store dst to f32 buffer
                     _dst = tmp_data_ + ithr * C_align;
@@ -234,7 +234,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
                     }
                     _dst[c] = maybe_post_op(bn_res);
                 }
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
                 if (d_type == bf16)
                     // convert dst from f32 to b16
                     cvt_float_to_bfloat16((bfloat16_t *)dst + s_off, _dst, C);
@@ -245,7 +245,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
 }
 
 template struct nspc_batch_normalization_fwd_t<f32>;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 template struct nspc_batch_normalization_fwd_t<bf16>;
 #endif // !TARGET_VANILLA
 
@@ -272,7 +272,7 @@ void nspc_batch_normalization_bwd_t<d_type>::execute_backward(
 
     const dim_t N = pd()->MB();
     const dim_t C = pd()->C();
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     const int simd_w = 16;
     const dim_t C_align = utils::rnd_up(C, simd_w);
 #endif // !TARGET_VANILLA
@@ -280,7 +280,7 @@ void nspc_batch_normalization_bwd_t<d_type>::execute_backward(
     acc_data_t *diff_gamma = diff_scaleshift, *diff_beta = diff_scaleshift + C;
     acc_data_t *ws_reduce
             = scratchpad.template get<acc_data_t>(key_bnorm_reduction);
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     acc_data_t *tmp_data_ = d_type == bf16
             ? scratchpad.template get<acc_data_t>(key_bnorm_bf16cvt)
             : nullptr;
@@ -310,7 +310,7 @@ void nspc_batch_normalization_bwd_t<d_type>::execute_backward(
                 const acc_data_t *_diff_dst;
                 const acc_data_t *_src;
                 const size_t s_off = (size_t)n * SP * C + sp * C;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
                 if (d_type == bf16) {
                     // convert diff_dst from b16 to f32
                     acc_data_t *tmp_diff_dst = tmp_data_ + ithr * C_align;
@@ -372,7 +372,7 @@ void nspc_batch_normalization_bwd_t<d_type>::execute_backward(
                 const acc_data_t *_diff_dst;
                 const acc_data_t *_src;
                 const size_t s_off = (size_t)n * SP * C + sp * C;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
                 if (d_type == bf16) {
                     // store diff_src to f32 buffer
                     _diff_src = tmp_data_ + ithr * C_align;
@@ -420,7 +420,7 @@ void nspc_batch_normalization_bwd_t<d_type>::execute_backward(
                     v_diff_src *= gamma * sqrt_variance;
                     _diff_src[c] = v_diff_src;
                 }
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
                 if (d_type == bf16) {
                     // convert diff_src from f32 to b16
                     cvt_float_to_bfloat16(
@@ -433,7 +433,7 @@ void nspc_batch_normalization_bwd_t<d_type>::execute_backward(
 }
 
 template struct nspc_batch_normalization_bwd_t<f32>;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 template struct nspc_batch_normalization_bwd_t<bf16>;
 #endif // !TARGET_VANILLA
 }

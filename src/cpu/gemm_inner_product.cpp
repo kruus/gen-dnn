@@ -52,7 +52,8 @@ void gemm_inner_product_fwd_t<data_type>::execute_forward(
     //if(postops_in_ip_) printf( "bbbbb ");
     extended_sgemm(wei_tr ? "T" : "N", "N", &OC, &MB, &IC, &alpha, weights,
             wei_tr ? &IC : &OC, src, &IC, &beta_, dst, &OC,
-            postops_in_ip_ ? nullptr : bias);
+            postops_in_ip_ ? nullptr : bias
+            );
 
     if (postops_in_ip_) {
         parallel(0, [&](int ithr, int nthr) {

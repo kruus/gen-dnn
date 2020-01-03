@@ -21,7 +21,7 @@
 #include "type_helpers.hpp" // common
 
 #include "cpu_isa_traits.hpp"
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 #include "jit_generator.hpp" //cpu
 #endif // !TARGET_VANILLA
 #include "cpu_batch_normalization_utils.hpp" // cpu
@@ -74,7 +74,7 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
 
     auto dst = CTX_OUT_MEM(data_t *, MKLDNN_ARG_DST);
     auto ws = CTX_OUT_MEM(uint8_t *, MKLDNN_ARG_WORKSPACE);
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     acc_data_t *bf16_src_cvt_wsp
             = scratchpad.template get<acc_data_t>(key_bnorm_bf16cvt);
 #endif // !TARGET_VANILLA
@@ -86,7 +86,7 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
             = [&](acc_data_t res) { return (with_relu && res < 0) ? 0 : res; };
     const bool has_spatial = utils::one_of(pd()->ndims(), 4, 5);
     const dim_t SP = (has_spatial) ? pd()->H() * pd()->W() * pd()->D() : 1;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     const dim_t simd_w = 16;
     const dim_t SP_cl_align = utils::rnd_up(SP, simd_w);
 #endif // !TARGET_VANILLA
@@ -157,7 +157,7 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
                     for (dim_t n = N_s; n < N_e; ++n) {
                         const acc_data_t *scr_fp32;
                         size_t soff = off + n * C * SP;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
                         if (d_type == bf16) {
                             // convert src from b16 to f32
                             acc_data_t *tmp_src
@@ -205,7 +205,7 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
                     for (dim_t n = N_s; n < N_e; ++n) {
                         const acc_data_t *_src;
                         size_t soff = off * SP + n * C * SP;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
                         if (d_type == bf16) {
                             // convert src from b16 to f32
                             acc_data_t *tmp_src
@@ -262,7 +262,7 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
                     acc_data_t *_dst;
                     const acc_data_t *_src;
                     size_t s_off = off * SP + n * C * SP;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
                     if (d_type == bf16) {
                         // store dst to f32 buffer
                         _dst = bf16_src_cvt_wsp + ithr * SP_cl_align;
@@ -302,7 +302,7 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
                         }
                         _dst[sp] = maybe_post_op(bn_res);
                     }
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
                     if (d_type == bf16) {
                         // convert dst from f32 to b16
                         cvt_float_to_bfloat16((bfloat16_t *)dst + s_off, _dst,
@@ -316,7 +316,7 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
 }
 
 template struct ncsp_batch_normalization_fwd_t<f32>;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 template struct ncsp_batch_normalization_fwd_t<bf16>;
 #endif // !TARGET_VANILLA
 
@@ -336,7 +336,7 @@ void ncsp_batch_normalization_bwd_t<d_type>::execute_backward(
 
     auto scratchpad = this->scratchpad(ctx);
     auto *ws_reduce = scratchpad.template get<acc_data_t>(key_bnorm_reduction);
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     acc_data_t *tmp_data_
             = scratchpad.template get<acc_data_t>(key_bnorm_bf16cvt);
 #endif // !TARGET_VANILLA
@@ -347,7 +347,7 @@ void ncsp_batch_normalization_bwd_t<d_type>::execute_backward(
 
     const bool has_spatial = utils::one_of(pd()->ndims(), 4, 5);
     const dim_t SP = (has_spatial) ? pd()->H() * pd()->W() * pd()->D() : 1;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
     const dim_t simd_w = 16; //??
     const dim_t SP_cl_align = utils::rnd_up(SP, simd_w);
 #endif // !TARGET_VANILLA
@@ -423,7 +423,7 @@ void ncsp_batch_normalization_bwd_t<d_type>::execute_backward(
                     const acc_data_t *_diff_dst;
                     const acc_data_t *_src;
                     dim_t s_off = off * SP + n * C * SP;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
                     if (d_type == bf16) {
                         // convert diff_dst from b16 to f32
                         acc_data_t *tmp_diff_dst
@@ -495,7 +495,7 @@ void ncsp_batch_normalization_bwd_t<d_type>::execute_backward(
                     const acc_data_t *_diff_dst;
                     const acc_data_t *_src;
                     dim_t s_off = off * SP + n * C * SP;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
                     if (d_type == bf16) {
                         // store diff_src to f32 buffer
                         _diff_src = tmp_data_ + ithr * SP_cl_align;
@@ -545,7 +545,7 @@ void ncsp_batch_normalization_bwd_t<d_type>::execute_backward(
                         v_diff_src *= gamma * sqrt_variance;
                         _diff_src[sp] = v_diff_src;
                     }
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
                     if (d_type == bf16) {
                         // convert diff_src from f32 to b16
                         cvt_float_to_bfloat16((bfloat16_t *)diff_src + s_off,
@@ -559,7 +559,7 @@ void ncsp_batch_normalization_bwd_t<d_type>::execute_backward(
 }
 
 template struct ncsp_batch_normalization_bwd_t<f32>;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !defined(TARGET_VANILLA)
 template struct ncsp_batch_normalization_bwd_t<bf16>;
 #endif // !TARGET_VANILLA
 }
