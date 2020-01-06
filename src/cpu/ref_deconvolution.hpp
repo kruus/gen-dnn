@@ -1,18 +1,18 @@
 /*******************************************************************************
-* Copyright 2018 Intel Corporation
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*******************************************************************************/
+ * Copyright 2018 Intel Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *******************************************************************************/
 
 #ifndef CPU_REF_DECONVOLUTION_HPP
 #define CPU_REF_DECONVOLUTION_HPP
@@ -24,18 +24,26 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 #include "primitive_iterator.hpp"
-#include "consistency.hpp"
 
 #include "cpu_convolution_pd.hpp"
 #include "cpu_deconvolution_pd.hpp"
 #include "cpu_primitive.hpp"
+
+#include "consistency.hpp"
+#include "mkldnn_debug.h"
+#define AND_(...) SCHKVV(ok,__VA_ARGS__)
+#define AND_STR(CSTR,...) do{bool a=ok; bool b=AND_(__VA_ARGS__); if(a && !b) printf("%s",CSTR);}while(0)
+#define DBG(CSTR) do{ }while(0)
+#define DBG2(CSTR1,CSTR2) do{ }while(0)
+//#define DBG(CSTR) do{ printf(" warning: %s:%lu %s\n",__FILE__,(long unsigned)__LINE__,(CSTR)); fflush(stdout); }while(0);
+//#define DBG2(CSTR1,CSTR2) do{ printf(" warning: %s:%lu %s %s\n",__FILE__,(long unsigned)__LINE__,(CSTR1),(CSTR2)); fflush(stdout); }while(0);
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
 
 static status_t compute_blocked_format(bool with_groups,
-    const memory_desc_t *oi_md, memory_desc_t *io_md)
+        const memory_desc_t *oi_md, memory_desc_t *io_md)
 {
     /* Computes blocking for *i*o* format from *o*i* format */
 
@@ -119,17 +127,18 @@ struct ref_deconvolution_fwd_t: public cpu_primitive_t {
                 const primitive_attr_t *attr,
                 const deconvolution_fwd_pd_t *hint_fwd_pd)
             : cpu_deconvolution_fwd_pd_t(engine, adesc, attr, hint_fwd_pd)
-            , conv_pd_(nullptr)
-        {}
+              , conv_pd_(nullptr)
+        {DBG("+ref_deconvolution_fwd_t");}
 
         pd_t(const pd_t &other)
             : cpu_deconvolution_fwd_pd_t(other)
-            , conv_pd_(other.conv_pd_->clone())
-            , conv_supports_bias_(other.conv_supports_bias_)
-            , dst_tag_(other.dst_tag_)
-        {}
+              , conv_pd_(other.conv_pd_->clone())
+              , conv_supports_bias_(other.conv_supports_bias_)
+              , dst_tag_(other.dst_tag_)
+        {DBG("+[copy]ref_deconvolution_fwd_t");}
 
         pd_t &operator=(const pd_t &other) {
+            DBG("+[assign]ref_deconvolution_fwd_t");
             MKLDNN_SHORT_CIRCUIT_SELF_ASSIGN(other);
             delete conv_pd_;
             conv_pd_ = other.conv_pd_->clone();
@@ -138,7 +147,10 @@ struct ref_deconvolution_fwd_t: public cpu_primitive_t {
             return *this;
         }
 
-        ~pd_t() { delete conv_pd_; }
+        ~pd_t() {
+            DBG("-ref_deconvolution_fwd_t");
+            delete conv_pd_;
+        }
 
         DECLARE_COMMON_PD_T(conv_pd_->name(), ref_deconvolution_fwd_t);
 
@@ -150,19 +162,19 @@ struct ref_deconvolution_fwd_t: public cpu_primitive_t {
             CHECK(conv_descr_create(desc(), &cd));
 
             mkldnn_primitive_desc_iterator it(engine_, (op_desc_t *)&cd,
-                &attr_, nullptr);
+                    &attr_, nullptr);
             while (++it != it.end()) {
                 conv_pd_ = *it;
                 conv_supports_bias_ =
                     static_cast<cpu_convolution_bwd_data_pd_t *>(conv_pd_)
                     ->support_bias();
                 bool ref_deconv_supports_bias = true
-                        && desc()->accum_data_type == data_type::f32
-                        && utils::one_of(desc()->dst_desc.data_type, f32, bf16)
-                        && IMPLICATION(desc()->src_desc.data_type == bf16,
-                                memory_desc_matches_one_of_tag(*conv_pd_->diff_src_md(),
-                                    utils::pick(ndims() - 3, ncw, nchw, ncdhw),
-                                    utils::pick(ndims() - 3, nCw16c, nChw16c, nCdhw16c)));
+                    && desc()->accum_data_type == data_type::f32
+                    && utils::one_of(desc()->dst_desc.data_type, f32, bf16)
+                    && IMPLICATION(desc()->src_desc.data_type == bf16,
+                            memory_desc_matches_one_of_tag(*conv_pd_->diff_src_md(),
+                                utils::pick(ndims() - 3, ncw, nchw, ncdhw),
+                                utils::pick(ndims() - 3, nCw16c, nChw16c, nCdhw16c)));
                 bool ok = true
                     && conv_pd_->weights_md()->extra.flags == 0
                     /* deconv reference code can process only f32 bias */
@@ -178,13 +190,23 @@ struct ref_deconvolution_fwd_t: public cpu_primitive_t {
 
         status_t init() {
             using namespace format_tag;
+#if 0 // orig
             bool ok = true
                 && is_fwd()
                 && utils::one_of(desc()->alg_kind,
-                                 alg_kind::deconvolution_direct,
-                                 alg_kind::deconvolution_winograd)
+                        alg_kind::deconvolution_direct,
+                        alg_kind::deconvolution_winograd)
                 && attr()->post_ops_.has_default_values();
+#else
+            Consistency ok("deconvolution_fwd consistency:");
+            AND_( is_fwd() );
+            AND_(utils::one_of(desc()->alg_kind,
+                        alg_kind::deconvolution_direct,
+                        alg_kind::deconvolution_winograd));
+            AND_(attr()->post_ops_.has_default_values());
+#endif
 
+#if 0 // orig
             if (ok) {
                 CHECK(init_convolution());
                 if (weights_md_.format_kind == format_kind::any) {
@@ -207,7 +229,33 @@ struct ref_deconvolution_fwd_t: public cpu_primitive_t {
                 return status::success;
             }
 
+            return status::unimplemented; // invalid_arguments, to match other code?
+#else
+            if(ok){
+                OK_CHECK(init_convolution());
+                if (weights_md_.format_kind == format_kind::any) {
+                    OK_CHECK(compute_blocked_format(with_groups(),
+                                conv_pd_->weights_md(), &desc_.weights_desc));
+                    weights_md_ = desc_.weights_desc;
+                }
+                if (src_md_.format_kind == format_kind::any)
+                    src_md_ = *conv_pd_->diff_dst_md();
+                if (dst_md_.format_kind == format_kind::any)
+                    dst_md_ = *conv_pd_->diff_src_md();
+                if (bias_md_.format_kind == format_kind::any)
+                    OK_CHECK(memory_desc_init_by_tag(bias_md_, x));
+
+                dst_tag_ = memory_desc_matches_one_of_tag(dst_md_,
+                        utils::pick(ndims() - 3, ncw, nchw, ncdhw),
+                        utils::pick(ndims() - 3, nCw8c, nChw8c, nCdhw8c),
+                        utils::pick(ndims() - 3, nCw16c, nChw16c, nCdhw16c));
+            }
+            if(ok)
+                return status::success;
+
+            DBG(" warning: missing ref deconvolution");
             return status::unimplemented;
+#endif
         }
 
         virtual void init_scratchpad_md() override {
@@ -256,18 +304,18 @@ struct ref_deconvolution_fwd_t: public cpu_primitive_t {
         return status::success;
     }
 
-private:
+    private:
     void compute_fwd_bias(float *dst, const float *bias) const;
     template <data_type_t dst_type, data_type_t bia_type>
-    void compute_fwd_bias_ncdhw(typename prec_traits<dst_type>::type *dst,
-            const typename prec_traits<bia_type>::type *bias) const;
+        void compute_fwd_bias_ncdhw(typename prec_traits<dst_type>::type *dst,
+                const typename prec_traits<bia_type>::type *bias) const;
 
     template <data_type_t dst_type, data_type_t bia_type, int blksize>
-    void compute_fwd_bias_nCdhwXc(typename prec_traits<dst_type>::type *dst,
-            const typename prec_traits<bia_type>::type *bias) const;
+        void compute_fwd_bias_nCdhwXc(typename prec_traits<dst_type>::type *dst,
+                const typename prec_traits<bia_type>::type *bias) const;
 
     template <data_type_t dst_type, data_type_t bia_type>
-    void compute_bias(const exec_ctx_t &ctx) const;
+        void compute_bias(const exec_ctx_t &ctx) const;
 
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
     primitive_t *conv_p_;
@@ -279,12 +327,12 @@ struct ref_deconvolution_bwd_data_t: public cpu_primitive_t {
                 const primitive_attr_t *attr,
                 const deconvolution_fwd_pd_t *hint_fwd_pd)
             : cpu_deconvolution_bwd_data_pd_t(engine, adesc, attr, hint_fwd_pd)
-            , conv_pd_(nullptr)
+              , conv_pd_(nullptr)
         {}
 
         pd_t(const pd_t &other)
             : cpu_deconvolution_bwd_data_pd_t(other)
-            , conv_pd_(other.conv_pd_->clone()) {}
+              , conv_pd_(other.conv_pd_->clone()) {}
 
         pd_t &operator=(const pd_t &other) {
             MKLDNN_SHORT_CIRCUIT_SELF_ASSIGN(other);
@@ -306,13 +354,13 @@ struct ref_deconvolution_bwd_data_t: public cpu_primitive_t {
 
             mkldnn_primitive_desc_iterator it(engine_, (op_desc_t *)&cd,
                     &attr_, nullptr);
-             while (++it != it.end()) {
+            while (++it != it.end()) {
                 conv_pd_ = *it;
                 if (conv_pd_->weights_md()->extra.flags == 0)
                     return status::success;
                 delete conv_pd_;
             }
-
+            DBG(" warning: missing ref deconvolution");
             return status::unimplemented;
         }
 
@@ -321,6 +369,7 @@ struct ref_deconvolution_bwd_data_t: public cpu_primitive_t {
             auto dsrc_type = desc()->diff_src_desc.data_type;
             auto wei_type = desc()->weights_desc.data_type;
             auto ddst_type = desc()->diff_dst_desc.data_type;
+#if 0 // orig
             bool ok = true
                 && desc()->prop_kind == prop_kind::backward_data
                 && (utils::everyone_is(f32, dsrc_type, wei_type, ddst_type)
@@ -329,7 +378,19 @@ struct ref_deconvolution_bwd_data_t: public cpu_primitive_t {
                 && utils::one_of(desc()->alg_kind,
                         alg_kind::deconvolution_direct,
                         alg_kind::deconvolution_winograd);
+#else
+            Consistency ok;
+            AND_STR(mkldnn_prop_kind2str(desc()->prop_kind),
+                    desc()->prop_kind == prop_kind::backward_data);
+            AND_(utils::everyone_is(f32, dsrc_type, wei_type, ddst_type)
+                    || (utils::one_of(dsrc_type, f32, bf16)
+                        && utils::everyone_is(bf16, wei_type, ddst_type)));
+            AND_(utils::one_of(desc()->alg_kind,
+                        alg_kind::deconvolution_direct,
+                        alg_kind::deconvolution_winograd));
+#endif
 
+#if 0 // orig
             if (ok) {
                 CHECK(init_convolution());
                 if (weights_md_.format_kind == format_kind::any) {
@@ -345,7 +406,26 @@ struct ref_deconvolution_bwd_data_t: public cpu_primitive_t {
                 return status::success;
             }
 
+            DBG(" warning: missing ref deconvolution");
             return status::unimplemented;
+#else
+            if (ok) {
+                OK_CHECK(init_convolution());
+                if (weights_md_.format_kind == format_kind::any) {
+                    OK_CHECK(compute_blocked_format(with_groups(),
+                                conv_pd_->weights_md(), &desc_.weights_desc));
+                    weights_md_ = desc_.weights_desc;
+                }
+                if (diff_src_md_.format_kind == format_kind::any)
+                    diff_src_md_ = *conv_pd_->dst_md();
+                if (diff_dst_md_.format_kind == format_kind::any)
+                    diff_dst_md_ = *conv_pd_->src_md();
+            }
+            if(ok)
+                return status::success;
+            DBG(" warning: missing ref deconvolution");
+            return status::unimplemented;
+#endif
         }
 
         virtual void init_scratchpad_md() override {
@@ -375,7 +455,7 @@ struct ref_deconvolution_bwd_data_t: public cpu_primitive_t {
         return status::success;
     }
 
-private:
+    private:
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
     primitive_t *conv_p_;
 };
@@ -387,13 +467,13 @@ struct ref_deconvolution_bwd_weights_t: public cpu_primitive_t {
                 const primitive_attr_t *attr,
                 const deconvolution_fwd_pd_t *hint_fwd_pd)
             : cpu_deconvolution_bwd_weights_pd_t(engine, adesc, attr, hint_fwd_pd)
-            , conv_pd_(nullptr)
+              , conv_pd_(nullptr)
         {}
 
         pd_t(const pd_t &other)
             : cpu_deconvolution_bwd_weights_pd_t(other)
-            , conv_pd_(other.conv_pd_->clone())
-            , dst_tag_(other.dst_tag_)
+              , conv_pd_(other.conv_pd_->clone())
+              , dst_tag_(other.dst_tag_)
         {}
 
         pd_t &operator=(const pd_t &other) {
@@ -417,7 +497,7 @@ struct ref_deconvolution_bwd_weights_t: public cpu_primitive_t {
 
             mkldnn_primitive_desc_iterator it(engine_, (op_desc_t *)&cd,
                     &attr_, nullptr);
-             while (++it != it.end()) {
+            while (++it != it.end()) {
                 conv_pd_ = *it;
                 bool bf16_ref_deconv_supports_bias = IMPLICATION(
                         with_bias() && desc()->src_desc.data_type == data_type::bf16,
@@ -429,15 +509,18 @@ struct ref_deconvolution_bwd_weights_t: public cpu_primitive_t {
                     return status::success;
                 delete conv_pd_;
             }
+            DBG(" warning: missing ref deconvolution_bwd_weights impl?");
             return status::unimplemented;
         }
 
         status_t init() {
+            DBG(" deconv bwd weights init...");
             using namespace format_tag;
             using namespace data_type;
             auto src_type = desc()->src_desc.data_type;
             auto dwei_type = desc()->diff_weights_desc.data_type;
             auto ddst_type = desc()->diff_dst_desc.data_type;
+#if 0
             bool ok = true
                 && desc()->prop_kind == prop_kind::backward_weights
                 && (utils::everyone_is(f32, src_type, dwei_type, ddst_type)
@@ -453,7 +536,7 @@ struct ref_deconvolution_bwd_weights_t: public cpu_primitive_t {
                 if (diff_weights_md_.format_kind == format_kind::any) {
                     CHECK(compute_blocked_format(with_groups(),
                                 conv_pd_->diff_weights_md(),
-                        &desc_.diff_weights_desc));
+                                &desc_.diff_weights_desc));
                     diff_weights_md_ = desc_.diff_weights_desc;
                 }
                 if (src_md_.format_kind == format_kind::any)
@@ -471,7 +554,72 @@ struct ref_deconvolution_bwd_weights_t: public cpu_primitive_t {
                 return status::success;
             }
 
+            DBG(" warning: missing ref deconvolution_bwd_weights impl?");
             return status::unimplemented;
+#else
+            Consistency ok;
+            DBG2("desc()->prop_kind ==",mkldnn_prop_kind2str(desc()->prop_kind));
+#if 1 // orig
+            //AND_(desc()->prop_kind == prop_kind::backward_weights);
+            // above failed in tests/gtests/test_deconvolution.cpp
+            AND_STR(mkldnn_prop_kind2str(desc()->prop_kind),
+                    desc()->prop_kind == prop_kind::backward_weights);
+            // sometimes it is forward_training !
+#else
+            // but JUST forward_training does not fix much
+            AND_STR(mkldnn_prop_kind2str(desc()->prop_kind),
+                    desc()->prop_kind == prop_kind::forward_training);
+#endif
+
+            DBG2("src_type",mkldnn_dt2str(src_type));
+            DBG2("dwei_type",mkldnn_dt2str(dwei_type));
+            DBG2("ddst_type",mkldnn_dt2str(ddst_type));
+#if defined(TARGET_VANILLA) // no bf16 support
+            {
+                // but also perhaps issues with undef data types in gtests
+                bool a=ok;
+                AND_(utils::everyone_is(f32, src_type, dwei_type, ddst_type));
+                bool b=ok;
+                if (a && !b) printf(" data types src,dwei,ddst={%s, %s, %s}\n",
+                        mkldnn_dt2str(src_type),
+                        mkldnn_dt2str(dwei_type),
+                        mkldnn_dt2str(ddst_type));
+            }
+#else
+            AND_(utils::everyone_is(f32, src_type, dwei_type, ddst_type)
+                    || (utils::one_of(dwei_type, f32, bf16)
+                        && utils::everyone_is(bf16, src_type, ddst_type)));
+#endif
+            AND_(utils::one_of(desc()->alg_kind,
+                        alg_kind::deconvolution_direct,
+                        alg_kind::deconvolution_winograd));
+            AND_(attr()->has_default_values());
+
+            if (ok) {
+                OK_CHECK(init_convolution());
+                if (diff_weights_md_.format_kind == format_kind::any) {
+                    OK_CHECK(compute_blocked_format(with_groups(),
+                                conv_pd_->diff_weights_md(),
+                                &desc_.diff_weights_desc));
+                    diff_weights_md_ = desc_.diff_weights_desc;
+                }
+                if (src_md_.format_kind == format_kind::any)
+                    src_md_ = *conv_pd_->diff_dst_md();
+                if (diff_dst_md_.format_kind == format_kind::any)
+                    diff_dst_md_ = *conv_pd_->src_md();
+                if (diff_bias_md_.format_kind == format_kind::any)
+                    CHECK(memory_desc_init_by_tag(diff_bias_md_, x));
+
+                dst_tag_ = memory_desc_matches_one_of_tag(diff_dst_md_,
+                        utils::pick(ndims() - 3, ncw, nchw, ncdhw),
+                        utils::pick(ndims() - 3, nCw8c, nChw8c, nCdhw8c),
+                        utils::pick(ndims() - 3, nCw16c, nChw16c, nCdhw16c));
+            }
+            if(ok)
+                return status::success;
+            DBG(" warning: missing ref deconvolution_bwd_weights");
+            return status::unimplemented;
+#endif
         }
 
         virtual void init_scratchpad_md() override {
@@ -509,30 +657,29 @@ struct ref_deconvolution_bwd_weights_t: public cpu_primitive_t {
 #if !defined(TARGET_VANILLA)
             else if (utils::everyone_is(bf16, dbia_type, ddst_type))
                 compute_bias<bf16, bf16>(ctx);
-            else if (dbia_type == f32 && ddst_type == bf16) {
+            else if (dbia_type == f32 && ddst_type == bf16)
                 compute_bias<f32, bf16>(ctx);
-            }
 #endif // !TARGET_VANILLA
         }
         return status::success;
     }
 
-private:
+    private:
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
     void compute_bwd_bias(float *diff_bias, const float *diff_dst) const;
 
     template <data_type_t dbia_type, data_type_t ddst_type>
-    void compute_bwd_bias_ncdhw(
-            typename prec_traits<dbia_type>::type *diff_bias,
-            const typename prec_traits<ddst_type>::type *diff_dst) const;
+        void compute_bwd_bias_ncdhw(
+                typename prec_traits<dbia_type>::type *diff_bias,
+                const typename prec_traits<ddst_type>::type *diff_dst) const;
 
     template <data_type_t dbia_type, data_type_t ddst_type, int blksize>
-    void compute_bwd_bias_nCdhwXc(
-            typename prec_traits<dbia_type>::type *diff_bias,
-            const typename prec_traits<ddst_type>::type *diff_dst) const;
+        void compute_bwd_bias_nCdhwXc(
+                typename prec_traits<dbia_type>::type *diff_bias,
+                const typename prec_traits<ddst_type>::type *diff_dst) const;
 
     template <data_type_t dbia_type, data_type_t ddst_type>
-    void compute_bias(const exec_ctx_t &ctx) const;
+        void compute_bias(const exec_ctx_t &ctx) const;
     primitive_t *conv_p_;
 };
 
@@ -542,4 +689,4 @@ private:
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

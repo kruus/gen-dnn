@@ -40,7 +40,7 @@
  *
  * \deprecated Easier to mkldnn_verbose_set(2) in cpu_engine constructor (see below)
  */
-#define VERBOSE_PRIMITIVE_CREATE 1/*release mode compile*/
+#define VERBOSE_PRIMITIVE_CREATE 0/*release mode compile*/
 #else
 // debug output here can be extremely lengthy for some tests, ex. "no-FOO" for every impl in cpu_engine list
 #define VERBOSE_PRIMITIVE_CREATE 0

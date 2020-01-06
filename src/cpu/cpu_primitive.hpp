@@ -36,12 +36,6 @@
 #define CTX_OUT_MEM(type, arg) \
     static_cast<ARG_TYPE(type) *>(CTX_OUT_STORAGE(arg).data_handle())
 
-#define CPU_PRIMITIVE_HPP_DBG 0
-
-#if CPU_PRIMITIVE_HPP_DBG
-#include "mkldnn_io.h"
-#endif
-
 namespace mkldnn {
 namespace impl {
 namespace cpu {

@@ -177,7 +177,7 @@ struct Consistency {
  * so provide a default macro verbose for debug compilation.
  * NOTE: please do not commit with this set to SCHKVV.
  *       releases should use SCHKV, for fastest optimized code. */
-#define OK_AND(...) SCHKVV(ok,__VA_ARGS__)
+#define OK_AND(...) SCHKV(ok,__VA_ARGS__)
 
 /** like CHECK from \ref utils.hpp , returning error code immediately, but using
  * 'Consistency ok;', to inherit failure printing in debug compiles. */

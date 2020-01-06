@@ -21,7 +21,7 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
-#include "mkldnn_io.hpp" // ve debug (uninitialized structs compiler bug)
+//#include "mkldnn_io.hpp" // ve debug (uninitialized structs compiler bug)
 using namespace mkldnn::impl;
 using namespace mkldnn::impl::utils;
 using namespace mkldnn::impl::status;

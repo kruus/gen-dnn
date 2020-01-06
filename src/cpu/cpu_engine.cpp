@@ -128,6 +128,9 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
     using namespace mkldnn::impl;
     using namespace mkldnn::impl::status;
     typedef typename prim::pd_t pd_t;
+    if(0){
+        printf(" create-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
+    }
     auto const ret = primitive_desc_t::create<pd_t>( pd, adesc, attr, engine,
             hint_fwd );
     if( ret == success ) {
@@ -140,27 +143,41 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
         //char const* result;
         //mkldnn_primitive_desc_query( *pd, mkldnn_query_impl_info_str, 0, &result );
         //printf(" created descriptor %s\n", result);
-        //fflush(stdout);
-    }else if(ret == unimplemented && /*opt.*/ adesc->kind == pd_t::base_pkind){
+        fflush(stdout);
+    }else if(ret == unimplemented){
         printf(" skip-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
-        // partially construct (no init(), no init_info()) to get the name()
-        //     This allows printing right-kind-but-skipped messages
-        //                      [see src/common/primitive_desc.hpp]
-        // TODO: primitive_desc.hpp can return an optional const char* name()
-        //       result, sometimes, even if the full construction failed.
-        //    Q: Is prop_kind a universal attribute of all prim? Probably not.
-        using pd_op_desc_t = typename pkind_traits<pd_t::base_pkind>::desc_type;
-        auto _pd = new pd_t(engine, (const pd_op_desc_t *)adesc, attr,
-            reinterpret_cast<const typename pd_t::hint_class *> (hint_fwd));
-        if (_pd != nullptr){ // get the 'name()' ~ short impl_name string
-            char const* name = _pd->name();
-            printf(":%s", name);
-            delete _pd;
+        if(/*opt.*/ adesc->kind == pd_t::base_pkind){
+            if (adesc->kind == primitive_kind::deconvolution) {
+                // DNNL v1.0.0 bug with deconvolution private data constructors
+                // not dealing with memory format undef in 'init()' routine
+                //
+                // for some reason, format type undef leads to difficulty in constructing
+                // an unattached ref_deconvolution private data object...
+                printf("-avoid_pd:name_unknown)");
+            }else{
+                printf("-pd"); fflush(stdout);
+                // partially construct (no init(), no init_info()) to get the name()
+                //     This allows printing right-kind-but-skipped messages
+                //                      [see src/common/primitive_desc.hpp]
+                // TODO: primitive_desc.hpp can return an optional const char* name()
+                //       result, sometimes, even if the full construction failed.
+                //    Q: Is prop_kind a universal attribute of all prim? Probably not.
+                using pd_op_desc_t = typename pkind_traits<pd_t::base_pkind>::desc_type;
+                auto _pd = new pd_t(engine, (const pd_op_desc_t *)adesc, attr,
+                        reinterpret_cast<const typename pd_t::hint_class *> (hint_fwd));
+                if (_pd != nullptr){ // get the 'name()' ~ short impl_name string
+                    char const* name = _pd->name();
+                    printf(":%s", name); fflush(stdout);
+                    delete _pd;
+                }else{
+                    printf(":bad"); fflush(stdout);
+                }
+            }
         }
-        printf("\n"); fflush(stdout);
+        printf(" unimpl\n"); fflush(stdout);
     }else{
         // printing wrong-kind msg not too interesting [and lengthy]
-        //printf(" no-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
+        printf(" no-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
     }
     return ret;
 }

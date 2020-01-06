@@ -11,7 +11,7 @@
 #include "math_utils.hpp"
 
 #if MKLDNN_REF_CONV_DBG
-#include "mkldnn_io.h"
+#include "mkldnn_debug.h"
 #include "string.h"
 #include <unordered_set> // to track new ref_convolutions (potential to optimize?)
 #endif
@@ -47,11 +47,11 @@ using math::saturate;
 template<mkldnn_memory_format_t s, mkldnn_memory_format_t wb, mkldnn_memory_format_t d>
 inline int constexpr cmem_fmt_tag() {
     mkldnn_memory_format_t const m=mkldnn_format_last;
-    return ((s)*m + wb)*m + d;
+    return (s*m + wb)*m + d;
 }
 inline int mem_fmt_tag(mkldnn_memory_format_t s, mkldnn_memory_format_t wb, mkldnn_memory_format_t d){
     mkldnn_memory_format_t const m=mkldnn_format_last;
-    return ((s)*m + wb)*m + d;
+    return (s*m + wb)*m + d;
 }
 // maintain a registry, and avoid outputting duplicates
 static std::unordered_set<int> seen;
@@ -126,25 +126,32 @@ vednnx_convolution_fwd_t
                           const output_vector &outputs)
     : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd) {
 #if MKLDNN_REF_CONV_DBG
+#warning "untested"
     /* print "name" of impl if first time constructed */
-    mkldnn_memory_format_t const sfmt = conf_.src_pd()->desc()->format;
-    mkldnn_memory_format_t const wbfmt = conf_.weights_pd()->desc()->format;
-    mkldnn_memory_format_t const dfmt = conf_.dst_pd()->desc()->format;
+    //mkldnn_memory_format_t const sfmt = conf_.src_pd()->desc()->format;
+    mkldnn_format_tag_t const sfmt  = conf_.src_pd()    ->desc()->format;
+    mkldnn_format_tag_t const wbfmt = conf_.weights_pd()->desc()->format;
+    mkldnn_format_tag_t const dfmt  = conf_.dst_pd()    ->desc()->format;
     int tag = mem_fmt_tag(sfmt,wbfmt,dfmt);
     auto ins = seen.insert( tag );
     if(ins.second){ // a one-line message
         printf("\n *** NEW FMTS for %s *** src %s,  wei|bia %s,  dst %s\n",
                     short_impl(conf_.name()),
-                    after_last_colon(mkldnn_name_memory_format( sfmt )),
-                    after_last_colon(mkldnn_name_memory_format( wbfmt )),
-                    after_last_colon(mkldnn_name_memory_format( dfmt )));
+                    //after_last_colon(mkldnn_name_memory_format( sfmt )),
+                    after_last_colon(mkldnn_fmt_tag2str( sfmt )),
+                    after_last_colon(mkldnn_fmt_tag2str( wbfmt )),
+                    after_last_colon(mkldnn_fmt_tag2str( dfmt )));
     }
     if(ins.second){ // extra detail
 #define LEN 500
         char sbuf[LEN], wbuf[LEN], dbuf[LEN]; // bias layout same as weights
-        mkldnn_name_memory_desc( conf_.src_pd()->desc(),     sbuf, LEN );
-        mkldnn_name_memory_desc( conf_.weights_pd()->desc(), wbuf, LEN );
-        mkldnn_name_memory_desc( conf_.dst_pd()->desc(),     dbuf, LEN );
+
+        //mkldnn_name_memory_desc( conf_.src_pd()->desc(),     sbuf, LEN );
+        // v1 has nice mkldnn_debug.h
+        mkldnn_md2fmt_str(sbuf, LEN, conf_.src_pd()    ->desc());
+        mkldnn_md2fmt_str(wbuf, LEN, conf_.weights_pd()->desc());
+        mkldnn_md2fmt_str(dbuf, LEN, conf_.dst_pd()    ->desc());
+
         printf(" _vednnx_conv( src         %s\n"
                "          , weight/bias %s\n"
                "          , dst         %s\n",

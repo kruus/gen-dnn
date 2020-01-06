@@ -211,6 +211,7 @@ protected:
 
         auto weights_tr = memory(*con_weights_desc, eng);
         transpose_wei<data_t>(dd, weights->get(), weights_tr);
+        printf("\n\t\tdeconv_desc...\n"); fflush(stdout);
         auto deconv_desc = with_bias ?
             deconvolution_forward::desc(aprop_kind,
                     algorithm::deconvolution_direct, *dec_src_desc,
@@ -221,6 +222,7 @@ protected:
                         *dec_weights_desc, *dec_dst_desc, { dd.strh, dd.strw },
                         { dd.padh, dd.padw }, padR);
 
+        //printf("deconv_primitive_desc...\n"); fflush(stdout);
         auto deconv_primitive_desc = deconvolution_forward::primitive_desc(
                 deconv_desc, eng);
 
@@ -231,19 +233,23 @@ protected:
                 {MKLDNN_ARG_DST, dst->get()}});
         strm.wait();
 
+        //printf("conv_desc...\n"); fflush(stdout);
         auto conv_desc = convolution_forward::desc(
                 prop_kind::forward_training, algorithm::convolution_direct,
                 *con_src_desc, *con_weights_desc, *con_dst_desc,
                 { dd.strh, dd.strw }, { dd.padh, dd.padw }, padR);
 
+        //printf("conv_primitive_desc...\n"); fflush(stdout);
         auto conv_primitive_desc = convolution_forward::primitive_desc(
                 conv_desc, eng);
 
+        //printf("conv_bwd_data_desc...\n"); fflush(stdout);
         auto conv_bwd_data_desc = convolution_backward_data::desc(
                 algorithm::convolution_direct, *con_src_desc,
                 *con_weights_desc, *con_dst_desc,
                 { dd.strh, dd.strw }, { dd.padh, dd.padw }, padR);
 
+        //printf("conv_bwd_data_primitive_desc...\n"); fflush(stdout);
         auto conv_bwd_data_primitive_desc
             = convolution_backward_data::primitive_desc(
                     conv_bwd_data_desc, eng, conv_primitive_desc);
@@ -314,6 +320,8 @@ protected:
     }
 
     void BackwardWeights() {
+        // DNNL v1.0.0 has an issue with supplying prop_kind forward_training and undef
+        // data_type for wei and dst descriptors?
         auto p = ::testing::TestWithParam<deconvolution_test_params>::GetParam();
         auto conv_src = dst;
         auto conv_dst = src;
@@ -331,13 +339,16 @@ protected:
                 *dec_weights_desc, *dec_bias_desc, *dec_dst_desc,
                 { dd.strh, dd.strw }, { dd.padh, dd.padw }, padR);
 
+        //printf("deconv_primitive_desc...\n"); fflush(stdout);
         auto deconv_primitive_desc = deconvolution_forward::primitive_desc(
                 deconv_desc, eng);
 
+        //printf("deconv_bwd_weights_desc...\n"); fflush(stdout);
         auto deconv_bwd_weights_desc = deconvolution_backward_weights::desc(
                 algorithm::deconvolution_direct, *dec_src_desc,
                 *dec_weights_desc, *dec_bias_desc, *dec_dst_desc,
                 { dd.strh, dd.strw }, { dd.padh, dd.padw }, padR);
+        //printf("deconv_bwd_weights_primitive_desc...\n"); fflush(stdout);
         auto deconv_bwd_weights_primitive_desc
             = deconvolution_backward_weights::primitive_desc(
                     deconv_bwd_weights_desc, eng, deconv_primitive_desc);
