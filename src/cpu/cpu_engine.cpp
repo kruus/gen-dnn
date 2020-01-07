@@ -151,8 +151,14 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
                 // DNNL v1.0.0 bug with deconvolution private data constructors
                 // not dealing with memory format undef in 'init()' routine
                 //
-                // for some reason, format type undef leads to difficulty in constructing
-                // an unattached ref_deconvolution private data object...
+                // gtest effect :
+                //   debug compile --> UNIMPL
+                //   release compile --> segfault
+                //
+                // - for some reason, format type undef leads to difficulty in constructing
+                //   an unattached ref_deconvolution private data object...
+                // - forward deconv also tries to find whether bkwd deconv also exists
+                //   (iter over impls) ?
                 printf("-avoid_pd:name_unknown)");
             }else{
                 printf("-pd"); fflush(stdout);

@@ -898,7 +898,7 @@ void simple_net() {
 
 int main(int argc, char **argv) {
     try {
-#if TARGET_VANILLA
+#if defined(TARGET_VANILLA)
         throw error(mkldnn_unimplemented,"disabled for TARGET_VANILLA");
 #endif
         simple_net();

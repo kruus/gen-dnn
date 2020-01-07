@@ -269,7 +269,7 @@ void simple_net_int8() {
 
 int main(int argc, char **argv) {
     try {
-#if TARGET_VANILLA
+#if defined(TARGET_VANILLA)
         throw error(mkldnn_unimplemented,"disabled for TARGET_VANILLA (segfault?)");
 #endif
         simple_net_int8();

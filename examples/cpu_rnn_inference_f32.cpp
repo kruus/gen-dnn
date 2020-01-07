@@ -819,10 +819,11 @@ void simple_net() {
 }
 
 int main(int argc, char **argv) {
+#if defined(TARGET_VANILLA)
+    printf(" example %s disabled for TARGET_VANILLA",__FILE__);
+    //throw error(mkldnn_unimplemented,"disabled for TARGET_VANILLA");
+#else
     try {
-#if TARGET_VANILLA
-        throw error(mkldnn_unimplemented,"disabled for TARGET_VANILLA");
-#endif
         simple_net();
         std::cout << "ok\n";
     } catch (error &e) {
@@ -830,5 +831,6 @@ int main(int argc, char **argv) {
         std::cerr << "message: " << e.message << std::endl;
         return 1;
     }
+#endif
     return 0;
 }
