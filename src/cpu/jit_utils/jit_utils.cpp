@@ -18,19 +18,22 @@
 
 #include "utils.hpp"
 
-#ifndef MKLDNN_ENABLE_JIT_PROFILING
-#define MKLDNN_ENABLE_JIT_PROFILING 1
+#ifndef DNNL_ENABLE_JIT_PROFILING
+#define DNNL_ENABLE_JIT_PROFILING 1
 #endif
 
-#ifndef MKLDNN_ENABLE_JIT_DUMP
-#define MKLDNN_ENABLE_JIT_DUMP 1
+#ifndef DNNL_ENABLE_JIT_DUMP
+#define DNNL_ENABLE_JIT_DUMP 1
 #endif
 
-#if MKLDNN_ENABLE_JIT_PROFILING
+#if DNNL_ENABLE_JIT_PROFILING
 #include "jitprofiling/jitprofiling.h"
+#ifdef __linux__
+#include "linux_perf/linux_perf.hpp"
+#endif
 #endif
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 namespace jit_utils {
@@ -38,15 +41,16 @@ namespace jit_utils {
 // WARNING: These functions are not thread safe and must be protected by a
 // mutex
 
-void dump_jit_code(const void *code, size_t code_size, const char *code_name)
-{
-#if MKLDNN_ENABLE_JIT_DUMP
-    if (code && jit_dump_enabled()) {
+// TODO (rsdubtso): support prefix for code dumps
+
+void dump_jit_code(const void *code, size_t code_size, const char *code_name) {
+#if DNNL_ENABLE_JIT_DUMP
+    if (code && get_jit_dump()) {
         static int counter = 0;
 #define MAX_FNAME_LEN 256
         char fname[MAX_FNAME_LEN + 1];
         // TODO (Roma): support prefix for code / linux perf dumps
-        snprintf(fname, MAX_FNAME_LEN, "mkldnn_dump_%s.%d.bin", code_name,
+        snprintf(fname, MAX_FNAME_LEN, "dnnl_dump_%s.%d.bin", code_name,
                 counter);
         counter++;
 
@@ -67,20 +71,22 @@ void dump_jit_code(const void *code, size_t code_size, const char *code_name)
 }
 
 void register_jit_code_vtune(const void *code, size_t code_size,
-        const char *code_name, const char *source_file_name)
-{
-#if MKLDNN_ENABLE_JIT_PROFILING
-    if (iJIT_IsProfilingActive() == iJIT_SAMPLING_ON) {
+        const char *code_name, const char *source_file_name) {
+#if DNNL_ENABLE_JIT_PROFILING
+    unsigned flags = get_jit_profiling_flags();
+    if ((flags & DNNL_JIT_PROFILE_VTUNE)
+            && iJIT_IsProfilingActive() == iJIT_SAMPLING_ON) {
         auto jmethod = iJIT_Method_Load();
         jmethod.method_id = iJIT_GetNewMethodID(); // XXX: not thread-safe
         jmethod.method_name = (char *)code_name; // XXX: dropping const
         jmethod.class_file_name = NULL;
-        jmethod.source_file_name = (char *)source_file_name; // XXX: dropping const
+        jmethod.source_file_name
+                = (char *)source_file_name; // XXX: dropping const
         jmethod.method_load_address = (void *)code;
         jmethod.method_size = (unsigned int)code_size;
 
-        iJIT_NotifyEvent(iJVM_EVENT_TYPE_METHOD_LOAD_FINISHED,
-                (void*)&jmethod);
+        iJIT_NotifyEvent(
+                iJVM_EVENT_TYPE_METHOD_LOAD_FINISHED, (void *)&jmethod);
     }
 #else
     UNUSED(code);
@@ -90,17 +96,33 @@ void register_jit_code_vtune(const void *code, size_t code_size,
 #endif
 }
 
+void register_jit_code_linux_perf(const void *code, size_t code_size,
+        const char *code_name, const char *source_file_name) {
+#if DNNL_ENABLE_JIT_PROFILING && defined(__linux__)
+    unsigned flags = get_jit_profiling_flags();
+    if (flags & DNNL_JIT_PROFILE_LINUX_JITDUMP)
+        linux_perf_jitdump_record_code_load(code, code_size, code_name);
+    if (flags & DNNL_JIT_PROFILE_LINUX_PERFMAP)
+        linux_perf_perfmap_record_code_load(code, code_size, code_name);
+#else
+    UNUSED(code);
+    UNUSED(code_size);
+    UNUSED(code_name);
+#endif
+    UNUSED(source_file_name);
+}
+
 void register_jit_code(const void *code, size_t code_size,
-        const char *code_name, const char *source_file_name)
-{
+        const char *code_name, const char *source_file_name) {
     // The #ifdef guards are required to avoid generating a function that only
     // consists of lock and unlock code
-#if MKLDNN_ENABLE_JIT_PROFILING || MKLDNN_ENABLE_JIT_DUMP
+#if DNNL_ENABLE_JIT_PROFILING || DNNL_ENABLE_JIT_DUMP
     static std::mutex m;
     std::lock_guard<std::mutex> guard(m);
 
     dump_jit_code(code, code_size, code_name);
     register_jit_code_vtune(code, code_size, code_name, source_file_name);
+    register_jit_code_linux_perf(code, code_size, code_name, source_file_name);
 #else
     UNUSED(code);
     UNUSED(code_size);
@@ -109,7 +131,7 @@ void register_jit_code(const void *code, size_t code_size,
 #endif
 }
 
-}
-}
-}
-}
+} // namespace jit_utils
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl

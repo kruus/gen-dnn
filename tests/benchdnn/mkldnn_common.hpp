@@ -16,6 +16,7 @@
 
 #ifndef MKLDNN_COMMON_HPP
 #define MKLDNN_COMMON_HPP
+#error "removed for dnnl v1.1.0+, use dnnl_memory.hpp instead"
 
 #include <stddef.h>
 #include <stdint.h>

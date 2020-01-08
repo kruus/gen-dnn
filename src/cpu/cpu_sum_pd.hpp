@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -18,22 +18,23 @@
 #define CPU_SUM_PD_HPP
 
 #include "c_types_map.hpp"
+#include "cpu_engine.hpp"
 #include "sum_pd.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
-struct cpu_sum_pd_t: public sum_pd_t {
+struct cpu_sum_pd_t : public sum_pd_t {
     using sum_pd_t::sum_pd_t;
 };
 
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

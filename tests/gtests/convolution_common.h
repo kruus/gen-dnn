@@ -1,6 +1,6 @@
 #if 0
 /*******************************************************************************
-* Copyright 2017-2018 Intel Corporation
+* Copyright 2017-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -16,13 +16,15 @@
 *******************************************************************************/
 #endif
 
-#include "mkldnn.hpp"
+#include "dnnl.hpp"
 
 #define EXPAND_FORMATS(src, weights, bias, dst) \
-    { mkldnn::memory::format_tag::src, mkldnn::memory::format_tag::weights, \
-    mkldnn::memory::format_tag::bias, mkldnn::memory::format_tag::dst }
+    { \
+        dnnl::memory::format_tag::src, dnnl::memory::format_tag::weights, \
+                dnnl::memory::format_tag::bias, dnnl::memory::format_tag::dst \
+    }
 
-#define ALGORITHM mkldnn::algorithm::convolution_direct
+#define ALGORITHM dnnl::algorithm::convolution_direct
 
 // Note: these are geared for testing JIT implementations.
 //       should these change for TARGET_VANILLA compile?
@@ -77,38 +79,48 @@
 #define FMT_DATA_BLOCKED nChw8c
 #define FMT_DATA_BLOCKED16 nChw16c
 
-#define CONCAT_WITH_UNDERSCORE_(a,b) a ## _ ## b
-#define CONCAT_WITH_UNDERSCORE(a,b) CONCAT_WITH_UNDERSCORE_(a,b)
+#define CONCAT_WITH_UNDERSCORE_(a, b) a##_##b
+#define CONCAT_WITH_UNDERSCORE(a, b) CONCAT_WITH_UNDERSCORE_(a, b)
 
-#define CPU_INST_TEST_CASE_(str, ...) CPU_INSTANTIATE_TEST_SUITE_P( \
-        str, convolution_test, ::testing::Values(__VA_ARGS__))
-#define CPU_INST_TEST_CASE(str, ...) CPU_INST_TEST_CASE_( \
-        CONCAT_WITH_UNDERSCORE(TEST_CASE_NAME_PREFIX, str), __VA_ARGS__)
+#define CPU_INST_TEST_CASE_(str, ...) \
+    CPU_INSTANTIATE_TEST_SUITE_P( \
+            str, convolution_test, ::testing::Values(__VA_ARGS__))
+#define CPU_INST_TEST_CASE(str, ...) \
+    CPU_INST_TEST_CASE_( \
+            CONCAT_WITH_UNDERSCORE(TEST_CASE_NAME_PREFIX, str), __VA_ARGS__)
 
-#define GPU_INST_TEST_CASE_(str, ...) GPU_INSTANTIATE_TEST_SUITE_P( \
-        str, convolution_test, ::testing::Values(__VA_ARGS__))
-#define GPU_INST_TEST_CASE(str, ...) GPU_INST_TEST_CASE_( \
-        CONCAT_WITH_UNDERSCORE(TEST_CASE_NAME_PREFIX, str), __VA_ARGS__)
+#define GPU_INST_TEST_CASE_(str, ...) \
+    GPU_INSTANTIATE_TEST_SUITE_P( \
+            str, convolution_test, ::testing::Values(__VA_ARGS__))
+#define GPU_INST_TEST_CASE(str, ...) \
+    GPU_INST_TEST_CASE_( \
+            CONCAT_WITH_UNDERSCORE(TEST_CASE_NAME_PREFIX, str), __VA_ARGS__)
 
 #define INST_TEST_CASE(str, ...) \
-        CPU_INST_TEST_CASE(str, __VA_ARGS__); \
-        GPU_INST_TEST_CASE(str, __VA_ARGS__)
+    CPU_INST_TEST_CASE(str, __VA_ARGS__); \
+    GPU_INST_TEST_CASE(str, __VA_ARGS__)
 
 #define PARAMS(src, weights, bias, dst, ...) \
-    test_convolution_params_t { ALGORITHM, \
-    EXPAND_FORMATS(src, weights, bias, dst), /* empty attributes */ {}, \
-    {__VA_ARGS__} }
+    test_convolution_params_t { \
+        ALGORITHM, EXPAND_FORMATS(src, weights, bias, dst), \
+                /* empty attributes */ {}, { \
+            __VA_ARGS__ \
+        } \
+    }
 
 #define PARAMS_EXPECT_FAIL(src, weights, bias, dst, code, ...) \
-    test_convolution_params_t { ALGORITHM, \
-    EXPAND_FORMATS(src, weights, bias, dst), /* empty attributes */ {}, \
-    {__VA_ARGS__}, true, code }
+    test_convolution_params_t { \
+        ALGORITHM, EXPAND_FORMATS(src, weights, bias, dst), \
+                /* empty attributes */ {}, {__VA_ARGS__}, true, code \
+    }
 
 #define PARAMS_ATTR(src, weights, bias, dst, scale, policy, ...) \
-    test_convolution_params_t { ALGORITHM, \
-    EXPAND_FORMATS(src, weights, bias, dst), \
-    {scale, test_convolution_attr_t::scale_t::policy}, \
-    {__VA_ARGS__} }
+    test_convolution_params_t { \
+        ALGORITHM, EXPAND_FORMATS(src, weights, bias, dst), \
+                {scale, test_convolution_attr_t::scale_t::policy}, { \
+            __VA_ARGS__ \
+        } \
+    }
 
 #ifdef TEST_PARAM_ATTR
 #include "convolution_attr.h"

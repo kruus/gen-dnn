@@ -20,7 +20,7 @@
 #include "ocl/ref_sum.hpp"
 #include "ocl/simple_sum.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace ocl {
 
@@ -29,17 +29,17 @@ using spd_create_f = engine_t::sum_primitive_desc_create_f;
 namespace {
 #define INSTANCE(...) __VA_ARGS__::pd_t::create
 static const spd_create_f ocl_sum_impl_list[] = {
-    INSTANCE(simple_sum_t<data_type::f32>),
-    INSTANCE(ref_sum_t),
-    nullptr,
+        INSTANCE(simple_sum_t<data_type::f32>),
+        INSTANCE(ref_sum_t),
+        nullptr,
 };
 #undef INSTANCE
 } // namespace
 
-const spd_create_f *ocl_engine_t::get_sum_implementation_list() const {
+const spd_create_f *ocl_gpu_engine_impl_list_t::get_sum_implementation_list() {
     return ocl_sum_impl_list;
 }
 
 } // namespace ocl
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl

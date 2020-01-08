@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2018 Intel Corporation
+* Copyright 2017-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -22,56 +22,60 @@
 #include "memory_tracking.hpp"
 
 #include "cpu_convolution_pd.hpp"
-#include "cpu_primitive.hpp"
-#if !defined(TARGET_VANILLA)
-#include "jit_primitive_conf.hpp"
-#include "jit_generator.hpp"
-#include "jit_uni_eltwise.hpp"
-#endif // !TARGET_VANILLA
-#include "ref_eltwise.hpp"
+// XXX ? #include "cpu_primitive.hpp"
+
 #include "gemm_convolution_utils.hpp"
+#if !defined(TARGET_VANILLA)
+#include "jit_generator.hpp"
+#include "jit_primitive_conf.hpp"
+#include "jit_uni_eltwise_injector.hpp"
+#endif // !defined(TARGET_VANILLA)
+#include "ref_eltwise.hpp"
 
 #include "gemm/gemm.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
 template <data_type_t src_type, data_type_t dst_type>
-struct _gemm_x8s8s32x_convolution_fwd_t: public cpu_primitive_t {
-    struct pd_t: public cpu_convolution_fwd_pd_t {
+struct _gemm_x8s8s32x_convolution_fwd_t : public primitive_impl_t {
+    struct pd_t : public cpu_convolution_fwd_pd_t {
         pd_t(engine_t *engine, const convolution_desc_t *adesc,
                 const primitive_attr_t *attr,
                 const typename pd_t::base_class *hint_fwd_pd)
             : cpu_convolution_fwd_pd_t(engine, adesc, attr, hint_fwd_pd)
             , jcp_() {}
 
-        DECLARE_COMMON_PD_T(IGEMM_S8U8S32_ISA_STR, 
-            _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>);
+        DECLARE_COMMON_PD_T(IGEMM_S8U8S32_ISA_STR,
+                _gemm_x8s8s32x_convolution_fwd_t, USE_GLOBAL_SCRATCHPAD);
 
         status_t init() {
             using namespace data_type;
 
-            bool ok = true
-                && is_fwd()
-                && set_default_alg_kind(alg_kind::convolution_direct)
-                && expect_data_types(src_type, s8, data_type::undef, dst_type,
-                        s32)
-                && IMPLICATION(with_bias(), utils::one_of(
-                            desc()->bias_desc.data_type, f32, s32, s8, u8))
-                && !has_zero_dim_memory()
-                && set_default_formats_common(
-                        dat_tag(), format_tag::any, dat_tag())
-                && post_ops_ok()
-                && memory_desc_matches_tag(*src_md(), dat_tag())
-                && memory_desc_matches_tag(*dst_md(), dat_tag())
-                && set_or_check_wei_format();
+            bool ok = true && is_fwd()
+                    && set_default_alg_kind(alg_kind::convolution_direct)
+                    && expect_data_types(
+                            src_type, s8, data_type::undef, dst_type, s32)
+                    && IMPLICATION(with_bias(),
+                            utils::one_of(desc()->bias_desc.data_type, f32, s32,
+                                    s8, u8))
+                    && !has_zero_dim_memory()
+                    && set_default_formats_common(
+                            dat_tag(), format_tag::any, dat_tag())
+                    && attr()->has_default_values(
+                            primitive_attr_t::skip_mask_t::oscale
+                            | primitive_attr_t::skip_mask_t::post_ops)
+                    && output_scales_mask_ok() && post_ops_ok()
+                    && memory_desc_matches_tag(*src_md(), dat_tag())
+                    && memory_desc_matches_tag(*dst_md(), dat_tag())
+                    && set_or_check_wei_format();
             if (!ok) return status::unimplemented;
 
             auto scratchpad = scratchpad_registry().registrar();
             return jit_gemm_convolution_utils::init_conf(jcp_, scratchpad,
                     *desc(), src_md(), weights_md(0), dst_md(),
-                    mkldnn_get_max_threads());
+                    dnnl_get_max_threads());
         }
 
         jit_gemm_conv_conf_t jcp_;
@@ -89,12 +93,12 @@ struct _gemm_x8s8s32x_convolution_fwd_t: public cpu_primitive_t {
 
             if (is_src_s8) {
                 want_wei_md.extra.flags = 0
-                    | memory_extra_flags::compensation_conv_s8s8
-                    | memory_extra_flags::scale_adjust;
-                want_wei_md.extra.compensation_mask = (1 << 0)
-                    + (with_groups() ? (1 << 1) : 0);
-                want_wei_md.extra.scale_adjust =
-                    mayiuse(avx512_core_vnni) ? 1.f : 0.5f;
+                        | memory_extra_flags::compensation_conv_s8s8
+                        | memory_extra_flags::scale_adjust;
+                want_wei_md.extra.compensation_mask
+                        = (1 << 0) + (with_groups() ? (1 << 1) : 0);
+                want_wei_md.extra.scale_adjust
+                        = mayiuse(avx512_core_vnni) ? 1.f : 0.5f;
             }
 
             if (weights_md_.format_kind == format_kind::any) {
@@ -105,29 +109,34 @@ struct _gemm_x8s8s32x_convolution_fwd_t: public cpu_primitive_t {
             return weights_md_ == want_wei_md;
         }
 
+        bool output_scales_mask_ok() const {
+            const auto &mask = attr()->output_scales_.mask_;
+            return mask == 0 || mask == 1 << 1;
+        }
+
         bool post_ops_ok() const {
-            using namespace mkldnn::impl::primitive_kind;
+            using namespace dnnl::impl::primitive_kind;
             auto const &po = attr()->post_ops_;
-            auto is_eltwise = [&](int idx) { return po.entry_[idx].is_eltwise(); };
+            auto is_eltwise
+                    = [&](int idx) { return po.entry_[idx].is_eltwise(); };
 
             switch (po.len_) {
-            case 0: return true;
-            case 1: return is_eltwise(0) || po.contain(sum, 0);
-            case 2:
-                return (po.contain(sum, 0) && is_eltwise(1))
-                        || (po.contain(sum, 1) && is_eltwise(0));
-            default: return false;
+                case 0: return true;
+                case 1: return is_eltwise(0) || po.contain(sum, 0);
+                case 2:
+                    return (po.contain(sum, 0) && is_eltwise(1))
+                            || (po.contain(sum, 1) && is_eltwise(0));
+                default: return false;
             }
             return false;
         }
     };
 
     _gemm_x8s8s32x_convolution_fwd_t(const pd_t *apd)
-        : cpu_primitive_t(apd, true), pp_ker_(nullptr)
-    {
+        : primitive_impl_t(apd), pp_ker_(nullptr) {
 #if !defined(TARGET_VANILLA)
         pp_ker_ = new pp_ker_t(pd());
-#endif // !TARGET_VANILLA
+#endif // !defined(TARGET_VANILLA)
     }
     ~_gemm_x8s8s32x_convolution_fwd_t() { delete pp_ker_; }
 
@@ -153,22 +162,20 @@ private:
     public:
 #if !defined(TARGET_VANILLA)
         DECLARE_CPU_JIT_AUX_FUNCTIONS(
-        _gemm_x8s8s32x_convolution_fwd_t::pp_kernel);
+                _gemm_x8s8s32x_convolution_fwd_t::pp_kernel);
 #endif // !TARGET_VANILLA
         pp_ker_t(const pd_t *pd);
         ~pp_ker_t() {
 #if !defined(TARGET_VANILLA)
-            if (eltwise_injector_)
-                delete eltwise_injector_;
-#endif // !TARGET_VANILLA
-            if (eltwise_)
-                delete eltwise_;
+            if (eltwise_injector_) delete eltwise_injector_;
+#endif // !defined(TARGET_VANILLA)
+            if (eltwise_) delete eltwise_;
         }
 
         void operator()(dst_data_t *dst, const acc_data_t *acc,
-            const char *bias, const float *scales,
-            float nslope, float sum_scale, float signed_scale,
-            int g, size_t start, size_t end);
+                const char *bias, const float *scales, float nslope,
+                float sum_scale, float signed_scale, int g, size_t start,
+                size_t end);
 
         size_t dst_os_stride_;
 
@@ -188,7 +195,7 @@ private:
             size_t len;
             size_t oc_offset;
         };
-        void(*ker_)(const ker_args *args);
+        void (*ker_)(const ker_args *args);
 
         const jit_gemm_conv_conf_t &jcp_;
         size_t OC_;
@@ -205,10 +212,9 @@ private:
         jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
 #endif // !TARGET_VANILLA
         ref_eltwise_scalar_fwd_t *eltwise_;
-
     };
 
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
     void execute_forward(const exec_ctx_t &ctx) const;
     void execute_forward_thr(const int ithr, const int nthr,
             const src_data_t *src_base, const wei_data_t *wei_base,
@@ -217,42 +223,45 @@ private:
 
     int nthr_ = 0;
     pp_ker_t *pp_ker_;
-
 };
 
 template <data_type_t dst_type>
-struct _gemm_u8s8s32x_convolution_bwd_data_t: public cpu_primitive_t {
-    struct pd_t: public cpu_convolution_bwd_data_pd_t{
-        pd_t(engine_t *engine,
-                const convolution_desc_t *adesc, const primitive_attr_t *attr,
+struct _gemm_u8s8s32x_convolution_bwd_data_t : public primitive_impl_t {
+    struct pd_t : public cpu_convolution_bwd_data_pd_t {
+        pd_t(engine_t *engine, const convolution_desc_t *adesc,
+                const primitive_attr_t *attr,
                 const convolution_fwd_pd_t *hint_fwd_pd)
             : cpu_convolution_bwd_data_pd_t(engine, adesc, attr, hint_fwd_pd)
             , jcp_() {}
 
         DECLARE_COMMON_PD_T(IGEMM_S8U8S32_ISA_STR,
-            _gemm_u8s8s32x_convolution_bwd_data_t<dst_type>);
+                _gemm_u8s8s32x_convolution_bwd_data_t, USE_GLOBAL_SCRATCHPAD);
 
         status_t init() {
             using namespace data_type;
 
-            bool ok = true
-                && desc()->prop_kind == prop_kind::backward_data
-                && set_default_alg_kind(alg_kind::convolution_direct)
-                && expect_data_types(dst_type, s8, data_type::undef, u8, s32)
-                && IMPLICATION(with_bias(), utils::one_of(
-                            desc()->bias_desc.data_type, f32, s32, s8, u8))
-                && !has_zero_dim_memory()
-                && set_default_formats_common(dat_tag(), wei_tag(), dat_tag())
-                && attr()->post_ops_.has_default_values()
-                && memory_desc_matches_tag(*diff_src_md(), dat_tag())
-                && memory_desc_matches_tag(*diff_dst_md(), dat_tag())
-                && memory_desc_matches_tag(*weights_md(), wei_tag());
+            bool ok = true && desc()->prop_kind == prop_kind::backward_data
+                    && set_default_alg_kind(alg_kind::convolution_direct)
+                    && expect_data_types(
+                            dst_type, s8, data_type::undef, u8, s32)
+                    && IMPLICATION(with_bias(),
+                            utils::one_of(desc()->bias_desc.data_type, f32, s32,
+                                    s8, u8))
+                    && !has_zero_dim_memory()
+                    && set_default_formats_common(
+                            dat_tag(), wei_tag(), dat_tag())
+                    && attr()->has_default_values(
+                            primitive_attr_t::skip_mask_t::oscale)
+                    && output_scales_mask_ok()
+                    && memory_desc_matches_tag(*diff_src_md(), dat_tag())
+                    && memory_desc_matches_tag(*diff_dst_md(), dat_tag())
+                    && memory_desc_matches_tag(*weights_md(), wei_tag());
             if (!ok) return status::unimplemented;
 
             auto scratchpad = scratchpad_registry().registrar();
             return jit_gemm_convolution_utils::init_conf(jcp_, scratchpad,
                     *desc(), diff_src_md(), weights_md(), diff_dst_md(),
-                    mkldnn_get_max_threads());
+                    dnnl_get_max_threads());
         }
 
         virtual bool support_bias() const override { return true; }
@@ -265,10 +274,14 @@ struct _gemm_u8s8s32x_convolution_bwd_data_t: public cpu_primitive_t {
         format_tag_t wei_tag() const {
             return with_groups() ? format_tag::hwigo : format_tag::hwio;
         }
+        bool output_scales_mask_ok() const {
+            const auto &mask = attr()->output_scales_.mask_;
+            return mask == 0 || mask == 1 << 1;
+        }
     };
 
     _gemm_u8s8s32x_convolution_bwd_data_t(const pd_t *apd)
-        : cpu_primitive_t(apd, true) {}
+        : primitive_impl_t(apd) {}
 
     typedef typename prec_traits<data_type::u8>::type diff_dst_data_t;
     typedef typename prec_traits<data_type::s8>::type wei_data_t;
@@ -286,11 +299,12 @@ private:
             const diff_dst_data_t *diff_dst_base, const wei_data_t *wei_base,
             const char *bia_base, diff_src_data_t *diff_src_base,
             const memory_tracking::grantor_t &scratchpad) const;
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
 };
 
-}
-}
-}
-// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
+
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

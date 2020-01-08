@@ -20,22 +20,17 @@
 #include <assert.h>
 
 #include "common/c_types_map.hpp"
-#include "ocl/cl_engine.hpp"
-#include "ocl/jit_ref_inner_product_common_kernel.hpp"
+#include "compute/compute.hpp"
+#include "ocl/jit_ref_inner_product_kernel.hpp"
 #include "ocl/ocl_inner_product_pd.hpp"
 #include "ocl/ocl_stream.hpp"
 #include "ocl/ocl_utils.hpp"
 
-extern const char *ref_inner_product_kernel;
-
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace ocl {
 
-template <impl::data_type_t src_type, impl::data_type_t wei_type = src_type,
-        impl::data_type_t dst_type = src_type,
-        impl::data_type_t acc_type = dst_type>
-struct ref_inner_product_fwd_t : public primitive_t {
+struct ref_inner_product_fwd_t : public primitive_impl_t {
     struct pd_t : public ocl_inner_product_fwd_pd_t {
         pd_t(engine_t *engine, const inner_product_desc_t *adesc,
                 const primitive_attr_t *attr,
@@ -46,33 +41,55 @@ struct ref_inner_product_fwd_t : public primitive_t {
         DECLARE_COMMON_PD_T("ocl:ref:any", ref_inner_product_fwd_t);
 
         status_t init() {
+            using namespace data_type;
             using namespace prop_kind;
             using namespace data_type;
             assert(engine()->kind() == engine_kind::gpu);
-            auto *cl_engine = utils::downcast<cl_engine_t *>(engine());
+            auto *compute_engine
+                    = utils::downcast<compute::compute_engine_t *>(engine());
+
+            const auto attr_skip_mask = primitive_attr_t::skip_mask_t::oscale
+                    | primitive_attr_t::skip_mask_t::post_ops;
 
             bool ok = true
                     && utils::one_of(desc()->prop_kind, forward_training,
                             forward_inference)
                     && set_default_params() == status::success
-                    && desc()->src_desc.data_type == src_type
-                    && desc()->weights_desc.data_type == wei_type
-                    && desc()->accum_data_type == acc_type
-                    && desc()->dst_desc.data_type == dst_type
-                    && utils::one_of(desc()->src_desc.data_type, bf16, f16, f32)
+                    && utils::one_of(true,
+                            expect_data_types(
+                                    u8, s8, data_type::undef, s8, s32),
+                            expect_data_types(
+                                    u8, s8, data_type::undef, u8, s32),
+                            expect_data_types(
+                                    u8, s8, data_type::undef, s32, s32),
+                            expect_data_types(
+                                    s8, s8, data_type::undef, s8, s32),
+                            expect_data_types(
+                                    s8, s8, data_type::undef, u8, s32),
+                            expect_data_types(
+                                    s8, s8, data_type::undef, s32, s32),
+                            expect_data_types(
+                                    bf16, bf16, data_type::undef, bf16, f32),
+                            expect_data_types(
+                                    bf16, bf16, data_type::undef, f32, f32),
+                            expect_data_types(f32, f32, f32, f32, f32),
+                            expect_data_types(f16, f16, f16, f16, f16))
                     && IMPLICATION(with_bias(),
-                            utils::one_of(desc()->bias_desc.data_type, bf16,
-                                    f16, f32))
-                    && attr()->output_scales_.has_default_values()
+                            utils::one_of(desc()->bias_desc.data_type, u8, s8,
+                                    bf16, f16, f32))
+                    && attr()->has_default_values(attr_skip_mask)
+                    && post_ops_ok(attr())
+                    && IMPLICATION(!attr()->output_scales_.has_default_values(),
+                            utils::one_of(src_md_.data_type, s8, u8)
+                                    && attr()->output_scales_.mask_ == 0)
                     && dense_consitency_check(src_md(), weights_md(), dst_md())
-                    && IMPLICATION(src_type == data_type::f16,
-                            cl_engine->mayiuse(cl_device_ext_t::khr_fp16));
-            if (!ok)
-                return status::unimplemented;
+                    && IMPLICATION(desc()->src_desc.data_type == f16,
+                            compute_engine->mayiuse(
+                                    compute::device_ext_t::khr_fp16));
+            if (!ok) return status::unimplemented;
 
-            return jit_ref_inner_product_fwd_kernel::init_conf(jip_, desc_,
-                    src_md(), weights_md(), dst_md(), *this->attr(), jit_off_,
-                    acc_type);
+            return jit_ref_inner_product_kernel::init_conf(
+                    jip_, this, jit_off_);
         }
         bool with_eltwise() const {
             return attr()->post_ops_.find(primitive_kind::eltwise) != -1;
@@ -83,35 +100,33 @@ struct ref_inner_product_fwd_t : public primitive_t {
         }
 
         float eltwise_alpha() const {
-            const int eltwise_idx =
-                attr()->post_ops_.find(primitive_kind::eltwise);
+            const int eltwise_idx
+                    = attr()->post_ops_.find(primitive_kind::eltwise);
             return with_eltwise()
-                ? attr()->post_ops_.entry_[eltwise_idx].eltwise.alpha
-                : 1.0f;
+                    ? attr()->post_ops_.entry_[eltwise_idx].eltwise.alpha
+                    : 1.0f;
         }
 
         float eltwise_beta() const {
-            const int eltwise_idx =
-                attr()->post_ops_.find(primitive_kind::eltwise);
+            const int eltwise_idx
+                    = attr()->post_ops_.find(primitive_kind::eltwise);
             return with_eltwise()
-                ? attr()->post_ops_.entry_[eltwise_idx].eltwise.beta
-                : 0.0f;
+                    ? attr()->post_ops_.entry_[eltwise_idx].eltwise.beta
+                    : 0.0f;
         }
 
         float sum_scale() const {
-            const int sum_idx =
-                attr()->post_ops_.find(primitive_kind::sum);
-            return with_sum()
-                ? attr()->post_ops_.entry_[sum_idx].sum.scale
-                : 1.0f;
+            const int sum_idx = attr()->post_ops_.find(primitive_kind::sum);
+            return with_sum() ? attr()->post_ops_.entry_[sum_idx].sum.scale
+                              : 1.0f;
         }
 
         alg_kind_t eltwise_alg_kind() const {
-            const int eltwise_idx =
-                attr()->post_ops_.find(primitive_kind::eltwise);
+            const int eltwise_idx
+                    = attr()->post_ops_.find(primitive_kind::eltwise);
             return with_eltwise()
-                ? attr()->post_ops_.entry_[eltwise_idx].eltwise.alg
-                : mkldnn_alg_kind_undef;
+                    ? attr()->post_ops_.entry_[eltwise_idx].eltwise.alg
+                    : dnnl_alg_kind_undef;
         }
 
         jit_inner_product_conf_t jip_;
@@ -119,31 +134,24 @@ struct ref_inner_product_fwd_t : public primitive_t {
     };
 
     status_t init() override {
-        auto jit = ocl_jit_t(ref_inner_product_kernel);
-        jit_ref_inner_product_fwd_kernel::init_const_def(
-                jit, pd()->jip_, pd()->jit_off_, pd()->with_eltwise(),
-                pd()->with_sum(), pd()->eltwise_alg_kind());
+        auto *compute_engine
+                = utils::downcast<compute::compute_engine_t *>(engine());
+        compute::kernel_ctx_t kernel_ctx;
+        jit_ref_inner_product_kernel::init_const_def(kernel_ctx, pd()->jip_,
+                pd()->jit_off_, pd()->with_eltwise(), pd()->with_sum(),
+                pd()->eltwise_alg_kind());
 
-        status_t status = jit.build(engine());
-        if (status != status::success)
-            return status;
-
-        kernel_ = jit.get_kernel("ref_inner_product_fwd_kernel");
-        if (!kernel_)
-            return status::runtime_error;
+        compute_engine->create_kernel(
+                &kernel_, "ref_inner_product_fwd", kernel_ctx);
+        if (!kernel_) return status::runtime_error;
 
         return status::success;
     }
 
-    ref_inner_product_fwd_t(const pd_t *apd) : primitive_t(apd) {
-        ker_ = new jit_ref_inner_product_fwd_kernel(pd()->jip_);
+    ref_inner_product_fwd_t(const pd_t *apd) : primitive_impl_t(apd) {
+        ker_ = new jit_ref_inner_product_kernel(pd()->jip_);
     }
     ~ref_inner_product_fwd_t() { delete ker_; }
-
-    typedef typename prec_traits<src_type>::type src_data_t;
-    typedef typename prec_traits<wei_type>::type wei_data_t;
-    typedef typename prec_traits<dst_type>::type dst_data_t;
-    typedef typename prec_traits<acc_type>::type acc_data_t;
 
     virtual status_t execute(const exec_ctx_t &ctx) const override {
         return execute_forward(ctx);
@@ -151,15 +159,12 @@ struct ref_inner_product_fwd_t : public primitive_t {
 
 private:
     status_t execute_forward(const exec_ctx_t &ctx) const;
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
-    jit_ref_inner_product_fwd_kernel *ker_;
-    ocl_kernel_t kernel_;
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
+    jit_ref_inner_product_kernel *ker_;
+    compute::kernel_t kernel_;
 };
 
-template <impl::data_type_t diff_src_type, impl::data_type_t wei_type,
-        impl::data_type_t diff_dst_type,
-        impl::data_type_t acc_type = diff_src_type>
-struct ref_inner_product_bwd_data_t : public primitive_t {
+struct ref_inner_product_bwd_data_t : public primitive_impl_t {
     struct pd_t : public ocl_inner_product_bwd_data_pd_t {
         pd_t(engine_t *engine, const inner_product_desc_t *adesc,
                 const primitive_attr_t *attr,
@@ -170,54 +175,49 @@ struct ref_inner_product_bwd_data_t : public primitive_t {
         DECLARE_COMMON_PD_T("ref:any", ref_inner_product_bwd_data_t);
 
         status_t init() {
+            using namespace data_type;
             using namespace prop_kind;
             assert(engine()->kind() == engine_kind::gpu);
+
             bool ok = true
                     && utils::one_of(
-                               this->desc()->prop_kind, backward, backward_data)
+                            this->desc()->prop_kind, backward, backward_data)
                     && this->set_default_params() == status::success
-                    && desc()->diff_src_desc.data_type == diff_src_type
-                    && desc()->weights_desc.data_type == wei_type
-                    && desc()->accum_data_type == acc_type
-                    && desc()->diff_dst_desc.data_type == diff_dst_type
+                    && utils::one_of(true,
+                            expect_data_types(
+                                    bf16, bf16, data_type::undef, bf16, f32),
+                            expect_data_types(
+                                    f32, bf16, data_type::undef, bf16, f32),
+                            expect_data_types(
+                                    f32, f32, data_type::undef, f32, f32))
                     && attr()->has_default_values();
-            if (!ok)
-                return status::unimplemented;
+            if (!ok) return status::unimplemented;
 
-            return jit_ref_inner_product_fwd_kernel::init_conf(jip_, desc_,
-                    diff_src_md(), weights_md(), diff_dst_md(), *this->attr(),
-                    jit_off_, acc_type);
+            return jit_ref_inner_product_kernel::init_conf(
+                    jip_, this, jit_off_);
         }
         jit_inner_product_conf_t jip_;
         jit_offsets jit_off_;
     };
 
     virtual status_t init() override {
-        auto jit = ocl_jit_t(ref_inner_product_kernel);
-        jit_ref_inner_product_fwd_kernel::init_const_def(
-                jit, pd()->jip_, pd()->jit_off_, false, false,
-                mkldnn_alg_kind_undef);
+        auto *compute_engine
+                = utils::downcast<compute::compute_engine_t *>(engine());
+        compute::kernel_ctx_t kernel_ctx;
+        jit_ref_inner_product_kernel::init_const_def(kernel_ctx, pd()->jip_,
+                pd()->jit_off_, false, false, dnnl_alg_kind_undef);
 
-        status_t status = jit.build(engine());
-        if (status != status::success)
-            return status;
-
-        kernel_ = jit.get_kernel("ref_inner_product_bwd_data_kernel");
-        if (!kernel_)
-            return status::runtime_error;
+        compute_engine->create_kernel(
+                &kernel_, "ref_inner_product_bwd_data", kernel_ctx);
+        if (!kernel_) return status::runtime_error;
 
         return status::success;
     }
 
-    ref_inner_product_bwd_data_t(const pd_t *apd) : primitive_t(apd) {
-        ker_ = new jit_ref_inner_product_fwd_kernel(pd()->jip_);
+    ref_inner_product_bwd_data_t(const pd_t *apd) : primitive_impl_t(apd) {
+        ker_ = new jit_ref_inner_product_kernel(pd()->jip_);
     }
     ~ref_inner_product_bwd_data_t() { delete ker_; }
-
-    typedef typename prec_traits<diff_src_type>::type diff_src_data_t;
-    typedef typename prec_traits<wei_type>::type wei_data_t;
-    typedef typename prec_traits<diff_dst_type>::type diff_dst_data_t;
-    typedef typename prec_traits<acc_type>::type acc_data_t;
 
     virtual status_t execute(const exec_ctx_t &ctx) const override {
         return execute_backward_data(ctx);
@@ -225,73 +225,62 @@ struct ref_inner_product_bwd_data_t : public primitive_t {
 
 private:
     status_t execute_backward_data(const exec_ctx_t &ctx) const;
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
-    jit_ref_inner_product_fwd_kernel *ker_;
-    ocl_kernel_t kernel_;
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
+    jit_ref_inner_product_kernel *ker_;
+    compute::kernel_t kernel_;
 };
 
-template <impl::data_type_t data_type>
-struct ref_inner_product_bwd_weights_t : public primitive_t {
+struct ref_inner_product_bwd_weights_t : public primitive_impl_t {
     struct pd_t : public ocl_inner_product_bwd_weights_pd_t {
         pd_t(engine_t *engine, const inner_product_desc_t *adesc,
                 const primitive_attr_t *attr,
                 const inner_product_fwd_pd_t *hint_fwd_pd)
             : ocl_inner_product_bwd_weights_pd_t(
-                      engine, adesc, attr, hint_fwd_pd)
+                    engine, adesc, attr, hint_fwd_pd)
             , jit_off_() {}
 
         DECLARE_COMMON_PD_T("ref:any", ref_inner_product_bwd_weights_t);
 
         status_t init() {
+            using namespace data_type;
             using namespace prop_kind;
             assert(engine()->kind() == engine_kind::gpu);
             bool ok = true
-                    && utils::one_of(this->desc()->prop_kind, backward,
-                               backward_weights)
+                    && utils::one_of(
+                            this->desc()->prop_kind, backward, backward_weights)
                     && this->set_default_params() == status::success
-                    && utils::everyone_is(data_type,
-                               this->desc()->src_desc.data_type,
-                               this->desc()->diff_dst_desc.data_type,
-                               this->desc()->diff_weights_desc.data_type)
-                    && IMPLICATION(this->with_bias(),
-                               data_type
-                                       == this->desc()
-                                                  ->diff_bias_desc.data_type)
+                    && utils::one_of(true,
+                            expect_data_types(bf16, bf16, bf16, bf16, f32),
+                            expect_data_types(bf16, f32, f32, bf16, f32),
+                            expect_data_types(f32, f32, f32, f32, f32))
                     && attr()->has_default_values();
-            if (!ok)
-                return status::unimplemented;
+            if (!ok) return status::unimplemented;
 
-            return jit_ref_inner_product_fwd_kernel::init_conf(jip_, desc_,
-                    src_md(), diff_weights_md(), diff_dst_md(), *this->attr(),
-                    jit_off_, desc()->accum_data_type);
+            return jit_ref_inner_product_kernel::init_conf(
+                    jip_, this, jit_off_);
         }
         jit_inner_product_conf_t jip_;
         jit_offsets jit_off_;
     };
 
     status_t init() override {
-        auto jit = ocl_jit_t(ref_inner_product_kernel);
-        jit_ref_inner_product_fwd_kernel::init_const_def(
-                jit, pd()->jip_, pd()->jit_off_, false, false,
-                mkldnn_alg_kind_undef);
+        auto *compute_engine
+                = utils::downcast<compute::compute_engine_t *>(engine());
+        compute::kernel_ctx_t kernel_ctx;
+        jit_ref_inner_product_kernel::init_const_def(kernel_ctx, pd()->jip_,
+                pd()->jit_off_, false, false, dnnl_alg_kind_undef);
 
-        status_t status = jit.build(engine());
-        if (status != status::success)
-            return status;
-
-        kernel_ = jit.get_kernel("ref_inner_product_bwd_weights_kernel");
-        if (!kernel_)
-            return status::runtime_error;
+        compute_engine->create_kernel(
+                &kernel_, "ref_inner_product_bwd_weights", kernel_ctx);
+        if (!kernel_) return status::runtime_error;
 
         return status::success;
     }
 
-    ref_inner_product_bwd_weights_t(const pd_t *apd) : primitive_t(apd) {
-        ker_ = new jit_ref_inner_product_fwd_kernel(pd()->jip_);
+    ref_inner_product_bwd_weights_t(const pd_t *apd) : primitive_impl_t(apd) {
+        ker_ = new jit_ref_inner_product_kernel(pd()->jip_);
     }
     ~ref_inner_product_bwd_weights_t() { delete ker_; }
-
-    typedef typename prec_traits<data_type>::type data_t;
 
     virtual status_t execute(const exec_ctx_t &ctx) const override {
         return execute_backward_weights(ctx);
@@ -299,15 +288,15 @@ struct ref_inner_product_bwd_weights_t : public primitive_t {
 
 private:
     status_t execute_backward_weights(const exec_ctx_t &ctx) const;
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
-    jit_ref_inner_product_fwd_kernel *ker_;
-    ocl_kernel_t kernel_;
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
+    jit_ref_inner_product_kernel *ker_;
+    compute::kernel_t kernel_;
 };
 
 } // namespace ocl
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

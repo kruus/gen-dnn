@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2018 Intel Corporation
+* Copyright 2018-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -15,14 +15,13 @@
 *******************************************************************************/
 
 #include <stdio.h>
-#include "mkldnn.h"
+#include "dnnl.h"
 
 int main() {
-    printf("mkldnn_version: %d.%d.%d\n",
-            MKLDNN_VERSION_MAJOR, MKLDNN_VERSION_MINOR, MKLDNN_VERSION_PATCH);
-    printf("mkldnn_memory_desc_init_by_tag = %p, "
-            "sizeof(mkldnn_memory_desc_t) = %d\n",
-            mkldnn_memory_desc_init_by_tag,
-            (int)sizeof(mkldnn_memory_desc_t));
+    printf("dnnl_version: %d.%d.%d\n", DNNL_VERSION_MAJOR, DNNL_VERSION_MINOR,
+            DNNL_VERSION_PATCH);
+    printf("dnnl_memory_desc_init_by_tag = %p, "
+           "sizeof(dnnl_memory_desc_t) = %d\n",
+            dnnl_memory_desc_init_by_tag, (int)sizeof(dnnl_memory_desc_t));
     return 0;
 }

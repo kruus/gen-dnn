@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2018 Intel Corporation
+* Copyright 2018-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -17,14 +17,14 @@
 #ifndef RNN_PD_HPP
 #define RNN_PD_HPP
 
-#include "mkldnn.h"
+#include "dnnl.h"
 
 #include "c_types_map.hpp"
 #include "primitive_desc.hpp"
-#include "type_helpers.hpp"
 #include "rnn.hpp"
+#include "type_helpers.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 
 struct rnn_fwd_pd_t;
@@ -32,10 +32,8 @@ struct rnn_fwd_pd_t;
 struct rnn_pd_t : public primitive_desc_t {
     static constexpr auto base_pkind = primitive_kind::rnn;
 
-    rnn_pd_t(engine_t *engine,
-            const rnn_desc_t *adesc,
-            const primitive_attr_t *attr,
-            const rnn_fwd_pd_t *hint_fwd_pd)
+    rnn_pd_t(engine_t *engine, const rnn_desc_t *adesc,
+            const primitive_attr_t *attr, const rnn_fwd_pd_t *hint_fwd_pd)
         : primitive_desc_t(engine, attr, base_pkind)
         , desc_(*adesc)
         , hint_fwd_pd_(hint_fwd_pd)
@@ -48,18 +46,21 @@ struct rnn_pd_t : public primitive_desc_t {
         , dst_layer_md_(desc_.dst_layer_desc)
         , dst_iter_md_(desc_.dst_iter_desc)
         , dst_iter_c_md_(desc_.dst_iter_c_desc)
-        , ws_md_()
-    {}
+        , ws_md_() {}
 
     const rnn_desc_t *desc() const { return &desc_; }
-    virtual const op_desc_t *op_desc() const override
-    { return reinterpret_cast<const op_desc_t *>(this->desc()); }
+    virtual const op_desc_t *op_desc() const override {
+        return reinterpret_cast<const op_desc_t *>(this->desc());
+    }
     virtual void init_info() override { impl::init_info(this, this->info_); }
 
     virtual status_t query(query_t what, int idx, void *result) const override {
         switch (what) {
-        case query::rnn_d: *(const rnn_desc_t **)result = desc(); break;
-        default: return primitive_desc_t::query(what, idx, result);
+            case query::prop_kind:
+                *(prop_kind_t *)result = desc()->prop_kind;
+                break;
+            case query::rnn_d: *(const rnn_desc_t **)result = desc(); break;
+            default: return primitive_desc_t::query(what, idx, result);
         }
         return status::success;
     }
@@ -82,8 +83,9 @@ struct rnn_pd_t : public primitive_desc_t {
         if (index == 2 && with_dst_iter_c()) return &dst_iter_c_md_;
         return &glob_zero_md;
     }
-    virtual const memory_desc_t *workspace_md(int index = 0) const override
-        { return (index == 0) ?  &ws_md_ : &glob_zero_md;}
+    virtual const memory_desc_t *workspace_md(int index = 0) const override {
+        return (index == 0) ? &ws_md_ : &glob_zero_md;
+    }
 
     /* common aux functions */
 
@@ -111,34 +113,37 @@ struct rnn_pd_t : public primitive_desc_t {
 
     dim_t DLC() const { return desc_.dst_layer_desc.dims[2]; }
 
-    bool with_bias() const
-    { return !memory_desc_wrapper(desc_.bias_desc).is_zero(); }
+    bool with_bias() const {
+        return !memory_desc_wrapper(desc_.bias_desc).is_zero();
+    }
 
-    bool with_src_iter() const
-    { return !(memory_desc_wrapper(desc_.src_iter_desc).is_zero()); }
+    bool with_src_iter() const {
+        return !(memory_desc_wrapper(desc_.src_iter_desc).is_zero());
+    }
 
-    bool with_src_iter_c() const
-    { return is_lstm()
-               && !(memory_desc_wrapper(desc_.src_iter_desc).is_zero()); }
+    bool with_src_iter_c() const {
+        return is_lstm()
+                && !(memory_desc_wrapper(desc_.src_iter_desc).is_zero());
+    }
 
-    bool with_dst_iter() const
-    { return !memory_desc_wrapper(desc_.dst_iter_desc).is_zero(); }
+    bool with_dst_iter() const {
+        return !memory_desc_wrapper(desc_.dst_iter_desc).is_zero();
+    }
 
-    bool with_dst_iter_c() const
-    { return is_lstm() &&!memory_desc_wrapper(desc_.dst_iter_desc).is_zero(); }
+    bool with_dst_iter_c() const {
+        return is_lstm() && !memory_desc_wrapper(desc_.dst_iter_desc).is_zero();
+    }
 
-    mkldnn::impl::alg_kind_t cell_kind() const
-    { return desc_.cell_kind; }
-    mkldnn::impl::alg_kind_t activation_kind() const
-    { return desc_.activation_kind; }
+    dnnl::impl::alg_kind_t cell_kind() const { return desc_.cell_kind; }
+    dnnl::impl::alg_kind_t activation_kind() const {
+        return desc_.activation_kind;
+    }
 
-    bool is_lbr() const
-    { return cell_kind() == mkldnn_lbr_gru; }
+    bool is_lbr() const { return cell_kind() == dnnl_lbr_gru; }
 
-    bool is_lstm() const
-    { return cell_kind() == mkldnn_vanilla_lstm; }
+    bool is_lstm() const { return cell_kind() == dnnl_vanilla_lstm; }
 
-    mkldnn_rnn_direction_t direction() const { return desc_.direction; }
+    dnnl_rnn_direction_t direction() const { return desc_.direction; }
 
 protected:
     rnn_desc_t desc_;
@@ -157,63 +162,71 @@ protected:
     memory_desc_t ws_md_;
 };
 
-struct rnn_fwd_pd_t: public rnn_pd_t {
+struct rnn_fwd_pd_t : public rnn_pd_t {
     typedef rnn_fwd_pd_t base_class;
     typedef rnn_fwd_pd_t hint_class;
 
-    rnn_fwd_pd_t(engine_t *engine,
-            const rnn_desc_t *adesc,
-            const primitive_attr_t *attr,
-            const rnn_fwd_pd_t *hint_fwd_pd)
-        : rnn_pd_t(engine, adesc, attr, hint_fwd_pd)
-    {}
+    rnn_fwd_pd_t(engine_t *engine, const rnn_desc_t *adesc,
+            const primitive_attr_t *attr, const rnn_fwd_pd_t *hint_fwd_pd)
+        : rnn_pd_t(engine, adesc, attr, hint_fwd_pd) {}
 
     virtual arg_usage_t arg_usage(int arg) const override {
-        if (arg == MKLDNN_ARG_SRC_LAYER)
+        if (arg == DNNL_ARG_SRC_LAYER) return arg_usage_t::input;
+
+        if (arg == DNNL_ARG_SRC_ITER && with_src_iter())
             return arg_usage_t::input;
 
-        if (arg == MKLDNN_ARG_SRC_ITER && with_src_iter())
+        if (arg == DNNL_ARG_SRC_ITER_C && with_src_iter_c())
             return arg_usage_t::input;
 
-        if (arg == MKLDNN_ARG_SRC_ITER_C && with_src_iter_c())
+        if (utils::one_of(arg, DNNL_ARG_WEIGHTS_LAYER, DNNL_ARG_WEIGHTS_ITER))
             return arg_usage_t::input;
 
-        if (utils::one_of(arg, MKLDNN_ARG_WEIGHTS_LAYER,
-                    MKLDNN_ARG_WEIGHTS_ITER))
-            return arg_usage_t::input;
+        if (arg == DNNL_ARG_BIAS && with_bias()) return arg_usage_t::input;
 
-        if (arg == MKLDNN_ARG_BIAS && with_bias())
-            return arg_usage_t::input;
+        if (arg == DNNL_ARG_DST_LAYER) return arg_usage_t::output;
 
-        if (arg == MKLDNN_ARG_DST_LAYER)
+        if (arg == DNNL_ARG_DST_ITER && with_dst_iter())
             return arg_usage_t::output;
 
-        if (arg == MKLDNN_ARG_DST_ITER && with_dst_iter())
+        if (arg == DNNL_ARG_DST_ITER_C && with_dst_iter() && is_lstm())
             return arg_usage_t::output;
 
-        if (arg == MKLDNN_ARG_DST_ITER_C && with_dst_iter() && is_lstm())
-            return arg_usage_t::output;
-
-        if (arg == MKLDNN_ARG_WORKSPACE && is_training())
+        if (arg == DNNL_ARG_WORKSPACE && is_training())
             return arg_usage_t::output;
 
         return primitive_desc_t::arg_usage(arg);
     }
 
-    virtual int n_inputs() const override
-    { return 3 + with_bias() +  with_src_iter() +  with_src_iter_c();}
-    virtual int n_outputs() const override
-    { return 1 + with_dst_iter() + with_dst_iter_c() + is_training(); }
+    virtual const memory_desc_t *arg_md(int arg) const override {
+        switch (arg) {
+            case DNNL_ARG_SRC_LAYER: return src_md(0);
+            case DNNL_ARG_SRC_ITER: return src_md(1);
+            case DNNL_ARG_SRC_ITER_C: return src_md(2);
+            case DNNL_ARG_WEIGHTS_LAYER: return weights_md(0);
+            case DNNL_ARG_WEIGHTS_ITER: return weights_md(1);
+            case DNNL_ARG_BIAS: return weights_md(2);
+            case DNNL_ARG_DST_LAYER: return dst_md(0);
+            case DNNL_ARG_DST_ITER: return dst_md(1);
+            case DNNL_ARG_DST_ITER_C: return dst_md(2);
+            default: return rnn_pd_t::arg_md(arg);
+        }
+    }
+
+    virtual int n_inputs() const override {
+        return 3 + with_bias() + with_src_iter() + with_src_iter_c();
+    }
+    virtual int n_outputs() const override {
+        return 1 + with_dst_iter() + with_dst_iter_c() + is_training();
+    }
 };
 
 struct rnn_bwd_pd_t : public rnn_pd_t {
     typedef rnn_bwd_pd_t base_class;
     typedef rnn_fwd_pd_t hint_class;
 
-    rnn_bwd_pd_t(engine_t *engine,
-            const rnn_desc_t *adesc,
-            const primitive_attr_t *attr,
-            const rnn_fwd_pd_t *hint_fwd_pd)
+    rnn_bwd_pd_t(engine_t *engine, const rnn_desc_t *adesc,
+            const primitive_attr_t *attr, const rnn_fwd_pd_t *hint_fwd_pd)
         : rnn_pd_t(engine, adesc, attr, hint_fwd_pd)
         , diff_src_layer_md_(desc_.diff_src_layer_desc)
         , diff_src_iter_md_(desc_.diff_src_iter_desc)
@@ -223,56 +236,73 @@ struct rnn_bwd_pd_t : public rnn_pd_t {
         , diff_bias_md_(desc_.diff_bias_desc)
         , diff_dst_layer_md_(desc_.diff_dst_layer_desc)
         , diff_dst_iter_md_(desc_.diff_dst_iter_desc)
-        , diff_dst_iter_c_md_(desc_.diff_dst_iter_c_desc)
-    {}
+        , diff_dst_iter_c_md_(desc_.diff_dst_iter_c_desc) {}
 
     virtual arg_usage_t arg_usage(int arg) const override {
-        if (utils::one_of(arg, MKLDNN_ARG_SRC_LAYER, MKLDNN_ARG_DST_LAYER,
-                    MKLDNN_ARG_DIFF_DST_LAYER, MKLDNN_ARG_WEIGHTS_LAYER,
-                    MKLDNN_ARG_WEIGHTS_ITER))
+        if (utils::one_of(arg, DNNL_ARG_SRC_LAYER, DNNL_ARG_DST_LAYER,
+                    DNNL_ARG_DIFF_DST_LAYER, DNNL_ARG_WEIGHTS_LAYER,
+                    DNNL_ARG_WEIGHTS_ITER))
             return arg_usage_t::input;
 
-        if (utils::one_of(arg, MKLDNN_ARG_DIFF_SRC_LAYER,
-                    MKLDNN_ARG_DIFF_WEIGHTS_LAYER,
-                    MKLDNN_ARG_DIFF_WEIGHTS_ITER))
+        if (utils::one_of(arg, DNNL_ARG_DIFF_SRC_LAYER,
+                    DNNL_ARG_DIFF_WEIGHTS_LAYER, DNNL_ARG_DIFF_WEIGHTS_ITER))
             return arg_usage_t::output;
 
         if (with_bias()) {
-            if (arg == MKLDNN_ARG_BIAS)
-                return arg_usage_t::input;
+            if (arg == DNNL_ARG_BIAS) return arg_usage_t::input;
 
-            if (arg == MKLDNN_ARG_DIFF_BIAS)
-                return arg_usage_t::output;
+            if (arg == DNNL_ARG_DIFF_BIAS) return arg_usage_t::output;
         }
 
         if (with_src_iter()) {
-            if (arg == MKLDNN_ARG_SRC_ITER)
-                return arg_usage_t::input;
+            if (arg == DNNL_ARG_SRC_ITER) return arg_usage_t::input;
 
-            if (arg == MKLDNN_ARG_DIFF_SRC_ITER)
-                return arg_usage_t::output;
+            if (arg == DNNL_ARG_DIFF_SRC_ITER) return arg_usage_t::output;
         }
 
-        if(with_src_iter_c()){
-            if (arg == MKLDNN_ARG_SRC_ITER_C)
-                return arg_usage_t::input;
+        if (with_src_iter_c()) {
+            if (arg == DNNL_ARG_SRC_ITER_C) return arg_usage_t::input;
 
-            if (arg == MKLDNN_ARG_DIFF_SRC_ITER_C)
-                return arg_usage_t::output;
+            if (arg == DNNL_ARG_DIFF_SRC_ITER_C) return arg_usage_t::output;
         }
 
-        if (with_dst_iter() && utils::one_of(arg, MKLDNN_ARG_DST_ITER,
-                    MKLDNN_ARG_DIFF_DST_ITER))
+        if (with_dst_iter()
+                && utils::one_of(
+                        arg, DNNL_ARG_DST_ITER, DNNL_ARG_DIFF_DST_ITER))
             return arg_usage_t::input;
 
-        if (with_dst_iter_c() && utils::one_of(arg,  MKLDNN_ARG_DST_ITER_C,
-                    MKLDNN_ARG_DIFF_DST_ITER_C))
+        if (with_dst_iter_c()
+                && utils::one_of(
+                        arg, DNNL_ARG_DST_ITER_C, DNNL_ARG_DIFF_DST_ITER_C))
             return arg_usage_t::input;
 
-        if (arg == MKLDNN_ARG_WORKSPACE)
-            return arg_usage_t::input;
+        if (arg == DNNL_ARG_WORKSPACE) return arg_usage_t::input;
 
         return primitive_desc_t::arg_usage(arg);
+    }
+
+    virtual const memory_desc_t *arg_md(int arg) const override {
+        switch (arg) {
+            case DNNL_ARG_SRC_LAYER: return src_md(0);
+            case DNNL_ARG_SRC_ITER: return src_md(1);
+            case DNNL_ARG_SRC_ITER_C: return src_md(2);
+            case DNNL_ARG_DIFF_SRC_LAYER: return diff_src_md(0);
+            case DNNL_ARG_DIFF_SRC_ITER: return diff_src_md(1);
+            case DNNL_ARG_DIFF_SRC_ITER_C: return diff_src_md(2);
+            case DNNL_ARG_WEIGHTS_LAYER: return weights_md(0);
+            case DNNL_ARG_WEIGHTS_ITER: return weights_md(1);
+            case DNNL_ARG_BIAS: return weights_md(2);
+            case DNNL_ARG_DIFF_WEIGHTS_LAYER: return diff_weights_md(0);
+            case DNNL_ARG_DIFF_WEIGHTS_ITER: return diff_weights_md(1);
+            case DNNL_ARG_DIFF_BIAS: return diff_weights_md(2);
+            case DNNL_ARG_DST_LAYER: return dst_md(0);
+            case DNNL_ARG_DST_ITER: return dst_md(1);
+            case DNNL_ARG_DST_ITER_C: return dst_md(2);
+            case DNNL_ARG_DIFF_DST_LAYER: return diff_dst_md(0);
+            case DNNL_ARG_DIFF_DST_ITER: return diff_dst_md(1);
+            case DNNL_ARG_DIFF_DST_ITER_C: return diff_dst_md(2);
+            default: return rnn_pd_t::arg_md(arg);
+        }
     }
 
     virtual const memory_desc_t *diff_src_md(int index = 0) const override {
@@ -281,8 +311,7 @@ struct rnn_bwd_pd_t : public rnn_pd_t {
         if (index == 2 && with_src_iter_c()) return &diff_src_iter_c_md_;
         return &glob_zero_md;
     }
-    virtual const memory_desc_t *diff_weights_md(
-            int index = 0) const override {
+    virtual const memory_desc_t *diff_weights_md(int index = 0) const override {
         if (index == 0) return &diff_weights_layer_md_;
         if (index == 1) return &diff_weights_iter_md_;
         if (index == 2 && with_bias()) return &diff_bias_md_;
@@ -295,12 +324,13 @@ struct rnn_bwd_pd_t : public rnn_pd_t {
         return &glob_zero_md;
     }
 
-    virtual int n_inputs() const override
-    { return 6 +  with_src_iter() +  with_src_iter_c()
-            + 2 * (with_dst_iter() + with_dst_iter_c())
-            + with_bias(); }
-    virtual int n_outputs() const override
-    { return 3 + with_src_iter() + with_src_iter_c() + with_bias(); }
+    virtual int n_inputs() const override {
+        return 6 + with_src_iter() + with_src_iter_c()
+                + 2 * (with_dst_iter() + with_dst_iter_c()) + with_bias();
+    }
+    virtual int n_outputs() const override {
+        return 3 + with_src_iter() + with_src_iter_c() + with_bias();
+    }
 
 protected:
     memory_desc_t diff_src_layer_md_;
@@ -314,7 +344,7 @@ protected:
     memory_desc_t diff_dst_iter_c_md_;
 };
 
-}
-}
+} // namespace impl
+} // namespace dnnl
 
 #endif

@@ -14,6 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
+#if 0 // file removed for dnnl v1.0.0+
 /// @example cpu_cnn_inference_int8.cpp
 /// @copybrief cpu_cnn_inference_int8_cpp
 /// > Annotated version: @ref cpu_cnn_inference_int8_cpp
@@ -280,3 +281,4 @@ int main(int argc, char **argv) {
     }
     return 0;
 }
+#endif

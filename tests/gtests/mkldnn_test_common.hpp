@@ -16,6 +16,7 @@
 
 #ifndef MKLDNN_TEST_COMMON_HPP
 #define MKLDNN_TEST_COMMON_HPP
+#error "file removed for dnnl v1.1.0+  use dnnl_test_common.hpp instead"
 
 #include <limits>
 #include <numeric>
@@ -42,18 +43,15 @@
 #include "src/common/mkldnn_thread.hpp"
 #include "src/common/memory_desc_wrapper.hpp"
 #include "src/common/float16.hpp"
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !(defined(TARGET_VANILLA)
 #include "src/common/bfloat16.hpp"
 #endif // !TARGET_VANILLA
 #include "src/common/nstl.hpp"
 
 using mkldnn::impl::f16_support::float16_t;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if !(defined(TARGET_VANILLA)
 using mkldnn::impl::bfloat16_t;
 #endif // !TARGET_VANILLA
-
-/* Allow tests with certain generic properties */
-#define MKLDNN_TEST_BLOCKED_FORMATS 1
 
 #define MKLDNN_CHECK(f)               \
     do {                              \

@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -17,21 +17,28 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <stdint.h>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
+
+#include <memory>
+#include <string>
 
 #if defined(__x86_64__) || defined(_M_X64)
-#define MKLDNN_X86_64
+#define DNNL_X86_64
 #endif
 
 #define MSAN_ENABLED 0
+#define ATTR_NO_MSAN
 #if defined(__has_feature)
 #if __has_feature(memory_sanitizer)
 #undef MSAN_ENABLED
 #define MSAN_ENABLED 1
+#undef ATTR_NO_MSAN
+#define ATTR_NO_MSAN __attribute__((no_sanitize("memory")))
 #include <sanitizer/msan_interface.h>
 #endif
 #endif
@@ -40,25 +47,31 @@
 #include "nstl.hpp"
 #include "z_magic.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 
-#define MKLDNN_SHORT_CIRCUIT_SELF_ASSIGN(other) do { \
+#define DNNL_SHORT_CIRCUIT_SELF_ASSIGN(other) \
+    do { \
         if (this == &other) return *this; \
     } while (0)
 
-#define MKLDNN_DISALLOW_COPY_AND_ASSIGN(T) \
-    T(const T&) = delete; \
-    T &operator=(const T&) = delete;
+#define DNNL_SHORT_CIRCUIT_SELF_COMPARISON(other) \
+    do { \
+        if (this == &other) return true; \
+    } while (0)
+
+#define DNNL_DISALLOW_COPY_AND_ASSIGN(T) \
+    T(const T &) = delete; \
+    T &operator=(const T &) = delete;
 
 // Sanity check for 64 bits
-static_assert(sizeof(void*) == 8, "Intel(R) MKL-DNN supports 64 bit only");
+static_assert(sizeof(void *) == 8, "DNNL supports 64 bit only");
 
-#define CHECK(f) do { \
-    status_t status = f; \
-    if (status != status::success) \
-    return status; \
-} while (0)
+#define CHECK(f) \
+    do { \
+        status_t _status_ = f; \
+        if (_status_ != status::success) return _status_; \
+    } while (0)
 
 #define IMPLICATION(cause, effect) (!(cause) || !!(effect))
 
@@ -69,126 +82,194 @@ namespace utils {
  * Rationale: msvs c++ (and even some c) headers contain special pragma that
  * injects msvs-version check into object files in order to abi-mismatches
  * during the static linking. This makes sense if e.g. std:: objects are passed
- * through between application and library, which is not the case for mkl-dnn
+ * through between application and library, which is not the case for DNNL
  * (since there is no any c++-rt dependent stuff, ideally...). */
 
 /* SFINAE helper -- analogue to std::enable_if */
-template<bool expr, class T = void> struct enable_if {};
-template<class T> struct enable_if<true, T> { typedef T type; };
+template <bool expr, class T = void>
+struct enable_if {};
+template <class T>
+struct enable_if<true, T> {
+    typedef T type;
+};
 
 /* analogue std::conditional */
-template <bool, typename, typename> struct conditional {};
-template <typename T, typename F> struct conditional<true, T, F>
-{ typedef T type; };
-template <typename T, typename F> struct conditional<false, T, F>
-{ typedef F type; };
+template <bool, typename, typename>
+struct conditional {};
+template <typename T, typename F>
+struct conditional<true, T, F> {
+    typedef T type;
+};
+template <typename T, typename F>
+struct conditional<false, T, F> {
+    typedef F type;
+};
 
-template <bool, typename, bool, typename, typename> struct conditional3 {};
+template <bool, typename, bool, typename, typename>
+struct conditional3 {};
 template <typename T, typename FT, typename FF>
-struct conditional3<true, T, false, FT, FF> { typedef T type; };
+struct conditional3<true, T, false, FT, FF> {
+    typedef T type;
+};
 template <typename T, typename FT, typename FF>
-struct conditional3<false, T, true, FT, FF> { typedef FT type; };
+struct conditional3<false, T, true, FT, FF> {
+    typedef FT type;
+};
 template <typename T, typename FT, typename FF>
-struct conditional3<false, T, false, FT, FF> { typedef FF type; };
+struct conditional3<false, T, false, FT, FF> {
+    typedef FF type;
+};
 
-template <bool, typename U, U, U> struct conditional_v {};
-template <typename U, U t, U f> struct conditional_v<true, U, t, f>
-{ static constexpr U value = t; };
-template <typename U, U t, U f> struct conditional_v<false, U, t, f>
-{ static constexpr U value = f; };
-
-template <typename T> struct remove_reference { typedef T type; };
-template <typename T> struct remove_reference<T&> { typedef T type; };
-template <typename T> struct remove_reference<T&&> { typedef T type; };
+template <bool, typename U, U, U>
+struct conditional_v {};
+template <typename U, U t, U f>
+struct conditional_v<true, U, t, f> {
+    static constexpr U value = t;
+};
+template <typename U, U t, U f>
+struct conditional_v<false, U, t, f> {
+    static constexpr U value = f;
+};
 
 template <typename T>
-inline T&& forward(typename utils::remove_reference<T>::type &t)
-{ return static_cast<T&&>(t); }
+struct remove_reference {
+    typedef T type;
+};
 template <typename T>
-inline T&& forward(typename utils::remove_reference<T>::type &&t)
-{ return static_cast<T&&>(t); }
+struct remove_reference<T &> {
+    typedef T type;
+};
+template <typename T>
+struct remove_reference<T &&> {
+    typedef T type;
+};
 
 template <typename T>
-inline typename remove_reference<T>::type zero()
-{ auto zero = typename remove_reference<T>::type(); return zero; }
+inline T &&forward(typename utils::remove_reference<T>::type &t) {
+    return static_cast<T &&>(t);
+}
+template <typename T>
+inline T &&forward(typename utils::remove_reference<T>::type &&t) {
+    return static_cast<T &&>(t);
+}
+
+template <typename T>
+inline typename remove_reference<T>::type zero() {
+    auto zero = typename remove_reference<T>::type();
+    return zero;
+}
+
+template <typename T, typename... Args>
+std::unique_ptr<T> make_unique(Args &&... args) {
+    return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
 
 template <typename T, typename P>
-inline bool everyone_is(T val, P item) { return val == item; }
+inline bool everyone_is(T val, P item) {
+    return val == item;
+}
 template <typename T, typename P, typename... Args>
 inline bool everyone_is(T val, P item, Args... item_others) {
     return val == item && everyone_is(val, item_others...);
 }
 
 template <typename T, typename P>
-constexpr bool one_of(T val, P item) { return val == item; }
+constexpr bool one_of(T val, P item) {
+    return val == item;
+}
 template <typename T, typename P, typename... Args>
 constexpr bool one_of(T val, P item, Args... item_others) {
     return val == item || one_of(val, item_others...);
 }
 
-template <typename... Args>
-inline bool any_null(Args... ptrs) { return one_of(nullptr, ptrs...); }
-
-template<typename T>
-inline void array_copy(T *dst, const T *src, size_t size) {
-    for (size_t i = 0; i < size; ++i) dst[i] = src[i];
+template <typename T, typename P>
+constexpr P map(T pat, P def) {
+    return def;
 }
-template<typename T>
+template <typename T, typename P, typename... Args>
+constexpr P map(T pat, P def, T item, P ival, Args... item_others) {
+    return pat == item ? ival : map(pat, def, item_others...);
+}
+
+template <typename... Args>
+inline bool any_null(Args... ptrs) {
+    return one_of(nullptr, ptrs...);
+}
+
+template <typename T>
+inline void array_copy(T *dst, const T *src, size_t size) {
+    for (size_t i = 0; i < size; ++i)
+        dst[i] = src[i];
+}
+template <typename T>
 inline bool array_cmp(const T *a1, const T *a2, size_t size) {
 #if defined(__ve)
     bool ret=true;
     for (size_t i = 0; i < size; ++i) if (a1[i] != a2[i]) {ret=false; break; }
     return ret;
 #else
-    for (size_t i = 0; i < size; ++i) if (a1[i] != a2[i]) return false;
+    for (size_t i = 0; i < size; ++i)
+        if (a1[i] != a2[i]) return false;
     return true;
 #endif
 }
-template<typename T, typename U>
-inline void array_set(T *arr, const U& val, size_t size) {
-    for (size_t i = 0; i < size; ++i) arr[i] = static_cast<T>(val);
+template <typename T, typename U>
+inline void array_set(T *arr, const U &val, size_t size) {
+    for (size_t i = 0; i < size; ++i)
+        arr[i] = static_cast<T>(val);
 }
 
 namespace product_impl {
-template<size_t> struct int2type{};
+template <size_t>
+struct int2type {};
 
 template <typename T>
-constexpr int product_impl(const T *arr, int2type<0>) { return arr[0]; }
+constexpr int product_impl(const T *arr, int2type<0>) {
+    return arr[0];
+}
 
 template <typename T, size_t num>
 inline T product_impl(const T *arr, int2type<num>) {
-    return arr[0]*product_impl(arr+1, int2type<num-1>()); }
+    return arr[0] * product_impl(arr + 1, int2type<num - 1>());
 }
+} // namespace product_impl
 
 template <size_t num, typename T>
 inline T array_product(const T *arr) {
-    return product_impl::product_impl(arr, product_impl::int2type<num-1>());
+    return product_impl::product_impl(arr, product_impl::int2type<num - 1>());
 }
 
-template<typename T, typename R = T>
+template <typename T, typename R = T>
 inline R array_product(const T *arr, size_t size) {
     R prod = 1;
-    for (size_t i = 0; i < size; ++i) prod *= arr[i];
+    for (size_t i = 0; i < size; ++i)
+        prod *= arr[i];
     return prod;
 }
 
-/** sorts an array of values using @p comparator. While sorting the array
- * of value, the function permutes an array of @p keys accordingly.
- *
- * @note The arrays of @p keys can be omitted. In this case the function
- *       sorts the array of @vals only.
+/* Sorts an array of @p vals using @p comparator. Uses @p vals_2nd_level as a
+ * second level comparing criteria in case comparator returns 0 (equal values)
+ * for @p vals elements.
+ * While sorting the array of @p vals, the function permutes an array of
+ * @p vals_2nd_level and @p keys accordingly.
  */
 template <typename T, typename U, typename F>
-inline void simultaneous_sort(T *vals, U *keys, size_t size, F comparator) {
+inline void simultaneous_sort(
+        T *vals, T *vals_2nd_level, U *keys, size_t size, F comparator) {
     if (size == 0) return;
 
     for (size_t i = 0; i < size - 1; ++i) {
         bool swapped = false;
 
         for (size_t j = 0; j < size - i - 1; j++) {
-            if (comparator(vals[j], vals[j + 1]) > 0) {
+            auto res = comparator(vals[j], vals[j + 1]);
+            if (res == 0)
+                res = comparator(vals_2nd_level[j], vals_2nd_level[j + 1]);
+
+            if (res > 0) {
                 nstl::swap(vals[j], vals[j + 1]);
-                if (keys) nstl::swap(keys[j], keys[j + 1]);
+                nstl::swap(vals_2nd_level[j], vals_2nd_level[j + 1]);
+                nstl::swap(keys[j], keys[j + 1]);
                 swapped = true;
             }
         }
@@ -217,15 +298,16 @@ template <typename T, typename U>
 inline typename remove_reference<T>::type max_div(const T a, const U b) {
     U div = b;
     while (div > 1) {
-        if (a % div == 0)
-            return div;
+        if (a % div == 0) return div;
         div--;
     }
     return static_cast<typename remove_reference<T>::type>(div);
 }
 
-template <typename T> T *align_ptr(T *ptr, uintptr_t alignment)
-{ return (T *)(((uintptr_t)ptr + alignment - 1) & ~(alignment - 1)); }
+template <typename T>
+T *align_ptr(T *ptr, uintptr_t alignment) {
+    return (T *)(((uintptr_t)ptr + alignment - 1) & ~(alignment - 1));
+}
 
 template <typename T, typename U, typename V>
 inline U this_block_size(const T offset, const U max, const V block_size) {
@@ -239,9 +321,11 @@ inline U this_block_size(const T offset, const U max, const V block_size) {
         return block_size;
 }
 
-template<typename T>
-inline T nd_iterator_init(T start) { return start; }
-template<typename T, typename U, typename W, typename... Args>
+template <typename T>
+inline T nd_iterator_init(T start) {
+    return start;
+}
+template <typename T, typename U, typename W, typename... Args>
 inline T nd_iterator_init(T start, U &x, const W &X, Args &&... tuple) {
     start = nd_iterator_init(start, utils::forward<Args>(tuple)...);
     x = static_cast<U>(start % static_cast<T>(X));
@@ -252,21 +336,22 @@ inline T nd_iterator_init(T start, U &x, const W &X, Args &&... tuple) {
     //return static_cast<T>(start / X);
 }
 
-inline bool nd_iterator_step() { return true; }
-template<typename U, typename W, typename... Args>
+inline bool nd_iterator_step() {
+    return true;
+}
+template <typename U, typename W, typename... Args>
 inline bool nd_iterator_step(U &x, const W &X, Args &&... tuple) {
     // nc++: err(1813) Cannot branch into or out of OpenMP construct.
     bool ret = false;
-    if (nd_iterator_step(utils::forward<Args>(tuple)...) ) {
+    if (nd_iterator_step(utils::forward<Args>(tuple)...)) {
         x = (x + 1) % X;
         ret = (x == 0);
     }
     return ret;
 }
 
-template<typename U, typename W, typename Y>
-inline bool nd_iterator_jump(U &cur, const U end, W &x, const Y &X)
-{
+template <typename U, typename W, typename Y>
+inline bool nd_iterator_jump(U &cur, const U end, W &x, const Y &X) {
     U max_jump = end - cur;
     U dim_jump = X - x;
     if (dim_jump <= max_jump) {
@@ -279,10 +364,9 @@ inline bool nd_iterator_jump(U &cur, const U end, W &x, const Y &X)
         return false;
     }
 }
-template<typename U, typename W, typename Y, typename... Args>
-inline bool nd_iterator_jump(U &cur, const U end, W &x, const Y &X,
-        Args &&... tuple)
-{
+template <typename U, typename W, typename Y, typename... Args>
+inline bool nd_iterator_jump(
+        U &cur, const U end, W &x, const Y &X, Args &&... tuple) {
     if (nd_iterator_jump(cur, end, utils::forward<Args>(tuple)...)) {
         x = (x + 1) % X;
         return x == 0;
@@ -291,8 +375,10 @@ inline bool nd_iterator_jump(U &cur, const U end, W &x, const Y &X,
 }
 
 template <typename T>
-inline T pick(size_t i, const T &x0) { return x0; }
-template <typename T, typename ...Args>
+inline T pick(size_t i, const T &x0) {
+    return x0;
+}
+template <typename T, typename... Args>
 inline T pick(size_t i, const T &x0, Args &&... args) {
     return i == 0 ? x0 : pick(i - 1, utils::forward<Args>(args)...);
 }
@@ -301,50 +387,47 @@ template <typename T>
 T pick_by_prop_kind(prop_kind_t prop_kind, const T &val_fwd_inference,
         const T &val_fwd_training, const T &val_bwd_d, const T &val_bwd_w) {
     switch (prop_kind) {
-    case prop_kind::forward_inference: return val_fwd_inference;
-    case prop_kind::forward_training: return val_fwd_training;
-    case prop_kind::backward_data: return val_bwd_d;
-    case prop_kind::backward_weights: return val_bwd_w;
-    default: assert(!"unsupported prop_kind");
+        case prop_kind::forward_inference: return val_fwd_inference;
+        case prop_kind::forward_training: return val_fwd_training;
+        case prop_kind::backward_data: return val_bwd_d;
+        case prop_kind::backward_weights: return val_bwd_w;
+        default: assert(!"unsupported prop_kind");
     }
     return T();
 }
 
 template <typename T>
-T pick_by_prop_kind(prop_kind_t prop_kind,
-        const T &val_fwd, const T &val_bwd_d, const T &val_bwd_w)
-{ return pick_by_prop_kind(prop_kind, val_fwd, val_fwd, val_bwd_d, val_bwd_w); }
+T pick_by_prop_kind(prop_kind_t prop_kind, const T &val_fwd, const T &val_bwd_d,
+        const T &val_bwd_w) {
+    return pick_by_prop_kind(prop_kind, val_fwd, val_fwd, val_bwd_d, val_bwd_w);
+}
 
 template <typename Telem, size_t Tdims>
 struct array_offset_calculator {
     template <typename... Targs>
-    array_offset_calculator(Telem *base, Targs... Fargs) : _dims{ Fargs... }
-    {
+    array_offset_calculator(Telem *base, Targs... Fargs) : _dims {Fargs...} {
         _base_ptr = base;
     }
     template <typename... Targs>
-    inline Telem &operator()(Targs... Fargs)
-    {
+    inline Telem &operator()(Targs... Fargs) {
         return *(_base_ptr + _offset(1, Fargs...));
     }
 
 private:
     template <typename... Targs>
-    inline size_t _offset(size_t const dimension, size_t element)
-    {
+    inline size_t _offset(size_t const dimension, size_t element) {
         return element;
     }
 
     template <typename... Targs>
-    inline size_t _offset(size_t const dimension, size_t theta, size_t element)
-    {
+    inline size_t _offset(
+            size_t const dimension, size_t theta, size_t element) {
         return element + (_dims[dimension] * theta);
     }
 
     template <typename... Targs>
     inline size_t _offset(size_t const dimension, size_t theta, size_t element,
-            Targs... Fargs)
-    {
+            Targs... Fargs) {
         size_t t_prime = element + (_dims[dimension] * theta);
         return _offset(dimension + 1, t_prime, Fargs...);
     }
@@ -359,7 +442,35 @@ inline derived_type downcast(base_type *base) {
     return static_cast<derived_type>(base);
 }
 
+template <typename T,
+        typename std::enable_if<!std::is_same<typename std::decay<T>::type,
+                std::string>::value>::type * = nullptr>
+auto format_cvt_impl(T &&t) -> decltype(std::forward<T>(t)) {
+    return std::forward<T>(t);
 }
+
+template <typename T,
+        typename std::enable_if<std::is_same<typename std::decay<T>::type,
+                std::string>::value>::type * = nullptr>
+const char *format_cvt_impl(T &&t) {
+    return std::forward<T>(t).c_str();
+}
+
+template <typename... Args>
+std::string format_impl(const char *fmt, Args... args) {
+    size_t sz = snprintf(nullptr, 0, fmt, args...);
+    std::string buf(sz + 1, '\0');
+    snprintf(&buf[0], sz + 1, fmt, args...);
+    buf.resize(sz);
+    return buf;
+}
+
+template <typename... Args>
+std::string format(const char *fmt, Args &&... args) {
+    return format_impl(fmt, format_cvt_impl(std::forward<Args>(args))...);
+}
+
+} // namespace utils
 
 int32_t fetch_and_add(int32_t *dst, int32_t val);
 inline void yield_thread() {}
@@ -390,7 +501,9 @@ inline void yield_thread() {}
 int getenv(const char *name, char *buffer, int buffer_size);
 // Reads an integer from the environment
 int getenv_int(const char *name, int default_value = 0);
-bool jit_dump_enabled();
+bool get_jit_dump();
+unsigned get_jit_profiling_flags();
+std::string get_jit_profiling_jitdumpdir();
 FILE *fopen(const char *filename, const char *mode);
 
 constexpr int msan_enabled = MSAN_ENABLED;
@@ -400,9 +513,28 @@ inline void msan_unpoison(void *ptr, size_t size) {
 #endif
 }
 
-}
-}
+// std::optional? std::maybe? std::whatever
+template <typename T>
+struct setting_t {
+private:
+    T value_;
+    bool initialized_;
+
+public:
+    setting_t() : initialized_ {false} {}
+    setting_t(const T init) : value_ {init}, initialized_ {false} {}
+    bool initialized() { return initialized_; }
+    T get() { return value_; }
+    void set(T new_value) {
+        value_ = new_value;
+        initialized_ = true;
+    }
+    DNNL_DISALLOW_COPY_AND_ASSIGN(setting_t);
+};
+
+} // namespace impl
+} // namespace dnnl
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

@@ -22,7 +22,7 @@
 
 #include <assert.h>
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 
 // Memory storage is an abstraction providing interfaces to:
@@ -60,6 +60,13 @@ struct memory_storage_t : public c_compatible {
         return status::success;
     }
 
+    /** returns slice of memory storage
+     *
+     * @note: sub-storage lifetime shall not exceed one of the base memory storage
+     * @note: (offset + size) shall not be greater than base memory storage size */
+    virtual std::unique_ptr<memory_storage_t> get_sub_storage(
+            size_t offset, size_t size) const = 0;
+
     /** returns true if the pointer associated with the storage is NULL */
     bool is_null() const {
         void *ptr;
@@ -77,12 +84,11 @@ private:
     engine_t *engine_;
     size_t offset_ = 0;
 
-    MKLDNN_DISALLOW_COPY_AND_ASSIGN(memory_storage_t);
+    DNNL_DISALLOW_COPY_AND_ASSIGN(memory_storage_t);
 };
 
 struct empty_memory_storage_t : public memory_storage_t {
-    empty_memory_storage_t(): memory_storage_t(nullptr)
-    {}
+    empty_memory_storage_t() : memory_storage_t(nullptr) {}
 
     virtual status_t get_data_handle(void **handle) const override {
         *handle = nullptr;
@@ -93,14 +99,20 @@ struct empty_memory_storage_t : public memory_storage_t {
         assert(!"not expected");
         return status::runtime_error;
     }
+
+    virtual std::unique_ptr<memory_storage_t> get_sub_storage(
+            size_t offset, size_t size) const override {
+        assert(!"not expected");
+        return nullptr;
+    }
 };
 
-inline memory_storage_t& memory_storage_t::empty_storage() {
+inline memory_storage_t &memory_storage_t::empty_storage() {
     static empty_memory_storage_t instance;
     return instance;
 }
 
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl
 
 #endif

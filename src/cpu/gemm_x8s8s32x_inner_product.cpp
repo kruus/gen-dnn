@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2018 Intel Corporation
+* Copyright 2018-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -14,14 +14,14 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include "dnnl_thread.hpp"
 #include "math_utils.hpp"
-#include "mkldnn_thread.hpp"
 #include "simple_q10n.hpp"
 
 #include "gemm/gemm.hpp"
 #include "gemm_x8s8s32x_inner_product.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
@@ -32,10 +32,10 @@ using namespace memory_tracking::names;
 template <data_type_t src_type, data_type_t dst_type>
 void gemm_x8s8s32x_inner_product_fwd_t<src_type, dst_type>::execute_forward(
         const exec_ctx_t &ctx) const {
-    auto src = CTX_IN_MEM(const src_data_t *, MKLDNN_ARG_SRC);
-    auto weights = CTX_IN_MEM(const wei_data_t *, MKLDNN_ARG_WEIGHTS);
-    auto bias = CTX_IN_MEM(const char *, MKLDNN_ARG_BIAS);
-    auto dst = CTX_OUT_MEM(dst_data_t *, MKLDNN_ARG_DST);
+    auto src = CTX_IN_MEM(const src_data_t *, DNNL_ARG_SRC);
+    auto weights = CTX_IN_MEM(const wei_data_t *, DNNL_ARG_WEIGHTS);
+    auto bias = CTX_IN_MEM(const char *, DNNL_ARG_BIAS);
+    auto dst = CTX_OUT_MEM(dst_data_t *, DNNL_ARG_DST);
 
     const int MB = pd()->MB();
     const int OC = pd()->OC();
@@ -53,8 +53,9 @@ void gemm_x8s8s32x_inner_product_fwd_t<src_type, dst_type>::execute_forward(
     const float *scales = pd()->attr()->output_scales_.scales_;
 
     acc_data_t *acc = pd()->dst_is_acc_
-        ? (acc_data_t *)dst
-        : scratchpad(ctx).template get<acc_data_t>(key_iprod_int_dat_in_acc_dt);
+            ? (acc_data_t *)dst
+            : ctx.get_scratchpad_grantor().template get<acc_data_t>(
+                    key_iprod_int_dat_in_acc_dt);
 
     const float onef = 1.0, zerof = 0.0;
     gemm_s8x8s32(wei_tr ? "T" : "N", "N", "F", &M, &N, &K, &onef, weights,
@@ -62,7 +63,8 @@ void gemm_x8s8s32x_inner_product_fwd_t<src_type, dst_type>::execute_forward(
 
     if (!pd()->attr()->has_default_values() || !pd()->dst_is_acc_
             || pd()->with_bias()) {
-        const bool force_sequential = MB * OC < 2000;
+        const bool force_sequential
+                = pp_kernel_->sequential_kernel() || MB * OC < 2000;
         parallel(force_sequential ? 1 : 0, [&](int ithr, int nthr) {
             size_t start, end;
             balance211((size_t)OC * MB, nthr, ithr, start, end);
@@ -82,6 +84,6 @@ template struct gemm_x8s8s32x_inner_product_fwd_t<s8, s32>;
 template struct gemm_x8s8s32x_inner_product_fwd_t<s8, s8>;
 template struct gemm_x8s8s32x_inner_product_fwd_t<s8, u8>;
 
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl

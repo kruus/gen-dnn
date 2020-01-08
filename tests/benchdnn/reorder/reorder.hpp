@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2018 Intel Corporation
+* Copyright 2017-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -19,12 +19,12 @@
 
 #include <iostream>
 
-#include "mkldnn.h"
+#include "dnnl.h"
 
 #include "common.hpp"
 #include "dnn_types.hpp"
-#include "mkldnn_common.hpp"
-#include "mkldnn_memory.hpp"
+#include "dnnl_common.hpp"
+#include "dnnl_memory.hpp"
 #include "perf_report.hpp"
 
 namespace reorder {
@@ -38,7 +38,7 @@ flag_t str2flag(const char *str);
 const char *flag2str(flag_t flag);
 
 struct dt_conf_s {
-    mkldnn_data_type_t dt;
+    dnnl_data_type_t dt;
     int min;
     int range;
 };
@@ -49,12 +49,12 @@ extern const dt_conf_t conf_s8;
 extern const dt_conf_t conf_u8;
 extern const dt_conf_t conf_s32;
 
-dt_conf_t dt2cfg(mkldnn_data_type_t dt);
-mkldnn_data_type_t cfg2dt(dt_conf_t cfg);
+dt_conf_t dt2cfg(dnnl_data_type_t dt);
+dnnl_data_type_t cfg2dt(dt_conf_t cfg);
 
 struct reorder_conf_t {
     dims_t dims;
-    mkldnn_format_tag_t tag_in, tag_out;
+    dnnl_format_tag_t tag_in, tag_out;
 };
 
 struct q10n_conf_t {
@@ -68,13 +68,14 @@ struct q10n_conf_t {
 struct prb_t {
     prb_t(const reorder_conf_t &r, const dt_conf_t &conf_in,
             const dt_conf_t &conf_out, const attr_t &attr, alg_t alg,
-            flag_t oflag, float scale = 0.f)
+            flag_t oflag, unsigned runtime_dim_mask, float scale = 0.f)
         : reorder(r)
         , conf_in(conf_in)
         , conf_out(conf_out)
         , attr(attr)
         , alg(alg)
         , oflag(oflag)
+        , runtime_dim_mask(runtime_dim_mask)
         , ops(0) {
         if (scale != 0.f) this->attr.oscale.scale = scale;
         count_ops();
@@ -86,6 +87,7 @@ struct prb_t {
     attr_t attr;
     alg_t alg;
     flag_t oflag;
+    unsigned runtime_dim_mask;
     double ops;
 
     void count_ops() {
@@ -98,7 +100,7 @@ struct prb_t {
 };
 std::ostream &operator<<(std::ostream &s, const prb_t &p);
 
-struct perf_report_t: public base_perf_report_t {
+struct perf_report_t : public base_perf_report_t {
     using base_perf_report_t::base_perf_report_t;
 
     void report(const prb_t *p, const res_t *r, const char *prb_str) {
@@ -119,24 +121,27 @@ struct perf_report_t: public base_perf_report_t {
 
     virtual double ops() const override { return p_->ops; }
     virtual const attr_t *attr() const override { return &p_->attr; }
-    virtual const std::vector<mkldnn_data_type_t> *sdt() const override
-    { return &sdt_; }
-    virtual const mkldnn_data_type_t *ddt() const override { return &ddt_; }
-    virtual const std::vector<mkldnn_format_tag_t> *stag() const override
-    { return &stag_; }
-    virtual const mkldnn_format_tag_t *dtag() const override
-    { return &p_->reorder.tag_out; }
+    virtual const std::vector<dnnl_data_type_t> *sdt() const override {
+        return &sdt_;
+    }
+    virtual const dnnl_data_type_t *ddt() const override { return &ddt_; }
+    virtual const std::vector<dnnl_format_tag_t> *stag() const override {
+        return &stag_;
+    }
+    virtual const dnnl_format_tag_t *dtag() const override {
+        return &p_->reorder.tag_out;
+    }
 
 private:
     const prb_t *p_ = NULL;
-    std::vector<mkldnn_data_type_t> sdt_;
-    mkldnn_data_type_t ddt_;
-    std::vector<mkldnn_format_tag_t> stag_;
+    std::vector<dnnl_data_type_t> sdt_;
+    dnnl_data_type_t ddt_;
+    std::vector<dnnl_format_tag_t> stag_;
 };
 
 int doit(const prb_t *p, res_t *res);
 int bench(int argc, char **argv);
 
-}
+} // namespace reorder
 
 #endif

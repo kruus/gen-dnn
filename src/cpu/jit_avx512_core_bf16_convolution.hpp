@@ -18,22 +18,22 @@
 #define CPU_JIT_AVX512_CORE_BF16_CONVOLUTION_HPP
 
 #include "c_types_map.hpp"
+#include "dnnl_thread.hpp"
 #include "memory_tracking.hpp"
-#include "mkldnn_thread.hpp"
 #include "utils.hpp"
 
 #include "cpu_barrier.hpp"
 #include "cpu_convolution_pd.hpp"
 #include "cpu_reducer.hpp"
 
-#include "jit_transpose_src_utils.hpp"
 #include "jit_avx512_core_bf16_conv_kernel.hpp"
+#include "jit_transpose_src_utils.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
-struct jit_avx512_core_bf16_convolution_fwd_t : public cpu_primitive_t {
+struct jit_avx512_core_bf16_convolution_fwd_t : public primitive_impl_t {
     struct pd_t : public cpu_convolution_fwd_pd_t {
         pd_t(engine_t *engine, const convolution_desc_t *adesc,
                 const primitive_attr_t *attr,
@@ -41,63 +41,58 @@ struct jit_avx512_core_bf16_convolution_fwd_t : public cpu_primitive_t {
             : cpu_convolution_fwd_pd_t(engine, adesc, attr, hint_fwd_pd)
             , jcp_() {}
 
-        DECLARE_COMMON_PD_T(
-                JIT_IMPL_NAME_HELPER("jit_bf16:", avx512_core, ""),
+        DECLARE_COMMON_PD_T(JIT_IMPL_NAME_HELPER("jit_bf16:", jcp_.isa, ""),
                 jit_avx512_core_bf16_convolution_fwd_t);
 
-        status_t init()
-        {
-            bool ok = true
-                    && mayiuse(avx512_core)
-                    && is_fwd()
+        status_t init() {
+            bool ok = true && mayiuse(avx512_core) && is_fwd()
                     && set_default_alg_kind(alg_kind::convolution_direct)
                     && (expect_data_types(data_type::bf16, data_type::bf16,
-                               data_type::undef, data_type::bf16, data_type::undef)
-                         || expect_data_types(data_type::bf16, data_type::bf16,
-                               data_type::undef, data_type::f32, data_type::undef))
+                                data_type::undef, data_type::bf16,
+                                data_type::undef)
+                            || expect_data_types(data_type::bf16,
+                                    data_type::bf16, data_type::undef,
+                                    data_type::f32, data_type::undef))
                     && IMPLICATION(with_bias(),
-                               utils::one_of(weights_md(1)->data_type,
-                                           data_type::f32, data_type::bf16))
-                    && !has_zero_dim_memory()
-                    && set_default_formats();
-            if (!ok)
-                return status::unimplemented;
+                            utils::one_of(weights_md(1)->data_type,
+                                    data_type::f32, data_type::bf16))
+                    && attr()->has_default_values(
+                            primitive_attr_t::skip_mask_t::post_ops)
+                    && !has_zero_dim_memory() && set_default_formats();
+            if (!ok) return status::unimplemented;
 
-            status_t status = jit_avx512_core_bf16_fwd_kernel::init_conf(
-                    jcp_, *desc(), *src_md(), *weights_md(0),
-                    *dst_md(), *weights_md(1), *attr(),
-                    mkldnn_get_max_threads());
+            status_t status = jit_avx512_core_bf16_fwd_kernel::init_conf(jcp_,
+                    *desc(), *src_md(), *weights_md(0), *dst_md(),
+                    *weights_md(1), *attr(), dnnl_get_max_threads());
             if (status != status::success) return status::unimplemented;
 
-           auto scratchpad = scratchpad_registry().registrar();
-           jit_avx512_core_bf16_fwd_kernel::init_scratchpad(
-                   scratchpad, jcp_);
+            auto scratchpad = scratchpad_registry().registrar();
+            jit_avx512_core_bf16_fwd_kernel::init_scratchpad(scratchpad, jcp_);
 
             return status::success;
         }
 
         jit_conv_conf_t jcp_;
 
-        protected:
-            bool set_default_formats() {
-                using namespace format_tag;
+    protected:
+        bool set_default_formats() {
+            using namespace format_tag;
 
-                auto dat_tag = utils::pick(ndims() - 3, nCw16c, nChw16c, nCdhw16c);
-                auto wei_tag = utils::pick(2 * ndims() - 6 + with_groups(),
-                        OIw8i16o2i, gOIw8i16o2i, OIhw8i16o2i, gOIhw8i16o2i,
-                        OIdhw8i16o2i, gOIdhw8i16o2i);
+            auto dat_tag = utils::pick(ndims() - 3, nCw16c, nChw16c, nCdhw16c);
+            auto wei_tag = utils::pick(2 * ndims() - 6 + with_groups(),
+                    OIw8i16o2i, gOIw8i16o2i, OIhw8i16o2i, gOIhw8i16o2i,
+                    OIdhw8i16o2i, gOIdhw8i16o2i);
 
-                return set_default_formats_common(dat_tag, wei_tag, dat_tag);
-            }
+            return set_default_formats_common(dat_tag, wei_tag, dat_tag);
+        }
     };
 
     jit_avx512_core_bf16_convolution_fwd_t(const pd_t *apd)
-        : cpu_primitive_t(apd)
-    {
-        kernel_ = new jit_avx512_core_bf16_fwd_kernel(pd()->jcp_,
-                    *pd()->attr());
+        : primitive_impl_t(apd) {
+        kernel_ = new jit_avx512_core_bf16_fwd_kernel(
+                pd()->jcp_, *pd()->attr());
     }
-    ~jit_avx512_core_bf16_convolution_fwd_t() { delete kernel_;}
+    ~jit_avx512_core_bf16_convolution_fwd_t() { delete kernel_; }
 
     typedef typename prec_traits<data_type::bf16>::type src_data_t;
     typedef typename prec_traits<data_type::bf16>::type wei_data_t;
@@ -112,8 +107,7 @@ struct jit_avx512_core_bf16_convolution_fwd_t : public cpu_primitive_t {
         else
             return status::unimplemented;
 
-        if (pd()->wants_zero_pad_dst())
-            ctx.memory(MKLDNN_ARG_DST)->zero_pad();
+        if (pd()->wants_zero_pad_dst()) ctx.memory(DNNL_ARG_DST)->zero_pad();
 
         return status::success;
     }
@@ -124,41 +118,39 @@ private:
     void execute_forward_1d(const exec_ctx_t &ctx) const;
     void execute_forward_2d(const exec_ctx_t &ctx) const;
     void execute_forward_3d(const exec_ctx_t &ctx) const;
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
 
     jit_avx512_core_bf16_fwd_kernel *kernel_;
 };
 
-struct jit_avx512_core_bf16_convolution_bwd_data_t: public cpu_primitive_t {
-    struct pd_t: public cpu_convolution_bwd_data_pd_t {
-        pd_t(engine_t *engine,
-                const convolution_desc_t *adesc,
+struct jit_avx512_core_bf16_convolution_bwd_data_t : public primitive_impl_t {
+    struct pd_t : public cpu_convolution_bwd_data_pd_t {
+        pd_t(engine_t *engine, const convolution_desc_t *adesc,
                 const primitive_attr_t *attr,
                 const convolution_fwd_pd_t *hint_fwd_pd)
             : cpu_convolution_bwd_data_pd_t(engine, adesc, attr, hint_fwd_pd)
-            , jcp_()
-        {}
+            , jcp_() {}
 
-        DECLARE_COMMON_PD_T(
-                JIT_IMPL_NAME_HELPER("jit_bf16:", avx512_core, ""),
+        DECLARE_COMMON_PD_T(JIT_IMPL_NAME_HELPER("jit_bf16:", jcp_.isa, ""),
                 jit_avx512_core_bf16_convolution_bwd_data_t);
 
         status_t init() {
             using namespace prop_kind;
-            bool ok = true
-                && mayiuse(avx512_core)
-                && is_bwd_d()
-                && set_default_alg_kind(alg_kind::convolution_direct)
-                && (expect_data_types(data_type::f32, data_type::bf16,
-                        data_type::undef, data_type::bf16, data_type::undef)
-                || expect_data_types(data_type::bf16, data_type::bf16,
-                        data_type::undef, data_type::bf16, data_type::undef))
-                && !has_zero_dim_memory()
-                && set_default_formats();
+            bool ok = true && mayiuse(avx512_core) && is_bwd_d()
+                    && set_default_alg_kind(alg_kind::convolution_direct)
+                    && (expect_data_types(data_type::f32, data_type::bf16,
+                                data_type::undef, data_type::bf16,
+                                data_type::undef)
+                            || expect_data_types(data_type::bf16,
+                                    data_type::bf16, data_type::undef,
+                                    data_type::bf16, data_type::undef))
+                    && attr()->has_default_values() && !has_zero_dim_memory()
+                    && set_default_formats();
             if (!ok) return status::unimplemented;
 
             status_t status = jit_avx512_core_bf16_bwd_data_kernel::init_conf(
-                    jcp_, *desc(), *diff_src_md(), *weights_md(), *diff_dst_md());
+                    jcp_, *desc(), *diff_src_md(), *weights_md(),
+                    *diff_dst_md(), dnnl_get_max_threads());
             return status;
         }
 
@@ -178,8 +170,7 @@ struct jit_avx512_core_bf16_convolution_bwd_data_t: public cpu_primitive_t {
     };
 
     jit_avx512_core_bf16_convolution_bwd_data_t(const pd_t *apd)
-        : cpu_primitive_t(apd)
-    {
+        : primitive_impl_t(apd) {
         kernel_ = new jit_avx512_core_bf16_bwd_data_kernel(pd()->jcp_);
     }
     ~jit_avx512_core_bf16_convolution_bwd_data_t() { delete kernel_; };
@@ -201,54 +192,53 @@ struct jit_avx512_core_bf16_convolution_bwd_data_t: public cpu_primitive_t {
 private:
     void execute_backward_data(const exec_ctx_t &ctx) const;
     void execute_backward_data_3d(const exec_ctx_t &ctx) const;
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
     jit_avx512_core_bf16_bwd_data_kernel *kernel_;
 };
 
-struct jit_avx512_core_bf16_convolution_bwd_weights_t: public cpu_primitive_t {
-    struct pd_t: public  cpu_convolution_bwd_weights_pd_t {
+struct jit_avx512_core_bf16_convolution_bwd_weights_t
+    : public primitive_impl_t {
+    struct pd_t : public cpu_convolution_bwd_weights_pd_t {
         pd_t(engine_t *engine, const convolution_desc_t *adesc,
                 const primitive_attr_t *attr,
                 const convolution_fwd_pd_t *hint_fwd_pd)
             : cpu_convolution_bwd_weights_pd_t(engine, adesc, attr, hint_fwd_pd)
             , jcp_() {}
 
-        DECLARE_COMMON_PD_T(
-                JIT_IMPL_NAME_HELPER("jit_bf16:", avx512_core, ""),
+        DECLARE_COMMON_PD_T(JIT_IMPL_NAME_HELPER("jit_bf16:", jcp_.isa, ""),
                 jit_avx512_core_bf16_convolution_bwd_weights_t);
 
         status_t init() {
-            bool ok = true
-                && mayiuse(avx512_core)
-                && is_bwd_w()
-                && set_default_alg_kind(alg_kind::convolution_direct)
-                && (expect_data_types(data_type::bf16, data_type::bf16,
-                        data_type::undef, data_type::bf16, data_type::undef)
-                    || expect_data_types(data_type::bf16, data_type::f32,
-                        data_type::undef, data_type::bf16, data_type::undef))
-                && IMPLICATION(with_bias(),
-                           utils::one_of(diff_weights_md(1)->data_type,
-                                       data_type::f32, data_type::bf16))
-                && !has_zero_dim_memory()
-                && set_default_formats();
-           if (!ok) return status::unimplemented;
+            bool ok = true && mayiuse(avx512_core) && is_bwd_w()
+                    && set_default_alg_kind(alg_kind::convolution_direct)
+                    && (expect_data_types(data_type::bf16, data_type::bf16,
+                                data_type::undef, data_type::bf16,
+                                data_type::undef)
+                            || expect_data_types(data_type::bf16,
+                                    data_type::f32, data_type::undef,
+                                    data_type::bf16, data_type::undef))
+                    && IMPLICATION(with_bias(),
+                            utils::one_of(diff_weights_md(1)->data_type,
+                                    data_type::f32, data_type::bf16))
+                    && attr()->has_default_values() && !has_zero_dim_memory()
+                    && set_default_formats();
+            if (!ok) return status::unimplemented;
 
-           status_t status = jit_avx512_core_bf16_conv_bwd_weights_kernel_f32::
-                   init_conf(jcp_, *desc(), *src_md(), *diff_weights_md(0),
-                           *diff_weights_md(1), *diff_dst_md());
-           if (status != status::success)
-               return status;
+            status_t status = jit_avx512_core_bf16_conv_bwd_weights_kernel_f32::
+                    init_conf(jcp_, *desc(), *src_md(), *diff_weights_md(0),
+                            *diff_weights_md(1), *diff_dst_md());
+            if (status != status::success) return status;
 
-           init_balancers();
+            init_balancers();
 
-           auto scratchpad = scratchpad_registry().registrar();
-           jit_avx512_core_bf16_conv_bwd_weights_kernel_f32::init_scratchpad(
-                   scratchpad, jcp_);
+            auto scratchpad = scratchpad_registry().registrar();
+            jit_avx512_core_bf16_conv_bwd_weights_kernel_f32::init_scratchpad(
+                    scratchpad, jcp_);
 
-           auto reducer_bia_scratchpad = memory_tracking::registrar_t(
-                   scratchpad, memory_tracking::names::prefix_reducer_bia);
-           reducer_bia_conf_.init_scratchpad(reducer_bia_scratchpad);
-           return status;
+            auto reducer_bia_scratchpad = memory_tracking::registrar_t(
+                    scratchpad, memory_tracking::names::prefix_reducer_bia);
+            reducer_bia_conf_.init_scratchpad(reducer_bia_scratchpad);
+            return status;
         }
 
         jit_conv_conf_t jcp_;
@@ -260,8 +250,8 @@ struct jit_avx512_core_bf16_convolution_bwd_weights_t: public cpu_primitive_t {
 
             auto dat_tag = utils::pick(ndims() - 3, nCw16c, nChw16c, nCdhw16c);
             auto wei_tag = utils::pick(2 * ndims() - 6 + with_groups(),
-                    OIw16i16o, gOIw16i16o, OIhw16i16o, gOIhw16i16o,
-                    OIdhw16i16o, gOIdhw16i16o);
+                    OIw16i16o, gOIw16i16o, OIhw16i16o, gOIhw16i16o, OIdhw16i16o,
+                    gOIdhw16i16o);
 
             return set_default_formats_common(dat_tag, wei_tag, dat_tag);
         }
@@ -271,8 +261,8 @@ struct jit_avx512_core_bf16_convolution_bwd_weights_t: public cpu_primitive_t {
             const size_t max_buffer_size = jcp_.nthr * 3 * 5 * 5 * 16 * 16;
             if (with_bias()) {
                 reducer_bia_conf_.init(reduce_balancer_t(jcp_.nthr,
-                            jcp_.oc_block, jcp_.ngroups * jcp_.nb_oc, jcp_.mb,
-                            max_buffer_size, true));
+                        jcp_.oc_block, jcp_.ngroups * jcp_.nb_oc, jcp_.mb,
+                        max_buffer_size, true));
             }
         }
     };
@@ -280,10 +270,8 @@ struct jit_avx512_core_bf16_convolution_bwd_weights_t: public cpu_primitive_t {
     jit_avx512_core_bf16_convolution_bwd_weights_t(const pd_t *apd);
     ~jit_avx512_core_bf16_convolution_bwd_weights_t() {
         delete kernel_;
-#ifndef BF16_CONV_BWD_W_JIT_KER_USES_PERMW_TRANSPOSITION
         delete trans_kernel_;
         delete trans_dst_kernel_;
-#endif
         delete acc_ker_;
         delete reducer_bias_;
     }
@@ -304,7 +292,7 @@ private:
     void reduce_and_convert_diff_weights(const thread_info_t *) const;
     void compute_diff_bias(const thread_info_t *, const exec_ctx_t &ctx) const;
 
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
 
     int nthr_, nthr_mb_, nthr_g_, nthr_oc_b_, nthr_ic_b_;
 
@@ -313,16 +301,14 @@ private:
     cpu_accumulator_1d_t<data_type::f32> *acc_ker_;
     cpu_reducer_t<data_type::f32> *reducer_bias_;
 
-#ifndef BF16_CONV_BWD_W_JIT_KER_USES_PERMW_TRANSPOSITION
     jit_trans_src_t *trans_kernel_;
     jit_trans_dst_t *trans_dst_kernel_;
-#endif
 };
 
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

@@ -1,12 +1,12 @@
 Developer Guide {#dev_guide}
 ============================
 
-Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN) is an
+Deep Neural Network Library (DNNL) is an
 open-source performance library for deep learning applications. The library
 includes basic building blocks for neural networks optimized
 for Intel Architecture Processors and Intel Processor Graphics.
-Intel MKL-DNN is intended for deep learning applications and framework
-developers intersted in improving application performance
+DNNL is intended for deep learning applications and framework
+developers interested in improving application performance
 on Intel CPUs and GPUs.
 
 # Building and Linking
@@ -18,9 +18,8 @@ on Intel CPUs and GPUs.
 # Programming Model
 
  * @ref dev_guide_basic_concepts
- * @ref cpu_getting_started_cpp
- * @ref gpu_getting_started_cpp
- * @ref cpu_memory_format_propagation_cpp
+ * @ref getting_started_cpp
+ * @ref memory_format_propagation_cpp
  * @ref dev_guide_inference_and_training_aspects
    * @ref dev_guide_inference
    * @ref dev_guide_inference_int8
@@ -30,6 +29,7 @@ on Intel CPUs and GPUs.
    * @ref dev_guide_attributes_quantization
    * @ref dev_guide_attributes_post_ops
  * @ref dev_guide_data_types
+ * @ref cross_engine_reorder_cpp
  * @ref dev_guide_c_and_cpp_apis
 
 # Primitives
@@ -37,17 +37,22 @@ on Intel CPUs and GPUs.
 Compute intensive operations:
  * [(De-)Convolution](@ref dev_guide_convolution): Direct 1D/2D/3D, Winograd 2D
  * [Inner Product](@ref dev_guide_inner_product)
+ * [Matrix Multiplication](@ref dev_guide_matmul)
  * [RNN](@ref dev_guide_rnn): LSTM, Vanilla RNN, GRU
 
 Memory bandwidth limited operations:
- * [Pooling](@ref dev_guide_pooling)
  * [Batch Normalization](@ref dev_guide_batch_normalization)
- * [Local Response Normalization](@ref dev_guide_lrn)
- * [Softmax](@ref dev_guide_softmax)
- * [Elementwise](@ref dev_guide_eltwise): ReLU, Tanh, ELU, Abs, and other
- * [Sum](@ref dev_guide_sum)
+ * [Binary](@ref dev_guide_binary)
  * [Concat](@ref dev_guide_concat)
+ * [Elementwise](@ref dev_guide_eltwise): ReLU, Tanh, ELU, Abs, and other
+ * [Layer Normalization](@ref dev_guide_layer_normalization)
+ * [Local Response Normalization](@ref dev_guide_lrn)
+ * [LogSoftmax](@ref dev_guide_logsoftmax)
+ * [Pooling](@ref dev_guide_pooling)
+ * [Resampling](@ref dev_guide_resampling)
  * [Shuffle](@ref dev_guide_shuffle)
+ * [Softmax](@ref dev_guide_softmax)
+ * [Sum](@ref dev_guide_sum)
 
 Data manipulation:
  * [Reorder](@ref dev_guide_reorder)
@@ -56,30 +61,34 @@ Data manipulation:
 
  * @ref dev_guide_verbose
  * @ref dev_guide_benchdnn
- * @ref dev_guide_vtune
+ * @ref dev_guide_profilers
  * @ref dev_guide_inspecting_jit
- * @ref cpu_performance_profiling_cpp
+ * @ref performance_profiling_cpp
+ * @ref dev_guide_cpu_dispatcher_control
 
 # Advanced topics
 
  * @ref dev_guide_transition_to_v1
+ * @ref dev_guide_transition_to_dnnl
  * @ref dev_guide_understanding_memory_formats
  * @ref dev_guide_int8_computations
  * @ref dev_guide_opencl_interoperability
+ * @ref dev_guide_primitive_cache
 
 # Examples
 
 | Topic          | Engine   | C++ API                                | C API                        |
 | :----          | :---     | :----                                  | :---                         |
-| Tutorials      | CPU      | @ref cpu_getting_started_cpp           |                              |
-|                |          | @ref cpu_memory_format_propagation_cpp |                              |
-|                |          | @ref cpu_performance_profiling_cpp     |                              |
-|                | GPU      | @ref gpu_getting_started_cpp           | @ref gpu_getting_started_c   |
+| Tutorials      | CPU/GPU  | @ref getting_started_cpp               |                              |
+|                | CPU/GPU  | @ref memory_format_propagation_cpp     |                              |
+|                | CPU/GPU  | @ref performance_profiling_cpp         |                              |
+|                | CPU/GPU  | @ref cross_engine_reorder_cpp          | @ref cross_engine_reorder_c  |
 |                | GPU      | @ref gpu_opencl_interop_cpp            |                              |
-| f32 inference  | CPU      | @ref cpu_cnn_inference_f32_cpp         | @ref cpu_cnn_inference_f32_c |
+| f32 inference  | CPU/GPU  | @ref cnn_inference_f32_cpp             | @ref cnn_inference_f32_c     |
 |                | CPU      | @ref cpu_rnn_inference_f32_cpp         |                              |
-| int8 inference | CPU      | @ref cpu_cnn_inference_int8_cpp        |                              |
+| int8 inference | CPU/GPU  | @ref cnn_inference_int8_cpp            |                              |
 |                | CPU      | @ref cpu_rnn_inference_int8_cpp        |                              |
-| f32 training   | CPU      | @ref cpu_cnn_training_f32_cpp          | @ref cpu_cnn_training_f32_c  |
-|                | CPU      | @ref cpu_rnn_training_f32_cpp          |                              |
+| f32 training   | CPU/GPU  | @ref cnn_training_f32_cpp              |                              |
+|                | CPU      |                                        | @ref cpu_cnn_training_f32_c  |
+|                | CPU/GPU  | @ref rnn_training_f32_cpp              |                              |
 | bf16 training  | CPU      | @ref cpu_cnn_training_bf16_cpp         |                              |

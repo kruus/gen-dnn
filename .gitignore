@@ -40,6 +40,10 @@ install-sx*
 install-jit*
 install-dbg*
 .*.sw?
+tags
+*~
+\#*\#
+.projectile
 **.nm
 **.ii
 **.i

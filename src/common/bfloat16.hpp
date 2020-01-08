@@ -16,24 +16,30 @@
 
 #ifndef BFLOAT16_HPP
 #define BFLOAT16_HPP
-#include <cmath>
-#include <cstdint>
-#include <limits>
-#include "mkldnn_config.h"
 
+//? #include "mkldnn_config.h"
+#include "dnnl_config.h"
+//? #include "cpu_isa_traits.hpp" this resides in src/cpu (not common)
 #if !defined(TARGET_VANILLA)
-namespace mkldnn {
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <limits>
+#include "dnnl.h"
+
+namespace dnnl {
 namespace impl {
 
 struct bfloat16_t {
     uint16_t raw_bits_;
     bfloat16_t() = default;
-    constexpr bfloat16_t(uint16_t r, bool): raw_bits_(r) {}
+    constexpr bfloat16_t(uint16_t r, bool) : raw_bits_(r) {}
     bfloat16_t(float f) { (*this) = f; }
 
-    bfloat16_t MKLDNN_API &operator=(float f);
+    bfloat16_t DNNL_API &operator=(float f);
 
-    MKLDNN_API operator float() const;
+    DNNL_API operator float() const;
 
     bfloat16_t &operator+=(bfloat16_t a) {
         (*this) = (float)(*this) + (float)a;
@@ -49,12 +55,12 @@ void cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t size);
 
 // performs element-by-element sum of inp and add float arrays and stores
 // result to bfloat16 out array with downconversion
-void add_floats_and_cvt_to_bfloat16(bfloat16_t *out, const float *inp0,
-        const float *inp1, size_t size);
+void add_floats_and_cvt_to_bfloat16(
+        bfloat16_t *out, const float *inp0, const float *inp1, size_t size);
 
-}
-}
-#endif // !TARGET_VANILLA
-// vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s
+} // namespace impl
+} // namespace dnnl
+#endif // !defined(TARGET_VANILLA)
+
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif
-

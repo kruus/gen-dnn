@@ -14,15 +14,15 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <sstream>
 
-#include "mkldnn.h"
+#include "dnnl.h"
 
-#include "mkldnn_common.hpp"
-#include "mkldnn_memory.hpp"
+#include "dnnl_common.hpp"
+#include "dnnl_memory.hpp"
 #include "parser.hpp"
 
 #include "softmax/softmax.hpp"
@@ -30,8 +30,9 @@
 namespace softmax {
 
 std::vector<dir_t> dir {FWD_D};
-std::vector<mkldnn_data_type_t> dt {mkldnn_f32};
-std::vector<mkldnn_format_tag_t> tag {mkldnn_nchw};
+std::vector<dnnl_data_type_t> dt {dnnl_f32};
+std::vector<dnnl_format_tag_t> tag {dnnl_nchw};
+std::vector<alg_t> alg {SOFTMAX};
 std::vector<int> axis {1};
 std::vector<int64_t> mb {0};
 std::vector<bool> inplace {true};
@@ -39,15 +40,16 @@ std::vector<bool> inplace {true};
 dims_t dims;
 const char *skip_impl = "";
 bool allow_unimpl = false;
-const char *perf_template_csv =
-    "perf,%engine%,%dir%,%dt%,%tag%,%axis%,%DESC%,%-time%,%0time%";
+const char *perf_template_csv
+        = "perf,%engine%,%dir%,%dt%,%tag%,%alg%,%axis%,%DESC%,%-time%,%0time%";
 const char *perf_template_def = "perf,%engine%,%desc%,%-time%,%0time%";
 const char *perf_template = perf_template_def;
 
 void reset_parameters() {
     dir = {FWD_D};
-    dt = {mkldnn_f32};
-    tag = {mkldnn_nchw};
+    dt = {dnnl_f32};
+    tag = {dnnl_nchw};
+    alg = {SOFTMAX};
     axis = {1};
     mb = {0};
     inplace = {true};
@@ -56,20 +58,21 @@ void reset_parameters() {
 }
 
 void check_correctness() {
-    for (const auto &i_dir: dir)
-    for (const auto &i_dt: dt)
-    for (const auto &i_tag: tag)
-    for (const auto &i_axis: axis)
-    for (const auto &i_inplace: inplace)
-    for (const auto &i_mb: mb) {
-        const prb_t p(dims, i_dir, i_dt, i_tag, i_axis, i_inplace, i_mb);
+    for_(const auto &i_dir : dir)
+    for_(const auto &i_dt : dt)
+    for_(const auto &i_tag : tag)
+    for_(const auto &i_alg : alg)
+    for_(const auto &i_axis : axis)
+    for_(const auto &i_inplace : inplace)
+    for (const auto &i_mb : mb) {
+        const prb_t p(dims, i_dir, i_dt, i_tag, i_alg, i_axis, i_inplace, i_mb);
         std::stringstream ss;
         ss << p;
         const std::string cpp_pstr = ss.str();
         const char *pstr = cpp_pstr.c_str();
         print(1, "run: %s\n", pstr);
 
-        res_t res{};
+        res_t res {};
         const int status = doit(&p, &res);
 
         bool want_perf_report = false;
@@ -85,24 +88,21 @@ void check_correctness() {
 }
 
 int bench(int argc, char **argv) {
+    driver_name = "softmax";
     using namespace parser;
     for (; argc > 0; --argc, ++argv) {
-        const bool parsed_options = false
-            || parse_bench_settings(argv[0])
-            || parse_batch(bench, argv[0])
-            || parse_dir(dir, argv[0])
-            || parse_dt(dt, argv[0])
-            || parse_tag(tag, argv[0])
-            || parse_axis(axis, argv[0])
-            || parse_inplace(inplace, argv[0])
-            || parse_mb(mb, argv[0])
-            || parse_skip_impl(skip_impl, argv[0])
-            || parse_allow_unimpl(allow_unimpl, argv[0])
-            || parse_perf_template(perf_template, perf_template_def,
-                    perf_template_csv, argv[0])
-            || parse_reset(reset_parameters, argv[0]);
+        const bool parsed_options = false || parse_bench_settings(argv[0])
+                || parse_batch(bench, argv[0]) || parse_dir(dir, argv[0])
+                || parse_dt(dt, argv[0]) || parse_tag(tag, argv[0])
+                || parse_vector_option(alg, str2alg, argv[0], "alg")
+                || parse_axis(axis, argv[0]) || parse_inplace(inplace, argv[0])
+                || parse_mb(mb, argv[0]) || parse_skip_impl(skip_impl, argv[0])
+                || parse_allow_unimpl(allow_unimpl, argv[0])
+                || parse_perf_template(perf_template, perf_template_def,
+                        perf_template_csv, argv[0])
+                || parse_reset(reset_parameters, argv[0]);
         if (!parsed_options) {
-            catch_unknown_options(argv[0], "softmax");
+            catch_unknown_options(argv[0]);
 
             parse_dims(dims, argv[0]);
             check_correctness();
@@ -111,4 +111,4 @@ int bench(int argc, char **argv) {
 
     return parse_last_argument();
 }
-}
+} // namespace softmax

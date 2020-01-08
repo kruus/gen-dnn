@@ -19,20 +19,19 @@
 
 #include <memory>
 #include <numeric>
-#include <type_traits>
 #include <utility>
+#include <type_traits>
 
+#include "dnnl_test_common.hpp"
 #include "gtest/gtest.h"
-#include "mkldnn_test_common.hpp"
 
-#include "mkldnn.hpp"
+#include "dnnl.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 
 template <typename data_i_t, typename data_o_t>
 inline void check_reorder(const memory::desc &md_i, const memory::desc &md_o,
-        memory &src, memory &dst)
-{
+        memory &src, memory &dst) {
     auto src_data = map_memory<data_i_t>(src);
     auto dst_data = map_memory<data_o_t>(dst);
 
@@ -41,8 +40,8 @@ inline void check_reorder(const memory::desc &md_i, const memory::desc &md_o,
     const size_t nelems = std::accumulate(
             dims, dims + ndims, size_t(1), std::multiplies<size_t>());
 
-    const mkldnn::impl::memory_desc_wrapper mdw_i(md_i.data);
-    const mkldnn::impl::memory_desc_wrapper mdw_o(md_o.data);
+    const dnnl::impl::memory_desc_wrapper mdw_i(md_i.data);
+    const dnnl::impl::memory_desc_wrapper mdw_o(md_o.data);
     for (size_t i = 0; i < nelems; ++i) {
         data_i_t s_raw = src_data[mdw_i.off_l(i, false)];
         data_o_t s = static_cast<data_o_t>(s_raw);
@@ -57,40 +56,37 @@ struct test_simple_params {
     memory::format_tag fmt_o;
     memory::dims dims;
     bool expect_to_fail;
-    mkldnn_status_t expected_status;
+    dnnl_status_t expected_status;
 };
 
 template <typename reorder_types>
-class reorder_simple_test:
-    public ::testing::TestWithParam<test_simple_params<reorder_types>>
-{
+class reorder_simple_test
+    : public ::testing::TestWithParam<test_simple_params<reorder_types>> {
 protected:
     void Test() {
         test_simple_params<reorder_types> p
                 = ::testing::TestWithParam<decltype(p)>::GetParam();
         catch_expected_failures(
                 [=]() {
-                    RunTest(get_test_engine_kind(), get_test_engine_kind());
+                    engine eng(get_test_engine_kind(), 0);
+                    RunTest(eng, eng);
                 },
                 p.expect_to_fail, p.expected_status);
     }
 
-    void Test(engine::kind eng_kind_i, engine::kind eng_kind_o) {
+    void Test(engine &eng_i, engine &eng_o) {
         test_simple_params<reorder_types> p
                 = ::testing::TestWithParam<decltype(p)>::GetParam();
-        catch_expected_failures([=]() { RunTest(eng_kind_i, eng_kind_o); },
+        catch_expected_failures([&]() { RunTest(eng_i, eng_o); },
                 p.expect_to_fail, p.expected_status);
     }
 
-    void RunTest(engine::kind eng_kind_i, engine::kind eng_kind_o) {
+    void RunTest(engine &eng_i, engine &eng_o) {
         using data_i_t = typename reorder_types::first_type;
         using data_o_t = typename reorder_types::second_type;
 
         test_simple_params<reorder_types> p
-            = ::testing::TestWithParam<decltype(p)>::GetParam();
-
-        auto eng_i = engine(eng_kind_i, 0);
-        auto eng_o = (eng_kind_o == eng_kind_i) ? eng_i : engine(eng_kind_o, 0);
+                = ::testing::TestWithParam<decltype(p)>::GetParam();
 
         const size_t nelems = std::accumulate(p.dims.begin(), p.dims.end(),
                 size_t(1), std::multiplies<size_t>());
@@ -104,16 +100,24 @@ protected:
         auto dst = memory(md_o, eng_o);
 
         /* initialize input data */
-        const mkldnn::impl::memory_desc_wrapper mdw_i(md_i.data);
+        const dnnl::impl::memory_desc_wrapper mdw_i(md_i.data);
         {
             auto src_data = map_memory<data_i_t>(src);
             for (size_t i = 0; i < nelems; ++i)
                 src_data[mdw_i.off_l(i, false)] = data_i_t(i);
         }
 
-        reorder::primitive_desc r_pd(eng_i, md_i, eng_o, md_o, primitive_attr());
-        auto r = reorder(r_pd);
+        reorder::primitive_desc r_pd(
+                eng_i, md_i, eng_o, md_o, primitive_attr());
+        // test construction from a C pd
+        r_pd = reorder::primitive_desc(r_pd.get());
 
+        ASSERT_TRUE(r_pd.query_md(query::exec_arg_md, DNNL_ARG_SRC)
+                == r_pd.src_desc());
+        ASSERT_TRUE(r_pd.query_md(query::exec_arg_md, DNNL_ARG_DST)
+                == r_pd.dst_desc());
+
+        auto r = reorder(r_pd);
         auto strm = stream(r_pd.get_engine());
         r.execute(strm, src, dst);
         strm.wait();
@@ -123,6 +127,6 @@ protected:
     }
 };
 
-} // namespace mkldnn
+} // namespace dnnl
 
 #endif

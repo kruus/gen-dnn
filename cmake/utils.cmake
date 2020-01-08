@@ -1,5 +1,5 @@
 #===============================================================================
-# Copyright 2018 Intel Corporation
+# Copyright 2018-2019 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,10 +25,10 @@ include("cmake/options.cmake")
 
 # Common configuration for tests / test cases on Windows
 function(maybe_configure_windows_test name kind)
-    if(WIN32 AND (NOT MKLDNN_BUILD_FOR_CI))
+    if(WIN32 AND (NOT DNNL_BUILD_FOR_CI))
         string(REPLACE  ";" "\;" PATH "${CTESTCONFIG_PATH};$ENV{PATH}")
         set_property(${kind} ${name} PROPERTY ENVIRONMENT "PATH=${PATH}")
-        if(CMAKE_GENERATOR MATCHES "Visual Studio")
+        if(TARGET ${name} AND CMAKE_GENERATOR MATCHES "Visual Studio")
             configure_file(${PROJECT_SOURCE_DIR}/cmake/template.vcxproj.user
                 ${name}.vcxproj.user @ONLY)
         endif()
@@ -47,9 +47,11 @@ function(register_exe name srcs test)
     message(STATUS "             test ${test}")
     message(STATUS "             libs ${LIB_NAME} ${EXTRA_SHARED_LIBS} ${ARGV3}")
     target_link_libraries(${name} ${LIB_NAME} ${EXTRA_SHARED_LIBS} ${ARGV3})
-    if("${test}" STREQUAL "test")
+    if("x${test}" STREQUAL "xtest")
         add_test(${name} ${name})
         maybe_configure_windows_test(${name} TEST)
+    else()
+        maybe_configure_windows_test(${name} TARGET)
     endif()
 endfunction()
 

@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2018 Intel Corporation
+* Copyright 2018-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -14,20 +14,19 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "mkldnn_test_common.hpp"
+#include "dnnl_test_common.hpp"
 #include "gtest/gtest.h"
 
-#include "mkldnn.h"
+#include "dnnl.h"
 #include "test_gemm_common.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 
 using gemm_test = gemm_test_common<float, float, float>;
 
-TEST_P(gemm_test, TestGEMM)
-{}
+TEST_P(gemm_test, TestGEMM) {}
 
 #define TEST_CASE_NAME_PREFIX fp32
 #define FP32
 #include "gemm_in.h"
-}
+} // namespace dnnl

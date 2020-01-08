@@ -26,14 +26,9 @@ find_package(Doxygen)
 if(DOXYGEN_FOUND)
     set(DOXYGEN_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/reference)
     set(DOXYGEN_STAMP_FILE ${CMAKE_CURRENT_BINARY_DIR}/doc.stamp)
-    set(DOXYGEN_STAMP_FILE2 ${CMAKE_CURRENT_BINARY_DIR}/doc2.stamp)
     configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/doc/Doxyfile.in
         ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
-        @ONLY)
-    configure_file(
-        ${CMAKE_CURRENT_SOURCE_DIR}/doc/Doxyfile-cpu.in
-        ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile-cpu
         @ONLY)
     configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/doc/header.html.in
@@ -63,7 +58,7 @@ if(DOXYGEN_FOUND)
         COMMENT "Generating API documentation with Doxygen" VERBATIM)
     add_custom_target(doc DEPENDS ${DOXYGEN_STAMP_FILE})
 
-    if(NOT MKLDNN_INSTALL_MODE STREQUAL "BUNDLE")
+    if(NOT DNNL_INSTALL_MODE STREQUAL "BUNDLE")
         install(
             DIRECTORY ${DOXYGEN_OUTPUT_DIR}
             DESTINATION share/doc/${LIB_NAME} OPTIONAL)

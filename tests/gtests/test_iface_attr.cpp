@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2018 Intel Corporation
+* Copyright 2017-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -14,21 +14,21 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "mkldnn_test_common.hpp"
+#include "dnnl_test_common.hpp"
 #include "gtest/gtest.h"
 
-#include "mkldnn.hpp"
+#include "dnnl.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 
-class attr_test: public ::testing::Test {
+class attr_test : public ::testing::Test {
 protected:
     virtual void SetUp() {}
 };
 
 TEST_F(attr_test, TestScratchpadMode) {
-    mkldnn::primitive_attr attr;
-    for (auto m: {scratchpad_mode::library, scratchpad_mode::user}) {
+    dnnl::primitive_attr attr;
+    for (auto m : {scratchpad_mode::library, scratchpad_mode::user}) {
         attr.set_scratchpad_mode(m);
         ASSERT_EQ(m, attr.get_scratchpad_mode());
     }
@@ -40,16 +40,17 @@ TEST_F(attr_test, TestScratchpadModeEx) {
     const memory::dim N = 2, C = 2, W = 2;
 
     memory::desc data_md(
-            { N, C, W }, memory::data_type::f32, memory::format_tag::ncw);
+            {N, C, W}, memory::data_type::f32, memory::format_tag::ncw);
 
-    mkldnn::primitive_attr attr;
-    auto softmax_d = softmax_forward::desc(prop_kind::forward_inference, data_md, 1);
-    for (auto m: {scratchpad_mode::library, scratchpad_mode::user}) {
+    dnnl::primitive_attr attr;
+    auto softmax_d
+            = softmax_forward::desc(prop_kind::forward_inference, data_md, 1);
+    for (auto m : {scratchpad_mode::library, scratchpad_mode::user}) {
         attr.set_scratchpad_mode(m);
-        auto softmax_pd = softmax_forward::primitive_desc(
-                softmax_d, attr, eng);
+        auto softmax_pd = softmax_forward::primitive_desc(softmax_d, attr, eng);
         auto scratchpad_size = (long)softmax_pd.scratchpad_desc().get_size();
-        auto mem_consumption = (long)softmax_pd.query_s64(query::memory_consumption_s64);
+        auto mem_consumption
+                = (long)softmax_pd.query_s64(query::memory_consumption_s64);
 
         // printf("scratchpad_size: %ld\n", scratchpad_size);
         // printf("mem consumption: %ld\n", mem_consumption);
@@ -63,7 +64,7 @@ TEST_F(attr_test, TestScratchpadModeEx) {
 }
 
 TEST_F(attr_test, TestIntOutputScales) {
-    mkldnn::primitive_attr attr;
+    dnnl::primitive_attr attr;
 
     int mask;
     std::vector<float> scales;
@@ -91,9 +92,65 @@ TEST_F(attr_test, TestIntOutputScales) {
     ASSERT_EQ(scales[2], 3.);
 }
 
+TEST_F(attr_test, TestZeroPoints) {
+    dnnl::primitive_attr attr;
+
+    const std::vector<int> supported_args
+            = {DNNL_ARG_SRC, DNNL_ARG_WEIGHTS, DNNL_ARG_DST};
+    const std::vector<int> unsupported_args = {DNNL_ARG_BIAS, DNNL_ARG_DST_2,
+            DNNL_ARG_MEAN, DNNL_ARG_WORKSPACE, DNNL_ARG_SCRATCHPAD};
+    int zero_points_mask;
+    std::vector<int> zero_points;
+
+    // default zero points
+    for (int arg : supported_args) {
+        attr.get_zero_points(arg, zero_points_mask, zero_points);
+        ASSERT_EQ(zero_points_mask, 0);
+        ASSERT_EQ(zero_points.size(), 1U);
+        ASSERT_EQ(zero_points[0], 0);
+    }
+
+    for (int arg : unsupported_args) {
+        attr.get_zero_points(arg, zero_points_mask, zero_points);
+        ASSERT_EQ(zero_points_mask, 0);
+        ASSERT_EQ(zero_points.size(), 1U);
+        ASSERT_EQ(zero_points[0], 0);
+    }
+
+    // single non-default zero_point for supported arg
+    attr.set_zero_points(supported_args[0], 0, {2});
+    attr.get_zero_points(supported_args[0], zero_points_mask, zero_points);
+    ASSERT_EQ(zero_points_mask, 0);
+    ASSERT_EQ(zero_points.size(), 1U);
+    ASSERT_EQ(zero_points[0], 2);
+
+    // single **default** zero_point for **unsupported** arg
+    attr.set_zero_points(unsupported_args[0], 0, {0});
+    attr.get_zero_points(unsupported_args[0], zero_points_mask, zero_points);
+    ASSERT_EQ(zero_points_mask, 0);
+    ASSERT_EQ(zero_points.size(), 1U);
+    ASSERT_EQ(zero_points[0], 0);
+
+    // multiple zero_points not implemented yet ...
+}
+
+TEST_F(attr_test, TestZeroPointsExpectFailure) {
+    dnnl::primitive_attr attr;
+
+    const int supported_arg = DNNL_ARG_SRC;
+    const int unsupported_arg = DNNL_ARG_MEAN;
+
+    // single non-default zero_point for unsupported arg
+    EXPECT_ANY_THROW(attr.set_zero_points(unsupported_arg, 0, {2}));
+
+    // multiple zero points for supported and unsupported args
+    EXPECT_ANY_THROW(attr.set_zero_points(supported_arg, 1 << 1, {1, 2, 3}));
+    EXPECT_ANY_THROW(attr.set_zero_points(unsupported_arg, 1 << 1, {1, 2, 3}));
+}
+
 TEST_F(attr_test, TestPostOps) {
-    mkldnn::primitive_attr attr;
-    mkldnn::post_ops ops;
+    dnnl::primitive_attr attr;
+    dnnl::post_ops ops;
 
     algorithm alg;
     float scale, alpha, beta;
@@ -122,4 +179,4 @@ TEST_F(attr_test, TestPostOps) {
     ASSERT_FLOAT_EQ(beta, 4.4f);
 }
 
-}
+} // namespace dnnl

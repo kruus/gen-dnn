@@ -17,20 +17,20 @@
 #ifndef GEMM_PD_HPP
 #define GEMM_PD_HPP
 
-#include "mkldnn.h"
+#include "dnnl.h"
 
 #include "common/c_types_map.hpp"
 #include "common/gemm_utils.hpp"
 #include "common/primitive_desc.hpp"
 #include "common/utils.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 
 struct gemm_pd_t : public primitive_desc_t {
     static constexpr auto base_pkind = primitive_kind::gemm;
 
-    gemm_pd_t(mkldnn::impl::engine_t *engine, const gemm_desc_t *adesc,
+    gemm_pd_t(dnnl::impl::engine_t *engine, const gemm_desc_t *adesc,
             const primitive_attr_t *attr)
         : primitive_desc_t(engine, attr, base_pkind)
         , desc_(*adesc)
@@ -44,20 +44,28 @@ struct gemm_pd_t : public primitive_desc_t {
     }
 
     virtual arg_usage_t arg_usage(int arg) const override {
-        if (utils::one_of(arg, MKLDNN_ARG_SRC_0, MKLDNN_ARG_SRC_1))
+        if (utils::one_of(arg, DNNL_ARG_SRC_0, DNNL_ARG_SRC_1))
             return arg_usage_t::input;
 
-        if (arg == MKLDNN_ARG_DST)
-            return arg_usage_t::output;
+        if (arg == DNNL_ARG_DST) return arg_usage_t::output;
 
         return primitive_desc_t::arg_usage(arg);
     }
 
+    virtual const memory_desc_t *arg_md(int arg) const override {
+        switch (arg) {
+            case DNNL_ARG_SRC_0: return src_md(0);
+            case DNNL_ARG_SRC_1: return src_md(1);
+            case DNNL_ARG_DST: return dst_md(0);
+            default: return primitive_desc_t::arg_md(arg);
+        }
+    }
+
     virtual const memory_desc_t *src_md(int index = 0) const override {
         switch (index) {
-        case 0: return &a_md_;
-        case 1: return &b_md_;
-        default: return &glob_zero_md;
+            case 0: return &a_md_;
+            case 1: return &b_md_;
+            default: return &glob_zero_md;
         }
     }
     virtual const memory_desc_t *dst_md(int index = 0) const override {
@@ -74,7 +82,7 @@ private:
             const gemm_desc_t *adesc, int index) {
         memory_desc_t m_desc;
         data_type_t data_types[3]
-                = { adesc->a_type, adesc->b_type, adesc->c_type };
+                = {adesc->a_type, adesc->b_type, adesc->c_type};
 
         auto status = create_gemm_memory_desc(
                 &m_desc, adesc, index, data_types[index]);
@@ -91,6 +99,6 @@ private:
 };
 
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl
 
 #endif

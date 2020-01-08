@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2018 Intel Corporation
+* Copyright 2017-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@
 #include "jit_generator.hpp"
 #endif
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
@@ -45,15 +45,48 @@ inline void barrier(ctx_t *ctx, int nthr){
 
 #else // assume multiple thread support
 
-STRUCT_ALIGN(CACHE_LINE_SIZE,
-struct ctx_t {
-    volatile size_t ctr;
-    char pad1[CACHE_LINE_SIZE - 1 * sizeof(size_t)];
-    volatile size_t sense;
-    char pad2[CACHE_LINE_SIZE - 1 * sizeof(size_t)];
-});
+//? STRUCT_ALIGN(CACHE_LINE_SIZE,
+//? struct ctx_t {
+//?     volatile size_t ctr;
+//?     char pad1[CACHE_LINE_SIZE - 1 * sizeof(size_t)];
+//?     volatile size_t sense;
+//?     char pad2[CACHE_LINE_SIZE - 1 * sizeof(size_t)];
+//? });
+#ifdef _WIN32
+#define CTX_ALIGNMENT 64
+#else
+#define CTX_ALIGNMENT 4096
+#endif
 
-inline void ctx_init(ctx_t *ctx) { *ctx = utils::zero<ctx_t>(); }
+STRUCT_ALIGN(
+        CTX_ALIGNMENT, struct ctx_t {
+            enum { CACHE_LINE_SIZE = 64 };
+            volatile size_t ctr;
+            char pad1[CACHE_LINE_SIZE - 1 * sizeof(size_t)];
+            volatile size_t sense;
+            char pad2[CACHE_LINE_SIZE - 1 * sizeof(size_t)];
+        });
+
+/* TODO: remove ctx_64_t once batch normalization switches to barrier-less
+ * implementation.
+ * Different alignments of context structure affect performance differently for
+ * convolution and batch normalization. Convolution performance becomes more
+ * stable with page alignment compared to cache line size alignment.
+ * Batch normalization (that creates C / simd_w barriers) degrades with page
+ * alignment due to significant overhead of ctx_init in case of mb=1. */
+STRUCT_ALIGN(
+        64, struct ctx_64_t {
+            enum { CACHE_LINE_SIZE = 64 };
+            volatile size_t ctr;
+            char pad1[CACHE_LINE_SIZE - 1 * sizeof(size_t)];
+            volatile size_t sense;
+            char pad2[CACHE_LINE_SIZE - 1 * sizeof(size_t)];
+        });
+
+template <typename ctx_t>
+inline void ctx_init(ctx_t *ctx) {
+    *ctx = utils::zero<ctx_t>();
+}
 void barrier(ctx_t *ctx, int nthr);
 
 #endif // "barrier(ctx,nthr)" support
@@ -65,16 +98,14 @@ void barrier(ctx_t *ctx, int nthr);
  *   reg_ctx   -- read-only register with pointer to the barrier context
  *   reg_nnthr -- read-only register with the # of synchronizing threads
  */
-void generate(jit_generator &code, Xbyak::Reg64 reg_ctx,
-        Xbyak::Reg64 reg_nthr);
+void generate(jit_generator &code, Xbyak::Reg64 reg_ctx, Xbyak::Reg64 reg_nthr);
+#endif // !defined(TARGET_VANILLA)
+
+} // namespace simple_barrier
+
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
+
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif
-
-}//simple_barrier::
-
-}
-}
-}
-
-#endif
-
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

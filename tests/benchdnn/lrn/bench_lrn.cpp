@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2018 Intel Corporation
+* Copyright 2017-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -14,17 +14,17 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 #include <sstream>
 
-#include "mkldnn.h"
+#include "dnnl.h"
 
-#include "mkldnn_common.hpp"
-#include "mkldnn_memory.hpp"
-#include "mkldnn_debug.hpp"
+#include "dnnl_common.hpp"
+#include "dnnl_debug.hpp"
+#include "dnnl_memory.hpp"
 #include "parser.hpp"
 
 #include "lrn/lrn.hpp"
@@ -32,22 +32,22 @@
 namespace lrn {
 
 std::vector<dir_t> dir {FWD_D};
-std::vector<mkldnn_data_type_t> dt {mkldnn_f32};
-std::vector<mkldnn_format_tag_t> tag {mkldnn_nchw};
+std::vector<dnnl_data_type_t> dt {dnnl_f32};
+std::vector<dnnl_format_tag_t> tag {dnnl_nchw};
 std::vector<alg_t> alg {ACROSS};
 std::vector<int64_t> mb {0};
 
 const char *skip_impl = "";
 bool allow_unimpl = false;
-const char *perf_template_csv =
-    "perf,%engine%,%name%,%dir%,%dt%,%tag%,%alg%,%DESC%,%-time%,%0time%";
+const char *perf_template_csv
+        = "perf,%engine%,%name%,%dir%,%dt%,%tag%,%alg%,%DESC%,%-time%,%0time%";
 const char *perf_template_def = "perf,%engine%,%name%,%desc%,%-time%,%0time%";
 const char *perf_template = perf_template_def;
 
 void reset_parameters() {
     dir = {FWD_D};
-    dt = {mkldnn_f32};
-    tag = {mkldnn_nchw};
+    dt = {dnnl_f32};
+    tag = {dnnl_nchw};
     alg = {ACROSS};
     mb = {0};
     skip_impl = "";
@@ -55,11 +55,11 @@ void reset_parameters() {
 }
 
 void check_correctness(const desc_t *c) {
-    for (const auto &i_dir: dir)
-    for (const auto &i_dt: dt)
-    for (const auto &i_tag: tag)
-    for (const auto &i_alg: alg)
-    for (const auto &i_mb: mb) {
+    for_(const auto &i_dir : dir)
+    for_(const auto &i_dt : dt)
+    for_(const auto &i_tag : tag)
+    for_(const auto &i_alg : alg)
+    for (const auto &i_mb : mb) {
         const prb_t p(*c, i_mb, i_dir, i_dt, i_tag, i_alg);
         std::stringstream ss;
         ss << p;
@@ -67,7 +67,7 @@ void check_correctness(const desc_t *c) {
         const char *pstr = cpp_pstr.c_str();
         print(1, "run: %s\n", pstr);
 
-        res_t res{};
+        res_t res {};
         const int status = doit(&p, &res);
 
         bool want_perf_report = false;
@@ -83,23 +83,20 @@ void check_correctness(const desc_t *c) {
 }
 
 int bench(int argc, char **argv) {
+    driver_name = "lrn";
     using namespace parser;
     for (; argc > 0; --argc, ++argv) {
-        const bool parsed_options = false
-            || parse_bench_settings(argv[0])
-            || parse_batch(bench, argv[0])
-            || parse_dir(dir, argv[0])
-            || parse_dt(dt, argv[0])
-            || parse_tag(tag, argv[0])
-            || parse_vector_option(alg, str2alg, argv[0], "alg")
-            || parse_mb(mb, argv[0])
-            || parse_skip_impl(skip_impl, argv[0])
-            || parse_allow_unimpl(allow_unimpl, argv[0])
-            || parse_perf_template(perf_template, perf_template_def,
-                    perf_template_csv, argv[0])
-            || parse_reset(reset_parameters, argv[0]);
+        const bool parsed_options = false || parse_bench_settings(argv[0])
+                || parse_batch(bench, argv[0]) || parse_dir(dir, argv[0])
+                || parse_dt(dt, argv[0]) || parse_tag(tag, argv[0])
+                || parse_vector_option(alg, str2alg, argv[0], "alg")
+                || parse_mb(mb, argv[0]) || parse_skip_impl(skip_impl, argv[0])
+                || parse_allow_unimpl(allow_unimpl, argv[0])
+                || parse_perf_template(perf_template, perf_template_def,
+                        perf_template_csv, argv[0])
+                || parse_reset(reset_parameters, argv[0]);
         if (!parsed_options) {
-            catch_unknown_options(argv[0], "lrn");
+            catch_unknown_options(argv[0]);
 
             desc_t c;
             SAFE_V(str2desc(&c, argv[0]));
@@ -110,4 +107,4 @@ int bench(int argc, char **argv) {
     return parse_last_argument();
 }
 
-}
+} // namespace lrn

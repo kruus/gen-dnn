@@ -19,28 +19,27 @@
 
 #include "common/c_types_map.hpp"
 #include "common/memory.hpp"
+#include "compute/compute.hpp"
 #include "ocl/jit_primitive_conf.hpp"
 #include "ocl_shuffle_pd.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace ocl {
 
 struct jit_ref_shuffle_kernel {
 
-    jit_ref_shuffle_kernel(jit_shuffle_conf_t ajshfl) : jshfl(ajshfl){}
+    jit_ref_shuffle_kernel(const jit_shuffle_conf_t &ajshfl) : jshfl(ajshfl) {}
 
-    ~jit_ref_shuffle_kernel(){}
+    ~jit_ref_shuffle_kernel() {}
 
-    static status_t init_conf(const shuffle_pd_t *pd, jit_shuffle_conf_t &jshfl,
-        jit_offsets &jit_off, const memory_desc_wrapper &src_md,
-        const memory_desc_wrapper &dst_md,
-        const memory_desc_wrapper &diff_src_md,
-        const memory_desc_wrapper &diff_dst_md) {
+    static status_t init_conf(jit_shuffle_conf_t &jshfl, const shuffle_pd_t *pd,
+            jit_offsets &jit_off) {
 
         const bool is_fwd = pd->is_fwd();
 
-        const memory_desc_wrapper &input_md = is_fwd ? src_md : diff_dst_md;
+        const memory_desc_wrapper input_md(
+                is_fwd ? pd->src_md() : pd->diff_dst_md());
         jshfl.data_type = input_md.data_type();
 
         const int axis = pd->axis();
@@ -56,8 +55,8 @@ struct jit_ref_shuffle_kernel {
         auto dims = pd->desc()->data_desc.dims;
         auto ndims = pd->desc()->data_desc.ndims;
         const size_t outer_size = utils::array_product(dims, axis);
-        const size_t inner_size = utils::array_product(dims + axis + 1,
-            ndims - axis - 1);
+        const size_t inner_size
+                = utils::array_product(dims + axis + 1, ndims - axis - 1);
         const size_t dim = axis_size * inner_size;
         jshfl.outer_size = outer_size;
         jshfl.inner_size = inner_size;
@@ -73,20 +72,20 @@ struct jit_ref_shuffle_kernel {
         return status::success;
     }
 
-    static status_t init_const_def(ocl_jit_t &jit,
-        const jit_shuffle_conf_t &jshfl, const jit_offsets &jit_off) {
+    static status_t init_const_def(compute::kernel_ctx_t &kernel_ctx,
+            const jit_shuffle_conf_t &jshfl, const jit_offsets &jit_off) {
 
-        jit.set_data_type(jshfl.data_type);
-        jit.define_int("NDIMS", jshfl.ndims);
-        jit.define_int("AXIS", jshfl.axis);
-        jit.define_int("AXIS_SIZE", jshfl.axis_size);
-        jit.define_int("GROUP_SIZE", jshfl.group_size);
-        jit.define_int("TRANSPOSE_ROW", jshfl.transpose_row);
-        jit.define_int("TRANSPOSE_COL", jshfl.transpose_col);
-        jit.define_int("INNER_SIZE", jshfl.inner_size);
-        jit.define_int("OUTER_SIZE", jshfl.outer_size);
+        kernel_ctx.set_data_type(jshfl.data_type);
+        kernel_ctx.define_int("NDIMS", jshfl.ndims);
+        kernel_ctx.define_int("AXIS", jshfl.axis);
+        kernel_ctx.define_int("AXIS_SIZE", jshfl.axis_size);
+        kernel_ctx.define_int("GROUP_SIZE", jshfl.group_size);
+        kernel_ctx.define_int("TRANSPOSE_ROW", jshfl.transpose_row);
+        kernel_ctx.define_int("TRANSPOSE_COL", jshfl.transpose_col);
+        kernel_ctx.define_int("INNER_SIZE", jshfl.inner_size);
+        kernel_ctx.define_int("OUTER_SIZE", jshfl.outer_size);
 
-        def_offsets(jit_off.src_off, jit, "SRC", jshfl.ndims);
+        def_offsets(jit_off.src_off, kernel_ctx, "SRC", jshfl.ndims);
         return status::success;
     }
 
@@ -95,6 +94,6 @@ struct jit_ref_shuffle_kernel {
 
 } // namespace ocl
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl
 
 #endif // JIT_REF_SHUFFLE_KERNEL_HPP

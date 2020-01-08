@@ -16,52 +16,47 @@
 
 #include "ocl/ref_softmax.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace ocl {
 
-template <impl::data_type_t data_type>
-status_t ref_softmax_fwd_t<data_type>::execute_generic(
-        const exec_ctx_t &ctx) const {
-    auto &src = CTX_IN_STORAGE(MKLDNN_ARG_SRC);
-    auto &dst = CTX_OUT_STORAGE(MKLDNN_ARG_DST);
+status_t ref_softmax_fwd_t::execute_generic(const exec_ctx_t &ctx) const {
+    auto *compute_stream
+            = utils::downcast<compute::compute_stream_t *>(ctx.stream());
 
-    kernel_.set_arg(0, src);
-    kernel_.set_arg(1, dst);
+    auto &src = CTX_IN_STORAGE(DNNL_ARG_SRC);
+    auto &dst = CTX_OUT_STORAGE(DNNL_ARG_DST);
 
-    auto nd_range = cl_nd_range_t(pd()->gws.size(), pd()->gws.data());
-    auto &executor
-            = *(utils::downcast<cl_stream_t *>(ctx.stream())->cl_executor());
-    status_t status = executor.parallel_for(nd_range, kernel_);
+    compute::kernel_arg_list_t arg_list;
+    arg_list.set(0, src);
+    arg_list.set(1, dst);
 
-    return status;
-}
-
-template <impl::data_type_t data_type>
-status_t ref_softmax_bwd_t<data_type>::execute_generic(
-        const exec_ctx_t &ctx) const {
-    auto &dst = CTX_IN_STORAGE(MKLDNN_ARG_DST);
-    auto &diff_dst = CTX_IN_STORAGE(MKLDNN_ARG_DIFF_DST);
-    auto &diff_src = CTX_OUT_STORAGE(MKLDNN_ARG_DIFF_SRC);
-
-    kernel_.set_arg(0, dst);
-    kernel_.set_arg(1, diff_src);
-    kernel_.set_arg(2, diff_dst);
-
-    auto nd_range = cl_nd_range_t(pd()->gws.size(), pd()->gws.data());
-    auto &executor
-            = *(utils::downcast<cl_stream_t *>(ctx.stream())->cl_executor());
-    status_t status = executor.parallel_for(nd_range, kernel_);
+    auto nd_range = compute::nd_range_t(pd()->gws, pd()->lws);
+    status_t status = compute_stream->parallel_for(nd_range, kernel_, arg_list);
 
     return status;
 }
 
-template struct ref_softmax_fwd_t<data_type::f16>;
-template struct ref_softmax_fwd_t<data_type::f32>;
-template struct ref_softmax_bwd_t<data_type::f32>;
+status_t ref_softmax_bwd_t::execute_generic(const exec_ctx_t &ctx) const {
+    auto &dst = CTX_IN_STORAGE(DNNL_ARG_DST);
+    auto &diff_dst = CTX_IN_STORAGE(DNNL_ARG_DIFF_DST);
+    auto &diff_src = CTX_OUT_STORAGE(DNNL_ARG_DIFF_SRC);
+
+    compute::kernel_arg_list_t arg_list;
+    arg_list.set(0, dst);
+    arg_list.set(1, diff_src);
+    arg_list.set(2, diff_dst);
+
+    auto nd_range = compute::nd_range_t(pd()->gws);
+    auto *compute_stream
+            = utils::downcast<compute::compute_stream_t *>(ctx.stream());
+    status_t status = compute_stream->parallel_for(nd_range, kernel_, arg_list);
+
+    return status;
+}
 
 } // namespace ocl
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

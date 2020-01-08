@@ -18,29 +18,36 @@
 #define JIT_GEN9_GEMM_KERNEL_HPP
 
 #include "common/c_types_map.hpp"
+#include "compute/compute.hpp"
 #include "ocl/jit_primitive_conf.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace ocl {
 
 struct jit_gen9_gemm_kernel {
-    template <impl::data_type_t type>
-    static status_t init_cl_options(ocl_jit_t &jit) {
+    template <impl::data_type_t type, impl::data_type_t src_type = type,
+            impl::data_type_t dst_type = type>
+    static status_t init_cl_options(compute::kernel_ctx_t &kernel_ctx) {
         using namespace data_type;
 
-        if (type != f32 && type != f16)
-            return status::unimplemented;
+        if (type != f32 && type != f16) return status::unimplemented;
 
-        jit.define_int("DT_F32", type == f32);
-        jit.define_int("DT_F16", type == f16);
+        def_data_type(kernel_ctx, src_type, "SRC");
+        def_data_type(kernel_ctx, dst_type, "DST");
 
-        jit.add_option("-cl-mad-enable");
-        jit.add_option("-cl-strict-aliasing");
+        kernel_ctx.define_int("DT_F32", type == f32);
+        kernel_ctx.define_int("DT_F16", type == f16);
+
+        kernel_ctx.add_option("-cl-mad-enable");
+        kernel_ctx.add_option("-cl-strict-aliasing");
 #ifdef CL_VERSION_2_0
-        jit.add_option("-cl-std=CL2.0");
+        kernel_ctx.add_option("-cl-std=CL2.0");
 #else
-        jit.add_option("-Dget_enqueued_local_size=get_local_size");
+        kernel_ctx.add_option("-Dget_enqueued_local_size=get_local_size");
+#endif
+#ifndef _WIN32
+        kernel_ctx.add_option("-DALLOW_READ_OVERRUNS");
 #endif
         return status::success;
     }
@@ -51,35 +58,30 @@ struct jit_gen9_gemm_kernel {
     };
 };
 
-template <impl::data_type_t type>
+template <impl::data_type_t src_type, impl::data_type_t type = src_type>
 struct jit_gen9_gemm_beta_kernel : public jit_gen9_gemm_kernel {
-    static status_t init_const_def(ocl_jit_t &jit) {
-        auto status = init_cl_options<type>(jit);
-        if (status)
-            return status;
+    static status_t init_const_def(compute::kernel_ctx_t &kernel_ctx) {
+        auto status = init_cl_options<type, src_type, src_type>(kernel_ctx);
+        if (status) return status;
 
-#ifdef DEBUG_PRINT
-        printf("OPT:\n%s\n", jit.get_options());
-#endif
+        kernel_ctx.print_options();
         return status::success;
     }
 };
 
-template <impl::data_type_t type>
+template <impl::data_type_t src_type, impl::data_type_t type = src_type>
 struct jit_gen9_gemm_copy_kernel : public jit_gen9_gemm_kernel {
-    static status_t init_const_def(ocl_jit_t &jit, bool outer, bool trans) {
-        auto status = init_cl_options<type>(jit);
-        if (status)
-            return status;
+    static status_t init_const_def(
+            compute::kernel_ctx_t &kernel_ctx, bool outer, bool trans) {
+        auto status = init_cl_options<type, src_type>(kernel_ctx);
+        if (status) return status;
 
-        jit.define_int("COPY_UNROLL",
+        kernel_ctx.define_int("COPY_UNROLL",
                 !outer ? copy_params::unroll_m : copy_params::unroll_n);
 
-        jit.add_option(trans ? "-DUSE_TRANS" : "-DUSE_NOTRANS");
+        kernel_ctx.add_option(trans ? "-DUSE_TRANS" : "-DUSE_NOTRANS");
 
-#ifdef DEBUG_PRINT
-        printf("OPT:\n%s\n", jit.get_options());
-#endif
+        kernel_ctx.print_options();
         return status::success;
     }
 
@@ -89,22 +91,22 @@ struct jit_gen9_gemm_copy_kernel : public jit_gen9_gemm_kernel {
     }
 };
 
-template <impl::data_type_t type>
+template <impl::data_type_t type, impl::data_type_t dst_type = type>
 struct jit_gen9_gemm_compute_kernel : public jit_gen9_gemm_kernel {
-    static status_t init_const_def(ocl_jit_t &jit, bool beta0) {
-        auto status = init_cl_options<type>(jit);
-        if (status)
-            return status;
+    static status_t init_const_def(compute::kernel_ctx_t &kernel_ctx,
+            bool beta0, bool with_eltwise, alg_kind_t alg) {
+        auto status = init_cl_options<type, type, dst_type>(kernel_ctx);
+        if (status) return status;
 
-        if (beta0)
-            jit.add_option("-DBETA_ZERO");
+        if (beta0) kernel_ctx.add_option("-DBETA_ZERO");
 
-        jit.define_int("UNROLL_M", copy_params::unroll_m);
-        jit.define_int("UNROLL_N", copy_params::unroll_n);
+        kernel_ctx.define_int("UNROLL_M", copy_params::unroll_m);
+        kernel_ctx.define_int("UNROLL_N", copy_params::unroll_n);
 
-#ifdef DEBUG_PRINT
-        printf("OPT:\n%s\n", jit.get_options());
-#endif
+        kernel_ctx.define_int("WITH_ELTWISE", with_eltwise);
+        if (with_eltwise) def_postops(kernel_ctx, alg);
+
+        kernel_ctx.print_options();
         return status::success;
     }
 
@@ -116,30 +118,24 @@ struct jit_gen9_gemm_compute_kernel : public jit_gen9_gemm_kernel {
 
 template <impl::data_type_t type>
 struct jit_gen9_gemm_nocopy_kernel : public jit_gen9_gemm_kernel {
-    static status_t init_const_def(ocl_jit_t &jit, bool trans_a, bool trans_b,
-            bool with_eltwise, alg_kind_t alg) {
+    static status_t init_const_def(compute::kernel_ctx_t &kernel_ctx,
+            bool trans_a, bool trans_b, bool with_eltwise, alg_kind_t alg) {
 
-        auto status = init_cl_options<type>(jit);
-        if (status)
-            return status;
+        auto status = init_cl_options<type>(kernel_ctx);
+        if (status) return status;
 
-        if (trans_a)
-            jit.add_option("-DTRANS_A");
-        if (trans_b)
-            jit.add_option("-DTRANS_B");
+        if (trans_a) kernel_ctx.add_option("-DTRANS_A");
+        if (trans_b) kernel_ctx.add_option("-DTRANS_B");
 
-        jit.define_int("WITH_ELTWISE", with_eltwise);
-        if (with_eltwise)
-            def_postops(jit, alg);
+        kernel_ctx.define_int("WITH_ELTWISE", with_eltwise);
+        if (with_eltwise) def_postops(kernel_ctx, alg);
 
-#ifdef DEBUG_PRINT
-        printf("OPT:\n%s\n", jit.get_options());
-#endif
+        kernel_ctx.print_options();
         return status::success;
     }
 
-    static void get_unrolls(bool trans_a, bool trans_b, int &unroll_m,
-            int &unroll_n) {
+    static void get_unrolls(
+            bool trans_a, bool trans_b, int &unroll_m, int &unroll_n) {
 
         unroll_m = unroll_n = 0;
 
@@ -156,18 +152,17 @@ struct jit_gen9_gemm_nocopy_kernel : public jit_gen9_gemm_kernel {
 
 template <impl::data_type_t type>
 struct jit_gen9_gemm_nocopy_superkernel : public jit_gen9_gemm_kernel {
-    static status_t init_const_def(ocl_jit_t &jit, bool trans_a, bool trans_b,
-            bool with_eltwise, alg_kind_t alg) {
+    static status_t init_const_def(compute::kernel_ctx_t &kernel_ctx,
+            bool trans_a, bool trans_b, bool with_eltwise, alg_kind_t alg) {
 
-        if (trans_a)
-            return status::unimplemented;
+        if (trans_a) return status::unimplemented;
 
-        return jit_gen9_gemm_nocopy_kernel<type>::init_const_def(jit, trans_a,
-                trans_b, with_eltwise, alg);
+        return jit_gen9_gemm_nocopy_kernel<type>::init_const_def(
+                kernel_ctx, trans_a, trans_b, with_eltwise, alg);
     }
 
-    static void get_unrolls(bool trans_a, bool trans_b, int (&unroll_m)[2],
-            int &unroll_n) {
+    static void get_unrolls(
+            bool trans_a, bool trans_b, int (&unroll_m)[2], int &unroll_n) {
 
         unroll_m[0] = 32;
         unroll_m[1] = 16;
@@ -175,9 +170,8 @@ struct jit_gen9_gemm_nocopy_superkernel : public jit_gen9_gemm_kernel {
     }
 };
 
-
 } // namespace ocl
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl
 
 #endif

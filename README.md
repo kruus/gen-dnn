@@ -1,24 +1,25 @@
-# Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)
-![v1.0 gold](https://img.shields.io/badge/v1.0-gold-green.svg)
+Deep Neural Network Library (DNNL)
+==================================
+
+> **Note**
+>
+> Starting with version 1.1 the library is renamed to DNNL. Please read
+> [Intel MKL-DNN to DNNL Transition Guide](https://intel.github.io/mkl-dnn/dev_guide_transition_to_dnnl.html).
 
 > **Note**
 >
 > Version 1.0 brings incompatible changes to the 0.20 version. Please read
 > [Version 1.0 Transition Guide](https://intel.github.io/mkl-dnn/dev_guide_transition_to_v1.html).
 
-Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN) is an
+Deep Neural Network Library (DNNL) is an
 open-source performance library for deep learning applications. The library
 includes basic building blocks for neural networks optimized
 for Intel Architecture Processors and Intel Processor Graphics.
 
-> **Note**
-> Intel MKL-DNN is distinct from Intel MKL, which is general math
-> performance library.
-
-Intel MKL-DNN is intended for deep learning applications and framework
+DNNL is intended for deep learning applications and framework
 developers interested in improving application performance
 on Intel CPUs and GPUs. Deep learning practitioners should use one of the
-applications enabled with Intel MKL-DNN:
+applications enabled with DNNL:
 * [Apache\* MXNet](https://mxnet.apache.org)
 * [BigDL](https://github.com/intel-analytics/BigDL)
 * [Caffe\* Optimized for Intel Architecture](https://github.com/intel/caffe)
@@ -34,70 +35,52 @@ applications enabled with Intel MKL-DNN:
 * [PyTorch\*](https://pytorch.org/)
 * [Tensorflow\*](https://www.tensorflow.org)
 
-## License
-Intel MKL-DNN is licensed under
-[Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0). This
-software includes the following third-party components:
-* [Xbyak](https://github.com/herumi/xbyak) distributed under
-[3-clause BSD licence](src/cpu/xbyak/COPYRIGHT)
-* [gtest](https://github.com/google/googletest) distributed under
-[3-clause BSD license](tests/gtests/gtest/LICENSE)
-* [ittnotify](https://github.com/intel/IntelSEAPI) distributed under
-[3-clause BSD license](src/cpu/jit_utils/jitprofiling/LICENSE.BSD)
+# Documentation
 
-## Documentation
 * [Developer guide](https://intel.github.io/mkl-dnn) explains programming
 model, supported functionality, details of primitives implementations and
 includes annotated examples.
 * [API reference](https://intel.github.io/mkl-dnn/modules.html) provides
 comprehensive reference of the library API.
 
-## Support
-Please submit your questions, feature requests, and bug reports on the
-[GitHub issues](https://github.com/intel/mkl-dnn/issues) page.
+# Installation
 
-> **WARNING**
-> The following functionality has preview status and might change without prior
-> notification in future releases.
+Pre-built binaries for Linux\*, Windows\*, and macOS\* are available for download
+in the [releases section](https://github.com/intel/mkl-dnn/releases). Package
+names use the following convention:
 
-* Threading Building Blocks (TBB) support
+| OS      | Package name
+| :------ | :-----------
+| Linux   | `dnnl_lnx_<version>_cpu_<cpu runtime>[_gpu_<gpu runtime>].tgz`
+| Windows | `dnnl_win_<version>_cpu_<cpu runtime>[_gpu_<gpu runtime>].zip`
+| macOS   | `dnnl_mac_<version>_cpu_<cpu runtime>.tgz`
 
-## How to Contribute
-We welcome community contributions to Intel MKL-DNN. If you have an idea on how
-to improve the library:
+Several packages are available for each operating system to ensure
+interoperability with CPU or GPU runtime libraries used by the application.
 
-* For changes impacting the public API, submit
-  an [RFC pull request](CONTRIBUTING.md#RFC_pull_requests).
-* Ensure that the changes are consistent with the
- [code contribution guidelines](CONTRIBUTING.md#code_contribution_guidelines)
- and [coding style](CONTRIBUTING.md#coding_style).
-* Ensure that you can build the product and run all the examples with your
-  patch.
-* Submit a [pull request](https://github.com/intel/mkl-dnn/pulls).
+| Configuration | Dependency
+| :-------------| :---------
+| `cpu_iomp`    | Intel OpenMP runtime
+| `cpu_gomp`    | GNU\* OpenMP runtime
+| `cpu_vcomp`   | Microsoft Visual C OpenMP runtime
+| `cpu_tbb`     | Threading Building Blocks
 
-For additional details, see [contribution guidelines](CONTRIBUTING.md).
+The packages do not include library dependencies and these need to be resolved
+in the application at build time. See the
+[System Requirements](#system-requirements) section below and the
+[Build Options](http://intel.github.io/mkl-dnn/dev_guide_build_options.html)
+section in the [developer guide](http://intel.github.io/mkl-dnn) for more
+details on CPU and GPU runtimes.
 
-## System Requirements
-Intel MKL-DNN supports systems meeting the following requirements:
-* Intel 64 architecture or compatible
-* C++ compiler with C++11 standard support
-* [CMake](https://cmake.org/download/) 2.8.11 or later
-* [Doxygen](http://www.doxygen.nl/download.html#srcbin) 1.8.5 or later
+If the configuration you need is not available, you can
+[build the library from source](http://intel.github.io/mkl-dnn/dev_guide_build.html).
 
-Configurations of CPU and GPU engines may introduce additional build time
-dependencies.
+# System Requirements
 
-### CPU Support
-Intel Architecture Processors and compatible devices are supported by
-Intel MKL-DNN CPU engine. The CPU engine is built by default and cannot
-be disabled at build time. The engine can be configured to use OpenMP or
-TBB threading runtime. The following additional requirements apply:
-* OpenMP runtime requires C++ compiler with OpenMP 2.0 or later standard support
-* TBB runtime requires
-[Threading Building Blocks (TBB)](https://www.threadingbuildingblocks.org/)
-2017 or later.
+DNNL supports systems based on Intel 64 architecture or
+compatible processors.
 
-The library is optimized for systems based on
+The library is optimized for the following CPUs:
 * Intel Atom processor with Intel SSE4.1 support
 * 4th, 5th, 6th, 7th, and 8th generation Intel Core(TM) processor
 * Intel Xeon(R) processor E3, E5, and E7 family (formerly Sandy Bridge,
@@ -106,19 +89,107 @@ The library is optimized for systems based on
 * Intel Xeon Scalable processor (formerly Skylake and Cascade Lake)
 * future Intel Xeon Scalable processor (code name Cooper Lake)
 
-and compatible processors.
-
-Intel MKL-DNN detects instruction set architecture (ISA) in the runtime and uses
+DNNL detects instruction set architecture (ISA) in the runtime and uses
 just-in-time (JIT) code generation to deploy the code optimized
-for the latest supported ISA. Some implementations rely on OpenMP 4.0 SIMD
-extensions and we recommend using the Intel C++ Compiler for the best
-performance results.
+for the latest supported ISA.
 
-> **Warning**
-> In the default build configuration, Intel MKL-DNN targets build system ISA as
-> the minimal supported ISA for the build. To make sure that the build is
-> portable to older systems, you might need to override
-> [MKLDNN_ARCH_OPT_FLAGS](http://intel.github.io/mkl-dnn/dev_guide_build_options.html).
+> **WARNING**
+>
+> On macOS, applications that use DNNL may need to request special
+> entitlements if they use the hardened runtime. See the
+> [linking guide](https://intel.github.io/mkl-dnn/dev_guide_link.html)
+> for more details.
+
+The library is optimized for the following GPUs:
+* Intel HD Graphics
+* Intel UHD Graphics
+* Intel Iris Plus Graphics
+
+## Requirements for Building from Source
+
+DNNL supports systems meeting the following requirements:
+* Operating system with Intel 64 architecture support
+* C++ compiler with C++11 standard support
+* [CMake](https://cmake.org/download/) 2.8.11 or later
+* [Doxygen](http://www.doxygen.nl/download.html#srcbin) 1.8.5 or later to build
+documentation
+
+Configurations of CPU and GPU engines may introduce additional build time
+dependencies.
+
+### CPU Engine
+
+Intel Architecture Processors and compatible devices are supported by the
+DNNL CPU engine. The CPU engine is built by default and cannot
+be disabled at build time. The engine can be configured to use the OpenMP or
+TBB threading runtime. The following additional requirements apply:
+* OpenMP runtime requires C++ compiler with OpenMP 2.0 or later standard support
+* TBB runtime requires
+[Threading Building Blocks (TBB)](https://www.threadingbuildingblocks.org/)
+2017 or later.
+
+Some implementations rely on OpenMP 4.0 SIMD extensions, and we recommend using
+the Intel C++ Compiler for the best performance results.
+
+### GPU Engine
+
+Intel Processor Graphics is supported by the DNNL GPU engine. The GPU
+engine is disabled in the default build configuration. The following
+additional requirements apply when GPU engine is enabled:
+* OpenCL\* runtime library (OpenCL version 1.2 or later)
+* OpenCL driver (with kernel language support for OpenCL C 2.0 or later)
+  with Intel subgroups extension support
+
+### Runtime Dependencies
+
+When DNNL is built from source, the library runtime dependencies
+and specific versions are defined by the build environment.
+
+#### Linux
+
+Common dependencies:
+* System C/C++ runtime (libc.so, libstdc++.so)
+* Dynamic Linking Library (libdl.so)
+* C Math Library (libm.so)
+* POSIX Threads Library (libpthread.so)
+
+Runtime specific dependencies:
+
+| Runtime configuration  | Compiler                      | Dependency
+| :--------------------- | :---------------------------- | :---------
+| `DNNL_CPU_RUNTIME=OMP` | GCC                           | GNU OpenMP runtime (libgomp.so)
+| `DNNL_CPU_RUNTIME=OMP` | Intel C/C++ Compiler          | Intel OpenMP runtime (libiomp5.so)
+| `DNNL_CPU_RUNTIME=OMP` | Clang                         | Intel OpenMP runtime (libiomp5.so)
+| `DNNL_CPU_RUNTIME=TBB` | any                           | Threading Building Blocks (libtbb.so)
+| `DNNL_GPU_RUNTIME=OCL` | any                           | OpenCL runtime (libOpenCL.so)
+
+#### Windows
+
+Common dependencies:
+* Microsoft Visual C++ Redistributable (msvcrt.dll)
+
+Runtime specific dependencies:
+
+| Runtime configuration  | Compiler                      | Dependency
+| :--------------------- | :---------------------------- | :---------
+| `DNNL_CPU_RUNTIME=OMP` | Microsoft Visual C++ Compiler | No additional requirements
+| `DNNL_CPU_RUNTIME=OMP` | Intel C/C++ Compiler          | Intel OpenMP runtime (iomp5.dll)
+| `DNNL_CPU_RUNTIME=TBB` | any                           | Threading Building Blocks (tbb.dll)
+| `DNNL_GPU_RUNTIME=OCL` | any                           | OpenCL runtime (OpenCL.dll)
+
+#### macOS
+
+Common dependencies:
+* System C/C++ runtime (libc++.dylib, libSystem.dylib)
+
+Runtime specific dependencies:
+
+| Runtime configuration  | Compiler                      | Dependency
+| :--------------------- | :---------------------------- | :---------
+| `DNNL_CPU_RUNTIME=OMP` | Intel C/C++ Compiler          | Intel OpenMP runtime (libiomp5.dylib)
+| `DNNL_CPU_RUNTIME=TBB` | any                           | Threading Building Blocks (libtbb.dylib)
+
+### Validated Configurations
 
 CPU engine was validated on RedHat\* Enterprise Linux 7 with
 * GNU Compiler Collection 4.8, 5.4, 6.1, 7.2, and 8.1
@@ -131,7 +202,7 @@ on Windows Server\* 2012 R2 with
 * [Intel C/C++ Compiler](https://software.intel.com/en-us/intel-parallel-studio-xe)
   17.0 and 19.0
 
-on macOS\* 10.13 (High Sierra) with
+on macOS 10.13 (High Sierra) with
 * Apple LLVM version 9.2 (XCode 9.2)
 * [Intel C/C++ Compiler](https://software.intel.com/en-us/intel-parallel-studio-xe)
   18.0 and 19.0
@@ -147,34 +218,82 @@ the compilation type.
 * extra debug flags:
   * src/cpu/gemm/gemm.cpp extended\_sgemm debug
   * debug mode compile is verbose about how implementation is selected by cpu\_engine
-
-### GPU Support
-Intel Processor Graphics is supported by Intel MKL-DNNs GPU engine. GPU engine
-is disabled in the default build configuration. The following
-additional requirements apply when GPU engine is enabled:
-* OpenCL\* runtime library (OpenCL\* version 1.2 or later)
-* OpenCL\* driver (with kernel language support for OpenCL\* C 2.0 or later)
-  with Intel subgroups extension support
-
-The library is optimized for systems based on
-* Intel HD Graphics
-* Intel UHD Graphics
-* Intel Iris Plus Graphics
+  * `tests/gtests/mkldnn_test_common.hpp` may set `DNNL_TEST_BLOCKED_FORMATS` to
+    0 to reduce testing time (esp. for slow TARGET_VANILLA slow ref impls)
 
 GPU engine was validated on Ubuntu\* 18.04 with
-* GNU Compiler Collection 5.4 and 8.1
-* Clang\* 3.8.1
+* GNU Compiler Collection 6.1 and 8.1
+* Clang 3.8.1
 * [Intel C/C++ Compiler](https://software.intel.com/en-us/intel-parallel-studio-xe)
   19.0
-* [Intel SDK for OpenCL\* applications](https://software.intel.com/en-us/intel-opencl) 2019 Update 3
-* [Intel Graphics Compute Runtime for OpenCL\*](https://github.com/intel/compute-runtime/releases) 19.15.12831
+* [Intel SDK for OpenCL applications](https://software.intel.com/en-us/intel-opencl) 2019 Update 3
+* [Intel Graphics Compute Runtime for OpenCL](https://github.com/intel/compute-runtime/releases) 19.37.14191
 
-on Windows Server\* 2019 with
+on Windows Server 2019 with
 * Microsoft Visual C++ 14.0 (Visual Studio 2015 Update 3)
 * [Intel C/C++ Compiler](https://software.intel.com/en-us/intel-parallel-studio-xe)
   19.0
-* [Intel SDK for OpenCL\* applications](https://software.intel.com/en-us/intel-opencl) 2019 Update 3
-* [Intel Graphics - Windows\* 10 DCH Drivers](https://downloadcenter.intel.com/download/28783/Intel-Graphics-Windows-10-DCH-Drivers) 26.20.100.6709
+* [Intel SDK for OpenCL applications](https://software.intel.com/en-us/intel-opencl) 2019 Update 3
+* [Intel Graphics - Windows 10 DCH Drivers](https://downloadcenter.intel.com/download/28783/Intel-Graphics-Windows-10-DCH-Drivers) 26.20.100.6709
+
+## Requirements for Pre-built Binaries
+
+See README included into corresponding binary package.
+
+# Support
+
+Please submit your questions, feature requests, and bug reports on the
+[GitHub issues](https://github.com/intel/mkl-dnn/issues) page.
+
+You may reach out to project maintainers privately at dnnl.maintainers@intel.com.
+
+> **WARNING**
+>
+> The following functionality has preview status and might be changed without
+> prior notification in future releases:
+> * [Primitive cache](https://intel.github.io/mkl-dnn/dev_guide_primitive_cache.html)
+
+# Contributing
+
+We welcome community contributions to DNNL. If you have an idea on how
+to improve the library:
+
+* For changes impacting the public API, submit
+  an [RFC pull request](CONTRIBUTING.md#RFC_pull_requests).
+* Ensure that the changes are consistent with the
+ [code contribution guidelines](CONTRIBUTING.md#code_contribution_guidelines)
+ and [coding style](CONTRIBUTING.md#coding_style).
+* Ensure that you can build the product and run all the examples with your
+  patch.
+* Submit a [pull request](https://github.com/intel/mkl-dnn/pulls).
+
+For additional details, see [contribution guidelines](CONTRIBUTING.md).
+
+This project is intended to be a safe, welcoming space for collaboration, and
+contributors are expected to adhere to the
+[Contributor Covenant](CODE_OF_CONDUCT.md) code of conduct.
+
+# License
+
+DNNL is licensed under
+[Apache License Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).  This
+software includes components with separate copyright notices and license
+terms. Your use of the source code for these components is subject to the terms
+and conditions of the following licenses.
+
+3-clause BSD license:
+* [Xbyak](https://github.com/herumi/xbyak)
+* [gtest](https://github.com/google/googletest)
+* [ittnotify](https://github.com/intel/IntelSEAPI)
+* [CMake](https://github.com/Kitware/CMake)
+
+Apache License Version 2.0:
+* [MathJax](https://github.com/mathjax/MathJax)
+
+Boost Software License, Version 1.0:
+* [Boost C++ Libraries](https://www.boost.org/)
+
+See accompanying [LICENSE](LICENSE) file for full license text and copyright notices.
 
 --------
 

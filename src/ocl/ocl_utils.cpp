@@ -16,11 +16,9 @@
 
 #include <CL/cl_ext.h>
 
-#include "ocl/cl_engine.hpp"
-
 #include "ocl/ocl_utils.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace ocl {
 
@@ -32,8 +30,7 @@ status_t get_ocl_devices(
 
     cl_int err = clGetPlatformIDs(0, nullptr, &num_platforms);
     // No platforms - a valid scenario
-    if (err == CL_PLATFORM_NOT_FOUND_KHR)
-        return status::success;
+    if (err == CL_PLATFORM_NOT_FOUND_KHR) return status::success;
 
     OCL_CHECK(err);
 
@@ -54,8 +51,16 @@ status_t get_ocl_devices(
             plat_devices.resize(num_devices);
             OCL_CHECK(clGetDeviceIDs(platforms[i], device_type, num_devices,
                     &plat_devices[0], nullptr));
-            devices->swap(plat_devices);
-            return status::success;
+
+            // Use Intel devices only
+            for (size_t j = 0; j < plat_devices.size(); ++j) {
+                cl_uint vendor_id;
+                clGetDeviceInfo(plat_devices[j], CL_DEVICE_VENDOR_ID,
+                        sizeof(cl_uint), &vendor_id, NULL);
+                if (vendor_id == 0x8086) {
+                    devices->push_back(plat_devices[j]);
+                }
+            }
         }
     }
     // No devices found but still return success
@@ -64,38 +69,6 @@ status_t get_ocl_devices(
 
 } // namespace ocl_utils
 
-status_t ocl_jit_t::build(const engine_t *engine) {
-    auto *cl_engine = utils::downcast<const cl_engine_t *>(engine);
-    cl_context ctx = cl_engine->ocl_context();
-    cl_device_id dev = cl_engine->ocl_device();
-
-    cl_int err = CL_SUCCESS;
-
-    program_ = clCreateProgramWithSource(ctx, 1, &code_, &code_size_, &err);
-    status_t status = ocl_utils::convert_to_mkldnn(err);
-    if (status != status::success)
-        return status;
-
-    const char *opt_str = options_.data();
-    err = clBuildProgram(program_, 1, &dev, opt_str, nullptr, nullptr);
-#ifndef NDEBUG
-    if (err != CL_SUCCESS) {
-        size_t log_length = 0;
-        err = clGetProgramBuildInfo(
-                program_, dev, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_length);
-        assert(err == CL_SUCCESS);
-
-        std::vector<char> log_buf(log_length);
-        err = clGetProgramBuildInfo(program_, dev, CL_PROGRAM_BUILD_LOG,
-                log_length, log_buf.data(), 0);
-        assert(err == CL_SUCCESS);
-        printf("Error during the build of OpenCL program.\nBuild log:\n%s\n",
-                log_buf.data());
-    }
-#endif
-    return ocl_utils::convert_to_mkldnn(err);
-}
-
 } // namespace ocl
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl

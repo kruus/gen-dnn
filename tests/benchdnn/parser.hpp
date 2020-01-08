@@ -17,12 +17,12 @@
 #ifndef PARSER_HPP
 #define PARSER_HPP
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string>
 
-#include "mkldnn.h"
-#include "mkldnn_memory.hpp"
+#include "dnnl.h"
+#include "dnnl_memory.hpp"
 
 namespace parser {
 
@@ -34,15 +34,14 @@ static inline std::string get_pattern(const std::string &option_name) {
 }
 
 template <typename T, typename F>
-static bool parse_vector_str(T &vec, F process_func, const char *str,
-        char delimeter = ',') {
+static bool parse_vector_str(
+        T &vec, F process_func, const char *str, char delimeter = ',') {
     const std::string s = str;
     vec.clear();
-    for (size_t start = 0, delim = 0; delim != eol; start = delim + 1) {
-        delim = s.find_first_of(delimeter, start);
-        size_t val_len = (delim == eol ? s.size() : delim) - start;
-        std::string sub_s(s, start, val_len);
-        vec.push_back(process_func(sub_s.c_str()));
+    for (size_t pos_st = 0, pos_en = s.find_first_of(delimeter, pos_st); true;
+            pos_st = pos_en + 1, pos_en = s.find_first_of(delimeter, pos_st)) {
+        vec.push_back(process_func(s.substr(pos_st, pos_en - pos_st).c_str()));
+        if (pos_en == eol) break;
     }
     return true;
 }
@@ -94,26 +93,27 @@ static bool parse_cfg(T &vec, F process_func, const char *str,
     return parse_vector_option(vec, process_func, str, option_name);
 }
 
+// vector types
 bool parse_dir(std::vector<dir_t> &dir, const char *str,
         const std::string &option_name = "dir");
 
-bool parse_dt(std::vector<mkldnn_data_type_t> &dt, const char *str,
+bool parse_dt(std::vector<dnnl_data_type_t> &dt, const char *str,
         const std::string &option_name = "dt");
 
-bool parse_multi_dt(std::vector<std::vector<mkldnn_data_type_t>> &dt,
+bool parse_multi_dt(std::vector<std::vector<dnnl_data_type_t>> &dt,
         const char *str, const std::string &option_name = "sdt");
 
-bool parse_tag(std::vector<mkldnn_format_tag_t> &tag, const char *str,
+bool parse_tag(std::vector<dnnl_format_tag_t> &tag, const char *str,
         const std::string &option_name = "tag");
 
-bool parse_multi_tag(std::vector<std::vector<mkldnn_format_tag_t>> &tag,
+bool parse_multi_tag(std::vector<std::vector<dnnl_format_tag_t>> &tag,
         const char *str, const std::string &option_name = "stag");
 
 bool parse_mb(std::vector<int64_t> &mb, const char *str,
         const std::string &option_name = "mb");
 
-bool parse_attr(attr_t &attr, const char *str,
-        const std::string &option_name = "attr");
+bool parse_attr(
+        attr_t &attr, const char *str, const std::string &option_name = "attr");
 
 bool parse_axis(std::vector<int> &axis, const char *str,
         const std::string &option_name = "axis");
@@ -124,11 +124,21 @@ bool parse_test_pattern_match(const char *&match, const char *str,
 bool parse_inplace(std::vector<bool> &inplace, const char *str,
         const std::string &option_name = "inplace");
 
+bool parse_skip_nonlinear(std::vector<bool> &skip, const char *str,
+        const std::string &option_name = "skip-nonlinear");
+
+bool parse_scale_policy(std::vector<policy_t> &policy, const char *str,
+        const std::string &option_name = "scaling");
+
+// plain types
 bool parse_skip_impl(const char *&skip_impl, const char *str,
         const std::string &option_name = "skip-impl");
 
 bool parse_allow_unimpl(bool &allow_unimpl, const char *str,
         const std::string &option_name = "allow-unimpl");
+
+bool parse_fast_ref_gpu(
+        const char *str, const std::string &option_name = "fast-ref-gpu");
 
 bool parse_perf_template(const char *&pt, const char *pt_def,
         const char *pt_csv, const char *str,
@@ -140,15 +150,17 @@ bool parse_reset(void (*reset_func)(), const char *str,
 bool parse_batch(const bench_f bench, const char *str,
         const std::string &option_name = "batch");
 
-bool parse_bench_settings(const char *str);
-
+// dim_t type
 void parse_dims(dims_t &dims, const char *str);
 
 void parse_multi_dims(std::vector<dims_t> &dims, const char *str);
 
-void catch_unknown_options(const char *str, const char *driver_name);
+// service functions
+bool parse_bench_settings(const char *str);
+
+void catch_unknown_options(const char *str);
 
 int parse_last_argument();
-}
+} // namespace parser
 
 #endif

@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -17,39 +17,44 @@
 #ifndef SOFTMAX_PD_HPP
 #define SOFTMAX_PD_HPP
 
-#include "mkldnn.h"
+#include "dnnl.h"
 
 #include "c_types_map.hpp"
 #include "primitive_desc.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 
 struct softmax_fwd_pd_t;
 
-struct softmax_pd_t: public primitive_desc_t {
+struct softmax_pd_t : public primitive_desc_t {
     static constexpr auto base_pkind = primitive_kind::softmax;
 
-    softmax_pd_t(engine_t *engine,
-            const softmax_desc_t *adesc,
-            const primitive_attr_t *attr,
-            const softmax_fwd_pd_t *hint_fwd_pd)
+    softmax_pd_t(engine_t *engine, const softmax_desc_t *adesc,
+            const primitive_attr_t *attr, const softmax_fwd_pd_t *hint_fwd_pd)
         : primitive_desc_t(engine, attr, base_pkind)
         , desc_(*adesc)
         , hint_fwd_pd_(hint_fwd_pd)
-        , data_md_(desc_.data_desc)
-    {}
+        , data_md_(desc_.data_desc) {}
 
     const softmax_desc_t *desc() const { return &desc_; }
-    virtual const op_desc_t *op_desc() const override
-    { return reinterpret_cast<const op_desc_t *>(this->desc()); }
+    virtual const op_desc_t *op_desc() const override {
+        return reinterpret_cast<const op_desc_t *>(this->desc());
+    }
     virtual void init_info() override { impl::init_info(this, this->info_); }
 
     virtual status_t query(query_t what, int idx, void *result) const override {
         switch (what) {
-        case query::softmax_d:
-            *(const softmax_desc_t**)result = desc(); break;
-        default: return primitive_desc_t::query(what, idx, result);
+            case query::prop_kind:
+                *(prop_kind_t *)result = desc()->prop_kind;
+                break;
+            case query::softmax_d:
+                *(const softmax_desc_t **)result = desc();
+                break;
+            case query::logsoftmax_d:
+                *(const logsoftmax_desc_t **)result = desc();
+                break;
+            default: return primitive_desc_t::query(what, idx, result);
         }
         return status::success;
     }
@@ -67,8 +72,8 @@ struct softmax_pd_t: public primitive_desc_t {
     }
     dim_t axis_size() const { return data_desc().dims[axis()]; }
     dim_t inner_size() const {
-        return utils::array_product(data_desc().dims + axis() + 1,
-                ndims() - 1 - axis());
+        return utils::array_product(
+                data_desc().dims + axis() + 1, ndims() - 1 - axis());
     }
 
     dim_t outer_stride() const {
@@ -88,6 +93,13 @@ struct softmax_pd_t: public primitive_desc_t {
         return memory_desc_wrapper(data_desc()).has_zero_dim();
     }
 
+    bool is_softmax() const {
+        return desc()->primitive_kind == primitive_kind::softmax;
+    }
+    bool is_logsoftmax() const {
+        return desc()->primitive_kind == primitive_kind::logsoftmax;
+    }
+
 protected:
     softmax_desc_t desc_;
     const softmax_fwd_pd_t *hint_fwd_pd_;
@@ -98,83 +110,106 @@ private:
     const memory_desc_t &data_desc() const { return desc_.data_desc; }
 };
 
-struct softmax_fwd_pd_t: public softmax_pd_t {
+struct softmax_fwd_pd_t : public softmax_pd_t {
     typedef softmax_fwd_pd_t base_class;
     typedef softmax_fwd_pd_t hint_class;
 
-    softmax_fwd_pd_t(engine_t *engine,
-            const softmax_desc_t *adesc,
-            const primitive_attr_t *attr,
-            const softmax_fwd_pd_t *hint_fwd_pd)
-        : softmax_pd_t(engine, adesc, attr, hint_fwd_pd)
-    {}
+    softmax_fwd_pd_t(engine_t *engine, const softmax_desc_t *adesc,
+            const primitive_attr_t *attr, const softmax_fwd_pd_t *hint_fwd_pd)
+        : softmax_pd_t(engine, adesc, attr, hint_fwd_pd) {}
 
     virtual arg_usage_t arg_usage(int arg) const override {
-        if (arg == MKLDNN_ARG_SRC)
-            return arg_usage_t::input;
+        if (arg == DNNL_ARG_SRC) return arg_usage_t::input;
 
-        if (arg == MKLDNN_ARG_DST)
-            return arg_usage_t::output;
+        if (arg == DNNL_ARG_DST) return arg_usage_t::output;
 
-        if (arg == MKLDNN_ARG_WORKSPACE && (!types::is_zero_md(workspace_md())))
+        if (arg == DNNL_ARG_WORKSPACE && (!types::is_zero_md(workspace_md())))
             return arg_usage_t::output;
 
         return primitive_desc_t::arg_usage(arg);
     }
 
-    virtual const memory_desc_t *src_md(int index = 0) const override
-    { return index == 0 ? &data_md_ : &glob_zero_md; }
-    virtual const memory_desc_t *dst_md(int index = 0) const override
-    { return index == 0 ? &data_md_ : &glob_zero_md; }
+    virtual const memory_desc_t *arg_md(int arg) const override {
+        switch (arg) {
+            case DNNL_ARG_SRC: return src_md(0);
+            case DNNL_ARG_DST: return dst_md(0);
+            default: return softmax_pd_t::arg_md(arg);
+        }
+    }
+
+    virtual const memory_desc_t *src_md(int index = 0) const override {
+        return index == 0 ? &data_md_ : &glob_zero_md;
+    }
+    virtual const memory_desc_t *dst_md(int index = 0) const override {
+        return index == 0 ? &data_md_ : &glob_zero_md;
+    }
 
     virtual int n_inputs() const override { return 1; }
-    virtual int n_outputs() const override
-    { return 1 + (!types::is_zero_md(workspace_md())); }
+    virtual int n_outputs() const override {
+        return 1 + (!types::is_zero_md(workspace_md()));
+    }
 };
 
-struct softmax_bwd_pd_t: public softmax_pd_t {
+struct softmax_bwd_pd_t : public softmax_pd_t {
     typedef softmax_bwd_pd_t base_class;
     typedef softmax_fwd_pd_t hint_class;
 
-    softmax_bwd_pd_t(engine_t *engine,
-            const softmax_desc_t *adesc,
-            const primitive_attr_t *attr,
-            const softmax_fwd_pd_t *hint_fwd_pd)
+    softmax_bwd_pd_t(engine_t *engine, const softmax_desc_t *adesc,
+            const primitive_attr_t *attr, const softmax_fwd_pd_t *hint_fwd_pd)
         : softmax_pd_t(engine, adesc, attr, hint_fwd_pd)
-        , diff_data_md_(desc_.diff_desc)
-    {}
+        , diff_data_md_(desc_.diff_desc) {}
 
     virtual arg_usage_t arg_usage(int arg) const override {
-        if (utils::one_of(arg, MKLDNN_ARG_DST, MKLDNN_ARG_DIFF_DST))
+        if (utils::one_of(arg, DNNL_ARG_DST, DNNL_ARG_DIFF_DST))
             return arg_usage_t::input;
 
-        if (arg == MKLDNN_ARG_DIFF_SRC)
-            return arg_usage_t::output;
+        if (arg == DNNL_ARG_DIFF_SRC) return arg_usage_t::output;
 
-        if (arg == MKLDNN_ARG_WORKSPACE && (!types::is_zero_md(workspace_md())))
+        if (arg == DNNL_ARG_WORKSPACE && (!types::is_zero_md(workspace_md())))
             return arg_usage_t::input;
 
         return primitive_desc_t::arg_usage(arg);
     }
 
-    virtual const memory_desc_t *dst_md(int index = 0) const override
-    { return index == 0 ? &data_md_ : &glob_zero_md; }
-    virtual const memory_desc_t *diff_dst_md(int index = 0) const override
-    { return index == 0 ? &diff_data_md_ : &glob_zero_md; }
-    virtual const memory_desc_t *diff_src_md(int index = 0) const override
-    { return index == 0 ? &diff_data_md_ : &glob_zero_md; }
+    virtual const memory_desc_t *arg_md(int arg) const override {
+        switch (arg) {
+            case DNNL_ARG_DST: return dst_md(0);
+            case DNNL_ARG_DIFF_SRC: return diff_src_md(0);
+            case DNNL_ARG_DIFF_DST: return diff_dst_md(0);
+            default: return softmax_pd_t::arg_md(arg);
+        }
+    }
 
-    virtual int n_inputs() const override
-    { return 2 + (!types::is_zero_md(workspace_md())); }
+    virtual const memory_desc_t *dst_md(int index = 0) const override {
+        return index == 0 ? &data_md_ : &glob_zero_md;
+    }
+    virtual const memory_desc_t *diff_dst_md(int index = 0) const override {
+        return index == 0 ? &diff_data_md_ : &glob_zero_md;
+    }
+    virtual const memory_desc_t *diff_src_md(int index = 0) const override {
+        return index == 0 ? &diff_data_md_ : &glob_zero_md;
+    }
+
+    virtual int n_inputs() const override {
+        return 2 + (!types::is_zero_md(workspace_md()));
+    }
     virtual int n_outputs() const override { return 1; }
 
 protected:
     memory_desc_t diff_data_md_;
+
+    bool set_default_formats_common() {
+        if (diff_data_md_.format_kind != format_kind::any) return true;
+
+        return memory_desc_init_by_md_and_dt(
+                       diff_data_md_, data_md_, diff_data_md_.data_type)
+                == status::success;
+    }
 };
 
-}
-}
+} // namespace impl
+} // namespace dnnl
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

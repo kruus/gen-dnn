@@ -14,8 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef OCL_INNER_PRODUCT_FWD_PD_HPP
-#define OCL_INNER_PRODUCT_FWD_PD_HPP
+#ifndef OCL_INNER_PRODUCT_PD_HPP
+#define OCL_INNER_PRODUCT_PD_HPP
 
 #include <assert.h>
 
@@ -25,7 +25,7 @@
 #include "common/utils.hpp"
 #include "ocl/ocl_engine.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace ocl {
 
@@ -34,12 +34,11 @@ inline bool dense_consitency_check(const memory_desc_wrapper &src_d,
         const memory_desc_wrapper &wei_d, const memory_desc_wrapper &dst_d) {
     using namespace format_tag;
     using namespace utils;
-    return true
-            && IMPLICATION(src_d.matches_tag(ncw), wei_d.matches_tag(oiw))
+    return true && IMPLICATION(src_d.matches_tag(ncw), wei_d.matches_tag(oiw))
             && IMPLICATION(src_d.matches_tag(nchw), wei_d.matches_tag(oihw))
             && IMPLICATION(src_d.matches_tag(ncdhw), wei_d.matches_tag(oidhw))
             && IMPLICATION(
-                       src_d.matches_tag(nc), wei_d.matches_one_of_tag(oi, io))
+                    src_d.matches_tag(nc), wei_d.matches_one_of_tag(oi, io))
             && dst_d.matches_tag(nc) && src_d.is_dense(true) && dst_d.is_dense()
             && wei_d.is_dense(true);
 }
@@ -63,19 +62,15 @@ inline bool dense_gemm_consitency_check(const memory_desc_wrapper &src_d,
             == wei_d.blocking_desc().inner_nblks
             && utils::one_of(src_d.blocking_desc().inner_nblks, 0, 1)
             && array_cmp(src_d.blocking_desc().inner_blks,
-                       wei_d.blocking_desc().inner_blks,
-                       wei_d.blocking_desc().inner_nblks)
+                    wei_d.blocking_desc().inner_blks,
+                    wei_d.blocking_desc().inner_nblks)
             && array_cmp(src_d.blocking_desc().inner_idxs,
-                       wei_d.blocking_desc().inner_idxs,
-                       wei_d.blocking_desc().inner_nblks)
-            && strides_compatible()
-            && dst_d.matches_tag(format_tag::nc)
-            && src_d.only_padded_dim(1)
-            && wei_d.only_padded_dim(1)
+                    wei_d.blocking_desc().inner_idxs,
+                    wei_d.blocking_desc().inner_nblks)
+            && strides_compatible() && dst_d.matches_tag(format_tag::nc)
+            && src_d.only_padded_dim(1) && wei_d.only_padded_dim(1)
             && src_d.padded_dims()[1] == wei_d.padded_dims()[1]
-            && src_d.is_dense(true)
-            && dst_d.is_dense()
-            && wei_d.is_dense(true);
+            && src_d.is_dense(true) && dst_d.is_dense() && wei_d.is_dense(true);
 }
 
 status_t template_set_default_params(memory_desc_t &src_md,
@@ -83,25 +78,29 @@ status_t template_set_default_params(memory_desc_t &src_md,
         memory_desc_t *bias_md, int ndims) {
     using namespace format_tag;
 
-    auto matching_tag = [&](const memory_desc_t &md) {
-        if (memory_desc_matches_one_of_tag(md, ba, cba, cdba, cdeba))
-            return utils::pick(ndims - 2, ab, acb, acdb, acdeb);
-        if (memory_desc_matches_one_of_tag(md, acb, acdb, acdeb))
-            return utils::pick(ndims - 3, cba, cdba, cdeba);
-        auto src_tag = memory_desc_matches_one_of_tag(md, ab, abc, abcd,
-                abcde, aBcd16b, aBcde16b, aBcd8b, aBcde8b, aBcd4b, aBcde4b);
-        return src_tag;
+    auto init_md = [&](memory_desc_t &out_md, const memory_desc_t &in_md) {
+        format_tag_t md_tag;
+        if (memory_desc_matches_one_of_tag(in_md, ba, cba, cdba, cdeba))
+            md_tag = utils::pick(ndims - 2, ab, acb, acdb, acdeb);
+        else if (memory_desc_matches_one_of_tag(in_md, acb, acdb, acdeb))
+            md_tag = utils::pick(ndims - 3, cba, cdba, cdeba);
+        else {
+            memory_desc_wrapper md_desc_wrapper(in_md);
+            return memory_desc_init_by_blocking_desc(
+                    out_md, md_desc_wrapper.blocking_desc());
+        }
+        return memory_desc_init_by_tag(out_md, md_tag);
     };
     if (src_md.format_kind == format_kind::any
             && weights_md.format_kind == format_kind::any) {
         CHECK(memory_desc_init_by_tag(
                 src_md, utils::pick(ndims - 2, nc, ncw, nchw, ncdhw)));
-        CHECK(memory_desc_init_by_tag(weights_md,
-                utils::pick(ndims - 2, oi, oiw, oihw, oidhw)));
+        CHECK(memory_desc_init_by_tag(
+                weights_md, utils::pick(ndims - 2, oi, oiw, oihw, oidhw)));
     } else if (src_md.format_kind == format_kind::any)
-         CHECK(memory_desc_init_by_tag(src_md, matching_tag(weights_md)));
+        CHECK(init_md(src_md, weights_md));
     else if (weights_md.format_kind == format_kind::any)
-         CHECK(memory_desc_init_by_tag(weights_md, matching_tag(src_md)));
+        CHECK(init_md(weights_md, src_md));
     if (dst_md.format_kind == format_kind::any)
         CHECK(memory_desc_init_by_tag(dst_md, nc));
     if (bias_md->format_kind == format_kind::any)
@@ -113,16 +112,34 @@ status_t template_set_default_params(memory_desc_t &src_md,
 
 struct ocl_inner_product_fwd_pd_t : public inner_product_fwd_pd_t {
     using inner_product_fwd_pd_t::inner_product_fwd_pd_t;
+
 protected:
     status_t set_default_params() {
-        return template_set_default_params(src_md_, weights_md_, dst_md_,
-                &bias_md_, ndims());
+        return template_set_default_params(
+                src_md_, weights_md_, dst_md_, &bias_md_, ndims());
     }
 
+    bool post_ops_ok(const primitive_attr_t *attr) const {
+        const auto &p = attr->post_ops_;
+
+        auto is_eltwise
+                = [&](int idx) { return p.entry_[idx].is_eltwise(false); };
+        auto is_sum = [&](int idx) { return p.entry_[idx].is_sum(false); };
+
+        switch (p.len_) {
+            case 0: return true; // no post_ops
+            case 1: return is_eltwise(0) || is_sum(0); // sum OR eltwise
+            case 2: return is_sum(0) && is_eltwise(1); // sum -> eltwise
+            default: return false;
+        }
+
+        return false;
+    }
 };
 
 struct ocl_inner_product_bwd_data_pd_t : public inner_product_bwd_data_pd_t {
     using inner_product_bwd_data_pd_t::inner_product_bwd_data_pd_t;
+
 protected:
     status_t set_default_params() {
         return template_set_default_params(diff_src_md_, weights_md_,
@@ -133,6 +150,7 @@ protected:
 struct ocl_inner_product_bwd_weights_pd_t
     : public inner_product_bwd_weights_pd_t {
     using inner_product_bwd_weights_pd_t::inner_product_bwd_weights_pd_t;
+
 protected:
     status_t set_default_params() {
         return template_set_default_params(src_md_, diff_weights_md_,
@@ -142,6 +160,6 @@ protected:
 
 } // namespace ocl
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl
 
 #endif

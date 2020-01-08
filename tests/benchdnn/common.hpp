@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2018 Intel Corporation
+* Copyright 2017-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -18,31 +18,24 @@
 #define COMMON_HPP
 
 #include <assert.h>
-#include <stdlib.h>
-#include <stddef.h>
-#include <string.h>
-#include <stdio.h>
 #include <float.h>
 #include <math.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <cinttypes>
 
-#define ABS(a) ((a)>0?(a):(-(a)))
+#include "src/common/z_magic.hpp"
 
-#define MIN2(a,b) ((a)<(b)?(a):(b))
-#define MAX2(a,b) ((a)>(b)?(a):(b))
+#define ABS(a) ((a) > 0 ? (a) : (-(a)))
 
-#define MIN3(a,b,c) MIN2(a,MIN2(b,c))
-#define MAX3(a,b,c) MAX2(a,MAX2(b,c))
+#define MIN2(a, b) ((a) < (b) ? (a) : (b))
+#define MAX2(a, b) ((a) > (b) ? (a) : (b))
 
-#define STRINGIFy(s) #s
-#define STRINGIFY(s) STRINGIFy(s)
-
-#define CHAIn2(a,b) a b
-#define CHAIN2(a,b) CHAIn2(a,b)
-
-#define CONCAt2(a,b) a ## b
-#define CONCAT2(a,b) CONCAt2(a,b)
+#define MIN3(a, b, c) MIN2(a, MIN2(b, c))
+#define MAX3(a, b, c) MAX2(a, MAX2(b, c))
 
 #if defined(_WIN32) && !defined(__GNUC__)
 #define strncasecmp _strnicmp
@@ -61,42 +54,60 @@
 
 enum { CRIT = 1, WARN = 2 };
 
-#define SAFE(f, s) do { \
-    int status = (f); \
-    if (status != OK) { \
-        if (s == CRIT || s == WARN) { \
+#define SAFE(f, s) \
+    do { \
+        int status = (f); \
+        if (status != OK) { \
+            if (s == CRIT || s == WARN) { \
+                fprintf(stderr, "@@@ error [%s:%d]: '%s' -> %d\n", \
+                        __PRETTY_FUNCTION__, __LINE__, STRINGIFY(f), status); \
+                fflush(0); \
+                if (s == CRIT) exit(1); \
+            } \
+            return status; \
+        } \
+    } while (0)
+
+#define SAFE_V(f) \
+    do { \
+        int status = (f); \
+        if (status != OK) { \
             fprintf(stderr, "@@@ error [%s:%d]: '%s' -> %d\n", \
                     __PRETTY_FUNCTION__, __LINE__, STRINGIFY(f), status); \
             fflush(0); \
-            if (s == CRIT) exit(1); \
+            exit(1); \
         } \
-        return status; \
-    } \
-} while(0)
+    } while (0)
 
-#define SAFE_V(f) do { \
-    int status = (f); \
-    if (status != OK) { \
-        fprintf(stderr, "@@@ error [%s:%d]: '%s' -> %d\n", \
-                __PRETTY_FUNCTION__, __LINE__, STRINGIFY(f), status); \
-        fflush(0); \
-        exit(1); \
-    } \
-} while(0)
+#define SAFE_CLEAN(f, s, clean) \
+    do { \
+        int status = (f); \
+        if (status != OK) { \
+            if (s == CRIT || s == WARN) { \
+                fprintf(stderr, "@@@ error [%s:%d]: '%s' -> %d\n", \
+                        __PRETTY_FUNCTION__, __LINE__, STRINGIFY(f), status); \
+                fflush(0); \
+                if (s == CRIT) exit(1); \
+            } \
+            clean(); \
+            return status; \
+        } \
+    } while (0)
 
 extern int verbose;
 
-#define print(v, fmt, ...) do { \
-    if (verbose >= v) { \
-        printf(fmt, __VA_ARGS__); \
-        /* printf("[%d][%s:%d]" fmt, v, __func__, __LINE__, __VA_ARGS__); */ \
-        fflush(0); \
-    } \
-} while (0)
+#define print(v, fmt, ...) \
+    do { \
+        if (verbose >= v) { \
+            printf(fmt, __VA_ARGS__); \
+            /* printf("[%d][%s:%d]" fmt, v, __func__, __LINE__, __VA_ARGS__); */ \
+            fflush(0); \
+        } \
+    } while (0)
 
 #define BENCHDNN_DISALLOW_COPY_AND_ASSIGN(T) \
-    T(const T&) = delete; \
-    T &operator=(const T&) = delete;
+    T(const T &) = delete; \
+    T &operator=(const T &) = delete;
 
 enum prim_t {
     SELF,
@@ -105,6 +116,7 @@ enum prim_t {
     IP,
     SHUFFLE,
     REORDER,
+    LNORM,
     BNORM,
     RNN,
     SOFTMAX,
@@ -113,20 +125,29 @@ enum prim_t {
     ELTWISE,
     CONCAT,
     LRN,
+    BINARY,
+    MATMUL,
+    RESAMPLING,
     DEF = CONV,
 };
 
-enum bench_mode_t { MODE_UNDEF = 0x0, CORR = 0x1, PERF = 0x2, };
+enum bench_mode_t {
+    MODE_UNDEF = 0x0,
+    CORR = 0x1,
+    PERF = 0x2,
+    LIST = 0x4,
+};
 const char *bench_mode2str(bench_mode_t mode);
 bench_mode_t str2bench_mode(const char *str);
 extern bench_mode_t bench_mode;
+extern const char *driver_name;
 
 /* perf */
 extern double max_ms_per_prb; /** maximum time spends per prb in ms */
 extern int min_times_per_prb; /** minimal amount of runs per prb */
 extern int fix_times_per_prb; /** if non-zero run prb that many times */
 
-extern prim_t prim;
+extern bool fast_ref_gpu;
 
 struct benchdnn_timer_t {
     enum mode_t { min = 0, avg = 1, max = 2, n_modes };
@@ -136,9 +157,9 @@ struct benchdnn_timer_t {
     void reset(); /** fully reset the measurements */
 
     void start(); /** restart timer */
-    void stop(); /** stop timer & update statistics */
+    void stop(int add_times = 1); /** stop timer & update statistics */
 
-    void stamp() { stop(); }
+    void stamp(int add_times = 1) { stop(add_times); }
 
     int times() const { return times_; }
 
@@ -171,13 +192,21 @@ struct stat_t {
     int skipped;
     int mistrusted;
     int unimplemented;
+    int listed;
     double ms[benchdnn_timer_t::mode_t::n_modes];
 };
 extern stat_t benchdnn_stat;
 
 /* result structure */
-enum res_state_t { UNTESTED = 0, PASSED, SKIPPED, MISTRUSTED, UNIMPLEMENTED,
-    FAILED };
+enum res_state_t {
+    UNTESTED = 0,
+    PASSED,
+    SKIPPED,
+    MISTRUSTED,
+    UNIMPLEMENTED,
+    FAILED,
+    LISTED
+};
 const char *state2str(res_state_t state, bool allow_unimpl);
 
 struct res_t {
@@ -209,17 +238,17 @@ int batch(const char *fname, bench_f bench);
 int flip_coin(ptrdiff_t seed, float probability);
 
 int64_t div_up(const int64_t a, const int64_t b);
+int64_t next_pow2(int64_t a);
 int mxcsr_round(float f);
 
 /* set '0' across *arr:+size */
 void array_set(char *arr, size_t size);
 
-/* wrapper to mkldnn_sgemm
+/* wrapper to dnnl_sgemm
  * layout = 'F' - column major
  * layout = 'C' - row major*/
-void gemm(const char *layout, const char *transa, const char *transb,
-        int64_t m, int64_t n, int64_t k,
-        const float alpha, const float *a, const int64_t lda,
-        const float *b, const int64_t ldb,
-        const float beta, float *c, const int64_t ldc);
+void gemm(const char *layout, const char *transa, const char *transb, int64_t m,
+        int64_t n, int64_t k, const float alpha, const float *a,
+        const int64_t lda, const float *b, const int64_t ldb, const float beta,
+        float *c, const int64_t ldc);
 #endif

@@ -9,7 +9,7 @@
 where *conv-knobs* are:
 
  - `--dir={FWD_B [default], FWD_D, FWD_I, BWD_D, BWD_W, BWD_WB}`
-            -- mkldnn_prop_kind_t. Refer to the common glossary in README.md for
+            -- dnnl_prop_kind_t. Refer to the common glossary in README.md for
             details.
  - `--cfg={f32 [default], ...}` -- Refer to ``Configurations`` below.
  - `--stag={any [default], ...}` -- physical src memory layout.
@@ -58,19 +58,19 @@ The table below shows supported name configurations for this driver:
 | src  | wei  | dst  | acc  | cfg             | notes
 |:---  |:---  |:---  |:---  |:---             |:---
 | f32  | f32  | f32  | f32  | f32             | inference optimized for sse4.1+, training for avx2+
-| u8   | s8   | f32  | s32  | u8s8f32s32      | optimized for processors with support of avx512vl, FWD_x only.
-| u8   | s8   | s32  | s32  | u8s8s32s32      | same as above
-| u8   | s8   | s8   | s32  | u8s8s8s32       | same as above
-| u8   | s8   | u8   | s32  | u8s8u8s32       | same as above
-| s8   | s8   | f32  | s32  | s8s8f32s32      | same as above
-| s8   | s8   | s32  | s32  | s8s8s32s32      | same as above
-| s8   | s8   | s8   | s32  | s8s8s8s32       | same as above
-| s8   | s8   | u8   | s32  | s8s8u8s32       | same as above
+| u8   | s8   | f32  | s32  | u8s8f32         | optimized for processors with support of avx512vl, FWD_x only.
+| u8   | s8   | s32  | s32  | u8s8s32         | same as above
+| u8   | s8   | s8   | s32  | u8s8s8          | same as above
+| u8   | s8   | u8   | s32  | u8s8u8          | same as above
+| s8   | s8   | f32  | s32  | s8s8f32         | same as above
+| s8   | s8   | s32  | s32  | s8s8s32         | same as above
+| s8   | s8   | s8   | s32  | s8s8s8          | same as above
+| s8   | s8   | u8   | s32  | s8s8u8          | same as above
 | f32  | f32  | f32  | f32  | f32_wino        | Winograd-based convolution.
-| u8   | s8   | f32  | s32  | u8s8f32s32_wino | sabe as above
-| u8   | s8   | s32  | s32  | u8s8s32s32_wino | same as above
-| u8   | s8   | s8   | s32  | u8s8s8s32_wino  | same as above
-| u8   | s8   | u8   | s32  | u8s8u8s32_wino  | same as above
+| u8   | s8   | f32  | s32  | u8s8f32_wino    | same as above
+| u8   | s8   | s32  | s32  | u8s8s32_wino    | same as above
+| u8   | s8   | s8   | s32  | u8s8s8_wino     | same as above
+| u8   | s8   | u8   | s32  | u8s8u8_wino     | same as above
 | f16  | f16  | f16  | f16  | f16             | Only for GPU
 | bf16 | bf16 | bf16 | f32  | bf16bf16bf16    | optimized for processors with support of avx512vl + VNNI
 | bf16 | bf16 | f32  | f32  | bf16bf16f32     | same as above
@@ -79,10 +79,10 @@ The table below shows supported name configurations for this driver:
 
 ## Essence of Testing
 
-Intel MKL-DNN supports different data types, such as single-precision floating
-point (`mkldnn_f32`) and signed/unsigned integer of different lengths
-(`mkldnn_{s,u}{8,16,32}`). We need to cover all those cases with tests. It is
-essential to test real convolution sizes, because Intel MKL-DNN provides
+DNNL supports different data types, such as single-precision floating
+point (`dnnl_f32`) and signed/unsigned integer of different lengths
+(`dnnl_{s,u}{8,16,32}`). We need to cover all those cases with tests. It is
+essential to test real convolution sizes, because DNNL provides
 different optimizations depending on the convolution parameters. There is no
 single unified approach inside, so it would not be enough to test only a few
 convolutions (also known as unit tests).
@@ -134,24 +134,24 @@ verbose level set to 2:
                --match='.*kh3[^0-9].*' --batch=inputs/conv/conv_all
 ```
 
-Run a set of u8s8u8s32 backward convolutions wrt data but skip all
+Run a set of u8s8u8 backward convolutions wrt data but skip all
 the convolutions that will use reference or gemm-based implementation:
 ``` sh
-    ./benchdnn --conv --cfg=u8s8u8s32 --dir=BWD_B \
+    ./benchdnn --conv --cfg=u8s8u8 --dir=BWD_B \
                --skip-impl='ref:gemm' --batch=inputs/conv/conv_all
 ```
 
 Run explicitly specified first forward convolution (including bias) from Alexnet
 with the minibatch set to 4 and the verbose level set to 1 for two given
-configurations (`u8s8u8s32` and `f32`):
+configurations (`u8s8u8` and `f32`):
 ``` sh
-    ./benchdnn --conv -v1 --mb=4 --dir=FWD_B --cfg=f32,u8s8u8s32
+    ./benchdnn --conv -v1 --mb=4 --dir=FWD_B --cfg=f32,u8s8u8
                ic3ih227iw227_oc96oh55ow55_kh11kw11_sh4sw4ph0pw0_n"alexnet:conv1"
 ```
 
 Run the batch file for different algorithms (assuming the file specifies only
 convolutions and does not include driver options that would override any passed
-on the command line). Also ignore mkldnn_unimplemented errors in case of
+on the command line). Also ignore dnnl_unimplemented errors in case of
 Winograd. Before running the AUTO algorithm, reset the allow-unimpl value back
 to false:
 ``` sh
@@ -163,15 +163,38 @@ to false:
                --alg=AUTO   --batch=convs.in
 ```
 
-Run a set of u8s8u8s32 forward convolutions without bias, skipping
+Run a set of u8s8u8 forward convolutions without bias, skipping
 reference implementations and not triggering unimplemented as an error, with
 one common output scale set to 0.5:
 ``` sh
-    ./benchdnn --conv --cfg=u8s8u8s32 --dir=FWD_D \
+    ./benchdnn --conv --cfg=u8s8u8 --dir=FWD_D \
                --skip-impl="ref" --allow-unimpl=true \
                --attr="oscale=common:.5" --batch=inputs/conv/conv_all
 ```
 
 More examples with different driver options can be found at
-inputs/conv/test_conv_***. Examples with different driver descriptors can be
-found at inputs/conv/conv_***.
+inputs/conv/test_*** or inputs/conv/harness_***. Examples with different
+driver descriptors can be found at inputs/conv/shapes_***.
+
+## Naming
+
+The convention for naming files in benchdnn for convolution is the following:
+
+* **shapes_\<label\>**: a file containing one or more specific convolution
+shape inputs e.g. `ic16ih10oc32oh10kh3sh1ph1n"conv_1"`. These are
+independent of any benchdnn configuration such as data-type and direction,
+etc.
+
+* **set_\<label\>**: a group of **shapes_\<label\>** files. These are
+independent of any benchdnn configuration. The general rule is to group
+single-feature inputs into a single *batch* (e.g. all *topology* based
+inputs, all *regression* based inputs, all 2D convolutions, etc).
+
+* **harness_\<label\>**: a deployable suite of configurations and shapes.
+Entries in a harness test may include many instances and combinations of
+batch files and configurations (e.g `--mb`, `--dir`, `--skip-impl`,
+`--allow-unimpl`, `--batch={topology, shape_conv_2d, shape_conv_3d,
+shape_conv_regression}`).
+
+* **test_conv_\<label\>**: These files are used for deploying testing
+via command-line `make <test>`.

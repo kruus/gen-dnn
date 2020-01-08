@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2018 Intel Corporation
+* Copyright 2017-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -17,12 +17,13 @@
 #ifndef SIMPLE_SUM_HPP
 #define SIMPLE_SUM_HPP
 
-#include "cpu_sum_pd.hpp"
-#include "cpu_primitive.hpp"
+#include "dnnl_thread.hpp"
 #include "type_helpers.hpp"
-#include "mkldnn_thread.hpp"
 
-namespace mkldnn {
+#include "cpu_isa_traits.hpp"
+#include "cpu_sum_pd.hpp"
+
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
@@ -33,11 +34,11 @@ struct sum_bf16_params_t {
     dim_t ws_elements_per_thread_;
     dim_t acc_loop_step_;
 };
-}
+} // namespace
 
 template <data_type_t src_data_type, data_type_t dst_data_type = src_data_type>
-struct simple_sum_t: public cpu_primitive_t {
-    struct pd_t: public cpu_sum_pd_t {
+struct simple_sum_t : public primitive_impl_t {
+    struct pd_t : public cpu_sum_pd_t {
         using cpu_sum_pd_t::cpu_sum_pd_t;
 
         DECLARE_SUM_PD_T("simple:any", simple_sum_t);
@@ -46,14 +47,15 @@ struct simple_sum_t: public cpu_primitive_t {
             const int n = n_inputs();
 
             bool ok = true
-                && cpu_sum_pd_t::init() == status::success
-                && n <= max_num_arrs;
+                    && IMPLICATION(utils::one_of(data_type::bf16, src_data_type,
+                                           dst_data_type),
+                            mayiuse(avx512_core))
+                    && cpu_sum_pd_t::init() == status::success
+                    && n <= max_num_arrs;
             if (!ok) return status::unimplemented;
 
             const memory_desc_wrapper o_d(dst_md());
-            ok = ok
-                && o_d.data_type() == dst_data_type
-                && o_d.is_dense();
+            ok = ok && o_d.data_type() == dst_data_type && o_d.is_dense();
             if (!ok) return status::unimplemented;
 
             for (int i = 0; i < n; ++i) {
@@ -61,8 +63,7 @@ struct simple_sum_t: public cpu_primitive_t {
                 ok = true && utils::everyone_is(src_data_type, i_d.data_type())
                         && o_d.similar_to(i_d, true, false, 0)
                         && i_d.is_dense();
-                if (!ok)
-                    return status::unimplemented;
+                if (!ok) return status::unimplemented;
             }
 
             compute_blocking();
@@ -71,7 +72,7 @@ struct simple_sum_t: public cpu_primitive_t {
         }
 
         sum_bf16_params_t bf16_p_;
-        dim_t block_size_, nelems_, blocks_number_, tail_;
+        dim_t block_size_ = 0, nelems_ = 0, blocks_number_ = 0, tail_ = 0;
 
     private:
         const dim_t cacheline_size_ = 64; // bytes
@@ -107,7 +108,7 @@ struct simple_sum_t: public cpu_primitive_t {
                         + bf16_p_.ws_acc_elements_per_thread_;
                 dim_t bf16cvt_buf_sz_ = sizeof(acc_data_t)
                         * bf16_p_.ws_elements_per_thread_
-                        * mkldnn_get_max_threads();
+                        * dnnl_get_max_threads();
                 auto scratchpad = scratchpad_registry().registrar();
                 scratchpad.book(memory_tracking::names::key_sum_srcs_cvt,
                         bf16cvt_buf_sz_);
@@ -115,23 +116,23 @@ struct simple_sum_t: public cpu_primitive_t {
         }
     };
 
-    simple_sum_t(const pd_t *apd): cpu_primitive_t(apd) {}
+    simple_sum_t(const pd_t *apd) : primitive_impl_t(apd) {}
 
     virtual status_t execute(const exec_ctx_t &ctx) const override;
 
-    enum {max_num_arrs = 16 };
+    enum { max_num_arrs = 16 };
     typedef typename prec_traits<src_data_type>::type src_data_t;
     typedef typename prec_traits<dst_data_type>::type dst_data_t;
     typedef typename prec_traits<data_type::f32>::type acc_data_t;
 
 private:
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
 };
 
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

@@ -20,14 +20,15 @@
 #include <assert.h>
 
 #include "c_types_map.hpp"
-#include "mkldnn_debug.h"
+#include "cpu_isa_traits.hpp"
+#include "dnnl_debug.h"
 #include "nstl.hpp"
 #include "type_helpers.hpp"
 
 #include "bfloat16.hpp"
 #include "jit_generator.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
@@ -38,7 +39,7 @@ struct jit_call_t {
     void *add;
     size_t size;
 };
-}
+} // namespace bf16_support
 
 #define GET_OFF(field) offsetof(bf16_support::jit_call_t, field)
 
@@ -48,8 +49,8 @@ struct bf16_emulation_t {
     using Ymm_t = const Xbyak::Ymm;
     using reg64_t = const Xbyak::Reg64;
 
-    bf16_emulation_t(jit_generator *host, Zmm_t one, Zmm_t even,
-            Zmm_t selector, reg64_t scratch, Zmm_t tr0, Zmm_t tr1)
+    bf16_emulation_t(jit_generator *host, Zmm_t one, Zmm_t even, Zmm_t selector,
+            reg64_t scratch, Zmm_t tr0, Zmm_t tr1)
         : host_(host)
         , one_(one)
         , even_(even)
@@ -58,8 +59,8 @@ struct bf16_emulation_t {
         , tr0_(tr0)
         , tr1_(tr1) {}
 
-    bf16_emulation_t(jit_generator *host, Zmm_t one, Zmm_t even,
-            Zmm_t selector, reg64_t scratch, Zmm_t tr0)
+    bf16_emulation_t(jit_generator *host, Zmm_t one, Zmm_t even, Zmm_t selector,
+            reg64_t scratch, Zmm_t tr0)
         : bf16_emulation_t(host, one, even, selector, scratch, tr0, tr0) {}
 
     void vdpbf16ps(Zmm_t &acc, Zmm_t wei, Zmm_t inp) {
@@ -92,14 +93,21 @@ struct bf16_emulation_t {
 
     void init_vcvtneps2bf16() {
         const int selector_int32 =
-            /* qnan input to qnan output (presenrving input bits 0..21) */
-            encode_fixup_selector(fixup_input_code_snan, fixup_output_code_qnan_input) |
-            /* snan input to qnan output (presenrving input bits 0..21) */
-            encode_fixup_selector(fixup_input_code_qnan, fixup_output_code_qnan_input) |
-            /* neg inf input copied to output */
-            encode_fixup_selector(fixup_input_code_ninf, fixup_output_code_copy_input) |
-            /* pos inf input copied to output */
-            encode_fixup_selector(fixup_input_code_pinf, fixup_output_code_copy_input);
+                /* qnan input to qnan output (presenrving input bits 0..21) */
+                encode_fixup_selector(
+                        fixup_input_code_snan, fixup_output_code_qnan_input)
+                |
+                /* snan input to qnan output (presenrving input bits 0..21) */
+                encode_fixup_selector(
+                        fixup_input_code_qnan, fixup_output_code_qnan_input)
+                |
+                /* neg inf input copied to output */
+                encode_fixup_selector(
+                        fixup_input_code_ninf, fixup_output_code_copy_input)
+                |
+                /* pos inf input copied to output */
+                encode_fixup_selector(
+                        fixup_input_code_pinf, fixup_output_code_copy_input);
 
         host_->xor_(scratch_, scratch_);
         host_->mov(scratch_.cvt32(), 0x1);
@@ -113,6 +121,8 @@ struct bf16_emulation_t {
         host_->mov(scratch_.cvt32(), selector_int32);
         host_->vpbroadcastd(selector_, scratch_.cvt32());
     }
+
+    static cpu_isa_t get_isa() { return avx512_core; }
 
 private:
     jit_generator *const host_;
@@ -135,29 +145,29 @@ private:
         fixup_output_code_copy_input = 1,
         fixup_output_code_qnan_input = 2,
     };
-
 };
 
 struct jit_avx512_core_cvt_ps_to_bf16_t : public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_core_cvt_ps_to_bf16)
 
-    jit_avx512_core_cvt_ps_to_bf16_t(void) : simd_w_(16), is_dynamic_size_(true) {
-        bf16_emu_ = new bf16_emulation_t(this, one, even,
-                selector, scratch, fp32_tmp);
+    jit_avx512_core_cvt_ps_to_bf16_t(void)
+        : size_(0), tail_mask_(0), simd_w_(16), is_dynamic_size_(true) {
+        bf16_emu_ = new bf16_emulation_t(
+                this, one, even, selector, scratch, fp32_tmp);
 
         generate();
-        jit_ker = (void (*)(bf16_support::jit_call_t *))getCode();
+        jit_ker_ = (void (*)(bf16_support::jit_call_t *))getCode();
     }
 
     jit_avx512_core_cvt_ps_to_bf16_t(size_t size)
         : size_(size), simd_w_(16), is_dynamic_size_(false) {
         tail_mask_ = (1 << (size % simd_w_)) - 1;
 
-        bf16_emu_ = new bf16_emulation_t(this, one, even,
-                selector, scratch, fp32_tmp);
+        bf16_emu_ = new bf16_emulation_t(
+                this, one, even, selector, scratch, fp32_tmp);
 
         generate();
-        jit_ker = (void (*)(bf16_support::jit_call_t *))getCode();
+        jit_ker_ = (void (*)(bf16_support::jit_call_t *))getCode();
     }
 
     ~jit_avx512_core_cvt_ps_to_bf16_t() { delete bf16_emu_; }
@@ -173,18 +183,15 @@ struct jit_avx512_core_cvt_ps_to_bf16_t : public jit_generator {
                 bf16_emu_->vcvtneps2bf16(bf16_out, fp32_inp);
             else
                 vcvtneps2bf16(bf16_out, fp32_inp);
-            vmovdqu16(
-                    yword[reg_out + sizeof(bfloat16_t) * (idx)] | ktail_mask,
+            vmovdqu16(yword[reg_out + sizeof(bfloat16_t) * (idx)] | ktail_mask,
                     bf16_out);
         };
 
         mov(reg_inp, ptr[abi_param1 + GET_OFF(inp)]);
         mov(reg_out, ptr[abi_param1 + GET_OFF(out)]);
-        if (is_dynamic_size_)
-            mov(reg_size, ptr[abi_param1 + GET_OFF(size)]);
+        if (is_dynamic_size_) mov(reg_size, ptr[abi_param1 + GET_OFF(size)]);
 
-        if (use_bf16_emu)
-            bf16_emu_->init_vcvtneps2bf16();
+        if (use_bf16_emu) bf16_emu_->init_vcvtneps2bf16();
 
         mov(reg32_tail, 0xffff);
         kmovw(ktail_mask, reg32_tail);
@@ -194,7 +201,8 @@ struct jit_avx512_core_cvt_ps_to_bf16_t : public jit_generator {
             Xbyak::Label l_simd_loop[n_unroll + 2], l_simd_notail;
             for (int i = n_unroll; i >= 0; i--) {
                 const int unroll = 1 << i; // 4, 2, 1
-                L(l_simd_loop[i + 1]); {
+                L(l_simd_loop[i + 1]);
+                {
                     cmp(reg_size, simd_w_ * unroll);
                     jl(l_simd_loop[i], T_NEAR);
                     for (int j = 0; j < simd_w_ * unroll; j += simd_w_) {
@@ -253,12 +261,18 @@ struct jit_avx512_core_cvt_ps_to_bf16_t : public jit_generator {
         postamble();
     }
 
-    void (*jit_ker)(bf16_support::jit_call_t *);
+    void jit_ker(bf16_support::jit_call_t *params) const {
+        jit_ker_(params);
+        msan_unpoison(params->out,
+                (size_ ? size_ : params->size) * sizeof(bfloat16_t));
+    }
 
 private:
     size_t size_;
     int tail_mask_;
     int simd_w_;
+
+    void (*jit_ker_)(bf16_support::jit_call_t *);
 
     bf16_emulation_t *bf16_emu_;
     bool is_dynamic_size_;
@@ -282,15 +296,15 @@ private:
     Xbyak::Reg32 reg32_tail = ecx;
     Xbyak::Reg8 reg8_mask_shift = cl;
     Xbyak::Reg32 reg32_mask = r8d;
-
 };
 
 struct jit_avx512_core_cvt_bf16_to_ps_t : public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_core_cvt_bf16_to_ps_t)
 
-    jit_avx512_core_cvt_bf16_to_ps_t(void) : simd_w_(16), is_dynamic_size_(true) {
+    jit_avx512_core_cvt_bf16_to_ps_t(void)
+        : size_(0), tail_mask_(0), simd_w_(16), is_dynamic_size_(true) {
         generate();
-        jit_ker = (void (*)(bf16_support::jit_call_t *))getCode();
+        jit_ker_ = (void (*)(bf16_support::jit_call_t *))getCode();
     }
 
     jit_avx512_core_cvt_bf16_to_ps_t(size_t size)
@@ -298,7 +312,7 @@ struct jit_avx512_core_cvt_bf16_to_ps_t : public jit_generator {
         tail_mask_ = (1 << (size_ % simd_w_)) - 1;
 
         generate();
-        jit_ker = (void (*)(bf16_support::jit_call_t *))getCode();
+        jit_ker_ = (void (*)(bf16_support::jit_call_t *))getCode();
     }
 
     void generate() {
@@ -313,12 +327,13 @@ struct jit_avx512_core_cvt_bf16_to_ps_t : public jit_generator {
             Xbyak::Label l_simd_loop[n_unroll + 2], l_simd_notail;
             for (int i = n_unroll; i >= 0; i--) {
                 const int unroll = 1 << i; // 4, 2, 1
-                L(l_simd_loop[i + 1]); {
+                L(l_simd_loop[i + 1]);
+                {
                     cmp(reg_size, simd_w_ * unroll);
                     jl(l_simd_loop[i], T_NEAR);
                     for (int j = 0; j < simd_w_ * unroll; j += simd_w_) {
-                        vpmovzxwd(zmm_cvt,
-                                ptr[reg_inp + sizeof(bfloat16_t) * j]);
+                        vpmovzxwd(
+                                zmm_cvt, ptr[reg_inp + sizeof(bfloat16_t) * j]);
                         vpslld(zmm_cvt, zmm_cvt, 0x10);
                         vmovdqu32(zword[reg_out + sizeof(float) * j], zmm_cvt);
                     }
@@ -388,13 +403,18 @@ struct jit_avx512_core_cvt_bf16_to_ps_t : public jit_generator {
         postamble();
     }
 
-    void (*jit_ker)(bf16_support::jit_call_t *);
+    void jit_ker(bf16_support::jit_call_t *params) const {
+        jit_ker_(params);
+        msan_unpoison(
+                params->out, (size_ ? size_ : params->size) * sizeof(float));
+    }
 
 private:
     size_t size_;
     int tail_mask_;
     int simd_w_;
     bool is_dynamic_size_;
+    void (*jit_ker_)(bf16_support::jit_call_t *);
 
     Xbyak::Opmask ktail_mask = k1;
     Xbyak::Zmm zmm_cvt = Xbyak::Zmm(0);
@@ -415,11 +435,11 @@ struct jit_avx512_core_add_cvt_ps_to_bf16_t : public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_core_add_cvt_ps_to_bf16)
 
     jit_avx512_core_add_cvt_ps_to_bf16_t() : simd_w_(16) {
-        bf16_emu_ = new bf16_emulation_t(this, one, even,
-                selector, scratch, fp32_tmp, fp32_tmp);
+        bf16_emu_ = new bf16_emulation_t(
+                this, one, even, selector, scratch, fp32_tmp, fp32_tmp);
 
         generate();
-        jit_ker = (void (*)(bf16_support::jit_call_t *))getCode();
+        jit_ker_ = (void (*)(bf16_support::jit_call_t *))getCode();
     }
 
     ~jit_avx512_core_add_cvt_ps_to_bf16_t() { delete bf16_emu_; }
@@ -430,15 +450,16 @@ struct jit_avx512_core_add_cvt_ps_to_bf16_t : public jit_generator {
         bool use_bf16_emu = !mayiuse(avx512_core_bf16);
 
         auto add_cvt = [&](size_t idx, Xbyak::Opmask ktail_mask) {
-            vmovups(fp32_inp | ktail_mask | T_z, ptr[reg_inp + sizeof(float) * (idx)]);
-            vaddps(fp32_inp | ktail_mask | T_z, fp32_inp, ptr[reg_add + sizeof(float) * (idx)]);
+            vmovups(fp32_inp | ktail_mask | T_z,
+                    ptr[reg_inp + sizeof(float) * (idx)]);
+            vaddps(fp32_inp | ktail_mask | T_z, fp32_inp,
+                    ptr[reg_add + sizeof(float) * (idx)]);
             if (use_bf16_emu)
                 bf16_emu_->vcvtneps2bf16(bf16_out, fp32_inp);
             else
                 vcvtneps2bf16(bf16_out, fp32_inp);
 
-            vmovdqu16(
-                    yword[reg_out + sizeof(bfloat16_t) * (idx)] | ktail_mask,
+            vmovdqu16(yword[reg_out + sizeof(bfloat16_t) * (idx)] | ktail_mask,
                     bf16_out);
         };
 
@@ -447,8 +468,7 @@ struct jit_avx512_core_add_cvt_ps_to_bf16_t : public jit_generator {
         mov(reg_out, ptr[abi_param1 + GET_OFF(out)]);
         mov(reg_size, ptr[abi_param1 + GET_OFF(size)]);
 
-        if (use_bf16_emu)
-            bf16_emu_->init_vcvtneps2bf16();
+        if (use_bf16_emu) bf16_emu_->init_vcvtneps2bf16();
 
         mov(reg32_tail, 0xffff);
         kmovw(ktail_mask, reg32_tail);
@@ -457,7 +477,8 @@ struct jit_avx512_core_add_cvt_ps_to_bf16_t : public jit_generator {
         Xbyak::Label l_simd_loop[n_unroll + 2], l_simd_notail;
         for (int i = n_unroll; i >= 0; i--) {
             const int unroll = 1 << i; // 4, 2, 1
-            L(l_simd_loop[i + 1]); {
+            L(l_simd_loop[i + 1]);
+            {
                 cmp(reg_size, simd_w_ * unroll);
                 jl(l_simd_loop[i], T_NEAR);
                 for (int j = 0; j < simd_w_ * unroll; j += simd_w_) {
@@ -486,10 +507,14 @@ struct jit_avx512_core_add_cvt_ps_to_bf16_t : public jit_generator {
         postamble();
     }
 
-    void (*jit_ker)(bf16_support::jit_call_t *);
+    void jit_ker(bf16_support::jit_call_t *params) const {
+        jit_ker_(params);
+        msan_unpoison(params->out, params->size * sizeof(bfloat16_t));
+    }
 
 private:
     int simd_w_;
+    void (*jit_ker_)(bf16_support::jit_call_t *);
 
     bf16_emulation_t *bf16_emu_;
 
@@ -524,7 +549,7 @@ struct jit_avx512_core_bf16_reorder_s16c_to_S16c2s_t : public jit_generator {
 
     jit_avx512_core_bf16_reorder_s16c_to_S16c2s_t() : simd_w_(16) {
         generate();
-        jit_ker = (void (*)(bf16_support::jit_call_t *))getCode();
+        jit_ker_ = (void (*)(bf16_support::jit_call_t *))getCode();
     }
 
     ~jit_avx512_core_bf16_reorder_s16c_to_S16c2s_t() {}
@@ -550,14 +575,15 @@ struct jit_avx512_core_bf16_reorder_s16c_to_S16c2s_t : public jit_generator {
         Xbyak::Label l_simd_loop[n_unroll + 2], l_simd_notail;
         for (int i = n_unroll; i >= 0; i--) {
             const int unroll = 1 << i; // 4, 2, 1
-            L(l_simd_loop[i + 1]); {
+            L(l_simd_loop[i + 1]);
+            {
                 cmp(reg_size, 2 * unroll);
                 jl(l_simd_loop[i], T_NEAR);
                 for (int j = 0; j < unroll; j++) {
-                     auto zmm_inp = zmm_reg(j);
-                     vmovups(zmm_inp, zword[reg_inp + j * sizeofcacheline]);
-                     vpermw(zmm_inp, zmm_prm, zmm_inp);
-                     vmovups(zword[reg_out + j * sizeofcacheline], zmm_inp);
+                    auto zmm_inp = zmm_reg(j);
+                    vmovups(zmm_inp, zword[reg_inp + j * sizeofcacheline]);
+                    vpermw(zmm_inp, zmm_prm, zmm_inp);
+                    vmovups(zword[reg_out + j * sizeofcacheline], zmm_inp);
                 }
                 add(reg_inp, unroll * sizeofcacheline);
                 add(reg_out, unroll * sizeofcacheline);
@@ -584,9 +610,9 @@ struct jit_avx512_core_bf16_reorder_s16c_to_S16c2s_t : public jit_generator {
 
         postamble();
 
-        const uint16_t dst_prm_array[32] =
-            {0,16,  1,17,  2,18,  3,19,  4,20,  5,21,  6,22,  7,23,  8,24,
-            9,25,  10,26,  11,27,  12,28,  13,29,  14,30,  15,31 };
+        const uint16_t dst_prm_array[32] = {0, 16, 1, 17, 2, 18, 3, 19, 4, 20,
+                5, 21, 6, 22, 7, 23, 8, 24, 9, 25, 10, 26, 11, 27, 12, 28, 13,
+                29, 14, 30, 15, 31};
 
         align(64);
         L(dst_prm_table);
@@ -594,10 +620,14 @@ struct jit_avx512_core_bf16_reorder_s16c_to_S16c2s_t : public jit_generator {
             dw(dst_prm_array[i]);
     }
 
-    void (*jit_ker)(bf16_support::jit_call_t *);
+    void jit_ker(bf16_support::jit_call_t *params) const {
+        jit_ker_(params);
+        msan_unpoison(params->out, params->size * sizeof(bfloat16_t));
+    }
 
 private:
     int simd_w_;
+    void (*jit_ker_)(bf16_support::jit_call_t *);
 
     Xbyak::Opmask ktail_mask = k2;
     Xbyak::Zmm zmm_prm = Xbyak::Zmm(31);
@@ -611,8 +641,8 @@ private:
 };
 
 #undef GET_OFF
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
 
 #endif

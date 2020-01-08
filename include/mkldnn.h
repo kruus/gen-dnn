@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2019 Intel Corporation
+* Copyright 2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -14,22 +14,16 @@
 * limitations under the License.
 *******************************************************************************/
 
-/// @file
-/// C API
+// Header file ensures the backwards compatibility with previous namings.
 
 #ifndef MKLDNN_H
 #define MKLDNN_H
 
-#include "mkldnn_config.h"
-#include "mkldnn_types.h"
-#include "mkldnn_version.h"
+#include "mkldnn_dnnl_mangling.h"
 
-#ifndef DOXYGEN_SHOULD_SKIP_THIS
-#if MKLDNN_GPU_RUNTIME == MKLDNN_RUNTIME_OCL
-#   include <CL/cl.h>
-#endif
-#endif /* DOXYGEN_SHOULD_SKIP_THIS */
+#include "dnnl.h"
 
+#if 0 // old v1.0.0
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -2015,5 +2009,6 @@ mkldnn_status_t MKLDNN_API mkldnn_gemm_s8s8s32(
 }
 #endif
 
-// vim: et ts=4 sw=4 cindent cino=^l0,\:0,N-s
-#endif
+#endif /* old v1.0.0 */
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+#endif /* MKLDNN_H */

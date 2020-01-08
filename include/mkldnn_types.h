@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2019 Intel Corporation
+* Copyright 2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -14,23 +14,22 @@
 * limitations under the License.
 *******************************************************************************/
 
-/// @file
-/// C API types definitions
+// Header file ensures the backwards compatibility with previous namings.
 
 #ifndef MKLDNN_TYPES_H
 #define MKLDNN_TYPES_H
 
 #include "mkldnn_os.h" // compiler/OS compatibility macros
+#include "mkldnn_dnnl_mangling.h"
+#include "dnnl_types.h"
 
+#if 0 // \deprecated mkl-dnn v1.0 version
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#ifndef DOXYGEN_SHOULD_SKIP_THIS
-#include <stddef.h>
-#include <stdint.h>
-#endif
 
+<<<<<<< HEAD
 /// @addtogroup c_api C API
 /// @{
 ///
@@ -1577,6 +1576,7 @@ typedef const struct mkldnn_stream *const_mkldnn_stream_t;
 #ifdef __cplusplus
 }
 #endif
+#endif // deprecated v1.0.0
 
-/* vim: set et ts=4 sw=4 cino=^=l0,\:0,N-s: */
-#endif
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+#endif /* MKLDNN_TYPES_H */

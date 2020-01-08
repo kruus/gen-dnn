@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2018 Intel Corporation
+* Copyright 2017-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -14,23 +14,24 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
 #include <float.h>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include "mkldnn.h"
+#include "dnnl.h"
 
-#include "dnn_types.hpp"
-#include "mkldnn_common.hpp"
-#include "mkldnn_debug.hpp"
 #include "conv/conv.hpp"
+#include "dnn_types.hpp"
+#include "dnnl_common.hpp"
+#include "dnnl_debug.hpp"
 
 namespace conv {
 
 alg_t str2alg(const char *str) {
-#define CASE(_alg) if (!strcasecmp(STRINGIFY(_alg), str)) return _alg
+#define CASE(_alg) \
+    if (!strcasecmp(STRINGIFY(_alg), str)) return _alg
     CASE(AUTO);
     CASE(DIRECT);
     CASE(WINO);
@@ -47,16 +48,16 @@ const char *alg2str(alg_t alg) {
     return "unknown algorithm";
 }
 
-alg_t alg_kind2alg(mkldnn_alg_kind_t alg) {
-    if (alg == mkldnn_convolution_auto) return AUTO;
-    if (alg == mkldnn_convolution_direct) return DIRECT;
-    if (alg == mkldnn_convolution_winograd) return WINO;
+alg_t alg_kind2alg(dnnl_alg_kind_t alg) {
+    if (alg == dnnl_convolution_auto) return AUTO;
+    if (alg == dnnl_convolution_direct) return DIRECT;
+    if (alg == dnnl_convolution_winograd) return WINO;
     assert(!"unknown algorithm");
     return DIRECT;
 }
 
 int str2desc(desc_t *desc, const char *str, bool is_deconv) {
-    desc_t d{0};
+    desc_t d {0};
 
     /* canonical form:
      * dYgXmbXicXihXiwXocXohXowXkhXkwXshXswXphXpwXdhXdwXnS
@@ -66,58 +67,87 @@ int str2desc(desc_t *desc, const char *str, bool is_deconv) {
      *
      * implicit rules:
      *  - default values:
-     *      mb = 2, g = 1, d = fd, sh = sw = 1, dh = dw = 0, S="wip"
+     *      mb = 2, g = 1, d = fd, sh = sw = 1, dh = dw = 0
      *  - if H is undefined => H = W
      *  - if W is undefined => W = H
      *  - if `output` is undefined => compute output
      *  - if padding is undefined => compute trivial padding
      */
 
-    d.g = 1; d.mb = 2; d.sd = d.sh = d.sw = 1; d.dd = d.dh = d.dw = 0;
-    d.has_groups = false, d.name = "\"wip\"";
-    d.pw = -1; d.ph = -1; d.pd = -1;
+    d.g = 1;
+    d.mb = 2;
+    d.sd = d.sh = d.sw = 1;
+    d.dd = d.dh = d.dw = 0;
+    d.has_groups = false;
+    d.pw = -1;
+    d.ph = -1;
+    d.pd = -1;
 
     const char *s = str;
     assert(s);
 
-#   define CASE_NN(p, c) do { \
+#define CASE_NN(p, c) \
+    do { \
         if (!strncmp(p, s, strlen(p))) { \
-            ok = 1; s += strlen(p); \
-            char *end_s; d. c = strtol(s, &end_s, 10); s += (end_s - s); \
+            ok = 1; \
+            s += strlen(p); \
+            char *end_s; \
+            d.c = strtol(s, &end_s, 10); \
+            s += (end_s - s); \
+            /* check any # groups, including one, works correcly */ \
             if (!strncmp(p, "g", 1)) d.has_groups = true; \
-            if (d. c < 0) return FAIL; \
+            if (d.c < 0) return FAIL; \
             /* printf("@@@debug: %s: %d\n", p, d. c); */ \
         } \
     } while (0)
-#   define CASE_N(c) CASE_NN(#c, c)
+#define CASE_N(c) CASE_NN(#c, c)
     while (*s) {
         int ok = 0;
-        CASE_N(g); CASE_N(mb);
-        CASE_N(ic); CASE_N(id); CASE_N(ih); CASE_N(iw);
-        CASE_N(oc); CASE_N(od); CASE_N(oh); CASE_N(ow);
-        CASE_N(kd); CASE_N(kh); CASE_N(kw);
-        CASE_N(sd); CASE_N(sh); CASE_N(sw);
-        CASE_N(pd); CASE_N(ph); CASE_N(pw);
-        CASE_N(dd); CASE_N(dh); CASE_N(dw);
-        if (*s == 'n') { d.name = s + 1; break; }
+        CASE_N(g);
+        CASE_N(mb);
+        CASE_N(ic);
+        CASE_N(id);
+        CASE_N(ih);
+        CASE_N(iw);
+        CASE_N(oc);
+        CASE_N(od);
+        CASE_N(oh);
+        CASE_N(ow);
+        CASE_N(kd);
+        CASE_N(kh);
+        CASE_N(kw);
+        CASE_N(sd);
+        CASE_N(sh);
+        CASE_N(sw);
+        CASE_N(pd);
+        CASE_N(ph);
+        CASE_N(pw);
+        CASE_N(dd);
+        CASE_N(dh);
+        CASE_N(dw);
+        if (*s == 'n') {
+            d.name = s + 1;
+            break;
+        }
         if (*s == '_') ++s;
         if (!ok) return FAIL;
     }
-#   undef CASE_NN
-#   undef CASE_N
+#undef CASE_NN
+#undef CASE_N
 
+    if (d.has_groups && d.g <= 0) return FAIL;
     if (d.ic == 0 || d.oc == 0) return FAIL;
     if (d.sd <= 0 || d.sh <= 0 || d.sw <= 0) return FAIL;
 
     auto compute_out = [](bool is_deconv, int64_t i, int64_t k, int64_t s,
-            int64_t p, int64_t d) {
+                               int64_t p, int64_t d) {
         if (is_deconv)
             return (i - 1) * s + (k - 1) * (d + 1) + 2 * p + 1;
         else
             return (i - ((k - 1) * (d + 1) + 1) + 2 * p) / s + 1;
     };
     auto compute_pad = [](bool is_deconv, int64_t o, int64_t i, int64_t k,
-            int64_t s, int64_t d) {
+                               int64_t s, int64_t d) {
         if (is_deconv)
             return ((i - 1) * s - o + ((k - 1) * (d + 1) + 1)) / 2;
         else
@@ -132,7 +162,7 @@ int str2desc(desc_t *desc, const char *str, bool is_deconv) {
     if (!no_d) {
         if (!d.id || !d.kd) return FAIL;
         if (!d.od) {
-            d.pd = 0;
+            if (d.pd < 0) d.pd = 0;
             d.od = compute_out(is_deconv, d.id, d.kd, d.sd, d.pd, d.dd);
         } else if (d.pd < 0)
             d.pd = compute_pad(is_deconv, d.od, d.id, d.kd, d.sd, d.dd);
@@ -141,7 +171,7 @@ int str2desc(desc_t *desc, const char *str, bool is_deconv) {
     if (!no_h) {
         if (!d.ih || !d.kh) return FAIL;
         if (!d.oh) {
-            d.ph = 0;
+            if (d.ph < 0) d.ph = 0;
             d.oh = compute_out(is_deconv, d.ih, d.kh, d.sh, d.ph, d.dh);
         } else if (d.ph < 0)
             d.ph = compute_pad(is_deconv, d.oh, d.ih, d.kh, d.sh, d.dh);
@@ -150,7 +180,7 @@ int str2desc(desc_t *desc, const char *str, bool is_deconv) {
     if (!no_w) {
         if (!d.iw || !d.kw) return FAIL;
         if (!d.ow) {
-            d.pw = 0;
+            if (d.pw < 0) d.pw = 0;
             d.ow = compute_out(is_deconv, d.iw, d.kw, d.sw, d.pw, d.dw);
         } else if (d.pw < 0)
             d.pw = compute_pad(is_deconv, d.ow, d.iw, d.kw, d.sw, d.dw);
@@ -206,16 +236,16 @@ std::ostream &operator<<(std::ostream &s, const desc_t &d) {
     if (canonical || d.has_groups) s << "g" << d.g;
     if (canonical || d.mb != 2) s << "mb" << d.mb;
 
-    const bool half_form = (d.ih == d.iw && d.kh == d.kw && d.oh == d.ow
-        && d.sh == d.sw && d.ph == d.pw && d.dh == d.dw) && d.id == 1;
+    const bool print_d = is_problem_3d(&d);
+    const bool half_form
+            = (d.ih == d.iw && d.kh == d.kw && d.oh == d.ow && d.sh == d.sw
+                      && d.ph == d.pw && d.dh == d.dw)
+            && !print_d;
 
-    const bool print_d = d.id > 1;
     const bool print_w = canonical || print_d || !half_form;
 
-    auto print_spatial = [&](
-            const char *sd, int64_t vd,
-            const char *sh, int64_t vh,
-            const char *sw, int64_t vw) {
+    auto print_spatial = [&](const char *sd, int64_t vd, const char *sh,
+                                 int64_t vh, const char *sw, int64_t vw) {
         if (print_d) s << sd << vd;
         s << sh << vh;
         if (print_w) s << sw << vw;
@@ -230,13 +260,12 @@ std::ostream &operator<<(std::ostream &s, const desc_t &d) {
     if (canonical || d.sh != 1 || d.sw != 1 || d.sd != 1)
         print_spatial("sd", d.sd, "sh", d.sh, "sw", d.sw);
 
-    if (canonical || d.ph != 0 || d.pw != 0 || d.pd != 0)
-        print_spatial("pd", d.pd, "ph", d.ph, "pw", d.pw);
+    print_spatial("pd", d.pd, "ph", d.ph, "pw", d.pw);
 
     if (canonical || d.dh != 0 || d.dw != 0 || d.dd != 0)
         print_spatial("dd", d.dd, "dh", d.dh, "dw", d.dw);
 
-    s << "n" << d.name;
+    if (d.name) s << "n" << d.name;
 
     return s;
 }
@@ -251,24 +280,24 @@ void prb_t::count_ops() {
     int64_t ih_t = is_deconv ? this->oh : this->ih;
     int64_t iw_t = is_deconv ? this->ow : this->iw;
     double sp_ops = 0;
-    for (int64_t od = 0; od < od_t; ++od) {
-    for (int64_t oh = 0; oh < oh_t; ++oh) {
+    for_(int64_t od = 0; od < od_t; ++od)
+    for_(int64_t oh = 0; oh < oh_t; ++oh)
     for (int64_t ow = 0; ow < ow_t; ++ow) {
         for (int64_t kd = 0; kd < this->kd; ++kd) {
             const int64_t id = od * this->sd - this->pd + kd * (this->dd + 1);
             if (id < 0 || id >= id_t) continue;
             for (int64_t kh = 0; kh < this->kh; ++kh) {
-                const int64_t ih = oh * this->sh - this->ph + kh * (this->dh + 1);
+                const int64_t ih
+                        = oh * this->sh - this->ph + kh * (this->dh + 1);
                 if (ih < 0 || ih >= ih_t) continue;
                 for (int64_t kw = 0; kw < this->kw; ++kw) {
-                    const int64_t iw = ow * this->sw - this->pw + kw * (this->dw + 1);
+                    const int64_t iw
+                            = ow * this->sw - this->pw + kw * (this->dw + 1);
                     if (iw < 0 || iw >= iw_t) continue;
                     sp_ops += 1;
                 }
             }
         }
-    }
-    }
     }
 
     ops = 2 * this->mb * this->oc * this->ic / this->g * sp_ops;
@@ -282,16 +311,16 @@ void prb_t::generate_oscales() {
 
     const float K = 32;
     /* scale in [1/K .. K], with starting point at oscale.scale */
-    float s[2] = {attr.oscale.scale, attr.oscale.scale/2};
+    float s[2] = {attr.oscale.scale, attr.oscale.scale / 2};
     for (int64_t i = 0; i < oc; ++i) {
         int64_t si = i % 2; // 0 -> left, 1 -> right
         scales[i] = s[si];
         if (si == 0) {
             s[si] /= 2.;
-            if (s[si] < 1./K) s[si] *= K*K; // turn around to become ~K
+            if (s[si] < 1. / K) s[si] *= K * K; // turn around to become ~K
         } else {
             s[si] *= 2.;
-            if (s[si] > K) s[si] /= K*K; // turn around to become ~K
+            if (s[si] > K) s[si] /= K * K; // turn around to become ~K
         }
     }
 }
@@ -299,18 +328,20 @@ void prb_t::generate_oscales() {
 std::ostream &operator<<(std::ostream &s, const prb_t &p) {
     dump_global_params(s);
 
-    if (p.dir != FWD_B)
-        s << "--dir=" << dir2str(p.dir) << " ";
-    if (p.cfg != conf_f32)
-        s << "--cfg=" << cfg2str(p.cfg) << " ";
-    if (p.alg != DIRECT)
-        s << "--alg=" << alg2str(p.alg) << " ";
-    if (!p.attr.is_def())
-        s << "--attr=\"" << p.attr << "\" ";
+    if (p.dir != FWD_B) s << "--dir=" << dir2str(p.dir) << " ";
+    if (p.cfg != conf_f32) s << "--cfg=" << cfg2str(p.cfg) << " ";
+    if (p.stag != dnnl_format_tag_any)
+        s << "--stag=" << fmt_tag2str(p.stag) << " ";
+    if (p.wtag != dnnl_format_tag_any)
+        s << "--wtag=" << fmt_tag2str(p.wtag) << " ";
+    if (p.dtag != dnnl_format_tag_any)
+        s << "--dtag=" << fmt_tag2str(p.dtag) << " ";
+    if (p.alg != DIRECT) s << "--alg=" << alg2str(p.alg) << " ";
+    if (!p.attr.is_def()) s << "--attr=\"" << p.attr << "\" ";
 
     s << static_cast<const desc_t &>(p);
 
     return s;
 }
 
-}
+} // namespace conv

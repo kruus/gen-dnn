@@ -17,16 +17,16 @@
 #ifndef POOL_HPP
 #define POOL_HPP
 
-#include <stdint.h>
-#include <limits.h>
 #include <assert.h>
+#include <limits.h>
+#include <stdint.h>
 
 #include <iostream>
 
 #include "common.hpp"
 #include "dnn_types.hpp"
-#include "mkldnn_common.hpp"
-#include "mkldnn_memory.hpp"
+#include "dnnl_common.hpp"
+#include "dnnl_memory.hpp"
 #include "perf_report.hpp"
 
 namespace pool {
@@ -34,7 +34,7 @@ namespace pool {
 enum alg_t { MAX, AVG_NP, AVG_P };
 alg_t str2alg(const char *str);
 const char *alg2str(alg_t alg);
-mkldnn_alg_kind_t alg2alg_kind(alg_t alg);
+dnnl_alg_kind_t alg2alg_kind(alg_t alg);
 
 struct desc_t {
     int64_t mb, ic;
@@ -46,6 +46,15 @@ struct desc_t {
 
     const char *name;
 };
+
+inline bool is_3d(const desc_t *p) {
+    return p->id > 1 || p->od > 1 || p->kd > 1;
+}
+
+inline bool is_1d(const desc_t *p) {
+    return !is_3d(p) && p->ih == 1 && p->oh == 1 && p->kh == 1;
+}
+
 int str2desc(desc_t *desc, const char *str);
 std::ostream &operator<<(std::ostream &s, const desc_t &d);
 
@@ -64,7 +73,7 @@ std::ostream &operator<<(std::ostream &s, const desc_t &d);
  * relative difference should not exceed eps
  */
 typedef struct dt_conf_t {
-    mkldnn_data_type_t dt;
+    dnnl_data_type_t dt;
     double min, max; /* representative */
     int f_min, f_max; /* fill range */
     double eps; /* acceptable error */
@@ -75,9 +84,9 @@ extern const _dt_conf_t conf_f32;
 const dt_conf_t *str2cfg(const char *str);
 const char *cfg2str(const dt_conf_t *cfg);
 
-struct prb_t: public desc_t {
+struct prb_t : public desc_t {
     prb_t(const desc_t &desc, dir_t dir, const dt_conf_t *cfg,
-             mkldnn_format_tag_t tag, alg_t alg, int64_t mb = 0)
+            dnnl_format_tag_t tag, alg_t alg, int64_t mb = 0)
         : desc_t(desc), dir(dir), cfg(cfg), tag(tag), alg(alg) {
         if (mb) this->mb = mb;
     }
@@ -85,14 +94,14 @@ struct prb_t: public desc_t {
 
     dir_t dir;
     const dt_conf_t *cfg;
-    mkldnn_format_tag_t tag;
+    dnnl_format_tag_t tag;
     alg_t alg;
 
     BENCHDNN_DISALLOW_COPY_AND_ASSIGN(prb_t);
 };
 std::ostream &operator<<(std::ostream &s, const prb_t &p);
 
-struct perf_report_t: public base_perf_report_t {
+struct perf_report_t : public base_perf_report_t {
     using base_perf_report_t::base_perf_report_t;
 
     void report(const prb_t *p, const res_t *r, const char *prb_str) {
@@ -111,31 +120,20 @@ struct perf_report_t: public base_perf_report_t {
     virtual void dump_desc_csv(std::ostream &s) const override {
         s << p_->mb << ','
 
-          << p_->ic << ','
-          << p_->id << ','
-          << p_->ih << ','
-          << p_->iw << ','
+          << p_->ic << ',' << p_->id << ',' << p_->ih << ',' << p_->iw << ','
 
-          << p_->od << ','
-          << p_->oh << ','
-          << p_->ow << ','
+          << p_->od << ',' << p_->oh << ',' << p_->ow << ','
 
-          << p_->kd << ','
-          << p_->kh << ','
-          << p_->kw << ','
+          << p_->kd << ',' << p_->kh << ',' << p_->kw << ','
 
-          << p_->sd << ','
-          << p_->sh << ','
-          << p_->sw << ','
+          << p_->sd << ',' << p_->sh << ',' << p_->sw << ','
 
-          << p_->pd << ','
-          << p_->ph << ','
-          << p_->pw;
+          << p_->pd << ',' << p_->ph << ',' << p_->pw;
     }
 
     virtual const char *name() const override { return p_->name; }
     virtual const dir_t *dir() const override { return &p_->dir; }
-    virtual const mkldnn_format_tag_t *tag() const override { return &p_->tag; }
+    virtual const dnnl_format_tag_t *tag() const override { return &p_->tag; }
 
 private:
     const prb_t *p_ = NULL;
@@ -152,11 +150,16 @@ inline int64_t src_off_f(const prb_t *p, int64_t mb, int64_t ic, int64_t id,
 
 inline void inv_src_off_f(const prb_t *p, int64_t off, int64_t &mb, int64_t &ic,
         int64_t &id, int64_t &ih, int64_t &iw) {
-    iw = off % p->iw; off /= p->iw;
-    ih = off % p->ih; off /= p->ih;
-    id = off % p->id; off /= p->id;
-    ic = off % p->ic; off /= p->ic;
-    mb = off % p->mb; off /= p->mb;
+    iw = off % p->iw;
+    off /= p->iw;
+    ih = off % p->ih;
+    off /= p->ih;
+    id = off % p->id;
+    off /= p->id;
+    ic = off % p->ic;
+    off /= p->ic;
+    mb = off % p->mb;
+    off /= p->mb;
     assert(off == 0);
 }
 
@@ -167,11 +170,16 @@ inline int64_t dst_off_f(const prb_t *p, int64_t mb, int64_t ic, int64_t od,
 
 inline void inv_dst_off_f(const prb_t *p, int64_t off, int64_t &mb, int64_t &ic,
         int64_t &od, int64_t &oh, int64_t &ow) {
-    ow = off % p->ow; off /= p->ow;
-    oh = off % p->oh; off /= p->oh;
-    od = off % p->od; off /= p->od;
-    ic = off % p->ic; off /= p->ic;
-    mb = off % p->mb; off /= p->mb;
+    ow = off % p->ow;
+    off /= p->ow;
+    oh = off % p->oh;
+    off /= p->oh;
+    od = off % p->od;
+    off /= p->od;
+    ic = off % p->ic;
+    off /= p->ic;
+    mb = off % p->mb;
+    off /= p->mb;
     assert(off == 0);
 }
 
@@ -179,8 +187,8 @@ inline int64_t ker_off_f(const prb_t *p, int64_t kd, int64_t kh, int64_t kw) {
     return (kd * p->kh + kh) * p->kw + kw;
 }
 
-inline int64_t get_num_summands(const prb_t *p, int64_t d, int64_t h, int64_t w)
-{
+inline int64_t get_num_summands(
+        const prb_t *p, int64_t d, int64_t h, int64_t w) {
     const int64_t ID = p->id, IH = p->ih, IW = p->iw;
     const int64_t KD = p->kd, KH = p->kh, KW = p->kw;
     const int64_t PD = p->pd, PH = p->ph, PW = p->pw;
@@ -194,12 +202,12 @@ inline int64_t get_num_summands(const prb_t *p, int64_t d, int64_t h, int64_t w)
     auto w_end = MIN2(w * SW - PW + KW, IW);
 
     return p->alg == AVG_P
-        ? KD * KH * KW
-        : (d_end - d_start) * (h_end - h_start) * (w_end - w_start);
+            ? KD * KH * KW
+            : (d_end - d_start) * (h_end - h_start) * (w_end - w_start);
 }
 
-void compute_ref_fwd(const prb_t *p, const dnn_mem_t &src, dnn_mem_t &dst,
-        dnn_mem_t &ws);
+void compute_ref_fwd(
+        const prb_t *p, const dnn_mem_t &src, dnn_mem_t &dst, dnn_mem_t &ws);
 void compute_ref_bwd(const prb_t *p, dnn_mem_t &diff_src,
         const dnn_mem_t &diff_dst, const dnn_mem_t &ws);
 
@@ -212,6 +220,6 @@ int fill_ws(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp, res_t *r);
 int doit(const prb_t *p, res_t *res);
 int bench(int argc, char **argv);
 
-}
+} // namespace pool
 
 #endif

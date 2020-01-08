@@ -2,15 +2,15 @@ Local Response Normalization (LRN) {#dev_guide_lrn}
 ====================================================
 
 >
-> API reference: [C](@ref c_api_lrn), [C++](@ref cpp_api_lrn)
+> [API Reference](@ref dnnl_api_lrn)
 >
 
 The LRN primitive performs a forward or backward local response normalization
-operation on 2D spatial data and is defined by the following formulas:
+operation defined by the following formulas:
 
 ### Forward
 
-LRN [across channels](#mkldnn_lrn_across_channels):
+LRN [across channels](#dnnl_lrn_across_channels):
 
 \f[
     dst(n, c, h, w) =
@@ -22,7 +22,7 @@ LRN [across channels](#mkldnn_lrn_across_channels):
         src(n, c, h, w),
 \f]
 
-LRN [within channel](#mkldnn_lrn_within_channel):
+LRN [within channel](#dnnl_lrn_within_channel):
 
 \f[
     dst(n, c, h, w) =
@@ -35,7 +35,8 @@ LRN [within channel](#mkldnn_lrn_within_channel):
         src(n, c, h, w),
 \f]
 
-where \f$n_{l}\f$ is the @p local_size.
+where \f$n_{l}\f$ is the @p local_size. Formulas are provided for 2D spatial
+data case.
 
 ### Backward
 
@@ -57,10 +58,10 @@ based on
    is required and its description will be returned.
 
 2. The memory format and data type for `src` and `dst` are assumed to be the
-   same, and in the API are typically referred as `data` (e.g., see `data_desc`
-   in mkldnn::lrn_forward::desc::desc()). The same holds for `diff_src` and
-   `diff_dst`. The corresponding memory descriptors are referred to as
-   `diff_data_desc`.
+   same, and in the API are typically referred to as `data` (e.g., see
+   `data_desc` in dnnl::lrn_forward::desc::desc()). The same holds for
+   `diff_src` and `diff_dst`. The corresponding memory descriptors are referred
+   to as `diff_data_desc`.
 
 ### Data Type Support
 
@@ -72,24 +73,31 @@ The LRN primitive supports the following combinations of data types:
 | forward            | f16                  |
 
 @warning
-    There might be hardware and/or implementation specific restrictions.
-    Check [Implementation Limitations](@ref dg_lrn_impl_limits) section below.
+    There might be hardware and/or implementation specific restrictions. Check
+    the [Implementation Limitations](@ref dg_lrn_impl_limits) section below.
 
 ### Data Representation
 
 #### Source, Destination, and Their Gradients
 
-The LRN primitive supports only 2D spatial data. Like other CNN primitives, the
-LRN primitive expects data to be \f$N \times C \times H \times W\f$ tensor.
+Like most other primitives, the LRN primitive expects the following
+tensors:
+
+| Spatial | Source / Destination
+| :--     | :--
+| 0D      | \f$N \times C\f$
+| 1D      | \f$N \times C \times W\f$
+| 2D      | \f$N \times C \times H \times W\f$
+| 3D      | \f$N \times C \times D \times H \times W\f$
 
 The LRN primitive is optimized for the following memory formats:
 
 | Spatial | Logical tensor | Implementations optimized for memory formats
 | :--     | :--            | :--
-| 2D      | NCHW           | #mkldnn_nchw (#mkldnn_abcd), #mkldnn_nhwc (#mkldnn_acdb), *optimized^*
+| 2D      | NCHW           | #dnnl_nchw (#dnnl_abcd), #dnnl_nhwc (#dnnl_acdb), *optimized^*
 
 Here *optimized^* means the format that
-[comes out](@ref cpu_memory_format_propagation_cpp)
+[comes out](@ref memory_format_propagation_cpp)
 of any preceding compute-intensive primitive.
 
 ### Post-ops and Attributes
@@ -102,6 +110,9 @@ The LRN primitive doesn't support any post-ops or attributes.
 
 1. Refer to @ref dev_guide_data_types for limitations related to data types
    support.
+
+2. **GPU**
+    - Supports only 2D spatial case.
 
 
 ## Performance Tips

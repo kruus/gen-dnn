@@ -16,12 +16,12 @@
 
 #include <memory>
 #include "cpu_isa_traits.hpp"
+#include "bfloat16.hpp"
 #if !defined(TARGET_VANILLA)
 #include "jit_avx512_core_bf16cvt.hpp"
-#endif
-#include "bfloat16.hpp"
+#endif // !defined(TARGET_VANILLA)
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 
 using namespace cpu::bf16_support;
@@ -38,40 +38,39 @@ bfloat16_t &bfloat16_t::operator=(float f) {
         jit_call_t p;
         p.inp = (void *)&f;
         p.out = (void *)this;
-        static const cpu::jit_avx512_core_cvt_ps_to_bf16_t cvt_one_ps_to_bf16(1);
+        static const cpu::jit_avx512_core_cvt_ps_to_bf16_t cvt_one_ps_to_bf16(
+                1);
         cvt_one_ps_to_bf16.jit_ker(&p);
     } else
 #endif // !TARGET_VANILLA
     {
-        float_raw r = { f };
+        float_raw r = {f};
         switch (std::fpclassify(f)) {
-        case FP_SUBNORMAL:
-        case FP_ZERO:
-            // sign preserving zero (denormal go to zero)
-            raw_bits_ = r.iraw[1];
-            raw_bits_ &= 0x8000;
-            break;
-        case FP_INFINITE: 
-            raw_bits_ = r.iraw[1]; 
-            break;
-        case FP_NAN:
-            // truncate and set MSB of the mantissa force QNAN
-            raw_bits_ = r.iraw[1];
-            raw_bits_ |= 1 << 6;
-            break;
-        case FP_NORMAL:
-            // round to nearest even and truncate
-            unsigned int rounding_bias = 0x00007FFF + (r.iraw[1] & 0x1);
-            r.int_raw += rounding_bias;
-            raw_bits_ = r.iraw[1];
-            break;
+            case FP_SUBNORMAL:
+            case FP_ZERO:
+                // sign preserving zero (denormal go to zero)
+                raw_bits_ = r.iraw[1];
+                raw_bits_ &= 0x8000;
+                break;
+            case FP_INFINITE: raw_bits_ = r.iraw[1]; break;
+            case FP_NAN:
+                // truncate and set MSB of the mantissa force QNAN
+                raw_bits_ = r.iraw[1];
+                raw_bits_ |= 1 << 6;
+                break;
+            case FP_NORMAL:
+                // round to nearest even and truncate
+                unsigned int rounding_bias = 0x00007FFF + (r.iraw[1] & 0x1);
+                r.int_raw += rounding_bias;
+                raw_bits_ = r.iraw[1];
+                break;
         }
     }
     return *this;
 }
 
 bfloat16_t::operator float() const {
-    float_raw r = { 0 };
+    float_raw r = {0};
     r.iraw[1] = raw_bits_;
     r.iraw[0] = 0;
     return r.fraw;
@@ -79,37 +78,51 @@ bfloat16_t::operator float() const {
 
 #if !defined(TARGET_VANILLA)
 void cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t size) {
-    assert(cpu::mayiuse(cpu::cpu_isa_t::avx512_core));
-    jit_call_t p_;
-    p_.inp = (void *)inp;
-    p_.out = (void *)out;
-    p_.size = size;
-    static const cpu::jit_avx512_core_cvt_ps_to_bf16_t cvt_ps_to_bf16;
-    cvt_ps_to_bf16.jit_ker(&p_);
+    if (cpu::mayiuse(cpu::cpu_isa_t::avx512_core)) {
+        jit_call_t p_;
+        p_.inp = (void *)inp;
+        p_.out = (void *)out;
+        p_.size = size;
+        static const cpu::jit_avx512_core_cvt_ps_to_bf16_t cvt_ps_to_bf16;
+        cvt_ps_to_bf16.jit_ker(&p_);
+    } else {
+        for (size_t i = 0; i < size; ++i)
+            out[i] = inp[i];
+    }
 }
 
 void cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t size) {
-    assert(cpu::mayiuse(cpu::cpu_isa_t::avx512_core));
-    jit_call_t p_;
-    p_.inp = (void *)inp;
-    p_.out = (void *)out;
-    p_.size = size;
-    static const cpu::jit_avx512_core_cvt_bf16_to_ps_t cvt_bf16_to_ps;
-    cvt_bf16_to_ps.jit_ker(&p_);
+    if (cpu::mayiuse(cpu::cpu_isa_t::avx512_core)) {
+        jit_call_t p_;
+        p_.inp = (void *)inp;
+        p_.out = (void *)out;
+        p_.size = size;
+        static const cpu::jit_avx512_core_cvt_bf16_to_ps_t cvt_bf16_to_ps;
+        cvt_bf16_to_ps.jit_ker(&p_);
+    } else {
+        for (size_t i = 0; i < size; ++i)
+            out[i] = inp[i];
+    }
 }
 
 void add_floats_and_cvt_to_bfloat16(
         bfloat16_t *out, const float *inp0, const float *inp1, size_t size) {
-    assert(cpu::mayiuse(cpu::cpu_isa_t::avx512_core));
-    jit_call_t p_;
-    p_.inp = (void *)inp0;
-    p_.add = (void *)inp1;
-    p_.out = (void *)out;
-    p_.size = size;
-    static const cpu::jit_avx512_core_add_cvt_ps_to_bf16_t add_cvt_ps_to_bf16;
-    add_cvt_ps_to_bf16.jit_ker(&p_);
+    if (cpu::mayiuse(cpu::cpu_isa_t::avx512_core)) {
+        jit_call_t p_;
+        p_.inp = (void *)inp0;
+        p_.add = (void *)inp1;
+        p_.out = (void *)out;
+        p_.size = size;
+        static const cpu::jit_avx512_core_add_cvt_ps_to_bf16_t
+                add_cvt_ps_to_bf16;
+        add_cvt_ps_to_bf16.jit_ker(&p_);
+    } else {
+        for (size_t i = 0; i < size; ++i)
+            out[i] = inp0[i] + inp1[i];
+    }
 }
 #endif // !TARGET_VANILLA
 
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

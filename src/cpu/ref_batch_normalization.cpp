@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -17,32 +17,31 @@
 #include <assert.h>
 #include <math.h>
 
-#include "c_types_map.hpp"
-#include "memory_tracking.hpp"
-#include "type_helpers.hpp"
-#include "mkldnn_thread.hpp"
-#include "simple_q10n.hpp"
-#if !defined(TARGET_VANILLA)
 #include "bfloat16.hpp"
-#endif // !TARGET_VANILLA
+#include "c_types_map.hpp"
+#include "dnnl_thread.hpp"
+#include "memory_tracking.hpp"
+// XXX #include "dnnl_thread.hpp"
 #include "ref_batch_normalization.hpp"
+#include "simple_q10n.hpp"
+#include "type_helpers.hpp"
 
-#define DECLARE_DATA_OFFSET                                                 \
+#define DECLARE_DATA_OFFSET \
     auto data_offset = [&](const memory_desc_wrapper &data_d, int n, int c, \
-                               int d, int h, int w) {                       \
-        if (has_spatial) {                                                  \
-            if (is_3d)                                                      \
-                return data_d.off(n, c, d, h, w);                           \
-            else if (is_1d)                                                 \
-                return data_d.off(n, c, w);                                 \
-            else                                                            \
-                return data_d.off(n, c, h, w);                              \
-        } else {                                                            \
-            return data_d.off(n, c);                                        \
-        }                                                                   \
+                               int d, int h, int w) { \
+        if (has_spatial) { \
+            if (is_3d) \
+                return data_d.off(n, c, d, h, w); \
+            else if (is_1d) \
+                return data_d.off(n, c, w); \
+            else \
+                return data_d.off(n, c, h, w); \
+        } else { \
+            return data_d.off(n, c); \
+        } \
     }
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
@@ -72,22 +71,21 @@ template <impl::data_type_t d_type>
 void ref_batch_normalization_fwd_t<d_type>::execute_forward(
         const exec_ctx_t &ctx) const {
     /* fast return */
-    if (this->pd()->has_zero_dim_memory())
-        return;
+    if (this->pd()->has_zero_dim_memory()) return;
 
-    auto src = CTX_IN_MEM(const data_t *, MKLDNN_ARG_SRC);
-    auto scaleshift = CTX_IN_MEM(const acc_data_t *, MKLDNN_ARG_SCALE_SHIFT);
+    auto src = CTX_IN_MEM(const data_t *, DNNL_ARG_SRC);
+    auto scaleshift = CTX_IN_MEM(const acc_data_t *, DNNL_ARG_SCALE_SHIFT);
 
-    auto mean = pd()->stats_is_src() ? const_cast<acc_data_t *>(CTX_IN_MEM(
-                                               const float *, MKLDNN_ARG_MEAN))
-                                     : CTX_OUT_MEM(float *, MKLDNN_ARG_MEAN);
+    auto mean = pd()->stats_is_src()
+            ? const_cast<acc_data_t *>(CTX_IN_MEM(const float *, DNNL_ARG_MEAN))
+            : CTX_OUT_MEM(float *, DNNL_ARG_MEAN);
     auto variance = pd()->stats_is_src()
             ? const_cast<acc_data_t *>(
-                      CTX_IN_MEM(const float *, MKLDNN_ARG_VARIANCE))
-            : CTX_OUT_MEM(float *, MKLDNN_ARG_VARIANCE);
+                    CTX_IN_MEM(const float *, DNNL_ARG_VARIANCE))
+            : CTX_OUT_MEM(float *, DNNL_ARG_VARIANCE);
 
-    auto dst = CTX_OUT_MEM(data_t *, MKLDNN_ARG_DST);
-    auto ws = CTX_OUT_MEM(uint8_t *, MKLDNN_ARG_WORKSPACE);
+    auto dst = CTX_OUT_MEM(data_t *, DNNL_ARG_DST);
+    auto ws = CTX_OUT_MEM(uint8_t *, DNNL_ARG_WORKSPACE);
 
     const memory_desc_wrapper data_d(pd()->src_md());
     const memory_desc_wrapper scaleshift_d(pd()->weights_md());
@@ -109,6 +107,16 @@ void ref_batch_normalization_fwd_t<d_type>::execute_forward(
     const bool fuse_norm_relu = pd()->fuse_norm_relu();
     const bool calculate_stats = !pd()->stats_is_src();
 
+    /* fast return */
+    if (this->pd()->has_zero_dim_memory()) {
+        if (calculate_stats && save_stats)
+            for (dim_t c = 0; c < pd()->C(); c++) {
+                mean[c] = 0;
+                variance[c] = 0;
+            }
+        return;
+    }
+
     const bool with_relu = pd()->with_relu_post_op();
     auto maybe_post_op = [&](acc_data_t res) {
         return (with_relu && res < 0.0f) ? 0.0f : res;
@@ -124,18 +132,18 @@ void ref_batch_normalization_fwd_t<d_type>::execute_forward(
         acc_data_t v_variance = calculate_stats ? 0 : variance[c];
 
         if (calculate_stats) {
-            for (int n = 0; n < N; ++n)
-            for (int d = 0; d < D; ++d)
-            for (int h = 0; h < H; ++h)
+            for_(int n = 0; n < N; ++n)
+            for_(int d = 0; d < D; ++d)
+            for_(int h = 0; h < H; ++h)
             for (int w = 0; w < W; ++w) {
                 v_mean += maybe_up_convert(
                         src[data_offset(data_d, n, c, d, h, w)]);
             }
             v_mean /= W * N * H * D;
 
-            for (int n = 0; n < N; ++n)
-            for (int d = 0; d < D; ++d)
-            for (int h = 0; h < H; ++h)
+            for_(int n = 0; n < N; ++n)
+            for_(int d = 0; d < D; ++d)
+            for_(int h = 0; h < H; ++h)
             for (int w = 0; w < W; ++w) {
                 acc_data_t m = src[data_offset(data_d, n, c, d, h, w)] - v_mean;
                 v_variance += m * m;
@@ -149,9 +157,9 @@ void ref_batch_normalization_fwd_t<d_type>::execute_forward(
                 / sqrt_variance;
         acc_data_t sv = use_scaleshift ? scaleshift[scaleshift_d.off(1, c)] : 0;
 
-        for (dim_t n = 0; n < N; ++n)
-        for (dim_t d = 0; d < D; ++d)
-        for (dim_t h = 0; h < H; ++h)
+        for_(dim_t n = 0; n < N; ++n)
+        for_(dim_t d = 0; d < D; ++d)
+        for_(dim_t h = 0; h < H; ++h)
         for (dim_t w = 0; w < W; ++w) {
             auto d_off = data_offset(data_d, n, c, d, h, w);
             acc_data_t bn_res
@@ -159,11 +167,9 @@ void ref_batch_normalization_fwd_t<d_type>::execute_forward(
             if (fuse_norm_relu) {
                 if (bn_res <= 0) {
                     bn_res = 0;
-                    if (is_training)
-                        ws[d_off] = 0;
+                    if (is_training) ws[d_off] = 0;
                 } else {
-                    if (is_training)
-                        ws[d_off] = 1;
+                    if (is_training) ws[d_off] = 1;
                 }
             }
             if (d_type == s8)
@@ -190,16 +196,15 @@ template struct ref_batch_normalization_fwd_t<bf16>;
 template <impl::data_type_t d_type>
 void ref_batch_normalization_bwd_t<d_type>::execute_backward(
         const exec_ctx_t &ctx) const {
-    auto src = CTX_IN_MEM(const data_t *, MKLDNN_ARG_SRC);
-    auto mean = CTX_IN_MEM(const acc_data_t *, MKLDNN_ARG_MEAN);
-    auto variance = CTX_IN_MEM(const acc_data_t *, MKLDNN_ARG_VARIANCE);
-    auto diff_dst = CTX_IN_MEM(const data_t *, MKLDNN_ARG_DIFF_DST);
-    auto scaleshift = CTX_IN_MEM(const acc_data_t *, MKLDNN_ARG_SCALE_SHIFT);
-    auto ws = CTX_IN_MEM(const uint8_t *, MKLDNN_ARG_WORKSPACE);
+    auto src = CTX_IN_MEM(const data_t *, DNNL_ARG_SRC);
+    auto mean = CTX_IN_MEM(const acc_data_t *, DNNL_ARG_MEAN);
+    auto variance = CTX_IN_MEM(const acc_data_t *, DNNL_ARG_VARIANCE);
+    auto diff_dst = CTX_IN_MEM(const data_t *, DNNL_ARG_DIFF_DST);
+    auto scaleshift = CTX_IN_MEM(const acc_data_t *, DNNL_ARG_SCALE_SHIFT);
+    auto ws = CTX_IN_MEM(const uint8_t *, DNNL_ARG_WORKSPACE);
 
-    auto diff_src = CTX_OUT_MEM(data_t *, MKLDNN_ARG_DIFF_SRC);
-    auto diff_scaleshift
-            = CTX_OUT_MEM(acc_data_t *, MKLDNN_ARG_DIFF_SCALE_SHIFT);
+    auto diff_src = CTX_OUT_MEM(data_t *, DNNL_ARG_DIFF_SRC);
+    auto diff_scaleshift = CTX_OUT_MEM(acc_data_t *, DNNL_ARG_DIFF_SCALE_SHIFT);
 
     const memory_desc_wrapper data_d(pd()->src_md());
     const memory_desc_wrapper diff_data_d(pd()->diff_src_md());
@@ -271,9 +276,9 @@ void ref_batch_normalization_bwd_t<d_type>::execute_backward(
             diff_scaleshift[diff_scaleshift_d.off(1, c)] = diff_beta;
         }
 
-        for (dim_t n = 0; n < N; ++n)
-        for (dim_t d = 0; d < D; ++d)
-        for (dim_t h = 0; h < H; ++h)
+        for_(dim_t n = 0; n < N; ++n)
+        for_(dim_t d = 0; d < D; ++d)
+        for_(dim_t h = 0; h < H; ++h)
         for (dim_t w = 0; w < W; ++w) {
             const size_t s_off = data_offset(data_d, n, c, d, h, w);
             const size_t dd_off = data_offset(diff_data_d, n, c, d, h, w);
@@ -299,7 +304,8 @@ template struct ref_batch_normalization_bwd_t<f32>;
 template struct ref_batch_normalization_bwd_t<bf16>;
 #endif // !TARGET_VANILLA
 
-}
-}
-}
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
+
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

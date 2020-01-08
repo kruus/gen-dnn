@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2018 Intel Corporation
+* Copyright 2017-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -14,26 +14,24 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "mkldnn_debug.hpp"
+#include "dnnl_debug.hpp"
 
 #include "reorder/reorder.hpp"
 
 namespace reorder {
 
 alg_t str2alg(const char *str) {
-    if (!strcasecmp("bootstrap", str))
-        return ALG_BOOT;
-    if (!strcasecmp("reference", str))
-        return ALG_REF;
+    if (!strcasecmp("bootstrap", str)) return ALG_BOOT;
+    if (!strcasecmp("reference", str)) return ALG_REF;
     assert(!"unknown algorithm");
     return ALG_REF;
 }
 
 const char *alg2str(alg_t alg) {
     switch (alg) {
-    case ALG_REF: return "reference";
-    case ALG_BOOT: return "bootstrap";
-    default: assert(!"unknown algorithm"); return "unknown algorithm";
+        case ALG_REF: return "reference";
+        case ALG_BOOT: return "bootstrap";
+        default: assert(!"unknown algorithm"); return "unknown algorithm";
     }
 }
 
@@ -48,10 +46,10 @@ flag_t str2flag(const char *str) {
 
 const char *flag2str(flag_t flag) {
     switch (flag) {
-    case FLAG_NONE: return "";
-    case FLAG_CONV_S8S8: return "conv_s8s8";
-    case FLAG_GCONV_S8S8: return "gconv_s8s8";
-    default: assert(!"Invalid flag"); return "";
+        case FLAG_NONE: return "";
+        case FLAG_CONV_S8S8: return "conv_s8s8";
+        case FLAG_GCONV_S8S8: return "gconv_s8s8";
+        default: assert(!"Invalid flag"); return "";
     }
 }
 
@@ -63,16 +61,15 @@ std::ostream &operator<<(std::ostream &s, const prb_t &p) {
     s << "--stag=" << fmt_tag2str(p.reorder.tag_in) << " ";
     s << "--dtag=" << fmt_tag2str(p.reorder.tag_out) << " ";
 
-    if (p.alg != ALG_REF)
-        s << "--alg=" << alg2str(p.alg) << " ";
-    if (p.oflag != FLAG_NONE)
-        s << "--oflag=" << flag2str(p.oflag) << " ";
-    if (!p.attr.is_def())
-        s << "--attr=\"" << p.attr << "\" ";
+    if (p.alg != ALG_REF) s << "--alg=" << alg2str(p.alg) << " ";
+    if (p.oflag != FLAG_NONE) s << "--oflag=" << flag2str(p.oflag) << " ";
+    if (p.runtime_dim_mask != 0)
+        s << "--runtime-dim-mask=" << p.runtime_dim_mask << " ";
+    if (!p.attr.is_def()) s << "--attr=\"" << p.attr << "\" ";
 
     s << p.reorder.dims;
 
     return s;
 }
 
-}
+} // namespace reorder

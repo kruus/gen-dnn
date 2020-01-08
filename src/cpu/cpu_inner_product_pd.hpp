@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -20,10 +20,11 @@
 #include <assert.h>
 
 #include "c_types_map.hpp"
+#include "cpu_engine.hpp"
 #include "inner_product_pd.hpp"
 #include "utils.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
@@ -112,8 +113,7 @@ void transpose_md(memory_desc_t &md) {
     auto is_a_first = [&](memory_desc_t &md) {
         auto &md_blk = md.format_desc.blocking;
         for (int d = 1; d < md.ndims; d++)
-            if (md_blk.strides[0] < md_blk.strides[d])
-                return false;
+            if (md_blk.strides[0] < md_blk.strides[d]) return false;
         return true;
     };
 
@@ -129,27 +129,35 @@ format_tag_t get_tag(memory_desc_t &md) {
     using namespace format_tag;
     auto tag = memory_desc_matches_one_of_tag(md, ab, abc, abcd,
             abcde, // NCHW derivatives
+            ba, cba, cdba, cdeba, // IO and spatial derivatives
             acb, acdb, acdeb, // NHWC derivatives
             aBcd16b, aBcde16b, aBcd8b, aBcde8b, aBcd4b,
             aBcde4b); // blocked layouts
-    assert(tag != format_tag::undef);
     return tag;
 }
-}
+} // namespace
 
-struct cpu_inner_product_fwd_pd_t: public inner_product_fwd_pd_t {
+#define INIT_MEM_BY_TAG(tag_init_f, md) \
+    do { \
+        auto tag = tag_init_f; \
+        if (tag == format_tag::undef) return status::unimplemented; \
+        CHECK(memory_desc_init_by_tag(md, tag)); \
+    } while (0)
+
+struct cpu_inner_product_fwd_pd_t : public inner_product_fwd_pd_t {
     using inner_product_fwd_pd_t::inner_product_fwd_pd_t;
+
 protected:
     status_t set_default_params() {
         using namespace format_tag;
 
         auto set_default_src = [&]() {
-            format_tag_t tag;
             if (weights_md_.format_kind == format_kind::any) {
-                tag = utils::pick(ndims() - 2, ab, abc, abcd, abcde);
-                CHECK(memory_desc_init_by_tag(src_md_, tag));
+                INIT_MEM_BY_TAG(utils::pick(ndims() - 2, ab, abc, abcd, abcde),
+                        src_md_);
             } else {
-                CHECK(memory_desc_init_by_tag(src_md_, get_tag(weights_md_)));
+                INIT_MEM_BY_TAG(get_tag(weights_md_), src_md_);
+                // transpose weights to improve efficiency of non-copy kernels
                 if (src_md_.format_desc.blocking.strides[0] == 1)
                     transpose_md(src_md_);
             }
@@ -157,18 +165,17 @@ protected:
         };
 
         auto set_default_weights = [&]() {
-            CHECK(memory_desc_init_by_tag(weights_md_, get_tag(src_md_)));
+            INIT_MEM_BY_TAG(get_tag(src_md_), weights_md_);
             /* with batch = 1, no transpose to use the faster gemv kernels */
-            /* otherwise, we transpose the weights to improve efficiency of no-copy kernels*/
+            /* otherwise, we transpose the weights to improve efficiency of
+             * no-copy kernels */
             auto batch = src_md_.dims[0];
-            if (batch > 1)
-                transpose_md(weights_md_);
+            if (batch > 1) transpose_md(weights_md_);
 
             return status::success;
         };
 
-        if (src_md_.format_kind == format_kind::any)
-            CHECK(set_default_src());
+        if (src_md_.format_kind == format_kind::any) CHECK(set_default_src());
         if (weights_md_.format_kind == format_kind::any)
             CHECK(set_default_weights());
         if (dst_md_.format_kind == format_kind::any)
@@ -179,20 +186,19 @@ protected:
     }
 };
 
-struct cpu_inner_product_bwd_data_pd_t: public inner_product_bwd_data_pd_t {
+struct cpu_inner_product_bwd_data_pd_t : public inner_product_bwd_data_pd_t {
     using inner_product_bwd_data_pd_t::inner_product_bwd_data_pd_t;
+
 protected:
     status_t set_default_params() {
         using namespace format_tag;
 
         auto set_default_diff_src = [&]() {
-            format_tag_t tag;
             if (weights_md_.format_kind == format_kind::any) {
-                tag = utils::pick(ndims() - 2, ab, abc, abcd, abcde);
-                CHECK(memory_desc_init_by_tag(diff_src_md_, tag));
+                INIT_MEM_BY_TAG(utils::pick(ndims() - 2, ab, abc, abcd, abcde),
+                        diff_src_md_);
             } else {
-                CHECK(memory_desc_init_by_tag(
-                        diff_src_md_, get_tag(weights_md_)));
+                INIT_MEM_BY_TAG(get_tag(weights_md_), diff_src_md_);
                 if (diff_src_md_.format_desc.blocking.strides[0] == 1)
                     transpose_md(diff_src_md_);
             }
@@ -200,12 +206,12 @@ protected:
         };
 
         auto set_default_weights = [&]() {
-            CHECK(memory_desc_init_by_tag(weights_md_, get_tag(diff_src_md_)));
+            INIT_MEM_BY_TAG(get_tag(diff_src_md_), weights_md_);
             /* with batch = 1, no transpose to use the faster gemv kernels */
-            /* otherwise, we transpose the weights to improve efficiency of no-copy kernels*/
+            /* otherwise, we transpose the weights to improve efficiency of
+             * no-copy kernels */
             auto batch = diff_src_md_.dims[0];
-            if (batch == 1)
-                transpose_md(weights_md_);
+            if (batch == 1) transpose_md(weights_md_);
 
             return status::success;
         };
@@ -220,20 +226,20 @@ protected:
     }
 };
 
-struct cpu_inner_product_bwd_weights_pd_t: public inner_product_bwd_weights_pd_t {
+struct cpu_inner_product_bwd_weights_pd_t
+    : public inner_product_bwd_weights_pd_t {
     using inner_product_bwd_weights_pd_t::inner_product_bwd_weights_pd_t;
+
 protected:
     status_t set_default_params() {
         using namespace format_tag;
 
         auto set_default_src = [&]() {
-            format_tag_t tag;
             if (diff_weights_md_.format_kind == format_kind::any) {
-                tag = utils::pick(ndims() - 2, ab, abc, abcd, abcde);
-                CHECK(memory_desc_init_by_tag(src_md_, tag));
+                INIT_MEM_BY_TAG(utils::pick(ndims() - 2, ab, abc, abcd, abcde),
+                        src_md_);
             } else {
-                CHECK(memory_desc_init_by_tag(
-                        src_md_, get_tag(diff_weights_md_)));
+                INIT_MEM_BY_TAG(get_tag(diff_weights_md_), src_md_);
                 if (src_md_.format_desc.blocking.strides[0] == 1)
                     transpose_md(src_md_);
             }
@@ -241,17 +247,15 @@ protected:
         };
 
         auto set_default_diff_weights = [&]() {
-            CHECK(memory_desc_init_by_tag(diff_weights_md_, get_tag(src_md_)));
+            INIT_MEM_BY_TAG(get_tag(src_md_), diff_weights_md_);
             // Here, we want diff_weights layout to match the fwd weights layout
             auto batch = src_md_.dims[0];
-            if (batch > 1)
-                transpose_md(diff_weights_md_);
+            if (batch > 1) transpose_md(diff_weights_md_);
 
             return status::success;
         };
 
-        if (src_md_.format_kind == format_kind::any)
-            CHECK(set_default_src());
+        if (src_md_.format_kind == format_kind::any) CHECK(set_default_src());
         if (diff_weights_md_.format_kind == format_kind::any)
             CHECK(set_default_diff_weights());
         if (diff_dst_md_.format_kind == format_kind::any)
@@ -261,11 +265,12 @@ protected:
         return status::success;
     }
 };
+#undef INIT_MEM_BY_TAG
 
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

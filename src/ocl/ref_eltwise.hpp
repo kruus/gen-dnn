@@ -18,53 +18,53 @@
 #define OCL_REF_ELTWISE_HPP
 
 #include "common/c_types_map.hpp"
+#include "compute/compute.hpp"
 #include "ocl/jit_ref_eltwise_common_kernel.hpp"
-#include "ocl/ocl_engine.hpp"
 #include "ocl/ocl_eltwise_pd.hpp"
 #include "ocl/ocl_stream.hpp"
 #include "ocl/ocl_utils.hpp"
 
-extern const char *ref_eltwise_kernel;
-
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace ocl {
 
-struct ref_eltwise_fwd_t : public primitive_t {
+struct ref_eltwise_fwd_t : public primitive_impl_t {
     struct pd_t : public ocl_eltwise_fwd_pd_t {
         using ocl_eltwise_fwd_pd_t::ocl_eltwise_fwd_pd_t;
 
         DECLARE_COMMON_PD_T("ocl:ref:any", ref_eltwise_fwd_t);
 
         status_t init() {
-            auto *cl_engine = utils::downcast<cl_engine_t *>(engine());
+            auto *compute_engine
+                    = utils::downcast<compute::compute_engine_t *>(engine());
 
+            using namespace alg_kind;
             bool ok = true
                     && utils::one_of(desc()->prop_kind,
-                               prop_kind::forward_training,
-                               prop_kind::forward_inference)
-                    && utils::one_of(desc()->alg_kind, alg_kind::eltwise_relu,
-                               alg_kind::eltwise_linear,
-                               alg_kind::eltwise_bounded_relu,
-                               alg_kind::eltwise_abs,
-                               alg_kind::eltwise_tanh,
-                               alg_kind::eltwise_elu,
-                               alg_kind::eltwise_square,
-                               alg_kind::eltwise_sqrt,
-                               alg_kind::eltwise_soft_relu,
-                               alg_kind::eltwise_logistic,
-                               alg_kind::eltwise_exp)
+                            prop_kind::forward_training,
+                            prop_kind::forward_inference)
+                    && utils::one_of(desc()->alg_kind, eltwise_relu,
+                            eltwise_linear, eltwise_bounded_relu, eltwise_abs,
+                            eltwise_tanh, eltwise_elu, eltwise_square,
+                            eltwise_sqrt, eltwise_soft_relu, eltwise_logistic,
+                            eltwise_exp, eltwise_gelu, eltwise_swish,
+                            eltwise_log, eltwise_clip)
                     && utils::one_of(desc()->data_desc.data_type,
-                               data_type::f32, data_type::f16)
+                            data_type::f32, data_type::f16, data_type::bf16,
+                            data_type::s32, data_type::s8)
                     && attr()->has_default_values()
+                    && IMPLICATION(utils::one_of(desc()->data_desc.data_type,
+                                           data_type::s32, data_type::s8),
+                            desc()->alg_kind == eltwise_relu
+                                    && desc()->alpha == 0)
                     && IMPLICATION(
-                               desc()->data_desc.data_type == data_type::f16,
-                               cl_engine->mayiuse(cl_device_ext_t::khr_fp16));
-            if (!ok)
-                return status::unimplemented;
+                            desc()->data_desc.data_type == data_type::f16,
+                            compute_engine->mayiuse(
+                                    compute::device_ext_t::khr_fp16));
+            if (!ok) return status::unimplemented;
 
-            return jit_ref_eltwise_common_kernel::init_conf(jel_,
-                    data_md_, jit_off_, desc()->alg_kind, true);
+            return jit_ref_eltwise_common_kernel::init_conf(
+                    jel_, this, jit_off_);
         }
 
         jit_eltwise_conf_t jel_;
@@ -72,23 +72,22 @@ struct ref_eltwise_fwd_t : public primitive_t {
     };
 
     virtual status_t init() override {
-        auto jit = ocl_jit_t(ref_eltwise_kernel);
+        auto *compute_engine
+                = utils::downcast<compute::compute_engine_t *>(engine());
+        compute::kernel_ctx_t kernel_ctx;
 
         status_t status = jit_ref_eltwise_common_kernel::init_const_def(
-                jit, pd()->jel_, pd()->jit_off_);
+                kernel_ctx, pd()->jel_, pd()->jit_off_);
 
-        if (status != status::success)
-            return status;
+        if (status != status::success) return status;
 
-        status = jit.build(engine());
-        if (status != status::success)
-            return status;
+        compute_engine->create_kernel(&kernel_, "ref_eltwise_fwd", kernel_ctx);
+        if (!kernel_) return status::runtime_error;
 
-        kernel_ = jit.get_kernel("ref_eltwise_fwd");
         return status::success;
     }
 
-    ref_eltwise_fwd_t(const pd_t *apd) : primitive_t(apd) {}
+    ref_eltwise_fwd_t(const pd_t *apd) : primitive_impl_t(apd) {}
 
     virtual status_t execute(const exec_ctx_t &ctx) const override {
         return execute_forward_dense(ctx);
@@ -96,11 +95,11 @@ struct ref_eltwise_fwd_t : public primitive_t {
 
 private:
     status_t execute_forward_dense(const exec_ctx_t &ctx) const;
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
-    ocl_kernel_t kernel_;
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
+    compute::kernel_t kernel_;
 };
 
-struct ref_eltwise_bwd_t : public primitive_t {
+struct ref_eltwise_bwd_t : public primitive_impl_t {
     struct pd_t : public ocl_eltwise_bwd_pd_t {
         pd_t(engine_t *engine, const eltwise_desc_t *adesc,
                 const primitive_attr_t *attr,
@@ -114,30 +113,22 @@ struct ref_eltwise_bwd_t : public primitive_t {
             using namespace utils;
             assert(engine()->kind() == engine_kind::gpu);
 
-            memory_desc_wrapper data_mdw(desc()->data_desc);
-            memory_desc_wrapper diff_data_mdw(desc()->diff_data_desc);
-
-            bool ok = true
-                    && desc()->prop_kind == backward_data
-                    && utils::one_of(desc()->alg_kind, alg_kind::eltwise_relu,
-                               alg_kind::eltwise_linear,
-                               alg_kind::eltwise_bounded_relu,
-                               alg_kind::eltwise_abs,
-                               alg_kind::eltwise_tanh,
-                               alg_kind::eltwise_elu,
-                               alg_kind::eltwise_square,
-                               alg_kind::eltwise_sqrt,
-                               alg_kind::eltwise_soft_relu,
-                               alg_kind::eltwise_logistic,
-                               alg_kind::eltwise_exp)
-                    && desc()->data_desc.data_type == data_type::f32
-                    && data_mdw == diff_data_mdw
+            using namespace alg_kind;
+            bool ok = true && desc()->prop_kind == backward_data
+                    && utils::one_of(desc()->alg_kind, eltwise_relu,
+                            eltwise_linear, eltwise_bounded_relu, eltwise_abs,
+                            eltwise_tanh, eltwise_elu, eltwise_square,
+                            eltwise_sqrt, eltwise_soft_relu, eltwise_logistic,
+                            eltwise_exp, eltwise_gelu, eltwise_swish,
+                            eltwise_log, eltwise_clip)
+                    && utils::one_of(desc()->data_desc.data_type,
+                            data_type::f32, data_type::bf16)
+                    && set_default_formats_common()
                     && attr()->has_default_values();
-            if (!ok)
-                return status::unimplemented;
+            if (!ok) return status::unimplemented;
 
-            return jit_ref_eltwise_common_kernel::init_conf(jel_,
-                    data_md_, jit_off_, desc()->alg_kind, false);
+            return jit_ref_eltwise_common_kernel::init_conf(
+                    jel_, this, jit_off_);
         }
 
         jit_eltwise_conf_t jel_;
@@ -146,25 +137,21 @@ struct ref_eltwise_bwd_t : public primitive_t {
     };
 
     status_t init() override {
-        auto jit = ocl_jit_t(ref_eltwise_kernel);
+        auto *compute_engine
+                = utils::downcast<compute::compute_engine_t *>(engine());
+        compute::kernel_ctx_t kernel_ctx;
 
         status_t status = jit_ref_eltwise_common_kernel::init_const_def(
-                jit, pd()->jel_, pd()->jit_off_);
-        if (status != status::success)
-            return status;
+                kernel_ctx, pd()->jel_, pd()->jit_off_);
+        if (status != status::success) return status;
 
-        status = jit.build(engine());
-        if (status != status::success)
-            return status;
-
-        kernel_ = jit.get_kernel("ref_eltwise_bwd");
-        if (!kernel_)
-            return status::runtime_error;
+        compute_engine->create_kernel(&kernel_, "ref_eltwise_bwd", kernel_ctx);
+        if (!kernel_) return status::runtime_error;
 
         return status::success;
     }
 
-    ref_eltwise_bwd_t(const pd_t *apd) : primitive_t(apd) {}
+    ref_eltwise_bwd_t(const pd_t *apd) : primitive_impl_t(apd) {}
 
     ~ref_eltwise_bwd_t() {}
 
@@ -174,12 +161,12 @@ struct ref_eltwise_bwd_t : public primitive_t {
 
 private:
     status_t execute_backward_dense(const exec_ctx_t &ctx) const;
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
-    ocl_kernel_t kernel_;
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
+    compute::kernel_t kernel_;
 };
 
 } // namespace ocl
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl
 
 #endif

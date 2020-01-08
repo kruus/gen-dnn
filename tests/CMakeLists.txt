@@ -1,5 +1,5 @@
 #===============================================================================
-# Copyright 2016-2018 Intel Corporation
+# Copyright 2016-2019 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 # limitations under the License.
 #===============================================================================
 
-if (NOT MKLDNN_BUILD_TESTS)
+if (NOT DNNL_BUILD_TESTS)
     return()
 endif()
 
@@ -39,7 +39,7 @@ append(CMAKE_C_FLAGS "${CMAKE_CCXX_SANITIZER_FLAGS}")
 append(CMAKE_CXX_FLAGS "${CMAKE_CCXX_SANITIZER_FLAGS}")
 
 # allow tests to include internal header files with, e.g.
-# include "src/common/mkldnn_thread.hpp"
+# include "src/common/dnnl_thread.hpp"
 include_directories(${PROJECT_SOURCE_DIR})
 
 if(UNIX OR MINGW)
@@ -58,7 +58,7 @@ elseif(WIN32 AND NOT MINGW)
         append(CMAKE_TEST_CCXX_NOWARN_FLAGS "/Qdiag-disable:1786")
         # 2415: unused variable
         append(CMAKE_TEST_CCXX_NOWARN_FLAGS "/Qdiag-disable:2415")
-    else()
+    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
         # c4244: conversion with possible loss of data
         # c4996: unsafe / deprecated functions
         append(CMAKE_TEST_CCXX_NOWARN_FLAGS "/wd4996 /wd4244")
@@ -85,3 +85,5 @@ endif()
 
 add_subdirectory(gtests)
 add_subdirectory(benchdnn)
+add_subdirectory(mkldnn_compat)
+add_subdirectory(noexcept)

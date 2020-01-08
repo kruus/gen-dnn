@@ -14,49 +14,50 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <sstream>
 
-#include "mkldnn.h"
+#include "dnnl.h"
 
-#include "mkldnn_common.hpp"
-#include "mkldnn_memory.hpp"
+#include "dnnl_common.hpp"
+#include "dnnl_memory.hpp"
 #include "parser.hpp"
 
 #include "concat/concat.hpp"
 
 namespace concat {
 
-std::vector<mkldnn_data_type_t> sdt {mkldnn_f32};
-std::vector<mkldnn_data_type_t> ddt {mkldnn_f32};
-std::vector<std::vector<mkldnn_format_tag_t>> stag {{mkldnn_nchw, mkldnn_nchw}};
-std::vector<mkldnn_format_tag_t> dtag {mkldnn_format_tag_undef};
+std::vector<dnnl_data_type_t> sdt {dnnl_f32};
+std::vector<dnnl_data_type_t> ddt {dnnl_f32};
+std::vector<std::vector<dnnl_format_tag_t>> stag {{dnnl_nchw, dnnl_nchw}};
+std::vector<dnnl_format_tag_t> dtag {dnnl_format_tag_undef};
 std::vector<int> axis {1};
 
 std::vector<dims_t> sdims;
 bool allow_unimpl = false;
-const char *perf_template_csv =
-    "perf,%engine%,%sdt%,%ddt%,%stag%,%dtag%,%axis%,%DESC%,%-time%,%0time%";
+const char *perf_template_csv
+        = "perf,%engine%,%sdt%,%ddt%,%stag%,%dtag%,%axis%,%DESC%,%-time%,%"
+          "0time%";
 const char *perf_template_def = "perf,%engine%,%desc%,%-time%,%0time%";
 const char *perf_template = perf_template_def;
 
 void reset_parameters() {
-    sdt = {mkldnn_f32};
-    ddt = {mkldnn_f32};
-    stag = {{mkldnn_nchw, mkldnn_nchw}};
-    dtag = {mkldnn_nchw};
+    sdt = {dnnl_f32};
+    ddt = {dnnl_f32};
+    stag = {{dnnl_nchw, dnnl_nchw}};
+    dtag = {dnnl_format_tag_undef};
     axis = {1};
     allow_unimpl = false;
 }
 
 void check_correctness() {
-    for (const auto &i_sdt: sdt)
-    for (const auto &i_ddt: ddt)
-    for (const auto &i_stag: stag)
-    for (const auto &i_dtag: dtag)
-    for (const auto &i_axis: axis) {
+    for_(const auto &i_sdt : sdt)
+    for_(const auto &i_ddt : ddt)
+    for_(const auto &i_stag : stag)
+    for_(const auto &i_dtag : dtag)
+    for (const auto &i_axis : axis) {
         if (sdims.size() != i_stag.size()) // expect 1:1 match of sdims and tag
             SAFE_V(FAIL);
 
@@ -67,7 +68,7 @@ void check_correctness() {
         const char *pstr = cpp_pstr.c_str();
         print(1, "run: %s\n", pstr);
 
-        res_t res{};
+        res_t res {};
         int status = doit(&p, &res);
 
         bool want_perf_report = false;
@@ -83,22 +84,20 @@ void check_correctness() {
 }
 
 int bench(int argc, char **argv) {
+    driver_name = "concat";
     using namespace parser;
     for (; argc > 0; --argc, ++argv) {
-        const bool parsed_options = false
-            || parse_bench_settings(argv[0])
-            || parse_batch(bench, argv[0])
-            || parse_dt(sdt, argv[0], "sdt")
-            || parse_dt(ddt, argv[0], "ddt")
-            || parse_multi_tag(stag, argv[0])
-            || parse_tag(dtag, argv[0], "dtag")
-            || parse_axis(axis, argv[0])
-            || parse_allow_unimpl(allow_unimpl, argv[0])
-            || parse_perf_template(perf_template, perf_template_def,
-                    perf_template_csv, argv[0])
-            || parse_reset(reset_parameters, argv[0]);
+        const bool parsed_options = false || parse_bench_settings(argv[0])
+                || parse_batch(bench, argv[0]) || parse_dt(sdt, argv[0], "sdt")
+                || parse_dt(ddt, argv[0], "ddt")
+                || parse_multi_tag(stag, argv[0])
+                || parse_tag(dtag, argv[0], "dtag") || parse_axis(axis, argv[0])
+                || parse_allow_unimpl(allow_unimpl, argv[0])
+                || parse_perf_template(perf_template, perf_template_def,
+                        perf_template_csv, argv[0])
+                || parse_reset(reset_parameters, argv[0]);
         if (!parsed_options) {
-            catch_unknown_options(argv[0], "concat");
+            catch_unknown_options(argv[0]);
 
             parse_multi_dims(sdims, argv[0]);
             check_correctness();
@@ -108,4 +107,4 @@ int bench(int argc, char **argv) {
     return parse_last_argument();
 }
 
-}
+} // namespace concat

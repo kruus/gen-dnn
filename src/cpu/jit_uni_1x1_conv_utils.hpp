@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2018 Intel Corporation
+* Copyright 2017-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -14,22 +14,20 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef JIT_UNI_1x1_CONV_UTILS_HPP
-#define JIT_UNI_1x1_CONV_UTILS_HPP
+#ifndef JIT_UNI_1X1_CONV_UTILS_HPP
+#define JIT_UNI_1X1_CONV_UTILS_HPP
 
+#include "dnnl_thread.hpp"
 #include "memory_tracking.hpp"
-#include "mkldnn_thread.hpp"
 #include "nstl.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
 #include "jit_generator.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
-
-using namespace mkldnn::impl::utils;
 
 struct reduce_to_unit_stride_t {
     convolution_desc_t conv_d_;
@@ -46,38 +44,37 @@ struct reduce_to_unit_stride_t {
 template <typename conv_pd_t>
 inline void rtus_prepare(conv_pd_t *self, const convolution_desc_t *&conv_d,
         const memory_desc_t *&src_d, const memory_desc_t *dst_d) {
-    const bool is_bwd_data = self->desc()->prop_kind
-        == prop_kind::backward_data;
+    using namespace dnnl::impl::utils;
+    const bool is_bwd_data
+            = self->desc()->prop_kind == prop_kind::backward_data;
 
     const int ndims = src_d->ndims;
     const auto dat_tag = ndims == 3
-        ? memory_desc_wrapper(dst_d).matches_one_of_tag(
-                format_tag::nCw8c, format_tag::nCw16c)
-        : memory_desc_wrapper(dst_d).matches_one_of_tag(
-                format_tag::nChw8c, format_tag::nChw16c);
+            ? memory_desc_wrapper(dst_d).matches_one_of_tag(
+                    format_tag::nCw8c, format_tag::nCw16c)
+            : memory_desc_wrapper(dst_d).matches_one_of_tag(
+                    format_tag::nChw8c, format_tag::nChw16c);
 
     bool rtus_applicable = true
-        && utils::pick(ndims - 3,
-            (conv_d->strides[0] != 1 && !one_of(conv_d->src_desc.data_type,
-                data_type::s32)),
-            (conv_d->strides[0] != 1 || conv_d->strides[1] != 1))
-        && dat_tag != format_tag::undef;
+            && utils::pick(ndims - 3,
+                    (conv_d->strides[0] != 1
+                            && !one_of(conv_d->src_desc.data_type,
+                                    data_type::s32)),
+                    (conv_d->strides[0] != 1 || conv_d->strides[1] != 1))
+            && dat_tag != format_tag::undef;
     for (int d = 2; d < ndims; ++d) {
         /* TODO: relax these conditions (by improving reducer) */
-        rtus_applicable = rtus_applicable
-            && conv_d->padding[0][d - 2] == 0
-            && dst_d->dims[d] * conv_d->strides[d - 2] == src_d->dims[d];
+        rtus_applicable = rtus_applicable && conv_d->padding[0][d - 2] == 0
+                && dst_d->dims[d] * conv_d->strides[d - 2] == src_d->dims[d];
     }
 
     if (rtus_applicable) {
         self->rtus_.reduce_src_ = true;
         conv_d = &(self->rtus_.conv_d_ = *conv_d);
         self->rtus_.conv_d_.strides[0] = 1;
-        if (ndims == 4)
-            self->rtus_.conv_d_.strides[1] = 1;
+        if (ndims == 4) self->rtus_.conv_d_.strides[1] = 1;
         utils::array_set(self->rtus_.conv_d_.padding[0], 0, 2);
-        if (ndims == 4)
-            utils::array_set(self->rtus_.conv_d_.padding[1], 0, 2);
+        if (ndims == 4) utils::array_set(self->rtus_.conv_d_.padding[1], 0, 2);
         const int ic = src_d->dims[1];
         if (is_bwd_data) {
             data_type_t data_type = self->rtus_.conv_d_.diff_src_desc.data_type;
@@ -98,16 +95,16 @@ inline void rtus_prepare(conv_pd_t *self, const convolution_desc_t *&conv_d,
 }
 
 template <typename conv_pd_t>
-inline void rtus_prepare_space_info(conv_pd_t *self,
-        memory_tracking::registrar_t &scratchpad) {
+inline void rtus_prepare_space_info(
+        conv_pd_t *self, memory_tracking::registrar_t &scratchpad) {
     if (!self->rtus_.reduce_src_) return;
     const auto &jcp = self->jcp_;
 
-    const int max_threads = mkldnn_get_max_threads();
+    const int max_threads = dnnl_get_max_threads();
     const size_t factor = utils::pick_by_prop_kind(self->desc()->prop_kind,
             jcp.nb_reduce, jcp.nb_load_blocking_max, jcp.nb_bcast_blocking);
-    size_t typesize = types::data_type_size(
-            conv_prop_invariant_src_d(self->desc())->data_type);
+    size_t typesize
+            = types::data_type_size(self->invariant_src_md()->data_type);
 
     self->rtus_.space_per_thread_ = factor * jcp.is * jcp.ic_block;
     scratchpad.book(memory_tracking::names::key_conv_rtus_space,
@@ -115,7 +112,7 @@ inline void rtus_prepare_space_info(conv_pd_t *self,
 }
 
 template <cpu_isa_t isa>
-struct rtus_driver_t: public jit_generator {
+struct rtus_driver_t : public jit_generator {
 
     struct call_params_t {
         const void *ws; /* reduced image (w/ strides = 1) */
@@ -147,12 +144,15 @@ struct rtus_driver_t: public jit_generator {
     Xbyak::Xmm reg_zero;
     Xbyak::Xmm reg_v;
 
-    rtus_driver_t(int iw, int stride_w, int src_step_h,
-            int src_step_icb, int ws_step_icb, bool src_to_ws, size_t typesize)
-        : iw_(iw), stride_w_(stride_w), src_step_h_(src_step_h)
-        , src_step_icb_(src_step_icb), ws_step_icb_(ws_step_icb)
-        , src_to_ws_(src_to_ws), typesize_(typesize)
-    {
+    rtus_driver_t(int iw, int stride_w, int src_step_h, int src_step_icb,
+            int ws_step_icb, bool src_to_ws, size_t typesize)
+        : iw_(iw)
+        , stride_w_(stride_w)
+        , src_step_h_(src_step_h)
+        , src_step_icb_(src_step_icb)
+        , ws_step_icb_(ws_step_icb)
+        , src_to_ws_(src_to_ws)
+        , typesize_(typesize) {
         using namespace Xbyak;
 
         /*FIXME: derive Vmm type on compile time.
@@ -164,26 +164,26 @@ struct rtus_driver_t: public jit_generator {
         auto Vmm = [=](int idx, int typesize) {
             Xmm res;
             switch (isa) {
-            case avx2:
-                switch (typesize) {
-                case 4: res = Ymm(idx); break;
-                case 2: res = Xmm(idx); break;
-                default:
-                    assert(!"Not supported typesize");
-                    res = Ymm(idx);
-                }
-                break;
-            case avx512_common:
-            case avx512_core:
-            case avx512_mic:
-                switch (typesize) {
-                case 4: res = Zmm(idx); break;
-                case 2: res = Ymm(idx); break;
-                case 1: res = Xmm(idx); break;
-                default:
-                    assert(!"Not supported typesize");
-                    res = Zmm(idx);
-                }
+                case avx2:
+                    switch (typesize) {
+                        case 4: res = Ymm(idx); break;
+                        case 2: res = Xmm(idx); break;
+                        default:
+                            assert(!"Not supported typesize");
+                            res = Ymm(idx);
+                    }
+                    break;
+                case avx512_common:
+                case avx512_core:
+                case avx512_mic:
+                    switch (typesize) {
+                        case 4: res = Zmm(idx); break;
+                        case 2: res = Ymm(idx); break;
+                        case 1: res = Xmm(idx); break;
+                        default:
+                            assert(!"Not supported typesize");
+                            res = Zmm(idx);
+                    }
             }
             return res;
         };
@@ -198,7 +198,7 @@ struct rtus_driver_t: public jit_generator {
         while (tvlen > 1) {
             tvlen /= 2;
             vlen_shift_++;
-         }
+        }
         generate();
     }
 
@@ -209,7 +209,7 @@ struct rtus_driver_t: public jit_generator {
         mov(reg_cur_iw, reg_iw_start);
         mov(reg_cur_os, reg_os);
 
-        Label is_loop, skip_h_step;
+        Label is_loop;
         L(is_loop);
 
         if (src_to_ws_) {
@@ -223,34 +223,34 @@ struct rtus_driver_t: public jit_generator {
         }
 
         add(reg_ws, vlen_);
-
-        add(reg_cur_iw, stride_w_);
         add(reg_cur_src, stride_w_ * vlen_);
 
-        cmp(reg_cur_iw, iw_);
-        jl(skip_h_step);
-        /* for 1d convolution the loop over h should be skipped */
-        if (src_step_icb_ == iw_) jmp(skip_h_step);
+        // for 1d or stride_h=1 convolutions the loop over h should be skipped
+        if (!(src_step_icb_ == iw_ || src_step_h_ == iw_)) {
+            Label skip_h_step;
+            add(reg_cur_iw, stride_w_);
+            cmp(reg_cur_iw, iw_);
+            jl(skip_h_step);
 
-        if (src_to_ws_) {
-            add(reg_cur_src, (src_step_h_ - iw_) * vlen_);
-        } else {
-            Xbyak::Reg64 reg_cur_src_fin = reg_cur_iw; /* just reuse */
-            mov(reg_cur_src_fin, reg_cur_src);
-            add(reg_cur_src_fin, (src_step_h_ - iw_) * vlen_);
-            Label ih_loop;
-            L(ih_loop);
+            if (src_to_ws_) {
+                add(reg_cur_src, (src_step_h_ - iw_) * vlen_);
+            } else {
+                Xbyak::Reg64 reg_cur_src_fin = reg_cur_iw; /* just reuse */
+                mov(reg_cur_src_fin, reg_cur_src);
+                add(reg_cur_src_fin, (src_step_h_ - iw_) * vlen_);
+                Label ih_loop;
+                L(ih_loop);
 
-            for (int w = 0; w < stride_w_; ++w)
-                vmovups(ptr[reg_cur_src + w * vlen_], reg_zero);
+                for (int w = 0; w < stride_w_; ++w)
+                    vmovups(ptr[reg_cur_src + w * vlen_], reg_zero);
 
-            add(reg_cur_src, stride_w_ * vlen_);
-            cmp(reg_cur_src, reg_cur_src_fin);
-            jl(ih_loop);
+                add(reg_cur_src, stride_w_ * vlen_);
+                cmp(reg_cur_src, reg_cur_src_fin);
+                jl(ih_loop);
+            }
+            xor_(reg_cur_iw, reg_cur_iw);
+            L(skip_h_step);
         }
-        xor_(reg_cur_iw, reg_cur_iw);
-
-        L(skip_h_step);
 
         sub(reg_cur_os, vlen_);
         jnz(is_loop);
@@ -261,8 +261,8 @@ struct rtus_driver_t: public jit_generator {
 
     void generate() {
         using namespace Xbyak;
-        assert(isa == avx2 || isa == avx512_common
-                || isa == avx512_core || isa == avx512_mic);
+        assert(isa == avx2 || isa == avx512_common || isa == avx512_core
+                || isa == avx512_mic);
 
 #if defined(_WIN32)
         assert(reg_src == abi_not_param1 && abi_not_param1 == rdi);
@@ -270,7 +270,7 @@ struct rtus_driver_t: public jit_generator {
 #endif
 
 #define READ_PARAM(what) \
-        mov(reg_ ## what, ptr[abi_param1 + offsetof(call_params_t, what)])
+    mov(reg_##what, ptr[abi_param1 + offsetof(call_params_t, what)])
         READ_PARAM(src);
         READ_PARAM(icb);
         READ_PARAM(os);
@@ -278,28 +278,24 @@ struct rtus_driver_t: public jit_generator {
 
         assert(reg_ws == abi_param1);
         READ_PARAM(ws); /* reg_ws should always be read the last */
-#undef  READ_PARAM
+#undef READ_PARAM
 
         shl(reg_os, vlen_shift_);
 
         if (!src_to_ws_) {
             switch (reg_zero.getBit() / 8) {
-            case 16 /*xmm*/:
-                uni_vpxor(reg_zero, reg_zero, reg_zero);
-                break;
-            case 32 /*ymm*/:
-                {
-                Xbyak::Ymm ymm_z(reg_zero.getIdx());
-                uni_vpxor(ymm_z, ymm_z, ymm_z);
-                break;
+                case 16 /*xmm*/: uni_vpxor(reg_zero, reg_zero, reg_zero); break;
+                case 32 /*ymm*/: {
+                    Xbyak::Ymm ymm_z(reg_zero.getIdx());
+                    uni_vpxor(ymm_z, ymm_z, ymm_z);
+                    break;
                 }
-            case 64 /*zmm*/:
-                {
-                Xbyak::Zmm zmm_z(reg_zero.getIdx());
-                uni_vpxor(zmm_z, zmm_z, zmm_z);
-                break;
+                case 64 /*zmm*/: {
+                    Xbyak::Zmm zmm_z(reg_zero.getIdx());
+                    uni_vpxor(zmm_z, zmm_z, zmm_z);
+                    break;
                 }
-            default: assert(!"rtus kernel failure");
+                default: assert(!"rtus kernel failure");
             }
         }
 
@@ -320,8 +316,8 @@ struct rtus_driver_t: public jit_generator {
 
         uni_vzeroupper();
         ret();
-        this->ker_ = reinterpret_cast<decltype(ker_)>(const_cast<uint8_t*>(
-                    this->getCode()));
+        this->ker_ = reinterpret_cast<decltype(ker_)>(
+                const_cast<uint8_t *>(this->getCode()));
     }
 };
 
@@ -345,21 +341,22 @@ inline void init_rtus_driver(conv_t *self) {
     const int src_step_icb = ih * iw;
     const int ws_step_icb = conf.jcp_.is;
     const bool src_to_ws = !is_bwd_data;
-    const size_t typesize = types::data_type_size(
-            conv_prop_invariant_src_d(self->pd()->desc())->data_type);
+    const size_t typesize
+            = types::data_type_size(self->pd()->invariant_src_md()->data_type);
 
     self->rtus_driver_ = new rtus_driver_t<isa>(iw, stride_w, src_step_h,
             src_step_icb, ws_step_icb, src_to_ws, typesize);
 }
 
 inline int best_divider(int value, int min_divider, int max_divider,
-        bool find_max, int step = 1)
-{
+        bool find_max, int step = 1) {
+    using namespace dnnl::impl::utils;
     max_divider = nstl::max(1, nstl::min(max_divider, value));
     min_divider = nstl::max(1, nstl::min(min_divider, max_divider));
 
-    auto loss_ratio = [](int total, int chunk)
-    { return float(rnd_up(total, chunk) - total) / rnd_up(total, chunk); };
+    auto loss_ratio = [](int total, int chunk) {
+        return float(rnd_up(total, chunk) - total) / rnd_up(total, chunk);
+    };
 
     float min_loss = FLT_MAX;
     int x_divider = max_divider;
@@ -373,8 +370,8 @@ inline int best_divider(int value, int min_divider, int max_divider,
     return x_divider;
 }
 
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
 
 #endif

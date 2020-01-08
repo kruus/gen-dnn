@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -18,22 +18,23 @@
 #define CPU_BATCH_NORMALIZATION_PD_HPP
 
 #include "batch_normalization_pd.hpp"
+#include "cpu_engine.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
-struct cpu_batch_normalization_fwd_pd_t: public batch_normalization_fwd_pd_t {
+struct cpu_batch_normalization_fwd_pd_t : public batch_normalization_fwd_pd_t {
     using batch_normalization_fwd_pd_t::batch_normalization_fwd_pd_t;
 };
 
-struct cpu_batch_normalization_bwd_pd_t: public batch_normalization_bwd_pd_t {
+struct cpu_batch_normalization_bwd_pd_t : public batch_normalization_bwd_pd_t {
     using batch_normalization_bwd_pd_t::batch_normalization_bwd_pd_t;
 };
 
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
 
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

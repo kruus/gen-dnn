@@ -48,11 +48,22 @@ if(POLICY CMP0066)
     cmake_policy(SET CMP0066 NEW)
 endif()
 
-set(PROJECT_NAME "GEN-DNN generic MKL-DNN)")
-set(PROJECT_FULL_NAME "Generic (Intel(R) MKL-DNN)")
-set(PROJECT_VERSION "1.0.0")
+# Use <PackageName>_ROOT env. variable as a prefix
+if(POLICY CMP0074)
+    cmake_policy(SET CMP0074 NEW)
+endif()
 
-set(LIB_NAME mkldnn)
+if("${CMAKE_BUILD_TYPE}" STREQUAL "")
+    message(STATUS "CMAKE_BUILD_TYPE is unset, defaulting to Release")
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING
+        "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel ...")
+endif()
+
+set(PROJECT_NAME "DNNL generic")
+set(PROJECT_FULL_NAME "Deep Neural Network Library (DNNL) generic")
+set(PROJECT_VERSION "1.1.0")
+
+set(LIB_NAME dnnl)
 
 if (CMAKE_VERSION VERSION_LESS 3.0)
     project(${PROJECT_NAME} C CXX)
@@ -62,7 +73,7 @@ else()
 endif()
 
 if (NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
-    message(FATAL_ERROR "Intel(R) MKL-DNN supports 64 bit platforms only")
+    message(FATAL_ERROR "DNNL supports 64 bit platforms only")
 endif()
 
 # If enabled, generate a compile_commands.json file of the exact compiler
@@ -86,31 +97,7 @@ if(UNIX OR MINGW)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
 
-# Tentative remapping of old options to the new one.
-# CAUTION: The old options will soon be removed.
-
-if(MKLDNN_THREADING)
-    set(MKLDNN_CPU_RUNTIME "${MKLDNN_THREADING}" CACHE STRING "" FORCE)
-    message(STATUS "Using the obsolete way to specify the CPU runtime. "
-        "Use MKLDNN_CPU_RUNTIME=${MKLDNN_CPU_RUNTIME} instead.")
-endif()
-
-if(MKLDNN_GPU_BACKEND)
-    if (MKLDNN_GPU_BACKEND STREQUAL "OPENCL")
-        set(MKLDNN_GPU_BACKEND "OCL" CACHE STRING "" FORCE)
-        message(STATUS "Using the obsolete way to specify the OpenCL runtime. "
-            "Use MKLDNN_GPU_RUNTIME=OCL instead.")
-    endif()
-    set(MKLDNN_GPU_RUNTIME "${MKLDNN_GPU_BACKEND}" CACHE STRING "" FORCE)
-    message(STATUS "Using the obsolete way to specify the GPU runtime. "
-        "Use MKLDNN_GPU_RUNTME=${MKLDNN_GPU_RUNTIME} instead.")
-endif()
-
-if (MKLDNN_GPU_RUNTIME STREQUAL "OPENCL")
-    set(MKLDNN_GPU_RUNTIME "OCL" CACHE STRING "" FORCE)
-    message(STATUS "Using the obsolete way to specify the OpenCL runtime. "
-        "Use MKLDNN_GPU_RUNTIME=OCL instead.")
-endif()
+include("cmake/mkldnn_compat.cmake")
 
 include("cmake/utils.cmake")
 include("cmake/options.cmake")
@@ -127,18 +114,31 @@ include("cmake/Doxygen.cmake")
 include("cmake/version.cmake")
 # XXX hack (debug function to print various cmake things)
 include("Platform/SX-util.cmake")
+include("cmake/coverage.cmake")
+
+# Handle cases when OpenMP runtime is requested but not found: override CPU
+# runtime to be sequential
+if(DNNL_CPU_RUNTIME STREQUAL "OMP" AND
+   DNNL_CPU_THREADING_RUNTIME STREQUAL "SEQ")
+    set(DNNL_CPU_RUNTIME "SEQ" CACHE STRING "" FORCE)
+endif()
 
 enable_testing()
 
 include_directories(include)
 
 configure_file(
-    "${PROJECT_SOURCE_DIR}/include/mkldnn_config.h.in"
-    "${PROJECT_BINARY_DIR}/include/mkldnn_config.h"
+    "${PROJECT_SOURCE_DIR}/include/dnnl_config.h.in"
+    "${PROJECT_BINARY_DIR}/include/dnnl_config.h"
 )
 include_directories(${PROJECT_BINARY_DIR}/include)
 
-if(MKLDNN_INSTALL_MODE STREQUAL "BUNDLE" AND NOT DEFINED CMAKE_INSTALL_LIBDIR)
+configure_file(
+    "${PROJECT_SOURCE_DIR}/README.binary.in"
+    "${PROJECT_BINARY_DIR}/README"
+)
+
+if(DNNL_INSTALL_MODE STREQUAL "BUNDLE" AND NOT DEFINED CMAKE_INSTALL_LIBDIR)
     # define CMAKE_INSTALL_LIBDIR as "lib" in the case of bundle
     set(CMAKE_INSTALL_LIBDIR "lib")
 endif()
@@ -146,14 +146,17 @@ endif()
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-add_subdirectory(src)
+#add_subdirectory(src)
 add_subdirectory(examples)
-add_subdirectory(tests)
+#add_subdirectory(tests)
 
-if(MKLDNN_INSTALL_MODE STREQUAL "BUNDLE")
+if(DNNL_INSTALL_MODE STREQUAL "BUNDLE")
     install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_PREFIX})
-    install(FILES README.md DESTINATION ${CMAKE_INSTALL_PREFIX})
+    install(FILES ${PROJECT_BINARY_DIR}/README DESTINATION ${CMAKE_INSTALL_PREFIX})
 else()
     # Cannot use CMAKE_INSTALL_DOCDIR since it uses PROJECT_NAME and not LIB_NAME
     install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${LIB_NAME})
+    install(FILES ${PROJECT_BINARY_DIR}/README DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${LIB_NAME})
 endif()
+
+show_cmake_stuff("At end of CMakeLists.txt")

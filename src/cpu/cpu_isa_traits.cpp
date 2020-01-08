@@ -157,3 +157,4 @@ dnnl_status_t dnnl_set_max_cpu_isa(dnnl_cpu_isa_t isa) {
     return unimplemented;
 #endif
 }
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

@@ -18,7 +18,8 @@
 #define OS_BLAS_HPP
 
 /** \file
- * Common stuff respecting USE_MKL and USE_CBLAS compile flags
+/* DNNL provides gemm functionality on its own using jit generated
+ * kernels. This is the only official supported option.
  *
  *  USE_MKL  USE_CBLAS effect
  *  -------  --------- ------
@@ -88,4 +89,4 @@ typedef CBLAS_ORDER CBLAS_LAYOUT;
 
 #endif /* OS_BLAS_HPP */
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

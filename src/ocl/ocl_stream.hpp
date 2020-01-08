@@ -17,34 +17,34 @@
 #ifndef OCL_STREAM_HPP
 #define OCL_STREAM_HPP
 
+#include <memory>
+
 #include "common/c_types_map.hpp"
 #include "common/utils.hpp"
-#include "ocl/cl_stream.hpp"
+#include "compute/compute.hpp"
 #include "ocl/ocl_engine.hpp"
 #include "ocl/ocl_utils.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace ocl {
 
-struct ocl_stream_t : public cl_stream_t {
+struct ocl_stream_t : public compute::compute_stream_t {
     static status_t create_stream(
             stream_t **stream, engine_t *engine, unsigned generic_flags) {
 
         unsigned flags;
         status_t status = ocl_stream_t::init_flags(&flags, generic_flags);
-        if (status != status::success)
-            return status;
+        if (status != status::success) return status;
 
-        auto *ocl_stream = new ocl_stream_t(engine, flags);
-        if (!ocl_stream)
-            return status::out_of_memory;
+        std::unique_ptr<ocl_stream_t> ocl_stream(
+                new ocl_stream_t(engine, flags));
+        if (!ocl_stream) return status::out_of_memory;
 
         status = ocl_stream->init();
-        if (status != status::success)
-            return status;
+        if (status != status::success) return status;
 
-        *stream = ocl_stream;
+        *stream = ocl_stream.release();
         return status::success;
     }
 
@@ -52,18 +52,16 @@ struct ocl_stream_t : public cl_stream_t {
             stream_t **stream, engine_t *engine, cl_command_queue queue) {
         unsigned flags;
         status_t status = ocl_stream_t::init_flags(&flags, queue);
-        if (status != status::success)
-            return status;
+        if (status != status::success) return status;
 
-        auto *ocl_stream = new ocl_stream_t(engine, flags, queue);
-        if (!ocl_stream)
-            return status::out_of_memory;
+        std::unique_ptr<ocl_stream_t> ocl_stream(
+                new ocl_stream_t(engine, flags, queue));
+        if (!ocl_stream) return status::out_of_memory;
 
         status = ocl_stream->init();
-        if (status != status::success)
-            return status;
+        if (status != status::success) return status;
 
-        *stream = ocl_stream;
+        *stream = ocl_stream.release();
         return status::success;
     }
 
@@ -74,18 +72,19 @@ struct ocl_stream_t : public cl_stream_t {
 
     cl_command_queue queue() const { return queue_; }
 
-private:
-    ocl_stream_t(engine_t *engine, unsigned flags)
-        : cl_stream_t(engine, flags), queue_(nullptr) {}
-    ocl_stream_t(engine_t *engine, unsigned flags, cl_command_queue queue)
-        : cl_stream_t(engine, flags), queue_(queue) {}
+    virtual status_t copy(const memory_storage_t &src,
+            const memory_storage_t &dst, size_t size) override;
+
     ~ocl_stream_t() {
         wait();
-        if (queue_) {
-            clReleaseCommandQueue(queue_);
-        }
+        if (queue_) { clReleaseCommandQueue(queue_); }
     }
 
+private:
+    ocl_stream_t(engine_t *engine, unsigned flags)
+        : compute_stream_t(engine, flags), queue_(nullptr) {}
+    ocl_stream_t(engine_t *engine, unsigned flags, cl_command_queue queue)
+        : compute_stream_t(engine, flags), queue_(queue) {}
     status_t init();
 
     static status_t init_flags(unsigned *flags, unsigned generic_flags) {
@@ -96,12 +95,12 @@ private:
     }
 
     static status_t init_flags(unsigned *flags, cl_command_queue queue) {
+        *flags = 0;
         // Determine if the passed queue is in-order/out-of-order
         cl_command_queue_properties props;
         OCL_CHECK(clGetCommandQueueInfo(queue, CL_QUEUE_PROPERTIES,
                 sizeof(cl_command_queue_properties), &props, nullptr));
 
-        *flags = 0;
         *flags |= (props & CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE)
                 ? stream_flags::out_of_order
                 : stream_flags::in_order;
@@ -115,6 +114,6 @@ private:
 
 } // namespace ocl
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl
 
 #endif

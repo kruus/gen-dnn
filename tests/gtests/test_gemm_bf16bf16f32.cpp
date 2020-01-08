@@ -14,23 +14,21 @@
 * limitations under the License.
 *******************************************************************************/
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
-#include "mkldnn_test_common.hpp"
+#if !defined(TARGET_VANILLA)
+#include "dnnl_test_common.hpp"
 #include "gtest/gtest.h"
 
-#include "mkldnn.h"
+#include "dnnl.h"
 #include "test_gemm_common.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 
 using gemm_test = gemm_test_common<bfloat16_t, bfloat16_t, float>;
 
-TEST_P(gemm_test, TestGEMM)
-{}
+TEST_P(gemm_test, TestGEMM) {}
 
 #define TEST_CASE_NAME_PREFIX bf16bf16f32
 #define BF16BF16F32
 #include "gemm_in.h"
-}
-// vim: et ts=4 sw=4 cindent cino=^l0,\:0,N-s
-#endif // !TARGET_VANILLA
+} // namespace dnnl
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

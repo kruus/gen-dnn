@@ -18,25 +18,30 @@
 #define JIT_REF_POOLING_COMMON_KERNEL_HPP
 
 #include "common/c_types_map.hpp"
+#include "common/pooling_pd.hpp"
+#include "compute/compute.hpp"
 #include "ocl/jit_primitive_conf.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace ocl {
 
-using namespace mkldnn::impl::format_tag;
-using namespace alg_kind;
-
 struct jit_ref_pooling_fwd_kernel {
 
-    jit_ref_pooling_fwd_kernel(jit_pool_conf_t ajpp) : jpp(ajpp){};
+    jit_ref_pooling_fwd_kernel(const jit_pool_conf_t &ajpp) : jpp(ajpp) {}
 
-    ~jit_ref_pooling_fwd_kernel(){};
+    ~jit_ref_pooling_fwd_kernel() {}
 
-    static status_t init_conf(jit_pool_conf_t &jpp, const pooling_desc_t &pd,
-            const memory_desc_wrapper &src_d, const memory_desc_wrapper &dst_d,
+    static status_t init_conf(jit_pool_conf_t &jpp, const pooling_pd_t *_pd,
             jit_offsets &jit_off) {
+        using namespace dnnl::impl::format_tag;
 
+        const memory_desc_wrapper src_d(
+                _pd->is_fwd() ? _pd->src_md() : _pd->diff_src_md());
+        const memory_desc_wrapper dst_d(
+                _pd->is_fwd() ? _pd->dst_md() : _pd->diff_dst_md());
+
+        const pooling_desc_t &pd = *_pd->desc();
         const int ndims = src_d.ndims();
         const auto &src_dims = src_d.padded_dims();
         const auto &dst_dims = dst_d.padded_dims();
@@ -73,12 +78,11 @@ struct jit_ref_pooling_fwd_kernel {
         set_offsets(src_d, jit_off.src_off);
         set_offsets(dst_d, jit_off.dst_off);
 
-        jpp.lws_d[0] = 1;
-        jpp.lws_d[1] = 1;
-        jpp.lws_d[2] = 1;
-        jpp.gws_d[0] = jpp.mb;
-        jpp.gws_d[1] = jpp.c;
-        jpp.gws_d[2] = 1;
+        auto *compute_engine
+                = utils::downcast<compute::compute_engine_t *>(_pd->engine());
+        jpp.dispatch = compute_engine->create_dispatch(
+                jpp.is_backward ? src_d.md_ : dst_d.md_);
+
         jpp.sub_group_size = 1;
         jpp.use_16mb_unroll = 0;
         jpp.use_16c_unroll = 0;
@@ -99,79 +103,89 @@ struct jit_ref_pooling_fwd_kernel {
                     NCw16n16c, NChw16n16c, NCdhw16n16c);
             jpp.use_16c_unroll = 1;
             jpp.sub_group_size = 16;
-            jpp.lws_d[0] = 1;
-            jpp.lws_d[1] = 16;
-            jpp.lws_d[2] = 1;
-            jpp.gws_d[0] = jpp.is_backward ? jpp.id * jpp.ih * jpp.iw
-                                           : jpp.od * jpp.oh;
-            jpp.gws_d[1] = jpp.c;
-            jpp.gws_d[2] = jpp.use_16mb_unroll ? jpp.mb / 16 : jpp.mb;
+
+            jpp.dispatch.define_dim(
+                    "MB", 0, jpp.mb, jpp.use_16mb_unroll ? 16 : 1);
+            jpp.dispatch.define_dim("OC", 1, jpp.c);
+
+            if (!jpp.is_backward) {
+                jpp.dispatch.define_dim("OD", nstl::max(2, ndims - 3), jpp.od);
+                jpp.dispatch.define_dim("OH", nstl::max(2, ndims - 2), jpp.oh);
+            } else {
+                jpp.dispatch.define_dim("ID", nstl::max(2, ndims - 3), jpp.id);
+                jpp.dispatch.define_dim("IH", nstl::max(2, ndims - 2), jpp.ih);
+                jpp.dispatch.define_dim("IW", nstl::max(2, ndims - 1), jpp.iw);
+            }
+
+            jpp.dispatch.vectorize_dim("OC", 16);
+        } else {
+            jpp.dispatch.define_dim("MB", 0, jpp.mb);
+            jpp.dispatch.define_dim("OC", 1, jpp.c);
         }
+
+        jpp.dispatch.generate();
 
         return status::success;
     };
 
-    static status_t init_const_def(ocl_jit_t &jit, const jit_pool_conf_t &jpp,
-            const jit_offsets &jit_off) {
+    static status_t init_const_def(compute::kernel_ctx_t &kernel_ctx,
+            const jit_pool_conf_t &jpp, const jit_offsets &jit_off) {
+        using namespace dnnl::impl::alg_kind;
         status_t status = status::success;
 
-        jit.set_data_type(jpp.src_dt);
+        kernel_ctx.set_data_type(jpp.src_dt);
 
-        jit.define_int("NDIMS", jpp.ndims);
-        jit.define_int("MB", jpp.mb);
-        jit.define_int("C", jpp.c);
-        jit.define_int("ID", jpp.id);
-        jit.define_int("IH", jpp.ih);
-        jit.define_int("IW", jpp.iw);
-        jit.define_int("OD", jpp.od);
-        jit.define_int("OH", jpp.oh);
-        jit.define_int("OW", jpp.ow);
-        jit.define_int("KD", jpp.kd);
-        jit.define_int("KH", jpp.kh);
-        jit.define_int("KW", jpp.kw);
-        jit.define_int("SD", jpp.stride_d);
-        jit.define_int("SH", jpp.stride_h);
-        jit.define_int("SW", jpp.stride_w);
-        jit.define_int("PD", jpp.f_pad);
-        jit.define_int("PH", jpp.t_pad);
-        jit.define_int("PW", jpp.l_pad);
-        jit.define_int("LWS_0", jpp.lws_d[0]);
-        jit.define_int("LWS_1", jpp.lws_d[1]);
-        jit.define_int("LWS_2", jpp.lws_d[2]);
-        jit.define_int("SUB_GROUP_SIZE", jpp.sub_group_size);
-        jit.define_int("USE_16MB_UNROLL", jpp.use_16mb_unroll);
-        jit.define_int("USE_16C_UNROLL", jpp.use_16c_unroll);
-        jit.define_int("IS_TRAINING", jpp.is_training);
+        kernel_ctx.define_int("NDIMS", jpp.ndims);
+        kernel_ctx.define_int("MB", jpp.mb);
+        kernel_ctx.define_int("C", jpp.c);
+        kernel_ctx.define_int("ID", jpp.id);
+        kernel_ctx.define_int("IH", jpp.ih);
+        kernel_ctx.define_int("IW", jpp.iw);
+        kernel_ctx.define_int("OD", jpp.od);
+        kernel_ctx.define_int("OH", jpp.oh);
+        kernel_ctx.define_int("OW", jpp.ow);
+        kernel_ctx.define_int("KD", jpp.kd);
+        kernel_ctx.define_int("KH", jpp.kh);
+        kernel_ctx.define_int("KW", jpp.kw);
+        kernel_ctx.define_int("SD", jpp.stride_d);
+        kernel_ctx.define_int("SH", jpp.stride_h);
+        kernel_ctx.define_int("SW", jpp.stride_w);
+        kernel_ctx.define_int("PD", jpp.f_pad);
+        kernel_ctx.define_int("PH", jpp.t_pad);
+        kernel_ctx.define_int("PW", jpp.l_pad);
+        kernel_ctx.define_int("SUB_GROUP_SIZE", jpp.sub_group_size);
+        kernel_ctx.define_int("USE_16MB_UNROLL", jpp.use_16mb_unroll);
+        kernel_ctx.define_int("USE_16C_UNROLL", jpp.use_16c_unroll);
+        kernel_ctx.define_int("IS_TRAINING", jpp.is_training);
         if (jpp.is_backward)
-            jit.define_int("POOLING_BWD", 1);
+            kernel_ctx.define_int("IS_BWD", 1);
         else
-            jit.define_int("POOLING_FWD", 1);
+            kernel_ctx.define_int("IS_FWD", 1);
         switch (jpp.alg) {
-        case pooling_max: jit.define_int("POOLING_MAX", 1); break;
-        case pooling_avg_exclude_padding:
-            jit.define_int("POOLING_AVG_EXCLUDE_PADDING", 1);
-            break;
-        case pooling_avg_include_padding:
-            jit.define_int("POOLING_AVG_INCLUDE_PADDING", 1);
-            break;
-        default: status = status::unimplemented;
+            case pooling_max: kernel_ctx.define_int("POOLING_MAX", 1); break;
+            case pooling_avg_exclude_padding:
+                kernel_ctx.define_int("POOLING_AVG_EXCLUDE_PADDING", 1);
+                break;
+            case pooling_avg_include_padding:
+                kernel_ctx.define_int("POOLING_AVG_INCLUDE_PADDING", 1);
+                break;
+            default: status = status::unimplemented;
         }
-        if (status != status::success)
-            return status;
+        if (status != status::success) return status;
 
-        def_offsets(jit_off.src_off, jit, "SRC", jpp.ndims);
-        def_offsets(jit_off.dst_off, jit, "DST", jpp.ndims);
+        def_offsets(jit_off.src_off, kernel_ctx, "SRC", jpp.ndims);
+        def_offsets(jit_off.dst_off, kernel_ctx, "DST", jpp.ndims);
+
+        def_dispatch(kernel_ctx, jpp.dispatch);
 
         return status::success;
     }
 
     jit_pool_conf_t jpp;
-
-private:
 };
 
 } // namespace ocl
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl
 
 #endif

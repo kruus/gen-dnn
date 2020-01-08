@@ -1,5 +1,5 @@
 #===============================================================================
-# Copyright 2016-2018 Intel Corporation
+# Copyright 2016-2019 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,22 +36,31 @@ append(CMAKE_CXX_FLAGS "${CMAKE_CCXX_NOWARN_FLAGS}")
 append(CMAKE_C_FLAGS "${CMAKE_CCXX_SANITIZER_FLAGS}")
 append(CMAKE_CXX_FLAGS "${CMAKE_CCXX_SANITIZER_FLAGS}")
 
-if(NOT MKLDNN_VERBOSE)
+if(NOT DNNL_VERBOSE)
     add_definitions(-DDISABLE_VERBOSE)
 endif()
 
-if(MKLDNN_ENABLE_CONCURRENT_EXEC)
-    add_definitions(-DMKLDNN_ENABLE_CONCURRENT_EXEC)
+if(DNNL_ENABLE_CONCURRENT_EXEC)
+    add_definitions(-DDNNL_ENABLE_CONCURRENT_EXEC)
 endif()
 
-if(NOT MKLDNN_ENABLE_JIT_PROFILING)
+if(DNNL_ENABLE_PRIMITIVE_CACHE)
+    message(STATUS "Primitive cache is enabled")
+    add_definitions(-DDNNL_ENABLE_PRIMITIVE_CACHE)
+endif()
+
+if(NOT DNNL_ENABLE_JIT_PROFILING)
     # XXX: the profiling interface will still be built and present in the
     # library
-    message(STATUS "Intel\r VTune\t Amplifier JIT profiling disabled")
-    add_definitions(-DMKLDNN_ENABLE_JIT_PROFILING=0)
+    message(STATUS "Intel(R) VTune(TM) Amplifier JIT profiling disabled")
+    add_definitions(-DDNNL_ENABLE_JIT_PROFILING=0)
 elseif(UNIX AND NOT APPLE)
     # Not every compiler adds -ldl automatically
     list(APPEND EXTRA_SHARED_LIBS "${CMAKE_DL_LIBS}")
+endif()
+
+if(DNNL_ENABLE_MAX_CPU_ISA)
+    add_definitions(-DDNNL_ENABLE_MAX_CPU_ISA)
 endif()
 
 if(WIN32)
@@ -64,21 +73,21 @@ if(WIN32)
 endif()
 
 add_subdirectory(common)
-
+add_subdirectory(compute)
 #add_subdirectory(cpu)
 # cpu/ or vanilla/ ?
 message(STATUS "CPU_DIR=${CPU_DIR}")
 add_subdirectory(${CPU_DIR})
 
-if(MKLDNN_GPU_RUNTIME STREQUAL "OCL")
+if(DNNL_GPU_RUNTIME STREQUAL "OCL")
     add_subdirectory(ocl)
 endif()
 
-add_library(${LIB_NAME}
-    ${MKLDNN_LIBRARY_TYPE} ${HEADERS} ${${LIB_NAME}_SUB_OBJS})
+add_library(${LIB_NAME} ${DNNL_LIBRARY_TYPE}
+    ${VERSION_RESOURCE_FILE} ${HEADERS} ${${LIB_NAME}_SUB_OBJS})
 
-set_property(TARGET ${LIB_NAME} PROPERTY VERSION "${PROJECT_VERSION}.0")
-set_property(TARGET ${LIB_NAME} PROPERTY SOVERSION "0")
+set_property(TARGET ${LIB_NAME} PROPERTY VERSION "${DNNL_VERSION_MAJOR}.${DNNL_VERSION_MINOR}")
+set_property(TARGET ${LIB_NAME} PROPERTY SOVERSION "${DNNL_VERSION_MAJOR}")
 set_property(TARGET ${LIB_NAME} PROPERTY PUBLIC_HEADER ${HEADERS})
 
 target_include_directories(${LIB_NAME} PUBLIC
@@ -91,7 +100,7 @@ target_include_directories(${LIB_NAME} PUBLIC
 target_link_libraries_build(${LIB_NAME}
     "${EXTRA_SHARED_LIBS};${EXTRA_STATIC_LIBS}")
 target_link_libraries_install(${LIB_NAME} "${EXTRA_SHARED_LIBS}")
-if(MKLDNN_LIBRARY_TYPE STREQUAL "STATIC")
+if(DNNL_LIBRARY_TYPE STREQUAL "STATIC")
     target_link_libraries_install(${LIB_NAME} "${EXTRA_STATIC_LIBS}")
 endif()
 
@@ -125,8 +134,55 @@ install(EXPORT ${LIB_EXPORT_NAME}
     NAMESPACE ${LIB_NAMESPACE}
     DESTINATION ${LIB_CONFIG_INSTALL_DIR})
 
+# MKL-DNN compat cmake files
+install(CODE "execute_process(COMMAND ${CMAKE_COMMAND}
+    -DDIR=${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/cmake
+    -P ${PROJECT_SOURCE_DIR}/cmake/gen_mkldnn_compat_cmakes.cmake)")
+
+# MKL-DNN compat libraries
+if (WIN32)
+    if (NOT MINGW)
+        set(prefix "")
+        set(ext "lib")
+    else()
+        set(prefix "lib")
+        if (DNNL_LIBRARY_TYPE STREQUAL "SHARED")
+            set(ext "dll.a")
+        else()
+            set(ext "a")
+        endif()
+    endif()
+    add_custom_target(compat_libs ALL
+        ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE_DIR:${LIB_NAME}>/${prefix}dnnl.${ext}
+        $<TARGET_FILE_DIR:${LIB_NAME}>/${prefix}mkldnn.${ext}
+        DEPENDS ${LIB_NAME})
+    install(FILES $<TARGET_FILE_DIR:${LIB_NAME}>/${prefix}mkldnn.${ext}
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+else()
+    if(DNNL_LIBRARY_TYPE STREQUAL "SHARED")
+        set_ternary(ext APPLE ".dylib" ".so")
+        set(vers ".${DNNL_VERSION_MAJOR};.${DNNL_VERSION_MAJOR}.${DNNL_VERSION_MINOR}")
+    else()
+        set(ext ".a")
+        set(vers "")
+    endif()
+    foreach(ver "" ${vers})
+        set_ternary(ext_and_ver APPLE "${ver}${ext}" "${ext}${ver}")
+        add_custom_command(OUTPUT libmkldnn${ext_and_ver}
+            # to make the next command work fine
+            COMMAND ${CMAKE_COMMAND} -E remove -f libmkldnn${ext_and_ver}
+            COMMAND ${CMAKE_COMMAND} -E create_symlink libdnnl${ext_and_ver} libmkldnn${ext_and_ver}
+            DEPENDS ${LIB_NAME})
+        add_custom_target(compat_libs${ver} ALL
+                DEPENDS libmkldnn${ext_and_ver})
+        install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libmkldnn${ext_and_ver}
+            DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+    endforeach()
+endif()
+
 # Install custom find modules for transitive dependencies
-if(MKLDNN_CPU_RUNTIME STREQUAL "TBB")
+if(DNNL_CPU_RUNTIME STREQUAL "TBB")
     if(WIN32)
         install(FILES "../cmake/win/TBBConfig.cmake" RENAME "FindTBB.cmake"
             DESTINATION ${LIB_CONFIG_INSTALL_DIR})
@@ -139,16 +195,16 @@ if(MKLDNN_CPU_RUNTIME STREQUAL "TBB")
     endif()
 endif()
 
-if(MKLDNN_GPU_RUNTIME STREQUAL "OCL")
+if(DNNL_GPU_RUNTIME STREQUAL "OCL")
     install(FILES
         "../cmake/FindOpenCL.cmake"
         DESTINATION ${LIB_CONFIG_INSTALL_DIR})
 endif()
 
-# On Windows we need to add mkldnn.dll path to CTESTCONFIG_PATH which is later
+# On Windows we need to add dnnl.dll path to CTESTCONFIG_PATH which is later
 # passed to ctest and Visual Studio solutions
 if(WIN32)
-    if(NOT(MINGW))
+    if(CMAKE_GENERATOR MATCHES "Visual Studio")
         foreach(BUILD_TYPE Release Debug RelWithDebInfo MinSizeRel)
             append_to_windows_path_list(CTESTCONFIG_PATH
                 "${CMAKE_CURRENT_BINARY_DIR}/${BUILD_TYPE}")

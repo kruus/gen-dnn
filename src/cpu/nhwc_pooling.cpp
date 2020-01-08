@@ -18,30 +18,27 @@
 #include <math.h>
 
 #include "c_types_map.hpp"
-#include "type_helpers.hpp"
+#include "dnnl_thread.hpp"
 #include "math_utils.hpp"
-#include "mkldnn_thread.hpp"
 #include "nstl.hpp"
+#include "type_helpers.hpp"
 
 #include "nhwc_pooling.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
 #define MEM_D(name) name##_d
 
-#define DECLARE_READ_STRIDES(name)                                             \
-    const size_t name##_n_stride = MEM_D(name).blocking_desc().strides[0];     \
-    const size_t name##_d_stride = (!is_3d)                                    \
-                                 ? 0                                           \
-                                 : MEM_D(name).blocking_desc().strides[2];     \
-    const size_t name##_h_stride = (!is_3d)                                    \
-                                 ? MEM_D(name).blocking_desc().strides[2]      \
-                                 : MEM_D(name).blocking_desc().strides[3];     \
-    const size_t name##_w_stride = (!is_3d)                                    \
-                                 ? MEM_D(name).blocking_desc().strides[3]      \
-                                 : MEM_D(name).blocking_desc().strides[4];
+#define DECLARE_READ_STRIDES(name) \
+    const size_t name##_n_stride = MEM_D(name).blocking_desc().strides[0]; \
+    const size_t name##_d_stride \
+            = is_3d ? MEM_D(name).blocking_desc().strides[ndims - 3] : 0; \
+    const size_t name##_h_stride \
+            = is_1d ? 0 : MEM_D(name).blocking_desc().strides[ndims - 2]; \
+    const size_t name##_w_stride \
+            = MEM_D(name).blocking_desc().strides[ndims - 1];
 
 namespace nhwc_pooling {
 size_t strided_offset(const int _n, const size_t _sn, const int _d,
@@ -49,7 +46,7 @@ size_t strided_offset(const int _n, const size_t _sn, const int _d,
         const size_t _sw) {
     return _n * _sn + _d * _sd + _h * _sh + _w * _sw;
 }
-}
+} // namespace nhwc_pooling
 
 template <data_type_t d_type>
 void nhwc_pooling_fwd_t<d_type>::array_div_by_const(const int n,
@@ -77,9 +74,9 @@ void nhwc_pooling_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
 
     auto alg = pd()->desc()->alg_kind;
 
-    auto src = CTX_IN_MEM(const data_t *, MKLDNN_ARG_SRC);
-    auto dst = CTX_OUT_MEM(data_t *, MKLDNN_ARG_DST);
-    auto ws = CTX_OUT_MEM(unsigned char *, MKLDNN_ARG_WORKSPACE);
+    auto src = CTX_IN_MEM(const data_t *, DNNL_ARG_SRC);
+    auto dst = CTX_OUT_MEM(data_t *, DNNL_ARG_DST);
+    auto ws = CTX_OUT_MEM(unsigned char *, DNNL_ARG_WORKSPACE);
 
     const memory_desc_wrapper MEM_D(src)(pd()->src_md());
     const memory_desc_wrapper MEM_D(dst)(pd()->dst_md());
@@ -103,7 +100,9 @@ void nhwc_pooling_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
     const int padT = pd()->padT();
     const int padL = pd()->padL();
 
+    const bool is_1d = pd()->desc()->src_desc.ndims == 3;
     const bool is_3d = pd()->desc()->src_desc.ndims == 5;
+    const int ndims = pd()->ndims();
     const data_type_t ws_dt = ws ? ws_d.data_type() : data_type::undef;
 
     DECLARE_READ_STRIDES(src);
@@ -134,8 +133,8 @@ void nhwc_pooling_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
                 array_nhwc_initialize<true>(
                         OC, dst + dst_offset_init, ws, ws_offset_init, ws_dt);
 
-            for (int kd = 0; kd < KD; ++kd)
-            for (int kh = 0; kh < KH; ++kh)
+            for_(int kd = 0; kd < KD; ++kd)
+            for_(int kh = 0; kh < KH; ++kh)
             for (int kw = 0; kw < KW; ++kw) {
                 const int id = od * SD - padF + kd;
                 const int ih = oh * SH - padT + kh;
@@ -174,8 +173,8 @@ void nhwc_pooling_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
             // as the typical kernel is small
             size_t num_summands = 0;
 
-            for (int id = id_start; id < id_end; ++id)
-            for (int ih = ih_start; ih < ih_end; ++ih)
+            for_(int id = id_start; id < id_end; ++id)
+            for_(int ih = ih_start; ih < ih_end; ++ih)
             for (int iw = iw_start; iw < iw_end; ++iw) {
                 size_t src_offset_init = strided_offset(mb, src_n_stride, id,
                         src_d_stride, ih, src_h_stride, iw, src_w_stride);
@@ -206,11 +205,11 @@ void nhwc_pooling_fwd_t<data_type::bf16>::execute_forward(
 
     auto alg = pd()->desc()->alg_kind;
 
-    auto src = CTX_IN_MEM(const data_t *, MKLDNN_ARG_SRC);
-    auto dst = CTX_OUT_MEM(data_t *, MKLDNN_ARG_DST);
-    auto ws = CTX_OUT_MEM(unsigned char *, MKLDNN_ARG_WORKSPACE);
+    auto src = CTX_IN_MEM(const data_t *, DNNL_ARG_SRC);
+    auto dst = CTX_OUT_MEM(data_t *, DNNL_ARG_DST);
+    auto ws = CTX_OUT_MEM(unsigned char *, DNNL_ARG_WORKSPACE);
 
-    auto scratchpad = this->scratchpad(ctx);
+    auto scratchpad = ctx.get_scratchpad_grantor();
     float *bf16cvt_src_wsp = scratchpad.template get<float>(
             memory_tracking::names::key_pool_src_bf16cvt);
     float *bf16cvt_dst_wsp = scratchpad.template get<float>(
@@ -238,7 +237,9 @@ void nhwc_pooling_fwd_t<data_type::bf16>::execute_forward(
     const int padT = pd()->padT();
     const int padL = pd()->padL();
 
+    const bool is_1d = pd()->desc()->src_desc.ndims == 3;
     const bool is_3d = pd()->desc()->src_desc.ndims == 5;
+    const int ndims = pd()->ndims();
     const data_type_t ws_dt = ws ? ws_d.data_type() : data_type::undef;
 
     DECLARE_READ_STRIDES(src);
@@ -258,7 +259,7 @@ void nhwc_pooling_fwd_t<data_type::bf16>::execute_forward(
                 ws_offset_init = strided_offset(mb, ws_n_stride, od,
                         ws_d_stride, oh, ws_h_stride, ow, ws_w_stride);
             }
-            size_t ithr = mkldnn_get_thread_num();
+            size_t ithr = dnnl_get_thread_num();
             float *dst_f32 = &bf16cvt_dst_wsp[ithr * OC];
             float *src_f32 = &bf16cvt_src_wsp[ithr * OC];
 
@@ -273,8 +274,8 @@ void nhwc_pooling_fwd_t<data_type::bf16>::execute_forward(
                 array_nhwc_initialize<true>(
                         OC, dst_f32, ws, ws_offset_init, ws_dt);
 
-            for (int kd = 0; kd < KD; ++kd)
-            for (int kh = 0; kh < KH; ++kh)
+            for_(int kd = 0; kd < KD; ++kd)
+            for_(int kh = 0; kh < KH; ++kh)
             for (int kw = 0; kw < KW; ++kw) {
                 const int id = od * SD - padF + kd;
                 const int ih = oh * SH - padT + kh;
@@ -299,7 +300,7 @@ void nhwc_pooling_fwd_t<data_type::bf16>::execute_forward(
             cvt_float_to_bfloat16(dst + dst_offset_init, dst_f32, OC);
         } else {
             // pooling_avg
-            size_t ithr = mkldnn_get_thread_num();
+            size_t ithr = dnnl_get_thread_num();
             float *dst_f32 = &bf16cvt_dst_wsp[ithr * OC];
             float *src_f32 = &bf16cvt_src_wsp[ithr * OC];
 
@@ -316,8 +317,8 @@ void nhwc_pooling_fwd_t<data_type::bf16>::execute_forward(
             // as the typical kernel is small
             size_t num_summands = 0;
 
-            for (int id = id_start; id < id_end; ++id)
-            for (int ih = ih_start; ih < ih_end; ++ih)
+            for_(int id = id_start; id < id_end; ++id)
+            for_(int ih = ih_start; ih < ih_end; ++ih)
             for (int iw = iw_start; iw < iw_end; ++iw) {
                 size_t src_offset_init = strided_offset(mb, src_n_stride, id,
                         src_d_stride, ih, src_h_stride, iw, src_w_stride);
@@ -345,9 +346,9 @@ void nhwc_pooling_fwd_t<data_type::bf16>::execute_forward(
 template <data_type_t d_type>
 void nhwc_pooling_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
 
-    auto diff_dst = CTX_IN_MEM(const data_t *, MKLDNN_ARG_DIFF_DST);
-    auto ws = CTX_IN_MEM(const unsigned char *, MKLDNN_ARG_WORKSPACE);
-    auto diff_src = CTX_OUT_MEM(data_t *, MKLDNN_ARG_DIFF_SRC);
+    auto diff_dst = CTX_IN_MEM(const data_t *, DNNL_ARG_DIFF_DST);
+    auto ws = CTX_IN_MEM(const unsigned char *, DNNL_ARG_WORKSPACE);
+    auto diff_src = CTX_OUT_MEM(data_t *, DNNL_ARG_DIFF_SRC);
 
     const memory_desc_wrapper MEM_D(diff_src)(pd()->diff_src_md());
     const memory_desc_wrapper MEM_D(diff_dst)(pd()->diff_dst_md());
@@ -371,7 +372,9 @@ void nhwc_pooling_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
     const int OH = pd()->OH();
     const int OW = pd()->OW();
 
+    const bool is_1d = pd()->desc()->diff_src_desc.ndims == 3;
     const bool is_3d = pd()->desc()->diff_src_desc.ndims == 5;
+    const int ndims = pd()->ndims();
     auto alg = pd()->desc()->alg_kind;
 
     DECLARE_READ_STRIDES(diff_src);
@@ -381,12 +384,10 @@ void nhwc_pooling_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
         return (index > offset) ? index - offset : 0;
     };
 
-    parallel_nd(MB, ID, IH, IW,
-        [&](int mb, int id, int ih, int iw) {
-        size_t src_offset_init = strided_offset(mb, diff_src_n_stride,
-                                                id, diff_src_d_stride,
-                                                ih, diff_src_h_stride,
-                                                iw, diff_src_w_stride);
+    parallel_nd(MB, ID, IH, IW, [&](int mb, int id, int ih, int iw) {
+        size_t src_offset_init
+                = strided_offset(mb, diff_src_n_stride, id, diff_src_d_stride,
+                        ih, diff_src_h_stride, iw, diff_src_w_stride);
 
         for (int oc = 0; oc < OC; ++oc)
             diff_src[src_offset_init + oc] = data_type_t(0);
@@ -407,12 +408,12 @@ void nhwc_pooling_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
         int oh_right = min((ih + padT) / SH + 1, OH);
         int ow_right = min((iw + padL) / SW + 1, OW);
 
-        for (int od = od_left; od < od_right; ++od)
-        for (int oh = oh_left; oh < oh_right; ++oh)
+        for_(int od = od_left; od < od_right; ++od)
+        for_(int oh = oh_left; oh < oh_right; ++oh)
         for (int ow = ow_left; ow < ow_right; ++ow) {
-            const int kd = id - od*SD + padF;
-            const int kh = ih - oh*SH + padT;
-            const int kw = iw - ow*SW + padL;
+            const int kd = id - od * SD + padF;
+            const int kh = ih - oh * SH + padT;
+            const int kw = iw - ow * SW + padL;
 
             if (kd < 0 || kd >= KD) continue;
             if (kh < 0 || kh >= KH) continue;
@@ -482,11 +483,11 @@ template <>
 void nhwc_pooling_bwd_t<data_type::bf16>::execute_backward(
         const exec_ctx_t &ctx) const {
 
-    auto diff_dst = CTX_IN_MEM(const data_t *, MKLDNN_ARG_DIFF_DST);
-    auto ws = CTX_IN_MEM(const unsigned char *, MKLDNN_ARG_WORKSPACE);
-    auto diff_src = CTX_OUT_MEM(data_t *, MKLDNN_ARG_DIFF_SRC);
+    auto diff_dst = CTX_IN_MEM(const data_t *, DNNL_ARG_DIFF_DST);
+    auto ws = CTX_IN_MEM(const unsigned char *, DNNL_ARG_WORKSPACE);
+    auto diff_src = CTX_OUT_MEM(data_t *, DNNL_ARG_DIFF_SRC);
 
-    auto scratchpad = this->scratchpad(ctx);
+    auto scratchpad = ctx.get_scratchpad_grantor();
     float *bf16cvt_dsrc = scratchpad.template get<float>(
             memory_tracking::names::key_pool_src_bf16cvt);
     float *bf16cvt_ddst = scratchpad.template get<float>(
@@ -514,7 +515,9 @@ void nhwc_pooling_bwd_t<data_type::bf16>::execute_backward(
     const int OH = pd()->OH();
     const int OW = pd()->OW();
 
+    const bool is_1d = pd()->desc()->diff_src_desc.ndims == 3;
     const bool is_3d = pd()->desc()->diff_src_desc.ndims == 5;
+    const int ndims = pd()->ndims();
     auto alg = pd()->desc()->alg_kind;
 
     DECLARE_READ_STRIDES(diff_src);
@@ -524,15 +527,13 @@ void nhwc_pooling_bwd_t<data_type::bf16>::execute_backward(
         return (index > offset) ? index - offset : 0;
     };
 
-    parallel_nd(MB, ID, IH, IW,
-        [&](int mb, int id, int ih, int iw) {
-        size_t src_offset_init = strided_offset(mb, diff_src_n_stride,
-                                                id, diff_src_d_stride,
-                                                ih, diff_src_h_stride,
-                                                iw, diff_src_w_stride);
+    parallel_nd(MB, ID, IH, IW, [&](int mb, int id, int ih, int iw) {
+        size_t src_offset_init
+                = strided_offset(mb, diff_src_n_stride, id, diff_src_d_stride,
+                        ih, diff_src_h_stride, iw, diff_src_w_stride);
 
-        float *diff_dst_fp32 = &bf16cvt_ddst[mkldnn_get_thread_num() * OC];
-        float *diff_src_fp32 = &bf16cvt_dsrc[mkldnn_get_thread_num() * OC];
+        float *diff_dst_fp32 = &bf16cvt_ddst[dnnl_get_thread_num() * OC];
+        float *diff_src_fp32 = &bf16cvt_dsrc[dnnl_get_thread_num() * OC];
 
         for (int oc = 0; oc < OC; ++oc) {
             diff_src_fp32[oc] = 0.f;
@@ -555,8 +556,8 @@ void nhwc_pooling_bwd_t<data_type::bf16>::execute_backward(
         int oh_right = min((ih + padT) / SH + 1, OH);
         int ow_right = min((iw + padL) / SW + 1, OW);
 
-        for (int od = od_left; od < od_right; ++od)
-        for (int oh = oh_left; oh < oh_right; ++oh)
+        for_(int od = od_left; od < od_right; ++od)
+        for_(int oh = oh_left; oh < oh_right; ++oh)
         for (int ow = ow_left; ow < ow_right; ++ow) {
             const int kd = id - od * SD + padF;
             const int kh = ih - oh * SH + padT;
@@ -569,7 +570,8 @@ void nhwc_pooling_bwd_t<data_type::bf16>::execute_backward(
             size_t dst_offset_init = strided_offset(mb, diff_dst_n_stride, od,
                     diff_dst_d_stride, oh, diff_dst_h_stride, ow,
                     diff_dst_w_stride);
-            cvt_bfloat16_to_float(diff_dst_fp32, &diff_dst[dst_offset_init], OC);
+            cvt_bfloat16_to_float(
+                    diff_dst_fp32, &diff_dst[dst_offset_init], OC);
 
             if (alg == alg_kind::pooling_max) {
                 DECLARE_READ_STRIDES(ws);
@@ -587,8 +589,8 @@ void nhwc_pooling_bwd_t<data_type::bf16>::execute_backward(
                     // Check if kernel windows are disjoint, in this case
                     // there's no update needed and we just write there once
                     // otherwise we add value to the contents.
-                    float value
-                            = (index_from_ws == index) ? diff_dst_fp32[oc] : 0.0f;
+                    float value = (index_from_ws == index) ? diff_dst_fp32[oc]
+                                                           : 0.0f;
                     if (!(KD == SD && KH == SH && KW == SW))
                         diff_src_fp32[oc] += value;
                     else
@@ -620,7 +622,8 @@ void nhwc_pooling_bwd_t<data_type::bf16>::execute_backward(
                         diff_src_fp32[oc] = diff_dst_fp32[oc] / num_summands;
                 }
             }
-            cvt_float_to_bfloat16(&diff_src[src_offset_init], diff_src_fp32, OC);
+            cvt_float_to_bfloat16(
+                    &diff_src[src_offset_init], diff_src_fp32, OC);
         }
     });
 }
@@ -633,8 +636,8 @@ template struct nhwc_pooling_fwd_t<data_type::bf16>;
 template struct nhwc_pooling_bwd_t<data_type::bf16>;
 #endif // !TARGET_VANILLA
 
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

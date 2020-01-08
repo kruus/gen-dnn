@@ -15,7 +15,7 @@
 *******************************************************************************/
 
 /// @example cpu_cnn_training_bf16.cpp
-/// @copydoc cpu_cnn_training_bf16_cpp
+/// @copybrief cpu_cnn_training_bf16_cpp
 ///
 /// @page cpu_cnn_training_bf16_cpp CNN bf16 training example
 /// This C++ API example demonstrates how to build an AlexNet model training
@@ -25,15 +25,17 @@
 ///
 /// @include cpu_cnn_training_bf16.cpp
 
-#include <assert.h>
-
-#include "mkldnn.hpp"
+#include <cassert>
+#include <cmath>
 #include <iostream>
-#include <math.h>
 #include <numeric>
-#include <string>
+#include <stdexcept>
 
-using namespace mkldnn;
+#include "dnnl.hpp"
+
+#include "example_utils.hpp"
+
+using namespace dnnl;
 
 memory::dim product(const memory::dims &dims) {
     return std::accumulate(dims.begin(), dims.end(), (memory::dim)1,
@@ -65,12 +67,12 @@ void simple_net() {
     // {batch, 3, 227, 227} (x) {96, 3, 11, 11} -> {batch, 96, 55, 55}
     // strides: {4, 4}
 
-    memory::dims conv_src_tz = { batch, 3, 227, 227 };
-    memory::dims conv_weights_tz = { 96, 3, 11, 11 };
-    memory::dims conv_bias_tz = { 96 };
-    memory::dims conv_dst_tz = { batch, 96, 55, 55 };
-    memory::dims conv_strides = { 4, 4 };
-    memory::dims conv_padding = { 0, 0 };
+    memory::dims conv_src_tz = {batch, 3, 227, 227};
+    memory::dims conv_weights_tz = {96, 3, 11, 11};
+    memory::dims conv_bias_tz = {96};
+    memory::dims conv_dst_tz = {batch, 96, 55, 55};
+    memory::dims conv_strides = {4, 4};
+    memory::dims conv_padding = {0, 0};
 
     // float data type is used for user data
     std::vector<float> conv_weights(product(conv_weights_tz));
@@ -83,27 +85,43 @@ void simple_net() {
         conv_bias[i] = sinf((float)i);
 
     // create memory for user data
-    auto conv_user_src_memory = memory({ { conv_src_tz }, dt::f32, tag::nchw },
-            cpu_engine, net_src.data());
+    auto conv_user_src_memory = memory(
+            {{conv_src_tz}, dt::f32, tag::nchw}, cpu_engine, net_src.data());
     auto conv_user_weights_memory
-            = memory({ { conv_weights_tz }, dt::f32, tag::oihw }, cpu_engine,
+            = memory({{conv_weights_tz}, dt::f32, tag::oihw}, cpu_engine,
                     conv_weights.data());
-    auto conv_user_bias_memory = memory({ { conv_bias_tz }, dt::f32, tag::x },
-            cpu_engine, conv_bias.data());
+    auto conv_user_bias_memory = memory(
+            {{conv_bias_tz}, dt::f32, tag::x}, cpu_engine, conv_bias.data());
 
     // create memory descriptors for bfloat16 convolution data w/ no specified
     // format tag(`any`)
     // tag `any` lets a primitive(convolution in this case)
     // chose the memory format preferred for best performance.
-    auto conv_src_md = memory::desc({ conv_src_tz }, dt::bf16, tag::any);
-    auto conv_bias_md = memory::desc({ conv_bias_tz }, dt::bf16, tag::any);
-    auto conv_weights_md = memory::desc({ conv_weights_tz }, dt::bf16, tag::any);
-    auto conv_dst_md = memory::desc({ conv_dst_tz }, dt::bf16, tag::any);
+    auto conv_src_md = memory::desc({conv_src_tz}, dt::bf16, tag::any);
+    auto conv_bias_md = memory::desc({conv_bias_tz}, dt::bf16, tag::any);
+    auto conv_weights_md = memory::desc({conv_weights_tz}, dt::bf16, tag::any);
+    auto conv_dst_md = memory::desc({conv_dst_tz}, dt::bf16, tag::any);
 
     // create a convolution primitive descriptor
     auto conv_desc = convolution_forward::desc(prop_kind::forward,
-            algorithm::convolution_direct, conv_src_md, conv_weights_md, conv_bias_md,
-            conv_dst_md, conv_strides, conv_padding, conv_padding);
+            algorithm::convolution_direct, conv_src_md, conv_weights_md,
+            conv_bias_md, conv_dst_md, conv_strides, conv_padding,
+            conv_padding);
+
+    // check if bf16 convolution is supported
+    try {
+        convolution_forward::primitive_desc(conv_desc, cpu_engine);
+    } catch (error &e) {
+        if (e.status == dnnl_unimplemented)
+            throw example_allows_unimplemented {
+                    "DNNL does not have bf16 convolution implementation "
+                    "that supports this system.\n"
+                    "Please refer to the developer guide for details."};
+
+        // on any other error just re-throw
+        throw;
+    }
+
     auto conv_pd = convolution_forward::primitive_desc(conv_desc, cpu_engine);
 
     // create reorder primitives between user input and conv src if needed
@@ -111,8 +129,8 @@ void simple_net() {
     if (conv_pd.src_desc() != conv_user_src_memory.get_desc()) {
         conv_src_memory = memory(conv_pd.src_desc(), cpu_engine);
         net_fwd.push_back(reorder(conv_user_src_memory, conv_src_memory));
-        net_fwd_args.push_back({ { MKLDNN_ARG_FROM, conv_user_src_memory },
-                { MKLDNN_ARG_TO, conv_src_memory } });
+        net_fwd_args.push_back({{DNNL_ARG_FROM, conv_user_src_memory},
+                {DNNL_ARG_TO, conv_src_memory}});
     }
 
     auto conv_weights_memory = conv_user_weights_memory;
@@ -120,8 +138,8 @@ void simple_net() {
         conv_weights_memory = memory(conv_pd.weights_desc(), cpu_engine);
         net_fwd.push_back(
                 reorder(conv_user_weights_memory, conv_weights_memory));
-        net_fwd_args.push_back({ { MKLDNN_ARG_FROM, conv_user_weights_memory },
-                { MKLDNN_ARG_TO, conv_weights_memory } });
+        net_fwd_args.push_back({{DNNL_ARG_FROM, conv_user_weights_memory},
+                {DNNL_ARG_TO, conv_weights_memory}});
     }
 
     // create memory for conv dst
@@ -129,14 +147,14 @@ void simple_net() {
 
     // finally create a convolution primitive
     net_fwd.push_back(convolution_forward(conv_pd));
-    net_fwd_args.push_back({ { MKLDNN_ARG_SRC, conv_src_memory },
-            { MKLDNN_ARG_WEIGHTS, conv_weights_memory },
-            { MKLDNN_ARG_BIAS, conv_user_bias_memory },
-            { MKLDNN_ARG_DST, conv_dst_memory } });
+    net_fwd_args.push_back({{DNNL_ARG_SRC, conv_src_memory},
+            {DNNL_ARG_WEIGHTS, conv_weights_memory},
+            {DNNL_ARG_BIAS, conv_user_bias_memory},
+            {DNNL_ARG_DST, conv_dst_memory}});
 
     // AlexNet: relu
     // {batch, 96, 55, 55} -> {batch, 96, 55, 55}
-
+    memory::dims relu_data_tz = {batch, 96, 55, 55};
     const float negative_slope = 1.0f;
 
     // create relu primitive desc
@@ -151,8 +169,8 @@ void simple_net() {
 
     // finally create a relu primitive
     net_fwd.push_back(eltwise_forward(relu_pd));
-    net_fwd_args.push_back({ { MKLDNN_ARG_SRC, conv_dst_memory },
-            { MKLDNN_ARG_DST, relu_dst_memory } });
+    net_fwd_args.push_back(
+            {{DNNL_ARG_SRC, conv_dst_memory}, {DNNL_ARG_DST, relu_dst_memory}});
 
     // AlexNet: lrn
     // {batch, 96, 55, 55} -> {batch, 96, 55, 55}
@@ -160,6 +178,7 @@ void simple_net() {
     // alpha: 0.0001
     // beta: 0.75
     // k: 1.0
+    memory::dims lrn_data_tz = {batch, 96, 55, 55};
     const uint32_t local_size = 5;
     const float alpha = 0.0001f;
     const float beta = 0.75f;
@@ -167,8 +186,8 @@ void simple_net() {
 
     // create a lrn primitive descriptor
     auto lrn_desc = lrn_forward::desc(prop_kind::forward,
-            algorithm::lrn_across_channels, relu_pd.dst_desc(),
-            local_size, alpha, beta, k);
+            algorithm::lrn_across_channels, relu_pd.dst_desc(), local_size,
+            alpha, beta, k);
     auto lrn_pd = lrn_forward::primitive_desc(lrn_desc, cpu_engine);
 
     // create lrn dst memory
@@ -180,32 +199,31 @@ void simple_net() {
 
     // finally create a lrn primitive
     net_fwd.push_back(lrn_forward(lrn_pd));
-    net_fwd_args.push_back({ { MKLDNN_ARG_SRC, relu_dst_memory },
-            { MKLDNN_ARG_DST, lrn_dst_memory },
-            { MKLDNN_ARG_WORKSPACE, lrn_workspace_memory } });
+    net_fwd_args.push_back(
+            {{DNNL_ARG_SRC, relu_dst_memory}, {DNNL_ARG_DST, lrn_dst_memory},
+                    {DNNL_ARG_WORKSPACE, lrn_workspace_memory}});
 
     // AlexNet: pool
     // {batch, 96, 55, 55} -> {batch, 96, 27, 27}
     // kernel: {3, 3}
     // strides: {2, 2}
 
-    memory::dims pool_dst_tz = { batch, 96, 27, 27 };
-    memory::dims pool_kernel = { 3, 3 };
-    memory::dims pool_strides = { 2, 2 };
-    memory::dims pool_padding = { 0, 0 };
+    memory::dims pool_dst_tz = {batch, 96, 27, 27};
+    memory::dims pool_kernel = {3, 3};
+    memory::dims pool_strides = {2, 2};
+    memory::dims pool_padding = {0, 0};
 
     // create memory for pool dst data in user format
-    auto pool_user_dst_memory = memory({ { pool_dst_tz }, dt::f32, tag::nchw },
-            cpu_engine, net_dst.data());
+    auto pool_user_dst_memory = memory(
+            {{pool_dst_tz}, dt::f32, tag::nchw}, cpu_engine, net_dst.data());
 
     // create pool dst memory descriptor in format any for bfloat16 data type
-    auto pool_dst_md = memory::desc({ pool_dst_tz }, dt::bf16, tag::any);
+    auto pool_dst_md = memory::desc({pool_dst_tz}, dt::bf16, tag::any);
 
     // create a pooling primitive descriptor
     auto pool_desc = pooling_forward::desc(prop_kind::forward,
-            algorithm::pooling_max, lrn_dst_memory.get_desc(),
-            pool_dst_md, pool_strides, pool_kernel,
-            pool_padding, pool_padding);
+            algorithm::pooling_max, lrn_dst_memory.get_desc(), pool_dst_md,
+            pool_strides, pool_kernel, pool_padding, pool_padding);
     auto pool_pd = pooling_forward::primitive_desc(pool_desc, cpu_engine);
 
     // create pooling workspace memory if training
@@ -214,22 +232,22 @@ void simple_net() {
     // create a pooling primitive
     net_fwd.push_back(pooling_forward(pool_pd));
     // leave DST unknown for now (see the next reorder)
-    net_fwd_args.push_back({ { MKLDNN_ARG_SRC, lrn_dst_memory },
+    net_fwd_args.push_back({{DNNL_ARG_SRC, lrn_dst_memory},
             // delay putting DST until reorder (if needed)
-            { MKLDNN_ARG_WORKSPACE, pool_workspace_memory } });
+            {DNNL_ARG_WORKSPACE, pool_workspace_memory}});
 
     // create reorder primitive between pool dst and user dst format
     // if needed
     auto pool_dst_memory = pool_user_dst_memory;
     if (pool_pd.dst_desc() != pool_user_dst_memory.get_desc()) {
         pool_dst_memory = memory(pool_pd.dst_desc(), cpu_engine);
-        net_fwd_args.back().insert({ MKLDNN_ARG_DST, pool_dst_memory });
+        net_fwd_args.back().insert({DNNL_ARG_DST, pool_dst_memory});
 
         net_fwd.push_back(reorder(pool_dst_memory, pool_user_dst_memory));
-        net_fwd_args.push_back({ { MKLDNN_ARG_FROM, pool_dst_memory },
-                { MKLDNN_ARG_TO, pool_user_dst_memory } });
+        net_fwd_args.push_back({{DNNL_ARG_FROM, pool_dst_memory},
+                {DNNL_ARG_TO, pool_user_dst_memory}});
     } else {
-        net_fwd_args.back().insert({ MKLDNN_ARG_DST, pool_dst_memory });
+        net_fwd_args.back().insert({DNNL_ARG_DST, pool_dst_memory});
     }
 
     //-----------------------------------------------------------------------
@@ -240,14 +258,13 @@ void simple_net() {
         net_diff_dst[i] = sinf((float)i);
 
     // create memory for user diff dst data stored in float data type
-    auto pool_user_diff_dst_memory
-            = memory({ { pool_dst_tz }, dt::f32, tag::nchw }, cpu_engine,
-                    net_diff_dst.data());
+    auto pool_user_diff_dst_memory = memory({{pool_dst_tz}, dt::f32, tag::nchw},
+            cpu_engine, net_diff_dst.data());
 
     // Backward pooling
     // create memory descriptors for pooling
-    auto pool_diff_src_md = lrn_dst_memory.get_desc();
-    auto pool_diff_dst_md = pool_dst_memory.get_desc();
+    auto pool_diff_src_md = memory::desc({lrn_data_tz}, dt::bf16, tag::any);
+    auto pool_diff_dst_md = memory::desc({pool_dst_tz}, dt::bf16, tag::any);
 
     // create backward pooling descriptor
     auto pool_bwd_desc = pooling_backward::desc(algorithm::pooling_max,
@@ -264,8 +281,8 @@ void simple_net() {
         pool_diff_dst_memory = memory(pool_dst_memory.get_desc(), cpu_engine);
         net_bwd.push_back(
                 reorder(pool_user_diff_dst_memory, pool_diff_dst_memory));
-        net_bwd_args.push_back({ { MKLDNN_ARG_FROM, pool_user_diff_dst_memory },
-                { MKLDNN_ARG_TO, pool_diff_dst_memory } });
+        net_bwd_args.push_back({{DNNL_ARG_FROM, pool_user_diff_dst_memory},
+                {DNNL_ARG_TO, pool_diff_dst_memory}});
     }
 
     // create memory for pool diff src
@@ -273,12 +290,12 @@ void simple_net() {
 
     // finally create backward pooling primitive
     net_bwd.push_back(pooling_backward(pool_bwd_pd));
-    net_bwd_args.push_back({ { MKLDNN_ARG_DIFF_DST, pool_diff_dst_memory },
-            { MKLDNN_ARG_DIFF_SRC, pool_diff_src_memory },
-            { MKLDNN_ARG_WORKSPACE, pool_workspace_memory } });
+    net_bwd_args.push_back({{DNNL_ARG_DIFF_DST, pool_diff_dst_memory},
+            {DNNL_ARG_DIFF_SRC, pool_diff_src_memory},
+            {DNNL_ARG_WORKSPACE, pool_workspace_memory}});
 
     // Backward lrn
-    auto lrn_diff_dst_md = lrn_dst_memory.get_desc();
+    auto lrn_diff_dst_md = memory::desc({lrn_data_tz}, dt::bf16, tag::any);
 
     // create backward lrn primitive descriptor
     auto lrn_bwd_desc = lrn_backward::desc(algorithm::lrn_across_channels,
@@ -286,19 +303,29 @@ void simple_net() {
     auto lrn_bwd_pd
             = lrn_backward::primitive_desc(lrn_bwd_desc, cpu_engine, lrn_pd);
 
+    // create reorder primitive between pool diff src and lrn diff dst
+    // if required
+    auto lrn_diff_dst_memory = pool_diff_src_memory;
+    if (lrn_diff_dst_memory.get_desc() != lrn_bwd_pd.diff_dst_desc()) {
+        lrn_diff_dst_memory = memory(lrn_bwd_pd.diff_dst_desc(), cpu_engine);
+        net_bwd.push_back(reorder(pool_diff_src_memory, lrn_diff_dst_memory));
+        net_bwd_args.push_back({{DNNL_ARG_FROM, pool_diff_src_memory},
+                {DNNL_ARG_TO, lrn_diff_dst_memory}});
+    }
+
     // create memory for lrn diff src
     auto lrn_diff_src_memory = memory(lrn_bwd_pd.diff_src_desc(), cpu_engine);
 
     // finally create a lrn backward primitive
     // backward lrn needs src: relu dst in this topology
     net_bwd.push_back(lrn_backward(lrn_bwd_pd));
-    net_bwd_args.push_back({ { MKLDNN_ARG_SRC, relu_dst_memory },
-            { MKLDNN_ARG_DIFF_DST, pool_diff_src_memory },
-            { MKLDNN_ARG_DIFF_SRC, lrn_diff_src_memory },
-            { MKLDNN_ARG_WORKSPACE, lrn_workspace_memory } });
+    net_bwd_args.push_back({{DNNL_ARG_SRC, relu_dst_memory},
+            {DNNL_ARG_DIFF_DST, lrn_diff_dst_memory},
+            {DNNL_ARG_DIFF_SRC, lrn_diff_src_memory},
+            {DNNL_ARG_WORKSPACE, lrn_workspace_memory}});
 
     // Backward relu
-    auto relu_diff_dst_md = lrn_diff_src_memory.get_desc();
+    auto relu_diff_dst_md = memory::desc({relu_data_tz}, dt::bf16, tag::any);
     auto relu_src_md = conv_pd.dst_desc();
 
     // create backward relu primitive_descriptor
@@ -307,14 +334,24 @@ void simple_net() {
     auto relu_bwd_pd = eltwise_backward::primitive_desc(
             relu_bwd_desc, cpu_engine, relu_pd);
 
+    // create reorder primitive between lrn diff src and relu diff dst
+    // if required
+    auto relu_diff_dst_memory = lrn_diff_src_memory;
+    if (relu_diff_dst_memory.get_desc() != relu_bwd_pd.diff_dst_desc()) {
+        relu_diff_dst_memory = memory(relu_bwd_pd.diff_dst_desc(), cpu_engine);
+        net_bwd.push_back(reorder(lrn_diff_src_memory, relu_diff_dst_memory));
+        net_bwd_args.push_back({{DNNL_ARG_FROM, lrn_diff_src_memory},
+                {DNNL_ARG_TO, relu_diff_dst_memory}});
+    }
+
     // create memory for relu diff src
     auto relu_diff_src_memory = memory(relu_bwd_pd.diff_src_desc(), cpu_engine);
 
     // finally create a backward relu primitive
     net_bwd.push_back(eltwise_backward(relu_bwd_pd));
-    net_bwd_args.push_back({ { MKLDNN_ARG_SRC, conv_dst_memory },
-            { MKLDNN_ARG_DIFF_DST, lrn_diff_src_memory },
-            { MKLDNN_ARG_DIFF_SRC, relu_diff_src_memory } });
+    net_bwd_args.push_back({{DNNL_ARG_SRC, conv_dst_memory},
+            {DNNL_ARG_DIFF_DST, relu_diff_dst_memory},
+            {DNNL_ARG_DIFF_SRC, relu_diff_src_memory}});
 
     // Backward convolution with respect to weights
     // create user format diff weights and diff bias memory for float data type
@@ -322,23 +359,23 @@ void simple_net() {
     std::vector<float> conv_diff_bias_buffer(product(conv_bias_tz));
 
     auto conv_user_diff_weights_memory
-            = memory({ { conv_weights_tz }, dt::f32, tag::nchw }, cpu_engine,
+            = memory({{conv_weights_tz}, dt::f32, tag::nchw}, cpu_engine,
                     conv_user_diff_weights_buffer.data());
-    auto conv_diff_bias_memory = memory({ { conv_bias_tz }, dt::f32, tag::x },
+    auto conv_diff_bias_memory = memory({{conv_bias_tz}, dt::f32, tag::x},
             cpu_engine, conv_diff_bias_buffer.data());
 
     // create memory descriptors for bfloat16 convolution data
-    auto conv_bwd_src_md = memory::desc({ conv_src_tz }, dt::bf16, tag::any);
-    auto conv_diff_bias_md = memory::desc({ conv_bias_tz }, dt::bf16, tag::any);
+    auto conv_bwd_src_md = memory::desc({conv_src_tz}, dt::bf16, tag::any);
+    auto conv_diff_bias_md = memory::desc({conv_bias_tz}, dt::bf16, tag::any);
     auto conv_diff_weights_md
-            = memory::desc({ conv_weights_tz }, dt::bf16, tag::any);
-    auto conv_diff_dst_md = memory::desc({ conv_dst_tz }, dt::bf16, tag::any);
+            = memory::desc({conv_weights_tz}, dt::bf16, tag::any);
+    auto conv_diff_dst_md = memory::desc({conv_dst_tz}, dt::bf16, tag::any);
 
     // create backward convolution primitive descriptor
-    auto conv_bwd_weights_desc = convolution_backward_weights::desc(
-            algorithm::convolution_direct, conv_bwd_src_md, conv_diff_weights_md,
-            conv_diff_bias_md, conv_diff_dst_md, conv_strides, conv_padding,
-            conv_padding);
+    auto conv_bwd_weights_desc
+            = convolution_backward_weights::desc(algorithm::convolution_direct,
+                    conv_bwd_src_md, conv_diff_weights_md, conv_diff_bias_md,
+                    conv_diff_dst_md, conv_strides, conv_padding, conv_padding);
     auto conv_bwd_weights_pd = convolution_backward_weights::primitive_desc(
             conv_bwd_weights_desc, cpu_engine, conv_pd);
 
@@ -353,8 +390,8 @@ void simple_net() {
         conv_bwd_src_memory
                 = memory(conv_bwd_weights_pd.src_desc(), cpu_engine);
         net_bwd.push_back(reorder(conv_src_memory, conv_bwd_src_memory));
-        net_bwd_args.push_back({ { MKLDNN_ARG_FROM, conv_src_memory },
-                { MKLDNN_ARG_TO, conv_bwd_src_memory } });
+        net_bwd_args.push_back({{DNNL_ARG_FROM, conv_src_memory},
+                {DNNL_ARG_TO, conv_bwd_src_memory}});
     }
 
     // create reorder primitives for diff_dst between diff_src from relu_bwd
@@ -365,16 +402,16 @@ void simple_net() {
         conv_diff_dst_memory
                 = memory(conv_bwd_weights_pd.diff_dst_desc(), cpu_engine);
         net_bwd.push_back(reorder(relu_diff_src_memory, conv_diff_dst_memory));
-        net_bwd_args.push_back({ { MKLDNN_ARG_FROM, relu_diff_src_memory },
-                { MKLDNN_ARG_TO, conv_diff_dst_memory } });
+        net_bwd_args.push_back({{DNNL_ARG_FROM, relu_diff_src_memory},
+                {DNNL_ARG_TO, conv_diff_dst_memory}});
     }
 
     // create backward convolution primitive
     net_bwd.push_back(convolution_backward_weights(conv_bwd_weights_pd));
-    net_bwd_args.push_back({ { MKLDNN_ARG_SRC, conv_bwd_src_memory },
-            { MKLDNN_ARG_DIFF_DST, conv_diff_dst_memory },
+    net_bwd_args.push_back({{DNNL_ARG_SRC, conv_bwd_src_memory},
+            {DNNL_ARG_DIFF_DST, conv_diff_dst_memory},
             // delay putting DIFF_WEIGHTS until reorder (if needed)
-            { MKLDNN_ARG_DIFF_BIAS, conv_diff_bias_memory } });
+            {DNNL_ARG_DIFF_BIAS, conv_diff_bias_memory}});
 
     // create reorder primitives between conv diff weights and user diff weights
     // if needed
@@ -384,15 +421,15 @@ void simple_net() {
         conv_diff_weights_memory
                 = memory(conv_bwd_weights_pd.diff_weights_desc(), cpu_engine);
         net_bwd_args.back().insert(
-                { MKLDNN_ARG_DIFF_WEIGHTS, conv_diff_weights_memory });
+                {DNNL_ARG_DIFF_WEIGHTS, conv_diff_weights_memory});
 
         net_bwd.push_back(reorder(
                 conv_diff_weights_memory, conv_user_diff_weights_memory));
-        net_bwd_args.push_back({ { MKLDNN_ARG_FROM, conv_diff_weights_memory },
-                { MKLDNN_ARG_TO, conv_user_diff_weights_memory } });
+        net_bwd_args.push_back({{DNNL_ARG_FROM, conv_diff_weights_memory},
+                {DNNL_ARG_TO, conv_user_diff_weights_memory}});
     } else {
         net_bwd_args.back().insert(
-                { MKLDNN_ARG_DIFF_WEIGHTS, conv_diff_weights_memory });
+                {DNNL_ARG_DIFF_WEIGHTS, conv_diff_weights_memory});
     }
 
     // didn't we forget anything?
@@ -432,15 +469,10 @@ void simple_net() {
 }
 
 int main(int argc, char **argv) {
-    try {
 #if defined(TARGET_VANILLA)
-        throw error(mkldnn_unimplemented,"disabled for TARGET_VANILLA");
+    printf(" example %s disabled for TARGET_VANILLA",__FILE__);
+#else
+    return handle_example_errors({engine::kind::cpu}, simple_net);
 #endif
-        simple_net();
-        std::cout << "passed" << std::endl;
-    } catch (error &e) {
-        std::cerr << "status: " << e.status << std::endl;
-        std::cerr << "message: " << e.message << std::endl;
-    }
-    return 0;
 }
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

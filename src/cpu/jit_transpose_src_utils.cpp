@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2018 Intel Corporation
+* Copyright 2017-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -16,27 +16,27 @@
 #if !defined(TARGET_VANILLA)
 
 #include "c_types_map.hpp"
-#include "type_helpers.hpp"
-#include "nstl.hpp"
-#include "utils.hpp"
-#include "jit_generator.hpp"
 #include "cpu_barrier.hpp"
+#include "jit_generator.hpp"
+#include "nstl.hpp"
+#include "type_helpers.hpp"
+#include "utils.hpp"
 
 #include "jit_transpose_src_utils.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
-using namespace mkldnn::impl::utils;
+using namespace dnnl::impl::utils;
 using namespace Xbyak;
 
 #define GET_OFF(x) offsetof(ctx_t, x)
 
-struct jit_trans_iw_ic_t: public jit_trans_src_t, public jit_generator {
+struct jit_trans_iw_ic_t : public jit_trans_src_t, public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_trans_iw_ic_t)
 
-    jit_trans_iw_ic_t(const jit_conv_conf_t *conf): jit_trans_src_t(conf) {
+    jit_trans_iw_ic_t(const jit_conv_conf_t *conf) : jit_trans_src_t(conf) {
         generate();
         ker_ = (decltype(ker_))this->getCode();
     }
@@ -71,33 +71,33 @@ private:
     void generate();
 };
 
-void jit_trans_iw_ic_t::transpose(int nrows, int l_pad, int r_pad,
-    bool nontemporal_stores) {
+void jit_trans_iw_ic_t::transpose(
+        int nrows, int l_pad, int r_pad, bool nontemporal_stores) {
     assert(nrows >= 0 && nrows <= transpose_size);
     static_assert(transpose_size == 16, "Unsupported transpose size");
-    if (!nrows)
-        return;
+    if (!nrows) return;
 
     auto pf_src_t0 = [=](int i) {
-        if(enable_prefetch) prefetcht0(EVEX_compress_addr(reg_src,
-            (transpose_size + i) * src_stride));
+        if (enable_prefetch)
+            prefetcht0(EVEX_compress_addr(
+                    reg_src, (transpose_size + i) * src_stride));
     };
 
     auto pf_tr_src_t0 = [=](int i) {
-        int offset = (transpose_size) * typesize + i * tr_src_stride;
-        if(enable_prefetch) prefetcht0(EVEX_compress_addr(reg_tr_src, offset));
-        if(enable_prefetch) prefetcht0(EVEX_compress_addr(reg_tr_src,
-            offset + 64));
+        int offset = (transpose_size)*typesize + i * tr_src_stride;
+        if (enable_prefetch) prefetcht0(EVEX_compress_addr(reg_tr_src, offset));
+        if (enable_prefetch)
+            prefetcht0(EVEX_compress_addr(reg_tr_src, offset + 64));
     };
 
     auto pf_src_t1 = [=](int i) {
-        if(enable_prefetch) prefetcht1(EVEX_compress_addr(reg_src_prf,
-            i * src_stride));
+        if (enable_prefetch)
+            prefetcht1(EVEX_compress_addr(reg_src_prf, i * src_stride));
     };
 
     auto pf_tr_src_t1 = [=](int i) {
-        if(enable_prefetch) prefetchwt1(EVEX_compress_addr(reg_tr_src_prf,
-            i * tr_src_stride));
+        if (enable_prefetch)
+            prefetchwt1(EVEX_compress_addr(reg_tr_src_prf, i * tr_src_stride));
     };
 
     auto src_zmm = [=](int i) {
@@ -120,7 +120,7 @@ void jit_trans_iw_ic_t::transpose(int nrows, int l_pad, int r_pad,
             jit_generator::kmovw(k, regw_tmp);
         };
 
-        auto padding = [=] (Reg64 reg, int pad) {
+        auto padding = [=](Reg64 reg, int pad) {
             kmovw(kTail, (1 << pad) - 1);
             auto k = kTail;
             auto base = reg;
@@ -133,11 +133,9 @@ void jit_trans_iw_ic_t::transpose(int nrows, int l_pad, int r_pad,
         };
 
         mov(reg_tr_src_tmp, reg_tr_src);
-        if (l_pad > 0)
-            add(reg_tr_src_tmp, l_pad * typesize);
+        if (l_pad > 0) add(reg_tr_src_tmp, l_pad * typesize);
 
-        if (tail != transpose_size)
-            kmovw(kTail, (1 << tail) - 1);
+        if (tail != transpose_size) kmovw(kTail, (1 << tail) - 1);
 
         // Xbyak does not allow k0 to be specified explicitly via the '|'
         // operator, so we have to do this via a method call (implicitly
@@ -158,9 +156,7 @@ void jit_trans_iw_ic_t::transpose(int nrows, int l_pad, int r_pad,
             padding(reg_tr_src_tmp, r_pad);
         }
 
-        if (l_pad > 0) {
-            padding(reg_tr_src, l_pad);
-        }
+        if (l_pad > 0) { padding(reg_tr_src, l_pad); }
     };
 
     auto transpose16x8 = [=](int base_idx) {
@@ -177,7 +173,11 @@ void jit_trans_iw_ic_t::transpose(int nrows, int l_pad, int r_pad,
 
             if (base_idx == 0 && i == 0) {
                 load(src_idx0);
-                load(src_idx1);
+                if (src_idx1 < nrows)
+                    load(src_idx1);
+                else
+                    vpxord(src_zmm(src_idx1), src_zmm(src_idx1),
+                            src_zmm(src_idx1));
             }
 
             auto tmp0 = tmp_zmm(src_idx0);
@@ -185,13 +185,11 @@ void jit_trans_iw_ic_t::transpose(int nrows, int l_pad, int r_pad,
             auto src0 = src_zmm(src_idx0);
             auto src1 = src_zmm(src_idx1);
 
-            if (next_src_idx0 < nrows && load_next)
-                load(next_src_idx0);
+            if (next_src_idx0 < nrows && load_next) load(next_src_idx0);
             valignd(tmp0, src0, src0, 0x1);
             pf_src_t1(base_idx + i);
 
-            if (next_src_idx1 < nrows && load_next)
-                load(next_src_idx1);
+            if (next_src_idx1 < nrows && load_next) load(next_src_idx1);
             valignd(tmp1, src1, src1, 0xf);
             pf_src_t0(base_idx + i);
 
@@ -290,10 +288,10 @@ void jit_trans_iw_ic_t::generate() {
     const int left_pad = conf_->l_pad;
     const int right_pad = tr_iw - iw - left_pad;
 
-    mov(reg_src, ptr [param1 + GET_OFF(src)]);
-    mov(reg_tr_src, ptr [param1 + GET_OFF(tr_src)]);
-    mov(reg_src_prf, ptr [param1 + GET_OFF(src_prf)]);
-    mov(reg_tr_src_prf, ptr [param1 + GET_OFF(tr_src_prf)]);
+    mov(reg_src, ptr[param1 + GET_OFF(src)]);
+    mov(reg_tr_src, ptr[param1 + GET_OFF(tr_src)]);
+    mov(reg_src_prf, ptr[param1 + GET_OFF(src_prf)]);
+    mov(reg_tr_src_prf, ptr[param1 + GET_OFF(tr_src_prf)]);
 
     auto kmovw = [=](Opmask k, unsigned w) {
         mov(regw_tmp, w);
@@ -319,7 +317,8 @@ void jit_trans_iw_ic_t::generate() {
     if (loop_iters) {
         mov(reg_loop, loop_iters);
         Label loop;
-        L(loop); {
+        L(loop);
+        {
             transpose(transpose_size, 0, 0, nontemporal_stores);
             add(reg_src, src_step);
             add(reg_tr_src, tr_src_step);
@@ -337,10 +336,10 @@ void jit_trans_iw_ic_t::generate() {
     postamble();
 }
 
-struct jit_trans_iw_ic_int16_t: public jit_trans_src_t, public jit_generator {
+struct jit_trans_iw_ic_int16_t : public jit_trans_src_t, public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_trans_iw_ic_int16_t)
-    jit_trans_iw_ic_int16_t(const jit_conv_conf_t *conf):
-        jit_trans_src_t(conf) {
+    jit_trans_iw_ic_int16_t(const jit_conv_conf_t *conf)
+        : jit_trans_src_t(conf) {
         generate();
         ker_ = (decltype(ker_))this->getCode();
     }
@@ -350,7 +349,11 @@ private:
     using reg32_t = const Xbyak::Reg32;
     using opmask_t = const Xbyak::Opmask;
 
-    enum { typesize = sizeof(int16_t), transpose_size = 16, small_spatial = 14 };
+    enum {
+        typesize = sizeof(int16_t),
+        transpose_size = 16,
+        small_spatial = 14
+    };
     int src_stride, tr_src_stride;
     int tail;
     bool enable_prefetch;
@@ -378,23 +381,19 @@ private:
     Xbyak::Zmm vidx3 = zmm29;
     Xbyak::Zmm vidx4 = zmm28;
     Xbyak::Zmm vidx5 = zmm27;
-    Xbyak::Zmm zmm_tmp  = zmm26;
-
+    Xbyak::Zmm zmm_tmp = zmm26;
 
     void transpose(int nrows, int l_pad, int r_pad, bool nontemporal_stores);
     void generate();
 };
 
-void jit_trans_iw_ic_int16_t::transpose(int nrows, int l_pad, int r_pad,
-    bool nontemporal_stores) {
+void jit_trans_iw_ic_int16_t::transpose(
+        int nrows, int l_pad, int r_pad, bool nontemporal_stores) {
     assert(nrows >= 0 && nrows <= transpose_size);
     static_assert(transpose_size == 16, "Unsupported transpose size");
-    if (!nrows)
-        return;
+    if (!nrows) return;
 
-    auto src_zmm = [=](int i) {
-        return Zmm(i);
-    };
+    auto src_zmm = [=](int i) { return Zmm(i); };
 
     auto src_ymm = [=](int i) {
         assert(i >= 0 && i < 16);
@@ -411,8 +410,7 @@ void jit_trans_iw_ic_int16_t::transpose(int nrows, int l_pad, int r_pad,
     };
 
     auto store = [=](Zmm r, int i) {
-
-        auto padding = [=] (Reg64 reg, int pad) {
+        auto padding = [=](Reg64 reg, int pad) {
             kmovw(kTail, (1 << pad) - 1);
             auto k = kTail;
             auto base = reg;
@@ -439,41 +437,40 @@ void jit_trans_iw_ic_int16_t::transpose(int nrows, int l_pad, int r_pad,
         }
 
         int store_tail = rnd_up(nrows, 2);
-        kmovw(kTail, (1 << store_tail/2) - 1);
+        kmovw(kTail, (1 << store_tail / 2) - 1);
         auto k = kTail;
         auto base = reg_tr_src_tmp;
         base.setOpmaskIdx(k.getIdx(), true);
 
         auto addr = EVEX_compress_addr(base, i * tr_src_stride);
         vmovups(addr, r);
-
     };
 
     kmovw(kFFFF, 0xffff);
     //all loads
-    for (int i=0; i<16; i++){
+    for (int i = 0; i < 16; i++) {
         vpxord(src_zmm(i), src_zmm(i), src_zmm(i));
     }
 
-    for (int i = 0; i < nrows/2; i++) {
-        auto src0 = src_ymm(2*i);
-        auto src1 = src_ymm(2*i+1);
-        auto zmm_src0 = src_zmm(2*i);
-        load_ymm(2*i);
+    for (int i = 0; i < nrows / 2; i++) {
+        auto src0 = src_ymm(2 * i);
+        auto src1 = src_ymm(2 * i + 1);
+        auto zmm_src0 = src_zmm(2 * i);
+        load_ymm(2 * i);
 
         vpunpcklwd(src1, src0,
-            EVEX_compress_addr(reg_src, (2*i+1) * src_stride));
+                EVEX_compress_addr(reg_src, (2 * i + 1) * src_stride));
         vpunpckhwd(src0, src0,
-            EVEX_compress_addr(reg_src, (2*i+1) * src_stride));
+                EVEX_compress_addr(reg_src, (2 * i + 1) * src_stride));
         vinserti64x4(zmm_src0, zmm_src0, src1, 1);
         vpermps(zmm_src0 | kFFFF, vidx4, zmm_src0);
     }
 
     // for odd numbers we need to mix row with zeroes
-    if (nrows%2) {
-        int i = nrows-1;
+    if (nrows % 2) {
+        int i = nrows - 1;
         auto src0 = src_ymm(i);
-        auto src1 = src_ymm(i+1); //zero
+        auto src1 = src_ymm(i + 1); //zero
 
         auto zmm_src0 = src_zmm(i);
         vpxor(src1, src1, src1);
@@ -491,11 +488,11 @@ void jit_trans_iw_ic_int16_t::transpose(int nrows, int l_pad, int r_pad,
     }
 
     // swap 1
-    for (int i=0; i<4; i++) {
-        auto zmm0 = src_zmm(4*i);
-        auto zmm1 = src_zmm(4*i+2);
-        auto tmp0 = src_zmm(4*i+1);
-        auto tmp1 = src_zmm(4*i+3);
+    for (int i = 0; i < 4; i++) {
+        auto zmm0 = src_zmm(4 * i);
+        auto zmm1 = src_zmm(4 * i + 2);
+        auto tmp0 = src_zmm(4 * i + 1);
+        auto tmp1 = src_zmm(4 * i + 3);
 
         vmovups(tmp0, zmm0);
         vmovups(tmp1, zmm1);
@@ -505,13 +502,13 @@ void jit_trans_iw_ic_int16_t::transpose(int nrows, int l_pad, int r_pad,
     }
     // swap 2
     int base_idx;
-    base_idx=0;
-    for (int i=0; i<2; i++) {
-        auto zmm0 = src_zmm(base_idx+2*i+1);
-        auto zmm1 = src_zmm(base_idx+2*i+5);
+    base_idx = 0;
+    for (int i = 0; i < 2; i++) {
+        auto zmm0 = src_zmm(base_idx + 2 * i + 1);
+        auto zmm1 = src_zmm(base_idx + 2 * i + 5);
 
-        auto tmp0 = src_zmm(base_idx+2*i);
-        auto tmp1 = src_zmm(base_idx+2*i+4);
+        auto tmp0 = src_zmm(base_idx + 2 * i);
+        auto tmp1 = src_zmm(base_idx + 2 * i + 4);
 
         vmovupd(tmp0, zmm0);
         vmovupd(tmp1, zmm1);
@@ -519,13 +516,13 @@ void jit_trans_iw_ic_int16_t::transpose(int nrows, int l_pad, int r_pad,
         vpermpd(tmp0 | kAA, vidx2, zmm1);
         vpermpd(tmp1 | k55, vidx2, zmm0);
     }
-    base_idx=8;
-    for (int i=0; i<2; i++) {
-        auto zmm0 = src_zmm(base_idx+2*i+1);
-        auto zmm1 = src_zmm(base_idx+2*i+5);
+    base_idx = 8;
+    for (int i = 0; i < 2; i++) {
+        auto zmm0 = src_zmm(base_idx + 2 * i + 1);
+        auto zmm1 = src_zmm(base_idx + 2 * i + 5);
 
-        auto tmp0 = src_zmm(base_idx+2*i);
-        auto tmp1 = src_zmm(base_idx+2*i+4);
+        auto tmp0 = src_zmm(base_idx + 2 * i);
+        auto tmp1 = src_zmm(base_idx + 2 * i + 4);
 
         vmovupd(tmp0, zmm0);
         vmovupd(tmp1, zmm1);
@@ -535,12 +532,12 @@ void jit_trans_iw_ic_int16_t::transpose(int nrows, int l_pad, int r_pad,
     }
 
     // swap 3
-    for (int i=0; i<4; i++) {
-        auto zmm0 = src_zmm(2*i);
-        auto zmm1 = src_zmm(2*i+8);
+    for (int i = 0; i < 4; i++) {
+        auto zmm0 = src_zmm(2 * i);
+        auto zmm1 = src_zmm(2 * i + 8);
 
-        auto tmp0 = src_zmm(2*i+1);
-        auto tmp1 = src_zmm(2*i+9);
+        auto tmp0 = src_zmm(2 * i + 1);
+        auto tmp1 = src_zmm(2 * i + 9);
 
         vmovupd(tmp0, zmm0);
         vmovupd(tmp1, zmm1);
@@ -550,8 +547,8 @@ void jit_trans_iw_ic_int16_t::transpose(int nrows, int l_pad, int r_pad,
     }
 
     // all stores
-    for (int i=0; i<8; i++)
-        vextracti64x4(src_ymm(2*i), src_zmm(2*i+1), 1);
+    for (int i = 0; i < 8; i++)
+        vextracti64x4(src_ymm(2 * i), src_zmm(2 * i + 1), 1);
 
     store(src_zmm(1), 0);
     store(src_zmm(0), 1);
@@ -575,15 +572,15 @@ void jit_trans_iw_ic_int16_t::generate() {
     preamble();
 
     alignas(64) static constexpr const int64_t idx1[8]
-        = { 2, 3, 0, 1, 6, 7, 4, 5 };
+            = {2, 3, 0, 1, 6, 7, 4, 5};
     alignas(64) static constexpr const int64_t idx2[8]
-        = { 1, 0, 3, 2, 5, 4, 7, 6 };
+            = {1, 0, 3, 2, 5, 4, 7, 6};
     alignas(64) static constexpr const int32_t idx3[16]
-        = { 1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14 };
+            = {1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14};
     alignas(64) static constexpr const int32_t idx4[16]
-        = { 8, 10, 12, 14, 0, 2, 4, 6, 9, 11, 13, 15, 1, 3, 5, 7 };
+            = {8, 10, 12, 14, 0, 2, 4, 6, 9, 11, 13, 15, 1, 3, 5, 7};
     alignas(64) static constexpr const int32_t idx5[16]
-        = { 8, 10, 12, 14, 0, 2, 4, 6, 9, 11, 13, 15, 1, 3, 5, 7 };
+            = {8, 10, 12, 14, 0, 2, 4, 6, 9, 11, 13, 15, 1, 3, 5, 7};
 
     const int ic_block = conf_->ic_block;
     const int iw = conf_->iw;
@@ -627,7 +624,7 @@ void jit_trans_iw_ic_int16_t::generate() {
         const int left_pad = div_up(conf_->l_pad - s, str_w);
         const int iw1 = iw + conf_->l_pad;
         const int iw_s = (s < (iw1 % str_w) ? div_up(iw1, str_w) : iw1 / str_w)
-                           - left_pad;
+                - left_pad;
         const int right_pad = tr_iw_s - iw_s - left_pad;
 
         const int transposes = utils::div_up(iw_s, transpose_size);
@@ -643,10 +640,10 @@ void jit_trans_iw_ic_int16_t::generate() {
         const int src_step = ic_block * transpose_size * str_w * typesize;
         const int tr_src_step = transpose_size * typesize;
 
-        mov(reg_src, ptr [param1 + GET_OFF(src)]);
-        mov(reg_tr_src, ptr [param1 + GET_OFF(tr_src)]);
-        mov(reg_src_prf, ptr [param1 + GET_OFF(src_prf)]);
-        mov(reg_tr_src_prf, ptr [param1 + GET_OFF(tr_src_prf)]);
+        mov(reg_src, ptr[param1 + GET_OFF(src)]);
+        mov(reg_tr_src, ptr[param1 + GET_OFF(tr_src)]);
+        mov(reg_src_prf, ptr[param1 + GET_OFF(src_prf)]);
+        mov(reg_tr_src_prf, ptr[param1 + GET_OFF(tr_src_prf)]);
 
         if (str_w > 1) {
             int tr_src_shift = s;
@@ -669,7 +666,8 @@ void jit_trans_iw_ic_int16_t::generate() {
         if (loop_iters) {
             mov(reg_loop, loop_iters);
             Label loop;
-            L(loop); {
+            L(loop);
+            {
                 transpose(transpose_size, 0, 0, nontemporal_stores);
                 add(reg_src, src_step);
                 add(reg_tr_src, tr_src_step);
@@ -687,9 +685,9 @@ void jit_trans_iw_ic_int16_t::generate() {
     postamble();
 }
 
-struct jit_trans_ow_oc_t: public jit_trans_dst_t, public jit_generator {
+struct jit_trans_ow_oc_t : public jit_trans_dst_t, public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_trans_ow_oc_t)
-    jit_trans_ow_oc_t(const jit_conv_conf_t *conf): jit_trans_dst_t(conf) {
+    jit_trans_ow_oc_t(const jit_conv_conf_t *conf) : jit_trans_dst_t(conf) {
         generate();
         ker_ = (decltype(ker_))this->getCode();
     }
@@ -700,7 +698,11 @@ private:
     using opmask_t = const Xbyak::Opmask;
     using zmm = const Xbyak::Zmm;
 
-    enum { typesize = sizeof(int16_t), transpose_size = 16, small_spatial = 14 };
+    enum {
+        typesize = sizeof(int16_t),
+        transpose_size = 16,
+        small_spatial = 14
+    };
     int src_stride, tr_src_stride;
     int tail;
     bool enable_prefetch;
@@ -722,16 +724,13 @@ private:
     void generate();
 };
 
-void jit_trans_ow_oc_t::transpose(int nrows, int l_pad, int r_pad,
-    bool nontemporal_stores) {
+void jit_trans_ow_oc_t::transpose(
+        int nrows, int l_pad, int r_pad, bool nontemporal_stores) {
     assert(nrows >= 0 && nrows <= transpose_size);
     static_assert(transpose_size == 16, "Unsupported transpose size");
-    if (!nrows)
-        return;
+    if (!nrows) return;
 
-    auto src_zmm = [=](int i) {
-        return Zmm(i);
-    };
+    auto src_zmm = [=](int i) { return Zmm(i); };
 
     auto src_ymm = [=](int i) {
         assert(i >= 0 && i < 16);
@@ -742,7 +741,6 @@ void jit_trans_ow_oc_t::transpose(int nrows, int l_pad, int r_pad,
         vmovups(src_ymm(i), EVEX_compress_addr(reg_src, i * src_stride));
     };
 
-
     auto store = [=](Zmm r, int i) {
         auto addr = EVEX_compress_addr(reg_tr_src, i * tr_src_stride);
         if (nontemporal_stores)
@@ -751,24 +749,24 @@ void jit_trans_ow_oc_t::transpose(int nrows, int l_pad, int r_pad,
             vmovups(addr, r);
     };
 
-    for (int i = 0; i < nrows/2; i++) {
-        auto src0 = src_ymm(2*i);
-        auto src1 = src_ymm(2*i+1);
-        auto zmm_src0 = src_zmm(2*i);
-        load_ymm(2*i);
+    for (int i = 0; i < nrows / 2; i++) {
+        auto src0 = src_ymm(2 * i);
+        auto src1 = src_ymm(2 * i + 1);
+        auto zmm_src0 = src_zmm(2 * i);
+        load_ymm(2 * i);
         vpunpcklwd(src1, src0,
-            EVEX_compress_addr(reg_src, (2*i+1) * src_stride));
+                EVEX_compress_addr(reg_src, (2 * i + 1) * src_stride));
         vpunpckhwd(src0, src0,
-            EVEX_compress_addr(reg_src, (2*i+1) * src_stride));
+                EVEX_compress_addr(reg_src, (2 * i + 1) * src_stride));
         vinserti64x4(zmm_src0, zmm_src0, src1, 1);
         vpermpd(zmm_src0 | kFF, vidx1, zmm_src0);
-        store(zmm_src0, 2*i);
+        store(zmm_src0, 2 * i);
     }
     if (r_pad > 0) {
-        auto src0 = src_ymm(nrows-1);
+        auto src0 = src_ymm(nrows - 1);
         auto src1 = src_ymm(nrows);
         auto zmm_src0 = src_zmm(30);
-        load_ymm(nrows-1);
+        load_ymm(nrows - 1);
 
         vpxor(src1, src1, src1);
         vpunpckhwd(src1, src0, src1);
@@ -777,7 +775,7 @@ void jit_trans_ow_oc_t::transpose(int nrows, int l_pad, int r_pad,
         vpunpcklwd(src0, src0, src1);
         vinserti64x4(zmm_src0, zmm_src0, src0, 1);
         vpermpd(zmm_src0 | kFF, vidx1, zmm_src0);
-        store(zmm_src0, nrows-1);
+        store(zmm_src0, nrows - 1);
     }
 }
 
@@ -785,7 +783,7 @@ void jit_trans_ow_oc_t::generate() {
     preamble();
 
     alignas(64) static constexpr const int64_t idx1[8]
-          = { 4, 5, 0, 1, 6, 7, 2, 3 };
+            = {4, 5, 0, 1, 6, 7, 2, 3};
 
     const int oc_block = conf_->oc_block;
     const int ow = conf_->ow;
@@ -803,10 +801,10 @@ void jit_trans_ow_oc_t::generate() {
     const int tr_src_step = oc_block * transpose_size * typesize;
     const int right_pad = ow % 2;
 
-    mov(reg_src, ptr [param1 + GET_OFF(src)]);
-    mov(reg_tr_src, ptr [param1 + GET_OFF(tr_src)]);
-    mov(reg_src_prf, ptr [param1 + GET_OFF(src_prf)]);
-    mov(reg_tr_src_prf, ptr [param1 + GET_OFF(tr_src_prf)]);
+    mov(reg_src, ptr[param1 + GET_OFF(src)]);
+    mov(reg_tr_src, ptr[param1 + GET_OFF(tr_src)]);
+    mov(reg_src_prf, ptr[param1 + GET_OFF(src_prf)]);
+    mov(reg_tr_src_prf, ptr[param1 + GET_OFF(tr_src_prf)]);
 
     auto kmovw = [=](Opmask k, unsigned w) {
         mov(regw_tmp, w);
@@ -824,7 +822,8 @@ void jit_trans_ow_oc_t::generate() {
     if (loop_iters) {
         mov(reg_loop, loop_iters);
         Label loop;
-        L(loop); {
+        L(loop);
+        {
             transpose(transpose_size, 0, 0, nontemporal_stores);
             add(reg_src, src_step);
             add(reg_tr_src, tr_src_step);
@@ -839,10 +838,10 @@ void jit_trans_ow_oc_t::generate() {
     postamble();
 }
 
-struct jit_trans_iw_x4_4x_t: public jit_trans_src_t, public jit_generator {
+struct jit_trans_iw_x4_4x_t : public jit_trans_src_t, public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_trans_iw_x4_4x_t)
 
-    jit_trans_iw_x4_4x_t(const jit_conv_conf_t *conf): jit_trans_src_t(conf) {
+    jit_trans_iw_x4_4x_t(const jit_conv_conf_t *conf) : jit_trans_src_t(conf) {
         generate();
         ker_ = (decltype(ker_))this->getCode();
     }
@@ -858,7 +857,23 @@ void jit_trans_iw_x4_4x_t::generate() {
 
     /* TODO: put into code */
     static int mask[16] = {
-        0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15, };
+            0,
+            4,
+            8,
+            12,
+            1,
+            5,
+            9,
+            13,
+            2,
+            6,
+            10,
+            14,
+            3,
+            7,
+            11,
+            15,
+    };
 
     const auto &c = *conf_;
     const int simd_w = cpu_isa_traits<avx512_common>::vlen / typesize;
@@ -924,7 +939,8 @@ void jit_trans_iw_x4_4x_t::generate() {
             for (int i = 0; i < 4; ++i) {
                 for (int iter = 0; iter < niters; ++iter) {
                     const size_t off = i * c.tr_ld + iter * simd_w;
-                    vmovups(ptr[reg_ptr_tr_src + off * typesize], vreg(iter, i));
+                    vmovups(ptr[reg_ptr_tr_src + off * typesize],
+                            vreg(iter, i));
                 }
             }
         };
@@ -970,7 +986,8 @@ void jit_trans_iw_x4_4x_t::generate() {
     imul(reg_tmp, reg_ih, c.stride_w * c.tr_ld * typesize);
     add(reg_ptr_tr_src, reg_tmp);
 
-    L(l_ih_loop); {
+    L(l_ih_loop);
+    {
         emit_tr_iw();
 
         add(reg_ptr_src, c.iw * typesize);
@@ -994,12 +1011,10 @@ void jit_trans_iw_x4_4x_t::generate() {
 // -------------------------------------------------
 */
 
-void jit_transpose4x16_src::transpose(int nrows)
-{
+void jit_transpose4x16_src::transpose(int nrows) {
     assert(nrows >= 0 && nrows <= transpose_size);
     static_assert(transpose_size == 4, "Unsupported transpose size");
-    if (!nrows)
-        return;
+    if (!nrows) return;
 
     auto pf_src_t0 = [=](int i) {
         if (tparams->src_pf0_distance)
@@ -1110,16 +1125,13 @@ void jit_transpose4x16_src::transpose(int nrows)
     store(tmp3, 3);
 }
 
-alignas(64) static constexpr const int64_t idx01[8]
-        = { 0, 0, 0, 0, 0, 1, 2, 3 };
-alignas(64) static constexpr const int64_t idx10[8]
-        = { 0, 0, 0, 0, 4, 5, 6, 7 };
-alignas(64) static constexpr const int64_t idx1[8] = { 2, 3, 0, 1, 6, 7, 4, 5 };
+alignas(64) static constexpr const int64_t idx01[8] = {0, 0, 0, 0, 0, 1, 2, 3};
+alignas(64) static constexpr const int64_t idx10[8] = {0, 0, 0, 0, 4, 5, 6, 7};
+alignas(64) static constexpr const int64_t idx1[8] = {2, 3, 0, 1, 6, 7, 4, 5};
 alignas(64) static constexpr const int32_t idxP[16]
-        = { 0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15 };
+        = {0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15};
 
-void jit_transpose4x16_src::generate()
-{
+void jit_transpose4x16_src::generate() {
     preamble();
 
     const int ic_block = params->ic_block;
@@ -1201,12 +1213,12 @@ jit_trans_src_t *create_trans_src(const jit_conv_conf_t *conf) {
 }
 
 jit_trans_dst_t *create_trans_dst(const jit_conv_conf_t *conf) {
-    if (conf->ver == ver_vnni)
-        return new jit_trans_ow_oc_t(conf);
+    if (conf->ver == ver_vnni) return new jit_trans_ow_oc_t(conf);
     assert(!"unsupported configuration");
     return nullptr;
 }
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif // !defined(TARGET_VANILLA)

@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2018 Intel Corporation
+* Copyright 2018-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -21,8 +21,11 @@
  * utilities/macros that are also useful to non-jit programs.
  */
 
-#include <type_traits>
-#include "mkldnn_thread.hpp" // for crude cache size guesses, use omp_get_max_threads
+//? #include <type_traits>
+//? #include "mkldnn_thread.hpp" // for crude cache size guesses, use omp_get_max_threads
+#include "dnnl_types.h"
+
+#include "utils.hpp"
 
 #if defined(_WIN32) && !defined(__GNUC__)
 #   define STRUCT_ALIGN(al, ...) __declspec(align(al)) __VA_ARGS__
@@ -67,6 +70,7 @@
 #define JITFUNCS_AVX2 4
 #define JITFUNCS_AVX512 5
 #define JITFUNCS_VANILLA 6
+#define JITFUNCS_VE 7
 //@}
 
 #if defined(TARGET_VANILLA) && !defined(JITFUNCS)
@@ -121,30 +125,16 @@
  * currently we have a lot of jit-generated instructions that
  * take uint32_t, but we pass size_t (e.g. due to using sizeof).
  * FIXME: replace size_t parameters with the appropriate ones */
-#pragma warning (disable: 4267)
+#pragma warning(disable : 4267)
 #endif
 
 #include "xbyak/xbyak.h"
 #include "xbyak/xbyak_util.h"
 #endif
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
-
-typedef enum {
-    isa_any,
-    sse41,
-    avx,
-    avx2,
-    avx512_common,
-    avx512_core,
-    avx512_core_vnni,
-    avx512_mic,
-    avx512_mic_4ops,
-    avx512_core_bf16,
-    aurora,
-} cpu_isa_t;
 
 // generic, from jit_generator.hpp
 typedef enum {
@@ -158,47 +148,141 @@ typedef enum {
     enum { CACHE_LINE_SIZE = 64 };
 #endif
 
-// cpu_isa_traits (now always exists)
-template <cpu_isa_t> struct cpu_isa_traits {}; /* ::vlen -> 32 (for avx2) */
+//typedef enum {
+//    isa_any,
+//    sse41,
+//    avx,
+//    avx2,
+//    avx512_common,
+//    avx512_core,
+//    avx512_core_vnni,
+//    avx512_mic,
+//    avx512_mic_4ops,
+//    avx512_core_bf16,
+//    aurora,
+//} cpu_isa_t;
 
-template <> struct cpu_isa_traits<sse41> {
+enum cpu_isa_bit_t : unsigned {
+    x86_bit = 1U << 0, /* new */
+    sse41_bit = 1u << 1,
+    avx_bit = 1u << 2,
+    avx2_bit = 1u << 3,
+    avx512_common_bit = 1u << 4,
+    avx512_mic_bit = 1u << 5,
+    avx512_mic_4ops_bit = 1u << 6,
+    avx512_core_bit = 1u << 7,
+    avx512_core_vnni_bit = 1u << 8,
+    avx512_core_bf16_bit = 1u << 9,
+    /* extensions */
+    ve_bit = 1u << 9,
+    vednn_bit = 1u << 10,
+};
+
+enum cpu_isa_t : unsigned {
+    isa_any = x86_bit, /* means generic x86 */
+    sse41 = x86_bit | sse41_bit,
+    avx = x86_bit | avx_bit | sse41,
+    avx2 = x86_bit | avx2_bit | avx,
+    avx512_common = x86_bit | avx512_common_bit | avx2,
+    avx512_mic = x86_bit | avx512_mic_bit | avx512_common,
+    avx512_mic_4ops = x86_bit | avx512_mic_4ops_bit | avx512_mic,
+    avx512_core = x86_bit | avx512_core_bit | avx512_common,
+    avx512_core_vnni = x86_bit | avx512_core_vnni_bit | avx512_core,
+    avx512_core_bf16 = x86_bit | avx512_core_bf16_bit | avx512_core_vnni,
+    isa_all = ~(2*avx512_core_bf16_bit-1) /* means any variety of x86 (was -1) */
+    /* extensions */
+    isa_ve_any = ve_bit;
+    isa_vednn  = ve_bit | vednn_bit
+    isa_ve_all = ~(ve_bit | vednn_bit);
+    /* Note old TARGET_VANILLA code */
+    isa_vanilla = x86_bit | ve_bit;
+
+};
+
+template <cpu_isa_t>
+struct cpu_isa_traits {}; /* ::vlen -> 32 (for avx2) */
+
+template <>
+struct cpu_isa_traits<isa_all> {
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_all;
+    static constexpr const char *user_option_env = "ALL";
+};
+
+template <>
+struct cpu_isa_traits<sse41> {
 #if !defined(TARGET_VANILLA)
     typedef Xbyak::Xmm Vmm;
-#endif
+#endif // !defined(TARGET_VANILLA)
     static constexpr int vlen_shift = 4;
     static constexpr int vlen = 16;
     static constexpr int n_vregs = 16;
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_sse41;
+    static constexpr const char *user_option_env = "SSE41";
 };
-template <> struct cpu_isa_traits<avx> {
+
+template <>
+struct cpu_isa_traits<avx> {
 #if !defined(TARGET_VANILLA)
     typedef Xbyak::Ymm Vmm;
-#endif
+#endif // !defined(TARGET_VANILLA)
     static constexpr int vlen_shift = 5;
     static constexpr int vlen = 32; // 256-bit regs --> 32 *bytes*
     static constexpr int n_vregs = 16;
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_avx;
+    static constexpr const char *user_option_env = "AVX";
 };
-template <> struct cpu_isa_traits<avx2>:
-    public cpu_isa_traits<avx> {};
 
-template <> struct cpu_isa_traits<avx512_common> {
+template <>
+struct cpu_isa_traits<avx2> : public cpu_isa_traits<avx> {
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_avx2;
+    static constexpr const char *user_option_env = "AVX2";
+};
+
+template <>
+struct cpu_isa_traits<avx512_common> {
 #if !defined(TARGET_VANILLA)
     typedef Xbyak::Zmm Vmm;
-#endif
+#endif // !defined(TARGET_VANILLA)
     static constexpr int vlen_shift = 6;
     static constexpr int vlen = 64;
     static constexpr int n_vregs = 32;
 };
-template <> struct cpu_isa_traits<avx512_core>:
-    public cpu_isa_traits<avx512_common> {};
 
-template <> struct cpu_isa_traits<avx512_mic>:
-    public cpu_isa_traits<avx512_common> {};
+template <>
+struct cpu_isa_traits<avx512_core> : public cpu_isa_traits<avx512_common> {
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_avx512_core;
+    static constexpr const char *user_option_env = "AVX512_CORE";
+};
 
-template <> struct cpu_isa_traits<avx512_mic_4ops>:
-    public cpu_isa_traits<avx512_common> {};
+template <>
+struct cpu_isa_traits<avx512_mic> : public cpu_isa_traits<avx512_common> {
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_avx512_mic;
+    static constexpr const char *user_option_env = "AVX512_MIC";
+};
 
-template <> struct cpu_isa_traits<avx512_core_bf16>:
-    public cpu_isa_traits<avx512_common> {};
+template <>
+struct cpu_isa_traits<avx512_mic_4ops> : public cpu_isa_traits<avx512_mic> {
+    static constexpr dnnl_cpu_isa_t user_option_val
+            = dnnl_cpu_isa_avx512_mic_4ops;
+    static constexpr const char *user_option_env = "AVX512_MIC_4OPS";
+};
+
+template <>
+struct cpu_isa_traits<avx512_core_vnni> : public cpu_isa_traits<avx512_core> {
+    static constexpr dnnl_cpu_isa_t user_option_val
+            = dnnl_cpu_isa_avx512_core_vnni;
+    static constexpr const char *user_option_env = "AVX512_CORE_VNNI";
+};
+
+template <>
+struct cpu_isa_traits<avx512_core_bf16> : public cpu_isa_traits<avx512_core> {
+    static constexpr dnnl_cpu_isa_t user_option_val
+            = dnnl_cpu_isa_avx512_core_bf16;
+    static constexpr const char *user_option_env = "AVX512_CORE_BF16";
+};
+
+cpu_isa_t DNNL_API get_max_cpu_isa(bool soft = false);
+dnnl::impl::status_t DNNL_API set_max_cpu_isa(dnnl_cpu_isa_t isa, bool force);
 
 template <> struct cpu_isa_traits<aurora> {
     static constexpr int vlen_shift = 8;
@@ -228,48 +312,35 @@ static inline constexpr bool mayiuse(const cpu_isa_t cpu_isa) {
 
 namespace {
 static Xbyak::util::Cpu cpu;
-static inline bool mayiuse(const cpu_isa_t cpu_isa) {
+static inline bool mayiuse(const cpu_isa_t cpu_isa, bool soft = false) {
     using namespace Xbyak::util;
 
+    unsigned cpu_isa_mask = get_max_cpu_isa(soft);
+    if ((cpu_isa_mask & cpu_isa) != cpu_isa) return false;
+
     switch (cpu_isa) {
-    case sse41:
-        return cpu.has(Cpu::tSSE41);
-    case avx:
-        return cpu.has(Cpu::tAVX);
-    case avx2:
-        return cpu.has(Cpu::tAVX2);
-    case avx512_common:
-        return cpu.has(Cpu::tAVX512F);
-    case avx512_core:
-        return true
-            && cpu.has(Cpu::tAVX512F)
-            && cpu.has(Cpu::tAVX512BW)
-            && cpu.has(Cpu::tAVX512VL)
-            && cpu.has(Cpu::tAVX512DQ);
-    case avx512_core_vnni:
-        return true
-            && cpu.has(Cpu::tAVX512F)
-            && cpu.has(Cpu::tAVX512BW)
-            && cpu.has(Cpu::tAVX512VL)
-            && cpu.has(Cpu::tAVX512DQ)
-            && cpu.has(Cpu::tAVX512_VNNI);
-    case avx512_mic:
-        return true
-            && cpu.has(Cpu::tAVX512F)
-            && cpu.has(Cpu::tAVX512CD)
-            && cpu.has(Cpu::tAVX512ER)
-            && cpu.has(Cpu::tAVX512PF);
-    case avx512_mic_4ops:
-        return true
-            && mayiuse(avx512_mic)
-            && cpu.has(Cpu::tAVX512_4FMAPS)
-            && cpu.has(Cpu::tAVX512_4VNNIW);
-    case avx512_core_bf16:
-        return true
-            && mayiuse(avx512_core_vnni)
-            && cpu.has(Cpu::tAVX512_BF16);
-    case isa_any:
-        return true;
+        case sse41: return cpu.has(Cpu::tSSE41);
+        case avx: return cpu.has(Cpu::tAVX);
+        case avx2: return cpu.has(Cpu::tAVX2);
+        case avx512_common: return cpu.has(Cpu::tAVX512F);
+        case avx512_core:
+            return cpu.has(Cpu::tAVX512F) && cpu.has(Cpu::tAVX512BW)
+                    && cpu.has(Cpu::tAVX512VL) && cpu.has(Cpu::tAVX512DQ);
+        case avx512_core_vnni:
+            return cpu.has(Cpu::tAVX512F) && cpu.has(Cpu::tAVX512BW)
+                    && cpu.has(Cpu::tAVX512VL) && cpu.has(Cpu::tAVX512DQ)
+                    && cpu.has(Cpu::tAVX512_VNNI);
+        case avx512_mic:
+            return cpu.has(Cpu::tAVX512F) && cpu.has(Cpu::tAVX512CD)
+                    && cpu.has(Cpu::tAVX512ER) && cpu.has(Cpu::tAVX512PF);
+        case avx512_mic_4ops:
+            return mayiuse(avx512_mic, soft) && cpu.has(Cpu::tAVX512_4FMAPS)
+                    && cpu.has(Cpu::tAVX512_4VNNIW);
+        case avx512_core_bf16:
+            return mayiuse(avx512_core_vnni, soft)
+                    && cpu.has(Cpu::tAVX512_BF16);
+        case isa_any: return true;
+        case isa_all: return false;
     }
     return false;
 }
@@ -277,58 +348,70 @@ static inline bool mayiuse(const cpu_isa_t cpu_isa) {
 #endif
 
 namespace {
-    inline unsigned int get_cache_size(int level, bool per_core = true){
-	unsigned int l = level - 1;
+inline unsigned int get_cache_size(int level, bool per_core = true){
+    unsigned int l = level - 1;
 #if defined(__ve)
-        unsigned const cpuDataCacheLevels = 1;
+    unsigned const cpuDataCacheLevels = 1;
 #elif !defined(TARGET_VANILLA)
-        unsigned const cpuDataCacheLevels = cpu.getDataCacheLevels();
+    unsigned const cpuDataCacheLevels = cpu.getDataCacheLevels();
 #else
-        unsigned const cpuDataCacheLevels = 0;
+    unsigned const cpuDataCacheLevels = 0;
 #endif
-	// Currently, if XByak is not able to fetch the cache topology
-	// we default to 32KB of L1, 512KB of L2 and 1MB of L3 per core.
-	if (cpuDataCacheLevels == 0){
-	    const int L1_cache_per_core = 32000;
-	    const int L2_cache_per_core = 512000;
-	    const int L3_cache_per_core = 1024000;
-	    int num_cores = per_core ? 1 : mkldnn_get_max_threads();
-	    switch(l){
-	      case(0): return L1_cache_per_core * num_cores;
-	      case(1): return L2_cache_per_core * num_cores;
-	      case(2): return L3_cache_per_core * num_cores;
-	      default: return 0;
-	    }
-	}
-	if (l < cpuDataCacheLevels) {
-#if defined(__ve)
-	    return cpu.getDataCacheSize(l)
-		/ (per_core ? cpu.getCoresSharingDataCache(l) : 1);
-#else
-            size_t const cpuDataCacheSize = 16*1024*1024;
-	    return cpuDataCacheSize
-		/ (per_core ? mkldnn_get_max_threads() : 1);
-#endif
-	} else
-	    return 0;
+    // Currently, if XByak is not able to fetch the cache topology
+    // we default to 32KB of L1, 512KB of L2 and 1MB of L3 per core.
+    if (cpuDataCacheLevels == 0){
+        const int L1_cache_per_core = 32000;
+        const int L2_cache_per_core = 512000;
+        const int L3_cache_per_core = 1024000;
+        int num_cores = per_core ? 1 : mkldnn_get_max_threads();
+        switch(l){
+        case(0): return L1_cache_per_core * num_cores;
+        case(1): return L2_cache_per_core * num_cores;
+        case(2): return L3_cache_per_core * num_cores;
+        default: return 0;
+        }
     }
-}//anon::
+    if (l < cpuDataCacheLevels) {
+#if defined(__ve)
+        return cpu.getDataCacheSize(l)
+                / (per_core ? cpu.getCoresSharingDataCache(l) : 1);
+#else
+        size_t const cpuDataCacheSize = 16*1024*1024;
+        return cpuDataCacheSize
+                / (per_core ? mkldnn_get_max_threads() : 1);
+#endif
+    } else
+        return 0;
+}
+inline bool isa_has_bf16(cpu_isa_t isa) {
+    return isa == avx512_core_bf16;
+}
+
+} // namespace
+
 /* whatever is required to generate string literals... */
 #include "z_magic.hpp"
+/* clang-format off */
 #define JIT_IMPL_NAME_HELPER(prefix, isa, suffix_if_any) \
-    (isa == sse41 ? prefix STRINGIFY(sse41) : \
-    (isa == avx ? prefix STRINGIFY(avx) : \
-    (isa == avx2 ? prefix STRINGIFY(avx2) : \
-    (isa == avx512_common ? prefix STRINGIFY(avx512_common) : \
-    (isa == avx512_core ? prefix STRINGIFY(avx512_core) : \
-    (isa == avx512_core_vnni ? prefix STRINGIFY(avx512_core_vnni) : \
-    (isa == avx512_mic ? prefix STRINGIFY(avx512_mic) : \
-    (isa == avx512_mic_4ops ? prefix STRINGIFY(avx512_mic_4ops) : \
-    (isa == avx512_core_bf16 ? prefix STRINGIFY(avx512_core_bf16) : \
+    ((isa) == isa_any ? prefix STRINGIFY(x86) : \
+    ((isa) == sse41 ? prefix STRINGIFY(sse41) : \
+    ((isa) == avx ? prefix STRINGIFY(avx) : \
+    ((isa) == avx2 ? prefix STRINGIFY(avx2) : \
+    ((isa) == avx512_common ? prefix STRINGIFY(avx512_common) : \
+    ((isa) == avx512_core ? prefix STRINGIFY(avx512_core) : \
+    ((isa) == avx512_core_vnni ? prefix STRINGIFY(avx512_core_vnni) : \
+    ((isa) == avx512_mic ? prefix STRINGIFY(avx512_mic) : \
+    ((isa) == avx512_mic_4ops ? prefix STRINGIFY(avx512_mic_4ops) : \
+    ((isa) == avx512_core_bf16 ? prefix STRINGIFY(avx512_core_bf16) : \
+    ((isa) == avx512_core_bf16 ? prefix STRINGIFY(avx512_core_bf16) : \
+    ((isa) == isa_ve_any ? prefix STRINGIFY(ve) : \
+    ((isa) == isa_vednn ? prefix STRINGIFY(vednn) : \
     prefix suffix_if_any)))))))))
+/* clang-format on */
 
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
 
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

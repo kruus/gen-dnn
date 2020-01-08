@@ -21,19 +21,19 @@
 #include "common/stream.hpp"
 #include "ocl/ocl_sum_pd.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace ocl {
 
-struct ref_sum_t: public primitive_t {
-    struct pd_t: public ocl_sum_pd_t {
+struct ref_sum_t : public primitive_impl_t {
+    struct pd_t : public ocl_sum_pd_t {
         using ocl_sum_pd_t::ocl_sum_pd_t;
-        pd_t(const pd_t &rhs): ocl_sum_pd_t(rhs) { clone_reorder_pds(rhs); }
+        pd_t(const pd_t &rhs) : ocl_sum_pd_t(rhs) { clone_reorder_pds(rhs); }
 
         ~pd_t() { clear(); }
 
         pd_t &operator=(const pd_t &rhs) {
-            MKLDNN_SHORT_CIRCUIT_SELF_ASSIGN(rhs);
+            DNNL_SHORT_CIRCUIT_SELF_ASSIGN(rhs);
             ocl_sum_pd_t::operator=(rhs);
             clear();
             clone_reorder_pds(rhs);
@@ -54,9 +54,9 @@ struct ref_sum_t: public primitive_t {
                     if (i != 0) attr.post_ops_.append_sum(1.0);
 
                     reorder_pd_t *r_pd;
-                    if ((*r)(&r_pd, engine_, &attr, engine_, src_md(i),
-                                engine_, dst_md()) == status::success) {
-                        r_pd->init_info();
+                    if ((*r)(&r_pd, engine_, &attr, engine_, src_md(i), engine_,
+                                dst_md())
+                            == status::success) {
                         reorder_pds_.push_back(r_pd);
                         break;
                     }
@@ -69,42 +69,48 @@ struct ref_sum_t: public primitive_t {
         void clone_reorder_pds(const pd_t &rhs) {
             for (size_t i = 0; i < rhs.reorder_pds_.size(); ++i)
                 reorder_pds_.push_back(
-                       (const reorder_pd_t *)rhs.reorder_pds_[i]->clone());
+                        (const reorder_pd_t *)rhs.reorder_pds_[i]->clone());
         }
 
-        void clear() { for (auto &rpd: reorder_pds_) delete rpd; }
+        void clear() {
+            for (auto &rpd : reorder_pds_)
+                delete rpd;
+        }
 
-        nstl::vector<const reorder_pd_t *> reorder_pds_;
+        std::vector<const reorder_pd_t *> reorder_pds_;
     };
 
-    ref_sum_t(const pd_t *apd) : primitive_t(apd) {
+    ref_sum_t(const pd_t *apd) : primitive_impl_t(apd) {
         const int n = pd()->n_inputs();
         reorders_.resize(n);
         for (int i = 0; i < n; ++i)
             pd()->reorder_pds_[i]->create_primitive(&reorders_[i]);
     }
 
-    ~ref_sum_t() { for (auto &r: reorders_) delete r; }
+    ~ref_sum_t() {
+        for (auto &r : reorders_)
+            delete r;
+    }
 
     virtual status_t execute(const exec_ctx_t &ctx) const override {
         const auto n = pd()->n_inputs();
         for (int i = 0; i < n; ++i) {
             exec_args_t r_args;
-            r_args[MKLDNN_ARG_SRC] = ctx.args().at(MKLDNN_ARG_MULTIPLE_SRC + i);
-            r_args[MKLDNN_ARG_DST] = ctx.args().at(MKLDNN_ARG_DST);
+            r_args[DNNL_ARG_SRC] = ctx.args().at(DNNL_ARG_MULTIPLE_SRC + i);
+            r_args[DNNL_ARG_DST] = ctx.args().at(DNNL_ARG_DST);
             exec_ctx_t r_ctx(ctx.stream(), std::move(r_args));
             reorders_[i]->execute(r_ctx);
             ctx.stream()->wait();
         }
         return status::success;
     }
-private:
-   const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
-    nstl::vector<primitive_t *> reorders_;
-};
 
-}
-}
-}
+private:
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
+    std::vector<primitive_t *> reorders_;
+};
+} // namespace ocl
+} // namespace impl
+} // namespace dnnl
 
 #endif

@@ -14,30 +14,43 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "mkldnn_common.hpp"
-#include "mkldnn_debug.hpp"
+#include "dnnl_common.hpp"
+#include "dnnl_debug.hpp"
 
 #include "softmax/softmax.hpp"
 
 namespace softmax {
 
+alg_t str2alg(const char *str) {
+#define CASE(_alg) \
+    if (!strcasecmp(STRINGIFY(_alg), str)) return _alg
+    CASE(SOFTMAX);
+    CASE(LOGSOFTMAX);
+#undef CASE
+    assert(!"unknown algorithm");
+    return UNDEF;
+}
+
+const char *alg2str(alg_t alg) {
+    if (alg == SOFTMAX) return "SOFTMAX";
+    if (alg == LOGSOFTMAX) return "LOGSOFTMAX";
+    assert(!"unknown algorithm");
+    return "UNDEF";
+}
+
 std::ostream &operator<<(std::ostream &s, const prb_t &p) {
     dump_global_params(s);
 
-    if (p.dir != FWD_D)
-        s << "--dir=" << dir2str(p.dir) << " ";
-    if (p.dt != mkldnn_f32)
-        s << "--dt=" << dt2str(p.dt) << " ";
-    if (p.tag != mkldnn_nchw)
-        s << "--tag=" << fmt_tag2str(p.tag) << " ";
-    if (p.axis != 1)
-        s << "--axis=" << p.axis << " ";
-    if (p.inplace != true)
-        s << "--inplace=" << bool2str(p.inplace) << " ";
+    if (p.dir != FWD_D) s << "--dir=" << dir2str(p.dir) << " ";
+    if (p.dt != dnnl_f32) s << "--dt=" << dt2str(p.dt) << " ";
+    if (p.tag != dnnl_nchw) s << "--tag=" << fmt_tag2str(p.tag) << " ";
+    if (p.alg != SOFTMAX) s << "--alg=" << alg2str(p.alg) << " ";
+    if (p.axis != 1) s << "--axis=" << p.axis << " ";
+    if (p.inplace != true) s << "--inplace=" << bool2str(p.inplace) << " ";
 
     s << p.dims;
 
     return s;
 }
 
-}
+} // namespace softmax

@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -25,15 +25,14 @@
 
 #include "cpu_isa_traits.hpp"
 #include "cpu_lrn_pd.hpp"
-#include "cpu_primitive.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
 template <data_type_t d_type>
-struct ref_lrn_fwd_t: public cpu_primitive_t {
-    struct pd_t: public cpu_lrn_fwd_pd_t {
+struct ref_lrn_fwd_t : public primitive_impl_t {
+    struct pd_t : public cpu_lrn_fwd_pd_t {
         using cpu_lrn_fwd_pd_t::cpu_lrn_fwd_pd_t;
 
         DECLARE_COMMON_PD_T("lrn_ref:any", ref_lrn_fwd_t);
@@ -42,11 +41,9 @@ struct ref_lrn_fwd_t: public cpu_primitive_t {
             using namespace format_tag;
             using namespace data_type;
 
-            bool ok = true
-                && is_fwd()
-                && src_md()->data_type == d_type
-                && IMPLICATION(d_type == bf16, mayiuse(avx512_core))
-                && attr()->has_default_values();
+            bool ok = true && is_fwd() && src_md()->data_type == d_type
+                    && IMPLICATION(d_type == bf16, mayiuse(avx512_core))
+                    && attr()->has_default_values();
             if (!ok) return status::unimplemented;
 
             dat_tag_ = memory_desc_matches_one_of_tag(
@@ -58,45 +55,43 @@ struct ref_lrn_fwd_t: public cpu_primitive_t {
         format_tag_t dat_tag_;
     };
 
-    ref_lrn_fwd_t(const pd_t *apd): cpu_primitive_t(apd) {}
+    ref_lrn_fwd_t(const pd_t *apd) : primitive_impl_t(apd) {}
     typedef typename prec_traits<d_type>::type data_t;
 
     virtual status_t execute(const exec_ctx_t &ctx) const override {
         using namespace format_tag;
         switch (pd()->dat_tag_) {
-        case nChw16c: execute_forward<nChw16c>(ctx); break;
-        case nChw8c: execute_forward<nChw8c>(ctx); break;
-        case nchw: execute_forward<nchw>(ctx); break;
-        case nhwc: execute_forward<nhwc>(ctx); break;
-        default: execute_forward<any>(ctx);
+            case nChw16c: execute_forward<nChw16c>(ctx); break;
+            case nChw8c: execute_forward<nChw8c>(ctx); break;
+            case nchw: execute_forward<nchw>(ctx); break;
+            case nhwc: execute_forward<nhwc>(ctx); break;
+            default: execute_forward<any>(ctx);
         }
         return status::success;
     }
 
 private:
-    template<format_tag_t tag> void execute_forward(const exec_ctx_t &ctx) const;
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
+    template <format_tag_t tag>
+    void execute_forward(const exec_ctx_t &ctx) const;
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
 };
 
 template <impl::data_type_t d_type>
-struct ref_lrn_bwd_t: public cpu_primitive_t {
-    struct pd_t: public cpu_lrn_bwd_pd_t {
+struct ref_lrn_bwd_t : public primitive_impl_t {
+    struct pd_t : public cpu_lrn_bwd_pd_t {
         using cpu_lrn_bwd_pd_t::cpu_lrn_bwd_pd_t;
 
         DECLARE_COMMON_PD_T("lrn_ref:any", ref_lrn_bwd_t);
 
         status_t init() {
             using namespace format_tag;
-            using namespace alg_kind;
             using namespace data_type;
 
-            bool ok = true
-                && !is_fwd()
-                && utils::one_of(desc()->alg_kind, lrn_across_channels
-                        /*, lrn_within_channel */) // not supported yet
-                && utils::everyone_is(d_type, src_md()->data_type, diff_src_md()->data_type)
-                && IMPLICATION(d_type == bf16, mayiuse(avx512_core))
-                && attr()->has_default_values();
+            bool ok = true && !is_fwd() && set_default_formats_common()
+                    && utils::everyone_is(d_type, src_md()->data_type,
+                            diff_src_md()->data_type)
+                    && IMPLICATION(d_type == bf16, mayiuse(avx512_core))
+                    && attr()->has_default_values();
             if (!ok) return status::unimplemented;
 
             dat_tag_ = memory_desc_matches_one_of_tag(
@@ -108,30 +103,31 @@ struct ref_lrn_bwd_t: public cpu_primitive_t {
         format_tag_t dat_tag_;
     };
 
-    ref_lrn_bwd_t(const pd_t *apd): cpu_primitive_t(apd) {}
+    ref_lrn_bwd_t(const pd_t *apd) : primitive_impl_t(apd) {}
     typedef typename prec_traits<d_type>::type data_t;
 
     virtual status_t execute(const exec_ctx_t &ctx) const override {
         using namespace format_tag;
         switch (pd()->dat_tag_) {
-        case nChw16c: execute_backward<nChw16c>(ctx); break;
-        case nChw8c: execute_backward<nChw8c>(ctx); break;
-        case nchw: execute_backward<nchw>(ctx); break;
-        case nhwc: execute_backward<nhwc>(ctx); break;
-        default: execute_backward<any>(ctx);
+            case nChw16c: execute_backward<nChw16c>(ctx); break;
+            case nChw8c: execute_backward<nChw8c>(ctx); break;
+            case nchw: execute_backward<nchw>(ctx); break;
+            case nhwc: execute_backward<nhwc>(ctx); break;
+            default: execute_backward<any>(ctx);
         }
         return status::success;
     }
 
 private:
-    template<format_tag_t tag> void execute_backward(const exec_ctx_t &ctx) const;
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
+    template <format_tag_t tag>
+    void execute_backward(const exec_ctx_t &ctx) const;
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
 };
 
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

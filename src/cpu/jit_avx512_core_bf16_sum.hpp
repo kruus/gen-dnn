@@ -19,11 +19,10 @@
 
 #include "c_types_map.hpp" // common
 
-#include "cpu_primitive.hpp" // cpu
 #include "cpu_sum_pd.hpp" // cpu
 #include "jit_avx512_core_bf16cvt.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
@@ -93,7 +92,7 @@ private:
     reg64_t reg_scales = rbx;
     reg64_t reg_sz = rdx;
 
-    reg64_t reg_src[max_num_arrs] = { r8, r9, r10, r11, r12, r13, r14, r15 };
+    reg64_t reg_src[max_num_arrs] = {r8, r9, r10, r11, r12, r13, r14, r15};
 
     static int max_vregs_available(bool bf16_isa) {
         // one vector registers are reserved for vperm index and zero values
@@ -163,11 +162,11 @@ private:
 };
 
 template <data_type_t src_data_type, data_type_t dst_data_type>
-struct jit_bf16_sum_t : public cpu_primitive_t {
+struct jit_bf16_sum_t : public primitive_impl_t {
     struct pd_t : public cpu_sum_pd_t {
         using cpu_sum_pd_t::cpu_sum_pd_t;
 
-        DECLARE_SUM_PD_T(JIT_IMPL_NAME_HELPER("jit_bf16_", avx512_core, ""),
+        DECLARE_SUM_PD_T(JIT_IMPL_NAME_HELPER("jit_bf16_", jsp_.isa, ""),
                 jit_bf16_sum_t);
 
         virtual status_t init() {
@@ -175,13 +174,11 @@ struct jit_bf16_sum_t : public cpu_primitive_t {
                     && cpu_sum_pd_t::init() == status::success
                     && src_mds_.size()
                             <= jit_avx512_core_bf16_sum_kernel::max_num_arrs;
-            if (!ok)
-                return status::unimplemented;
+            if (!ok) return status::unimplemented;
 
             const memory_desc_wrapper o_d(&dst_md_);
             ok = true && o_d.data_type() == dst_data_type && o_d.is_dense();
-            if (!ok)
-                return status::unimplemented;
+            if (!ok) return status::unimplemented;
 
             const auto n = src_mds_.size();
 
@@ -190,15 +187,13 @@ struct jit_bf16_sum_t : public cpu_primitive_t {
 
             for (size_t i = 0; i < n; ++i) {
                 const memory_desc_wrapper i_d(&src_mds_[i]);
-                ok = true
-                    && src_data_type == i_d.data_type()
-                    && o_d.similar_to(i_d, true, false, 0)
-                    && i_d.is_dense()
-                    // is scales representable in bfloat16: scales will be down
-                    // converted to bf16 in order to use bf16 vnni instruction
-                    && scales_[i] == float(bfloat16_t(scales_[i]));
-                if (!ok)
-                    return status::unimplemented;
+                ok = true && src_data_type == i_d.data_type()
+                        && o_d.similar_to(i_d, true, false, 0)
+                        && i_d.is_dense()
+                        // is scales representable in bfloat16: scales will be down
+                        // converted to bf16 in order to use bf16 vnni instruction
+                        && scales_[i] == float(bfloat16_t(scales_[i]));
+                if (!ok) return status::unimplemented;
             }
 
             return jit_avx512_core_bf16_sum_kernel::init_conf(
@@ -207,7 +202,7 @@ struct jit_bf16_sum_t : public cpu_primitive_t {
         jit_sum_conf_t jsp_;
     };
 
-    jit_bf16_sum_t(const pd_t *apd) : cpu_primitive_t(apd) {
+    jit_bf16_sum_t(const pd_t *apd) : primitive_impl_t(apd) {
         kernel_ = new jit_avx512_core_bf16_sum_kernel(pd()->jsp_);
     }
 
@@ -220,12 +215,12 @@ struct jit_bf16_sum_t : public cpu_primitive_t {
     typedef typename prec_traits<data_type::f32>::type acc_data_t;
 
 private:
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
     jit_avx512_core_bf16_sum_kernel *kernel_;
 };
 
 } // namespace cpu
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl
 
 #endif

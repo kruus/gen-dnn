@@ -17,6 +17,11 @@ DOGCC_VER=0
 NEC_FTRACE=0
 DOTARGET="x"
 VEJIT=0
+
+CPU_X86=0
+CPU_VE=1
+CPU_SX=2
+CPU=-1
 JITFUNCS_VANILLA=6 # agree with src/cpu/cpu_isa_traits.cpp
 usage() {
     echo "$0 usage:"
@@ -42,11 +47,11 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMrC" arg; do
     case $arg in
         j) # force Intel x86 compile JIT (src/cpu/ JIT assembly code)
             if [ ! "${DOTARGET}" == "x" ]; then echo "-j no good: already have -${DOTARGET}"; usage; fi
-            DOTARGET="j"
+            DOTARGET="j";
             ;;
         g) # force Intel x86 JIT compile for generic architecture
             if [ ! "${DOTARGET}" == "x" ]; then echo "-g no good: already have -${DOTARGET}"; usage; fi
-            DOTARGET="g"
+            DOTARGET="g";
             ;;
         a) # NEC Aurora VE
             if [ ! "${DOTARGET}" == "x" ]; then echo "-a no good: already have -${DOTARGET}"; usage; fi
@@ -103,7 +108,7 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMrC" arg; do
             DOWARN=1
             ;;
         T) # cmake --trace
-            CMAKETRACE="--trace"
+            CMAKETRACE="--trace --debug-trycompile"
             ;;
         1) # make -j1
             JOBS="-j1"
@@ -154,6 +159,18 @@ if [ "${DOTARGET}" == "x" ]; then
     fi
 fi
 if [ "${DOTARGET}" == "x" ]; then
+    usage
+fi
+if [ "${DOTARGET}" == "g" ]; then
+    CPU=$(( ${CPU_X86} * 10 + 0 )) # x86 + 0 is no jit
+elif [ "${DOTARGET}" == "j" ]; then
+    CPU=$(( ${CPU_X86} * 10 + 5 )) # x86 + 5 is avx512 jit
+elif [ "${DOTARGET}" == "a" ]; then
+    CPU=$(( ${CPU_VE}  * 10 + 0 )) # 0 is none, 1 uses libvednn (jit?)
+elif [ "${DOTARGET}" == "s" ]; then
+    CPU=$(( ${CPU_SX} * 10 + 0 ))
+else
+    echo " ERROR: unknown cpu"
     usage
 fi
 INSTALLDIR=install
@@ -379,6 +396,7 @@ echo "PATH $PATH"
     #CMAKEOPT="${CMAKEOPT} -DMKLDNN_CPU_RUNTIME=OMP"    # def [OMP] TBB
     #CMAKEOPT="${CMAKEOPT} -DMKLDNN_GPU_RUNTIME=OCL"    # def [] OCL
     CMAKEOPT="${CMAKEOPT} -DMKLDNN_WERROR=ON" # default OFF
+    CMAKEOPT="${CMAKEOPT} -DDNNL_JIT_SUPPORT=${CPU}"    # default max jit for target cpu
     if [ $USE_CBLAS -ne 0 ]; then
         CMAKEOPT="${CMAKEOPT} -DMKLDNN_USE_CBLAS=ON" # default OFF
     fi

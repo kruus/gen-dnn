@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2019 Intel Corporation
+* Copyright 2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -14,28 +14,20 @@
 * limitations under the License.
 *******************************************************************************/
 
-/// @file
-/// C++ API
+// Header file ensures the backwards compatibility with previous namings.
 
 #ifndef MKLDNN_HPP
 #define MKLDNN_HPP
 
-#include "mkldnn_config.h"
+#include "mkldnn_dnnl_mangling.h"
 
-#ifndef DOXYGEN_SHOULD_SKIP_THIS
-#include <stdlib.h>
-#include <memory>
-#include <vector>
-#include <unordered_map>
-#include <algorithm>
-#include <iterator>
+#include "dnnl.hpp"
 
+#if 0 // old v1.0.0 version
 #include "mkldnn.h"
 
 #if MKLDNN_GPU_RUNTIME == MKLDNN_RUNTIME_OCL
 #include <CL/cl.h>
-#endif
-
 #endif
 
 #include <type_traits>
@@ -4992,5 +4984,6 @@ inline void primitive::execute(stream &astream,
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
 } // namespace mkldnn
-
-#endif
+#endif // old v1.0.0
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+#endif /* MKLDNN_HPP */

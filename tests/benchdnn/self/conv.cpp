@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2018 Intel Corporation
+* Copyright 2017-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -14,11 +14,11 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include "self/self.hpp"
 #include "conv/conv.hpp"
+#include "self/self.hpp"
 
 using namespace conv;
 
@@ -51,4 +51,4 @@ void conv() {
     RUN(check_simple_enums());
 }
 
-}
+} // namespace self

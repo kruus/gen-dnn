@@ -19,18 +19,18 @@
 
 #include "cpu_isa_traits.hpp"
 #include "c_types_map.hpp"
-#include "cpu_inner_product_pd.hpp"
 #include "cpu_engine.hpp"
+#include "cpu_inner_product_pd.hpp"
+#if !defined(TARGET_VANILLA)
+#include "jit_avx512_core_bf16cvt.hpp"
+#include "jit_generator.hpp"
+#include "jit_uni_eltwise_injector.hpp"
+#endif // !defined(TARGET_VANILLA)
+#include "ref_eltwise.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
-#if !defined(TARGET_VANILLA)
-#include "jit_generator.hpp"
-#include "jit_uni_eltwise.hpp"
-#include "jit_avx512_core_bf16cvt.hpp"
-#endif // !TARGET_VANILLA
-#include "ref_eltwise.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
@@ -40,46 +40,59 @@ template <impl::data_type_t acc_type, impl::data_type_t dst_type>
 class pp_kernel_t
 #if !defined(TARGET_VANILLA)
 : jit_generator
-#endif // !TARGET_VANILLA
+#endif // !defined(TARGET_VANILLA)
 {
 public:
 #if !defined(TARGET_VANILLA)
     DECLARE_CPU_JIT_AUX_FUNCTIONS(gemm_x8s8s32x_inner_product_fwd_t::pp_kernel);
-#endif // !TARGET_VANILLA
+#endif // !defined(TARGET_VANILLA)
+    pp_kernel_t(size_t OC, size_t MB, const primitive_attr_t *attr,
+            data_type_t bias_dt, bool skip_sum);
     pp_kernel_t(const cpu_inner_product_fwd_pd_t *pd, bool skip_sum);
     ~pp_kernel_t() {
 #if !defined(TARGET_VANILLA)
         if (eltwise_injector_)
             delete eltwise_injector_;
-#endif // !TARGET_VANILLA
+#endif // !defined(TARGET_VANILLA)
         if (ref_eltwise_)
             delete ref_eltwise_;
+        }
+#if !defined(TARGET_VANILLA)
+        delete bf16_emu_;
+#endif // !defined(TARGET_VANILLA)
     }
 
     typedef typename prec_traits<acc_type>::type acc_data_t;
     typedef typename prec_traits<dst_type>::type dst_data_t;
 
+    // mb kernel only supports single-threaded execution where performance
+    // degradation is larger
+    bool sequential_kernel() const { return mb_blk_kernel; }
+
     void operator()(dst_data_t *dst, const acc_data_t *acc, const char *bias,
-            const float *scales, size_t start, size_t end);
+            const float *scales, size_t start, size_t end,
+            size_t runtime_oc = 0, const float *dst_zero_points = nullptr);
 
 private:
 #if !defined(TARGET_VANILLA)
     void generate();
-#endif // !TARGET_VANILLA
+#endif // !defined(TARGET_VANILLA)
+    void compute_oc_channel_blk();
+    void compute_mb_blk(); // vectorize across minibatch
 
     struct ker_args {
         dst_data_t *dst;
         const acc_data_t *acc;
         const char *bias;
         const float *scales;
+        const float *dst_zero_points;
         float nslope;
+        size_t oc;
         size_t len;
         size_t oc_offset;
     };
 
-    enum {
-        default_OC_loop_unroll_ = 4
-    };
+    enum { default_OC_loop_unroll_ = 4 };
 
     void (*ker_)(const ker_args *args);
     ref_eltwise_scalar_fwd_t *ref_eltwise_;
@@ -94,14 +107,15 @@ private:
     Xbyak::Reg64 reg_bias = rbx;
     Xbyak::Reg64 reg_scales = rsi;
 
+    Xbyak::Reg64 reg_oc = r13;
     Xbyak::Reg64 reg_len = r8;
     Xbyak::Reg64 reg_tmp = rcx; // intentional for shifting purposes
     Xbyak::Reg64 reg_oc_offset = r9;
     Xbyak::Reg64 reg_rem_mask = r10;
     Xbyak::Opmask kreg_rem_mask = k1;
 
-    // Will be asigned in constructor
-    Xbyak::Zmm vreg_zero, vreg_scale, vreg_sum_scale;
+    // Will be assigned in constructor
+    Xbyak::Zmm vreg_zero, vreg_scale, vreg_sum_scale, vreg_dst_zero_points;
 
     Xbyak::Reg64 eltwise_reserved_1_ = r11;
     Xbyak::Opmask eltwise_reserved_2_ = k2;
@@ -111,9 +125,10 @@ private:
     Xbyak::Zmm bf16_emu_reserv_3 = Xbyak::Zmm(30);
     Xbyak::Reg64 bf16_emu_reserv_4 = r12;
     Xbyak::Zmm bf16_emu_reserv_5 = Xbyak::Zmm(31);
-#endif // !TARGET_VANILLA
+#endif // !defined(TARGET_VANILLA)
 
-    bool do_bias_;
+    size_t OC_;
+    size_t MB_;
     data_type_t bias_data_type_;
     size_t bias_data_type_size_;
     bool do_eltwise_;
@@ -122,6 +137,7 @@ private:
     bool do_scale_;
     size_t scale_idx_mult_;
     bool do_sum_;
+    bool do_dst_zero_points_;
     float sum_scale_;
 #if !defined(TARGET_VANILLA)
     cpu_isa_t isa_;
@@ -130,7 +146,14 @@ private:
     int idx_compute_vreg_max_;
     int compute_vregs_per_iter_;
     int compute_vreg_bias_shift_, compute_vreg_prev_dst_shift_;
-#endif // !TARGET_VANILLA
+#endif // !defined(TARGET_VANILLA)
+    bool mb_blk_kernel;
+
+    const size_t vlen = cpu_isa_traits<avx512_core>::vlen / sizeof(float);
+
+    bool do_bias() const { return bias_data_type_ != data_type::undef; }
+    bool runtime_oc() const { return OC_ == (size_t)DNNL_RUNTIME_DIM_VAL; }
+    bool runtime_mb() const { return MB_ == (size_t)DNNL_RUNTIME_DIM_VAL; }
 
 #if !defined(TARGET_VANILLA)
     Xbyak::Zmm vreg_dst(int iter) {
@@ -152,13 +175,14 @@ private:
         assert(idx <= idx_compute_vreg_max_);
         return Xbyak::Zmm(idx);
     };
-#endif // !TARGET_VANILLA
+#endif // !defined(TARGET_VANILLA)
 };
 
-}
+} // namespace inner_product_utils
 
-}
-}
-}
-// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
+
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

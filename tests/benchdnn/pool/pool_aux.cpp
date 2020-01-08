@@ -14,22 +14,23 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
 #include <float.h>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include "mkldnn.h"
+#include "dnnl.h"
 
-#include "mkldnn_common.hpp"
-#include "mkldnn_debug.hpp"
+#include "dnnl_common.hpp"
+#include "dnnl_debug.hpp"
 #include "pool/pool.hpp"
 
 namespace pool {
 
 alg_t str2alg(const char *str) {
-#define CASE(_alg) if (!strcasecmp(STRINGIFY(_alg), str)) return _alg
+#define CASE(_alg) \
+    if (!strcasecmp(STRINGIFY(_alg), str)) return _alg
     CASE(MAX);
     CASE(AVG_NP);
     CASE(AVG_P);
@@ -46,16 +47,16 @@ const char *alg2str(alg_t alg) {
     return "unknown algorithm";
 }
 
-mkldnn_alg_kind_t alg2alg_kind(alg_t alg) {
-    if (alg == MAX) return mkldnn_pooling_max;
-    if (alg == AVG_NP) return mkldnn_pooling_avg_exclude_padding;
-    if (alg == AVG_P) return mkldnn_pooling_avg_include_padding;
+dnnl_alg_kind_t alg2alg_kind(alg_t alg) {
+    if (alg == MAX) return dnnl_pooling_max;
+    if (alg == AVG_NP) return dnnl_pooling_avg_exclude_padding;
+    if (alg == AVG_P) return dnnl_pooling_avg_include_padding;
     assert(!"unknown algorithm");
-    return mkldnn_alg_kind_undef;
+    return dnnl_alg_kind_undef;
 }
 
 int str2desc(desc_t *desc, const char *str) {
-    desc_t d{0};
+    desc_t d {0};
 
     /* canonical form:
      * dYmbXicXihXiwXohXowXkhXkwXshXswXphXpwXnS
@@ -65,7 +66,7 @@ int str2desc(desc_t *desc, const char *str) {
      *
      * implicit rules:
      *  - default values:
-     *      mb = 2, d = fd, sh = sw = 1, S="wip"
+     *      mb = 2, d = fd, sh = sw = 1
      *  - if H is undefined => H = W
      *  - if W is undefined => W = H
      *  - if `output` is undefined => compute output
@@ -75,34 +76,51 @@ int str2desc(desc_t *desc, const char *str) {
     d.mb = 2;
     d.sd = d.sh = d.sw = 1;
     d.pd = d.ph = d.pw = -1;
-    d.name = "\"wip\"";
 
     const char *s = str;
     assert(s);
 
-#   define CASE_NN(p, c) do { \
+#define CASE_NN(p, c) \
+    do { \
         if (!strncmp(p, s, strlen(p))) { \
-            ok = 1; s += strlen(p); \
-            char *end_s; d. c = strtol(s, &end_s, 10); s += (end_s - s); \
-            if (d. c < 0) return FAIL; \
+            ok = 1; \
+            s += strlen(p); \
+            char *end_s; \
+            d.c = strtol(s, &end_s, 10); \
+            s += (end_s - s); \
+            if (d.c < 0) return FAIL; \
             /* printf("@@@debug: %s: %ld\n", p, d. c); */ \
         } \
     } while (0)
-#   define CASE_N(c) CASE_NN(#c, c)
+#define CASE_N(c) CASE_NN(#c, c)
     while (*s) {
         int ok = 0;
-        CASE_N(mb); CASE_N(ic);
-        CASE_N(id); CASE_N(ih); CASE_N(iw);
-        CASE_N(od); CASE_N(oh); CASE_N(ow);
-        CASE_N(kd); CASE_N(kh); CASE_N(kw);
-        CASE_N(sd); CASE_N(sh); CASE_N(sw);
-        CASE_N(pd); CASE_N(ph); CASE_N(pw);
-        if (*s == 'n') { d.name = s + 1; break; }
+        CASE_N(mb);
+        CASE_N(ic);
+        CASE_N(id);
+        CASE_N(ih);
+        CASE_N(iw);
+        CASE_N(od);
+        CASE_N(oh);
+        CASE_N(ow);
+        CASE_N(kd);
+        CASE_N(kh);
+        CASE_N(kw);
+        CASE_N(sd);
+        CASE_N(sh);
+        CASE_N(sw);
+        CASE_N(pd);
+        CASE_N(ph);
+        CASE_N(pw);
+        if (*s == 'n') {
+            d.name = s + 1;
+            break;
+        }
         if (*s == '_') ++s;
         if (!ok) return FAIL;
     }
-#   undef CASE_NN
-#   undef CASE_N
+#undef CASE_NN
+#undef CASE_N
 
     if (d.ic == 0) return FAIL;
     if (d.sd <= 0 || d.sh <= 0 || d.sw <= 0) return FAIL;
@@ -120,7 +138,7 @@ int str2desc(desc_t *desc, const char *str) {
     if (!no_h) {
         if (!d.ih || !d.kh) return FAIL;
         if (!d.oh) {
-            d.ph = 0;
+            if (d.ph < 0) d.ph = 0;
             d.oh = compute_out(d.ih, d.kh, d.sh, d.ph);
         } else if (d.ph < 0)
             d.ph = compute_pad(d.oh, d.ih, d.kh, d.sh);
@@ -129,7 +147,7 @@ int str2desc(desc_t *desc, const char *str) {
     if (!no_w) {
         if (!d.iw || !d.kw) return FAIL;
         if (!d.ow) {
-            d.pw = 0;
+            if (d.pw < 0) d.pw = 0;
             d.ow = compute_out(d.iw, d.kw, d.sw, d.pw);
         } else if (d.pw < 0)
             d.pw = compute_pad(d.ow, d.iw, d.kw, d.sw);
@@ -138,7 +156,7 @@ int str2desc(desc_t *desc, const char *str) {
     if (!no_d && d.id) {
         if (!d.id || !d.kd) return FAIL;
         if (!d.od) {
-            d.pd = 0;
+            if (d.pd < 0) d.pd = 0;
             d.od = compute_out(d.id, d.kd, d.sd, d.pd);
         } else if (d.pd < 0)
             d.pd = compute_pad(d.od, d.id, d.kd, d.sd);
@@ -182,16 +200,15 @@ std::ostream &operator<<(std::ostream &s, const desc_t &d) {
 
     if (canonical || d.mb != 2) s << "mb" << d.mb;
 
+    const bool print_d = is_3d(&d);
     const bool half_form = (d.ih == d.iw && d.kh == d.kw && d.oh == d.ow
-        && d.sh == d.sw && d.ph == d.pw) && d.id == 1;
+                                   && d.sh == d.sw && d.ph == d.pw)
+            && !print_d;
 
-    const bool print_d = d.id > 1;
     const bool print_w = canonical || print_d || !half_form;
 
-    auto print_spatial = [&](
-            const char *sd, int64_t vd,
-            const char *sh, int64_t vh,
-            const char *sw, int64_t vw) {
+    auto print_spatial = [&](const char *sd, int64_t vd, const char *sh,
+                                 int64_t vh, const char *sw, int64_t vw) {
         if (print_d) s << sd << vd;
         s << sh << vh;
         if (print_w) s << sw << vw;
@@ -205,10 +222,9 @@ std::ostream &operator<<(std::ostream &s, const desc_t &d) {
     if (canonical || d.sh != 1 || d.sw != 1 || d.sd != 1)
         print_spatial("sd", d.sd, "sh", d.sh, "sw", d.sw);
 
-    if (canonical || d.ph != 0 || d.pw != 0 || d.pd != 0)
-        print_spatial("pd", d.pd, "ph", d.ph, "pw", d.pw);
+    print_spatial("pd", d.pd, "ph", d.ph, "pw", d.pw);
 
-    s << "n" << d.name;
+    if (d.name) s << "n" << d.name;
 
     return s;
 }
@@ -216,18 +232,14 @@ std::ostream &operator<<(std::ostream &s, const desc_t &d) {
 std::ostream &operator<<(std::ostream &s, const prb_t &p) {
     dump_global_params(s);
 
-    if (p.dir != FWD_D)
-        s << "--dir=" << dir2str(p.dir) << " ";
-    if (p.cfg != conf_f32)
-        s << "--cfg=" << cfg2str(p.cfg) << " ";
-    if (p.tag != mkldnn_nchw)
-        s << "--tag=" << fmt_tag2str(p.tag) << " ";
-    if (p.alg != MAX)
-        s << "--alg=" << alg2str(p.alg) << " ";
+    if (p.dir != FWD_D) s << "--dir=" << dir2str(p.dir) << " ";
+    if (p.cfg != conf_f32) s << "--cfg=" << cfg2str(p.cfg) << " ";
+    if (p.tag != dnnl_nchw) s << "--tag=" << fmt_tag2str(p.tag) << " ";
+    if (p.alg != MAX) s << "--alg=" << alg2str(p.alg) << " ";
 
     s << static_cast<const desc_t &>(p);
 
     return s;
 }
 
-}
+} // namespace pool

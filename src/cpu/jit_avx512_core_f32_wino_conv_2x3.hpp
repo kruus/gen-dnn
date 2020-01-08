@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2018 Intel Corporation
+* Copyright 2018-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -14,23 +14,22 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef CPU_JIT_AVX512_CORE_F32_WINO_CONV_2x3_HPP
-#define CPU_JIT_AVX512_CORE_F32_WINO_CONV_2x3_HPP
+#ifndef CPU_JIT_AVX512_CORE_F32_WINO_CONV_2X3_HPP
+#define CPU_JIT_AVX512_CORE_F32_WINO_CONV_2X3_HPP
 
 #include <assert.h>
 
 #include "c_types_map.hpp"
-#include "mkldnn_thread.hpp"
+#include "dnnl_thread.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
 #include "cpu_convolution_pd.hpp"
-#include "cpu_primitive.hpp"
 
-#include "jit_primitive_conf.hpp"
 #include "jit_generator.hpp"
+#include "jit_primitive_conf.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
@@ -38,7 +37,7 @@ struct jit_avx512_core_f32_wino_conv_2x3_fwd_ker_t;
 struct jit_avx512_core_f32_wino_conv_2x3_src_trans_t;
 struct jit_avx512_core_f32_wino_conv_2x3_dst_trans_t;
 
-struct jit_avx512_core_f32_wino_conv_2x3_fwd_t : public cpu_primitive_t {
+struct jit_avx512_core_f32_wino_conv_2x3_fwd_t : public primitive_impl_t {
     struct pd_t : public cpu_convolution_fwd_pd_t {
         pd_t(engine_t *engine, const convolution_desc_t *adesc,
                 const primitive_attr_t *attr,
@@ -51,14 +50,15 @@ struct jit_avx512_core_f32_wino_conv_2x3_fwd_t : public cpu_primitive_t {
                 jit_avx512_core_f32_wino_conv_2x3_fwd_t);
 
         status_t init() {
-            bool ok = true
-                && desc()->prop_kind == prop_kind::forward_inference
-                && utils::one_of(desc()->alg_kind,
-                        alg_kind::convolution_auto,
-                        alg_kind::convolution_winograd)
-                && expect_data_types(data_type::f32, data_type::f32,
-                        data_type::f32, data_type::f32, data_type::f32)
-                && set_default_formats();
+            bool ok = true && desc()->prop_kind == prop_kind::forward_inference
+                    && utils::one_of(desc()->alg_kind,
+                            alg_kind::convolution_auto,
+                            alg_kind::convolution_winograd)
+                    && expect_data_types(data_type::f32, data_type::f32,
+                            data_type::f32, data_type::f32, data_type::f32)
+                    && attr()->has_default_values(
+                            primitive_attr_t::skip_mask_t::post_ops)
+                    && set_default_formats();
             if (!ok) return status::unimplemented;
 
             memory_desc_t expect_wei_md = *weights_md();
@@ -68,8 +68,7 @@ struct jit_avx512_core_f32_wino_conv_2x3_fwd_t : public cpu_primitive_t {
 
             if (weights_md_.format_kind == format_kind::any)
                 weights_md_ = expect_wei_md;
-            if (weights_md_ != expect_wei_md)
-                return status::unimplemented;
+            if (weights_md_ != expect_wei_md) return status::unimplemented;
 
             init_scratchpad();
 
@@ -79,7 +78,7 @@ struct jit_avx512_core_f32_wino_conv_2x3_fwd_t : public cpu_primitive_t {
         jit_conv_conf_2x3_wino_t jcp_;
 
     protected:
-        status_t jit_conf(memory_desc_t& expect_wei_md);
+        status_t jit_conf(memory_desc_t &expect_wei_md);
 
         void init_scratchpad() {
             using namespace memory_tracking::names;
@@ -110,15 +109,17 @@ struct jit_avx512_core_f32_wino_conv_2x3_fwd_t : public cpu_primitive_t {
     ~jit_avx512_core_f32_wino_conv_2x3_fwd_t();
 
     virtual status_t execute(const exec_ctx_t &ctx) const override {
-        auto src = CTX_IN_MEM(const float *, MKLDNN_ARG_SRC);
-        auto wei = CTX_IN_MEM(const float *, MKLDNN_ARG_WEIGHTS);
-        auto bia = CTX_IN_MEM(const float *, MKLDNN_ARG_BIAS);
-        auto dst = CTX_OUT_MEM(float *, MKLDNN_ARG_DST);
+        auto src = CTX_IN_MEM(const float *, DNNL_ARG_SRC);
+        auto wei = CTX_IN_MEM(const float *, DNNL_ARG_WEIGHTS);
+        auto bia = CTX_IN_MEM(const float *, DNNL_ARG_BIAS);
+        auto dst = CTX_OUT_MEM(float *, DNNL_ARG_DST);
 
         if (pd()->jcp_.small_mb)
-            execute_forward_small_mb(src, wei, bia, dst, this->scratchpad(ctx));
+            execute_forward_small_mb(
+                    src, wei, bia, dst, ctx.get_scratchpad_grantor());
         else
-            execute_forward_mbN(src, wei, bia, dst, this->scratchpad(ctx));
+            execute_forward_mbN(
+                    src, wei, bia, dst, ctx.get_scratchpad_grantor());
 
         return status::success;
     }
@@ -130,15 +131,15 @@ private:
     void execute_forward_mbN(const float *src, const float *wei,
             const float *bia, float *dst,
             const memory_tracking::grantor_t &scratchpad) const;
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
 
     jit_avx512_core_f32_wino_conv_2x3_fwd_ker_t *kernel_;
     jit_avx512_core_f32_wino_conv_2x3_src_trans_t *src_trans_;
     jit_avx512_core_f32_wino_conv_2x3_dst_trans_t *dst_trans_;
 };
 
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
 
 #endif

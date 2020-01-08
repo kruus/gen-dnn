@@ -14,46 +14,38 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "mkldnn_test_common.hpp"
+#include "dnnl_test_common.hpp"
 #include "gtest/gtest.h"
 
-#include "mkldnn.h"
-#include <CL/cl.h>
 #include <memory>
+#include "dnnl.h"
+#include <CL/cl.h>
 
-namespace mkldnn {
-class ocl_stream_test_c : public ::testing::Test
-{
+namespace dnnl {
+class ocl_stream_test_c : public ::testing::Test {
 protected:
     virtual void SetUp() {
-        if (!find_ocl_device(CL_DEVICE_TYPE_GPU)) {
-            return;
-        }
+        if (!find_ocl_device(CL_DEVICE_TYPE_GPU)) { return; }
 
-        MKLDNN_CHECK(mkldnn_engine_create(&eng, mkldnn_gpu, 0));
+        DNNL_CHECK(dnnl_engine_create(&eng, dnnl_gpu, 0));
 
-        MKLDNN_CHECK(mkldnn_engine_get_ocl_context(eng, &ocl_ctx));
-        MKLDNN_CHECK(mkldnn_engine_get_ocl_device(eng, &ocl_dev));
+        DNNL_CHECK(dnnl_engine_get_ocl_context(eng, &ocl_ctx));
+        DNNL_CHECK(dnnl_engine_get_ocl_device(eng, &ocl_dev));
     }
 
     virtual void TearDown() {
-        if (eng) {
-            MKLDNN_CHECK(mkldnn_engine_destroy(eng));
-        }
+        if (eng) { DNNL_CHECK(dnnl_engine_destroy(eng)); }
     }
 
-    mkldnn_engine_t eng = nullptr;
+    dnnl_engine_t eng = nullptr;
     cl_context ocl_ctx = nullptr;
     cl_device_id ocl_dev = nullptr;
 };
 
-class ocl_stream_test_cpp : public ::testing::Test
-{
+class ocl_stream_test_cpp : public ::testing::Test {
 protected:
     virtual void SetUp() {
-        if (!find_ocl_device(CL_DEVICE_TYPE_GPU)) {
-            return;
-        }
+        if (!find_ocl_device(CL_DEVICE_TYPE_GPU)) { return; }
 
         eng = engine(engine::kind::gpu, 0);
 
@@ -70,12 +62,11 @@ TEST_F(ocl_stream_test_c, CreateC) {
     SKIP_IF(!find_ocl_device(CL_DEVICE_TYPE_GPU),
             "OpenCL GPU devices not found.");
 
-    mkldnn_stream_t stream;
-    MKLDNN_CHECK(
-            mkldnn_stream_create(&stream, eng, mkldnn_stream_default_flags));
+    dnnl_stream_t stream;
+    DNNL_CHECK(dnnl_stream_create(&stream, eng, dnnl_stream_default_flags));
 
     cl_command_queue ocl_queue;
-    MKLDNN_CHECK(mkldnn_stream_get_ocl_command_queue(stream, &ocl_queue));
+    DNNL_CHECK(dnnl_stream_get_ocl_command_queue(stream, &ocl_queue));
 
     cl_device_id ocl_queue_dev;
     cl_context ocl_queue_ctx;
@@ -87,7 +78,7 @@ TEST_F(ocl_stream_test_c, CreateC) {
     ASSERT_EQ(ocl_dev, ocl_queue_dev);
     ASSERT_EQ(ocl_ctx, ocl_queue_ctx);
 
-    MKLDNN_CHECK(mkldnn_stream_destroy(stream));
+    DNNL_CHECK(dnnl_stream_destroy(stream));
 }
 
 TEST_F(ocl_stream_test_cpp, CreateCpp) {
@@ -117,11 +108,11 @@ TEST_F(ocl_stream_test_c, BasicInteropC) {
             = clCreateCommandQueue(ocl_ctx, ocl_dev, 0, &err);
     OCL_CHECK(err);
 
-    mkldnn_stream_t stream;
-    MKLDNN_CHECK(mkldnn_stream_create_ocl(&stream, eng, interop_ocl_queue));
+    dnnl_stream_t stream;
+    DNNL_CHECK(dnnl_stream_create_ocl(&stream, eng, interop_ocl_queue));
 
     cl_command_queue ocl_queue;
-    MKLDNN_CHECK(mkldnn_stream_get_ocl_command_queue(stream, &ocl_queue));
+    DNNL_CHECK(dnnl_stream_get_ocl_command_queue(stream, &ocl_queue));
     ASSERT_EQ(ocl_queue, interop_ocl_queue);
 
     cl_uint ref_count;
@@ -130,7 +121,7 @@ TEST_F(ocl_stream_test_c, BasicInteropC) {
     int i_ref_count = int(ref_count);
     ASSERT_EQ(i_ref_count, 2);
 
-    MKLDNN_CHECK(mkldnn_stream_destroy(stream));
+    DNNL_CHECK(dnnl_stream_destroy(stream));
 
     OCL_CHECK(clGetCommandQueueInfo(interop_ocl_queue, CL_QUEUE_REFERENCE_COUNT,
             sizeof(cl_uint), &ref_count, nullptr));
@@ -188,10 +179,9 @@ TEST_F(ocl_stream_test_c, InteropIncompatibleQueueC) {
             = clCreateCommandQueue(cpu_ocl_ctx, cpu_ocl_dev, 0, &err);
     OCL_CHECK(err);
 
-    mkldnn_stream_t stream;
-    mkldnn_status_t status
-            = mkldnn_stream_create_ocl(&stream, eng, cpu_ocl_queue);
-    ASSERT_EQ(status, mkldnn_invalid_arguments);
+    dnnl_stream_t stream;
+    dnnl_status_t status = dnnl_stream_create_ocl(&stream, eng, cpu_ocl_queue);
+    ASSERT_EQ(status, dnnl_invalid_arguments);
 
     OCL_CHECK(clReleaseCommandQueue(cpu_ocl_queue));
 }
@@ -213,9 +203,9 @@ TEST_F(ocl_stream_test_cpp, InteropIncompatibleQueueCpp) {
     OCL_CHECK(err);
 
     catch_expected_failures([&] { stream s(eng, cpu_ocl_queue); }, true,
-            mkldnn_invalid_arguments);
+            dnnl_invalid_arguments);
 
     OCL_CHECK(clReleaseCommandQueue(cpu_ocl_queue));
 }
 
-} // namespace mkldnn
+} // namespace dnnl

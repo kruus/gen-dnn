@@ -14,18 +14,18 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "src/common/mkldnn_thread.hpp"
+#include "src/common/dnnl_thread.hpp"
 
 #include "sum/sum.hpp"
 
 namespace sum {
 
-void compute_ref(const prb_t *p, const std::vector<dnn_mem_t> &src,
-        dnn_mem_t &dst) {
+void compute_ref(
+        const prb_t *p, const std::vector<dnn_mem_t> &src, dnn_mem_t &dst) {
     float *dst_ptr = (float *)dst;
     const auto nelems = dst.nelems();
 
-    mkldnn::impl::parallel_nd(nelems, [&](int64_t k) {
+    dnnl::impl::parallel_nd(nelems, [&](int64_t k) {
         dst_ptr[k] = 0;
         for (int i_input = 0; i_input < p->n_inputs(); ++i_input) {
             const float *src_ptr = (const float *)src[i_input];
@@ -34,4 +34,4 @@ void compute_ref(const prb_t *p, const std::vector<dnn_mem_t> &src,
     });
 }
 
-}
+} // namespace sum

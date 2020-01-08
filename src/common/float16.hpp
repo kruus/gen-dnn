@@ -22,7 +22,7 @@
 #include <limits>
 #include <type_traits>
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace f16_support {
 
@@ -83,8 +83,7 @@ inline float16_t &float16_t::operator=(float f) {
     } else if (e == 0xFF) {
         // Preserve inf/nan.
         ee = 0x1F;
-        if (m != 0 && mm == 0)
-            mm = 1;
+        if (m != 0 && mm == 0) mm = 1;
     } else if (eee > 0 && eee < 0x1F) {
         // Normal range. Perform round to even on mantissa.
         ee = eee;
@@ -147,6 +146,6 @@ inline float16_t::operator float() const {
 using f16_support::float16_t;
 
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl
 
 #endif

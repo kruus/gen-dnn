@@ -24,7 +24,7 @@
 
 #define GET_OFF(field) offsetof(jit_conv_call_s, field)
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
@@ -74,13 +74,15 @@ void jit_avx512_dw_conv_fwd_kernel_bf16::apply_filter(
 
     mov(iter_kh, reg_kh);
     Label kh_label;
-    L(kh_label); {
+    L(kh_label);
+    {
         mov(iter_kw, reg_kw);
         mov(aux1_reg_input, aux_reg_input);
         mov(aux1_reg_kernel, aux_reg_kernel);
 
         Label kw_label;
-        L(kw_label); {
+        L(kw_label);
+        {
             for (int ch = 0; ch < ur_ch_blocks; ch++) {
                 int ker_off = ch * jcp.kh * jcp.kw * ch_block;
                 vpmovzxwd(zmm_ker_reg,
@@ -130,7 +132,8 @@ void jit_avx512_dw_conv_fwd_kernel_bf16::apply_filter_unrolled(
 
     mov(iter_kh, reg_kh);
     Label kh_label;
-    L(kh_label); {
+    L(kh_label);
+    {
         for (int ch = 0; ch < ur_ch_blocks; ch++) {
             for (int kw = 0; kw < jcp.kw; kw++) {
                 int ker_off = ch * jcp.kh * jcp.kw * ch_blk + kw * ch_blk;
@@ -234,7 +237,8 @@ void jit_avx512_dw_conv_fwd_kernel_bf16::loop_ow(int ur_ch_blocks) {
     Label tail_w_label;
     Label exit_label;
 
-    L(unrolled_w_label); {
+    L(unrolled_w_label);
+    {
         int ur_w = jcp.ur_w;
 
         cmp(reg_ur_w, ur_w);
@@ -255,7 +259,8 @@ void jit_avx512_dw_conv_fwd_kernel_bf16::loop_ow(int ur_ch_blocks) {
         jmp(unrolled_w_label);
     }
 
-    L(tail_w_label); {
+    L(tail_w_label);
+    {
         int ur_w = 1;
 
         cmp(reg_ur_w, ur_w);
@@ -285,8 +290,7 @@ void jit_avx512_dw_conv_fwd_kernel_bf16::generate() {
     mov(reg_input, ptr[this->param1 + GET_OFF(src)]);
     mov(reg_output, ptr[this->param1 + GET_OFF(dst)]);
     mov(reg_kernel, ptr[this->param1 + GET_OFF(filt)]);
-    if (jcp.with_bias)
-        mov(reg_bias, ptr[this->param1 + GET_OFF(bias)]);
+    if (jcp.with_bias) mov(reg_bias, ptr[this->param1 + GET_OFF(bias)]);
     mov(reg_kh, ptr[this->param1 + GET_OFF(kh_padding)]);
     mov(reg_kw, ptr[this->param1 + GET_OFF(kw_padding)]);
     mov(reg_ch_blocks, ptr[this->param1 + GET_OFF(ch_blocks)]);
@@ -315,8 +319,7 @@ void jit_avx512_dw_conv_fwd_kernel_bf16::generate() {
 
     postamble();
 
-    if (jcp.with_eltwise)
-        eltwise_injector_->prepare_table();
+    if (jcp.with_eltwise) eltwise_injector_->prepare_table();
 }
 
 inline void jit_avx512_dw_conv_bwd_data_kernel_bf16::load_ddst(
@@ -350,13 +353,15 @@ inline void jit_avx512_dw_conv_bwd_data_kernel_bf16::apply_filter(
 
     mov(iter_kh, reg_kh);
     Label kh_label;
-    L(kh_label); {
+    L(kh_label);
+    {
         mov(aux1_reg_ddst, aux_reg_ddst);
         mov(aux1_reg_kernel, aux_reg_kernel);
 
         mov(iter_kw, reg_kw);
         Label kw_label;
-        L(kw_label); {
+        L(kw_label);
+        {
             for (int ch = 0; ch < ur_ch_blocks; ch++) {
                 int ker_off = ch * kh * kw * ch_blk;
                 vpmovzxwd(zmm_ker_reg,
@@ -371,8 +376,7 @@ inline void jit_avx512_dw_conv_bwd_data_kernel_bf16::apply_filter(
                     if (isa_has_bf16(jcp.isa))
                         vdpbf16ps(zmm_acc, zmm_ker_reg, zmm_dst_reg);
                     else
-                        bf16_emu_->vdpbf16ps(
-                                zmm_acc, zmm_dst_reg, zmm_ker_reg);
+                        bf16_emu_->vdpbf16ps(zmm_acc, zmm_dst_reg, zmm_ker_reg);
                 }
             }
 
@@ -435,7 +439,8 @@ inline void jit_avx512_dw_conv_bwd_data_kernel_bf16::loop_body(
     Label tail_w_label;
     Label exit_label;
 
-    L(unrolled_w_label); {
+    L(unrolled_w_label);
+    {
         int ur_w = jcp.ur_w;
 
         cmp(reg_ur_str_w, ur_w);
@@ -455,7 +460,8 @@ inline void jit_avx512_dw_conv_bwd_data_kernel_bf16::loop_body(
         jmp(unrolled_w_label);
     }
 
-    L(tail_w_label); {
+    L(tail_w_label);
+    {
         int ur_w = 1;
 
         cmp(reg_ur_str_w, ur_w);
@@ -540,11 +546,13 @@ inline void jit_avx512_dw_conv_bwd_weights_kernel_bf16::compute_ow_step_unroll(
 
     const int iw_block = ow_block * jcp.stride_w;
     const int right_border = jcp.iw - iw_block;
+    const int r_pad = jcp.r_pad;
 
     const int cascade_input = nstl::min(jcp.stride_w, jcp.kw);
 
     /* preamble count for number of cascaded LOAD + FMA operation */
     const int input_overlap = nstl::max(jcp.kw - l_pad, 0);
+    const bool is_last_block = (unroll_w + ow_block == jcp.ow);
 
     /* LOAD initial input registers, then cascade LOADs and FMAs*/
     for (int i_ur = 0; i_ur < unroll_w; ++i_ur) {
@@ -554,8 +562,12 @@ inline void jit_avx512_dw_conv_bwd_weights_kernel_bf16::compute_ow_step_unroll(
         if (i_ur == 0) {
             for (int c = 0; c < input_overlap; ++c) {
                 int off_input = (c - pad_offset) * jcp.ch_block;
-                if (off_input < 0 && unroll_w == jcp.ow)
-                        continue;
+                if (off_input < 0 && unroll_w == jcp.ow) continue;
+
+                const bool over_steps_bdry = true && is_last_block
+                        && (c - pad_offset + r_pad > right_border);
+                if (over_steps_bdry) continue;
+
                 Zmm zmm_input = get_input_reg(c);
                 vpmovzxwd(zmm_input,
                         ptr[reg_tmp_input + off_input * jcp.typesize_in]);
@@ -566,6 +578,11 @@ inline void jit_avx512_dw_conv_bwd_weights_kernel_bf16::compute_ow_step_unroll(
                 int off_input = (overlap + c - pad_offset) * jcp.ch_block;
                 if (off_input < 0 || overlap + c + l_pad > right_border)
                     continue;
+
+                const bool over_steps_bdry = true && is_last_block
+                        && (overlap + c - pad_offset + r_pad > right_border);
+                if (over_steps_bdry) continue;
+
                 Zmm zmm_input = get_input_reg(overlap + c);
                 vpmovzxwd(zmm_input,
                         ptr[reg_tmp_input + off_input * jcp.typesize_in]);
@@ -579,6 +596,10 @@ inline void jit_avx512_dw_conv_bwd_weights_kernel_bf16::compute_ow_step_unroll(
             if (io_overlap - l_pad < 0
                     || io_overlap - jcp.l_pad >= right_border)
                 continue;
+
+            const bool over_steps_bdry = true && is_last_block
+                    && (io_overlap - jcp.l_pad + jcp.r_pad > right_border);
+            if (over_steps_bdry) continue;
 
             Zmm zmm_input = get_input_reg(io_overlap - l_pad);
             Zmm zmm_acc = get_acc_reg(i_kw);
@@ -734,15 +755,15 @@ inline void jit_avx512_dw_conv_bwd_weights_kernel_bf16::compute_h_step(
 inline void jit_avx512_dw_conv_bwd_weights_kernel_bf16::compute_h_loop(
         int unroll_w, int l_pad, int pad_offset, int ow_block) {
 
-    const size_t io_overlap = jcp.ih / jcp.stride_h < jcp.oh ?
-            jcp.ih / jcp.stride_h - 1 :
-            jcp.oh - jcp.b_pad - 1;
+    // last index of output that is not influenced by right padding
+    const size_t io_overlap
+            = jcp.oh - 1 - utils::div_up(jcp.b_pad, jcp.stride_h);
+
     const int ch_offset = jcp.ch_block;
     const int t_overlap_off = jcp.t_pad % jcp.stride_h == 0 ? jcp.stride_h : 1;
     const int b_overlap_off = jcp.b_pad % jcp.stride_h == 0 ? jcp.stride_h : 1;
 
-    Label tpad_loop_label, h_loop_label, skip_tpad_label, skip_bpad_label,
-            end_h_loop_label;
+    Label tpad_loop_label, h_loop_label, skip_tpad_label, skip_bpad_label;
 
     mov(reg_oh, ptr[this->param1 + offsetof(jit_dw_conv_call_s, oh_index)]);
     mov(reg_oh_worksize,
@@ -794,29 +815,21 @@ inline void jit_avx512_dw_conv_bwd_weights_kernel_bf16::compute_h_loop(
 
         L(tpad_loop_label);
 
-        cmp(reg_oh, jcp.ih / jcp.stride_h);
-        jge(end_h_loop_label, T_NEAR);
-
         inc(reg_oh);
 
         cmp(reg_oh, reg_oh_worksize);
         jl(h_loop_label, T_NEAR);
     }
-    L(end_h_loop_label);
 }
 
-inline void jit_avx512_dw_conv_bwd_weights_kernel_bf16::
-        compute_ow_block_unroll() {
+inline void
+jit_avx512_dw_conv_bwd_weights_kernel_bf16::compute_ow_block_unroll() {
 
     const int ch_offset = jcp.ch_block;
     int ow = jcp.ow;
     int pad_offset = 0;
     int l_pad = jcp.l_pad;
-
-    /* Calculate effective padding */
-    int r_pad = nstl::max(0, (ow - 1) * jcp.stride_w
-                    + (jcp.kw - 1) * (jcp.dilate_w + 1)
-                    - (jcp.iw + jcp.l_pad - 1));
+    int r_pad = jcp.r_pad;
 
     /* Is this strictly defined by:
      * -code-size (?)
@@ -827,8 +840,9 @@ inline void jit_avx512_dw_conv_bwd_weights_kernel_bf16::
     int unroll_w_tail = 0;
     int unroll_w = 0;
     int unroll_w_trips = 0;
+    const bool do_unroll_w = jcp.ow > max_unroll_w;
 
-    if (jcp.ow > max_unroll_w) {
+    if (do_unroll_w) {
         unroll_w = nstl::min(block_size, jcp.ow);
         unroll_w_trips = ow / unroll_w;
         /* calculate tail */
@@ -846,8 +860,7 @@ inline void jit_avx512_dw_conv_bwd_weights_kernel_bf16::
             }
         }
     } else {
-        unroll_w = jcp.ow;
-        unroll_w_trips = nstl::max(1, ow / unroll_w);
+        unroll_w_tail = jcp.ow;
     }
     if (jcp.with_bias) {
         Label skip_load_bias;
@@ -877,7 +890,7 @@ inline void jit_avx512_dw_conv_bwd_weights_kernel_bf16::
     add(reg_filter_baddr, reg_kh_offset);
 
     /* compute left padded block */
-    if (l_pad) {
+    if (l_pad && do_unroll_w) {
         compute_h_loop(unroll_w, l_pad, 0, 0);
         add(reg_output_baddr, unroll_w * ch_offset * jcp.typesize_in);
         add(reg_input_baddr,
@@ -911,7 +924,8 @@ inline void jit_avx512_dw_conv_bwd_weights_kernel_bf16::
 
     /* compute right padded block */
     if (unroll_w_tail) {
-        compute_h_loop(unroll_w_tail, 0, pad_offset, jcp.ow - unroll_w_tail);
+        compute_h_loop(
+                unroll_w_tail, l_pad, pad_offset, jcp.ow - unroll_w_tail);
     }
 }
 
@@ -930,7 +944,8 @@ void jit_avx512_dw_conv_bwd_weights_kernel_bf16::generate() {
     postamble();
 }
 
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif // !defined(TARGET_VANILLA)

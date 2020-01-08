@@ -714,6 +714,7 @@ int main(int argc, char **argv) {
 #if defined(TARGET_VANILLA)
     printf(" example %s disabled for TARGET_VANILLA",__FILE__);
 #else
+    // ? return handle_example_errors({engine::kind::cpu}, simple_net);
     try {
         simple_net();
         std::cout << "ok\n";

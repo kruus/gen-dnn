@@ -18,21 +18,25 @@
 #include <math.h>
 
 #include "common/c_types_map.hpp"
+#include "common/dnnl_thread.hpp"
 #include "common/math_utils.hpp"
-#include "common/mkldnn_thread.hpp"
 #include "common/nstl.hpp"
 #include "common/type_helpers.hpp"
-#include "ocl/cl_stream.hpp"
+#include "compute/compute.hpp"
 
 #include "ocl/simple_sum.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace ocl {
 
 template <data_type_t data_type>
 status_t simple_sum_t<data_type>::execute(const exec_ctx_t &ctx) const {
-    auto &output = CTX_OUT_STORAGE(MKLDNN_ARG_DST);
+
+    compute::compute_stream_t *compute_stream
+            = utils::downcast<compute::compute_stream_t *>(ctx.stream());
+
+    auto &output = CTX_OUT_STORAGE(DNNL_ARG_DST);
 
     const int num_arrs = pd()->n_inputs();
     const memory_desc_wrapper o_d(pd()->dst_md());
@@ -40,21 +44,19 @@ status_t simple_sum_t<data_type>::execute(const exec_ctx_t &ctx) const {
 
     for (int a = 0; a < num_arrs; ++a) {
 
-        auto &input = CTX_IN_STORAGE(MKLDNN_ARG_MULTIPLE_SRC + a);
+        auto &input = CTX_IN_STORAGE(DNNL_ARG_MULTIPLE_SRC + a);
         const float scale = pd()->scales()[a];
 
-        kernel_.set_arg(0, input);
-        kernel_.set_arg(1, output);
-        kernel_.set_arg(2, scale);
-        kernel_.set_arg(3, a);
+        compute::kernel_arg_list_t arg_list;
+        arg_list.set(0, input);
+        arg_list.set(1, output);
+        arg_list.set(2, scale);
+        arg_list.set(3, a);
 
-        auto &executor = *(
-                utils::downcast<cl_stream_t *>(ctx.stream())->cl_executor());
-
-        auto nd_range = cl_nd_range_t({ nelems });
-        status_t status = executor.parallel_for(nd_range, kernel_);
-        if (status != status::success)
-            return status;
+        auto nd_range = compute::nd_range_t({nelems});
+        status_t status
+                = compute_stream->parallel_for(nd_range, kernel_, arg_list);
+        if (status != status::success) return status;
     }
     return status::success;
 }
@@ -63,4 +65,4 @@ template struct simple_sum_t<data_type::f32>;
 
 } // namespace ocl
 } // namespace impl
-} // namespace mkldnn
+} // namespace dnnl

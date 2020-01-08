@@ -23,53 +23,54 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
-#include "cpu_softmax_pd.hpp"
 #include "cpu_isa_traits.hpp"
-#include "cpu_primitive.hpp"
+#include "cpu_softmax_pd.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 namespace cpu {
 
-namespace softmax_impl { template <cpu_isa_t isa> struct driver_t; }
+namespace softmax_impl {
+template <cpu_isa_t isa>
+struct driver_t;
+}
 
 template <cpu_isa_t isa>
-struct jit_uni_softmax_fwd_t: public cpu_primitive_t {
-    struct pd_t: public cpu_softmax_fwd_pd_t {
+struct jit_uni_softmax_fwd_t : public primitive_impl_t {
+    struct pd_t : public cpu_softmax_fwd_pd_t {
         pd_t(engine_t *engine, const softmax_desc_t *adesc,
                 const primitive_attr_t *attr,
                 const softmax_fwd_pd_t *hint_fwd_pd)
-            : cpu_softmax_fwd_pd_t(engine, adesc, attr, hint_fwd_pd)
-        {}
+            : cpu_softmax_fwd_pd_t(engine, adesc, attr, hint_fwd_pd) {}
 
         DECLARE_COMMON_PD_T(
-                JIT_IMPL_NAME_HELPER("jit:", isa, ""),
-                jit_uni_softmax_fwd_t<isa>);
+                JIT_IMPL_NAME_HELPER("jit:", isa, ""), jit_uni_softmax_fwd_t);
 
         status_t init() {
             auto is_dense = [&]() {
                 const memory_desc_wrapper data_d(src_md());
                 const auto &bd = data_d.blocking_desc();
 
-                dim_t axis_blk_size = 1;
-                for (int iblk = 0; iblk < bd.inner_nblks; ++iblk)
-                    if (bd.inner_idxs[iblk] == axis())
-                        axis_blk_size *= bd.inner_blks[iblk];
+                if (!data_d.is_dense(true) || !data_d.only_padded_dim(axis()))
+                    return false;
 
-                return true
-                    && inner_size() == 1
-                    && data_d.is_dense(true)
-                    && data_d.only_padded_dim(axis())
-                    && bd.strides[axis()] == axis_blk_size;
+                const auto blk_size = cpu_isa_traits<isa>::vlen / sizeof(float);
+                if (data_d.is_plain())
+                    return bd.strides[axis()] == 1;
+                else {
+                    // 31 is a general limit, 2 is for unroll_regs_ = 4;
+                    const size_t max_stride = (1LL << (31 - 2)) - 1;
+                    const int last_blk = bd.inner_nblks - 1;
+                    return true && bd.inner_blks[last_blk] == blk_size
+                            && bd.inner_idxs[last_blk] == axis()
+                            && sizeof(float) * bd.strides[axis()] < max_stride;
+                }
             };
 
-            bool ok = true
-                && mayiuse(isa)
-                && is_fwd()
-                && !has_zero_dim_memory()
-                && src_md()->data_type == data_type::f32
-                && is_dense() // not dense impl can be easily done
-                && (attr()->has_default_values());
+            bool ok = true && mayiuse(isa) && is_fwd() && !has_zero_dim_memory()
+                    && src_md()->data_type == data_type::f32
+                    && is_dense() // not dense impl can be easily done
+                    && attr()->has_default_values();
             if (!ok) return status::unimplemented;
 
             return status::success;
@@ -84,15 +85,15 @@ struct jit_uni_softmax_fwd_t: public cpu_primitive_t {
     virtual status_t execute(const exec_ctx_t &ctx) const override;
 
 private:
-    const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
+    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
 
     softmax_impl::driver_t<isa> *softmax_driver_;
 };
 
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

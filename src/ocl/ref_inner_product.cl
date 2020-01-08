@@ -19,65 +19,64 @@
 #include "ocl/ocl_post_ops.h"
 #endif
 
-#if INNER_PRODUCT_FWD == 1
+#if IS_FWD == 1
 
-__kernel void ref_inner_product_fwd_kernel(__global SRC_DATA_T *src,
-        __global WEI_DATA_T *wht, __global BIA_DATA_T *bias, __global DST_DATA_T *dst,
-        float eltwise_alpha, float eltwise_beta, float sum_scale) {
+KERNEL_ATTR
+__kernel void ref_inner_product_fwd(__global SRC_DATA_T *src,
+        __global WEI_DATA_T *wht, __global BIA_DATA_T *bias,
+        __global DST_DATA_T *dst, float eltwise_alpha, float eltwise_beta,
+        float sum_scale, float output_scale) {
 
-    const int mb = get_global_id(0) / OC;
-    const int oc = get_global_id(0) % OC;
+    const int mb = GWS_GET_MB();
+    const int oc = GWS_GET_OC();
 
     ACC_DATA_T d = 0;
-#    if HAS_SPATIAL == 1
+#if HAS_SPATIAL == 1
     for (int ic = 0; ic < IC; ++ic)
         for (int kd = 0; kd < KD; ++kd)
             for (int kh = 0; kh < KH; ++kh)
                 for (int kw = 0; kw < KW; ++kw) {
                     const uint src_off = SRC_OFF(mb, ic, kd, kh, kw);
                     const uint wht_off = WHT_OFF(0, oc, ic, kd, kh, kw);
-#    else
+#else
     for (int ic = 0; ic < IC_TOTAL; ++ic) {
         const uint src_off = mb * IC_TOTAL + ic;
         const uint wht_off = oc * IC_TOTAL + ic;
-#    endif
+#endif
                     d += SRC_TO_REF(src[src_off]) * WEI_TO_REF(wht[wht_off]);
                 }
+    DATA_T tmp = d;
 #if WITH_BIAS
-    DATA_T tmp = (DATA_T)d + (DATA_T)BIA_TO_REF(bias[oc]);
-#else
-    DATA_T tmp = (DATA_T)d;
+    tmp += BIA_TO_REF(bias[oc]);
 #endif
-#    if WITH_SUM_ELTWISE == 1
-    tmp += sum_scale * (DATA_T)DST_TO_REF(dst[mb * OC + oc]);
-    dst[mb * OC + oc] = REF_TO_DST(fwd_eltwise(tmp, eltwise_alpha, eltwise_beta));
-#    else
-#    if WITH_ELTWISE == 1
-    dst[mb * OC + oc] = REF_TO_DST(fwd_eltwise(tmp, eltwise_alpha, eltwise_beta));
-#    endif
-#    if WITH_SUM == 1
-    dst[mb * OC + oc]
-            = REF_TO_DST(DST_TO_REF(dst[mb * OC + oc]) * sum_scale + tmp);
-#    endif
-#    if WITH_ELTWISE == 0 && WITH_SUM == 0
-    dst[mb * OC + oc] = REF_TO_DST(tmp);
-#    endif
-#    endif
+
+    tmp *= output_scale;
+
+#if WITH_SUM_ELTWISE == 1
+    tmp += sum_scale * DST_TO_REF(dst[mb * OC + oc]);
+    tmp = fwd_eltwise(tmp, eltwise_alpha, eltwise_beta);
+#else
+#if WITH_ELTWISE == 1
+    tmp = fwd_eltwise(tmp, eltwise_alpha, eltwise_beta);
+#endif
+#if WITH_SUM == 1
+    tmp = sum_scale * DST_TO_REF(dst[mb * OC + oc]) + tmp;
+#endif
+#endif
+    dst[mb * OC + oc] = TO_DST(tmp);
 }
 #endif
 
-#if INNER_PRODUCT_BWD_DATA == 1
-__kernel void ref_inner_product_bwd_data_kernel(__global SRC_DATA_T *diff_src,
+#if IS_BWD_D == 1
+KERNEL_ATTR
+__kernel void ref_inner_product_bwd_data(__global SRC_DATA_T *diff_src,
         __global WEI_DATA_T *wht, __global DST_DATA_T *diff_dst) {
 
-    const int mb = get_global_id(0) / IC_TOTAL;
-    const int ic_total = get_global_id(0) % IC_TOTAL;
-    const int ic = ic_total / (KD * KH * KW);
-    const int kdhw = ic_total % (KD * KH * KW);
-    const int kd = kdhw / (KH * KW);
-    const int khw = kdhw % (KH * KW);
-    const int kh = khw / KH;
-    const int kw = khw % KH;
+    const int mb = GWS_GET_MB_IC() / IC;
+    const int ic = GWS_GET_MB_IC() % IC;
+    const int kd = GWS_GET_KD();
+    const int kh = GWS_GET_KH();
+    const int kw = GWS_GET_KW();
 
     float ds = 0.0f;
     for (int oc = 0; oc < OC; ++oc) {
@@ -86,23 +85,21 @@ __kernel void ref_inner_product_bwd_data_kernel(__global SRC_DATA_T *diff_src,
         ds += DST_TO_REF(diff_dst[diff_dst_off]) * WEI_TO_REF(wht[wht_off]);
     }
     const uint diff_src_off = SRC_OFF(mb, ic, kd, kh, kw);
-    diff_src[diff_src_off] = REF_TO_DST(ds);
+    diff_src[diff_src_off] = REF_TO_SRC(ds);
 }
 #endif
 
-#if INNER_PRODUCT_BWD_WEIGHTS == 1
-__kernel void ref_inner_product_bwd_weights_kernel(__global SRC_DATA_T *src,
+#if IS_BWD_W == 1
+KERNEL_ATTR
+__kernel void ref_inner_product_bwd_weights(__global SRC_DATA_T *src,
         __global WEI_DATA_T *diff_wht, __global BIA_DATA_T *diff_bias,
         __global DST_DATA_T *diff_dst) {
 
-    const int oc = get_global_id(0) / IC_TOTAL;
-    const int ic_total = get_global_id(0) % IC_TOTAL;
-    const int ic = ic_total / (KD * KH * KW);
-    const int kdhw = ic_total % (KD * KH * KW);
-    const int kd = kdhw / (KH * KW);
-    const int khw = kdhw % (KH * KW);
-    const int kh = khw / KH;
-    const int kw = khw % KH;
+    const int oc = GWS_GET_OC();
+    const int ic = GWS_GET_IC();
+    const int kd = GWS_GET_KD();
+    const int kh = GWS_GET_KH();
+    const int kw = GWS_GET_KW();
 
     float ds = 0.0f;
     for (int mb = 0; mb < MB; ++mb) {
@@ -112,7 +109,7 @@ __kernel void ref_inner_product_bwd_weights_kernel(__global SRC_DATA_T *src,
     }
     const uint diff_wht_off = WHT_OFF(0, oc, ic, kd, kh, kw);
     diff_wht[diff_wht_off] = REF_TO_WEI(ds);
-#    if WITH_BIAS == 1
+#if WITH_BIAS == 1
     if (ic == 0) {
         float db = 0.0f;
         for (int mb = 0; mb < MB; ++mb) {
@@ -121,6 +118,6 @@ __kernel void ref_inner_product_bwd_weights_kernel(__global SRC_DATA_T *src,
         }
         diff_bias[oc] = REF_TO_BIA(db);
     }
-#    endif
+#endif
 }
 #endif

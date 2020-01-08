@@ -16,13 +16,13 @@
 
 #include <cmath>
 
-#include "mkldnn_test_common.hpp"
+#include "dnnl_test_common.hpp"
 #include "gtest/gtest.h"
 
 #include "cpu_isa_traits.hpp"
-#include "mkldnn.hpp"
+#include "dnnl.hpp"
 
-namespace mkldnn {
+namespace dnnl {
 
 struct test_lrn_desc_t {
     memory::dim mb, c;
@@ -38,7 +38,7 @@ struct lrn_params {
     memory::format_tag dst_format;
     test_lrn_desc_t test_ld;
     bool expect_to_fail;
-    mkldnn_status_t expected_status;
+    dnnl_status_t expected_status;
 };
 
 template <typename data_t, typename acc_data_t = data_t>
@@ -61,8 +61,8 @@ void check_lrn_fwd(const lrn_params &p, const memory::desc &src_d,
             : size * size;
     const auto padded_c = src.get_desc().data.padded_dims[1];
 
-    const mkldnn::impl::memory_desc_wrapper src_mdw(src_d.data);
-    const mkldnn::impl::memory_desc_wrapper dst_mdw(dst_d.data);
+    const dnnl::impl::memory_desc_wrapper src_mdw(src_d.data);
+    const dnnl::impl::memory_desc_wrapper dst_mdw(dst_d.data);
 
     auto off = [=](memory::dim n, memory::dim c, memory::dim h, memory::dim w) {
         return ((n * padded_c + c) * ld.h + h) * ld.w + w;
@@ -72,20 +72,14 @@ void check_lrn_fwd(const lrn_params &p, const memory::desc &src_d,
                        memory::dim ow) {
         acc_data_t sum = 0.0;
         for (memory::dim c = oc; c < oc + CSIZE; ++c) {
-            if (c < (CSIZE - 1) / 2)
-                continue;
-            if (c >= C + (CSIZE - 1) / 2)
-                continue;
+            if (c < (CSIZE - 1) / 2) continue;
+            if (c >= C + (CSIZE - 1) / 2) continue;
             for (memory::dim h = oh; h < oh + HWSIZE; ++h) {
-                if (h < (HWSIZE - 1) / 2)
-                    continue;
-                if (h >= H + (HWSIZE - 1) / 2)
-                    continue;
+                if (h < (HWSIZE - 1) / 2) continue;
+                if (h >= H + (HWSIZE - 1) / 2) continue;
                 for (memory::dim w = ow; w < ow + HWSIZE; ++w) {
-                    if (w < (HWSIZE - 1) / 2)
-                        continue;
-                    if (w >= W + (HWSIZE - 1) / 2)
-                        continue;
+                    if (w < (HWSIZE - 1) / 2) continue;
+                    if (w >= W + (HWSIZE - 1) / 2) continue;
                     acc_data_t s = src_ptr[src_mdw.off_l(
                             off(n, c - (CSIZE - 1) / 2, h - (HWSIZE - 1) / 2,
                                     w - (HWSIZE - 1) / 2),
@@ -102,39 +96,38 @@ void check_lrn_fwd(const lrn_params &p, const memory::desc &src_d,
         acc_data_t eps = static_cast<acc_data_t>(1.e-7f * (2 * summands + 5));
 
         memory::data_type data_type = data_traits<data_t>::data_type;
-        if (data_type == mkldnn::memory::data_type::f16)
+        if (data_type == dnnl::memory::data_type::f16)
             eps = static_cast<acc_data_t>(1.e-4f * 2 * summands);
-        else if (data_type == mkldnn::memory::data_type::bf16)
+        else if (data_type == dnnl::memory::data_type::bf16)
             eps = static_cast<acc_data_t>(1.e-3f * 2 * summands);
 
         acc_data_t out = d[0];
         acc_data_t norm_max = (std::max)(fabs(out), fabs(ref_out));
-        if (norm_max < eps)
-            norm_max = 1.;
+        if (norm_max < eps) norm_max = 1.;
         ASSERT_NEAR(out, ref_out, eps * norm_max);
     };
 
     const memory::dim N = ld.mb;
-    mkldnn::impl::parallel_nd(N, padded_c, H, W,
+    dnnl::impl::parallel_nd(N, padded_c, H, W,
             [&](memory::dim n, memory::dim c, memory::dim h, memory::dim w) {
                 ker(&dst_ptr[dst_mdw.off_l(off(n, c, h, w), true)], n, c, h, w);
             });
 }
 
 template <typename data_t>
-class lrn_forward_test : public ::testing::TestWithParam<lrn_params>
-{
+class lrn_forward_test : public ::testing::TestWithParam<lrn_params> {
     lrn_params p;
 
 protected:
     virtual void SetUp() {
         memory::data_type data_type = data_traits<data_t>::data_type;
         SKIP_IF(data_type == memory::data_type::f16
-                && get_test_engine_kind() == engine::kind::cpu,
+                        && get_test_engine_kind() == engine::kind::cpu,
                 "CPU does not support f16 data type.");
         SKIP_IF(data_type == memory::data_type::bf16
-                && get_test_engine_kind() == engine::kind::cpu
-                && !mkldnn::impl::cpu::mayiuse(mkldnn::impl::cpu::avx512_core),
+                        && get_test_engine_kind() == engine::kind::cpu
+                        && !dnnl::impl::cpu::mayiuse(
+                                dnnl::impl::cpu::avx512_core),
                 "ISA does not support bf16 data type.");
         p = ::testing::TestWithParam<decltype(p)>::GetParam();
         catch_expected_failures(
@@ -151,14 +144,24 @@ protected:
         test_lrn_desc_t ld = p.test_ld;
         bool with_workspace = p.aprop_kind == prop_kind::forward_training;
 
-        auto l_src_desc = create_md(
-                { ld.mb, ld.c, ld.h, ld.w }, data_type, p.src_format);
-        auto l_dst_desc = create_md(
-                { ld.mb, ld.c, ld.h, ld.w }, data_type, p.dst_format);
+        auto l_src_desc
+                = create_md({ld.mb, ld.c, ld.h, ld.w}, data_type, p.src_format);
+        auto l_dst_desc
+                = create_md({ld.mb, ld.c, ld.h, ld.w}, data_type, p.dst_format);
 
         auto lrn_desc = lrn_forward::desc(p.aprop_kind, p.aalgorithm,
                 l_src_desc, ld.local_size, ld.alpha, ld.beta, ld.k);
         auto lrn_prim_desc = lrn_forward::primitive_desc(lrn_desc, eng);
+        // test construction from a C pd
+        lrn_prim_desc = lrn_forward::primitive_desc(lrn_prim_desc.get());
+
+        ASSERT_TRUE(lrn_prim_desc.query_md(query::exec_arg_md, DNNL_ARG_SRC)
+                == lrn_prim_desc.src_desc());
+        ASSERT_TRUE(lrn_prim_desc.query_md(query::exec_arg_md, DNNL_ARG_DST)
+                == lrn_prim_desc.dst_desc());
+        ASSERT_TRUE(
+                lrn_prim_desc.query_md(query::exec_arg_md, DNNL_ARG_WORKSPACE)
+                == lrn_prim_desc.workspace_desc());
 
         auto l_src = test_memory(l_src_desc, eng);
         auto l_dst = test_memory(l_dst_desc, eng);
@@ -174,19 +177,18 @@ protected:
         // Execute
         auto l = lrn_forward(lrn_prim_desc);
         std::unordered_map<int, memory> args
-                = { { MKLDNN_ARG_SRC, l_src.get() },
-                      { MKLDNN_ARG_DST, l_dst.get() } };
+                = {{DNNL_ARG_SRC, l_src.get()}, {DNNL_ARG_DST, l_dst.get()}};
         if (with_workspace) {
             auto workspace_md = lrn_prim_desc.workspace_desc();
             workspace = memory(workspace_md, eng);
-            args.insert({ MKLDNN_ARG_WORKSPACE, workspace });
+            args.insert({DNNL_ARG_WORKSPACE, workspace});
         }
         l.execute(strm, args);
         strm.wait();
 
         check_zero_tail<data_t>(0, l_dst.get());
 
-        if (data_type == mkldnn::memory::data_type::bf16)
+        if (data_type == dnnl::memory::data_type::bf16)
             check_lrn_fwd<data_t, float>(
                     p, l_src_desc, l_dst_desc, l_src.get(), l_dst.get());
         else
@@ -209,227 +211,227 @@ const algorithm within = algorithm::lrn_within_channel;
 
 static auto ForwardZeroDim_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { 0, 10, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 0, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nChw16c,
-                    { 2, 16, 0, 4, 5, 1.0e-4f, 0.75f, 3.0f } });
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {0, 10, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 0, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nChw16c,
+                    {2, 16, 0, 4, 5, 1.0e-4f, 0.75f, 3.0f}});
 };
 
 static auto ForwardEF_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { -1, 10, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f }, true,
-                    mkldnn_invalid_arguments },
-            lrn_params{ fwd_scoring, across, fmt::nchw, fmt::nchw,
-                    { 2, -10, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f }, true,
-                    mkldnn_invalid_arguments },
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { 2, 10, -4, 4, 5, 1.0e-4f, 0.75f, 3.0f }, true,
-                    mkldnn_invalid_arguments });
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {-1, 10, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}, true,
+                    dnnl_invalid_arguments},
+            lrn_params {fwd_scoring, across, fmt::nchw, fmt::nchw,
+                    {2, -10, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}, true,
+                    dnnl_invalid_arguments},
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {2, 10, -4, 4, 5, 1.0e-4f, 0.75f, 3.0f}, true,
+                    dnnl_invalid_arguments});
 };
 
 static auto Forward_nChw16c_padded_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 17, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 19, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 26, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 12, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f } });
+            lrn_params {fwd_training, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 17, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 19, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 26, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f}},
+            lrn_params {fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 12, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f}});
 };
 
 static auto Forward_nChw8c_padded_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 7, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 9, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 26, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 12, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f } });
+            lrn_params {fwd_training, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 7, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 9, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 26, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f}},
+            lrn_params {fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 12, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f}});
 };
 
 static auto Forward_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { 2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nchw, fmt::nchw,
-                    { 2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { 2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 3.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nchw, fmt::nchw,
-                    { 2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 3.0f } });
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nchw, fmt::nchw,
+                    {2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 3.0f}},
+            lrn_params {fwd_scoring, across, fmt::nchw, fmt::nchw,
+                    {2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 3.0f}});
 };
 
 static auto ForwardNHWC_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nhwc, fmt::nhwc,
-                    { 2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nhwc, fmt::nhwc,
-                    { 2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nhwc, fmt::nhwc,
-                    { 2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 4.85f } },
-            lrn_params{ fwd_scoring, across, fmt::nhwc, fmt::nhwc,
-                    { 2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 4.85f } });
+            lrn_params {fwd_training, across, fmt::nhwc, fmt::nhwc,
+                    {2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nhwc, fmt::nhwc,
+                    {2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nhwc, fmt::nhwc,
+                    {2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 4.85f}},
+            lrn_params {fwd_scoring, across, fmt::nhwc, fmt::nhwc,
+                    {2, 10, 4, 4, 5, 1.0e-4f, 0.75f, 4.85f}});
 };
 
 static auto Forward_nChw8c_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f } });
+            lrn_params {fwd_training, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f}},
+            lrn_params {fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f}});
 };
 
 static auto Forward_nChw16c_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f } });
+            lrn_params {fwd_training, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f}},
+            lrn_params {fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 16, 4, 4, 5, 1.0e-4f, 0.75f, 5.7f}});
 };
 
 static auto AlexnetForwardNCHW_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { 2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nchw, fmt::nchw,
-                    { 2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { 2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nchw, fmt::nchw,
-                    { 2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f } });
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nchw, fmt::nchw,
+                    {2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nchw, fmt::nchw,
+                    {2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f}});
 };
 
 static auto AlexnetForwardNHWC_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nhwc, fmt::nhwc,
-                    { 2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nhwc, fmt::nhwc,
-                    { 2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nhwc, fmt::nhwc,
-                    { 2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nhwc, fmt::nhwc,
-                    { 2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f } });
+            lrn_params {fwd_training, across, fmt::nhwc, fmt::nhwc,
+                    {2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nhwc, fmt::nhwc,
+                    {2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nhwc, fmt::nhwc,
+                    {2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nhwc, fmt::nhwc,
+                    {2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f}});
 };
 
 static auto AlexnetForward_nChw8c_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f } });
+            lrn_params {fwd_training, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f}});
 };
 
 static auto AlexnetForward_nChw16c_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f } });
+            lrn_params {fwd_training, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f}});
 };
 
 static auto GoogleNetV1ForwardNCHW_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { 2, 64, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nchw, fmt::nchw,
-                    { 2, 64, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { 2, 192, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nchw, fmt::nchw,
-                    { 2, 192, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f } });
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {2, 64, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nchw, fmt::nchw,
+                    {2, 64, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {2, 192, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nchw, fmt::nchw,
+                    {2, 192, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f}});
 };
 
 static auto GoogleNetV1Forward_nChw8c_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 64, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 64, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 192, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 192, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f } });
+            lrn_params {fwd_training, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 64, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 64, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 192, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nChw8c, fmt::nChw8c,
+                    {2, 192, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f}});
 };
 
 static auto GoogleNetV1Forward_nChw16c_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 64, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 64, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 192, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
-                    { 2, 192, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f } });
+            lrn_params {fwd_training, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 64, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 64, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 192, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, across, fmt::nChw16c, fmt::nChw16c,
+                    {2, 192, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f}});
 };
 
 static auto RCNNForwardBlocked_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, within, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 96, 55, 55, 3, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, within, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 96, 55, 55, 3, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, within, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 256, 27, 27, 3, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, within, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 256, 27, 27, 3, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, within, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, within, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, within, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_scoring, within, fmt::nChw8c, fmt::nChw8c,
-                    { 2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f } });
+            lrn_params {fwd_training, within, fmt::nChw8c, fmt::nChw8c,
+                    {2, 96, 55, 55, 3, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, within, fmt::nChw8c, fmt::nChw8c,
+                    {2, 96, 55, 55, 3, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, within, fmt::nChw8c, fmt::nChw8c,
+                    {2, 256, 27, 27, 3, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, within, fmt::nChw8c, fmt::nChw8c,
+                    {2, 256, 27, 27, 3, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, within, fmt::nChw8c, fmt::nChw8c,
+                    {2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, within, fmt::nChw8c, fmt::nChw8c,
+                    {2, 96, 55, 55, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, within, fmt::nChw8c, fmt::nChw8c,
+                    {2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_scoring, within, fmt::nChw8c, fmt::nChw8c,
+                    {2, 256, 27, 27, 5, 1.0e-4f, 0.75f, 1.0f}});
 };
 
 // This tests compatibility with MKL-DNN 0.14
 static auto RegressionWeightFormat_cases = []() {
-    return ::testing::Values(lrn_params{ fwd_training, across, fmt::oihw,
-            fmt::oihw, { 2, 64, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f } });
+    return ::testing::Values(lrn_params {fwd_training, across, fmt::oihw,
+            fmt::oihw, {2, 64, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f}});
 };
 
 static auto ForwardNCHWTail_cases = []() {
     return ::testing::Values(
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { 1, 64, 1, 9, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { 1, 64, 2, 9, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { 1, 64, 3, 9, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { 1, 64, 4, 9, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { 1, 64, 5, 9, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { 1, 64, 9, 6, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, across, fmt::nchw, fmt::nchw,
-                    { 1, 64, 7, 9, 5, 1.0e-4f, 0.75f, 1.0f } },
-            lrn_params{ fwd_training, algorithm::lrn_across_channels, fmt::nchw,
-                    fmt::nchw, { 1, 64, 8, 9, 5, 1.0e-4f, 0.75f, 1.0f } });
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {1, 64, 1, 9, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {1, 64, 2, 9, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {1, 64, 3, 9, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {1, 64, 4, 9, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {1, 64, 5, 9, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {1, 64, 9, 6, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, across, fmt::nchw, fmt::nchw,
+                    {1, 64, 7, 9, 5, 1.0e-4f, 0.75f, 1.0f}},
+            lrn_params {fwd_training, algorithm::lrn_across_channels, fmt::nchw,
+                    fmt::nchw, {1, 64, 8, 9, 5, 1.0e-4f, 0.75f, 1.0f}});
 };
 
 // ------------- f32 ----------------------
@@ -536,4 +538,4 @@ GPU_INSTANTIATE_TEST_SUITE_P(TestLRNRegressionWeightFormat, lrn_fp16,
 GPU_INSTANTIATE_TEST_SUITE_P(
         TestLRNForwardNCHWTail, lrn_fp16, ForwardNCHWTail_cases());
 
-} // namespace mkldnn
+} // namespace dnnl
