@@ -469,5 +469,10 @@ void simple_net() {
 }
 
 int main(int argc, char **argv) {
+#if defined(TARGET_VANILLA)
+    printf(" example %s disabled for TARGET_VANILLA",__FILE__);
+#else
     return handle_example_errors({engine::kind::cpu}, simple_net);
+#endif
 }
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

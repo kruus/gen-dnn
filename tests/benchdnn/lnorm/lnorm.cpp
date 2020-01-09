@@ -51,7 +51,7 @@ static int prepare_fwd(const prb_t *p, dnn_mem_t &src, dnn_mem_t &mean,
      * Once src is set, variance is computed.
      *
      * ALG_0: mean is set to 0
-     * ALG_1: mean is set to 2^p, where p \in {-2, -1, ..., 4}
+     * ALG_1: mean is set to 2^p, where \f$ p \in {-2, -1, ..., 4} \f$
      * ALG_AUTO: choose between ALG_0 and ALG_1 automatically */
     const int64_t exact_bits = digits_dt(p->dt);
     const int64_t L = p->c;

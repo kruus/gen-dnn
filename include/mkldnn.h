@@ -23,6 +23,7 @@
 
 #include "dnnl.h"
 
+/// @cond DOXYGEN_SHOULD_SKIP_THIS
 #if 0 // old v1.0.0
 #ifdef __cplusplus
 extern "C" {
@@ -2010,5 +2011,6 @@ mkldnn_status_t MKLDNN_API mkldnn_gemm_s8s8s32(
 #endif
 
 #endif /* old v1.0.0 */
+/// @endcond
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif /* MKLDNN_H */

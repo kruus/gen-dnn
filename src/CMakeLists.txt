@@ -74,10 +74,7 @@ endif()
 
 add_subdirectory(common)
 add_subdirectory(compute)
-#add_subdirectory(cpu)
-# cpu/ or vanilla/ ?
-message(STATUS "CPU_DIR=${CPU_DIR}")
-add_subdirectory(${CPU_DIR})
+add_subdirectory(cpu)
 
 if(DNNL_GPU_RUNTIME STREQUAL "OCL")
     add_subdirectory(ocl)

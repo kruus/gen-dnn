@@ -438,7 +438,7 @@ static_assert( div_floorn( 4,-3) == -2, "oops");
 static_assert( div_floorn( 5,-3) == -2, "oops");
 static_assert( div_floorn( 6,-3) == -2, "oops");
 static_assert( div_floorn( 7,-3) == -3, "oops");
-/** \ret r in (d,0] st n=d*k+r for some integer k
+/** \return non-positive r in (d,0] st n=d*k+r for some integer k
  * \pre d<0 (unchecked) */
 inline constexpr int rem_floorn( int const n, int const d )
 {

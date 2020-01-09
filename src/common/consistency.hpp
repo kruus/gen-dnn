@@ -42,7 +42,7 @@ struct CondLocVV { // CondLoc with "verbose always" hint (even in optimized -DND
     char const* cond_msg;
 };
 
-/** \group Condition_Location macros */
+/** @defgroup consistency_location macros to construct {condition,location} CondLoc\* objects */
 //@{
 #define COND_LOC(...) CondLoc{bool{!!(__VA_ARGS__)}}
 
@@ -123,7 +123,7 @@ struct Consistency {
 };
 }//impl::
 }//mkldnn::
-/** \group Consistency Check macros
+/** @defgroup consistency_checks Consistency Check macros
  * {S|A}CHK[V|VV] macros wrap printing behavior of consistency checks
  *        S=Short-circuit [default]
  *        A=All (run all checks, do not short-circuit, might be dangerous)

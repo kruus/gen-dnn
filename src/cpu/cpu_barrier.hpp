@@ -93,10 +93,9 @@ void barrier(ctx_t *ctx, int nthr);
 
 #if !defined(TARGET_VANILLA)
 /** injects actual barrier implementation into another jitted code
- * @params:
- *   code      -- jit_generator object where the barrier is to be injected
- *   reg_ctx   -- read-only register with pointer to the barrier context
- *   reg_nnthr -- read-only register with the # of synchronizing threads
+ * @param code      jit_generator object where the barrier is to be injected
+ * @param reg_ctx   read-only register with pointer to the barrier context
+ * @param reg_nnthr read-only register with the # of synchronizing threads
  */
 void generate(jit_generator &code, Xbyak::Reg64 reg_ctx, Xbyak::Reg64 reg_nthr);
 #endif // !defined(TARGET_VANILLA)

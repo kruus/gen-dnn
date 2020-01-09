@@ -57,40 +57,79 @@
 
 // clang-format off
 
-// DNNL CPU threading runtime
+/// @defgroup cmake_build cmake build options
+//@{
+/// DNNL CPU threading runtime
 #cmakedefine DNNL_CPU_THREADING_RUNTIME DNNL_RUNTIME_${DNNL_CPU_THREADING_RUNTIME}
 
-// DNNL CPU engine runtime
+/// DNNL CPU engine runtime
 #cmakedefine DNNL_CPU_RUNTIME DNNL_RUNTIME_${DNNL_CPU_RUNTIME}
 
-// DNNL GPU engine runtime
+/// DNNL GPU engine runtime
 #cmakedefine DNNL_GPU_RUNTIME DNNL_RUNTIME_${DNNL_GPU_RUNTIME}
 
-// Here is how cmake can communicate target and jit support level..............
-#define DNNL_CPU_X86 0
-#define DNNL_CPU_VE  1
-#define DNNL_CPU_SX  2 // deprecated, very old code (if any)
-// Each cpu may have multiple levels of jit support
-// XXX dnnl now has a DNNL_ENABLE_MAX_CPU_ISA cmake flag
-//     and a dnnl_set_max_cpu_isa() function.
+/** DNNL CPU and max JIT level.
+ *
+ * This <TT>cmake</TT> setting is appropriate for compiling the full library to
+ * run chipsets other than x86, with varying levels of JIT support.
+ *
+ * In this model, we do \b not create a new engine that \e offloads x86
+ * calls to an external engine, but compile a monolithic libdnnl for the
+ * target cpu.
+ *
+ * - 1st digit is target cpu.
+ *   - If 0, then any cpu-specific code is determined by the compiler
+ *     and its flags (typically no jit or inline assembly)
+ * - 2nd digit is jit level (or other target-specific extensions)
+ *   - If 0, then this build should use minimal target-specific code
+ *   - 9 should always mean "assume fanciest CPU and extensions"
+ *
+ * The default dnnl build for x86 would set DNNL_CPU_JIT to 19
+ *
+ */
+#cmakedefine DNNL_CPU_JIT ${DNNL_JIT_SUPPORT}
+//@}
+
+//.............................................................................
+/** @defgroup CPU_JIT_constants DNNL CPU and JIT constants and conditionals */
+//@{
+/** @defgroup CPU_constants CPU targets*/
+//@{
+/** plain C/C++, no jit (inline assembler via compiler tests possible).
+ * When DNNL_CPU_JIT/10 is zero, DNNL_CPU_JIT%10 must also be zero. */
+#define DNNL_CPU_ANY 0
+#define DNNL_CPU_X86 1
+#define DNNL_CPU_VE  2
+#define DNNL_CPU_SX  3 ///< deprecated, very old code (if any)
+//@}
+/** @defgroup CPU_JIT_preset_constants known CPU + JIT/extensions
+ * Each cpu may have multiple levels of jit support.
+ *
+ * Note:
+ * \e libdnnl now has a DNNL_ENABLE_MAX_CPU_ISA cmake flag and a
+ * dnnl_set_max_cpu_isa() function.  But this applies to runtime
+ * pruning of available x86 implementations.
+ */
+//@{
+//x86 compilers could be gcc, icc or clang
 #define DNNL_JIT_ANY    (DNNL_CPU_X86*10 + 0)
 #define DNNL_JIT_SSE41  (DNNL_CPU_X86*10 + 1)
 #define DNNL_JIT_SSE42  (DNNL_CPU_X86*10 + 2)
 #define DNNL_JIT_AVX    (DNNL_CPU_X86*10 + 3)
 #define DNNL_JIT_AVX2   (DNNL_CPU_X86*10 + 4)
-#define DNNL_JIT_AVX512 (DNNL_CPU_X86*10 + 5)
-//
+#define DNNL_JIT_AVX512 (DNNL_CPU_X86*10 + 9)
+#define DNNL_JIT_MAX    (DNNL_CPU_X86*10 + 9)
+// VE compilers include ncc and clang (with -target=ve)
 #define DNNL_JIT_VEANY  (DNNL_CPU_VE*10 + 0)
-#define DNNL_JIT_VE     (DNNL_CPU_VE*10 + 1)
-//
-#define DNNL_JIT_SXANY  (DNNL_CPU_SX*10 + 0) /* deprecated, very old code (if any) */
-//.............................................................................
+#define DNNL_JIT_VE     (DNNL_CPU_VE*10 + 9)
+#define DNNL_JIT_VE     (DNNL_CPU_VE*10 + 9)
+// SX compiler support (historical?)
+#define DNNL_JIT_SXANY  (DNNL_CPU_SX*10 + 0)
+//@}
 
-// DNNL CPU engine jit level FIXME: VE should get a separate engine
-#cmakedefine DNNL_CPU_JIT ${DNNL_JIT_SUPPORT}
-
-// useful conditionals
-#define DNNL_TARGET_VANILLA (DNNL_CPU_JIT%10 == 0)
+/// @defgroup  CPU_JIT_conditionals test for occurence of common target conditions
+//@{
+#define DNNL_TARGET_VANILLA (DNNL_CPU == DNNL_CPU_ANY || DNNL_CPU_JIT%10 == 0)
 
 #define DNNL_TARGET_X86     (DNNL_CPU_JIT/10 == DNNL_CPU_X86)
 #define DNNL_TARGET_X86_JIT (DNNL_TARGET_X86 && DNNL_TARGET%10 > 0)
@@ -99,11 +138,18 @@
 #define DNNL_TARGET_VE_JIT  (DNNL_TARGET_X86 && DNNL_TARGET%10 > 0)
 
 #define DNNL_TARGET_SX      (DNNL_CPU_JIT/10 == DNNL_CPU_SX) /* deprecated, very old code (if any) */
-//.............................................................................
+//@}
 
+// compiler sanity checks...
 #if defined(__ve) && !DNNL_TARGET_VE
-#error "VE compiler but DNNL_JIT_SUPPORT for a non-VE CPU"
+#error "VE compiler but incompatible cmake DNNL_JIT_SUPPORT setting"
 #endif
+#if defined(_SX) && !DNNL_TARGET_SX
+#error "SX compiler but incompatible cmake DNNL_JIT_SUPPORT setting"
+#endif
+
+//@}
+//.............................................................................
 
 // clang-format on
 
@@ -120,5 +166,5 @@
 #error "BOTH DNNL_CPU_RUNTIME and DNNL_GPU_RUNTIME must be defined"
 #endif
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s syntax=cpp.doxygen
 #endif

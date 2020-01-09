@@ -59,7 +59,7 @@ PROJECT_LOGO           =
 # left blank the current directory will be used.
 
 #OUTPUT_DIRECTORY       = @CMAKE_CURRENT_BINARY_DIR@/reference
-OUTPUT_DIRECTORY       = @DOXYGEN_OUTPUT_DIR@
+OUTPUT_DIRECTORY       = @DOXYGEN_OUTPUT_DIR@-full
 
 # If the CREATE_SUBDIRS tag is set to YES then doxygen will create 4096 sub-
 # directories (in 2 levels) under the output directory of each output format and
@@ -722,7 +722,7 @@ WARNINGS               = YES
 # will automatically be disabled.
 # The default value is: YES.
 
-WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_UNDOCUMENTED   = NO
 
 # If the WARN_IF_DOC_ERROR tag is set to YES, doxygen will generate warnings for
 # potential errors in the documentation, such as not documenting some parameters
@@ -773,13 +773,27 @@ WARN_LOGFILE           =
 # Note: If this tag is empty the current directory is searched.
 
 INPUT                  = @CMAKE_CURRENT_SOURCE_DIR@/include \
+                         @CMAKE_BINARY_DIR@/include \
                          @CMAKE_CURRENT_SOURCE_DIR@/doc \
                          @CMAKE_CURRENT_SOURCE_DIR@/src/common \
-                         @CMAKE_CURRENT_SOURCE_DIR@/src/common \
-                         @CMAKE_CURRENT_SOURCE_DIR@/io \
-                         @CMAKE_CURRENT_SOURCE_DIR@/tests \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/io \
+                         @CMAKE_CURRENT_SOURCE_DIR@/tests/api.c \
+                         @CMAKE_CURRENT_SOURCE_DIR@/tests/api-io.c \
+                         @CMAKE_CURRENT_SOURCE_DIR@/tests/gtests \
+                         @CMAKE_CURRENT_SOURCE_DIR@/tests/benchdnn/ \
+                         @CMAKE_CURRENT_SOURCE_DIR@/tests/mkldnn_compat \
+                         @CMAKE_CURRENT_SOURCE_DIR@/tests/intel-rdpmc \
+                         @CMAKE_CURRENT_SOURCE_DIR@/tests/dev \
                          @CMAKE_CURRENT_SOURCE_DIR@/examples \
-                         @CMAKE_CURRENT_SOURCE_DIR@/src/cpu
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/cpu/ \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/cpu/gemm \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/cpu/matmul \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/cpu/matmul \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/cpu/resampling \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/cpu/rnn \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/vanilla/ve*.hpp \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/vanilla/ve*.cpp \
+                         @CMAKE_CURRENT_SOURCE_DIR@/src/compute
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses
@@ -857,14 +871,15 @@ EXCLUDE_SYMBOLS        =
 # that contain example code fragments that are included (see the \include
 # command).
 
-EXAMPLE_PATH           =
+EXAMPLE_PATH           = @CMAKE_CURRENT_SOURCE_DIR@/examples
 
 # If the value of the EXAMPLE_PATH tag contains directories, you can use the
 # EXAMPLE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp and
 # *.h) to filter out the source-files in the directories. If left blank all
 # files are included.
 
-EXAMPLE_PATTERNS       =
+EXAMPLE_PATTERNS       = *.c \
+                         *.cpp
 
 # If the EXAMPLE_RECURSIVE tag is set to YES then subdirectories will be
 # searched for input files to be used with the \include or \dontinclude commands
@@ -1081,7 +1096,7 @@ GENERATE_HTML          = YES
 # The default directory is: html.
 # This tag requires that the tag GENERATE_HTML is set to YES.
 
-HTML_OUTPUT            = cpu-html
+HTML_OUTPUT            = html
 
 # The HTML_FILE_EXTENSION tag can be used to specify the file extension for each
 # generated HTML page (for example: .htm, .php, .asp).
@@ -1484,7 +1499,7 @@ FORMULA_TRANSPARENT    = YES
 # The default value is: NO.
 # This tag requires that the tag GENERATE_HTML is set to YES.
 
-USE_MATHJAX            = NO
+USE_MATHJAX            = YES
 
 # When MathJax is enabled you can set the default output format to be used for
 # the MathJax output. See the MathJax site (see:
@@ -1660,7 +1675,7 @@ COMPACT_LATEX          = NO
 # The default value is: a4.
 # This tag requires that the tag GENERATE_LATEX is set to YES.
 
-PAPER_TYPE             = a4
+PAPER_TYPE             = letter
 
 # The EXTRA_PACKAGES tag can be used to specify one or more LaTeX package names
 # that should be included in the LaTeX output. The package can be specified just
@@ -2032,10 +2047,13 @@ SEARCH_INCLUDES        = YES
 # preprocessor.
 # This tag requires that the tag SEARCH_INCLUDES is set to YES.
 
-INCLUDE_PATH           = @CMAKE_SOURCE_DIR@/tests/gtests \
+INCLUDE_PATH           = \
+                         @CMAKE_SOURCE_DIR@/include \
+                         @CMAKE_BINARY_DIR@/include \
+                         @CMAKE_SOURCE_DIR@/src/common \
+			 @CMAKE_SOURCE_DIR@/tests/gtests \
                          @CMAKE_SOURCE_DIR@/tests/gtests/in \
                          @CMAKE_SOURCE_DIR@/tests/gtests/gtest \
-                         @CMAKE_SOURCE_DIR@/include
 
 # You can use the INCLUDE_FILE_PATTERNS tag to specify one or more wildcard
 # patterns (like *.h and *.hpp) to filter out the header-files in the

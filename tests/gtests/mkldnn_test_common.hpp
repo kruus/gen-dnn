@@ -43,13 +43,13 @@
 #include "src/common/mkldnn_thread.hpp"
 #include "src/common/memory_desc_wrapper.hpp"
 #include "src/common/float16.hpp"
-#if !(defined(TARGET_VANILLA)
+#if !defined(TARGET_VANILLA)
 #include "src/common/bfloat16.hpp"
 #endif // !TARGET_VANILLA
 #include "src/common/nstl.hpp"
 
 using mkldnn::impl::f16_support::float16_t;
-#if !(defined(TARGET_VANILLA)
+#if !defined(TARGET_VANILLA)
 using mkldnn::impl::bfloat16_t;
 #endif // !TARGET_VANILLA
 

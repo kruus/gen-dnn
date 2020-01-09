@@ -4,10 +4,10 @@ ORIGINAL_CMD="$0 $*"
 DOTEST=0
 DODEBUG="n"
 DODOC="y"
-DOJUSTDOC="n"
+DOJUSTDOC=0
 DOWARN="y"
 BUILDOK="y"
-SIZE_T=32 # or 64, for -s or -S SX compile
+SIZE_T=64 # or 64, for -s or -S SX compile
 JOBS="-j8"
 CMAKETRACE=""
 USE_MKL="n" # _MKLDNN_USE_MKL is deprecated in v1.0, -M to try it anyway
@@ -18,10 +18,14 @@ NEC_FTRACE=0
 DOTARGET="x"
 VEJIT=0
 
-CPU_X86=0
-CPU_VE=1
-CPU_SX=2
+# see dnnl_config.h ...
+CPU_ANY=0
+CPU_X86=1
+CPU_VE=2
+CPU_SX=3
+#
 CPU=-1
+#old way (deprecate and use DNNL_TARGET
 JITFUNCS_VANILLA=6 # agree with src/cpu/cpu_isa_traits.cpp
 usage() {
     echo "$0 usage:"
@@ -92,8 +96,8 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMrC" arg; do
         d) # [no] debug release
             DODEBUG="y"
             ;;
-        D) # [no] Doxygen-only : build documentation and then stop
-            DOJUSTDOC="y"
+        D) # [no] Doxygen-only : build documentation and then stop, -DD for doc-full target)
+            DOJUSTDOC=$(( ${DOJUSTDOC} + 1 )); DOTARGET="invalid"
             ;;
         q) # quick: once, skip doxygen on OK build; twice, cd BUILDDIR && make
             QUICK=$((QUICK+1))
@@ -166,11 +170,19 @@ if [ "${DOTARGET}" == "g" ]; then
 elif [ "${DOTARGET}" == "j" ]; then
     CPU=$(( ${CPU_X86} * 10 + 5 )) # x86 + 5 is avx512 jit
 elif [ "${DOTARGET}" == "a" ]; then
-    CPU=$(( ${CPU_VE}  * 10 + 0 )) # 0 is none, 1 uses libvednn (jit?)
+    CPU=$(( ${CPU_VE}  * 10 + 0 )) # VE | 0 is none
+elif [ "${DOTARGET}" == "a" ]; then
+    CPU=$(( ${CPU_VE}  * 10 + 1 )) # VE | 1 uses libvednn (jit?)
 elif [ "${DOTARGET}" == "s" ]; then
     CPU=$(( ${CPU_SX} * 10 + 0 ))
+elif [ "${DOTARGET}" == "v" ]; then
+    # TARGET_VANILLA means "no x86 jit",
+    # so cpu determined by compiler and compile flags
+    CPU=-1
+elif [ ${DOJUSTDOC} -gt 0 ]; then
+    echo " JUST building doxygen docs"
 else
-    echo " ERROR: unknown cpu"
+    echo " ERROR: build.sh unknown cpu target : DOTARGET=${DOTARGET}"
     usage
 fi
 INSTALLDIR=install
@@ -194,7 +206,6 @@ BUILDDIR=build
 #
 if [ "$DOTARGET" == "s" ]; then DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx';
 elif [ "$DOTARGET" == "a" ]; then
- 
     if [ "$VEJIT" -gt 0 ]; then
         INSTALLDIR="${INSTALLDIR}-vej"; BUILDDIR="${BUILDDIR}-vej";
     fi
@@ -254,22 +265,49 @@ if [ $NEC_FTRACE -gt 0 ]; then BUILDDIR="${BUILDDIR}F"; fi
 if [ $USE_CBLAS -gt 0 ]; then BUILDDIR="${BUILDDIR}C"; fi
 if [ "$BUILDDIR_SUFFIX" ]; then BUILDDIR="${BUILDDIR}${BUILDDIR_SUFFIX}"; fi
 
-if [ "$DOJUSTDOC" == "y" ]; then
-    (
+if [ $DOJUSTDOC -gt 0 ]; then
+    if [ $DOJUSTDOC -eq 1 ]; then # old way Doxyfile
+        (
         if [ ! -d build ]; then mkdir build; fi
         if [ ! -f build/Doxyfile ]; then
             # doxygen does not much care HOW to build, just WHERE
-            (cd build && cmake -DCMAKE_INSTALL_PREFIX=../${INSTALL_DIR} -DFAIL_WITHOUT_MKL=OFF ..)
+            (cd build && cmake -DCMAKE_INSTALL_PREFIX=../${INSTALLDIR} -DFAIL_WITHOUT_MKL=OFF ..)
         fi
         echo "Doxygen (please be patient) logging to doxygen.log"
-        rm -rf build/doc*stamp build/reference "${INSTALL_DIR}/share/doc"
+        rm -rf build/doc*stamp build/reference "${INSTALLDIR}/share/doc"
         #cd build \
-        #&& make VERBOSE=1 doc \
-        #&& cmake -DCOMPONENT=doc -P cmake_install.cmake
-        cd build && make VERBOSE=1 install-doc # Doxygen.cmake custom target
-        echo "doxygen.log ends up in gen-dnn project root"
-        echo "Documentation installed under ${INSTALL_DIR}/share/doc/"
-    ) 2>&1 | tee ../doxygen.log
+            #&& make VERBOSE=1 doc \
+            #&& cmake -DCOMPONENT=doc -P cmake_install.cmake
+        (cd build && make VERBOSE=1 doc) # Doxygen.cmake custom target (not always available!)
+        echo " Documentation built in build/reference/"
+        echo " doxygen.log ends up in gen-dnn project root,"
+        # this target was remove in dnnl-v1.1 (or maybe earlier)
+        #(cd build && make VERBOSE=1 install-doc) # Doxygen.cmake custom target
+        #echo "Documentation installed under ${INSTALLDIR}/share/doc/"
+        ) 2>&1 | tee doxygen.log
+    else # full docs Doxyfile-cpu, via 'make doc-full' also documents internals
+        (
+        if [ ! -d build ]; then mkdir build; fi
+        if [ ! -f build/Doxyfile ]; then
+            # doxygen does not much care HOW to build, just WHERE
+            (cd build && cmake --trace -DCMAKE_INSTALL_PREFIX=../${INSTALLDIR} -DFAIL_WITHOUT_MKL=OFF ..)
+        fi
+        echo "Doxygen (please be patient) logging to doxygen.log"
+        rm -rf build/doc*stamp build/reference-full "${INSTALLDIR}/share/doc"
+        #cd build \
+            #&& make VERBOSE=1 doc \
+            #&& cmake -DCOMPONENT=doc -P cmake_install.cmake
+        (cd build && make VERBOSE=1 doc-full) # Doxygen.cmake custom target
+        echo " Documentation built in build/reference-full/"
+        echo " doxygen-full.log ends up in gen-dnn project root"
+        if [ -d build/reference-full ]; then
+            echo " copying to INSTALLDIR..."
+            mkdir -P ${INSTALLDIR}/share/doc
+            cp -uar build/reference-full ${INSTALLDIR}/share/doc/
+            echo " You may browse ${INSTALLDIR}/share/doc/reference-full/html/index.html"
+        fi
+        ) 2>&1 | tee ../doxygen.log
+    fi
     exit 0
 fi
 if [ $QUICK -gt 0 ]; then DODOC="n"; fi

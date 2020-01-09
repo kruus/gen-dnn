@@ -14,13 +14,33 @@
 * limitations under the License.
 *******************************************************************************/
 /** \file
- * handle various compiler/os retrictions \deprecated */
-#ifndef _MKLDNN_OS_H_
-#define _MKLDNN_OS_H_
+ * handle various compiler/os retrictions.
+ *
+ * - These provide OS workarounds
+ *   - libc pecularities,
+ * - and compiler workarounds
+ *   - like support for \e restrict or \e alignment
+ *   - and C++ OpenMP support pragmas.
+ *
+ * Note: These macros <B>do not</B> begin with "DNNL_", so this file is \b not
+ * really part of the public API.  It aids <EM>code readability</EM> by
+ * avoiding ugly \#if blocks.
+ *
+ * You can think of it as settings that are even more common than code in
+ * src/common, and it is \e public for re-use when access to the full set
+ * of <TT>src/common</TT> is perhaps not required.
+ *
+ * OpenMP C++ Pragma macros because different compilers and \c DNNL_CPU_JIT
+ * targets have widely varying degrees of OpenMP support.
+ *
+ * \todo Can ENABLE_OPT_PRAGMAS be replaced in dnnl_os.h by
+ * (DNNL_CPU_RUNTIME & DNNL_RUNTIME_SEQ)
+ */
+#ifndef DNNL_OS_H
+#define DNNL_OS_H
 
-#if 1
-#include "dnnl.h"
-#else // old code
+#include "dnnl_config.h"        // TODO use DNNL_TARGET_FOO conditionals
+// this also includes dnnl_types.h, so DNNL_RUNTIME_CPU build flags are available
 
 //#include "os_common.hpp" // not available -- we use mkldnn public API only.
 #if 1
@@ -55,9 +75,16 @@
 // ENABLE_OPT_PRAGMAS
 //    set to 0 to debug pragma-related incorrect assumptions
 #if !defined(ENABLE_OPT_PRAGMAS)
-//#warning "Unknown system: optimization pragmas NOT USED"
-//#define ENABLE_OPT_PRAGMAS 0/*XXX*/
-#define ENABLE_OPT_PRAGMAS 1
+/** new way to control OpenMP usage is via cmake DNNL_CPU_RUNTIME.
+ * Even if you ask for OpenMP, \ref dnnl_os.h must be aware of your compiler to
+ * generate the appropriate supported set of directives.
+ *
+ * \e vim note: adding '\\\\;' is an ugly kludge to avoid next-line indent
+ * after prefixing a for loop with an OpenMP macro.
+ */
+#define ENABLE_OPT_PRAGMAS (DNNL_CPU_RUNTIME & DNNL_RUNTIME_SEQ)
+//#define ENABLE_OPT_PRAGMAS 0 /* may help debug */
+//#define ENABLE_OPT_PRAGMAS 1 /* old default (auto-determine) */
 #endif
 
 // ENABLE_OMP defaults to 1
@@ -218,5 +245,6 @@
 #   warning "not enabling #pragma omp (mkldnn_os.h)"
 #endif
 #endif
-#endif // old code
-#endif // _MKLDNN_OS_H_
+
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+#endif // DNNL_OS_H

@@ -1967,8 +1967,20 @@ typedef const struct dnnl_stream *const_dnnl_stream_t;
 /// TBB runtime (CPU only)
 #define DNNL_RUNTIME_TBB 4u
 
+/// \todo cblas runtime will avoiding x86 jit gemm. replace old USE_CBLAS flag
+//#define DNNL_USE_CBLAS
+
+/// \todo use mkl gemm routines, replace old USE_MKL flag, implies DNNL_USE_CBLAS
+//#define DNNL_USE_MKL_GEMM
+
+/// \todo for DNNL_CPU_VE, DNNL_CPU_RUNTIME can allow libvednn calls (or jit?)
+//#define DNNL_LIBVEDNN
+
 /// OpenCL runtime
 #define DNNL_RUNTIME_OCL 256u
+
+/// should we use some system cblas (old way used USE_CBLAS)
+
 
 /// Structure containing version information as per [Semantic
 /// Versioning](https://semver.org)

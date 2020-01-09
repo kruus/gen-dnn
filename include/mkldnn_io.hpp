@@ -8,6 +8,9 @@
 #if ! MKLDNN_IO
 #error "mkldnn_io.h not available"
 #else
+
+#include "mkldnn_dnnl_mangling.h"
+
 //#include "mkldnn.h"
 #include "mkldnn_io.h"
 // You will likely need the following include in .cpp codes :

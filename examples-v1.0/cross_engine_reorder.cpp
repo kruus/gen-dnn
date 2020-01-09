@@ -18,84 +18,71 @@
 /// @copybrief cross_engine_reorder_cpp
 /// > Annotated version: @ref cross_engine_reorder_cpp
 
-#include <iostream>
-#include <sstream>
-
-/// @page cross_engine_reorder_cpp Getting started on GPU
-/// This C++ API example demonstrates programming for Intel(R) Processor
-/// Graphics with Intel(R) MKL-DNN.
+/// @page cross_engine_reorder_cpp Reorder between CPU and GPU engines
+/// This C++ API example demonstrates programming flow when reordering memory
+/// between CPU and GPU engines.
 ///
 /// > Example code: @ref cross_engine_reorder.cpp
 ///
-///   - How to create Intel MKL-DNN memory objects for both GPU and CPU.
-///   - How to get data from the user's buffer into an Intel MKL-DNN
-///     GPU memory object.
-///   - How to get results from an Intel MKL-DNN GPU memory object
-///     into the user's buffer.
-///   - How to create Intel MKL-DNN primitives on GPU.
-///   - How to execute the primitives on GPU.
-///
 /// @section cross_engine_reorder_cpp_headers Public headers
 ///
-/// To start using Intel MKL-DNN, we must first include the @ref mkldnn.hpp
-/// header file in the application. We also include @ref mkldnn_debug.h, which
+/// To start using DNNL, we must first include the @ref dnnl.hpp
+/// header file in the application. We also include @ref dnnl_debug.h, which
 /// contains some debugging facilities such as returning a string representation
-/// for common Intel MKL-DNN C types.
+/// for common DNNL C types.
 ///
-/// All C++ API types and functions reside in the `mkldnn` namespace.
+/// All C++ API types and functions reside in the `dnnl` namespace.
 /// For simplicity of the example we import this namespace.
 /// @page cross_engine_reorder_cpp
+
+#include <iostream>
+#include <numeric>
+#include <stdexcept>
+#include <vector>
+
 /// @snippet cross_engine_reorder.cpp Prologue
 // [Prologue]
-#include "mkldnn.hpp"
+#include "dnnl.hpp"
 
-// Optional header to access debug functions like `mkldnn_status2str()`
-#include "mkldnn_debug.h"
+#include "example_utils.hpp"
 
-using namespace mkldnn;
+using namespace dnnl;
 
 using namespace std;
 // [Prologue]
 
-size_t product(const memory::dims adims) {
-    size_t n_elems = 1;
-    for (size_t d = 0; d < adims.size(); ++d) {
-        n_elems *= (size_t)adims[d];
-    }
-    return n_elems;
+memory::dim product(const memory::dims &dims) {
+    return std::accumulate(dims.begin(), dims.end(), (memory::dim)1,
+            std::multiplies<memory::dim>());
 }
 
-void fill(const memory &mem, const memory::dims adims) {
-    float *array = mem.map_data<float>();
-
-    for (size_t e = 0; e < adims.size(); ++e) {
+void fill(memory &mem, const memory::dims &adims) {
+    std::vector<float> array(product(adims));
+    for (size_t e = 0; e < array.size(); ++e) {
         array[e] = e % 7 ? 1.0f : -1.0f;
     }
-
-    mem.unmap_data(array);
+    write_to_dnnl_memory(array.data(), mem);
 }
 
-int find_negative(const memory &mem, const memory::dims adims) {
+int find_negative(memory &mem, const memory::dims &adims) {
     int negs = 0;
-
-    float *array = mem.map_data<float>();
+    std::vector<float> array(product(adims));
+    read_from_dnnl_memory(array.data(), mem);
 
     for (size_t e = 0; e < adims.size(); ++e) {
         negs += array[e] < 0.0f;
     }
-
-    mem.unmap_data(array);
     return negs;
 }
 
 /// @page cross_engine_reorder_cpp
 /// @section cross_engine_reorder_cpp_tutorial cross_engine_reorder_tutorial() function
-/// @page cross_engine_reorder_cpp
+///
 void cross_engine_reorder_tutorial() {
     /// @page cross_engine_reorder_cpp
     /// @subsection cross_engine_reorder_cpp_sub1 Engine and stream
     ///
-    /// All Intel MKL-DNN primitives and memory objects are attached to a
+    /// All DNNL primitives and memory objects are attached to a
     /// particular @ref dnnl::engine, which is an abstraction of a
     /// computational device (see also @ref dev_guide_basic_concepts). The
     /// primitives are created and optimized for the device they are attached
@@ -125,7 +112,7 @@ void cross_engine_reorder_tutorial() {
     auto stream_gpu = stream(gpu_engine);
     // [Initialize stream]
 
-    /// @subsection cross_engine_reorder_cpp_sub2 Wrapping data into Intel MKL-DNN GPU memory object
+    /// @subsection cross_engine_reorder_cpp_sub2 Wrapping data into DNNL GPU memory object
     /// Fill the data in CPU memory first, and then move data from CPU to GPU
     /// memory by reorder.
     /// @snippet cross_engine_reorder.cpp reorder cpu2gpu
@@ -156,7 +143,7 @@ void cross_engine_reorder_tutorial() {
     ///    @ref dnnl::eltwise_forward::desc), which defines the operation
     ///    parameters including a GPU memory descriptor.
     /// 2. Create an operation primitive descriptor (here @ref
-    ///    mkldnn::eltwise_forward::primitive_desc) on a GPU engine, which is a
+    ///    dnnl::eltwise_forward::primitive_desc) on a GPU engine, which is a
     ///    **lightweight** descriptor of the actual algorithm that
     ///    **implements** the given operation.
     /// 3. Create a primitive (here @ref dnnl::eltwise_forward) that can be
@@ -182,7 +169,7 @@ void cross_engine_reorder_tutorial() {
     auto relu = eltwise_forward(relu_pd);
     // [Create a ReLU primitive]
 
-    /// @subsection cross_engine_reorder_cpp_sub4 Getting results from an Intel MKL-DNN GPU memory object
+    /// @subsection cross_engine_reorder_cpp_sub4 Getting results from a DNNL GPU memory object
     /// After the ReLU operation, users need to get data from GPU to CPU memory
     /// by reorder.
     /// @snippet cross_engine_reorder.cpp reorder gpu2cpu
@@ -214,17 +201,15 @@ void cross_engine_reorder_tutorial() {
     ///    All primitives are executed in the SAME GPU stream (the first
     ///    parameter of the `execute()` method).
     ///
-    /// Depending on the stream kind, an execution might be blocking or
-    /// non-blocking. This means that we need to call @ref
-    /// mkldnn::stream::wait before accessing the results.
+    /// Execution is asynchronous on GPU. This means that we need to call @ref
+    /// dnnl::stream::wait before accessing the results.
     ///
     /// @snippet cross_engine_reorder.cpp Execute primitives
     // [Execute primitives]
     // wrap source data from CPU to GPU
     r1.execute(stream_gpu, m_cpu, m_gpu);
     // Execute ReLU on a GPU stream
-    relu.execute(
-            stream_gpu, {{MKLDNN_ARG_SRC, m_gpu}, {MKLDNN_ARG_DST, m_gpu}});
+    relu.execute(stream_gpu, {{DNNL_ARG_SRC, m_gpu}, {DNNL_ARG_DST, m_gpu}});
     // Get result data from GPU to CPU
     r2.execute(stream_gpu, m_gpu, m_cpu);
 
@@ -239,52 +224,25 @@ void cross_engine_reorder_tutorial() {
     ///
     /// @snippet cross_engine_reorder.cpp Check the results
     // [Check the results]
-    if (find_negative(m_cpu, tz) != 0) {
-        std::stringstream ss;
-        ss << "Unexpected output, find a negative value after the ReLU "
-              "execution";
-        throw ss.str();
-    }
+    if (find_negative(m_cpu, tz) != 0)
+        throw std::logic_error(
+                "Unexpected output, find a negative value after the ReLU "
+                "execution.");
     // [Check the results]
 }
 
-/// @page cross_engine_reorder_cpp
-/// @section cross_engine_reorder_cpp_main main() function
-///
-/// We now just call everything we prepared earlier.
-///
-/// Since we are using the Intel MKL-DNN C++ API, we use exceptions to handle
-/// errors (see @ref dev_guide_c_and_cpp_apis).
-/// The Intel MKL-DNN C++ API throws exceptions of type @ref dnnl::error,
-/// which contains the error status (of type @ref mkldnn_status_t) and a
-/// human-readable error message accessible through regular `what()` method.
-/// @snippet cross_engine_reorder.cpp Main
-
-// [Main]
 int main(int argc, char **argv) {
-    try {
-        cross_engine_reorder_tutorial();
-    } catch (mkldnn::error &e) {
-        std::cerr << "Intel MKL-DNN error: " << e.what() << std::endl
-                  << "Error status: " << mkldnn_status2str(e.status)
-                  << std::endl;
-        return 1;
-    } catch (std::string &e) {
-        std::cerr << "Error in the example: " << e << std::endl;
-        return 2;
-    }
-
-    std::cout << "Example passes" << std::endl;
-    return 0;
+    return handle_example_errors({engine::kind::cpu, engine::kind::gpu},
+            cross_engine_reorder_tutorial);
 }
-// [Main]
 
+/// @page cross_engine_reorder_cpp
+///
 /// <b></b>
 ///
 /// Upon compiling and running the example, the output should be just:
 ///
 /// ~~~
-/// Example passes
+/// Example passed.
 /// ~~~
 ///
-/// @page cross_engine_reorder_cpp

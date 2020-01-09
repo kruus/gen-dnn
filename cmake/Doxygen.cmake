@@ -31,9 +31,17 @@ if(DOXYGEN_FOUND)
         ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
         @ONLY)
     configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/doc/Doxyfile-cpu.in
+        ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile-cpu
+        @ONLY)
+    configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/doc/header.html.in
         ${CMAKE_CURRENT_BINARY_DIR}/header.html
         @ONLY)
+    configure_file(
+        "${PROJECT_SOURCE_DIR}/include/dnnl_config.h.in" 
+        "${PROJECT_BINARY_DIR}/include/dnnl_config.h" 
+        )
     file(COPY
         ${CMAKE_CURRENT_SOURCE_DIR}/doc/footer.html
         DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
@@ -41,7 +49,10 @@ if(DOXYGEN_FOUND)
     file(GLOB_RECURSE HEADERS
         ${PROJECT_SOURCE_DIR}/include/*.h
         ${PROJECT_SOURCE_DIR}/include/*.hpp
+        ${PROJECT_BINARY_DIR}/include/*.h
+        ${PROJECT_BINARY_DIR}/include/*.hpp
         )
+    message(STATUS "DOXYGEN headers ${HEADERS}")
     file(GLOB_RECURSE DOX
         ${PROJECT_SOURCE_DIR}/doc/*
         )
@@ -57,6 +68,17 @@ if(DOXYGEN_FOUND)
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMENT "Generating API documentation with Doxygen" VERBATIM)
     add_custom_target(doc DEPENDS ${DOXYGEN_STAMP_FILE})
+
+    # variation: use Doxyfile-cpu to create detailed documentation
+    add_custom_command(
+        OUTPUT ${DOXYGEN_STAMP_FILE}-full
+        DEPENDS ${HEADERS} ${DOX} ${EXAMPLES}
+        COMMAND ${DOXYGEN_EXECUTABLE} Doxyfile-cpu
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/doc/assets ${DOXYGEN_OUTPUT_DIR}/html/assets
+        COMMAND ${CMAKE_COMMAND} -E touch ${DOXYGEN_STAMP_FILE}-full
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Generating full source documentation with Doxygen" VERBATIM)
+    add_custom_target(doc-full DEPENDS ${DOXYGEN_STAMP_FILE}-full)
 
     if(NOT DNNL_INSTALL_MODE STREQUAL "BUNDLE")
         install(
