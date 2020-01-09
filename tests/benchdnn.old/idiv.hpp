@@ -26,6 +26,7 @@
  * | div_floorx    | 15        | 40            | any n, any d!=0 |
  */
 constexpr int div_floor( int const n, int const d );
+
 /** Euclidean remainder for \c d> 0 returns \b\c r in [0,k)
  * st \c n \c =d*k+r for some int \c k. [\c k is div_floor(n,d)]. */
 constexpr int rem_floor( int const n, int const d );
@@ -33,6 +34,7 @@ constexpr int rem_floor( int const n, int const d );
 /** Truncate integer \c n / \c d \f$\forall d<0, \mathrm{any }n\f$ toward \f$-\infty\f$,
  * unchecked. */
 constexpr int div_floorn( int const n, int const d );
+
 /** For \c d<0, returns \c r in (d,0] st \c n \c =d*k+r. This is so
  * \f$n=d*\mathrm{div_{floor*}}(n,d) + \mathrm{rem_{floor*}}\f$ holds. */
 inline constexpr int rem_floorn( int const n, int const d );
@@ -41,9 +43,6 @@ inline constexpr int rem_floorn( int const n, int const d );
  * toward \f$-\infty\f$. About 15 branchless instrns on Intel w/ cmov. */
 constexpr int div_floorx( int const n, int const d );
 
-/** return d>0? rem_floor(n,d): rem_floorn(n,d). Returned remainder
- * is always in open range including zero until \c d, for +ve or -ve \c d. */
-inline constexpr int rem_floorx( int const n, int const d );
 
 // normal C99 and C++11 integer division works like this:
 static_assert(  5/3 == 1, "oops"); // mod:2

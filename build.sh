@@ -96,8 +96,8 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMrC" arg; do
         d) # [no] debug release
             DODEBUG="y"
             ;;
-        D) # [no] Doxygen-only : build documentation and then stop, -DD for doc-full target)
-            DOJUSTDOC=$(( ${DOJUSTDOC} + 1 )); DOTARGET="invalid"
+        D) # [no] Doxygen-only : make doc (or doc-full with -DD) and stop. -q will reuse build/
+            DOJUSTDOC=$(( DOJUSTDOC + 1 )); DOTARGET="invalid"
             ;;
         q) # quick: once, skip doxygen on OK build; twice, cd BUILDDIR && make
             QUICK=$((QUICK+1))
@@ -266,6 +266,8 @@ if [ $USE_CBLAS -gt 0 ]; then BUILDDIR="${BUILDDIR}C"; fi
 if [ "$BUILDDIR_SUFFIX" ]; then BUILDDIR="${BUILDDIR}${BUILDDIR_SUFFIX}"; fi
 
 if [ $DOJUSTDOC -gt 0 ]; then
+    echo "DOJUSTDOC = ${DOJUSTDOC}"
+    echo "QUICK     = ${QUICK}"
     if [ $DOJUSTDOC -eq 1 ]; then # old way Doxyfile
         (
         if [ ! -d build ]; then mkdir build; fi
@@ -274,26 +276,41 @@ if [ $DOJUSTDOC -gt 0 ]; then
             (cd build && cmake -DCMAKE_INSTALL_PREFIX=../${INSTALLDIR} -DFAIL_WITHOUT_MKL=OFF ..)
         fi
         echo "Doxygen (please be patient) logging to doxygen.log"
-        rm -rf build/doc*stamp build/reference "${INSTALLDIR}/share/doc"
+        rm -f build/doc*stamp
+        if [ $QUICK -le 0 ]; then
+            rm -rf build/reference "${INSTALLDIR}/share/doc"
+        fi
         #cd build \
             #&& make VERBOSE=1 doc \
             #&& cmake -DCOMPONENT=doc -P cmake_install.cmake
         (cd build && make VERBOSE=1 doc) # Doxygen.cmake custom target (not always available!)
         echo " Documentation built in build/reference/"
         echo " doxygen.log ends up in gen-dnn project root,"
-        # this target was remove in dnnl-v1.1 (or maybe earlier)
+        # ... install-doc target was remove in dnnl-v1.1 (or maybe earlier)
+        #     can the cmake doc-full get additional docs from sub-cmakes ?
         #(cd build && make VERBOSE=1 install-doc) # Doxygen.cmake custom target
         #echo "Documentation installed under ${INSTALLDIR}/share/doc/"
+        #  ... so just copy manually ...
+        if [ -d build/reference ]; then
+            echo " copying to INSTALLDIR..."
+            mkdir --parents ${INSTALLDIR}/share/doc
+            cp -uar build/reference ${INSTALLDIR}/share/doc/
+            echo " You may browse API docs at"
+            echo "    ${INSTALLDIR}/share/doc/reference/html/index.html"
+        fi
         ) 2>&1 | tee doxygen.log
     else # full docs Doxyfile-cpu, via 'make doc-full' also documents internals
         (
         if [ ! -d build ]; then mkdir build; fi
         if [ ! -f build/Doxyfile ]; then
             # doxygen does not much care HOW to build, just WHERE
-            (cd build && cmake --trace -DCMAKE_INSTALL_PREFIX=../${INSTALLDIR} -DFAIL_WITHOUT_MKL=OFF ..)
+            (cd build && cmake -DCMAKE_INSTALL_PREFIX=../${INSTALLDIR} -DFAIL_WITHOUT_MKL=OFF ..)
         fi
-        echo "Doxygen (please be patient) logging to doxygen.log"
-        rm -rf build/doc*stamp build/reference-full "${INSTALLDIR}/share/doc"
+        echo "Doxygen (please be patient) logging to doxygen-full.log"
+        rm -f build/doc*stamp-full
+        if [ $QUICK -le 0 ]; then
+            rm -rf build/reference-full "${INSTALLDIR}/share/doc"
+        fi
         #cd build \
             #&& make VERBOSE=1 doc \
             #&& cmake -DCOMPONENT=doc -P cmake_install.cmake
@@ -302,11 +319,12 @@ if [ $DOJUSTDOC -gt 0 ]; then
         echo " doxygen-full.log ends up in gen-dnn project root"
         if [ -d build/reference-full ]; then
             echo " copying to INSTALLDIR..."
-            mkdir -P ${INSTALLDIR}/share/doc
+            mkdir --parents ${INSTALLDIR}/share/doc
             cp -uar build/reference-full ${INSTALLDIR}/share/doc/
-            echo " You may browse ${INSTALLDIR}/share/doc/reference-full/html/index.html"
+            echo " You may browse API docs at"
+            echo "    ${INSTALLDIR}/share/doc/reference-full/html/index.html"
         fi
-        ) 2>&1 | tee ../doxygen.log
+        ) 2>&1 | tee ../doxygen-full.log
     fi
     exit 0
 fi

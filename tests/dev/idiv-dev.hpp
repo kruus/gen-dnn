@@ -5,30 +5,68 @@
 #ifndef IDIV_HPP
 #define IDIV_HPP
 
+/** choose idiv branch vs branchless impl.
+ *
+ * I might suggest 2 versions, branchless and 1-branch, you will have to time
+ * to see which one is fastest.
+ * A branching impl may work better because inner loop limits vary smoothly and
+ * should be pretty predictable -- they only take an alternate branch when \em
+ * something changes sign!
+ *
+ * Of course the other common usage is to determine exactly a range of for-loop
+ * indices for which a linear function (that might have negative output values)
+ * has values lying in known target range.
+ * 
+ * In this case, you remove the branch from the loop and just change the loop
+ * indices -- guaranteeing that the linear function has values in the correct
+ * range.
+ */
+#define IDIV_BRANCHLESS 0
+
 // fwd decl
 
 /** Truncate integer \c n / \c d \f$\forall n, d>0\f$ toward \f$-\infty\f$,
- * unchecked. About 8 branchless instrns on Intel w/ cmov. */
+ * unchecked. About 8 branchless instrns on Intel w/ cmov.
+ * \return \c k s.t. \c n=k*d+r for some int \c k with \c r in [0,d).
+ * \pre \f$d>0\f$ (unchecked)
+ */
 
 constexpr int div_floor( int const n, int const d );
 
-/** Truncate integer \c n / \c d \f$\forall n, d<0\f$ toward \f$-\infty\f$,
- * unchecked. About 8 branchless instrns on Intel w/ cmov. */
-
+/** Truncate integer \c n / \c d \f$\forall n, d<0\f$ toward \f$-\infty\f$.
+ * About 8 branchless instrns on Intel w/ cmov.
+ * \return \c k s.t. \c n=k*d+r for some int \c k with \c r in [0,d).
+ * \pre \f$d<0\f$ (unchecked)
+ */
 constexpr int div_floorn( int const n, int const d );
 
-/** Truncate integer \c n / \c d (any signs) \f$\forall n, d!=0\f$
- * toward \f$-\infty\f$. About 15 branchless instrns on Intel w/ cmov. */
-
+/** Truncate integer \c n / \c d \f$\forall n, d!=0\f$ toward \f$-\infty\f$.
+ * About 15 branchless instrns on Intel w/ cmov.
+ * \return \c k s.t. \c n=k*d+r for some int \c k with \c r in [0,d).
+ * \pre d!=0 (unchecked)
+ */
 inline constexpr int div_floorx( int const n, int const d );
 
-/** I suggest 2 versions, branchless and 1-branch, you will have
- * to time to see which one is fastest.  A branching impl may work
- * better because inner loop limits vary smoothly and should be
- * pretty predictable -- they only take an alternate branch when
- * \em something changes sign!
+/** Euclidean remainder \f$\forall n, d>0\f$ after rounding \c n/d
+ * toward \f$-infty\f$. i
+ * \return \c r s.t. \c n=k*d+r for some int \c k with \c r in [0,d).
+ * \pre \f$d>0\f$ (unchecked)
  */
-#define IDIV_BRANCHLESS 0
+constexpr int rem_floor( int const n, int const d );
+
+/** Euclidean remainder \f$\forall n, d<0\f$ after rounding \c n/d
+ * toward \f$-infty\f$.
+ * \return \c r s.t. \c n=k*d+r for some int \c k with \c r in [0,d).
+ * \pre \f$d<0\f$ (unchecked)
+ */
+constexpr int rem_floorn( int const n, int const d );
+
+/** Euclidean remainder \f$\forall n, d!=0\f$ after rounding \c n/d
+ * toward \f$-infty\f$.
+ * \return \c r s.t. \c n=k*d+r for some int \c k with \c r in [0,d).
+ * \pre \f$d!=0\f$ (unchecked)
+ */
+constexpr int rem_floorx( int const n, int const d );
 
 // normal C99 and C++11 integer division works like this:
 static_assert(  5/3 == 1, "oops"); // mod:2
@@ -83,8 +121,7 @@ static_assert( -4%-3 ==-1, "oops");
  * always truncate the division downward,
  * towards \f$-\infty\f$.  This happens when we deal with
  * integer.
- * \pre d > 0 (unchecked)
- * \note This fast case often applies to strided "forward"
+ * \note This fast case often applies to positive-strided "forward"
  *       index calculations.  Any-valued strides should use
  *       \c div_floorx. Negative strides can use \c div_floorn.
  */
@@ -228,9 +265,25 @@ inline constexpr int rem_floor( int const n, int const d )
     return n - d*div_floor(n,d); // has Multiply
 #endif
 }
+#define DIVREM(n,d) \
+static_assert( rem_floor(n,d) >=0 && rem_floor(n,d) < d, "Oops " #n " " #d); \
+static_assert( n == d*div_floor(n,d) + rem_floor(n,d),   "Oops " #n " " #d )
+DIVREM( 5,3); // 2
+DIVREM( 4,3); // 1
+DIVREM( 3,3); // 0
+DIVREM( 2,3); // 2
+DIVREM( 1,3); // 1
+DIVREM( 0,3); // 0
+DIVREM(-1,3); // 2
+DIVREM(-2,3); // 1
+DIVREM(-3,3); // 0
+DIVREM(-4,3); // 2
+DIVREM(-5,3); // 1
+DIVREM( 2000444000,1);
+DIVREM(-2000444000,1);
+
 /** Truncate integer \c n / \c d \f$\forall n, d<0\f$
  * toward \f$-\infty\f$.
- * \pre d != 0 (unchecked)
  */
 inline constexpr int div_floorn( int const n, int const d )
 {
@@ -438,8 +491,23 @@ static_assert( div_floorn( 4,-3) == -2, "oops");
 static_assert( div_floorn( 5,-3) == -2, "oops");
 static_assert( div_floorn( 6,-3) == -2, "oops");
 static_assert( div_floorn( 7,-3) == -3, "oops");
-/** \return non-positive r in (d,0] st n=d*k+r for some integer k
- * \pre d<0 (unchecked) */
+#define DIVREMn(n,d) \
+static_assert( rem_floorn(n,d) <= 0 && rem_floorn(n,d) > d,  "Oops " #n " " #d ); \
+static_assert( n == d*div_floorn(n,d) + rem_floorn(n,d),   "Oops " #n " " #d )
+DIVREMn( 5,-3); // div_floor(5,-3)=-2, 5-(-3)*(-2) = -1
+DIVREMn( 4,-3); // 4-(-3)*(-2) = -2
+DIVREMn( 3,-3); // 3-(-3)*(-1) = 0
+DIVREMn( 2,-3); // 2-(-3)*(-1) = -1
+DIVREMn( 1,-3); // 1-(-3)*(-1) = -2
+DIVREMn( 0,-3); // 0-(-3)*( 0) = 0
+DIVREMn(-1,-3); // 1-(-3)*( 0) = -1
+DIVREMn(-2,-3); // 2-(-3)*( 0) = -2
+DIVREMn(-3,-3); // 3-(-3)*(-1) = 0
+DIVREMn(-4,-3);
+DIVREMn(-5,-3);
+DIVREMn( 2000444000,-1);
+DIVREMn(-2000444000,-1);
+
 inline constexpr int rem_floorn( int const n, int const d )
 {
 #if 0
@@ -528,10 +596,8 @@ inline constexpr int div_floorx_diffsign2( int const a, int const b ){
     //return ( ((a^b)>>31) & (a!=0) );    // ret is 0/1
     return (a!=0) & ((a^b)>>31);    // ret is 0/1
 }
-/** Truncate integer \c n / \c d (any signs) \f$\forall n, d!=0\f$
- * toward \f$-\infty\f$.
- * \pre d != 0 (unchecked)
- */
+
+
 inline constexpr int div_floorx( int const n, int const d )
 {
 #if 1 // remainder-based
@@ -827,10 +893,10 @@ static_assert( div_floorx(-6,-3) ==  2, "oops");
 
 inline constexpr int rem_floorx( int const n, int const d )
 {
+#if 0
     //return n - d*div_floor(n,d); // correct, but not so good (has Multiply)
     //return d>0? rem_floor(n,d): rem_floorn(n,d);
     //return d<0? rem_floorn(n,d): rem_floor(n,d);
-#if 0
   80:	89 f8                	mov    %edi,%eax
   82:	99                   	cltd   
   83:	f7 fe                	idiv   %esi
@@ -864,12 +930,11 @@ inline constexpr int rem_floorx( int const n, int const d )
   9f:	0f 4e f0             	cmovle %eax,%esi
   a2:	8d 04 32             	lea    (%rdx,%rsi,1),%eax
   a5:	c3                   	retq   
-#endif
+#elif 0
     //return d<0? //rem_floorn(n,d)
     //    n%d + (d & (n%d>0? ~0: 0))
     //    : //rem_floor(n,d);
     //    n%d + (d & (n%d<0? ~0: 0) );
-#if 0
     return n%d + (d & (d<0? (n%d>0? ~0: 0): (n%d<0? ~0: 0)));
 0000000000000080 <test_rem_floorx(int, int)>:
   80:	89 f8                	mov    %edi,%eax
@@ -890,8 +955,7 @@ inline constexpr int rem_floorx( int const n, int const d )
   a1:	21 c6                	and    %eax,%esi
   a3:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
   a6:	c3                   	retq   
-#endif
-#if 1
+#elif 0
     //return n%d + (d & (d<0? (n%d>0? ~0: 0): (n%d<0? ~0: 0)));
     // same return n%d + (d & (d<0? (n%d>0? ~(1-(d<0)): 1-(d<0)): (n%d<0? ~(d<0): (d<0))));
     //return n%d + (d & ( d<0?
@@ -904,6 +968,7 @@ inline constexpr int rem_floorx( int const n, int const d )
     //return n%d + (d & ( ((d<0) && (n%d>0) || ((d>0) && (n%d<0)) ? ~0 : 0))); // longer
     //return n%d + (d & ( ((d>>31)&&(n%d>0) || ((d>0)&&(n%d>>31)) ? ~0 : 0))); // longer
     // ?? return n%d + (d & ( ((d^(n%d)>>31)!=0) || ((d>0)&&(n%d>>31)) ? ~0 : 0));
+#else
     return n%d + (d & ( diffsign(n%d,d/*!=0*/) ? ~0 : 0));
     /* 0000000000000090 <test_rem_floorx(int, int)>:
 90:	89 f8                	mov    %edi,%eax
@@ -939,6 +1004,7 @@ ab:	c3                   	retq
      */
 #endif
 }
+/// @cond DOXYGEN_SHOULD_SKIP_THIS
 #ifdef TEST_MAIN
 #include <iostream>
 #include <cstdlib>  // atoi
@@ -1038,5 +1104,6 @@ int main(int argc, char** argv){
 #endif
 }
 #endif // TEST_MAIN
+/// @endcond
 // vim: et ts=4 sw=4 cindent nopaste ai cino=^=l0,\:0,N-s
 #endif //IDIV_HPP

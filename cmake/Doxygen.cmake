@@ -74,7 +74,7 @@ if(DOXYGEN_FOUND)
         OUTPUT ${DOXYGEN_STAMP_FILE}-full
         DEPENDS ${HEADERS} ${DOX} ${EXAMPLES}
         COMMAND ${DOXYGEN_EXECUTABLE} Doxyfile-cpu
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/doc/assets ${DOXYGEN_OUTPUT_DIR}/html/assets
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/doc/assets ${DOXYGEN_OUTPUT_DIR}-full/html/assets
         COMMAND ${CMAKE_COMMAND} -E touch ${DOXYGEN_STAMP_FILE}-full
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         COMMENT "Generating full source documentation with Doxygen" VERBATIM)
