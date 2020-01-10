@@ -1,6 +1,8 @@
 /** \file
  * Fast integer division, rounding toward -ve infinity.
  * If it compiles, the functions are correct (static assertions).
+ * \note should develop a version that calculates both Euclidean integer
+ *       division and the remainder (both div_floor\* and rem_floor\*).
  */
 #ifndef IDIV_HPP
 #define IDIV_HPP
@@ -25,92 +27,49 @@
 
 // fwd decl
 
-/** Truncate integer \c n / \c d \f$\forall n, d>0\f$ toward \f$-\infty\f$,
+/** Truncate integer \c n/d \f$\forall n, d>0\f$ toward \f$-\infty\f$,
  * unchecked. About 8 branchless instrns on Intel w/ cmov.
- * \return \c k s.t. \c n=k*d+r for some int \c k with \c r in [0,d).
+ * \return \c k s.t. \c n=k*d+r for some int \c k with \c r in [0,d)
  * \pre \f$d>0\f$ (unchecked)
  */
-
 constexpr int div_floor( int const n, int const d );
 
-/** Truncate integer \c n / \c d \f$\forall n, d<0\f$ toward \f$-\infty\f$.
- * About 8 branchless instrns on Intel w/ cmov.
- * \return \c k s.t. \c n=k*d+r for some int \c k with \c r in [0,d).
+/** Truncate integer \c n/d \f$\forall n, d<0\f$ toward \f$-\infty\f$,
+ * unchecked. About 8 branchless instrns on Intel w/ cmov.
+ * \return \c k s.t. \c n=k*d+r for some int \c k with \c r in (d,0]
  * \pre \f$d<0\f$ (unchecked)
  */
 constexpr int div_floorn( int const n, int const d );
 
-/** Truncate integer \c n / \c d \f$\forall n, d!=0\f$ toward \f$-\infty\f$.
- * About 15 branchless instrns on Intel w/ cmov.
- * \return \c k s.t. \c n=k*d+r for some int \c k with \c r in [0,d).
+/** Truncate integer \c n/d \f$\forall n, d!=0\f$ toward \f$-\infty\f$,
+ * unchecked. About 15 branchless instrns on Intel w/ cmov.
+ * \return \c k s.t. \c n=k*d+r for some int \c k with \c r toward 0 from \c d
  * \pre d!=0 (unchecked)
  */
-inline constexpr int div_floorx( int const n, int const d );
+constexpr int div_floorx( int const n, int const d );
 
-/** Euclidean remainder \f$\forall n, d>0\f$ after rounding \c n/d
- * toward \f$-infty\f$. i
- * \return \c r s.t. \c n=k*d+r for some int \c k with \c r in [0,d).
+/** \f$\forall n, d>0\f$, Euclidean remainder in [0,d) after rounding \c n/d
+ * toward \f$-\infty\f$, unchecked.
+ * \return \c r s.t. \c n=k*d+r for some int \c k with \c r in [0,d)
  * \pre \f$d>0\f$ (unchecked)
  */
 constexpr int rem_floor( int const n, int const d );
 
-/** Euclidean remainder \f$\forall n, d<0\f$ after rounding \c n/d
- * toward \f$-infty\f$.
- * \return \c r s.t. \c n=k*d+r for some int \c k with \c r in [0,d).
+/** \f$\forall n, d<0\f$, Euclidean remainder in [0,d) after rounding \c n/d
+ * toward \f$-\infty\f$, unchecked.
+ * \return \c r s.t. \c n=k*d+r for some int \c k with \c r in (d,0]
  * \pre \f$d<0\f$ (unchecked)
  */
-constexpr int rem_floorn( int const n, int const d );
+inline constexpr int rem_floorn( int const n, int const d );
 
-/** Euclidean remainder \f$\forall n, d!=0\f$ after rounding \c n/d
- * toward \f$-infty\f$.
- * \return \c r s.t. \c n=k*d+r for some int \c k with \c r in [0,d).
+/** \f$\forall n, d!=0\f$, Euclidean remainder in (d,0] after rounding \c n/d
+ * toward \f$-\infty\f$, unchecked.
+ * \return \c r s.t. \c n=k*d+r for some int \c k with \c r toward zero from \c d
  * \pre \f$d!=0\f$ (unchecked)
  */
 constexpr int rem_floorx( int const n, int const d );
 
-// normal C99 and C++11 integer division works like this:
-static_assert(  5/3 == 1, "oops"); // mod:2
-static_assert(  4/3 == 1, "oops"); // mod:1
-static_assert(  3/3 == 1, "oops"); // mod:0
-static_assert(  2/3 == 0, "oops"); // mod:2
-static_assert(  1/3 == 0, "oops"); // mod:1
-static_assert(  0/3 == 0, "oops"); // mod:0
-static_assert( -1/3 == 0, "oops"); // want "-1", mod:-1 
-static_assert( -2/3 == 0, "oops"); // want "-1", mod:-2
-static_assert( -3/3 ==-1, "oops"); // want "-1", mod:0  OK
-static_assert( -4/3 ==-1, "oops"); // want "-2", mod:-1
-
-static_assert(  5/-3 ==-1, "oops"); // mod:2  want: -2
-static_assert(  4/-3 ==-1, "oops"); // mod:1  want: -2
-static_assert(  3/-3 ==-1, "oops"); // mod:0  want: -1 (OK)
-static_assert(  2/-3 == 0, "oops"); // mod:2  want: -1
-static_assert(  1/-3 == 0, "oops"); // mod:1  want: -1
-static_assert(  0/-3 == 0, "oops"); // mod:0  want: 0
-static_assert( -1/-3 == 0, "oops"); // mod:-1 want: 0 (OK)
-static_assert( -2/-3 == 0, "oops"); // mod:-2 want: 0 (OK)
-static_assert( -3/-3 == 1, "oops"); // mod:0  want: 1 (OK)
-static_assert( -4/-3 == 1, "oops"); // mod:-1 want: 1 (OK)
-// and modulus...
-static_assert(  5%3 == 2, "oops");
-static_assert(  4%3 == 1, "oops");
-static_assert(  3%3 == 0, "oops");
-static_assert(  2%3 == 2, "oops");
-static_assert(  1%3 == 1, "oops");
-static_assert(  0%3 == 0, "oops");
-static_assert( -1%3 ==-1, "oops"); // -1/3*3 + X = -1 --> X = -1 - (0)
-static_assert( -2%3 ==-2, "oops");
-static_assert( -3%3 == 0, "oops");
-static_assert(  5%-3 == 2, "oops");
-static_assert(  4%-3 == 1, "oops");
-static_assert(  3%-3 == 0, "oops");
-static_assert(  2%-3 == 2, "oops");
-static_assert(  1%-3 == 1, "oops");
-static_assert(  0%-3 == 0, "oops");
-static_assert( -1%-3 ==-1, "oops");
-static_assert( -2%-3 ==-2, "oops");
-static_assert( -3%-3 == 0, "oops");
-static_assert( -4%-3 ==-1, "oops");
-/** Truncate integer \c n / \c d \f$\forall n, d>0\f$ toward \f$-\infty\f$.
+/** 
  * In C99 and C++11 integer division always truncates -ves toward 0.
  * so:
  *         5/3=1,     4/3=1,   3/3=1
@@ -127,7 +86,7 @@ static_assert( -4%-3 ==-1, "oops");
  */
 inline constexpr int div_floor( int const n, int const d )
 {
-#if 1 // remainder-based
+#if 1 // orig, remainder-based
     //return (n>=0? n/d: n/d - (n%d!=0));       // branch, 2 rets
     //return (n>=0? n/d: n/d - (n%d<0?1:0));    // branch, 2 ret, a bit better
     //return (n>=0? n/d: n/d - (n%d<0));          // equiv
@@ -142,13 +101,24 @@ inline constexpr int div_floor( int const n, int const d )
 a:	c3                   	retq   
      */
 #elif 0
-#if ! IDIV_BRANCHLESS
     // Method: -1-->3? -2-->4? -3-->5?
     //   -1/3 --> (3-(-1)-1)=3 --> -(3/3)=-1
     //   -2/3 --> (3-(-2)-1)=4 --> -(4/3)=-1
     //   -3/3 --> (3-(-3)-1)=5 --> -(5/3)=-1
     //   -4/3 --> (3-(-4)-1)=6 --> -(5/3)=-2
     //return (n<0? -((d-n-1)/d): n/d);
+    //return (n<0? -((d-n-1)): n)    / d;
+    return (n<0? n-d+1: n)    / d;
+    //0000000000000010 <test_div_floor(int, int)>:
+    //  10:	89 f8                	mov    %edi,%eax
+    //  12:	85 ff                	test   %edi,%edi
+    //  14:	79 05                	jns    1b <test_div_floor(int, int)+0xb>
+    //  16:	29 f0                	sub    %esi,%eax
+    //  18:	83 c0 01             	add    $0x1,%eax
+    //  1b:	99                   	cltd   
+    //  1c:	f7 fe                	idiv   %esi
+    //  1e:	c3                   	retq   
+    //return  (n - (n<0? d-1: 0))    / d; longer branchless
 
     // Alt Method:
     //  -1/3 --> -3/3, -2/3 --> -4/3, etc.
@@ -161,20 +131,20 @@ a:	c3                   	retq
     //return (n + (n<0) * (-d+(n<0))) / d;
     //return (n + (n<0) * (-d) + (n<0)) / d;
     //return (n + (n<0) - (n<0) * (d)) / d;
+    //0000000000000010 <test_div_floor(int, int)>:
+    //  10:	89 fa                	mov    %edi,%edx
+    //  12:	c1 ea 1f             	shr    $0x1f,%edx
+    //  15:	8d 04 17             	lea    (%rdi,%rdx,1),%eax
+    //  18:	0f af d6             	imul   %esi,%edx
+    //  1b:	29 d0                	sub    %edx,%eax
+    //  1d:	99                   	cltd   
+    //  1e:	f7 fe                	idiv   %esi
+    //  20:	c3                   	retq   
     //
     // now back to a (shorter) branch
-    return (n + ((n>=0)? 0: 1-d)) / d;
-    //   xorl	%eax, %eax
-    //   testl	%edi, %edi
-    //   jns	.L2
-    //   movl	$1, %eax
-    //   subl	%esi, %eax
-    // .L2: 
-    //   addl	%edi, %eax
-    //   cltd
-    //   idivl	%esi
-    //
-#else // IDIV_BRANCHLESS
+    //return (n + ((n>=0)? 0: 1-d)) / d; // same as remainder-based
+
+#elif 0 // IDIV_BRANCHLESS
     // ... YAHOO ... this is branchless (via cmov op) and short
     return (n + (n<0) - (n<0? d: n<0)) / d;
     // movl	%edi, %edx
@@ -185,8 +155,7 @@ a:	c3                   	retq
 	// subl	%edx, %eax
 	// cltd
 	// idivl	%esi
-#endif // IDIV_BRANCHLESS
-#else // try some bit twiddle approaches
+#elif 0 // try some bit twiddle approaches
     //return (n-rem_floor(n,d)) / d; // not so nice
     //return (n + (n<0) - (n<0? d: 0)) / d;
     //return (n + (n<0) - (d & (n<0? ~0: 0))) / d; // longer
@@ -216,24 +185,25 @@ e:	01 f8                	add    %edi,%eax
      */
 #endif
 }
-static_assert( div_floor( 5,3) ==  1, "oops");
-static_assert( div_floor( 4,3) ==  1, "oops");
-static_assert( div_floor( 3,3) ==  1, "oops");
-static_assert( div_floor( 2,3) ==  0, "oops");
-static_assert( div_floor( 1,3) ==  0, "oops");
-static_assert( div_floor( 0,3) ==  0, "oops");
-static_assert( div_floor(-1,3) == -1, "oops");
-static_assert( div_floor(-2,3) == -1, "oops");
-static_assert( div_floor(-3,3) == -1, "oops");
-static_assert( div_floor(-4,3) == -2, "oops");
-static_assert( div_floor(-5,3) == -2, "oops");
 inline constexpr int rem_floor( int const n, int const d )
 {
 #if 1 // I think this one is totally portable, and code is identical to next
-    return (n%d + (d & (n%d<0? ~0: 0) ));
-#elif ~(-1) == 0 /* best code, without numeric_limits */
+    //return (n%d + (d & (n%d<0? ~0: 0) ));
+    return n%d + (d & (n%d)>>31 );
+    //return (n%d + (d & ((+(n%d)) >> 31 ) ));     // equiv
+    //return n%d + (d & ((+(n%d))>>31) );
+    //0000000000000020 <test_rem_floor(int, int)>:
+    //  20:	89 f8                	mov    %edi,%eax
+    //  22:	99                   	cltd   
+    //  23:	f7 fe                	idiv   %esi
+    //  25:	89 d0                	mov    %edx,%eax
+    //  27:	c1 f8 1f             	sar    $0x1f,%eax
+    //  2a:	21 c6                	and    %eax,%esi
+    //  2c:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
+    //  2f:	c3                   	retq   
+#elif 0 /* best code, without numeric_limits */
     // only assumes 2-s complement
-    //return (n%d +   (d & (-(n%d<0)        ) ));
+    return (n%d +   (d & (-(n%d<0)        ) ));
     //return (n%d + (d & (n%d<0? 0xFFffFFff: 0) )); // test!
     /* 0000000000000010 <test_rem_floor(int, int)>:
 10:	89 f8                	mov    %edi,%eax
@@ -245,12 +215,14 @@ inline constexpr int rem_floor( int const n, int const d )
 1c:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
 1f:	c3                   	retq   
      */
-#elif -1 >> 1 == -1 /* have signed arithmetic shift? */
+#elif 0 /* have signed arithmetic shift? */
     // same code as above
     return n%d + ((n%d>>(std::numeric_limits<int>::digits)) & d);
     // (also OK with    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ bits-1)
 #elif 1 /* instructive, fall-back only */
+    //return n%d + ((n%d<0? d: 0)); // generates a cmov
     return n%d + ((n%d<0? d: 0)); // generates a cmov
+    //return n%d + ((n%d^d)<0? d: 0); // generates a cmov
     /* 0000000000000010 <test_rem_floor(int, int)>:
 10:	89 f8                	mov    %edi,%eax
 12:	99                   	cltd   
@@ -265,26 +237,51 @@ inline constexpr int rem_floor( int const n, int const d )
     return n - d*div_floor(n,d); // has Multiply
 #endif
 }
+/// @cond DOXYGEN_SHOULD_SKIP_THIS
+static_assert( rem_floor( 5,3) ==  2, "oops");
+static_assert( rem_floor( 4,3) ==  1, "oops");
+static_assert( rem_floor( 3,3) ==  0, "oops");
+static_assert( rem_floor( 2,3) ==  2, "oops");
+static_assert( rem_floor( 1,3) ==  1, "oops");
+static_assert( rem_floor( 0,3) ==  0, "oops");
+static_assert( rem_floor(-1,3) ==  2, "oops");
+static_assert( rem_floor(-2,3) ==  1, "oops");
+static_assert( rem_floor(-3,3) ==  0, "oops");
+static_assert( rem_floor(-4,3) ==  2, "oops");
+static_assert( rem_floor(-5,3) ==  1, "oops");
+static_assert( div_floor( 5,3) ==  1, "oops");
+static_assert( div_floor( 4,3) ==  1, "oops");
+static_assert( div_floor( 3,3) ==  1, "oops");
+static_assert( div_floor( 2,3) ==  0, "oops");
+static_assert( div_floor( 1,3) ==  0, "oops");
+static_assert( div_floor( 0,3) ==  0, "oops");
+static_assert( div_floor(-1,3) == -1, "oops");
+static_assert( div_floor(-2,3) == -1, "oops");
+static_assert( div_floor(-3,3) == -1, "oops");
+static_assert( div_floor(-4,3) == -2, "oops");
+static_assert( div_floor(-5,3) == -2, "oops");
+
 #define DIVREM(n,d) \
-static_assert( rem_floor(n,d) >=0 && rem_floor(n,d) < d, "Oops " #n " " #d); \
+static_assert( rem_floor(n,d) >=0, "Oops " #n " " #d); \
+static_assert( rem_floor(n,d) < d, "Oops " #n " " #d); \
 static_assert( n == d*div_floor(n,d) + rem_floor(n,d),   "Oops " #n " " #d )
-DIVREM( 5,3); // 2
-DIVREM( 4,3); // 1
-DIVREM( 3,3); // 0
-DIVREM( 2,3); // 2
-DIVREM( 1,3); // 1
-DIVREM( 0,3); // 0
-DIVREM(-1,3); // 2
-DIVREM(-2,3); // 1
-DIVREM(-3,3); // 0
-DIVREM(-4,3); // 2
-DIVREM(-5,3); // 1
+// n/d :    r=rem_floor   k=div_floor
+//                r =  n - d * k
+DIVREM( 5,3); //  2 =  5 - 3*( 1)
+DIVREM( 4,3); //  1 =  4 - 3*( 1) 
+DIVREM( 3,3); //  0 =  3 - 3*( 1)
+DIVREM( 2,3); //  2 =  2 - 3*( 0)
+DIVREM( 1,3); //  1 =  1 - 3*( 0)
+DIVREM( 0,3); //  0 =  0 - 3*( 0)
+DIVREM(-1,3); //  2 = -1 - 3*(-1)
+DIVREM(-2,3); //  1 = -2 - 3*(-1)
+DIVREM(-3,3); //  0 = -3 - 3*(-1)
+DIVREM(-4,3); //  2 = -4 - 3*(-2)
+DIVREM(-5,3); //  1 = -5 - 3*(-2)
 DIVREM( 2000444000,1);
 DIVREM(-2000444000,1);
+/// @endcond
 
-/** Truncate integer \c n / \c d \f$\forall n, d<0\f$
- * toward \f$-\infty\f$.
- */
 inline constexpr int div_floorn( int const n, int const d )
 {
 #if 1 // remainder-based correction
@@ -477,40 +474,14 @@ inline constexpr int div_floorn( int const n, int const d )
 #endif // IDIV_BRANCHLESS
 
 }
-static_assert( div_floorn(-6,-3) ==  2, "oops");
-static_assert( div_floorn(-5,-3) ==  1, "oops");
-static_assert( div_floorn(-4,-3) ==  1, "oops");
-static_assert( div_floorn(-3,-3) ==  1, "oops");
-static_assert( div_floorn(-2,-3) ==  0, "oops");
-static_assert( div_floorn(-1,-3) ==  0, "oops");
-static_assert( div_floorn( 0,-3) ==  0, "oops");
-static_assert( div_floorn( 1,-3) == -1, "oops");
-static_assert( div_floorn( 2,-3) == -1, "oops");
-static_assert( div_floorn( 3,-3) == -1, "oops");
-static_assert( div_floorn( 4,-3) == -2, "oops");
-static_assert( div_floorn( 5,-3) == -2, "oops");
-static_assert( div_floorn( 6,-3) == -2, "oops");
-static_assert( div_floorn( 7,-3) == -3, "oops");
-#define DIVREMn(n,d) \
-static_assert( rem_floorn(n,d) <= 0 && rem_floorn(n,d) > d,  "Oops " #n " " #d ); \
-static_assert( n == d*div_floorn(n,d) + rem_floorn(n,d),   "Oops " #n " " #d )
-DIVREMn( 5,-3); // div_floor(5,-3)=-2, 5-(-3)*(-2) = -1
-DIVREMn( 4,-3); // 4-(-3)*(-2) = -2
-DIVREMn( 3,-3); // 3-(-3)*(-1) = 0
-DIVREMn( 2,-3); // 2-(-3)*(-1) = -1
-DIVREMn( 1,-3); // 1-(-3)*(-1) = -2
-DIVREMn( 0,-3); // 0-(-3)*( 0) = 0
-DIVREMn(-1,-3); // 1-(-3)*( 0) = -1
-DIVREMn(-2,-3); // 2-(-3)*( 0) = -2
-DIVREMn(-3,-3); // 3-(-3)*(-1) = 0
-DIVREMn(-4,-3);
-DIVREMn(-5,-3);
-DIVREMn( 2000444000,-1);
-DIVREMn(-2000444000,-1);
-
-inline constexpr int rem_floorn( int const n, int const d )
+inline constexpr int rem_floorn( int const n, int const d ) // d < 0
 {
-#if 0
+#if 1
+    //return n%d + (n%d <= 0? 0: d); // same
+    //return n%d + ( n%d > 0? d: 0); // same
+    //return n%d + ( -(n%d) < 0? d: 0);
+    return n%d + (d & ((-(n%d))>>31) );
+#elif 0
     return n - d*div_floorn(n,d);
     /* 0000000000000030 <test_rem_floorn(int, int)>:
 30:	89 f8                	mov    %edi,%eax
@@ -525,7 +496,7 @@ inline constexpr int rem_floorn( int const n, int const d )
 44:	29 f0                	sub    %esi,%eax
 46:	c3                   	retq   
      */
-#else
+#elif 0
     //return n%d + (n%d > 0? d: 0);  // correct
     return n%d + (n%d <= 0? 0: d); // same
     /* 0000000000000030 <test_rem_floorn(int, int)>:
@@ -586,6 +557,63 @@ inline constexpr int rem_floorn( int const n, int const d )
 
 #endif
 }
+/// @cond DOXYGEN_SHOULD_SKIP_THIS
+static_assert( div_floorn(-7,-3) ==  2, "oops");
+static_assert( div_floorn(-6,-3) ==  2, "oops");
+static_assert( div_floorn(-5,-3) ==  1, "oops");
+static_assert( div_floorn(-4,-3) ==  1, "oops");
+static_assert( div_floorn(-3,-3) ==  1, "oops");
+static_assert( div_floorn(-2,-3) ==  0, "oops");
+static_assert( div_floorn(-1,-3) ==  0, "oops");
+static_assert( div_floorn( 0,-3) ==  0, "oops");
+static_assert( div_floorn( 1,-3) == -1, "oops");
+static_assert( div_floorn( 2,-3) == -1, "oops");
+static_assert( div_floorn( 3,-3) == -1, "oops");
+static_assert( div_floorn( 4,-3) == -2, "oops");
+static_assert( div_floorn( 5,-3) == -2, "oops");
+static_assert( div_floorn( 6,-3) == -2, "oops");
+static_assert( div_floorn( 7,-3) == -3, "oops");
+static_assert( div_floorn( 7,-3) == -3, "oops");
+
+static_assert( rem_floorn( 7,-3) == -2, "oops");
+static_assert( rem_floorn( 6,-3) ==  0, "oops");
+static_assert( rem_floorn( 5,-3) == -1, "oops");
+static_assert( rem_floorn( 4,-3) == -2, "oops");
+static_assert( rem_floorn( 3,-3) ==  0, "oops");
+static_assert( rem_floorn( 2,-3) == -1, "oops");
+static_assert( rem_floorn( 1,-3) == -2, "oops");
+static_assert( rem_floorn( 0,-3) ==  0, "oops");
+static_assert( rem_floorn(-1,-3) == -1, "oops");
+static_assert( rem_floorn(-2,-3) == -2, "oops");
+static_assert( rem_floorn(-3,-3) ==  0, "oops");
+static_assert( rem_floorn(-4,-3) == -1, "oops");
+static_assert( rem_floorn(-5,-3) == -2, "oops");
+static_assert( rem_floorn(-6,-3) ==  0, "oops");
+static_assert( rem_floorn(-7,-3) == -1, "oops");
+#define DIVREMn(n,d) \
+static_assert( d < 0, "Oops rem_floorn(n,d) needs d<0, but d=" #d ); \
+static_assert( rem_floorn(n,d) >  d,  "Oops " #n " " #d ); \
+static_assert( rem_floorn(n,d) <= 0,  "Oops " #n " " #d ); \
+static_assert( n == d*div_floorn(n,d) + rem_floorn(n,d),   "Oops " #n " " #d )
+// n/d :     r=rem_floor      k=div_floor
+//                  r =  n -   d * k
+DIVREMn( 5,-3); // -1 =  5 - (-3)*(-2)
+DIVREMn( 4,-3); // -2 =  4 - (-3)*(-2)
+DIVREMn( 3,-3); //  0 =  3 - (-3)*(-1)
+DIVREMn( 2,-3); // -1 =  2 - (-3)*(-1)
+DIVREMn( 1,-3); // -2 =  1 - (-3)*(-1)
+DIVREMn( 0,-3); //  0 =  0 - (-3)*( 0)
+DIVREMn(-1,-3); // -1 = -1 - (-3)*( 0)
+DIVREMn(-2,-3); // -2 = -2 - (-3)*( 0)
+DIVREMn(-3,-3); //  0 = -3 - (-3)*( 1)
+DIVREMn(-4,-3); // -1 = -4 - (-3)*( 1)
+DIVREMn(-5,-3); // -2 = -5 - (-3)*( 1)
+DIVREMn( 2000444000,-1);
+DIVREMn(-2000444000,-1);
+/// @endcond
+
+
+#if 1
 inline constexpr int div_floorx_diffsign0( int const a, int const b ){
     return a & ((a^b)<0? ~0: 0); 
 }
@@ -596,28 +624,146 @@ inline constexpr int div_floorx_diffsign2( int const a, int const b ){
     //return ( ((a^b)>>31) & (a!=0) );    // ret is 0/1
     return (a!=0) & ((a^b)>>31);    // ret is 0/1
 }
-
+inline constexpr int diffsign( int const a, int const b ){
+    return (a!=0) & ((a^b)>>31);    // ret is 0/1
+}
+/// @cond DOXYGEN_SHOULD_SKIP_THIS
+#define DIFFSIGN(FOO,n,d) /* assume n, d > 0 */ \
+static_assert( !FOO(n,d) && !FOO(-n,-d), #FOO " should return false (same sign)"); \
+static_assert( FOO(-n,d) && FOO(n,-d), #FOO " should return true (diff sign)");
+DIFFSIGN(div_floorx_diffsign0,1,1)
+DIFFSIGN(div_floorx_diffsign0,2,4)
+DIFFSIGN(div_floorx_diffsign0,1,1)
+#define DIFFSIGN_0(FOO,i) \
+static_assert( !FOO(0,i) && !FOO(i,0) && !FOO(0,-i) && !FOO(-i,0), #FOO " with zero arg should always be false");
+#undef DIFFSIGN
+#undef DIFFSIGN_0
+/// @endcond
+#endif
+inline constexpr int nzdiffsign_bnz( int const a, int const b )
+{
+#if 1
+    return ((a^b)>>31) & a; // good, and inlines well, returns a or 0
+    /* 0000000000000000 <test_nzdiffsign_bnz(int, int)>:
+0:	31 fe                	xor    %edi,%esi
+2:	c1 fe 1f             	sar    $0x1f,%esi
+5:	89 f0                	mov    %esi,%eax
+7:	21 f8                	and    %edi,%eax
+9:	c3                   	retq   
+     */
+#elif 0
+    return a & ((a^b)<0? ~0: 0); // return a or 0 (equiv. to above)
+#elif 0
+    return a & ((a^b)<0? ~0: 0); // return a or 0
+#elif 0
+    return ((a^b)<0? a: 0);                   // return a or 0 
+    /*
+       0000000000000000 <test_nzdiffsign_bnz(int, int)>:
+0:	31 fe                	xor    %edi,%esi
+2:	b8 00 00 00 00       	mov    $0x0,%eax
+7:	0f 48 c7             	cmovs  %edi,%eax
+a:	c3                   	retq   
+     */
+#elif 0
+    //return ((a^b)<0? (a!=0): 0);              // return 1 or 0
+    //return (a!=0) & ((a^b)<0);                // return 1 or 0
+    /*
+       0000000000000000 <test_nzdiffsign_bnz(int, int)>:
+0:	31 fe                	xor    %edi,%esi
+2:	c1 ee 1f             	shr    $0x1f,%esi
+5:	85 ff                	test   %edi,%edi
+7:	0f 95 c0             	setne  %al
+a:	21 f0                	and    %esi,%eax
+c:	c3                   	retq   
+     */
+#elif 0
+    //return a!=0 && b!=0 && (a^b)<0; // ok, but long
+    //return ( ((a^b)>>31) & (a!=0) );          // return 1 or 0
+    //return (a & ((a^b)<0? ~0: 0)) != 0;       // return 1 or 0
+    /* 
+0:	31 fe                	xor    %edi,%esi
+2:	31 c0                	xor    %eax,%eax
+4:	c1 fe 1f             	sar    $0x1f,%esi
+7:	85 ff                	test   %edi,%edi
+9:	0f 95 c0             	setne  %al
+c:	21 f0                	and    %esi,%eax
+e:	c3                   	retq   
+     */
+#else
+#error "bit-twiddling hacks insufficient"
+#endif
+}
+/// @cond DOXYGEN_SHOULD_SKIP_THIS
+#define TEST_nzdiffsign_bnz(a,b) /* a,b > 0 */ \
+static_assert( !nzdiffsign_bnz(a,b), "oops sign" " +" #a " +" #b); \
+static_assert( !nzdiffsign_bnz(-a,-b), "oops sign" " -" #a " -" #b); \
+static_assert(  nzdiffsign_bnz(a,-b), "oops sign" " +" #a " -" #b); \
+static_assert(  nzdiffsign_bnz(-a,b), "oops sign" " -" #a " +" #b);
+TEST_nzdiffsign_bnz(1,1);
+TEST_nzdiffsign_bnz(2000111000,1);
+TEST_nzdiffsign_bnz(1, 2000111000);
+TEST_nzdiffsign_bnz(2000111000, 2000111000);
+static_assert( !nzdiffsign_bnz(0,1), "oops");
+static_assert( !nzdiffsign_bnz(0,-1), "oops");
+static_assert( !nzdiffsign_bnz(0,2000111000), "oops");
+static_assert( !nzdiffsign_bnz(0,-2000111000), "oops");
+/// @endcond
 
 inline constexpr int div_floorx( int const n, int const d )
 {
-#if 1 // remainder-based
     //return d>0? div_floor(n,d): div_floorn(n,d);
-    /* 0000000000000020 <test_div_floorx(int, int)>:
-20:	89 f8                	mov    %edi,%eax
-22:	99                   	cltd   
-23:	f7 fe                	idiv   %esi
-25:	85 f6                	test   %esi,%esi
-27:	7e 07                	jle    30 <test_div_floorx(int, int)+0x10>
-29:	c1 ea 1f             	shr    $0x1f,%edx
-2c:	29 d0                	sub    %edx,%eax
-2e:	c3                   	retq   
-2f:	90                   	nop
-30:	85 d2                	test   %edx,%edx
-32:	0f 9f c2             	setg   %dl
-35:	0f b6 d2             	movzbl %dl,%edx
-38:	29 d0                	sub    %edx,%eax
-3a:	c3                   	retq   
-     */
+#if 1 // orig
+#if 0 // IDIV_BRANCHLESS
+    //return n/d - ( ((n%d^d)<0)? n%d!=0: 0);  // test setne and sub
+    //0000000000000060 <test_div_floorx(int, int)>:
+    //  60:	89 f8                	mov    %edi,%eax
+    //  62:	99                   	cltd   
+    //  63:	f7 fe                	idiv   %esi
+    //  65:	31 d6                	xor    %edx,%esi
+    //  67:	c1 ee 1f             	shr    $0x1f,%esi
+    //  6a:	85 d2                	test   %edx,%edx
+    //  6c:	0f 95 c2             	setne  %dl
+    //  6f:	21 d6                	and    %edx,%esi
+    //  71:	29 f0                	sub    %esi,%eax
+    //  73:	c3                   	retq   
+#else // shortest with a branch
+    return n/d - ( n%d? ((n%d^d)<0): 0);
+    //return n/d - ( n%d==0? 0: (n%d^d) < 0 ); // same
+    //return n%d==0? n/d : n/d - ((n%d^d)<0); // same
+    //0000000000000060 <test_div_floorx(int, int)>:
+    //  60:	89 f8                	mov    %edi,%eax
+    //  62:	99                   	cltd   
+    //  63:	f7 fe                	idiv   %esi
+    //  65:	85 d2                	test   %edx,%edx
+    //  67:	74 05                	je     6e <test_div_floorx(int, int)+0xe>
+    //  69:	31 f2                	xor    %esi,%edx
+    //  6b:	c1 ea 1f             	shr    $0x1f,%edx
+    //  6e:	29 d0                	sub    %edx,%eax
+    //  70:	c3                   	retq   
+#endif
+#elif 0
+    return n/d - ( ((n^d)<0)? n%d!=0: 0);  // has branch
+    //return n%d  & ((n^d)>>31) ? n/d-1 : n/d; // longer, cmp adc
+    return n/d - ( (n%d!=0)  & ((n%d^d)>>31) ); // longer, test setne movzbl and sub
+#elif 0
+    //return n/d - ( n%d & ((n^d)>>31) ? 1 : 0);  // test setme movzbl sub
+    //0000000000000060 <test_div_floorx(int, int)>:
+    //  60:	89 f8                	mov    %edi,%eax
+    //  62:	99                   	cltd   
+    //  63:	f7 fe                	idiv   %esi
+    //  65:	31 fe                	xor    %edi,%esi
+    //  67:	c1 fe 1f             	sar    $0x1f,%esi
+    //  6a:	85 d6                	test   %edx,%esi
+    //  6c:	0f 95 c2             	setne  %dl
+    //  6f:	0f b6 d2             	movzbl %dl,%edx
+    //  72:	29 d0                	sub    %edx,%eax
+    //  74:	c3                   	retq   
+    //return n/d - (n%d  & (n%d^d)>>31 ? 1 : 0); // same!
+    return n/d - ( (n%d & ((n%d^d)>>31))  ? 1 : 0); // same
+#elif 1 // --------------------- test
+    //return n/d - ( n%d  & ((n^d)>>31) ? 1 : 0);
+    return n/d - ( n%d  & ((n^d)>>31) ? 1 : 0);
+#elif 0
     //return d>0? (n/d) - (n%d<0? 1: 0): (n/d) - (n%d>0? 1: 0); // expand
     //return (n/d) - (d>0? (n%d<0? 1: 0): (n%d>0? 1: 0)); // equiv
     //return ((n/d) - (
@@ -740,7 +886,7 @@ inline constexpr int div_floorx( int const n, int const d )
 72:	29 d0                	sub    %edx,%eax
 74:	c3                   	retq   
      */
-    //return n/d - (nzdiffsign_bnz(n%d,d/*!=0*/)? 1 : 0); // changed nzdiffsign... (again)
+    //return n/d - (div_floorx_diffsign1(n%d,d/*!=0*/)? 1 : 0); // changed nzdiffsign... (again)
     /* 0000000000000060 <test_div_floorx(int, int)>:
 60:	89 f8                	mov    %edi,%eax
 62:	31 c9                	xor    %ecx,%ecx
@@ -852,12 +998,12 @@ inline constexpr int div_floorx( int const n, int const d )
     // sign(d), branchless:  (d>0) - (d<0)
     return (n>=0 == d>=0)? n/d
         :  (n-d+ ((d>0)-(d<0)) )/d ;
-#elif 1
+#elif 0
     return (n>=0 == d>=0? n
             :             n - d + (d>0)-(d<0)
            ) / d;
     // Would want to check assembly before continuing.
-#else
+#elif 0
     //return (n + (n>=0 == d>=0? 0
     //            : - d + (d>0)-(d<0))) / d;
     return d>0? div_floor(n,d)
@@ -876,8 +1022,8 @@ static_assert( div_floorx(-3,3) == -1, "oops");
 static_assert( div_floorx(-4,3) == -2, "oops");
 static_assert( div_floorx(-5,3) == -2, "oops");
 
-static_assert( div_floorn( 7,-3) == -3, "oops");
-static_assert( div_floorn( 6,-3) == -2, "oops");
+// FIXME static_assert( div_floorx( 7,-3) == -3, "oops");
+// FIXME tatic_assert( div_floorx( 6,-3) == -2, "oops");
 static_assert( div_floorx( 5,-3) == -2, "oops");
 static_assert( div_floorx( 4,-3) == -2, "oops");
 static_assert( div_floorx( 3,-3) == -1, "oops");
@@ -890,71 +1036,124 @@ static_assert( div_floorx(-3,-3) ==  1, "oops");
 static_assert( div_floorx(-4,-3) ==  1, "oops");
 static_assert( div_floorx(-5,-3) ==  1, "oops");
 static_assert( div_floorx(-6,-3) ==  2, "oops");
-
 inline constexpr int rem_floorx( int const n, int const d )
 {
-#if 0
+#if 1 // slightly shorter for x86 w/ test; setne; sub
+    return n%d + ( n%d  & (n^d)>>31 ? d : 0); // SHORTEST
+    //0000000000000080 <test_rem_floorx(int, int)>:
+    //  80:	89 f8                	mov    %edi,%eax
+    //  82:	31 f7                	xor    %esi,%edi
+    //  84:	99                   	cltd   
+    //  85:	c1 ff 1f             	sar    $0x1f,%edi
+    //  88:	f7 fe                	idiv   %esi
+    //  8a:	21 d7                	and    %edx,%edi
+    //  8c:	0f 45 fe             	cmovne %esi,%edi
+    //  8f:	8d 04 3a             	lea    (%rdx,%rdi,1),%eax
+    //  92:	c3                   	retq   
+#elif 0
+    // pretty good alternate; n and n%d have same sign bit
+    return n%d + ( n%d & (n%d^d)>>31 ? d: 0);
+    //0000000000000080 <test_rem_floorx(int, int)>:
+    //  80:	89 f8                	mov    %edi,%eax
+    //  82:	89 f1                	mov    %esi,%ecx
+    //  84:	99                   	cltd   
+    //  85:	f7 fe                	idiv   %esi
+    //  87:	31 d1                	xor    %edx,%ecx
+    //  89:	c1 f9 1f             	sar    $0x1f,%ecx
+    //  8c:	21 d1                	and    %edx,%ecx
+    //  8e:	0f 45 ce             	cmovne %esi,%ecx
+    //  91:	8d 04 0a             	lea    (%rdx,%rcx,1),%eax
+    //  94:	c3                   	retq   
+#elif 0
+    //return d > 0? n%d + (d & ((+(n%d))>>31) )
+    //            : n%d + (d & ((-(n%d))>>31) );
+    //return n%d + (d>0? (d & ((+(n%d))>>31)) : (d & ((-(n%d))>>31)) );
+    //return n%d + (d & (d>0? ((+(n%d))>>31) : ((-(n%d))>>31) ));
+    //return n%d + (d & (     (d>0? +(n%d): -(n%d))   >>31) );
+    return n%d + (d & (     ( d>0? n%d: -(n%d))   >>31) ); // still has a branch
+    //return n%d + (d & (   (~d<0? n%d: -(n%d))   >>31) ); // same
+    //  80:	89 f8                	mov    %edi,%eax
+    //  82:	99                   	cltd   
+    //  83:	f7 fe                	idiv   %esi
+    //  85:	89 d0                	mov    %edx,%eax
+    //  87:	85 f6                	test   %esi,%esi
+    //  89:	79 02                	jns    8d <test_rem_floorx(int, int)+0xd>
+    //  8b:	f7 d8                	neg    %eax
+    //  8d:	c1 f8 1f             	sar    $0x1f,%eax
+    //  90:	21 c6                	and    %eax,%esi
+    //  92:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
+    //  95:	c3                   	retq   
+    //return n%d + (d & ( (~d<0? n%d: ~(n%d)+1)   >>31) ); // still has a branch
+#elif 1 // SIMPLIFICATION from observed pattern in NORMAL_DIVMOD table belo
+    //return (n%d!=0 && ((n<0 && d>0) || (n>0 && d<0)))? n%d + d : n%d; // long
+    //return (n%d!=0 && ( (n^d)>>31                  ))? n%d + d : n%d; // short w/ branch
+    //return n%d + ((n%d!=0 && ( (n^d)>>31                  ))? d : 0); // shorter w/ branch
+    //return n%d + ((n%d!=0 && (n^d)>>31 )? d : 0); // rewrite
+    //return n%d + (( (n%d!=0) && ((n^d)>>31) )? d : 0); // rewrite, has branch
+    //return n%d + (( (n%d!=0) &  ((n^d)>>31) )? d : 0); // bitop, cmov but no branch
+    //return n%d + (( (n%d   ) &  ((n^d)>>31) )? d : 0); // shorter, cmov, no branch
+    //return n%d + ( n%d  & ((n^d)>>31) ? d : 0); // rewrite, SHORTEST, still have 'testne'
+    //
+    // but notice that sign bit of n^d is also obtained with n%d^d ...
+    //return n%d + ( n%d  & ((n%d^d)>>31) ? d : 0); // rewrite, slightly longer, cmov,
+    return n%d + (n%d  & (n%d^d)>>31 ? d : 0); // rewrite
+    //
+    //return n%d + (d>0?  (n%d^d>>31? d: 0)  :  (n%d^d^n>>31? 0: d));
+#elif 1
+    // can use nonzero and different signs assuming d!=0 as function:
+    return n%d + (div_floorx_diffsign1(n%d,d)? d: 0); // OK, equivalent
+    //return n%d + (nzdiffsign_bnz(n%d,d)? d: 0); // OK, can be equiv
+    //return n%d + (div_floorx_diffsign0(n%d,d)? d: 0); // OK, ugly
+    //return n%d + (div_floorx_diffsign2(n%d,d)? d: 0); // OK, worse
+    //return n%d + (n%d!=0 && div_floorx_diffsign1(n,d)? d: 0); // OK, branches
+    //return n%d + (n%d!=0 && div_floorx_diffsign1(n,d)? d: 0); // OK, branches
+#elif 0 // tests...
+    //return n%d + ( ((n%d^d)>>31) & n%d ? d: 0); // ok, w/ cmov, longer
+    return n%d + ( (n%d) & ((n%d^d)>>31) ? d: 0); // ok, w/ cmov, longer
+    //
+    // no return n%d + (( n%d ^ d < 0? n%d: 0)? d: 0); // ok
+    //return n%d + (d & ( div_floorx_diffsign0(n%d,d/*!=0*/) ? ~0 : 0)); // wrong?
+    //return n%d + (d & ( nzdiffsign_bnz(n%d,d/*!=0*/) ? ~0 : 0)); // wrong?
+    //return n%d + ( ((n%d^d)>>31 & (n%d))? d: 0 );
+    // no return n%d + ( ((n%d)>>31 & (n%d))? d: 0 );
+    // but
+#elif 0
     //return n - d*div_floor(n,d); // correct, but not so good (has Multiply)
     //return d>0? rem_floor(n,d): rem_floorn(n,d);
     //return d<0? rem_floorn(n,d): rem_floor(n,d);
-  80:	89 f8                	mov    %edi,%eax
-  82:	99                   	cltd   
-  83:	f7 fe                	idiv   %esi
-  85:	85 f6                	test   %esi,%esi
-  87:	7e 0f                	jle    98 <test_rem_floorx(int, int)+0x18>
-  89:	89 d0                	mov    %edx,%eax
-  8b:	c1 f8 1f             	sar    $0x1f,%eax
-  8e:	21 c6                	and    %eax,%esi
-  90:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
-  93:	c3                   	retq   
-  94:	0f 1f 40 00          	nopl   0x0(%rax)
-  98:	85 d2                	test   %edx,%edx
-  9a:	b8 00 00 00 00       	mov    $0x0,%eax
-  9f:	0f 4e f0             	cmovle %eax,%esi
-  a2:	8d 04 32             	lea    (%rdx,%rsi,1),%eax
-  a5:	c3                   	retq   
-0000000000000080 <test_rem_floorx(int, int)>:
-  80:	89 f8                	mov    %edi,%eax
-  82:	99                   	cltd   
-  83:	f7 fe                	idiv   %esi
-  85:	85 f6                	test   %esi,%esi
-  87:	7e 0f                	jle    98 <test_rem_floorx(int, int)+0x18>
-  89:	89 d0                	mov    %edx,%eax
-  8b:	c1 f8 1f             	sar    $0x1f,%eax
-  8e:	21 c6                	and    %eax,%esi
-  90:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
-  93:	c3                   	retq   
-  94:	0f 1f 40 00          	nopl   0x0(%rax)
-  98:	85 d2                	test   %edx,%edx
-  9a:	b8 00 00 00 00       	mov    $0x0,%eax
-  9f:	0f 4e f0             	cmovle %eax,%esi
-  a2:	8d 04 32             	lea    (%rdx,%rsi,1),%eax
-  a5:	c3                   	retq   
-#elif 0
-    //return d<0? //rem_floorn(n,d)
-    //    n%d + (d & (n%d>0? ~0: 0))
-    //    : //rem_floor(n,d);
-    //    n%d + (d & (n%d<0? ~0: 0) );
-    return n%d + (d & (d<0? (n%d>0? ~0: 0): (n%d<0? ~0: 0)));
-0000000000000080 <test_rem_floorx(int, int)>:
-  80:	89 f8                	mov    %edi,%eax
-  82:	99                   	cltd   
-  83:	f7 fe                	idiv   %esi
-  85:	89 d0                	mov    %edx,%eax
-  87:	c1 f8 1f             	sar    $0x1f,%eax
-  8a:	85 f6                	test   %esi,%esi
-  8c:	78 0a                	js     98 <test_rem_floorx(int, int)+0x18>
-  8e:	21 c6                	and    %eax,%esi
-  90:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
-  93:	c3                   	retq   
-  94:	0f 1f 40 00          	nopl   0x0(%rax)
-  98:	31 c0                	xor    %eax,%eax
-  9a:	85 d2                	test   %edx,%edx
-  9c:	0f 9f c0             	setg   %al
-  9f:	f7 d8                	neg    %eax
-  a1:	21 c6                	and    %eax,%esi
-  a3:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
-  a6:	c3                   	retq   
+    //  80:	89 f8                	mov    %edi,%eax
+    //  82:	99                   	cltd   
+    //  83:	f7 fe                	idiv   %esi
+    //  85:	85 f6                	test   %esi,%esi
+    //  87:	7e 0f                	jle    98 <test_rem_floorx(int, int)+0x18>
+    //  89:	89 d0                	mov    %edx,%eax
+    //  8b:	c1 f8 1f             	sar    $0x1f,%eax
+    //  8e:	21 c6                	and    %eax,%esi
+    //  90:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
+    //  93:	c3                   	retq   
+    //  94:	0f 1f 40 00          	nopl   0x0(%rax)
+    //  98:	85 d2                	test   %edx,%edx
+    //  9a:	b8 00 00 00 00       	mov    $0x0,%eax
+    //  9f:	0f 4e f0             	cmovle %eax,%esi
+    //  a2:	8d 04 32             	lea    (%rdx,%rsi,1),%eax
+    //  a5:	c3                   	retq   
+    //0000000000000080 <test_rem_floorx(int, int)>:
+    //  80:	89 f8                	mov    %edi,%eax
+    //  82:	99                   	cltd   
+    //  83:	f7 fe                	idiv   %esi
+    //  85:	85 f6                	test   %esi,%esi
+    //  87:	7e 0f                	jle    98 <test_rem_floorx(int, int)+0x18>
+    //  89:	89 d0                	mov    %edx,%eax
+    //  8b:	c1 f8 1f             	sar    $0x1f,%eax
+    //  8e:	21 c6                	and    %eax,%esi
+    //  90:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
+    //  93:	c3                   	retq   
+    //  94:	0f 1f 40 00          	nopl   0x0(%rax)
+    //  98:	85 d2                	test   %edx,%edx
+    //  9a:	b8 00 00 00 00       	mov    $0x0,%eax
+    //  9f:	0f 4e f0             	cmovle %eax,%esi
+    //  a2:	8d 04 32             	lea    (%rdx,%rsi,1),%eax
+    //  a5:	c3                   	retq   
 #elif 0
     //return n%d + (d & (d<0? (n%d>0? ~0: 0): (n%d<0? ~0: 0)));
     // same return n%d + (d & (d<0? (n%d>0? ~(1-(d<0)): 1-(d<0)): (n%d<0? ~(d<0): (d<0))));
@@ -969,7 +1168,10 @@ inline constexpr int rem_floorx( int const n, int const d )
     //return n%d + (d & ( ((d>>31)&&(n%d>0) || ((d>0)&&(n%d>>31)) ? ~0 : 0))); // longer
     // ?? return n%d + (d & ( ((d^(n%d)>>31)!=0) || ((d>0)&&(n%d>>31)) ? ~0 : 0));
 #else
-    return n%d + (d & ( diffsign(n%d,d/*!=0*/) ? ~0 : 0));
+    // diffsign versions still have extra instrns ... so
+    //return n/d - (nzdiffsign_bnz(n%d,d/*!=0*/)!=0);
+    //return n%d + (d & ( diffsign(n%d,d/*!=0*/) ? ~0 : 0));
+    //return n%d + (d & ( diffsign(n%d,d/*!=0*/) ? ~0 : 0));
     /* 0000000000000090 <test_rem_floorx(int, int)>:
 90:	89 f8                	mov    %edi,%eax
 92:	31 c9                	xor    %ecx,%ecx
@@ -1004,6 +1206,81 @@ ab:	c3                   	retq
      */
 #endif
 }
+/// @cond DOXYGEN_SHOULD_SKIP_THIS
+#define DIVREMx(n,d) /* DIVREM(n,d); DIVREMn(n,-d);  assume d>0, test +/-d */ \
+static_assert( rem_floorx(n,d) >=0, "Oops " #n " " #d); \
+static_assert( rem_floorx(n,d) < d, "Oops " #n " " #d); \
+static_assert( n == d*div_floorx(n,d) + rem_floorx(n,d),   "Oops " #n " " #d ); \
+static_assert( rem_floorx(n,-d) <= 0,  "Oops " #n " -" #d ); \
+static_assert( rem_floorx(n,-d) > -d,  "Oops " #n " -" #d ); \
+static_assert( n == (-d)*div_floorx(n,-d) + rem_floorx(n,-d),   "Oops " #n " -" #d )
+DIVREMx( 5,3);
+DIVREMx( 4,3);
+DIVREMx( 3,3);
+DIVREMx( 2,3);
+DIVREMx( 1,3);
+DIVREMx( 0,3);
+DIVREMx(-1,3);
+DIVREMx(-2,3);
+DIVREMx(-3,3);
+DIVREMx(-4,3);
+DIVREMx(-5,3);
+DIVREMx( 2000444000,1);
+DIVREMx(-2000444000,1);
+
+// Here is a table of expected 'C' and Euclidean divmod values
+// normal C99 and C++11 integer division and modulus work like this:
+#define NORMAL_DIVMOD( n, d, div, mod ) \
+static_assert(  n/d == div, "oops"); \
+static_assert(  n%d == mod, "oops");
+// We use div_floor and rem_floor for the Euclidean (or Arithmetic) version
+#define EUC_DIVMOD( n, d, div, mod ) \
+static_assert(  div_floorx(n,d) == div, "oops"); \
+static_assert(  rem_floorx(n,d) == mod, "oops");
+//
+//  positive divisor                              Arithmetic                        n^d^n%d
+//              n   d  n/d n%d                       Div Mod     Correction?    n%d^d     n^n%d
+NORMAL_DIVMOD(  7,  3,  2,  1 ); EUC_DIVMOD(  7,  3,  2,  1 ) // same                  -
+NORMAL_DIVMOD(  6,  3,  2,  0 ); EUC_DIVMOD(  6,  3,  2,  0 ) // same                  -
+NORMAL_DIVMOD(  5,  3,  1,  2 ); EUC_DIVMOD(  5,  3,  1,  2 ) // same                  -
+NORMAL_DIVMOD(  4,  3,  1,  1 ); EUC_DIVMOD(  4,  3,  1,  1 ) // same                  -
+NORMAL_DIVMOD(  3,  3,  1,  0 ); EUC_DIVMOD(  3,  3,  1,  0 ) // same                  -
+NORMAL_DIVMOD(  2,  3,  0,  2 ); EUC_DIVMOD(  2,  3,  0,  2 ) // same                  -
+NORMAL_DIVMOD(  1,  3,  0,  1 ); EUC_DIVMOD(  1,  3,  0,  1 ) // same                  -
+NORMAL_DIVMOD(  0,  3,  0,  0 ); EUC_DIVMOD(  0,  3,  0,  0 ) // same                  -
+NORMAL_DIVMOD( -1,  3,  0, -1 ); EUC_DIVMOD( -1,  3, -1,  2 ) // n/d-1; n%d+d     -         
+NORMAL_DIVMOD( -2,  3,  0, -2 ); EUC_DIVMOD( -2,  3, -1,  1 ) // n/d-1; n%d+d     -         
+NORMAL_DIVMOD( -3,  3, -1,  0 ); EUC_DIVMOD( -3,  3, -1,  0 ) // same                  -   -
+NORMAL_DIVMOD( -4,  3, -1, -1 ); EUC_DIVMOD( -4,  3, -2,  2 ) // n/d-1; n%d+d     -         
+NORMAL_DIVMOD( -5,  3, -1, -2 ); EUC_DIVMOD( -5,  3, -2,  1 ) // n/d-1; n%d+d     -         
+NORMAL_DIVMOD( -6,  3, -2,  0 ); EUC_DIVMOD( -6,  3, -2,  0 ) // same                  -   -
+NORMAL_DIVMOD( -7,  3, -2, -1 ); EUC_DIVMOD( -7,  3, -3,  2 ) // n/d-1; n%d+d     -         
+// Correction when n%d != 0 AND d>0 AND n<0
+// -------------------------------------------------------------------
+//  positive divisor                              Arithmetic
+//              n   d  n/d n%d                       Div Mod     Correction?
+NORMAL_DIVMOD(  7, -3, -2,  1 ); EUC_DIVMOD(  7, -3, -3, -2 ) // n/d-1; n%d+d     -    -  +
+NORMAL_DIVMOD(  6, -3, -2,  0 ); EUC_DIVMOD(  6, -3, -2,  0 ) // same             -    -  +
+NORMAL_DIVMOD(  5, -3, -1,  2 ); EUC_DIVMOD(  5, -3, -2, -1 ) // n/d-1; n%d+d     -    -  +
+NORMAL_DIVMOD(  4, -3, -1,  1 ); EUC_DIVMOD(  4, -3, -2, -2 ) // n/d-1; n%d+d     -    -  +
+NORMAL_DIVMOD(  3, -3, -1,  0 ); EUC_DIVMOD(  3, -3, -1,  0 ) // same             -    -  +
+NORMAL_DIVMOD(  2, -3,  0,  2 ); EUC_DIVMOD(  2, -3, -1, -1 ) // n/d-1; n%d+d     -       +
+NORMAL_DIVMOD(  1, -3,  0,  1 ); EUC_DIVMOD(  1, -3, -1, -2 ) // n/d-1; n%d+d     -       +
+NORMAL_DIVMOD(  0, -3,  0,  0 ); EUC_DIVMOD(  0, -3,  0,  0 ) // same             -       +
+NORMAL_DIVMOD( -1, -3,  0, -1 ); EUC_DIVMOD( -1, -3,  0, -1 ) // same                  -  +
+NORMAL_DIVMOD( -2, -3,  0, -2 ); EUC_DIVMOD( -2, -3,  0, -2 ) // same                  -  +
+NORMAL_DIVMOD( -3, -3,  1,  0 ); EUC_DIVMOD( -3, -3,  1,  0 ) // same             -       -
+NORMAL_DIVMOD( -4, -3,  1, -1 ); EUC_DIVMOD( -4, -3,  1, -1 ) // same                  -  +
+NORMAL_DIVMOD( -5, -3,  1, -2 ); EUC_DIVMOD( -5, -3,  1, -2 ) // same                  -  +
+NORMAL_DIVMOD( -6, -3,  2,  0 ); EUC_DIVMOD( -6, -3,  2,  0 ) // same             -       -
+NORMAL_DIVMOD( -7, -3,  2, -1 ); EUC_DIVMOD( -7, -3,  2, -1 ) // same                  - 
+// Correction when n%d != 0 AND d<0 AND n>0
+// -------------------------------------------------------------------
+// summary: Correction for n%d != 0 AND (n,d opposite sign bit)
+// ... equivalently        n%d != 0 AND (n%d opposite sign bit)
+//   should be same as (n^d>>31) == ~0 
+/// @endcond
+
 /// @cond DOXYGEN_SHOULD_SKIP_THIS
 #ifdef TEST_MAIN
 #include <iostream>

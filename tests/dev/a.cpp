@@ -1,6 +1,12 @@
 
-//#include "./idiv_test.hpp" // experiments
-#include "../benchdnn/idiv.hpp" // clean version
+#define DEV 1
+#if !DEV
+#include "./idiv.hpp" // experiments
+#else
+#include "idiv-dev.hpp" // experiments
+#endif
+//#include "../benchdnn/idiv.hpp" // clean version
+
 #include <iostream>
 #include <cstdlib>  // atoi
 
@@ -51,6 +57,20 @@ int test_rem_floorx( int n, int d){
     ASM_COMMENT( "remfp" );
     return rem_floorx(n,d);
 }
+#if DEV
+int test_div_floorx_diffsign0( int n, int d){
+    ASM_COMMENT( "diffsign0" );
+    return div_floorx_diffsign0(n,d);
+}
+int test_div_floorx_diffsign1( int n, int d){
+    ASM_COMMENT( "diffsign1" );
+    return div_floorx_diffsign1(n,d);
+}
+int test_div_floorx_diffsign2( int n, int d){
+    ASM_COMMENT( "diffsign2" );
+    return div_floorx_diffsign2(n,d);
+}
+#endif
 int main(int argc, char** argv){
     int s=0;
     int a = argc;

@@ -1,6 +1,10 @@
-all: a.o a.s a.d a
+all: hello a.o a.s a.d a
 
-HDRS := ../benchdnn/idiv.hpp
+.PHONY: hello
+hello:
+	g++ --version
+HDRS := idiv.hpp
+#HDRS := ./idiv-dev.hpp
 
 %.s: %.cpp $(HDRS)
 	g++ -std=c++11 -march=native -O3 -S $<
