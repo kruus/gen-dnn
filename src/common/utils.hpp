@@ -294,9 +294,8 @@ inline typename remove_reference<T>::type rnd_dn(const T a, const U b) {
     return static_cast<typename remove_reference<T>::type>((a / b) * b);
 }
 
-/** \todo rnd_neginf integer division, \sa idiv-dev.hpp for related functions
- * \c div_floor\* and \c rem_floor\*. */
-
+/** \return largest exact divisor \f$div \in [1,b] \ni a\%div = 0\f$.
+ * \pre \c b > 0 (unchecked) -- typically you want both \c a and \c b > 0. */
 template <typename T, typename U>
 inline typename remove_reference<T>::type max_div(const T a, const U b) {
     U div = b;
