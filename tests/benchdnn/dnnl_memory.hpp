@@ -141,7 +141,7 @@ struct dnn_mem_t {
             case dnnl_f16: ((float16_t *)data)[idx] = value; break;
 #if !defined(TARGET_VANILLA)
             case dnnl_bf16: ((bfloat16_t *)data)[idx] = value; break;
-#if !defined(TARGET_VANILLA)
+#endif // !defined(TARGET_VANILLA)
             default: assert(!"bad data type");
         }
     }

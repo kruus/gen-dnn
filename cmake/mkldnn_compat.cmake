@@ -57,6 +57,7 @@ foreach (var ${COMPAT_CACHE_BOOL_VARS})
     mkldnn_compat_var("DNNL_${var}" "MKLDNN_${var}" "CACHE BOOL")
 endforeach()
 mkldnn_compat_var(_DNNL_USE_MKL _MKLDNN_USE_MKL "CACHE BOOL")
+mkldnn_compat_var(_DNNL_USE_CBLAS MKLDNN_USE_CBLAS "CACHE BOOL")
 
 foreach (var ${COMPAT_CACHE_STRING_VARS})
     mkldnn_compat_var("DNNL_${var}" "MKLDNN_${var}" "CACHE STRING")

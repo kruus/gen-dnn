@@ -26,8 +26,6 @@
 #include "common/bfloat16.hpp"
 #include "jit_generator.hpp"
 #endif // MKLDNN_CPU_GEMM_JIT
-// XXX ? #include "mkldnn_thread.hpp"
-// XXX ? #include "mkldnn_types.h"
 #include "nstl.hpp"
 
 namespace dnnl {

@@ -15,7 +15,7 @@
 *******************************************************************************/
 
 #include "cpu_barrier.hpp"
-#if defined(_MULTI_THREAD) && ! MULTI_THREAD
+#if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
 // nothing to do (barrier throws if nthr > 1, o/w does nothing)
 
 #else // provide a nontrivial barrier impl
@@ -200,4 +200,5 @@ void barrier(ctx_t *ctx, int nthr) {
 } // namespace impl
 } // namespace dnnl
 
+#endif // DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
 // vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

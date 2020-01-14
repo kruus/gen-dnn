@@ -20,7 +20,7 @@
 #include <assert.h>
 #include "cpu_isa_traits.hpp"    // poor man's version is all that is needed for generic header
 #include "utils.hpp"
-#if defined(_MULTI_THREAD) && ! MULTI_THREAD
+#if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
 #include <stdexcept>
 #endif
 #if !defined(TARGET_VANILLA)
@@ -33,7 +33,7 @@ namespace cpu {
 
 namespace simple_barrier {
 
-#if defined(_MULTI_THREAD) && ! MULTI_THREAD
+#if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
 struct ctx_t {};
 
 // In C++14 can be constexpr, not C++11
@@ -89,7 +89,7 @@ inline void ctx_init(ctx_t *ctx) {
 }
 void barrier(ctx_t *ctx, int nthr);
 
-#endif // "barrier(ctx,nthr)" support
+#endif // "barrier(ctx,nthr)" support if not DNNL_RUNTIME_SEQ
 
 #if !defined(TARGET_VANILLA)
 /** injects actual barrier implementation into another jitted code

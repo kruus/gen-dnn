@@ -26,7 +26,6 @@ namespace dnnl {
 namespace impl {
 namespace cpu {
 
-enum conv_gemm_loop_order_t { gemm_loop_rlb, gemm_loop_lrb };
 #if !defined(TARGET_VANILLA)
 /* convolution */
 enum conv_version_t {
@@ -54,7 +53,9 @@ enum conv_1x1_loop_order_t {
     loop_blr,
     loop_brl
 };
+#endif
 enum conv_gemm_loop_order_t { gemm_loop_rlb, gemm_loop_lrb };
+#if !defined(TARGET_VANILLA)
 
 enum conv_kernel_kind_t { embd_bcast, expl_bcast };
 enum conv_harness_t {

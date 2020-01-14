@@ -254,26 +254,7 @@ dnnl_status_t gemm_s8x8s32(const char *transa, const char *transb,
     return status;
 }
 
-<<<<<<< HEAD
 #if !defined(TARGET_VANILLA)
-mkldnn_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
-        const int64_t *M, const int64_t *N, const int64_t *K,
-        const float *alpha,
-        const bfloat16_t *A, const int64_t *lda,
-        const bfloat16_t *B, const int64_t *ldb,
-        const float *beta, float *C, const int64_t *ldc) {
-    int M_s32 = (int)*M;
-    int N_s32 = (int)*N;
-    int K_s32 = (int)*K;
-    int lda_s32 = (int)*lda;
-    int ldb_s32 = (int)*ldb;
-    int ldc_s32 = (int)*ldc;
-    mkldnn_status_t status = check_gemm_input(transa, transb,
-            &M_s32, &N_s32, &K_s32, &lda_s32, &ldb_s32, &ldc_s32,
-            alpha, beta, false);
-    if (status != mkldnn_success)
-        return status;
-=======
 dnnl_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
         const int *M, const int *N, const int *K, const float *alpha,
         const bfloat16_t *A, const int *lda, const bfloat16_t *B,
@@ -281,7 +262,6 @@ dnnl_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
     dnnl_status_t status = check_gemm_input(transa, transb, M, N, K, A, lda, B,
             ldb, C, ldc, alpha, beta, false);
     if (status != dnnl_success) return status;
->>>>>>> ed1cf723ee94cf95b77af55fe1309374363b8edd
 
     char *dummyOffsetC = NULL;
     bfloat16_t *dummy_ao = NULL;
@@ -362,23 +342,6 @@ dnnl_status_t dnnl_gemm_s8s8s32(char transa, char transb, char offsetc,
 
 #if !defined(TARGET_VANILLA)
 extern "C" {
-<<<<<<< HEAD
-mkldnn_status_t MKLDNN_API mkldnn_gemm_bf16bf16f32(
-        char transa, char transb,
-        mkldnn_dim_t M, mkldnn_dim_t N, mkldnn_dim_t K,
-        float alpha,
-        const bfloat16_t *A, mkldnn_dim_t lda,
-        const bfloat16_t *B, mkldnn_dim_t ldb,
-        float beta,
-        float *C, mkldnn_dim_t ldc) {
-
-    return gemm_bf16bf16f32(&transb, &transa, &N, &M, &K,
-            &alpha, B, &ldb, A, &lda, &beta, C, &ldc);
-}
-}//"C"
-#endif // !TARGET_VANILLA
-
-=======
 dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32(char transa, char transb,
         dnnl_dim_t M, dnnl_dim_t N, dnnl_dim_t K, float alpha,
         const bfloat16_t *A, dnnl_dim_t lda, const bfloat16_t *B,
@@ -393,5 +356,5 @@ dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32(char transa, char transb,
     return gemm_bf16bf16f32(&transb, &transa, &N_s32, &M_s32, &K_s32, &alpha, B,
             &ldb_s32, A, &lda_s32, &beta, C, &ldc_s32);
 }
-}
->>>>>>> ed1cf723ee94cf95b77af55fe1309374363b8edd
+}//"C"
+#endif // !TARGET_VANILLA

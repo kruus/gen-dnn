@@ -5,7 +5,8 @@ set(cblas_cmake_included true)
 include("cmake/SDL.cmake")
 include("cmake/options.cmake")
 
-if (NOT MKLDNN_USE_CBLAS)
+#if (NOT MKLDNN_USE_CBLAS)
+if ( (DNNL_CPU_EXTERNAL_GEMM STREQUAL "NONE") OR NOT _DNNL_USE_CBLAS)
     return()
 endif()
 

@@ -32,7 +32,8 @@ struct verbose_t {
     int level;
 };
 
-int get_verbose();
+int get_verbose();              ///< get environment DNNL_VERBOSE (MKLDNN_VERBOSE) value
+int dnnl_get_verbose();         ///< current `dnnl_set_verbose(int)` setting
 double get_msec();
 const char *get_isa_info();
 
@@ -64,5 +65,5 @@ void init_info(sum_pd_t *s, char *buffer);
 } // namespace impl
 } // namespace dnnl
 
-// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

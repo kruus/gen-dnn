@@ -194,12 +194,9 @@ rnn_postgemm_sig(rnn_postgemm_bwd_bf16_t::gru_lbr_postgemm) {
             scratch_gates_, states_tm1_l_, diff_states_t_l_, diff_states_tp1_l_,
             diff_states_t_lp1_, scratch_cell_, ws_grid_);
 }
-<<<<<<< HEAD
-}
-#endif // !defined(TARGET_VANILLA)
-=======
 
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
->>>>>>> ed1cf723ee94cf95b77af55fe1309374363b8edd
+#endif // !defined(TARGET_VANILLA)
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

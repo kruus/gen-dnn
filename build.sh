@@ -153,6 +153,7 @@ if [ "${DOTARGET}" == "x" ]; then
         DOTARGET="s" # s for SX (C/C++ code, cross-compile)
     elif [ "${CC}" == "ncc" -a "${CXX}" == "nc++" ]; then
         echo "auto-detected '-a' Aurora compiler (ncc, nc++)"
+        # -1 ~ JITFUNCS_NONE; 7 ~ JITFUNCS_VE
         DOTARGET="a"; DOJIT=-1; SIZE_T=64
         if [ `uname -n` = "zoro" ]; then JOBS="-j8"; else JOBS="-j1"; fi
         if [ -f vejit/include/vednn.h ]; then VEJIT=100; echo "auto-detected libvednn"; fi
@@ -239,9 +240,11 @@ else #if [ "$DOTARGET" != "a" ]; then
         if $(gcc-${DOGCC_VER} -v); then export CXX=g++-${DOGCC_VER}; export CC=gcc-${DOGCC_VER}; fi
     fi
     if [ "$DOTARGET" == "j" ]; then
-        DOJIT=0; INSTALLDIR="${INSTALLDIR}-jit"; BUILDDIR="${BUILDDIR}-jit";
+        # 5 ~ JITFUNCS_AVX512 max support in engine
+        DOJIT=5; INSTALLDIR="${INSTALLDIR}-jit"; BUILDDIR="${BUILDDIR}-jit";
     fi
     if [ "$DOTARGET" == "g" ]; then
+        # -1 ~ JITFUNCS_NONE; 6 ~ JITFUNCS_VANILLA
         DOJIT=$JITFUNCS_VANILLA
         #DOJIT=-1; # JITFUNCS_NONE
         INSTALLDIR="${INSTALLDIR}-gen"; BUILDDIR="${BUILDDIR}-gen";
@@ -258,7 +261,7 @@ if [ ! "x${CC}" == "x" -a ! "`which ${CC}`" ]; then
 fi
 
 if [ "$DOTARGET" == "v" ]; then
-    DOJIT=-1
+    DOJIT=-1 # -1 ~ JITFUNCS_NONE; 7 ~ JITFUNCS_VE
 fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; BUILDDIR="${BUILDDIR}d"; fi
 if [ $NEC_FTRACE -gt 0 ]; then BUILDDIR="${BUILDDIR}F"; fi

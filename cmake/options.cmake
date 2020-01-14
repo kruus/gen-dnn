@@ -137,6 +137,29 @@ set(OPENCLROOT "" CACHE STRING
     "path to Intel(R) SDK for OpenCL(TM).
     Use this option to specify custom location for OpenCL.")
 
+set(DNNL_CPU "X86" CACHE STRING
+    "cpu target. Supports X86 (default), ANY, VE, or SX.
+    
+    Must be X86 to enable x86 JIT features. ANY will have the engine
+    implementations use only generic C/C++ code, with CPU determined by
+    compiler command line. See DNNL_CPU_EXTERNAL_GEMM to allow further
+    system/CPU library usage.  Can also use X86-FOO where FOO = SSE41, AVX,
+    AVX2, or AVX512 to limit the x86 implementations included in the engine,
+    but it is recommended to do such restrictions at runtime using ___."
+    )
+message(STATUS " DNNL_CPU=${DNNL_CPU}")
+if(NOT ${DNNL_CPU} MATCHES "^(X86|ANY|VE|SX)")
+    message(FATAL_ERROR "Unsupported CPU target: ${DNNL_CPU}")
+endif()
+
+set(DNNL_CPU_EXTERNAL_GEMM "NONE" CACHE STRING
+    "Use external GEMM (default NONE).  Supports MKL or CBLAS.  Typical use is
+    to allow in2col-gemm convolutions when DNNL_CPU!=X86."
+    )
+if(NOT ${DNNL_CPU_EXTERNAL_GEMM} MATCHES "^(NONE|MKL|CBLAS)$")
+    message(FATAL_ERROR "Unsupported CPU target: ${DNNL_CPU}")
+endif()
+
 # =============
 # Miscellaneous
 # =============
@@ -159,3 +182,28 @@ set(DNNL_USE_CLANG_SANITIZER "" CACHE STRING
     This feature is experimental and is only available on Linux.")
 
 option(_DNNL_USE_MKL "use BLAS functions from Intel MKL" OFF)
+# ==============================================
+# Some options depend on compiler/toolchain
+# TARGET_VANILLA is a historical gen-dnn option
+# JITFUNCS is also historical
+# CPU_JIT is for the new dnnl-config.h.in
+# ==============================================
+if(NECVE)
+    set(DNNL_CPU "VE")
+    set(TARGET_VANILLA ON)
+    set(JITFUNCS 7) # JITFUNCS_VE
+    set(DNNL_CPU_JIT 29) # 2 ~ VE
+elseif(NECSX)
+    set(DNNL_CPU "SX")
+    set(TARGET_VANILLA ON)
+    set(JITFUNCS 0)
+    set(DNNL_CPU_JIT 30) # 3 ~ SX
+else() # target via compiler, probably x86
+    # redo when build.sh is updated to use -DDNNL_CPU=ANY instead of TARGET_VANILLA
+    OPTION(TARGET_VANILLA "Use only pure C/C++ source_code (no x86 jit)" OFF)
+endif()
+if(DNNL_CPU MATCHES "^X86" AND TARGET_VANILLA)
+    set(DNNL_CPU_JIT 0) # cpu ANY and no x86 jit
+    set(JITFUNCS -1) # JITFUNCS_NONE
+endif()
+

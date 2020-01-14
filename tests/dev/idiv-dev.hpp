@@ -3,6 +3,10 @@
  * If it compiles, the functions are correct (static assertions).
  * \note should develop a version that calculates both Euclidean integer
  *       division and the remainder (both div_floor\* and rem_floor\*).
+ *
+ * \note For unsigned constexpr divisors, you may be able to do substantially
+ *       better, using division shortcuts (ex. multiply-add-shift with
+ *       magic constants)
  */
 #ifndef IDIV_HPP
 #define IDIV_HPP

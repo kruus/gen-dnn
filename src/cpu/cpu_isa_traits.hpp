@@ -22,7 +22,7 @@
  */
 
 //? #include <type_traits>
-//? #include "mkldnn_thread.hpp" // for crude cache size guesses, use omp_get_max_threads
+#include "dnnl_thread.hpp"      // dnnl_get_max_threads
 #include "dnnl_types.h"
 
 #include "utils.hpp"
@@ -63,7 +63,7 @@
  * *WIP* \sa cpu_isa_t
  */
 #define JITFUNCS_NONE -1
-#define JITFUNCS_ANY 0
+#define JITFUNCS_ANY 0          /* no vector ops, very old cpu */
 #define JITFUNCS_SSE41 1
 #define JITFUNCS_SSE42 2
 #define JITFUNCS_AVX 3
@@ -97,7 +97,7 @@
 #define TARGET_VANILLA
 #endif
 
-#if defined(TARGET_VANILLA) && JITFUNCS != JITFUNCS_NONE && JITFUNCS != JITFUNCS_VANILLA /*&& JITFUNCS!=JITFUNCS_VE*/
+#if defined(TARGET_VANILLA) && JITFUNCS != JITFUNCS_NONE && JITFUNCS != JITFUNCS_ANY /*&& JITFUNCS!=JITFUNCS_VE*/
 #error "TARGET_VANILLA requires JITFUNCS to be either JITFUNCS_NONE or JITFUNCS_VANILLA for now"
 #endif
 /* JITFUNCS is now always defined.
@@ -191,11 +191,11 @@ enum cpu_isa_t : unsigned {
     avx512_core_bf16 = x86_bit | avx512_core_bf16_bit | avx512_core_vnni,
     isa_all = ~(2*avx512_core_bf16_bit-1) /* means any variety of x86 (was -1) */
     /* extensions */
-    isa_ve_any = ve_bit;
-    isa_vednn  = ve_bit | vednn_bit
-    isa_ve_all = ~(ve_bit | vednn_bit);
+    , isa_ve_any = ve_bit
+    , isa_vednn  = ve_bit | vednn_bit
+    , isa_ve_all = ~(ve_bit | vednn_bit)
     /* Note old TARGET_VANILLA code */
-    isa_vanilla = x86_bit | ve_bit;
+    , isa_vanilla = x86_bit | ve_bit
 
 };
 
@@ -284,26 +284,18 @@ struct cpu_isa_traits<avx512_core_bf16> : public cpu_isa_traits<avx512_core> {
 cpu_isa_t DNNL_API get_max_cpu_isa(bool soft = false);
 dnnl::impl::status_t DNNL_API set_max_cpu_isa(dnnl_cpu_isa_t isa, bool force);
 
-template <> struct cpu_isa_traits<aurora> {
+template <> struct cpu_isa_traits<isa_ve_all> {
     static constexpr int vlen_shift = 8;
     static constexpr int vlen = 256*8; // 2 kByte vector regs (256 cwdouble or 512 packed float)
     static constexpr int n_vregs = 64;
 };
 // END cpu_isa_traits (vector register defaults)
 
-inline bool isa_has_bf16(cpu_isa_t isa) {
-#if defined(__ve)
-    return false;
-#else
-    return isa == avx512_core_bf16;
-#endif
-}
-
 #if defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS==JITFUNCS_VANILLA)
 // should not include jit_generator.hpp (or any other jit stuff)
 static inline constexpr bool mayiuse(const cpu_isa_t cpu_isa) {
 #if defined(__ve)
-    return cpu_isa == aurora;
+    return (cpu_isa & (ve_bit | vednn_bit));
 #else
     return (void)cpu_isa,false;
 #endif
@@ -341,6 +333,10 @@ static inline bool mayiuse(const cpu_isa_t cpu_isa, bool soft = false) {
                     && cpu.has(Cpu::tAVX512_BF16);
         case isa_any: return true;
         case isa_all: return false;
+        case isa_ve_any: return false;
+        case isa_vednn: return false;
+        case isa_ve_all: return false;
+        case isa_vanilla: return false;
     }
     return false;
 }
@@ -363,7 +359,7 @@ inline unsigned int get_cache_size(int level, bool per_core = true){
         const int L1_cache_per_core = 32000;
         const int L2_cache_per_core = 512000;
         const int L3_cache_per_core = 1024000;
-        int num_cores = per_core ? 1 : mkldnn_get_max_threads();
+        int num_cores = per_core ? 1 : dnnl_get_max_threads();
         switch(l){
         case(0): return L1_cache_per_core * num_cores;
         case(1): return L2_cache_per_core * num_cores;
@@ -378,14 +374,20 @@ inline unsigned int get_cache_size(int level, bool per_core = true){
 #else
         size_t const cpuDataCacheSize = 16*1024*1024;
         return cpuDataCacheSize
-                / (per_core ? mkldnn_get_max_threads() : 1);
+                / (per_core ? dnnl_get_max_threads() : 1);
 #endif
     } else
         return 0;
 }
+
 inline bool isa_has_bf16(cpu_isa_t isa) {
+//#if defined(__ve)
+//    return false;
+//#else
     return isa == avx512_core_bf16;
+//#endif
 }
+
 
 } // namespace
 
@@ -406,7 +408,7 @@ inline bool isa_has_bf16(cpu_isa_t isa) {
     ((isa) == avx512_core_bf16 ? prefix STRINGIFY(avx512_core_bf16) : \
     ((isa) == isa_ve_any ? prefix STRINGIFY(ve) : \
     ((isa) == isa_vednn ? prefix STRINGIFY(vednn) : \
-    prefix suffix_if_any)))))))))
+    prefix suffix_if_any)))))))))))))
 /* clang-format on */
 
 } // namespace cpu

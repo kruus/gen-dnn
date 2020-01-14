@@ -50,12 +50,11 @@ public:
             data_type_t bias_dt, bool skip_sum);
     pp_kernel_t(const cpu_inner_product_fwd_pd_t *pd, bool skip_sum);
     ~pp_kernel_t() {
+        if (do_eltwise_) {
 #if !defined(TARGET_VANILLA)
-        if (eltwise_injector_)
-            delete eltwise_injector_;
+            if (eltwise_injector_) delete eltwise_injector_;
 #endif // !defined(TARGET_VANILLA)
-        if (ref_eltwise_)
-            delete ref_eltwise_;
+            if (ref_eltwise_) delete ref_eltwise_;
         }
 #if !defined(TARGET_VANILLA)
         delete bf16_emu_;
@@ -133,7 +132,6 @@ private:
     size_t bias_data_type_size_;
     bool do_eltwise_;
     post_ops_t::entry_t::eltwise_t eltwise_;
-    size_t OC_;
     bool do_scale_;
     size_t scale_idx_mult_;
     bool do_sum_;

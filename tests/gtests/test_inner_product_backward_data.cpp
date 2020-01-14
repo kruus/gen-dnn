@@ -77,7 +77,6 @@ void compute_ref_inner_product_bwd_data(int ndims,
                         * weights_data[weights_mdw.off_l(widx, true)];
             }
         }
-    }
     });
 }
 

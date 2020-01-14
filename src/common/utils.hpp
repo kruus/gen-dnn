@@ -294,8 +294,9 @@ inline typename remove_reference<T>::type rnd_dn(const T a, const U b) {
     return static_cast<typename remove_reference<T>::type>((a / b) * b);
 }
 
-/** \return largest exact divisor \f$div \in [1,b] \ni a\%div = 0\f$.
- * \pre \c b > 0 (unchecked) -- typically you want both \c a and \c b > 0. */
+/** For \c b>0, return largest exact divisor \f$div \in [1,b] \ni a\%div=0\f$.
+ * Intended for both \c a and \c b > 0 (although \c a could be negative)
+ * \pre \c b > 0 (unchecked, returns \c b if \c b < 0). */
 template <typename T, typename U>
 inline typename remove_reference<T>::type max_div(const T a, const U b) {
     U div = b;

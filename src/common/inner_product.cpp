@@ -95,6 +95,7 @@ status_t dnnl_inner_product_forward_desc_init(inner_product_desc_t *ip_desc,
     if (!one_of(prop_kind, forward_training, forward_inference)){
         printf(" (ip:not fwd) "); fflush(stdout);
         return invalid_arguments;
+    }
     return ip_desc_init(
             ip_desc, prop_kind, src_desc, weights_desc, bias_desc, dst_desc);
 }

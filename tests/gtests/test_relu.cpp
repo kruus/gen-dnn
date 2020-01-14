@@ -15,7 +15,7 @@
 *******************************************************************************/
 
 #include "gtest/gtest.h"
-#include "mkldnn_test_common.hpp"
+#include "dnnl_test_common.hpp"
 
 #include "mkldnn.hpp"
 

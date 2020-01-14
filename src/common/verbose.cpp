@@ -78,7 +78,7 @@ int get_verbose() {
         if (getenv("MKLDNN_VERBOSE", val, len) == 1) verbose.set(atoi(val));
         if (getenv("DNNL_VERBOSE", val, len) == 1) verbose.set(atoi(val));
     }
-    static bool version_printed = false;
+    static bool version_printed = true;
     if (!version_printed && verbose.get() > 0) {
         printf("dnnl_verbose,info,DNNL v%d.%d.%d (commit %s)\n",
                 dnnl_version()->major, dnnl_version()->minor,
@@ -95,6 +95,10 @@ int get_verbose() {
     }
 #endif
     return verbose.get();
+}
+
+int dnnl_get_verbose() {
+    return dnnl::impl::verbose.get();
 }
 
 double get_msec() {

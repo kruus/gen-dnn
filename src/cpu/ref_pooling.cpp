@@ -139,23 +139,12 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
 
     if (alg == alg_kind::pooling_max) {
         parallel_nd(MB, OC, OD, OH, OW,
-<<<<<<< HEAD
-            [&](int mb, int oc, int od, int oh, int ow) {
-            data_t *d = is_3d
-                ? &dst[dst_d.off(mb, oc, od, oh, ow)]
-                : &dst[dst_d.off(mb, oc, oh, ow)];
-            d[0] = numeric_limits<data_t>::lowest();
-                set_ws(mb, oc, od, oh, ow, 0);
-            ker_max(d, mb, oc, od, oh, ow);
-        });
-=======
                 [&](int mb, int oc, int od, int oh, int ow) {
                     data_t *d = &dst[get_offset(dst_d, mb, oc, od, oh, ow)];
                     d[0] = numeric_limits<data_t>::lowest();
                     set_ws(mb, oc, od, oh, ow, 0);
                     ker_max(d, mb, oc, od, oh, ow);
                 });
->>>>>>> ed1cf723ee94cf95b77af55fe1309374363b8edd
     } else {
         parallel_nd(MB, OC, OD, OH, OW,
                 [&](int mb, int oc, int od, int oh, int ow) {

@@ -173,5 +173,5 @@ rnn_cell_execution_sig(ref_rnn_bwd_bf16_t::cell_execution) {
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-#if !defined(TARGET_VANILLA)
+#endif // !defined(TARGET_VANILLA)
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

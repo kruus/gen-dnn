@@ -203,7 +203,7 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
             AND_(utils::one_of(desc()->alg_kind,
                         alg_kind::deconvolution_direct,
                         alg_kind::deconvolution_winograd));
-            AND_(attr().has_default_values());
+            AND_(attr()->has_default_values());
 #endif
 
 #if 0 // orig

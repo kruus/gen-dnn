@@ -83,10 +83,10 @@ INST_TEST_CASE(TestGEMM_packed,
         test_params {'n', 't', 3, 2, 2, 1.0, 0.0, 3, 1, 8, {}, {true, true},
                 true, dnnl_invalid_arguments},
         test_params {'n', 'd', 3, 2, 1, 1.0, 0.0, 3, 3, 3, {}, {true, true},
-                true, dnnl_invalid_arguments},
+                true, dnnl_invalid_arguments}
 
 #if !defined(TARGET_VANILLA)
-        make_test_params_pack(
+        , make_test_params_pack(
                 {true, false}, 'N', 'n', 31, 21, 11, 1.0f, 1.5f, 61, 51, 81),
         make_test_params_pack(
                 {false, true}, 'n', 'T', 31, 21, 11, 1.0f, 1.5f, 61, 51, 81),
@@ -142,8 +142,10 @@ INST_TEST_CASE(TestGEMM_packed,
         make_test_params_pack({true, true}, 'n', 't', 200, 200, 8000, 1.0f,
                 3.0f, 8000, 8000, 200),
         make_test_params_pack({false, true}, 't', 'n', 200, 300, 8000, 1.0f,
-                3.0f, 200, 300, 300));
+                3.0f, 200, 300, 300)
 #endif // TARGET_VANILLA
+        );
+#endif
 
 #elif defined(BF16BF16BF16)
 

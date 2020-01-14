@@ -1167,4 +1167,3 @@ template struct _ref_rnn_common_t<prop_kind::forward, data_type::u8,
 } // namespace dnnl
 #endif // !defined(TARGET_VANILLA)
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
->>>>>>> ed1cf723ee94cf95b77af55fe1309374363b8edd

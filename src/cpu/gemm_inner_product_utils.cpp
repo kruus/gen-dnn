@@ -16,16 +16,11 @@
 
 #include "gemm_inner_product_utils.hpp"
 #include "dnnl_thread.hpp"
+#if !defined(TARGET_VANILLA)
 #include "jit_uni_eltwise_injector.hpp"
+#endif // !defined(TARGET_VANILLA)
 #include "math_utils.hpp"
 #include "simple_q10n.hpp"
-<<<<<<< HEAD
-#include "gemm_inner_product_utils.hpp"
-#if !defined(TARGET_VANILLA)
-#include "jit_uni_eltwise.hpp"
-#endif // !TARGET_VANILLA
-=======
->>>>>>> ed1cf723ee94cf95b77af55fe1309374363b8edd
 
 namespace dnnl {
 namespace impl {
@@ -41,27 +36,27 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
         const primitive_attr_t *attr, data_type_t bias_dt, bool skip_sum)
     : ker_(nullptr)
     , ref_eltwise_(nullptr)
-<<<<<<< HEAD
-    , do_bias_(pd->with_bias())
-    , bias_data_type_(data_type::undef)
-=======
+    //, do_bias_(pd->with_bias())
+    //, bias_data_type_(data_type::undef)
+#if !defined(TARGET_VANILLA)
+    , eltwise_injector_(nullptr)
     , bf16_emu_(nullptr)
+    , vreg_zero()
+    , vreg_scale()
+    , vreg_sum_scale()
+#endif
     , OC_(OC)
     , MB_(MB)
     , bias_data_type_(bias_dt)
->>>>>>> ed1cf723ee94cf95b77af55fe1309374363b8edd
     , bias_data_type_size_(0)
     , do_eltwise_(false)
     , eltwise_()
-    , OC_(pd->OC())
     , do_scale_(false)
     , scale_idx_mult_(0)
     , do_sum_(false)
     , do_dst_zero_points_(false)
     , sum_scale_(0)
 #if !defined(TARGET_VANILLA)
-    , eltwise_injector_(nullptr)
-    , bf16_emu_(nullptr)
     , isa_(isa_any)
     , max_OC_loop_unroll_(13)
     , idx_compute_vreg_start_(0)
@@ -69,43 +64,53 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
     , compute_vregs_per_iter_(1)
     , compute_vreg_bias_shift_(0)
     , compute_vreg_prev_dst_shift_(0)
-<<<<<<< HEAD
+    , mb_blk_kernel(false)
 #endif // !TARGET_VANILLA
-    {
-=======
-    , mb_blk_kernel(false) {
->>>>>>> ed1cf723ee94cf95b77af55fe1309374363b8edd
+{
     using namespace types;
+    //using namespace Xbyak;
 
-    if (do_bias_) {
-        bias_data_type_ = pd->desc()->bias_desc.data_type;
-        assert(bias_data_type_ != data_type::undef);
-        bias_data_type_size_ = data_type_size(bias_data_type_);
-    }
+    // generic setup...
 
-<<<<<<< HEAD
-    do_scale_ = !pd->attr()->output_scales_.has_default_values();
-    if (do_scale_)
-        scale_idx_mult_ = (pd->attr()->output_scales_.mask_ == (1 << 1));
-=======
     do_scale_ = !attr->output_scales_.has_default_values();
     if (do_scale_) {
         scale_idx_mult_ = (attr->output_scales_.mask_ == (1 << 1));
-        vreg_scale = Zmm(idx_compute_vreg_start_++);
+        //vreg_scale = Zmm(idx_compute_vreg_start_++);
     }
-    if (dst_type == data_type::u8) vreg_zero = Zmm(idx_compute_vreg_start_++);
->>>>>>> ed1cf723ee94cf95b77af55fe1309374363b8edd
+    //if (dst_type == data_type::u8) vreg_zero = Zmm(idx_compute_vreg_start_++);
 
     auto &p = attr->post_ops_;
     const int eltwise_ind = p.find(primitive_kind::eltwise);
     do_eltwise_ = eltwise_ind != -1;
     if (do_eltwise_) eltwise_ = p.entry_[eltwise_ind].eltwise;
+    // nb: post_ps_t::entry_t::eltwise_t eltwise_
+    //  vs ref_eltwise_scalar_fwd_t *ref_eltwise_
+    // Q: when related?
+#if defined(TARGET_VANILLA)
+    ref_eltwise_ = new ref_eltwise_scalar_fwd_t(
+            eltwise_.alg, eltwise_.alpha, eltwise_.beta);
+#endif
 
     const int sum_ind = p.find(primitive_kind::sum);
     do_sum_ = sum_ind != -1 && !skip_sum;
-    if (do_sum_)
+    if (do_sum_) {
         sum_scale_ = p.entry_[sum_ind].sum.scale;
+        //vreg_sum_scale = Zmm(idx_compute_vreg_start_++);
+        //compute_vreg_prev_dst_shift_ = compute_vregs_per_iter_++;
+    }
+
+    //if (do_bias()) {
+    //    bias_data_type_size_ = data_type_size(bias_data_type_);
+    //    compute_vreg_bias_shift_ = compute_vregs_per_iter_++;
+    //}
+
 #if !defined(TARGET_VANILLA)
+    using namespace Xbyak;
+    if (!attr->zero_points_.has_default_values(DNNL_ARG_DST)) {
+        do_dst_zero_points_ = true;
+        vreg_dst_zero_points = Zmm(idx_compute_vreg_start_++);
+    }
+
     using namespace Xbyak;
 
     if (do_scale_) {
@@ -119,12 +124,8 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
         compute_vreg_prev_dst_shift_ = compute_vregs_per_iter_++;
     }
 
-<<<<<<< HEAD
-    if (do_bias_) {
-=======
     if (do_bias()) {
         bias_data_type_size_ = data_type_size(bias_data_type_);
->>>>>>> ed1cf723ee94cf95b77af55fe1309374363b8edd
         compute_vreg_bias_shift_ = compute_vregs_per_iter_++;
     }
 
@@ -138,14 +139,9 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
         // x8s8s32 GEMM anyways. The configuration variables above are used by
         // the fallback code.
         if (do_eltwise_)
-<<<<<<< HEAD
-            ref_eltwise_ = new ref_eltwise_scalar_fwd_t(
-                    eltwise_.alg, eltwise_.alpha, eltwise_.beta);
-=======
             ref_eltwise_ = new ref_eltwise_scalar_fwd_t(eltwise_.alg,
                     eltwise_.alpha, eltwise_.beta, eltwise_.scale);
         return;
->>>>>>> ed1cf723ee94cf95b77af55fe1309374363b8edd
     } else {
         isa_ = mayiuse(avx512_core_bf16) ? avx512_core_bf16
                                          : bf16_emulation_t::get_isa();
@@ -170,25 +166,19 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
     if (do_eltwise_)
         ref_eltwise_ = new ref_eltwise_scalar_fwd_t(
                 eltwise_.alg, eltwise_.alpha, eltwise_.beta);
-#endif //ASMFMT_USE_DEPRECATED
+#endif // !defined(TARGET_VANILLA)
     return;
 }
 
-<<<<<<< HEAD
-#if !defined(TARGET_VANILLA)
-template<data_type_t acc_type, data_type_t dst_type>
-void pp_kernel_t<acc_type, dst_type>::generate()
-{
-=======
 template <data_type_t acc_type, data_type_t dst_type>
 pp_kernel_t<acc_type, dst_type>::pp_kernel_t(
         const cpu_inner_product_fwd_pd_t *pd, bool skip_sum)
     : pp_kernel_t(pd->OC(), pd->MB(), pd->attr(),
             pd->desc()->bias_desc.data_type, skip_sum) {}
 
+#if !defined(TARGET_VANILLA)
 template <data_type_t acc_type, data_type_t dst_type>
 void pp_kernel_t<acc_type, dst_type>::compute_oc_channel_blk() {
->>>>>>> ed1cf723ee94cf95b77af55fe1309374363b8edd
     using namespace Xbyak;
     using namespace utils;
 
@@ -656,7 +646,7 @@ void pp_kernel_t<acc_type, dst_type>::generate() {
 
     ker_ = getCode<decltype(ker_)>();
 }
-#endif //ASMFMT_USE_DEPRECATED
+#endif // !defined(TARGET_VANILLA)
 
 template <data_type_t acc_type, data_type_t dst_type>
 void pp_kernel_t<acc_type, dst_type>::operator()(dst_data_t *dst,
@@ -684,31 +674,18 @@ void pp_kernel_t<acc_type, dst_type>::operator()(dst_data_t *dst,
         args.oc_offset = oc_offset;
         ker_(&args);
     } else
-#endif //ASMFMT_USE_DEPRECATED
+#endif // !defined(TARGET_VANILLA)
     {
         // Fallback
         size_t oc = start % OC;
         for (size_t i = start; i < end; i++) {
             float d = (float)acc[i];
-<<<<<<< HEAD
             // surprise, bias gets passed to both extended_sgemm AND here ?
-            if (do_bias_){
-                //printf(" BBBBB ");
-                d += get_bias(bias, oc, bias_data_type_);
-            }
-            if (do_scale_)
-                d *= scales[oc * scale_idx_mult_];
-            if (do_sum_)
-                d += sum_scale_ * dst[i];
-            if (do_eltwise_)
-                d = ref_eltwise_->compute_scalar(d);
-=======
             if (do_bias()) d += get_bias(bias, oc, bias_data_type_);
             if (do_scale_) d *= scales[oc * scale_idx_mult_];
             if (do_sum_) d += sum_scale_ * dst[i];
             if (do_eltwise_) d = ref_eltwise_->compute_scalar(d);
             if (do_dst_zero_points_) d += dst_zero_points[0];
->>>>>>> ed1cf723ee94cf95b77af55fe1309374363b8edd
             dst[i] = qz_a1b0<float, dst_data_t>()(d);
             oc = (oc == OC - 1) ? 0 : oc + 1;
         }
@@ -723,18 +700,11 @@ template class pp_kernel_t<s32, s8>;
 template class pp_kernel_t<s32, u8>;
 #if !defined(TARGET_VANILLA)
 template class pp_kernel_t<f32, bf16>;
-<<<<<<< HEAD
 #endif // !TARGET_VANILLA
-}
-
-}
-}
-}
-// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s
-=======
 } // namespace inner_product_utils
 
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
->>>>>>> ed1cf723ee94cf95b77af55fe1309374363b8edd
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+

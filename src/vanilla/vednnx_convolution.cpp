@@ -6,7 +6,7 @@
 
 #include "vednnx.h"
 
-#include "mkldnn_thread.hpp"
+#include "dnnl_thread.hpp"
 #include "mkldnn_traits.hpp"
 #include "math_utils.hpp"
 

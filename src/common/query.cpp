@@ -54,7 +54,7 @@ int dnnl_primitive_desc_query_s32(
     Consistency args_ok("dnnl_primitive_desc_query_s32 args:");
     AND_(primitive_desc != nullptr);
     AND_(one_of(what, query::num_of_inputs_s32, query::num_of_outputs_s32));
-    AND_(mkldnn_primitive_desc_query(primitive_desc, what, index, &res_s32)
+    AND_(dnnl_primitive_desc_query(primitive_desc, what, index, &res_s32)
             == success);
     return args_ok ? res_s32 : 0;
 }

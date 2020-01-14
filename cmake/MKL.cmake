@@ -24,9 +24,12 @@ set(MKL_cmake_included true)
 include("cmake/utils.cmake")
 include("cmake/options.cmake")
 
-if (NOT _DNNL_USE_MKL)
+#if (NOT _DNNL_USE_MKL)
+if (NOT (_DNNL_USE_MKL OR (DNNL_CPU_EXTERNAL_GEMM STREQUAL "MKL")))
     return()
 endif()
+
+
 
 function(detect_mkl LIBNAME)
     find_path(MKLINC mkl_cblas.h

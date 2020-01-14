@@ -86,8 +86,6 @@ private:
 }
 }
 
-#endif
-
 #else // dnnl v1.1.0
 
 #include <assert.h>
@@ -147,6 +145,7 @@ private:
         zero_point = *zero_points_ptr; \
     } \
     MAYBE_UNUSED(zero_point);
+#endif // dnnl v1.1+ version
 
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif // CPU_PRIMITIVE_HPP

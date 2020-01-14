@@ -26,7 +26,7 @@
 
 #if !defined(TARGET_VANILLA)
 #include "cpu/matmul/gemm_bf16_matmul.hpp"
-#endif
+#endif // !defined(TARGET_VANILLA)
 #include "cpu/matmul/gemm_f32_matmul.hpp"
 #include "cpu/matmul/gemm_x8s8s32x_matmul.hpp"
 #include "cpu/matmul/ref_matmul.hpp"
@@ -134,7 +134,7 @@ using namespace dnnl::impl::data_type;
  */
 #if VERBOSE_PRIMITIVE_CREATE
 /** A verbose version of primitive_desc_t::create<pd_t>. \sa primitive_desc.hpp.
- * Note: now you can also just call mkldnn_verbose_set(2) in cpu_engine constructor (or so),
+ * Note: now you can also just call dnnl_set_verbose(2) in cpu_engine constructor (or so),
  *       and get more detailed info about execution and construction.
  * So the only real use of this is to track failed/successful creations (and not the executions) */
 template<typename prim>
@@ -304,12 +304,12 @@ static const pd_create_f cpu_impl_list[] = {
         INSTANCE_avx512(jit_avx512_common_convolution_fwd_t<f32>)
         INSTANCE_avx512(jit_avx512_common_convolution_bwd_data_t<f32>)
         INSTANCE_avx512(jit_avx512_common_convolution_bwd_weights_t<f32>)
-        INSTANCE_avs2(jit_avx2_dw_convolution_fwd_t)
-        INSTANCE_avs2(jit_avx2_dw_convolution_bwd_data_t)
-        INSTANCE_avs2(jit_avx2_dw_convolution_bwd_weights_t)
-        INSTANCE_avs2(jit_avx2_1x1_convolution_fwd_t)
-        INSTANCE_avs2(jit_avx2_1x1_convolution_bwd_data_t)
-        INSTANCE_avs2(jit_avx2_1x1_convolution_bwd_weights_t)
+        INSTANCE_avx2(jit_avx2_dw_convolution_fwd_t)
+        INSTANCE_avx2(jit_avx2_dw_convolution_bwd_data_t)
+        INSTANCE_avx2(jit_avx2_dw_convolution_bwd_weights_t)
+        INSTANCE_avx2(jit_avx2_1x1_convolution_fwd_t)
+        INSTANCE_avx2(jit_avx2_1x1_convolution_bwd_data_t)
+        INSTANCE_avx2(jit_avx2_1x1_convolution_bwd_weights_t)
         INSTANCE_sse41(jit_sse41_dw_convolution_fwd_t)
         INSTANCE_sse41(jit_sse41_dw_convolution_bwd_data_t)
         INSTANCE_sse41(jit_sse41_dw_convolution_bwd_weights_t)
@@ -427,9 +427,9 @@ static const pd_create_f cpu_impl_list[] = {
         INSTANCE(ref_deconvolution_bwd_data_t)
         INSTANCE(ref_deconvolution_fwd_t)
         /* shuffle */
-        INSTANCE(ref_shuffle_t<4>), /* f32 or s32 */
-        INSTANCE(ref_shuffle_t<2>), /* bf16 */
-        INSTANCE(ref_shuffle_t<1>), /* s8 or u8 */
+        INSTANCE(ref_shuffle_t<4>) /* f32 or s32 */
+        INSTANCE(ref_shuffle_t<2>) /* bf16 */
+        INSTANCE(ref_shuffle_t<1>) /* s8 or u8 */
         /* eltwise */
         INSTANCE_uni(jit_uni_eltwise_fwd_t<avx512_common, f32>)
         INSTANCE_uni(jit_uni_eltwise_fwd_t<avx512_common, s32>)

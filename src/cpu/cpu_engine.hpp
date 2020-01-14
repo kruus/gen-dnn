@@ -38,7 +38,7 @@
  * In particularly, with mods to various init() functions, you can use
  * this flag to also print out precisely why an impl was skipped.
  *
- * \deprecated Easier to mkldnn_verbose_set(2) in cpu_engine constructor (see below)
+ * \deprecated Easier to dnnl_set_verbose(2) in cpu_engine constructor (see below)
  */
 #define VERBOSE_PRIMITIVE_CREATE 0/*release mode compile*/
 #else

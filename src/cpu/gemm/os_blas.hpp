@@ -18,7 +18,7 @@
 #define OS_BLAS_HPP
 
 /** \file
-/* DNNL provides gemm functionality on its own using jit generated
+ * DNNL provides gemm functionality on its own using jit generated
  * kernels. This is the only official supported option.
  *
  *  USE_MKL  USE_CBLAS effect

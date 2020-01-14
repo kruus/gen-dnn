@@ -23,8 +23,6 @@
 
 #include "cpu_reducer.hpp"
 
-// [ejk] XXX Is this really only available for jit impls?
-
 namespace dnnl {
 namespace impl {
 namespace cpu {
@@ -285,7 +283,9 @@ struct reducer_2d_driver_f_s_32_t : public reducer_2d_driver_t<data_type>,
 template <impl::data_type_t data_type>
 inline reducer_2d_driver_t<data_type> *create_reduce_2d_drv(int n_src,
         size_t src_ld, size_t src_step, size_t dst_step, bool nullify_dst) {
-#if !defined(TARGET_VANILLA)
+#ifdef SIMPLE_IMPL
+    /* avoid creating a jit driver (before checking TARGET_VANILLA). */
+#elif !defined(TARGET_VANILLA)
     if (mayiuse(avx512_common))
         return new reducer_2d_driver_f_s_32_t<data_type, avx512_common>(
                 n_src, src_ld, src_step, dst_step, nullify_dst);
@@ -352,10 +352,9 @@ void cpu_reducer_t<data_type>::reduce_nolock(int ithr, data_t *dst,
     if (redundant_reduction) return;
 
 #if defined(TARGET_VANILLA)
-    assert(drv==nullptr);
+    assert(drv_==nullptr);
 #endif
-#if !defined(SIMPLE_IMPL)
-    if(drv) { /* nullptr if TARGET_VANILLA */
+    if(drv_) { /* nullptr if TARGET_VANILLA or not mayiuse avx2 or above */
         using namespace utils;
 
         const int id_in_grp = balancer().id_in_group(ithr);
@@ -365,32 +364,29 @@ void cpu_reducer_t<data_type>::reduce_nolock(int ithr, data_t *dst,
         const size_t reduction_size = njobs_in_grp * balancer().job_size_;
         size_t start {0}, end {0};
         balance211(div_up(reduction_size, cl), balancer().nthr_per_group_,
-                   id_in_grp, start, end);
+                id_in_grp, start, end);
 
         if (start == end) return;
 
         data_t *d = get_local_ptr(ithr - id_in_grp, dst, scratchpad) + start * cl;
         const data_t *space
-            = get_local_ptr(ithr - id_in_grp + 1, dst, scratchpad) + start * cl;
+                = get_local_ptr(ithr - id_in_grp + 1, dst, scratchpad) + start * cl;
         const size_t len = nstl::min(end * cl, reduction_size) - start * cl;
 
         (*drv_)(d, space, 1, len);
-        (*drv_)(d, space, 1, len);
-    else
-#else
-    { /* SIMPLE_IMPL */
+    } else {
         if (balancer().id_in_group(ithr) != 0)
             return; /* only threads 0 do the reduction */
 
         const int njobs_in_grp = balancer().ithr_njobs(ithr);
         data_t *d = get_local_ptr(ithr, dst, scratchpad);
-        for (int id_in_grp = 1; id_in_grp < balancer_.nthr_per_group_;
+        for (int id_in_grp = 1; id_in_grp < balancer().nthr_per_group_;
                 ++id_in_grp) {
             const data_t *space = get_local_ptr(ithr + id_in_grp, dst, scratchpad);
             for (size_t i = 0; i < (size_t)njobs_in_grp * balancer().job_size_; ++i)
                 d[i] += space[i];
         }
-#endif
+    }
 }
 
 template struct cpu_reducer_t<data_type::f32>;
@@ -466,14 +462,11 @@ void cpu_reducer_2d_t<data_type>::reduce_block(const data_t *space_base,
     const data_t *space = space_base + job * balancer().job_size_
             + ny_start * conf_.job_size_x_ + nx_start;
 #if defined(TARGET_VANILLA)
-    assert(drv==nullptr);
+    assert(drv_==nullptr);
 #endif
-#if !defined(SIMPLE_IMPL)
-    if(drv) { /* nullptr if TARGET_VANILLA */
+    if(drv_) { /* nullptr if not mayiuse avx2 or above */
         (*drv_)(d, space, ny_step, nx_step);
-    } else
-#else
-    { /* SIMPLE_IMPL */
+    } else {
         for (int idg = 0; idg < balancer().nthr_per_group_; ++idg) {
             const data_t *w = &space[idg * space_per_thread(balancer())];
             for (int y = 0; y < ny_step; ++y)
@@ -484,8 +477,6 @@ void cpu_reducer_2d_t<data_type>::reduce_block(const data_t *space_base,
                 }
         }
     }
-#endif
-
 }
 
 template <impl::data_type_t data_type>

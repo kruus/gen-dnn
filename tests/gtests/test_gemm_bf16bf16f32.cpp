@@ -31,4 +31,5 @@ TEST_P(gemm_test, TestGEMM) {}
 #define BF16BF16F32
 #include "gemm_in.h"
 } // namespace dnnl
+#endif // !defined(TARGET_VANILLA)
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

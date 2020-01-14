@@ -7,7 +7,7 @@
  * - verbose
  *   - print failure location in debug mode,
  *   - for -DNDEBUG compile with -DDISABLE_VERBOSE, never print
- *   - for -DNDEBUG compile o/w, print if bit 3 is set: `mkldnn_verbose() & 0x04`
+ *   - for -DNDEBUG compile o/w, print if bit 3 is set: `dnnl_get_verbose() & 0x04`
  *     - this is a questionable extension of mkldnn_set_verbose(int level)
  * - very verbose [print failure location even if -DNDEBUG
  *
@@ -19,7 +19,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-namespace mkldnn {
+namespace dnnl {
 namespace impl {
 
 struct CondLoc { // Quiet default: never print, so struct is simpler
@@ -47,7 +47,7 @@ struct CondLocVV { // CondLoc with "verbose always" hint (even in optimized -DND
 #define COND_LOC(...) CondLoc{bool{!!(__VA_ARGS__)}}
 
 #if !defined(DISABLE_VERBOSE)
-/** verbose for debug: always, for opt: use \c (*mkldnn_verbose() & 0x04) flag */
+/** verbose for debug: always, for opt: use \c (*dnnl_get_verbose() & 0x04) flag */
 #define COND_LOCV(...) CondLocV{bool{!!(__VA_ARGS__)}, __FILE__, __LINE__, #__VA_ARGS__}
 #else
 #define COND_LOCV(...) CondLocV{bool{!!(__VA_ARGS__)}}
@@ -96,7 +96,7 @@ struct Consistency {
         if (!cl.cond
 #if defined(NDEBUG)
                 // optimized compile can still use MKLDNN_VERBOSE=N bit 2 to to print consistency failures
-                && (mkldnn_verbose()->level & 0x04)
+                && (dnnl_get_verbose() & 0x04) // added a 3rd bit
 #endif
            ){
             fprintf(stdout," %s [%s:%d] %s\n",

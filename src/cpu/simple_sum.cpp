@@ -14,7 +14,6 @@
 * limitations under the License.
 *******************************************************************************/
 
-<<<<<<< HEAD
 #include "cpu_isa_traits.hpp"
 #include "simple_sum.hpp"
 #if !defined(TARGET_VANILLA)

@@ -308,12 +308,9 @@ rnn_postgemm_sig(rnn_postgemm_bwd_bf16_t::gru_part2_postgemm) {
             diff_states_tp1_l_, diff_states_t_lp1_,
             (scratch_data_t *)scratch_cell_);
 }
-<<<<<<< HEAD
 #endif // !defined(TARGET_VANILLA)
-=======
 
 #undef AOC
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
->>>>>>> ed1cf723ee94cf95b77af55fe1309374363b8edd

@@ -164,6 +164,7 @@ int compare_bootstrap(dnn_mem_t &mem_ref, dnn_mem_t &mem_got, res_t *r) {
 
 static int compare(const prb_t *p, const dnn_mem_t &mem_ref,
         const dnn_mem_t &mem_got, const attr_bundle_t &attr_bundle, res_t *r) {
+    using std::isinf;
     const auto nelems = mem_got.nelems();
     r->errors = 0;
     r->total = nelems;

@@ -15,7 +15,7 @@
 *******************************************************************************/
 
 #include "c_types_map.hpp"
-#include "mkldnn_thread.hpp"
+#include "dnnl_thread.hpp"
 #include "utils.hpp"
 
 #include "cpu_isa_traits.hpp"
@@ -35,12 +35,12 @@ void cache_balance(size_t working_set_size, dim_t C_blks,
     int nthrs = dnnl_get_max_threads();
     int l3_size = get_cache_size(3, true) * nthrs / 2;
 
-        C_blks_per_iter = l3_size / working_set_size;
+    C_blks_per_iter = l3_size / working_set_size;
 
     if (C_blks_per_iter == 0) C_blks_per_iter = 1;
     if (C_blks_per_iter > C_blks) C_blks_per_iter = C_blks;
 
-        iters = (C_blks + C_blks_per_iter - 1) / C_blks_per_iter;
+    iters = (C_blks + C_blks_per_iter - 1) / C_blks_per_iter;
 }
 
 bool thread_balance(bool do_blocking, bool spatial_thr_allowed, int ithr,
@@ -64,27 +64,10 @@ bool thread_balance(bool do_blocking, bool spatial_thr_allowed, int ithr,
             N_nthr = (int)nstl::min<dim_t>(N, nthr);
             C_nthr = (int)nstl::min<dim_t>(C_blks, nthr / N_nthr);
             S_nthr = (int)nstl::min<dim_t>(SP, nthr / (C_nthr * N_nthr));
-            } else {
+        } else {
             C_nthr = (int)math::gcd((dim_t)nthr, C_blks);
             N_nthr = (int)nstl::min<dim_t>(N, nthr / C_nthr);
             S_nthr = (int)nstl::min<dim_t>(SP, nthr / (C_nthr * N_nthr));
-            }
-
-            if (!spatial_thr_allowed)
-                S_nthr = 1;
-
-            if (S_nthr < 1) S_nthr = 1;
-            if (ithr < C_nthr * N_nthr * S_nthr) {
-                N_ithr = (ithr / S_nthr) % N_nthr ;
-                C_ithr = ithr / (N_nthr * S_nthr);
-                S_ithr = ithr % S_nthr;
-                balance211(C_blks, C_nthr, C_ithr, C_blk_s, C_blk_e);
-                balance211(N, N_nthr, N_ithr, N_s, N_e);
-                balance211(SP, S_nthr, S_ithr, S_s, S_e);
-            } else {
-                S_ithr = N_ithr = C_ithr = -ithr;
-                S_s = S_e = N_s = N_e = C_blk_s = C_blk_e = -1;
-            }
         }
 
         if (!spatial_thr_allowed) S_nthr = 1;
