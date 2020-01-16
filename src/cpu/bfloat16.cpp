@@ -14,17 +14,20 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include <memory>
 #include "cpu_isa_traits.hpp"
+#if DNNL_ENABLE_BFLOAT16
+#include <memory>
 #include "bfloat16.hpp"
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_XBYAK
 #include "jit_avx512_core_bf16cvt.hpp"
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_XBYAK
 
 namespace dnnl {
 namespace impl {
 
+#if DNNL_ENABLE_XBYAK
 using namespace cpu::bf16_support;
+#endif // DNNL_ENABLE_XBYAK
 
 union float_raw {
     float fraw;
@@ -33,7 +36,7 @@ union float_raw {
 };
 
 bfloat16_t &bfloat16_t::operator=(float f) {
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_XBYAK
     if (cpu::mayiuse(cpu::cpu_isa_t::avx512_core)) {
         jit_call_t p;
         p.inp = (void *)&f;
@@ -42,7 +45,7 @@ bfloat16_t &bfloat16_t::operator=(float f) {
                 1);
         cvt_one_ps_to_bf16.jit_ker(&p);
     } else
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_XBYAK
     {
         float_raw r = {f};
         switch (std::fpclassify(f)) {
@@ -76,8 +79,8 @@ bfloat16_t::operator float() const {
     return r.fraw;
 }
 
-#if !defined(TARGET_VANILLA)
 void cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t size) {
+#if DNNL_ENABLE_XBYAK
     if (cpu::mayiuse(cpu::cpu_isa_t::avx512_core)) {
         jit_call_t p_;
         p_.inp = (void *)inp;
@@ -85,13 +88,16 @@ void cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t size) {
         p_.size = size;
         static const cpu::jit_avx512_core_cvt_ps_to_bf16_t cvt_ps_to_bf16;
         cvt_ps_to_bf16.jit_ker(&p_);
-    } else {
+    } else
+#endif // DNNL_ENABLE_XBYAK
+    {
         for (size_t i = 0; i < size; ++i)
             out[i] = inp[i];
     }
 }
 
 void cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t size) {
+#if DNNL_ENABLE_XBYAK
     if (cpu::mayiuse(cpu::cpu_isa_t::avx512_core)) {
         jit_call_t p_;
         p_.inp = (void *)inp;
@@ -99,7 +105,9 @@ void cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t size) {
         p_.size = size;
         static const cpu::jit_avx512_core_cvt_bf16_to_ps_t cvt_bf16_to_ps;
         cvt_bf16_to_ps.jit_ker(&p_);
-    } else {
+    } else
+#endif // DNNL_ENABLE_XBYAK
+    {
         for (size_t i = 0; i < size; ++i)
             out[i] = inp[i];
     }
@@ -107,6 +115,7 @@ void cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t size) {
 
 void add_floats_and_cvt_to_bfloat16(
         bfloat16_t *out, const float *inp0, const float *inp1, size_t size) {
+#if DNNL_ENABLE_XBYAK
     if (cpu::mayiuse(cpu::cpu_isa_t::avx512_core)) {
         jit_call_t p_;
         p_.inp = (void *)inp0;
@@ -116,13 +125,16 @@ void add_floats_and_cvt_to_bfloat16(
         static const cpu::jit_avx512_core_add_cvt_ps_to_bf16_t
                 add_cvt_ps_to_bf16;
         add_cvt_ps_to_bf16.jit_ker(&p_);
-    } else {
+    } else
+#endif // DNNL_ENABLE_XBYAK
+    {
         for (size_t i = 0; i < size; ++i)
             out[i] = inp0[i] + inp1[i];
     }
 }
-#endif // !TARGET_VANILLA
 
 } // namespace impl
 } // namespace dnnl
+
+#endif // DNNL_ENABLE_BFLOAT16
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

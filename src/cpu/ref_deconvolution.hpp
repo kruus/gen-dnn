@@ -293,14 +293,14 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
             auto bia_type = pd()->weights_md(1)->data_type;
             if (utils::everyone_is(f32, dst_type, bia_type))
                 compute_bias<f32, f32>(ctx);
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
             else if (utils::everyone_is(bf16, dst_type, bia_type))
                 compute_bias<bf16, bf16>(ctx);
             else if (dst_type == f32 && bia_type == bf16)
                 compute_bias<f32, bf16>(ctx);
             else if (dst_type == bf16 && bia_type == f32)
                 compute_bias<bf16, f32>(ctx);
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
         }
         return status::success;
     }
@@ -577,7 +577,11 @@ struct ref_deconvolution_bwd_weights_t : public primitive_impl_t {
             DBG2("src_type",mkldnn_dt2str(src_type));
             DBG2("dwei_type",mkldnn_dt2str(dwei_type));
             DBG2("ddst_type",mkldnn_dt2str(ddst_type));
-#if defined(TARGET_VANILLA) // no bf16 support
+#if DNNL_ENABLE_BFLOAT16
+            AND_(utils::everyone_is(f32, src_type, dwei_type, ddst_type)
+                    || (utils::one_of(dwei_type, f32, bf16)
+                        && utils::everyone_is(bf16, src_type, ddst_type)));
+#else
             {
                 // but also perhaps issues with undef data types in gtests
                 bool a=ok;
@@ -588,10 +592,6 @@ struct ref_deconvolution_bwd_weights_t : public primitive_impl_t {
                         mkldnn_dt2str(dwei_type),
                         mkldnn_dt2str(ddst_type));
             }
-#else
-            AND_(utils::everyone_is(f32, src_type, dwei_type, ddst_type)
-                    || (utils::one_of(dwei_type, f32, bf16)
-                        && utils::everyone_is(bf16, src_type, ddst_type)));
 #endif
             AND_(utils::one_of(desc()->alg_kind,
                         alg_kind::deconvolution_direct,
@@ -659,12 +659,12 @@ struct ref_deconvolution_bwd_weights_t : public primitive_impl_t {
             auto ddst_type = pd()->diff_dst_md()->data_type;
             if (utils::everyone_is(f32, dbia_type, ddst_type))
                 compute_bias<f32, f32>(ctx);
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
             else if (utils::everyone_is(bf16, dbia_type, ddst_type))
                 compute_bias<bf16, bf16>(ctx);
             else if (dbia_type == f32 && ddst_type == bf16)
                 compute_bias<f32, bf16>(ctx);
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
         }
         return status::success;
     }
@@ -692,6 +692,5 @@ private:
 } // namespace impl
 } // namespace dnnl
 
-#endif
-
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+#endif

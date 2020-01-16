@@ -18,6 +18,8 @@
 #include "dnnl_thread.hpp"
 #if !defined(TARGET_VANILLA)
 #include "jit_uni_eltwise_injector.hpp"
+#else
+#include "ref_eltwise.hpp"
 #endif // !defined(TARGET_VANILLA)
 #include "math_utils.hpp"
 #include "simple_q10n.hpp"
@@ -87,8 +89,8 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
     //  vs ref_eltwise_scalar_fwd_t *ref_eltwise_
     // Q: when related?
 #if defined(TARGET_VANILLA)
-    ref_eltwise_ = new ref_eltwise_scalar_fwd_t(
-            eltwise_.alg, eltwise_.alpha, eltwise_.beta);
+    ref_eltwise_ = new ref_eltwise_scalar_fwd_t(eltwise_.alg,
+            eltwise_.alpha, eltwise_.beta, eltwise_.scale);
 #endif
 
     const int sum_ind = p.find(primitive_kind::sum);
@@ -110,8 +112,6 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
         do_dst_zero_points_ = true;
         vreg_dst_zero_points = Zmm(idx_compute_vreg_start_++);
     }
-
-    using namespace Xbyak;
 
     if (do_scale_) {
         vreg_scale = Zmm(idx_compute_vreg_start_++);
@@ -164,8 +164,8 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
     }
 #else
     if (do_eltwise_)
-        ref_eltwise_ = new ref_eltwise_scalar_fwd_t(
-                eltwise_.alg, eltwise_.alpha, eltwise_.beta);
+        ref_eltwise_ = new ref_eltwise_scalar_fwd_t(eltwise_.alg,
+                eltwise_.alpha, eltwise_.beta, eltwise_.scale);
 #endif // !defined(TARGET_VANILLA)
     return;
 }

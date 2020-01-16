@@ -13,6 +13,8 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_isa_traits.hpp"
+#if !defined(TARGET_VANILLA)
 
 #include "common_u8.hpp"
 #include "jit_generator.hpp"
@@ -683,3 +685,6 @@ jit_avx512_core_u8_copy_sum_bt_kern::jit_avx512_core_u8_copy_sum_bt_kern(
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
+
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+#endif // !defined(TARGET_VANILLA)

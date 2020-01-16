@@ -16,9 +16,8 @@
 
 #ifndef CPU_GEMM_BF16_CONVOLUTION_HPP
 #define CPU_GEMM_BF16_CONVOLUTION_HPP
-//
-// while header can compile for vanilla, impl REQUIRES jit XXX CHECKME
-//
+#include "cpu_target.h"
+#if DNNL_ENABLE_BFLOAT16
 
 #include "c_types_map.hpp"
 #include "memory_tracking.hpp"
@@ -28,10 +27,10 @@
 #include "cpu_reducer.hpp"
 #include "gemm/gemm.hpp"
 #include "gemm_convolution_utils.hpp"
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 #include "jit_avx512_core_bf16cvt.hpp"
 #include "jit_uni_eltwise_injector.hpp"
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 
 namespace dnnl {
 namespace impl {
@@ -125,16 +124,16 @@ struct gemm_bf16_convolution_fwd_t : public primitive_impl_t {
                 ? one
                 : zero;
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
         if (this->pd()->is_postprocess_required())
             pp_ker_ = new pp_ker_t(this->pd());
-#endif // !TARGET_VANILLA
+#endif // TARGET_X86_JIT
     }
 
     ~gemm_bf16_convolution_fwd_t() {
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
         delete pp_ker_;
-#endif // !TARGET_VANILLA
+#endif // TARGET_X86_JIT
     }
 
     typedef typename prec_traits<dst_data_type>::type dst_data_t;
@@ -151,7 +150,7 @@ private:
     void execute_forward(const exec_ctx_t &ctx) const;
     const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     class pp_ker_t : jit_generator {
     public:
         DECLARE_CPU_JIT_AUX_FUNCTIONS(gemm_bf16_convolution_fwd_t::pp_kernel);
@@ -251,12 +250,12 @@ private:
     };
 #else
     void* pp_ker_;
-#endif // !TARGET_VANILLA
+#endif // TARGET_X86_JIT
 
     acc_data_t beta_;
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     pp_ker_t *pp_ker_;
-#endif // !TARGET_VANILLA
+#endif // TARGET_X86_JIT
 };
 
 template <data_type_t diff_src_data_type>
@@ -405,5 +404,6 @@ private:
 } // namespace impl
 } // namespace dnnl
 
+#endif // DNNL_ENABLE_BFLOAT16
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

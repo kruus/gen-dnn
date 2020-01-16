@@ -13,6 +13,8 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_isa_traits.hpp"
+#if !defined(TARGET_VANILLA)
 
 #include "jit_avx2_kernel_sgemm_kern.hpp"
 
@@ -441,3 +443,6 @@ jit_avx2_kernel_sgemm_kern::jit_avx2_kernel_sgemm_kern(bool beta_zero)
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
+
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+#endif // !defined(TARGET_VANILLA)

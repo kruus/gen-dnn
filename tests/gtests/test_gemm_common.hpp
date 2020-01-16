@@ -104,7 +104,7 @@ dnnl_status_t dnnl_ocl_gemm_u8u8s32(cl_command_queue queue, char transa,
 }
 #endif
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if DNNL_ENABLE_BFLOAT16
 // Declare bfloat16 GEMM interfaces for testing
 extern "C" {
 dnnl_status_t dnnl_gemm_bf16bf16f32(char transa, char transb, dnnl_dim_t M,
@@ -112,7 +112,7 @@ dnnl_status_t dnnl_gemm_bf16bf16f32(char transa, char transb, dnnl_dim_t M,
         dnnl_dim_t lda, const bfloat16_t *B, dnnl_dim_t ldb, float beta,
         float *C, dnnl_dim_t ldc);
 }
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
 // Declare packed GEMM interfaces for testing
 namespace dnnl {
@@ -145,10 +145,12 @@ extern dnnl_status_t sgemm_pack(const char *identifier, const char *transa,
         const char *transb, const int *M, const int *N, const int *K,
         const int *lda, const int *ldb, const float *src, float *dst);
 
+#if DNNL_ENABLE_BFLOAT16
 extern dnnl_status_t gemm_bf16bf16f32_pack(const char *identifier,
         const char *transa, const char *transb, const int *M, const int *N,
         const int *K, const int *lda, const int *ldb, const bfloat16_t *src,
         bfloat16_t *dst);
+#endif // DNNL_ENABLE_BFLOAT16
 
 extern dnnl_status_t gemm_s8u8s32_pack(const char *identifier,
         const char *transa, const char *transb, const int *M, const int *N,
@@ -166,10 +168,12 @@ extern dnnl_status_t sgemm_compute(const char *transa, const char *transb,
         const int *lda, const float *B, const int *ldb, const float *beta,
         float *C, const int *ldc);
 
+#if DNNL_ENABLE_BFLOAT16
 extern dnnl_status_t gemm_bf16bf16f32_compute(const char *transa,
         const char *transb, const int *M, const int *N, const int *K,
         const bfloat16_t *A, const int *lda, const bfloat16_t *B,
         const int *ldb, const float *beta, float *C, const int *ldc);
+#endif // DNNL_ENABLE_BFLOAT16
 
 extern dnnl_status_t gemm_s8u8s32_compute(const char *transa,
         const char *transb, const char *offsetc, const int *M, const int *N,
@@ -1041,7 +1045,7 @@ struct dnnl_gemm<float16_t, float16_t, float> {
     }
 };
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if DNNL_ENABLE_BFLOAT16
 template <>
 struct dnnl_gemm<bfloat16_t, bfloat16_t, float> {
     static dnnl_status_t call_packed(const test_params &p,
@@ -1162,7 +1166,7 @@ struct dnnl_gemm<bfloat16_t, bfloat16_t, bfloat16_t> {
         return dnnl_unimplemented;
     }
 };
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
 template <typename a_dt, typename b_dt, typename c_dt>
 struct run_test_gemm {

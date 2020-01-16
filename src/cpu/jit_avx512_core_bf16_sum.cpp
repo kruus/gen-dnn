@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_isa_traits.hpp"
 #if !defined(TARGET_VANILLA)
 #include <float.h>
 #include "jit_avx512_core_bf16_sum.hpp" // cpu
@@ -296,11 +297,14 @@ status_t jit_bf16_sum_t<src_data_type, dst_data_type>::execute(
     return status::success;
 }
 
+#if !defined(TARGET_VANILLA)
 template struct jit_bf16_sum_t<data_type::bf16, data_type::f32>;
 template struct jit_bf16_sum_t<data_type::bf16, data_type::bf16>;
+#endif // !defined(TARGET_VANILLA)
 
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
+
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif // !defined(TARGET_VANILLA)

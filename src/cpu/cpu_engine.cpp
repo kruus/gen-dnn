@@ -447,8 +447,10 @@ static const pd_create_f cpu_impl_list[] = {
         INSTANCE_uni(jit_uni_eltwise_bwd_t<sse41, f32>)
         INSTANCE(ref_eltwise_fwd_t<f32>)
         INSTANCE(ref_eltwise_bwd_t<f32>)
+#if DNNL_ENABLE_BFLOAT16
         INSTANCE(ref_eltwise_fwd_t<bf16>)
         INSTANCE(ref_eltwise_bwd_t<bf16>)
+#endif
         /* eltwise (int) */
         INSTANCE(ref_eltwise_fwd_t<s32>)
         INSTANCE(ref_eltwise_fwd_t<s8>)
@@ -481,7 +483,7 @@ static const pd_create_f cpu_impl_list[] = {
         INSTANCE(nhwc_pooling_bwd_t<f32>)
 
         INSTANCE(ref_pooling_fwd_t<f32>)
-        INSTANCE_sse41(ref_pooling_fwd_t<bf16, f32>)
+        INSTANCE_sse41(ref_pooling_fwd_t<bf16, f32>) // or _any?
         INSTANCE(ref_pooling_bwd_t<f32>)
         INSTANCE_sse41(ref_pooling_bwd_t<bf16>)
 
@@ -502,8 +504,10 @@ static const pd_create_f cpu_impl_list[] = {
         INSTANCE_uni(jit_uni_lrn_fwd_t<sse41>)
         INSTANCE(ref_lrn_fwd_t<f32>)
         INSTANCE(ref_lrn_bwd_t<f32>)
+#if DNNL_ENABLE_BFLOAT16
         INSTANCE(ref_lrn_fwd_t<bf16>)
         INSTANCE(ref_lrn_bwd_t<bf16>)
+#endif
         /* batch normalization */
         INSTANCE_uni(jit_uni_batch_normalization_fwd_t<avx512_common>)
         INSTANCE_uni(jit_uni_batch_normalization_bwd_t<avx512_common>)
@@ -565,16 +569,22 @@ static const pd_create_f cpu_impl_list[] = {
         INSTANCE_uni(jit_uni_layer_normalization_bwd_t)
         INSTANCE(ref_layer_normalization_fwd_t<f32>)
         INSTANCE(ref_layer_normalization_bwd_t<f32>)
+#if DNNL_ENABLE_BFLOAT16
         INSTANCE(ref_layer_normalization_fwd_t<bf16>)
         INSTANCE(ref_layer_normalization_bwd_t<bf16>)
+#endif
         /* binary op */
         INSTANCE_uni(jit_uni_binary_t<avx512_common>)
         INSTANCE_uni(jit_uni_binary_t<avx2>)
         INSTANCE(ref_binary_t<f32>)
+#if DNNL_ENABLE_BFLOAT16
         INSTANCE(ref_binary_t<bf16>)
+#endif
         /* matmul op */
         INSTANCE(matmul::gemm_f32_matmul_t)
+#if DNNL_ENABLE_BFLOAT16
         INSTANCE(matmul::gemm_bf16_matmul_t<f32>)
+#endif
         INSTANCE_sse41(matmul::gemm_bf16_matmul_t<bf16>)
         INSTANCE(matmul::gemm_x8s8s32x_matmul_t<s8, s8, f32>)
         INSTANCE(matmul::gemm_x8s8s32x_matmul_t<s8, s8, s32>)

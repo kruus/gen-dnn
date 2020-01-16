@@ -86,6 +86,9 @@ inline tbb::static_partitioner dnnl_tbb_partitioner() {
 
 #define PRAGMA_OMP(...)
 
+#else
+#error "unsupported DNNL_CPU_THREADING_RUNTIME!"
+
 #endif
 
 #ifndef PRAGMA_OMP_SIMD // [ejk] pragma macros moved upward to include/mkldnn_os.h

@@ -17,13 +17,16 @@
 #ifndef GEMM_INFO_HPP
 #define GEMM_INFO_HPP
 
+#include "cpu_isa_traits.hpp"
 #include <cstdint>
-// XXX ? #include "cpu_isa_traits.hpp"
 #include <memory>
 #include "c_types_map.hpp"
 #include "gemm_pack_storage.hpp"
 #include "gemm_threading.hpp"
 
+// MKLDNN_CPU_GEMM_JIT is a 0/1 internal equivalent to defined(TARGET_VANILLA)
+// Originally to run the non-jit tests in an otherwise-jit build.
+// deprecated? (could just use TARGET_VANILLA throughout)
 #if defined(MKLDNN_CPU_GEMM_JIT)
 #undef MKLDNN_CPU_GEMM_JIT
 #define MKLDNN_CPU_GEMM_JIT 1

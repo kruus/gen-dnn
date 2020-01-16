@@ -16,10 +16,10 @@
 
 #include "dnnl.h"
 
+#include "utils.hpp"
 #include "c_types_map.hpp"
 #include "primitive_attr.hpp"
 #include "type_helpers.hpp"
-#include "utils.hpp"
 
 using namespace dnnl::impl;
 using namespace dnnl::impl::status;

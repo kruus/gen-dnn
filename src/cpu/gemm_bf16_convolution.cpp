@@ -13,8 +13,8 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-
-#if !defined(TARGET_VANILLA)
+#include "cpu_target.h"
+#if DNNL_ENABLE_BFLOAT16
 #include "dnnl_types.h"
 
 #include "c_types_map.hpp"
@@ -696,4 +696,4 @@ template struct gemm_bf16_convolution_bwd_weights_t<data_type::bf16>;
 } // namespace impl
 } // namespace dnnl
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16

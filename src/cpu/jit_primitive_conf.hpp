@@ -26,7 +26,7 @@ namespace dnnl {
 namespace impl {
 namespace cpu {
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 /* convolution */
 enum conv_version_t {
     ver_unused,
@@ -53,10 +53,10 @@ enum conv_1x1_loop_order_t {
     loop_blr,
     loop_brl
 };
-#endif
+#endif // TARGET_X86_JIT
 enum conv_gemm_loop_order_t { gemm_loop_rlb, gemm_loop_lrb };
-#if !defined(TARGET_VANILLA)
 
+#if TARGET_X86_JIT
 enum conv_kernel_kind_t { embd_bcast, expl_bcast };
 enum conv_harness_t {
     harness_2d_reduction,
@@ -84,9 +84,9 @@ enum {
     FLAG_COMPUTE_BIAS = 1 << 2, /* Controls bias computation during execution
                                     pass */
 };
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 struct jit_conv_conf_t {
     prop_kind_t prop_kind;
     conv_version_t ver;
@@ -199,9 +199,9 @@ inline status_t init_tag(format_tag_t &tag, const memory_desc_wrapper &mdw,
 }
 
 struct jit_conv_conf_2x3_wino_t {
-#ifndef TARGET_VANILLA
+#if TARGET_X86_JIT
     conv_version_t ver;
-#endif
+#endif // TARGET_X86_JIT
 
     int m;
     int r;
@@ -330,7 +330,7 @@ struct jit_conv_winograd_conf_t : public jit_conv_conf_t {
     winograd_sched_t sched_policy;
 };
 
-#ifndef TARGET_VANILLA /* is there a vanilla (non-jit) Winograd */
+#if TARGET_X86_JIT /* is there a vanilla (non-jit) Winograd */
 struct jit_conv_call_s {
     const void *src; /* hack, non-const for backward_data */
     const void *dst; /* hack, non-const for forward */
@@ -372,7 +372,7 @@ struct jit_conv_call_s {
     size_t back_overflow;
     int flags;
 };
-#endif
+#endif // TARGET_X86_JIT
 
 struct jit_deconv_call_s {
     const void *src; /* hack, non-const for backward_data */
@@ -418,9 +418,7 @@ struct jit_wino_transform_call_s {
     void *G;
     void *bias;
 };
-#endif
 
-#ifndef TARGET_VANILLA
 struct jit_1x1_conv_conf_t {
     prop_kind_t prop_kind;
     conv_version_t ver;
@@ -508,7 +506,7 @@ struct jit_gemm_conv_conf_t {
 };
 #endif
 
-#ifndef TARGET_VANILLA
+#if TARGET_X86_JIT
 struct jit_1x1_conv_call_s {
     const void *bcast_data;
     const void *load_data;
@@ -526,9 +524,9 @@ struct jit_1x1_conv_call_s {
 
     size_t first_last_flag;
 };
-#endif
+#endif // TARGET_X86_JIT
 
-#ifndef TARGET_VANILLA
+#if TARGET_X86_JIT
 struct jit_pool_conf_t {
     int ndims;
     int mb, c;
@@ -557,9 +555,9 @@ struct jit_pool_conf_t {
 
     cpu_isa_t isa;
 };
-#endif
+#endif // TARGET_X86_JIT
 
-#ifndef TARGET_VANILLA
+#if TARGET_X86_JIT
 struct jit_pool_call_s {
     const void *src;
     const void *dst;
@@ -576,7 +574,7 @@ struct jit_pool_call_s {
     const void *init_value;
     float ker_area_h;
 };
-#endif
+#endif // TARGET_X86_JIT
 
 } // namespace cpu
 } // namespace impl

@@ -21,11 +21,11 @@
 #include "c_types_map.hpp"
 #include "cpu_engine.hpp"
 #include "cpu_inner_product_pd.hpp"
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 #include "jit_avx512_core_bf16cvt.hpp"
 #include "jit_generator.hpp"
 #include "jit_uni_eltwise_injector.hpp"
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 #include "ref_eltwise.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
@@ -38,27 +38,27 @@ namespace inner_product_utils {
 
 template <impl::data_type_t acc_type, impl::data_type_t dst_type>
 class pp_kernel_t
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 : jit_generator
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 {
 public:
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     DECLARE_CPU_JIT_AUX_FUNCTIONS(gemm_x8s8s32x_inner_product_fwd_t::pp_kernel);
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
     pp_kernel_t(size_t OC, size_t MB, const primitive_attr_t *attr,
             data_type_t bias_dt, bool skip_sum);
     pp_kernel_t(const cpu_inner_product_fwd_pd_t *pd, bool skip_sum);
     ~pp_kernel_t() {
         if (do_eltwise_) {
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
             if (eltwise_injector_) delete eltwise_injector_;
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
             if (ref_eltwise_) delete ref_eltwise_;
         }
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
         delete bf16_emu_;
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
     }
 
     typedef typename prec_traits<acc_type>::type acc_data_t;
@@ -73,9 +73,9 @@ public:
             size_t runtime_oc = 0, const float *dst_zero_points = nullptr);
 
 private:
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     void generate();
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
     void compute_oc_channel_blk();
     void compute_mb_blk(); // vectorize across minibatch
 
@@ -96,7 +96,7 @@ private:
     void (*ker_)(const ker_args *args);
     ref_eltwise_scalar_fwd_t *ref_eltwise_;
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     jit_uni_eltwise_injector_f32<avx512_core> *eltwise_injector_;
     bf16_emulation_t *bf16_emu_;
 
@@ -124,7 +124,7 @@ private:
     Xbyak::Zmm bf16_emu_reserv_3 = Xbyak::Zmm(30);
     Xbyak::Reg64 bf16_emu_reserv_4 = r12;
     Xbyak::Zmm bf16_emu_reserv_5 = Xbyak::Zmm(31);
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 
     size_t OC_;
     size_t MB_;
@@ -137,14 +137,14 @@ private:
     bool do_sum_;
     bool do_dst_zero_points_;
     float sum_scale_;
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     cpu_isa_t isa_;
     int max_OC_loop_unroll_;
     int idx_compute_vreg_start_;
     int idx_compute_vreg_max_;
     int compute_vregs_per_iter_;
     int compute_vreg_bias_shift_, compute_vreg_prev_dst_shift_;
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
     bool mb_blk_kernel;
 
     const size_t vlen = cpu_isa_traits<avx512_core>::vlen / sizeof(float);
@@ -153,7 +153,7 @@ private:
     bool runtime_oc() const { return OC_ == (size_t)DNNL_RUNTIME_DIM_VAL; }
     bool runtime_mb() const { return MB_ == (size_t)DNNL_RUNTIME_DIM_VAL; }
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     Xbyak::Zmm vreg_dst(int iter) {
         int idx = idx_compute_vreg_start_ + iter * compute_vregs_per_iter_;
         assert(idx <= idx_compute_vreg_max_);
@@ -173,7 +173,7 @@ private:
         assert(idx <= idx_compute_vreg_max_);
         return Xbyak::Zmm(idx);
     };
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 };
 
 } // namespace inner_product_utils

@@ -14,6 +14,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_isa_traits.hpp"
 #if !defined(TARGET_VANILLA)
 
 #include "c_types_map.hpp"

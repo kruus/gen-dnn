@@ -76,7 +76,9 @@ void ref_binary_t<data_type>::execute_ref(const exec_ctx_t &ctx) const {
 }
 
 template struct ref_binary_t<data_type::f32>;
+#if !defined(TARGET_VANILLA)
 template struct ref_binary_t<data_type::bf16>;
+#endif // !defined(TARGET_VANILLA)
 
 } // namespace cpu
 } // namespace impl

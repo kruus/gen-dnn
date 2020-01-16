@@ -58,8 +58,10 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
         /* rnn reorders */
         rnn_data_reorder_t<f32, u8>::pd_t::create,
         rnn_weights_reorder_t<f32, f32>::pd_t::create,
+#if !defined(TARGET_VANILLA)
         rnn_weights_reorder_t<f32, bf16>::pd_t::create,
         rnn_weights_reorder_t<bf16, bf16>::pd_t::create,
+#endif // !defined(TARGET_VANILLA)
         rnn_weights_reorder_s8_t<f32>::pd_t::create,
 
         /* conv reorders w/ compensation */

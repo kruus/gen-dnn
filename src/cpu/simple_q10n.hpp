@@ -96,6 +96,7 @@ struct qz<in_t, float> {
     }
 };
 
+#if DNNL_ENABLE_BFLOAT16
 template <>
 struct qz<bfloat16_t, bfloat16_t> {
     float operator()(bfloat16_t in, bfloat16_t out, float alpha, float beta) {
@@ -103,13 +104,13 @@ struct qz<bfloat16_t, bfloat16_t> {
     }
 };
 
-#if !defined(TARGET_VANILLA)
 template <>
 struct qz<float, bfloat16_t> {
     float operator()(float in, bfloat16_t out, float alpha, float beta) {
         return (bfloat16_t)(alpha * in + (beta ? beta * out : 0));
     }
 };
+#endif // DNNL_ENABLE_BFLOAT16
 
 template <>
 struct qz<float16_t, float16_t> {
@@ -117,7 +118,6 @@ struct qz<float16_t, float16_t> {
         return (float16_t)(alpha * (float)in + (beta ? beta * (float)out : 0));
     }
 };
-#endif // !TARGET_VANILLA
 
 template <>
 struct qz<float, float16_t> {

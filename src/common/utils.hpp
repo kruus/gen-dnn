@@ -23,13 +23,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
-
 #include <memory>
-#include <string>
 
-#if defined(__x86_64__) || defined(_M_X64)
-#define DNNL_X86_64
-#endif
+#include "cpu_target.h" // dnnl_config, with some extra build macro settings
+#include "c_types_map.hpp"
+#include "nstl.hpp"
+#include "z_magic.hpp"
+
 
 #define MSAN_ENABLED 0
 #define ATTR_NO_MSAN
@@ -42,10 +42,6 @@
 #include <sanitizer/msan_interface.h>
 #endif
 #endif
-
-#include "c_types_map.hpp"
-#include "nstl.hpp"
-#include "z_magic.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -538,6 +534,5 @@ public:
 } // namespace impl
 } // namespace dnnl
 
-#endif
-
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+#endif // UTILS_HPP

@@ -128,8 +128,10 @@ status_t ref_matmul_t<src_type, weights_type, dst_type, acc_type>::execute_ref(
 
 using namespace data_type;
 template struct ref_matmul_t<f32, f32, f32, f32>;
+#if !defined(TARGET_VANILLA)
 template struct ref_matmul_t<bf16, bf16, f32, f32>;
 template struct ref_matmul_t<bf16, bf16, bf16, f32>;
+#endif // !defined(TARGET_VANILLA)
 template struct ref_matmul_t<s8, s8, f32, s32>;
 template struct ref_matmul_t<s8, s8, s32, s32>;
 template struct ref_matmul_t<s8, s8, s8, s32>;

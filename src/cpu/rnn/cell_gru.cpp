@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_target.h"
 #if !defined(TARGET_VANILLA)
 
 /*
@@ -78,7 +79,9 @@ rnn_cell_execution_sig((_ref_rnn_common_t<aprop, src_type, weights_type,
 }
 
 template rnn_cell_execution_sig(ref_rnn_fwd_f32_t::cell_execution_gru);
+#if !defined(TARGET_VANILLA)
 template rnn_cell_execution_sig(ref_rnn_fwd_bf16_t::cell_execution_gru);
+#endif // !defined(TARGET_VANILLA)
 template <>
 rnn_cell_execution_sig(ref_rnn_fwd_u8s8_t::cell_execution_gru) {
     assert(!"GRU int8 is not supported");

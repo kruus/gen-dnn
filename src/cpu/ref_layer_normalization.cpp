@@ -33,10 +33,12 @@ inline float maybe_up_convert(T x) {
     return x;
 }
 
+#if !defined(TARGET_VANILLA)
 template <>
 inline float maybe_up_convert<bfloat16_t>(bfloat16_t x) {
     return (float)x;
 }
+#endif // !defined(TARGET_VANILLA)
 
 } // namespace
 
@@ -122,7 +124,9 @@ void ref_layer_normalization_fwd_t<d_type>::execute_forward(
 }
 
 template struct ref_layer_normalization_fwd_t<f32>;
+#if !defined(TARGET_VANILLA)
 template struct ref_layer_normalization_fwd_t<bf16>;
+#endif // !defined(TARGET_VANILLA)
 
 template <impl::data_type_t d_type>
 void ref_layer_normalization_bwd_t<d_type>::execute_backward(
@@ -220,7 +224,9 @@ void ref_layer_normalization_bwd_t<d_type>::execute_backward(
 }
 
 template struct ref_layer_normalization_bwd_t<f32>;
+#if !defined(TARGET_VANILLA)
 template struct ref_layer_normalization_bwd_t<bf16>;
+#endif // !defined(TARGET_VANILLA)
 
 } // namespace cpu
 } // namespace impl

@@ -13,6 +13,8 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_isa_traits.hpp"
+#if !defined(TARGET_VANILLA)
 
 #include <cmath>
 #include <mutex>
@@ -2123,4 +2125,5 @@ dnnl_status_t jit_avx512_common_gemm_f32(const char *transa, const char *transb,
 } // namespace impl
 } // namespace dnnl
 
-// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+#endif // !defined(TARGET_VANILLA)

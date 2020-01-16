@@ -185,11 +185,15 @@ static auto simple_cases = []() {
     INSTANTIATE_TEST_SUITE_P(TestbinarySimple, test, simple_cases());
 
 using binary_test_float = binary_test<float>;
+#if DNNL_ENABLE_BFLOAT16
 using binary_test_bf16 = binary_test<bfloat16_t>;
+#endif
 using binary_test_f16 = binary_test<float16_t>;
 
 INST_TEST_CASE(binary_test_float)
+#if DNNL_ENABLE_BFLOAT16
 INST_TEST_CASE(binary_test_bf16)
 INST_TEST_CASE(binary_test_f16)
+#endif // DNNL_ENABLE_BFLOAT16
 
 } // namespace dnnl

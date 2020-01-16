@@ -431,10 +431,10 @@ using eltwise_test_s8 = eltwise_test<int8_t>;
 
 TEST_P(eltwise_test_f16, TestsEltwise) {}
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 using eltwise_test_bf16 = eltwise_test<bfloat16_t>;
 TEST_P(eltwise_test_bf16, TestsEltwise) {}
-#endif
+#endif // DNNL_ENABLE_BFLOAT16
 
 TEST_P(eltwise_test_f32, TestsEltwise) {}
 
@@ -499,11 +499,11 @@ TEST_P(eltwise_test_s8, TestsEltwise) {}
     INSTANTIATE_TEST_SUITE_P_(str##_##data_t, eltwise_test_##data_t, \
             ::testing::Values(__VA_ARGS__))
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 #define CPU_INST_TEST_CASE_BF16(str, ...) \
     _CPU_INST_TEST_CASE(str, bf16, __VA_ARGS__);
 #define INST_TEST_CASE_BF16(str, ...) _INST_TEST_CASE(str, bf16, __VA_ARGS__);
-#endif
+#endif // DNNL_ENABLE_BFLOAT16
 
 #define GPU_INST_TEST_CASE_F16(str, ...) \
     GPU_INSTANTIATE_TEST_SUITE_P_(TEST_CONCAT(str, _f16), eltwise_test_f16, \
@@ -518,23 +518,29 @@ TEST_P(eltwise_test_s8, TestsEltwise) {}
     _CPU_INST_TEST_CASE(str, s8, __VA_ARGS__);
 #define INST_TEST_CASE_S8(str, ...) _INST_TEST_CASE(str, s8, __VA_ARGS__);
 
+#if DNNL_ENABLE_BFLOAT16
 #define CPU_INST_TEST_CASE(str, ...) \
     CPU_INST_TEST_CASE_F32(str, __VA_ARGS__) \
     CPU_INST_TEST_CASE_BF16(str, __VA_ARGS__) \
     CPU_INST_TEST_CASE_S32(str, __VA_ARGS__) \
     CPU_INST_TEST_CASE_S8(str, __VA_ARGS__)
 
-#if defined(TARGET_VANILLA)
 #define INST_TEST_CASE(str, ...) \
     GPU_INST_TEST_CASE_F16(str, __VA_ARGS__) \
-    /* INST_TEST_CASE_BF16(str, __VA_ARGS__) */ \
+    INST_TEST_CASE_BF16(str, __VA_ARGS__) \
     INST_TEST_CASE_F32(str, __VA_ARGS__) \
     INST_TEST_CASE_S32(str, __VA_ARGS__) \
     INST_TEST_CASE_S8(str, __VA_ARGS__)
 #else
+#define CPU_INST_TEST_CASE(str, ...) \
+    CPU_INST_TEST_CASE_F32(str, __VA_ARGS__) \
+    /* CPU_INST_TEST_CASE_BF16(str, __VA_ARGS__) */ \
+    CPU_INST_TEST_CASE_S32(str, __VA_ARGS__) \
+    CPU_INST_TEST_CASE_S8(str, __VA_ARGS__)
+
 #define INST_TEST_CASE(str, ...) \
     GPU_INST_TEST_CASE_F16(str, __VA_ARGS__) \
-    INST_TEST_CASE_BF16(str, __VA_ARGS__) \
+    /* INST_TEST_CASE_BF16(str, __VA_ARGS__) */ \
     INST_TEST_CASE_F32(str, __VA_ARGS__) \
     INST_TEST_CASE_S32(str, __VA_ARGS__) \
     INST_TEST_CASE_S8(str, __VA_ARGS__)

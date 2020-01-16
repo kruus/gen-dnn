@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_target.h"
 #if !defined(TARGET_VANILLA)
 
 /*
@@ -58,7 +59,9 @@ rnn_cell_execution_sig((_ref_rnn_common_t<aprop, src_type, weights_type,
 #endif // !defined(TARGET_VANILLA)
 }
 template rnn_cell_execution_sig(ref_rnn_fwd_f32_t::cell_execution);
+#if !defined(TARGET_VANILLA)
 template rnn_cell_execution_sig(ref_rnn_fwd_bf16_t::cell_execution);
+#endif // !defined(TARGET_VANILLA)
 template rnn_cell_execution_sig(ref_rnn_fwd_u8s8_t::cell_execution);
 
 template <typename T1, typename T2, typename T3, typename T4, typename T5,

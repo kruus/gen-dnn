@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_target.h"
 #if !defined(TARGET_VANILLA)
 
 /*
@@ -1153,10 +1154,12 @@ template struct _ref_rnn_common_t<prop_kind::forward, data_type::f32,
 template struct _ref_rnn_common_t<prop_kind::backward, data_type::f32,
         data_type::f32, data_type::f32>;
 
+#if !defined(TARGET_VANILLA)
 template struct _ref_rnn_common_t<prop_kind::forward, data_type::bf16,
         data_type::bf16, data_type::f32>;
 template struct _ref_rnn_common_t<prop_kind::backward, data_type::bf16,
         data_type::bf16, data_type::f32>;
+#endif // !defined(TARGET_VANILLA)
 
 template struct _ref_rnn_common_t<prop_kind::forward, data_type::u8,
         data_type::s8, data_type::s32>;

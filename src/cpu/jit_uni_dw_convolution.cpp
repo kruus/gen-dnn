@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_isa_traits.hpp"
 #if !defined(TARGET_VANILLA)
 
 #include "c_types_map.hpp"
@@ -161,9 +162,11 @@ void jit_uni_dw_convolution_fwd_t<isa, src_type, dst_type>::execute_forward(
     if (pd()->wants_zero_pad_dst()) ctx.memory(DNNL_ARG_DST)->zero_pad();
 }
 
+#if !defined(TARGET_VANILLA)
 template struct jit_uni_dw_convolution_fwd_t<avx512_core, data_type::bf16,
         data_type::f32>;
 template struct jit_uni_dw_convolution_fwd_t<avx512_core, data_type::bf16>;
+#endif // !defined(TARGET_VANILLA)
 template struct jit_uni_dw_convolution_fwd_t<avx512_common, data_type::f32>;
 template struct jit_uni_dw_convolution_fwd_t<avx2, data_type::f32>;
 template struct jit_uni_dw_convolution_fwd_t<sse41, data_type::f32>;
@@ -594,5 +597,6 @@ template struct jit_uni_dw_convolution_bwd_weights_t<sse41, data_type::f32>;
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
+
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif // !defined(TARGET_VANILLA)

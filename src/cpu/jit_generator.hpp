@@ -16,9 +16,9 @@
 
 #ifndef CPU_JIT_GENERATOR_HPP
 #define CPU_JIT_GENERATOR_HPP
-#if defined(TARGET_VANILLA)
-#warning "jit_generator.hpp should not be included for TARGET_VANILLA compile"
-#endif
+#if !TARGET_X86_JIT
+#warning "jit_generator.hpp is only appropriate for TARGET_X86_JIT builds"
+#else
 
 #include <limits.h>
 
@@ -1417,4 +1417,6 @@ public:
 } // namespace impl
 } // namespace dnnl
 
+#endif // TARGET_X86_JIT
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

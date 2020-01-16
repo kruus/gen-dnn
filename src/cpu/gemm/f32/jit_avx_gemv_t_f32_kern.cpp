@@ -13,10 +13,10 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_isa_traits.hpp"
+#if !defined(TARGET_VANILLA)
 
 #include "jit_avx_gemv_t_f32_kern.hpp"
-
-#include "cpu_isa_traits.hpp"
 #include "jit_generator.hpp"
 
 #ifdef _WIN32
@@ -359,3 +359,6 @@ jit_avx_gemv_t_f32_kern::jit_avx_gemv_t_f32_kern()
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
+
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+#endif // !defined(TARGET_VANILLA)

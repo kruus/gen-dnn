@@ -511,17 +511,19 @@ static auto RegressionWeightFormat_cases = [](algorithm lk) {
 
 using float_across = lrn_test<float>;
 using float_within = lrn_test<float>;
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 using bfloat16_across = lrn_test<bfloat16_t>;
 using bfloat16_within = lrn_test<bfloat16_t>;
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
 INST_TEST_CASE(float_across, algorithm::lrn_across_channels)
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 INST_TEST_CASE(bfloat16_across, algorithm::lrn_across_channels)
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
 INST_TEST_CASE(float_within, algorithm::lrn_within_channel)
+#if DNNL_ENABLE_BFLOAT16
 INST_TEST_CASE(bfloat16_within, algorithm::lrn_within_channel)
+#endif // DNNL_ENABLE_BFLOAT16
 
 } // namespace dnnl

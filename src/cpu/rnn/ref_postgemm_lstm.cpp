@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_target.h"
 #if !defined(TARGET_VANILLA)
 
 /*
@@ -23,7 +24,9 @@
 #include "math_utils.hpp"
 
 #include "../simple_q10n.hpp"
+#if !defined(TARGET_VANILLA)
 #include "jit_uni_rnn_common_postgemm_dispatcher.hpp"
+#endif // !defined(TARGET_VANILLA)
 
 namespace dnnl {
 namespace impl {

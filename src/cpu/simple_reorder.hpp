@@ -454,7 +454,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     }
 };
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 /* bf16 reorders */
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
@@ -644,7 +644,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         return status::success;
     }
 };
-#endif // !TARGET_VANILLA
+#endif // TARGET_X86_JIT
 
 /* reorders with tail support */
 

@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_isa_traits.hpp"
 #if !defined(TARGET_VANILLA)
 
 #ifdef __INTEL_COMPILER
@@ -967,5 +968,6 @@ void jit_avx512_core_f32_wino_conv_4x3_bwd_weights_t::
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
+
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif // !defined(TARGET_VANILLA)

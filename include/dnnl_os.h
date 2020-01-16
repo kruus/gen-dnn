@@ -1,43 +1,39 @@
 /*******************************************************************************
-* Copyright 2017 NEC Labs America
+ * Copyright 2017 NEC Labs America
 *
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
+* Licensed under the Apache License, Version 2.0 (the "License"); you may not
+* use this file except in compliance with the License.  You may obtain a copy
+* of the License at
 *
 *     http://www.apache.org/licenses/LICENSE-2.0
 *
 * Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
+* distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+* WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+* License for the specific language governing permissions and limitations under
+* the License.
 *******************************************************************************/
-/** \file
- * handle various compiler/os retrictions.
+/** \file handle various compiler/os retrictions.
  *
- * - These provide OS workarounds
- *   - libc pecularities,
- * - and compiler workarounds
- *   - like support for \e restrict or \e alignment
- *   - and C++ OpenMP support pragmas.
+ * - These provide OS workarounds - libc pecularities, - and compiler
+ * workarounds - like support for \e restrict or \e alignment - and C++ OpenMP
+ * support pragmas.
  *
  * Note: These macros <B>do not</B> begin with "DNNL_", so this file is \b not
  * really part of the public API.  It aids <EM>code readability</EM> by
  * avoiding ugly \#if blocks.
  *
  * You can think of it as settings that are even more common than code in
- * src/common, and it is \e public for re-use when access to the full set
- * of <TT>src/common</TT> is perhaps not required.
+ * src/common, and it is \e public for re-use when access to the full set of
+ * <TT>src/common</TT> is perhaps not required.
  *
- * OpenMP C++ Pragma macros because different compilers and \c DNNL_CPU_JIT
- * targets have widely varying degrees of OpenMP support.
+ * OpenMP C++ Pragma macros because different different \c DNNL_CPU targets)
+ * have widely varying degrees of OpenMP support.
  *
- * \todo Can ENABLE_OPT_PRAGMAS be replaced in dnnl_os.h by
- * (DNNL_CPU_RUNTIME & DNNL_RUNTIME_SEQ)
+ * \todo Can ENABLE_OPT_PRAGMAS be replaced in dnnl_os.h by (DNNL_CPU_RUNTIME &
+ * DNNL_RUNTIME_SEQ)
  */
-#ifndef DNNL_OS_H
-#define DNNL_OS_H
+#ifndef DNNL_OS_H #define DNNL_OS_H
 
 #include "dnnl_config.h"        // TODO use DNNL_TARGET_FOO conditionals
 // this also includes dnnl_types.h, so DNNL_RUNTIME_CPU build flags are available
@@ -49,7 +45,7 @@
 #endif
 
 // How is the restrict keyword handled? (disallow it as you encounter errors, please)
-#if defined(_SX)
+#if defined(_SX) // deprecated
 
 #elif defined(__ve)
 // restrict is allowed

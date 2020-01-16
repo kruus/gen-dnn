@@ -16,6 +16,8 @@
 
 #ifndef GEMM_BF16_MATMUL_HPP
 #define GEMM_BF16_MATMUL_HPP
+#include "cpu_isa_traits.hpp"
+#if !defined(TARGET_VANILLA)
 
 #include <assert.h>
 
@@ -83,4 +85,6 @@ private:
 } // namespace impl
 } // namespace dnnl
 
+#endif // !defined(TARGET_VANILLA)
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

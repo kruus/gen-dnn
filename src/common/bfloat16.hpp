@@ -17,10 +17,8 @@
 #ifndef BFLOAT16_HPP
 #define BFLOAT16_HPP
 
-//? #include "mkldnn_config.h"
-#include "dnnl_config.h"
-//? #include "cpu_isa_traits.hpp" this resides in src/cpu (not common)
-#if !defined(TARGET_VANILLA)
+#include "cpu_target.h"        // defined(TARGET_VANILLA), DNNL_ENABLE_BFLOAT16(0/1)
+#if DNNL_ENABLE_BFLOAT16
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -49,7 +47,6 @@ struct bfloat16_t {
 
 static_assert(sizeof(bfloat16_t) == 2, "bfloat16_t must be 2 bytes");
 
-// the following depend on JIT
 void cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t size);
 void cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t size);
 
@@ -60,7 +57,7 @@ void add_floats_and_cvt_to_bfloat16(
 
 } // namespace impl
 } // namespace dnnl
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

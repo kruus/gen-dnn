@@ -25,11 +25,11 @@
 // XXX ? #include "cpu_primitive.hpp"
 
 #include "gemm_convolution_utils.hpp"
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 #include "jit_generator.hpp"
 #include "jit_primitive_conf.hpp"
 #include "jit_uni_eltwise_injector.hpp"
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 #include "ref_eltwise.hpp"
 
 #include "gemm/gemm.hpp"
@@ -134,9 +134,9 @@ struct _gemm_x8s8s32x_convolution_fwd_t : public primitive_impl_t {
 
     _gemm_x8s8s32x_convolution_fwd_t(const pd_t *apd)
         : primitive_impl_t(apd), pp_ker_(nullptr) {
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
         pp_ker_ = new pp_ker_t(pd());
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
     }
     ~_gemm_x8s8s32x_convolution_fwd_t() { delete pp_ker_; }
 
@@ -155,20 +155,20 @@ private:
     // sufficiently advanced igemm jit generator that supports quantization,
     // relu, and whatnot
     class pp_ker_t
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
         : jit_generator
-#endif // !TARGET_VANILLA
+#endif // TARGET_X86_JIT
     {
     public:
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
         DECLARE_CPU_JIT_AUX_FUNCTIONS(
                 _gemm_x8s8s32x_convolution_fwd_t::pp_kernel);
-#endif // !TARGET_VANILLA
+#endif // TARGET_X86_JIT
         pp_ker_t(const pd_t *pd);
         ~pp_ker_t() {
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
             if (eltwise_injector_) delete eltwise_injector_;
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
             if (eltwise_) delete eltwise_;
         }
 
@@ -180,9 +180,9 @@ private:
         size_t dst_os_stride_;
 
     private:
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
         void generate();
-#endif // !TARGET_VANILLA
+#endif // TARGET_X86_JIT
 
         struct ker_args {
             dst_data_t *dst;
@@ -208,9 +208,9 @@ private:
         bool do_sum_;
         bool do_signed_scaling_;
         size_t vlen_;
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
         jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
-#endif // !TARGET_VANILLA
+#endif // TARGET_X86_JIT
         ref_eltwise_scalar_fwd_t *eltwise_;
     };
 

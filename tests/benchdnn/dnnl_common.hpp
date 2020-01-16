@@ -75,20 +75,20 @@
     } while (0)
 
 /* aux */
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 using bfloat16_t = dnnl::impl::bfloat16_t;
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 
 using float16_t = dnnl::impl::float16_t;
 template <dnnl_data_type_t>
 struct prec_traits;
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 template <>
 struct prec_traits<dnnl_bf16> {
     typedef bfloat16_t type;
 };
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 
 template <>
 struct prec_traits<dnnl_f16> {
@@ -111,7 +111,7 @@ struct prec_traits<dnnl_u8> {
     typedef uint8_t type;
 };
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 #define CASE_ALL(dt) \
     switch (dt) { \
         CASE(dnnl_bf16); \
@@ -123,6 +123,7 @@ struct prec_traits<dnnl_u8> {
         default: assert(!"bad data_type"); \
     }
 #else
+#define CASE_ALL(dt) \
     switch (dt) { \
         /*CASE(dnnl_bf16);*/ \
         CASE(dnnl_f16); \

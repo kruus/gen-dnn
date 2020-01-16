@@ -31,6 +31,10 @@
 /// Git commit hash
 #define DNNL_VERSION_HASH  "@DNNL_VERSION_HASH@"
 
+// dnnl_version_t has some new build info:
+// [new] cpu target (determined by cmake and in dnnl_config.h.in)
+// [new] jit options (jit options for x86, libvednn options for VE)
+
 // clang-format on
 
 #endif

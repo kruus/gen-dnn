@@ -27,9 +27,9 @@
 
 #include "gemm/gemm.hpp"
 #include "gemm_inner_product_utils.hpp"
-#if !defined(TARGET_VANILLA)
-#include "jit_generator.hpp"
-#endif // !TARGET_VANILLA
+//#if TARGET_X86_JIT
+//#include "jit_generator.hpp"
+//#endif // TARGET_X86_JIT
 
 #include "cpu_inner_product_pd.hpp"
 

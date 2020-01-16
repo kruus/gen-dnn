@@ -21,7 +21,9 @@
 #include "../gemm.hpp"
 #include "dnnl_thread.hpp"
 #include "dnnl_types.h"
-#include "jit_generator.hpp"
+#if !defined(TARGET_VANILLA)
+#include "jit_generator.hpp" // why? XXX
+#endif // !defined(TARGET_VANILLA)
 #include "math_utils.hpp"
 #include "nstl.hpp"
 #include "utils.hpp"

@@ -68,90 +68,81 @@
 /// DNNL GPU engine runtime
 #cmakedefine DNNL_GPU_RUNTIME DNNL_RUNTIME_${DNNL_GPU_RUNTIME}
 
-/** DNNL CPU and max JIT level.
- *
- * This <TT>cmake</TT> setting is appropriate for compiling the full library to
- * run chipsets other than x86, with varying levels of JIT support.
- *
- * In this model, we do \b not create a new engine that \e offloads x86
- * calls to an external engine, but compile a monolithic libdnnl for the
- * target cpu.
- *
- * - 1st digit is target cpu.
- *   - If 0, then any cpu-specific code is determined by the compiler
- *     and its flags (typically no jit or inline assembly)
- * - 2nd digit is jit level (or other target-specific extensions)
- *   - If 0, then this build should use minimal target-specific code
- *   - 9 should always mean "assume fanciest CPU and extensions"
- *
- * The default dnnl build for x86 would set DNNL_CPU_JIT to 19
- *
- */
-#cmakedefine DNNL_CPU_JIT ${DNNL_JIT_SUPPORT}
-//@}
-
-//.............................................................................
-/** @defgroup CPU_JIT_constants DNNL CPU and JIT constants and conditionals */
-//@{
 /** @defgroup CPU_constants CPU targets*/
+/// DNNL_CPU in \ref dnnl_config.h values correspond to CMAKE_SYSTEM_PROCESSOR.
 //@{
-/** plain C/C++, no jit (inline assembler via compiler tests possible).
- * When DNNL_CPU_JIT/10 is zero, DNNL_CPU_JIT%10 must also be zero. */
-#define DNNL_CPU_ANY 0
-#define DNNL_CPU_X86 1
-#define DNNL_CPU_VE  2
-#define DNNL_CPU_SX  3 ///< deprecated, very old code (if any)
+/// DNNL CPU build target 1,2,etc = x86, ve, etc.
+#cmakedefine DNNL_CPU ${DNNL_CPU}
+///@}
+
+/// @defgroup cpu_isa cmake options communicating cpu-specific build options
+/// cpu target variants expand capability from VANILLA-->ANY-->(cpu-specific)-->ALL.
+//@{
+#cmakedefine DNNL_ISA ${DNNL_ISA_VALUE}
 //@}
-/** @defgroup CPU_JIT_preset_constants known CPU + JIT/extensions
- * Each cpu may have multiple levels of jit support.
- *
- * Note:
- * \e libdnnl now has a DNNL_ENABLE_MAX_CPU_ISA cmake flag and a
- * dnnl_set_max_cpu_isa() function.  But this applies to runtime
- * pruning of available x86 implementations.
- */
-//@{
-//x86 compilers could be gcc, icc or clang
-#define DNNL_JIT_ANY    (DNNL_CPU_X86*10 + 0)
-#define DNNL_JIT_SSE41  (DNNL_CPU_X86*10 + 1)
-#define DNNL_JIT_SSE42  (DNNL_CPU_X86*10 + 2)
-#define DNNL_JIT_AVX    (DNNL_CPU_X86*10 + 3)
-#define DNNL_JIT_AVX2   (DNNL_CPU_X86*10 + 4)
-#define DNNL_JIT_AVX512 (DNNL_CPU_X86*10 + 9)
-#define DNNL_JIT_MAX    (DNNL_CPU_X86*10 + 9)
-// VE compilers include ncc and clang (with -target=ve)
-#define DNNL_JIT_VEANY  (DNNL_CPU_VE*10 + 0)
-#define DNNL_JIT_VE     (DNNL_CPU_VE*10 + 9)
-#define DNNL_JIT_VE     (DNNL_CPU_VE*10 + 9)
-// SX compiler support (historical?)
-#define DNNL_JIT_SXANY  (DNNL_CPU_SX*10 + 0)
 //@}
 
-/// @defgroup  CPU_JIT_conditionals test for occurence of common target conditions
-//@{
-#define DNNL_TARGET_VANILLA (DNNL_CPU == DNNL_CPU_ANY || DNNL_CPU_JIT%10 == 0)
-
-#define DNNL_TARGET_X86     (DNNL_CPU_JIT/10 == DNNL_CPU_X86)
-#define DNNL_TARGET_X86_JIT (DNNL_TARGET_X86 && DNNL_TARGET%10 > 0)
-
-#define DNNL_TARGET_VE      (DNNL_CPU_JIT/10 == DNNL_CPU_VE)
-#define DNNL_TARGET_VE_JIT  (DNNL_TARGET_X86 && DNNL_TARGET%10 > 0)
-
-#define DNNL_TARGET_SX      (DNNL_CPU_JIT/10 == DNNL_CPU_SX) /* deprecated, very old code (if any) */
+/// @defgroup cmake_build_constants cmake build constants
+//@{ supported CPUs
+#cmakedefine DNNL_CPU_X86 ${DNNL_CPU_X86}
+#cmakedefine DNNL_CPU_VE  ${DNNL_CPU_VE}
+//#cmakedefine DNNL_CPU_SX  ${DNNL_CPU_SX} /* deprecated */
 //@}
 
-// compiler sanity checks...
-#if defined(__ve) && !DNNL_TARGET_VE
-#error "VE compiler but incompatible cmake DNNL_JIT_SUPPORT setting"
+///@{ cpu_isa cmake options describe flavors of the cpu build
+/// cmake strings tend to follow the DNNL_MAX_CPU_ISA cpu dispatch names.
+/// however for cpp, these defines are simple integers.
+///@{ all cpus support a few common settings.
+#cmakedefine DNNL_ISA_VANILLA ${DNNL_ISA_VANILLA}
+#cmakedefine DNNL_ISA_ANY     ${DNNL_ISA_ANY}  // least capable, maybe even same as vanilla
+#cmakedefine DNNL_ISA_ALL     ${DNNL_ISA_ALL}  // pull out all the stops, all options allowed
+///@}
+///@{ x86 isa settings govern jit instruction set support
+#cmakedefine DNNL_ISA_SSE41            ${DNNL_ISA_SSE41}
+#cmakedefine DNNL_ISA_AVX              ${DNNL_ISA_AVX}
+#cmakedefine DNNL_ISA_AVX2             ${DNNL_ISA_AVX2}
+#cmakedefine DNNL_ISA_AVX512_MIC       ${DNNL_ISA_AVX512_MIC}
+#cmakedefine DNNL_ISA_AVX512_MIC_4OPS  ${DNNL_ISA_AVX512_MIC_4OPS}
+#cmakedefine DNNL_ISA_AVX512_CORE      ${DNNL_ISA_AVX512_CORE}
+#cmakedefine DNNL_ISA_AVX512_CORE_VNNI ${DNNL_ISA_AVX512_CORE_VNNI}
+#cmakedefine DNNL_ISA_AVX512_CORE_BF16 ${DNNL_ISA_AVX512_CORE_BF16}
+///@}
+///@{ ve isa settings govern jit instruction set support
+#cmakedefine DNNL_ISA_VEDNN ${DNNL_ISA_VEDNN}
+#cmakedefine DNNL_ISA_VEJIT ${DNNL_ISA_VEJIT}
+///@}
+///@}
+
+/// @defgroup cmake_bool handy conditional tests for cmake build target
+/// \note \ref cpu_target.h can these into shorter internal versions
+//@{
+#define DNNL_TARGET_VANILLA (DNNL_ISA == DNNL_ISA_VANILLA || DNNL_CPU == DNNL_CPU_VE/*to start debug*/)
+// should be, someday, ...
+//#define DNNL_TARGET_VANILLA (DNNL_ISA == DNNL_ISA_VANILLA || (DNNL_CPU == DNNL_CPU_VE && DNNL_ISA <= DNNL_ISA_ANY))
+
+#define DNNL_TARGET_X86     (DNNL_CPU == DNNL_CPU_X86)
+#define DNNL_TARGET_X86_JIT (DNNL_TARGET_X86 && DNNL_ISA >= DNNL_ISA_ANY && DNNL_ISA <= DNNL_ISA_ALL)
+
+#define DNNL_TARGET_VE      (DNNL_CPU == DNNL_CPU_VE)
+#define DNNL_TARGET_VEDNN   (DNNL_TARGET_VE && DNNL_ISA >= DNNL_ISA_VEDNN && DNNL_ISA <= DNNL_ISA_ALL)
+#define DNNL_TARGET_VEJIT   (DNNL_TARGET_VE && DNNL_ISA >= DNNL_ISA_VEJIT && DNNL_ISA <= DNNL_ISA_ALL)
+
+//#define DNNL_TARGET_SX // \deprecated
+#if DNNL_TARGET_X86_JIT
+//#warning "DNNL_TARGET_X86_JIT is TRUE"
+#else
+//#warning "DNNL_TARGET_X86_JIT is FALSE"
 #endif
-#if defined(_SX) && !DNNL_TARGET_SX
-#error "SX compiler but incompatible cmake DNNL_JIT_SUPPORT setting"
-#endif
-
 //@}
-//.............................................................................
 
 // clang-format on
+
+#if DNNL_TARGET_X86 + DNNL_TARGET_VE == 0
+#error "unknown target cpu.  no DNNL_TARGET_foo was set"
+#endif
+#if DNNL_TARGET_X86 + DNNL_TARGET_VE != 1
+#error "cannot have more than one target cpu"
+#endif
 
 #if defined(DNNL_CPU_RUNTIME) && defined(DNNL_GPU_RUNTIME)
 #if (DNNL_CPU_RUNTIME == DNNL_RUNTIME_NONE) \

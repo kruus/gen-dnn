@@ -401,6 +401,7 @@ private:
 
         /* Convert fp32 input to bf16 */
         out_data_t *input_cvt = (out_data_t *)input;
+#if !defined(TARGET_VANILLA)
         if (type_i == data_type::f32 && type_o == data_type::bf16) {
             input_cvt
                     = (out_data_t *)ctx.get_scratchpad_grantor()
@@ -411,10 +412,12 @@ private:
                         (float *)input + ld * G * O * I, G * O * I);
             });
         }
+#endif // !defined(TARGET_VANILLA)
 
         /* Transpose weights prior to packing to ensure that packed GEMM
          * algorithm will be dispatched */
         out_data_t *input_tr = input_cvt;
+        // TARGET_VANILLA might not have packed GEMM available? XXX
         if (from_igo != to_igo) {
             input_tr
                     = (out_data_t *)ctx.get_scratchpad_grantor().template get<void>(
@@ -445,6 +448,7 @@ private:
                     int m_p = to_igo ? parts[p] * O : I;
                     int k_p = to_igo ? I : parts[p] * O;
                     dnnl_status_t st;
+#if !defined(TARGET_VANILLA)
                     if (type_o == data_type::bf16) {
                         st = gemm_bf16bf16f32_pack("A", "N", "N", &m_p, &n,
                                 &k_p, &lda, &ldb,
@@ -452,7 +456,9 @@ private:
                                                 ? off_igo(l, d, 0, g, 0)
                                                 : off_goi(l, d, 0, g, 0)],
                                 (bfloat16_t *)output);
-                    } else {
+                    } else
+#endif // !defined(TARGET_VANILLA)
+                    {
                         st = sgemm_pack("A", "N", "N", &m_p, &n, &k_p, &lda,
                                 &ldb,
                                 (float *)&input_tr[to_igo

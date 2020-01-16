@@ -14,6 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include "cpu_target.h"
 #include <stdlib.h>
 #ifndef _WIN32
 #include <sys/time.h>
@@ -50,8 +51,8 @@
 #include "ocl/verbose.hpp"
 #endif
 
-/* DNNL CPU ISA info */
-#define ISA_ANY "Intel 64"
+//@{ DNNL_ISA info via mayiuse scan in `char* get_isa_info()`
+#define ISA_ANY "Intel 64 (jit allowed)"
 #define SSE41 "Intel SSE4.1"
 #define AVX "Intel AVX"
 #define AVX2 "Intel AVX2"
@@ -65,6 +66,12 @@
     "Intel AVX-512 with AVX512_4FMAPS and AVX512_4VNNIW extensions"
 #define AVX512_CORE_BF16 \
     "Intel AVX-512 with Intel DL Boost and bfloat16 support"
+#define VEJIT "NEC Aurora (VE) with libvednn jit"
+#define VEDNN "NEC Aurora (VE) with libvednn C api calls"
+#define VE_COMMON \
+        "NEC Aurora (VE) (C/C++-only vanilla build)"
+#define VANILLA "Intel 64 (no jit, C/C++-only vanilla build)"
+//@}
 
 namespace dnnl {
 namespace impl {
@@ -126,7 +133,18 @@ const char *get_isa_info() {
     if (mayiuse(avx2)) return AVX2;
     if (mayiuse(avx)) return AVX;
     if (mayiuse(sse41)) return SSE41;
-    return ISA_ANY;
+    if (mayiuse(vejit)) return VEJIT;
+    if (mayiuse(vednn)) return VEDNN;
+    if (mayiuse(ve_common)) return VE_COMMON;
+    if (mayiuse(vanilla)) return VANILLA;
+    //return ISA_ANY;
+#if TARGET_X86
+    return "unrecovnized x86 isa : " __FILE__;
+#elif TARGET_VE
+    return "unrecognized ve isa : " __FILE__;
+#else
+#error "unhandled get_isa_info() cpu target" __FILE__
+#endif
 }
 
 /* init_info section */
@@ -989,7 +1007,10 @@ dnnl_status_t dnnl_set_verbose(int level) {
 const dnnl_version_t *dnnl_version() {
     static dnnl_version_t ver
             = {DNNL_VERSION_MAJOR, DNNL_VERSION_MINOR, DNNL_VERSION_PATCH,
-                    DNNL_VERSION_HASH, DNNL_CPU_RUNTIME, DNNL_GPU_RUNTIME};
+                    DNNL_VERSION_HASH, DNNL_CPU_RUNTIME, DNNL_GPU_RUNTIME,
+                    // new...
+                    DNNL_CPU, DNNL_ISA
+            };
     return &ver;
 }
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

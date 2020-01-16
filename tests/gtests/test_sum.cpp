@@ -263,7 +263,7 @@ static auto simple_test_cases = [](bool omit_output) {
                     {2, 16, 3, 3}, {2.0f, 3.0f}, omit_output});
 };
 
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if DNNL_ENABLE_BFLOAT16
 static auto simple_test_cases_bf16 = [](bool omit_output) {
     return ::testing::Values(
             sum_test_params {{tag::nChw16c, tag::nChw16c}, tag::nChw16c,
@@ -297,7 +297,7 @@ static auto simple_test_cases_bf16 = [](bool omit_output) {
             sum_test_params {{tag::nChw16c, tag::nChw16c}, tag::nChw16c,
                     {2, 128, 23, 15}, {2.5f, 0.125f}, omit_output});
 };
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
 static auto special_test_cases = []() {
     return ::testing::Values(

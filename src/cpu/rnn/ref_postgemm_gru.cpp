@@ -13,6 +13,7 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_isa_traits.hpp"
 #if !defined(TARGET_VANILLA)
 
 /*
@@ -22,7 +23,9 @@
 #include "dnnl_thread.hpp"
 #include "math_utils.hpp"
 
+#if !defined(TARGET_VANILLA)
 #include "jit_uni_rnn_common_postgemm_dispatcher.hpp"
+#endif // !defined(TARGET_VANILLA)
 
 namespace dnnl {
 namespace impl {
@@ -308,9 +311,11 @@ rnn_postgemm_sig(rnn_postgemm_bwd_bf16_t::gru_part2_postgemm) {
             diff_states_tp1_l_, diff_states_t_lp1_,
             (scratch_data_t *)scratch_cell_);
 }
-#endif // !defined(TARGET_VANILLA)
 
 #undef AOC
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
+
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+#endif // !defined(TARGET_VANILLA)

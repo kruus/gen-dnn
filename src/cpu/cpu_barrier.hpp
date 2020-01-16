@@ -23,9 +23,9 @@
 #if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
 #include <stdexcept>
 #endif
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 #include "jit_generator.hpp"
-#endif
+#endif // TARGET_X86_JIT
 
 namespace dnnl {
 namespace impl {
@@ -91,14 +91,14 @@ void barrier(ctx_t *ctx, int nthr);
 
 #endif // "barrier(ctx,nthr)" support if not DNNL_RUNTIME_SEQ
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 /** injects actual barrier implementation into another jitted code
  * @param code      jit_generator object where the barrier is to be injected
  * @param reg_ctx   read-only register with pointer to the barrier context
  * @param reg_nnthr read-only register with the # of synchronizing threads
  */
 void generate(jit_generator &code, Xbyak::Reg64 reg_ctx, Xbyak::Reg64 reg_nthr);
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 
 } // namespace simple_barrier
 

@@ -13,6 +13,8 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "cpu_isa_traits.hpp"
+#if !defined(TARGET_VANILLA)
 
 #include "c_types_map.hpp"
 #include "dnnl_thread.hpp"
@@ -261,3 +263,6 @@ template struct jit_avx2_x8s8s32x_1x1_convolution_fwd_t<s8, f32>;
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
+
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+#endif // !defined(TARGET_VANILLA)

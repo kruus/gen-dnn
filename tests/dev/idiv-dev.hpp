@@ -191,21 +191,7 @@ e:	01 f8                	add    %edi,%eax
 }
 inline constexpr int rem_floor( int const n, int const d )
 {
-#if 1 // I think this one is totally portable, and code is identical to next
-    //return (n%d + (d & (n%d<0? ~0: 0) ));
-    return n%d + (d & (n%d)>>31 );
-    //return (n%d + (d & ((+(n%d)) >> 31 ) ));     // equiv
-    //return n%d + (d & ((+(n%d))>>31) );
-    //0000000000000020 <test_rem_floor(int, int)>:
-    //  20:	89 f8                	mov    %edi,%eax
-    //  22:	99                   	cltd   
-    //  23:	f7 fe                	idiv   %esi
-    //  25:	89 d0                	mov    %edx,%eax
-    //  27:	c1 f8 1f             	sar    $0x1f,%eax
-    //  2a:	21 c6                	and    %eax,%esi
-    //  2c:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
-    //  2f:	c3                   	retq   
-#elif 0 /* best code, without numeric_limits */
+#if 1 /* best code, without numeric_limits */
     // only assumes 2-s complement
     return (n%d +   (d & (-(n%d<0)        ) ));
     //return (n%d + (d & (n%d<0? 0xFFffFFff: 0) )); // test!
@@ -219,11 +205,25 @@ inline constexpr int rem_floor( int const n, int const d )
 1c:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
 1f:	c3                   	retq   
      */
+#elif 0 // I think this one is totally portable (but only int32_t)
+    //return (n%d + (d & (n%d<0? ~0: 0) ));
+    return n%d + (d & (n%d)>>31 );
+    //return (n%d + (d & ((+(n%d)) >> 31 ) ));     // equiv
+    //return n%d + (d & ((+(n%d))>>31) );
+    //0000000000000020 <test_rem_floor(int, int)>:
+    //  20:	89 f8                	mov    %edi,%eax
+    //  22:	99                   	cltd   
+    //  23:	f7 fe                	idiv   %esi
+    //  25:	89 d0                	mov    %edx,%eax
+    //  27:	c1 f8 1f             	sar    $0x1f,%eax
+    //  2a:	21 c6                	and    %eax,%esi
+    //  2c:	8d 04 16             	lea    (%rsi,%rdx,1),%eax
+    //  2f:	c3                   	retq   
 #elif 0 /* have signed arithmetic shift? */
     // same code as above
     return n%d + ((n%d>>(std::numeric_limits<int>::digits)) & d);
     // (also OK with    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ bits-1)
-#elif 1 /* instructive, fall-back only */
+#elif 0 /* instructive, fall-back only */
     //return n%d + ((n%d<0? d: 0)); // generates a cmov
     return n%d + ((n%d<0? d: 0)); // generates a cmov
     //return n%d + ((n%d^d)<0? d: 0); // generates a cmov

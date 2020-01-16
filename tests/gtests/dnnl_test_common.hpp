@@ -40,9 +40,9 @@
 #include "dnnl_test_common_ocl.hpp"
 #endif
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 #include "src/common/bfloat16.hpp"
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 #include "src/common/dnnl_thread.hpp"
 #include "src/common/float16.hpp"
 #include "src/common/memory_desc_wrapper.hpp"
@@ -50,18 +50,10 @@
 
 #define for_ for
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 using dnnl::impl::bfloat16_t;
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 using dnnl::impl::f16_support::float16_t;
-
-/** Allow tests with certain generic properties. For some systems, tests
- * of x86 or GPU blocked formats may not be desired. Set this to reduce
- * test time.
- *
- * On for TARGET_VANILLA, for now. */
-#define DNNL_TEST_BLOCKED_FORMATS 1
-//#define MKLDNN_TEST_BLOCKED_FORMATS DNNL_TEST_BLOCKED_FORMATS /* deprecated XXX */
 
 #define DNNL_CHECK(f) \
     do { \
@@ -71,9 +63,7 @@ using dnnl::impl::f16_support::float16_t;
 
 /** Allow tests with certain generic properties. For some systems, tests
  * of x86 or GPU blocked formats may not be desired. Set this to reduce
- * test time.
- *
- * On for TARGET_VANILLA, for now. */
+ * test time. \deprecated */
 #define DNNL_TEST_BLOCKED_FORMATS 1
 
 using memory = dnnl::memory;
@@ -89,14 +79,14 @@ struct data_traits<float16_t> {
 
     using uint_type = uint16_t;
 };
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 template <>
 struct data_traits<bfloat16_t> {
     static const auto data_type = memory::data_type::bf16;
 
     using uint_type = uint16_t;
 };
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 template <>
 struct data_traits<float> {
     static const auto data_type = memory::data_type::f32;

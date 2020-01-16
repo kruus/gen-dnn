@@ -175,15 +175,15 @@ protected:
 using concat_test_float = concat_test<float>;
 using concat_test_float16 = concat_test<float16_t>;
 using concat_test_s8 = concat_test<int8_t>;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if DNNL_ENABLE_BFLOAT16
 using concat_test_bf16 = concat_test<bfloat16_t>;
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
 TEST_P(concat_test_float, TestsConcat) {}
 TEST_P(concat_test_s8, TestsConcat) {}
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if DNNL_ENABLE_BFLOAT16
 TEST_P(concat_test_bf16, TestsConcat) {}
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
 using fmt = memory::format_tag;
 
@@ -211,10 +211,10 @@ static auto case_ZeroDim = []() {
                     {{2, 4, 0, 5}, {2, 2, 0, 5}}, {2, 6, 0, 5}});
 };
 INSTANTIATE_TEST_SUITE_P(TestConcat_ZeroDim, concat_test_float, case_ZeroDim());
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 CPU_INSTANTIATE_TEST_SUITE_P(
         TestConcat_ZeroDim_bf16, concat_test_bf16, case_ZeroDim());
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
 static auto cases_EF = []() {
     return ::testing::Values(
@@ -247,9 +247,9 @@ static auto cases_EF = []() {
                     dnnl_invalid_arguments});
 };
 INSTANTIATE_TEST_SUITE_P(TestConcat_EF, concat_test_float, cases_EF());
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 CPU_INSTANTIATE_TEST_SUITE_P(TestConcat_EF_bf16, concat_test_bf16, cases_EF());
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
 static auto cases_padded = []() {
     return ::testing::Values(
@@ -291,10 +291,10 @@ static auto cases_padded = []() {
                     {{4, 25, 5, 5}, {4, 25, 5, 5}}, {4, 25, 10, 5}});
 };
 INSTANTIATE_TEST_SUITE_P(TestConcat_padded, concat_test_float, cases_padded());
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 CPU_INSTANTIATE_TEST_SUITE_P(
         TestConcat_padded_bf16, concat_test_bf16, cases_padded());
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
 static auto cases_3D = []() {
     return ::testing::Values(
@@ -324,9 +324,9 @@ static auto cases_3D = []() {
                     {{2, 8, 3, 4, 5}, {2, 8, 3, 4, 5}}, {2, 8, 3, 4, 10}});
 };
 INSTANTIATE_TEST_SUITE_P(TestConcat3D, concat_test_float, cases_3D());
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 CPU_INSTANTIATE_TEST_SUITE_P(TestConcat3D_bf16, concat_test_bf16, cases_3D());
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
 static auto cases_concat = []() {
     return ::testing::Values(
@@ -357,9 +357,9 @@ static auto cases_concat = []() {
                     {{2, 8, 1, 1}, {2, 16, 1, 1}}, {2, 24, 1, 1}});
 };
 INSTANTIATE_TEST_SUITE_P(TestConcat, concat_test_float, cases_concat());
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if DNNL_ENABLE_BFLOAT16
 CPU_INSTANTIATE_TEST_SUITE_P(TestConcat_bf16, concat_test_bf16, cases_concat());
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
 INSTANTIATE_TEST_SUITE_P(TestConcat, concat_test_s8,
         ::testing::Values(

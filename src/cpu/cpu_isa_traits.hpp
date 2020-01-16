@@ -21,10 +21,8 @@
  * utilities/macros that are also useful to non-jit programs.
  */
 
-//? #include <type_traits>
 #include "dnnl_thread.hpp"      // dnnl_get_max_threads
 #include "dnnl_types.h"
-
 #include "utils.hpp"
 
 #if defined(_WIN32) && !defined(__GNUC__)
@@ -35,86 +33,7 @@
 #   define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__(al)))
 #endif
 
-//@{
-/** \ref JITFUNCS compile-time thresholds for x86 code.
- *
- * <em>gen-dnn</em> compile introduces "vanilla" target for a library that can run on any CPU.
- * It removes all jit and xbyak code, and runs... slowly.
- * This is set by compile time flag <b>-DTARGET_VANILLA</b>.
- * In this case we set JITFUNCS=JITFUNCS_NONE.
- *
- * Or you can compile with -DJITFUNCS=-1 equiv to JITFUNCS_NONE and we'll define TARGET_VANILLA
- * So vanilla ccompile should check for
- *   <B>defined(TARGET_VANILA) || (JITFUNCS==JITFUNCS_VANILLA)</B>
- *
- * <em>mkl-dnn</em> without <b>-DTARGET_VANILLA</B> you can set other <B>JITFUNCS_FOO</b>,
- * to compiles xbyak and includes all jit implementations for CPU type FOO (or lower)
- *
- * To remove a subset of implementations from libmkldnn (well, at least remove them from the
- * default list in \ref cpu_engine.cpp ) you can compare the JITFUNCS value with these
- * thresholds.
- *
- * - Example:
- *   - '#if JITFUNCS >= JITFUNCS_AVX2'
- *     - for a code block enabled for AVX2 or higher CPU
- *
- * Default jit compile has JITFUNCS=100,
- *
- * *WIP* \sa cpu_isa_t
- */
-#define JITFUNCS_NONE -1
-#define JITFUNCS_ANY 0          /* no vector ops, very old cpu */
-#define JITFUNCS_SSE41 1
-#define JITFUNCS_SSE42 2
-#define JITFUNCS_AVX 3
-#define JITFUNCS_AVX2 4
-#define JITFUNCS_AVX512 5
-#define JITFUNCS_VANILLA 6
-#define JITFUNCS_VE 7
-//@}
-
-#if defined(TARGET_VANILLA) && !defined(JITFUNCS)
-/** In principle could have multiple TARGETS.
- * For example: VANILLA, and later perhaps SSE42, AVX2, AVX512.
- * Default is "compile everything".
- * These TARGETS can be set in cmake to generate reduced-functionality libmkldnn.
- * Which jit impls get included in the engine is capped by a single value.
- *
- * For example, TARGET_VANILLA includes NO Intel JIT code at all, and is suitable
- * for [cross-]compiling for other platforms.
- *
- * This header guarantees that JITFUNCS is always defined, and ensures that
- * whenever JITFUNCS is equal to JITFUNCS_NONE or JITFUNCS_VANILLA or ...,
- * that TARGET_VANILLA is always defined.
- * (TARGET_VANILLA is an easier-to-read check for "generic C or C++ code, no jit")
- *
- * \note TARGET_VANILLA impls are not *yet* optimized for speed!
- */
-#define JITFUNCS JITFUNCS_NONE
-
-#elif defined(JITFUNCS) && (JITFUNCS <= 0 || JITFUNCS == JITFUNCS_VANILLA) && !defined(TARGET_VANILLA)
-/** synonom for JITFUNCS <= 0 */
-#define TARGET_VANILLA
-#endif
-
-#if defined(TARGET_VANILLA) && JITFUNCS != JITFUNCS_NONE && JITFUNCS != JITFUNCS_ANY /*&& JITFUNCS!=JITFUNCS_VE*/
-#error "TARGET_VANILLA requires JITFUNCS to be either JITFUNCS_NONE or JITFUNCS_VANILLA for now"
-#endif
-/* JITFUNCS is now always defined.
- * TARGET_VANILLA is equivalent to (JITFUNCS==JITFUNCS_NONE || JITFUNCS==JITFUNCS_VANILLA)
- */
-
-#ifndef JITFUNCS
-/* default mkl-dnn compile works as usual, JITFUNCS_ANY means include all impls,
- * which is effectively same as JITFUNCS_AVX512. */
-#define JITFUNCS JITFUNCS_ANY
-#endif
-
-//#if JITFUNCS == 0
-//#warning "JITFUNCS == 0"
-//#endif
-
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 #define XBYAK64
 #define XBYAK_NO_OP_NAMES
 /* in order to make selinux happy memory that would be marked with X-bit should
@@ -143,9 +62,9 @@ typedef enum {
 } cpu_page_size_t;
 
 #if defined(__ve)
-    enum { CACHE_LINE_SIZE = 128 }; // is ADB cache line size the relevant quantity?
+enum { CACHE_LINE_SIZE = 128 }; // is ADB cache line size the relevant quantity?
 #else
-    enum { CACHE_LINE_SIZE = 64 };
+enum { CACHE_LINE_SIZE = 64 };
 #endif
 
 //typedef enum {
@@ -163,56 +82,124 @@ typedef enum {
 //} cpu_isa_t;
 
 enum cpu_isa_bit_t : unsigned {
-    x86_bit = 1U << 0, /* new */
-    sse41_bit = 1u << 1,
-    avx_bit = 1u << 2,
-    avx2_bit = 1u << 3,
-    avx512_common_bit = 1u << 4,
-    avx512_mic_bit = 1u << 5,
-    avx512_mic_4ops_bit = 1u << 6,
-    avx512_core_bit = 1u << 7,
-    avx512_core_vnni_bit = 1u << 8,
-    avx512_core_bf16_bit = 1u << 9,
-    /* extensions */
-    ve_bit = 1u << 9,
-    vednn_bit = 1u << 10,
+    /** impls using only C/C++ code. Typicall ref impls, but may be built
+     * to use external gemm routines (cblas/MKL). inline assembler only when
+     * absolutely necessary (by checking compile flags). */
+    vanilla_bit         = 1U << 0,
+    /// @defgroup x86_jit_flags x86 JIT levels
+    //@{
+    x86_bit             = 1U << 1, ///< new, x86 jit like dnnl_cpu_isa_all
+    sse41_bit           = 1u << 2,
+    avx_bit             = 1u << 3,
+    avx2_bit            = 1u << 4,
+    avx512_common_bit   = 1u << 5,
+    avx512_mic_bit      = 1u << 6,
+    avx512_mic_4ops_bit = 1u << 7,
+    avx512_core_bit     = 1u << 8,
+    avx512_core_vnni_bit =1u << 9,
+    avx512_core_bf16_bit =1u << 10,
+    x86_11_bit          = 1u << 11, ///< future use
+    x86_12_bit          = 1u << 12, ///< future use
+    x86_13_bit          = 1u << 13, ///< future use
+    x86_14_bit          = 1u << 14, ///< future use
+    x86_15_bit          = 1u << 15, ///< future use
+    x86_bits            = 0xffffu,               ///< set of x86 flags
+    //x86_jit_bits        = 0xffffu ^ vanilla_bit, ///< set of x86 flags
+    ///@}
+    /// @defgroup VE_extensions VE extended capabilities
+    ///@{
+    ve_common_bit       = 1u << 16, ///< without libvednn support (slow, equiv vanilla)
+    ve_vednn_bit        = 1u << 17, ///< DNNL_CPU_VE with libvednn support
+    ve_vejit_bit        = 1u << 18, ///< TBD: VE with jit support (also via libvednn)
+    ve_19_bit           = 1u << 19, ///< future use
+    ve_bits             = 0xf0000u | vanilla_bit, ///< set of VE flags
+    ///@}
 };
 
+// We leave all of them available, because mayiuse will simply return
+// false if a cpu_isa_t doesn't make sense.
 enum cpu_isa_t : unsigned {
-    isa_any = x86_bit, /* means generic x86 */
-    sse41 = x86_bit | sse41_bit,
-    avx = x86_bit | avx_bit | sse41,
-    avx2 = x86_bit | avx2_bit | avx,
-    avx512_common = x86_bit | avx512_common_bit | avx2,
-    avx512_mic = x86_bit | avx512_mic_bit | avx512_common,
-    avx512_mic_4ops = x86_bit | avx512_mic_4ops_bit | avx512_mic,
-    avx512_core = x86_bit | avx512_core_bit | avx512_common,
-    avx512_core_vnni = x86_bit | avx512_core_vnni_bit | avx512_core,
-    avx512_core_bf16 = x86_bit | avx512_core_bf16_bit | avx512_core_vnni,
-    isa_all = ~(2*avx512_core_bf16_bit-1) /* means any variety of x86 (was -1) */
-    /* extensions */
-    , isa_ve_any = ve_bit
-    , isa_vednn  = ve_bit | vednn_bit
-    , isa_ve_all = ~(ve_bit | vednn_bit)
-    /* Note old TARGET_VANILLA code */
-    , isa_vanilla = x86_bit | ve_bit
-
+    /** \enum vanilla
+     * cpu-agnostic ref code only (possibly cblas/mkl calls).
+     * \note non-jit builds may need to pull in some inline assembler.
+     * lowest common denominator.
+     * \todo could \c vanilla be 0x00 (avoiding vanilla_bit)?
+     */
+    vanilla             = vanilla_bit,
+    /// @defgroup x86_jit_masks x86-specific jit masks
+    //@{
+    x86_any             = x86_bit | vanilla,
+    sse41               = sse41_bit | x86_any,
+    avx                 = avx_bit | sse41,
+    avx2                = avx2_bit | avx,
+    //
+    avx512_common       = avx512_common_bit | vanilla,
+    avx512_mic          = avx512_mic_bit | avx512_common,
+    avx512_mic_4ops     = avx512_mic_4ops_bit | avx512_mic,
+    //
+    avx512_core         = avx512_core_bit | avx512_common,
+    avx512_core_vnni    = avx512_core_vnni_bit | avx512_core,
+    avx512_core_bf16    = avx512_core_bf16_bit | avx512_core_vnni,
+    x86_all             = x86_bits,
+    //@}
+    /// @defgroup ve_jit_masks VE-specific implementation masks
+    //@{
+    ve_common = ve_common_bit | vanilla,
+    vednn     = ve_vednn_bit | ve_common_bit,
+    vejit     = ve_vejit_bit | vednn,
+    ve_all    = ve_bits,
+    //@}
+    // following mappings handle cpu-agnostic settings
+    /** \enum isa_any
+     * "ANY" is a cpu-specific generic target.
+     * - x86 : allow x86 jit with no vec ops
+     * - VE  : same as "VANILLA" */
+    /** \enum isa_all
+     * "ALL" makes all optimizations for target cpu available.
+     * - x86 : allow max instruction set for jit impls.
+     * - VE  : allow libvednn with full jit capabilities */
+#if DNNL_CPU == DNNL_CPU_X86
+    isa_any = x86_any,
+    isa_all = x86_bits,          // all varieties of x86 jit
+#elif DNNL_CPU == DNNL_CPU_VE
+    isa_any = ve_common,
+    isa_all = ve_bits,           // all types of VE optimizations
+#endif
 };
 
 template <cpu_isa_t>
 struct cpu_isa_traits {}; /* ::vlen -> 32 (for avx2) */
 
 template <>
-struct cpu_isa_traits<isa_all> {
-    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_all;
-    static constexpr const char *user_option_env = "ALL";
+struct cpu_isa_traits<vanilla> { // Note: should work for x86/VE cpu
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_vanilla;
+    static constexpr const char *user_option_env = "VANILLA";
 };
 
+// "ANY" is cpu-specific
+template <>
+struct cpu_isa_traits<x86_any> {
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_any;
+    static constexpr const char *user_option_env = "ANY";
+};
+template <>
+struct cpu_isa_traits<ve_common> { // VE behavior same as VANILLA
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_any;
+    static constexpr const char *user_option_env = "ANY";
+    static constexpr int vlen_shift = 8;
+    // 2 kB vector regs (256 double or 512 packed float)
+    static constexpr int vlen = 256*8;
+    static constexpr int n_vregs = 64;
+};
+//
+
+/// x86-specific
+//@{
 template <>
 struct cpu_isa_traits<sse41> {
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     typedef Xbyak::Xmm Vmm;
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
     static constexpr int vlen_shift = 4;
     static constexpr int vlen = 16;
     static constexpr int n_vregs = 16;
@@ -222,9 +209,9 @@ struct cpu_isa_traits<sse41> {
 
 template <>
 struct cpu_isa_traits<avx> {
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     typedef Xbyak::Ymm Vmm;
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
     static constexpr int vlen_shift = 5;
     static constexpr int vlen = 32; // 256-bit regs --> 32 *bytes*
     static constexpr int n_vregs = 16;
@@ -239,10 +226,10 @@ struct cpu_isa_traits<avx2> : public cpu_isa_traits<avx> {
 };
 
 template <>
-struct cpu_isa_traits<avx512_common> {
-#if !defined(TARGET_VANILLA)
+struct cpu_isa_traits<avx512_common> { // for convenience
+#if TARGET_X86_JIT
     typedef Xbyak::Zmm Vmm;
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
     static constexpr int vlen_shift = 6;
     static constexpr int vlen = 64;
     static constexpr int n_vregs = 32;
@@ -281,36 +268,55 @@ struct cpu_isa_traits<avx512_core_bf16> : public cpu_isa_traits<avx512_core> {
     static constexpr const char *user_option_env = "AVX512_CORE_BF16";
 };
 
-cpu_isa_t DNNL_API get_max_cpu_isa(bool soft = false);
-dnnl::impl::status_t DNNL_API set_max_cpu_isa(dnnl_cpu_isa_t isa, bool force);
+/// "ALL" --> isa_all **just** for x86 build --> x86_bits
+template <>
+struct cpu_isa_traits<x86_all> { // isa_all just for x86
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_all;
+    static constexpr const char *user_option_env = "ALL";
+};
+//@}
 
-template <> struct cpu_isa_traits<isa_ve_all> {
+template <>
+struct cpu_isa_traits<vednn> : public cpu_isa_traits<ve_common> {
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_vednn;
+    static constexpr const char *user_option_env = "VEDNN";
+};
+
+template <>
+struct cpu_isa_traits<vejit> : public cpu_isa_traits<ve_common> {
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_vejit;
+    static constexpr const char *user_option_env = "VEJIT";
+};
+
+/// "ALL" --> isa_all **just** for ve build --> ve_bits
+template <>
+struct cpu_isa_traits<ve_all> : public cpu_isa_traits<ve_common> {
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_all;
+    static constexpr const char *user_option_env = "ALL";
     static constexpr int vlen_shift = 8;
     static constexpr int vlen = 256*8; // 2 kByte vector regs (256 cwdouble or 512 packed float)
     static constexpr int n_vregs = 64;
 };
+
+cpu_isa_t DNNL_API get_max_cpu_isa(bool soft = false);
 // END cpu_isa_traits (vector register defaults)
 
-#if defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS==JITFUNCS_VANILLA)
-// should not include jit_generator.hpp (or any other jit stuff)
-static inline constexpr bool mayiuse(const cpu_isa_t cpu_isa) {
-#if defined(__ve)
-    return (cpu_isa & (ve_bit | vednn_bit));
-#else
-    return (void)cpu_isa,false;
-#endif
-}
-#else
-
 namespace {
-static Xbyak::util::Cpu cpu;
-static inline bool mayiuse(const cpu_isa_t cpu_isa, bool soft = false) {
-    using namespace Xbyak::util;
 
+#if TARGET_X86_JIT
+static Xbyak::util::Cpu cpu;
+/** mayiuse is a runtime check that an ISA is available on the target CPU,
+ * and we respect a \c soft runtime limit.  Build time x86 limits are mostly
+ * enforced by \c cpu_engine (by pruning the impl lists at compile time).
+ */
+static inline bool mayiuse(const cpu_isa_t cpu_isa, const bool soft = false) {
     unsigned cpu_isa_mask = get_max_cpu_isa(soft);
     if ((cpu_isa_mask & cpu_isa) != cpu_isa) return false;
 
+    using namespace Xbyak::util;
+
     switch (cpu_isa) {
+        case isa_any: return true;
         case sse41: return cpu.has(Cpu::tSSE41);
         case avx: return cpu.has(Cpu::tAVX);
         case avx2: return cpu.has(Cpu::tAVX2);
@@ -331,27 +337,52 @@ static inline bool mayiuse(const cpu_isa_t cpu_isa, bool soft = false) {
         case avx512_core_bf16:
             return mayiuse(avx512_core_vnni, soft)
                     && cpu.has(Cpu::tAVX512_BF16);
-        case isa_any: return true;
         case isa_all: return false;
-        case isa_ve_any: return false;
-        case isa_vednn: return false;
-        case isa_ve_all: return false;
-        case isa_vanilla: return false;
+        default:
+                      assert(!"unhandled x86 mayiuse");
+                      return false;
     }
     return false;
 }
-}//anon::
+
+#elif TARGET_X86 // and no jit, only "VANILLA" build is usable
+static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=false) {
+    return cpu_isa == vanilla; // ??
+}
+
+#else // non-x86 target cpu
+static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=false) {
+#ifdef DNNL_ENABLE_MAX_CPU_ISA
+
+#if TARGET_X86
+    return cpu_isa == vanilla; // ??
+#elif TARGET_VE
+    // soft limit for VE TBD XXX
+    return (cpu_isa==isa_any? true
+            : cpu_isa==vednn? (CPU_ISA >= CPU_ISA_VEDNN)
+            : cpu_isa==vejit? (CPU_ISA >= CPU_ISA_VEJIT)
+            : false
+#else
+#error "unhandled DNNL_CPU target cpu"
 #endif
+#else
+    // non-x86 don't yet have a reason to call mayiuse...
+    return ((void)soft,(void)cpu_isa, false);
+#endif // DNNL_ENABLE_MAX_CPU_ISA
+}
+
+#endif // TARGET_* mayiuse variations
+} // namespace
 
 namespace {
 inline unsigned int get_cache_size(int level, bool per_core = true){
     unsigned int l = level - 1;
-#if defined(__ve)
+#if TARGET_VE
     unsigned const cpuDataCacheLevels = 1;
-#elif !defined(TARGET_VANILLA)
+#elif TARGET_X86_JIT
     unsigned const cpuDataCacheLevels = cpu.getDataCacheLevels();
 #else
-    unsigned const cpuDataCacheLevels = 0;
+    unsigned const cpuDataCacheLevels = 0; // use default settings
 #endif
     // Currently, if XByak is not able to fetch the cache topology
     // we default to 32KB of L1, 512KB of L2 and 1MB of L3 per core.
@@ -368,7 +399,7 @@ inline unsigned int get_cache_size(int level, bool per_core = true){
         }
     }
     if (l < cpuDataCacheLevels) {
-#if defined(__ve)
+#if TARGET_VE
         return cpu.getDataCacheSize(l)
                 / (per_core ? cpu.getCoresSharingDataCache(l) : 1);
 #else
@@ -381,34 +412,35 @@ inline unsigned int get_cache_size(int level, bool per_core = true){
 }
 
 inline bool isa_has_bf16(cpu_isa_t isa) {
-//#if defined(__ve)
-//    return false;
-//#else
-    return isa == avx512_core_bf16;
-//#endif
+    return TARGET_X86 \
+            && isa == avx512_core_bf16;
 }
-
 
 } // namespace
 
 /* whatever is required to generate string literals... */
 #include "z_magic.hpp"
 /* clang-format off */
+#if TARGET_X86_JIT
 #define JIT_IMPL_NAME_HELPER(prefix, isa, suffix_if_any) \
-    ((isa) == isa_any ? prefix STRINGIFY(x86) : \
-    ((isa) == sse41 ? prefix STRINGIFY(sse41) : \
-    ((isa) == avx ? prefix STRINGIFY(avx) : \
-    ((isa) == avx2 ? prefix STRINGIFY(avx2) : \
-    ((isa) == avx512_common ? prefix STRINGIFY(avx512_common) : \
-    ((isa) == avx512_core ? prefix STRINGIFY(avx512_core) : \
-    ((isa) == avx512_core_vnni ? prefix STRINGIFY(avx512_core_vnni) : \
-    ((isa) == avx512_mic ? prefix STRINGIFY(avx512_mic) : \
-    ((isa) == avx512_mic_4ops ? prefix STRINGIFY(avx512_mic_4ops) : \
-    ((isa) == avx512_core_bf16 ? prefix STRINGIFY(avx512_core_bf16) : \
-    ((isa) == avx512_core_bf16 ? prefix STRINGIFY(avx512_core_bf16) : \
-    ((isa) == isa_ve_any ? prefix STRINGIFY(ve) : \
-    ((isa) == isa_vednn ? prefix STRINGIFY(vednn) : \
-    prefix suffix_if_any)))))))))))))
+    ( (isa) == isa_any            ? (prefix STRINGIFY(x86)) \
+    : (isa) == sse41              ? (prefix STRINGIFY(sse41)) \
+    : (isa) == avx                ? (prefix STRINGIFY(avx)) \
+    : (isa) == avx2               ? (prefix STRINGIFY(avx2)) \
+    : (isa) == avx512_common      ? (prefix STRINGIFY(avx512_common)) \
+    : (isa) == avx512_core        ? (prefix STRINGIFY(avx512_core)) \
+    : (isa) == avx512_core_vnni   ? (prefix STRINGIFY(avx512_core_vnni)) \
+    : (isa) == avx512_mic         ? (prefix STRINGIFY(avx512_mic)) \
+    : (isa) == avx512_mic_4ops    ? (prefix STRINGIFY(avx512_mic_4ops)) \
+    : (isa) == avx512_core_bf16   ? (prefix STRINGIFY(avx512_core_bf16)) \
+    : (isa) == avx512_core_bf16   ? (prefix STRINGIFY(avx512_core_bf16)) \
+    : prefix suffix_if_any)
+
+#else
+// non-jit so far has no use for this macro
+#define JIT_IMPL_NAME_HELPER(prefix, isa, suffix_if_any) \
+    prefix "OOPS_no_x86_jit" suffix_if_any
+#endif // TARGET_X86_JIT
 /* clang-format on */
 
 } // namespace cpu

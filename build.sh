@@ -19,7 +19,6 @@ DOTARGET="x"
 VEJIT=0
 
 # see dnnl_config.h ...
-CPU_ANY=0
 CPU_X86=1
 CPU_VE=2
 CPU_SX=3
@@ -166,10 +165,12 @@ fi
 if [ "${DOTARGET}" == "x" ]; then
     usage
 fi
+
+# deprecated (now use CMAKEOPT
 if [ "${DOTARGET}" == "g" ]; then
     CPU=$(( ${CPU_X86} * 10 + 0 )) # x86 + 0 is no jit
 elif [ "${DOTARGET}" == "j" ]; then
-    CPU=$(( ${CPU_X86} * 10 + 5 )) # x86 + 5 is avx512 jit
+    CPU=$(( ${CPU_X86} * 10 + 6 )) # x86 + 5 is avx512 jit
 elif [ "${DOTARGET}" == "a" ]; then
     CPU=$(( ${CPU_VE}  * 10 + 0 )) # VE | 0 is none
 elif [ "${DOTARGET}" == "a" ]; then
@@ -437,7 +438,35 @@ echo "PATH $PATH"
 
     # NO! this is mkl-dnn "internal" from cmake/platform.cmake
     #    CMAKEOPT="${CMAKEOPT} -DCMAKE_CCXX_FLAGS=-DJITFUNCS=${DOJIT}"                                      
-    ccxx_flags -DJITFUNCS=${DOJIT}
+    # OLD WAY:
+    #ccxx_flags -DJITFUNCS=${DOJIT}
+    # NEW WAY: add to CMAKEOPT instead, auto-propagate to dnnl_config.h
+    #
+    # oops , we forgot this option
+    #if [ "${DOTARGET}" == "g" ]; then
+    if [ $DOJIT = $JITFUNCS_VANILLA ]; then
+        CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=VANILLA"
+    #elif [ "${DOTARGET}" == "j" ]; then
+    elif [ $DOJIT == 5 ]; then
+        : # default DNNL_ISA is ALL (for x86)
+    elif [ "${DOTARGET}" == "a" ]; then
+        # default DNNL_ISA is ALL (for VE)
+        CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=VANILLA"
+        #CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=VEDNN"
+        #CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=VEJIT"
+        #CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=ALL""
+    elif [ "${DOTARGET}" == "s" ]; then
+        : # deprecated
+    elif [ "${DOTARGET}" == "v" ]; then
+        # TARGET_VANILLA means "no x86 jit",
+        # so cpu determined by compiler and compile flags
+        CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=VANILLA"
+    elif [ ${DOJUSTDOC} -gt 0 ]; then
+        echo " JUST building doxygen docs"
+    else
+        echo " ERROR: build.sh unknown cpu target : DOTARGET=${DOTARGET}"
+        usage
+    fi
 
     # iterator debug code ?
     #export CFLAGS="${CFLAGS} -DVERBOSE_PRIMITIVE_CREATE=1"
@@ -454,21 +483,26 @@ echo "PATH $PATH"
     #CMAKEOPT="${CMAKEOPT} -DMKLDNN_BUILD_FOR_CI=OFF"   # def OFF
     #CMAKEOPT="${CMAKEOPT} -DMKLDNN_CPU_RUNTIME=OMP"    # def [OMP] TBB
     #CMAKEOPT="${CMAKEOPT} -DMKLDNN_GPU_RUNTIME=OCL"    # def [] OCL
-    CMAKEOPT="${CMAKEOPT} -DMKLDNN_WERROR=ON" # default OFF
-    CMAKEOPT="${CMAKEOPT} -DDNNL_JIT_SUPPORT=${CPU}"    # default max jit for target cpu
+
+    #CMAKEOPT="${CMAKEOPT} -DMKLDNN_WERROR=ON" # default OFF
+
+    # REMOVED:
+    #CMAKEOPT="${CMAKEOPT} -DDNNL_JIT_SUPPORT=${CPU}"    # default max jit for target cpu
+
     if [ $USE_CBLAS -ne 0 ]; then
         CMAKEOPT="${CMAKEOPT} -DMKLDNN_USE_CBLAS=ON" # default OFF
     fi
     if [ $USE_MKL == "y" ]; then # deprecated in v1.0
         CMAKEOPT="${CMAKEOPT} -D_MKLDNN_USE_MKL=ON"
     fi
-    if [ "$DOJIT" -lt 0 -o "$DOJIT" -eq $JITFUNCS_VANILLA ]; then
-        # this would NOT affect the jit generator
-        #CMAKEOPT="${CMAKEOPT} -DMKLDN_ARCH_OPT_FLAGS=\"\""
-        CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
-        # TODO add an option for target CPU, 'NONE' ~ 'TARGET_VANILLA'
-        ccxx_flags -DTARGET_VANILLA
-    fi
+    # removed -dTARGET_VANILLA (now set by CMAKEOPT -DDNNL_ISA=VANILLA)
+    #if [ "$DOJIT" -lt 0 -o "$DOJIT" -eq $JITFUNCS_VANILLA ]; then
+    #    # this would NOT affect the jit generator
+    #    #CMAKEOPT="${CMAKEOPT} -DMKLDN_ARCH_OPT_FLAGS=\"\""
+    #    CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
+    #    # TODO add an option for target CPU, 'NONE' ~ 'TARGET_VANILLA'
+    #    ccxx_flags -DTARGET_VANILLA
+    #fi
     #if [ ! "$DOTARGET" == "j" ]; then
     #    CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
     #    export CFLAGS="${CFLAGS} -DTARGET_VANILLA"
@@ -508,7 +542,9 @@ echo "PATH $PATH"
             export LDFLAGS="${LDFLAGS} -L${VEPERF_LIB_DIR} -lveperf"
             #export LDFLAGS="${LDLIBS} -Wl,-rpath,${VEPERF_LIB_DIR}"
         fi
-        CMAKEOPT="${CMAKEOPT} -DVEJIT=${VEJIT}"
+        # deprecated: use CMAKEOPT -DDNNL_ISA=VEJIT instead
+        #CMAKEOPT="${CMAKEOPT} -DVEJIT=${VEJIT}"
+
         #export CFLAGS="${CFLAGS} -DVEJIT=${VEJIT}"
         #export CXXFLAGS="${CXXFLAGS} -DVEJIT=${VEJIT}"
         echo "Aurora CMAKEOPT = ${CMAKEOPT}"
