@@ -454,8 +454,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     }
 };
 
-#if TARGET_X86_JIT
-/* bf16 reorders */
+#if DNNL_ENABLE_BFLOAT16
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         typename utils::enable_if<(
@@ -644,7 +643,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         return status::success;
     }
 };
-#endif // TARGET_X86_JIT
+#endif // DNNL_ENABLE_BFLOAT17
 
 /* reorders with tail support */
 

@@ -23,17 +23,15 @@
 #include "c_types_map.hpp"
 #include "gemm_pack_storage.hpp"
 #include "gemm_threading.hpp"
-
-// MKLDNN_CPU_GEMM_JIT is a 0/1 internal equivalent to defined(TARGET_VANILLA)
-// Originally to run the non-jit tests in an otherwise-jit build.
-// deprecated? (could just use TARGET_VANILLA throughout)
+// MKLDNN_CPU_GEMM_JIT *might* be different from TARGET_X86_JIT, because
+// of USE_CBLAS or USE_MKL build options.  There may be issues here FIXME
 #if defined(MKLDNN_CPU_GEMM_JIT)
 #undef MKLDNN_CPU_GEMM_JIT
 #define MKLDNN_CPU_GEMM_JIT 1
-#elif defined(TARGET_VANILLA)
-#define MKLDNN_CPU_GEMM_JIT 0
-#else
+#elif TARGET_X86_JIT
 #define MKLDNN_CPU_GEMM_JIT 1
+#else
+#define MKLDNN_CPU_GEMM_JIT 0
 #endif
 
 #define ASSERT_MKLDNN_CPU_GEMM_JIT static_assert \

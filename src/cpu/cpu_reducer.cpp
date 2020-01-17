@@ -115,7 +115,7 @@ protected:
     void (*ker_)(data_t *dst, const data_t *srcs, size_t ny, size_t nx);
 };
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 using namespace Xbyak;
 
 template <impl::data_type_t data_type, cpu_isa_t isa>
@@ -278,22 +278,20 @@ struct reducer_2d_driver_f_s_32_t : public reducer_2d_driver_t<data_type>,
                 const_cast<uint8_t *>(this->getCode()));
     }
 };
-#endif
+#endif // TARGET_X86_JIT
 
 template <impl::data_type_t data_type>
 inline reducer_2d_driver_t<data_type> *create_reduce_2d_drv(int n_src,
         size_t src_ld, size_t src_step, size_t dst_step, bool nullify_dst) {
-#ifdef SIMPLE_IMPL
-    /* avoid creating a jit driver (before checking TARGET_VANILLA). */
-#elif !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT && !defined(SIMPLE_IMPL)
     if (mayiuse(avx512_common))
         return new reducer_2d_driver_f_s_32_t<data_type, avx512_common>(
                 n_src, src_ld, src_step, dst_step, nullify_dst);
     else if (mayiuse(avx2))
         return new reducer_2d_driver_f_s_32_t<data_type, avx2>(
                 n_src, src_ld, src_step, dst_step, nullify_dst);
-#endif // !defined(TARGET_VANILLA)
-    assert(!"unimplemented");
+    assert(!"unimplemented"); // questionable (what if CPU dispatch to sse41?)
+#endif // TARGET_X86_JIT
     return nullptr;
 }
 
@@ -351,42 +349,41 @@ void cpu_reducer_t<data_type>::reduce_nolock(int ithr, data_t *dst,
             = balancer().nthr_per_group_ == 1 || balancer().idle(ithr);
     if (redundant_reduction) return;
 
-#if defined(TARGET_VANILLA)
+#if TARGET_X86_JIT && !defined(SIMPLE_IMPL)
+    using namespace utils;
+
+    const int id_in_grp = balancer().id_in_group(ithr);
+    const int njobs_in_grp = balancer().ithr_njobs(ithr);
+    const size_t cl = 64 / sizeof(data_t);
+
+    const size_t reduction_size = njobs_in_grp * balancer().job_size_;
+    size_t start {0}, end {0};
+    balance211(div_up(reduction_size, cl), balancer().nthr_per_group_,
+            id_in_grp, start, end);
+
+    if (start == end) return;
+
+    data_t *d = get_local_ptr(ithr - id_in_grp, dst, scratchpad) + start * cl;
+    const data_t *space
+            = get_local_ptr(ithr - id_in_grp + 1, dst, scratchpad) + start * cl;
+    const size_t len = nstl::min(end * cl, reduction_size) - start * cl;
+
+    (*drv_)(d, space, 1, len);
+
+#else
     assert(drv_==nullptr);
-#endif
-    if(drv_) { /* nullptr if TARGET_VANILLA or not mayiuse avx2 or above */
-        using namespace utils;
+    if (balancer().id_in_group(ithr) != 0)
+        return; /* only threads 0 do the reduction */
 
-        const int id_in_grp = balancer().id_in_group(ithr);
-        const int njobs_in_grp = balancer().ithr_njobs(ithr);
-        const size_t cl = 64 / sizeof(data_t);
-
-        const size_t reduction_size = njobs_in_grp * balancer().job_size_;
-        size_t start {0}, end {0};
-        balance211(div_up(reduction_size, cl), balancer().nthr_per_group_,
-                id_in_grp, start, end);
-
-        if (start == end) return;
-
-        data_t *d = get_local_ptr(ithr - id_in_grp, dst, scratchpad) + start * cl;
-        const data_t *space
-                = get_local_ptr(ithr - id_in_grp + 1, dst, scratchpad) + start * cl;
-        const size_t len = nstl::min(end * cl, reduction_size) - start * cl;
-
-        (*drv_)(d, space, 1, len);
-    } else {
-        if (balancer().id_in_group(ithr) != 0)
-            return; /* only threads 0 do the reduction */
-
-        const int njobs_in_grp = balancer().ithr_njobs(ithr);
-        data_t *d = get_local_ptr(ithr, dst, scratchpad);
-        for (int id_in_grp = 1; id_in_grp < balancer().nthr_per_group_;
-                ++id_in_grp) {
-            const data_t *space = get_local_ptr(ithr + id_in_grp, dst, scratchpad);
-            for (size_t i = 0; i < (size_t)njobs_in_grp * balancer().job_size_; ++i)
-                d[i] += space[i];
-        }
+    const int njobs_in_grp = balancer().ithr_njobs(ithr);
+    data_t *d = get_local_ptr(ithr, dst, scratchpad);
+    for (int id_in_grp = 1; id_in_grp < balancer().nthr_per_group_;
+            ++id_in_grp) {
+        const data_t *space = get_local_ptr(ithr + id_in_grp, dst, scratchpad);
+        for (size_t i = 0; i < (size_t)njobs_in_grp * balancer().job_size_; ++i)
+            d[i] += space[i];
     }
+#endif
 }
 
 template struct cpu_reducer_t<data_type::f32>;
@@ -461,22 +458,20 @@ void cpu_reducer_2d_t<data_type>::reduce_block(const data_t *space_base,
     data_t *d = dst + (start_y + ny_start) * conf_.dst_x_ + start_x + nx_start;
     const data_t *space = space_base + job * balancer().job_size_
             + ny_start * conf_.job_size_x_ + nx_start;
-#if defined(TARGET_VANILLA)
+#if TARGET_X86_JIT && !defined(SIMPLE_IMPL)
+    (*drv_)(d, space, ny_step, nx_step);
+#else
     assert(drv_==nullptr);
-#endif
-    if(drv_) { /* nullptr if not mayiuse avx2 or above */
-        (*drv_)(d, space, ny_step, nx_step);
-    } else {
-        for (int idg = 0; idg < balancer().nthr_per_group_; ++idg) {
-            const data_t *w = &space[idg * space_per_thread(balancer())];
-            for (int y = 0; y < ny_step; ++y)
-                for (int x = 0; x < nx_step; ++x) {
-                    d[y * conf_.dst_x_ + x]
-                            = (idg == 0 ? 0 : d[y * conf_.dst_x_ + x])
-                            + w[y * conf_.job_size_x_ + x];
-                }
-        }
+    for (int idg = 0; idg < balancer().nthr_per_group_; ++idg) {
+        const data_t *w = &space[idg * space_per_thread(balancer())];
+        for (int y = 0; y < ny_step; ++y)
+            for (int x = 0; x < nx_step; ++x) {
+                d[y * conf_.dst_x_ + x]
+                        = (idg == 0 ? 0 : d[y * conf_.dst_x_ + x])
+                        + w[y * conf_.job_size_x_ + x];
+            }
     }
+#endif
 }
 
 template <impl::data_type_t data_type>

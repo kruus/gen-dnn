@@ -31,7 +31,9 @@ namespace cpu {
 using namespace dnnl::impl::status;
 using namespace dnnl::impl::memory_tracking::names;
 using namespace dnnl::impl::utils;
+#if TARGET_X86_JIT /* this namespace is from jit_avx512_* files */
 using namespace dnnl::impl::cpu::bf16_support;
+#endif // TARGET_X86_JIT
 
 // This code is moved out from execute_backward_data() and
 // execute_backward_weights() to avoid warnings with gcc 7.x compilers:
@@ -49,6 +51,7 @@ void store_bfloat16_in_parallel(bfloat16_t *output_data, const float *acc_data,
     });
 }
 
+#if TARGET_X86_JIT
 template <data_type_t dst_data_type>
 gemm_bf16_convolution_fwd_t<dst_data_type>::pp_ker_t::pp_ker_t(const pd_t *pd)
     : ker_(nullptr)
@@ -274,6 +277,7 @@ void gemm_bf16_convolution_fwd_t<dst_data_type>::pp_ker_t::operator()(
         }
     });
 }
+#endif // TARGET_X86_JIT
 
 template <data_type_t dst_data_type>
 void gemm_bf16_convolution_fwd_t<dst_data_type>::execute_forward(
@@ -379,8 +383,13 @@ void gemm_bf16_convolution_fwd_t<dst_data_type>::execute_forward(
             if (this->pd()->is_postprocess_required()) {
                 size_t acc_str = LDC;
                 size_t dst_str = M;
+#if TARGET_X86_JIT
                 (*pp_ker_)(dst_local, _acc, bias + g * jcp.oc, sum_scale,
                         dst_str, acc_str, m, jcp.nthr == 1);
+#else
+#warning "missing reference impl for gemm_bf16_convolution.cpp"
+                assert(!"missing reference impl");
+#endif // TARGET_X86_JIT
             }
 
             nd_iterator_step(g, jcp.ngroups, n, jcp.mb, od, jcp.od, ohb, nb_oh,

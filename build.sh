@@ -449,6 +449,8 @@ echo "PATH $PATH"
     #elif [ "${DOTARGET}" == "j" ]; then
     elif [ $DOJIT == 5 ]; then
         : # default DNNL_ISA is ALL (for x86)
+        #CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=ALL" 
+        CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=SSE41"
     elif [ "${DOTARGET}" == "a" ]; then
         # default DNNL_ISA is ALL (for VE)
         CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=VANILLA"

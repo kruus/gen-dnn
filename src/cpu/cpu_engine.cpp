@@ -24,9 +24,9 @@
 #include "cpu_stream.hpp"
 #include "memory.hpp"
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 #include "cpu/matmul/gemm_bf16_matmul.hpp"
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 #include "cpu/matmul/gemm_f32_matmul.hpp"
 #include "cpu/matmul/gemm_x8s8s32x_matmul.hpp"
 #include "cpu/matmul/ref_matmul.hpp"
@@ -34,19 +34,21 @@
 #include "cpu/resampling/ref_resampling.hpp"
 #include "cpu/resampling/simple_resampling.hpp"
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_RNN
 #include "cpu/rnn/ref_rnn.hpp" // for now requires jit
+#endif
 
+#if DNNL_ENABLE_BFLOAT16
 #include "cpu/gemm_bf16_convolution.hpp"
 #include "cpu/gemm_bf16_inner_product.hpp"
-#endif // !defined(TARGET_VANILLA)
+#endif
 
 #include "cpu/gemm_convolution.hpp"
 #include "cpu/gemm_inner_product.hpp"
 #include "cpu/gemm_x8s8s32x_convolution.hpp"
 #include "cpu/gemm_x8s8s32x_inner_product.hpp"
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_TARGET_X86_JIT
 #include "cpu/jit_avx2_1x1_convolution.hpp"
 #include "cpu/jit_avx2_convolution.hpp"
 #include "cpu/jit_avx2_x8s8s32x_1x1_convolution.hpp"
@@ -77,7 +79,7 @@
 #include "cpu/jit_uni_pooling.hpp"
 #include "cpu/jit_uni_softmax.hpp"
 #include "cpu/jit_uni_tbb_batch_normalization.hpp"
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 
 #include "cpu/nchw_pooling.hpp"
 #include "cpu/ncsp_batch_normalization.hpp"
@@ -90,7 +92,7 @@
 #include "cpu/ref_eltwise.hpp"
 #include "cpu/ref_inner_product.hpp"
 
-#if VEJIT > 0
+#if DNNL_TARGET_VEDNN // VE cpu, fast libvednn routines allowed
 #include "vanilla/vednnx_convolution.hpp"
 #endif
 #include "cpu/ref_layer_normalization.hpp"
@@ -222,57 +224,63 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
 #define INSTANCE_CREATOR(...) primitive_desc_t::create<__VA_ARGS__::pd_t>
 #endif
 
-
-#if JITFUNCS >= JITFUNCS_AVX512 && JITFUNCS < JITFUNCS_VANILLA
+// different avx512 types not distinguished
+#if DNNL_ISA >= DNNL_ISA_AVX512_MIC && DNNL_ISA <= DNNL_ISA_X86_ALL
+#warning "cpu_engine WITH _avx512"
 #define INSTANCE_avx512(...) &INSTANCE_CREATOR(__VA_ARGS__),
-//#warning "jit avx512 YES"
 #else
-//#warning "INSTANCE_avx512 is NO-OP"
 #define INSTANCE_avx512(...)
 #endif
 
-#if JITFUNCS >= JITFUNCS_AVX2 && JITFUNCS < JITFUNCS_VANILLA
+#if DNNL_ISA >= DNNL_ISA_AVX2 && DNNL_ISA <= DNNL_ISA_X86_ALL
+#warning "cpu_engine WITH _avx2"
 #define INSTANCE_avx2(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
 #define INSTANCE_avx2(...)
 #endif
 
-#if JITFUNCS >= JITFUNCS_AVX && JITFUNCS < JITFUNCS_VANILLA
+#if DNNL_ISA >= DNNL_ISA_AVX && DNNL_ISA <= DNNL_ISA_X86_ALL
+#warning "cpu_engine WITH _avx"
 #define INSTANCE_avx(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
 #define INSTANCE_avx(...)
 #endif
 
-#if JITFUNCS >= JITFUNCS_SSE42 && JITFUNCS < JITFUNCS_VANILLA
-#define INSTANCE_sse42(...) &INSTANCE_CREATOR(__VA_ARGS__),
-#else
-#define INSTANCE_sse42(...)
-#endif
+// no x86 jit specific to sse42
 
-#if JITFUNCS >= JITFUNCS_SSE41 && JITFUNCS < JITFUNCS_VANILLA
+#if DNNL_ISA >= DNNL_ISA_SSE41 && DNNL_ISA <= DNNL_ISA_X86_ALL
+#warning "cpu_engine WITH _sse41"
 #define INSTANCE_sse41(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
 #define INSTANCE_sse41(...)
 #endif
 
-#if JITFUNCS >= JITFUNCS_ANY && JITFUNCS < JITFUNCS_VANILLA /* unified(?) x86 jit */
+/** _uni CAN run on any ISA, but at runtime will choose highest available.
+ * This circumvents compile-time attempts to limit the ISA -- the runtime
+ * limit via environment variable DNNL_MAX_CPU_ISA should still work. */
+#if DNNL_ISA >= DNNL_ISA_X86 && DNNL_ISA <= DNNL_ISA_X86_ALL
+#warning "cpu_engine WITH _uni"
 #define INSTANCE_uni(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
 #define INSTANCE_uni(...)
 #endif
 
-#if JITFUNCS == JITFUNCS_VANILLA // portable non-jit (generic cpu)
+// Hmm. is there a difference between uni and any ?
+#if (DNNL_ISA >= DNNL_ISA_X86 && DNNL_ISA <= DNNL_ISA_ALL)
+#warning "cpu_engine WITH _any"
 #define INSTANCE_any(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
 #define INSTANCE_any(...)
 #endif
 
-/** unmodified INSTANCE(...) macro works like JITFUNCS_VANILLA
- * and should compile on x86 and non-x86 architectures. */
+/** unmodified INSTANCE(...) macro for DNNL_ISA_VANILLA should compile
+ * anywhere, on x86/non-x86. */
 #define INSTANCE(...) &INSTANCE_CREATOR(__VA_ARGS__),
 
-/** an implementation ONLY working for VE (Aurora) vector processor. */
-#if VEJIT > 0
+/** an implementation ONLY working for VE (Aurora) vector processor.
+ * (no distinctions between vednn or vejit) */
+#if DNNL_ISA >= DNNL_ISA_VE && DNNL_ISA <= DNNL_ISA_VE_ALL
+#warning "cpu_engine WITH _ve"
 #define INSTANCE_ve(...) &INSTANCE_CREATOR(__VA_ARGS__),
 #else
 #define INSTANCE_ve(...)

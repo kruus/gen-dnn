@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 #include "cpu_isa_traits.hpp"
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 
 #include "c_types_map.hpp"
 #include "dnnl_thread.hpp"
@@ -1147,4 +1147,4 @@ status_t jit_avx512_common_conv_winograd_bwd_weights_kernel_f32::init_conf(
 } // namespace dnnl
 
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT

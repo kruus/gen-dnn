@@ -16,11 +16,11 @@
 
 #include "gemm_inner_product_utils.hpp"
 #include "dnnl_thread.hpp"
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 #include "jit_uni_eltwise_injector.hpp"
 #else
 #include "ref_eltwise.hpp"
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 #include "math_utils.hpp"
 #include "simple_q10n.hpp"
 
@@ -40,13 +40,13 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
     , ref_eltwise_(nullptr)
     //, do_bias_(pd->with_bias())
     //, bias_data_type_(data_type::undef)
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     , eltwise_injector_(nullptr)
     , bf16_emu_(nullptr)
     , vreg_zero()
     , vreg_scale()
     , vreg_sum_scale()
-#endif
+#endif // TARGET_X86_JIT
     , OC_(OC)
     , MB_(MB)
     , bias_data_type_(bias_dt)
@@ -58,7 +58,7 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
     , do_sum_(false)
     , do_dst_zero_points_(false)
     , sum_scale_(0)
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     , isa_(isa_any)
     , max_OC_loop_unroll_(13)
     , idx_compute_vreg_start_(0)
@@ -67,7 +67,7 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
     , compute_vreg_bias_shift_(0)
     , compute_vreg_prev_dst_shift_(0)
     , mb_blk_kernel(false)
-#endif // !TARGET_VANILLA
+#endif // TARGET_X86_JIT
 {
     using namespace types;
     //using namespace Xbyak;
@@ -88,7 +88,8 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
     // nb: post_ps_t::entry_t::eltwise_t eltwise_
     //  vs ref_eltwise_scalar_fwd_t *ref_eltwise_
     // Q: when related?
-#if defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
+#else
     ref_eltwise_ = new ref_eltwise_scalar_fwd_t(eltwise_.alg,
             eltwise_.alpha, eltwise_.beta, eltwise_.scale);
 #endif
@@ -106,7 +107,7 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
     //    compute_vreg_bias_shift_ = compute_vregs_per_iter_++;
     //}
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     using namespace Xbyak;
     if (!attr->zero_points_.has_default_values(DNNL_ARG_DST)) {
         do_dst_zero_points_ = true;
@@ -166,7 +167,7 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
     if (do_eltwise_)
         ref_eltwise_ = new ref_eltwise_scalar_fwd_t(eltwise_.alg,
                 eltwise_.alpha, eltwise_.beta, eltwise_.scale);
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
     return;
 }
 
@@ -176,7 +177,7 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(
     : pp_kernel_t(pd->OC(), pd->MB(), pd->attr(),
             pd->desc()->bias_desc.data_type, skip_sum) {}
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 template <data_type_t acc_type, data_type_t dst_type>
 void pp_kernel_t<acc_type, dst_type>::compute_oc_channel_blk() {
     using namespace Xbyak;
@@ -646,7 +647,7 @@ void pp_kernel_t<acc_type, dst_type>::generate() {
 
     ker_ = getCode<decltype(ker_)>();
 }
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 
 template <data_type_t acc_type, data_type_t dst_type>
 void pp_kernel_t<acc_type, dst_type>::operator()(dst_data_t *dst,
@@ -659,7 +660,7 @@ void pp_kernel_t<acc_type, dst_type>::operator()(dst_data_t *dst,
 
     const size_t OC = this->runtime_oc() ? runtime_oc : OC_;
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     if (ker_) {
         // JIT
         ker_args args;
@@ -674,7 +675,7 @@ void pp_kernel_t<acc_type, dst_type>::operator()(dst_data_t *dst,
         args.oc_offset = oc_offset;
         ker_(&args);
     } else
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
     {
         // Fallback
         size_t oc = start % OC;
@@ -698,9 +699,9 @@ template class pp_kernel_t<s32, f32>;
 template class pp_kernel_t<s32, s32>;
 template class pp_kernel_t<s32, s8>;
 template class pp_kernel_t<s32, u8>;
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 template class pp_kernel_t<f32, bf16>;
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 } // namespace inner_product_utils
 
 } // namespace cpu

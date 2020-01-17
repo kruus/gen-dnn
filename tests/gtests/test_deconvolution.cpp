@@ -478,7 +478,7 @@ CPU_INST_TEST_CASE(SimpleSmall_NCHW,
         PARAMS(nchw, oihw, x, nchw, 2, 1, 6, 2, 2, 4, 4, 4, 3, 3, 0, 0, 1, 1),
         PARAMS(nhwc, oihw, x, nhwc, 2, 1, 6, 2, 2, 4, 4, 4, 3, 3, 0, 0, 1, 1),
         PARAMS(nhwc, hwio, x, nhwc, 2, 1, 6, 4, 4, 4, 4, 4, 3, 3, 1, 1, 1, 1),
-        PARAMS(nhwc, hwio, x, nhwc, 2, 1, 6, 2, 2, 4, 4, 4, 3, 3, 0, 0, 1, 1),
+        PARAMS(nhwc, hwio, x, nhwc, 2, 1, 6, 2, 2, 4, 4, 4, 3, 3, 0, 0, 1, 1), // failed with VANILLA build XXX
         PARAMS(nhwc, goihw, x, nhwc, 2, 2, 6, 4, 4, 4, 4, 4, 3, 3, 0, 0, 1, 1),
         PARAMS(nhwc, hwigo, x, nhwc, 2, 2, 6, 4, 4, 4, 4, 4, 3, 3, 1, 1, 1, 1)
 

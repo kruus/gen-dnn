@@ -17,7 +17,7 @@
 #ifndef GEMM_BF16_MATMUL_HPP
 #define GEMM_BF16_MATMUL_HPP
 #include "cpu_isa_traits.hpp"
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 
 #include <assert.h>
 
@@ -84,7 +84,7 @@ private:
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
+#endif // DNNL_ENABLE_BFLOAT16
 
-#endif // !defined(TARGET_VANILLA)
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

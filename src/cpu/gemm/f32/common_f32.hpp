@@ -17,8 +17,8 @@
 #ifndef COMMON_F32_HPP
 #define COMMON_F32_HPP
 #include "cpu_isa_traits.hpp"
-#if defined(TARGET_VANILLA)
-#error "common_f32.hpp is incompatible with TARGET_VANILLA build"
+#if !TARGET_X86_JIT
+#error "common_f32.hpp requires a TARGET_X86_JIT build"
 #else
 
 #include "jit_generator.hpp"
@@ -174,6 +174,6 @@ public:
 } // namespace impl
 } // namespace dnnl
 
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif // COMMON_F32_HPP

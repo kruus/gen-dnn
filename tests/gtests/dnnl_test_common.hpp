@@ -40,9 +40,7 @@
 #include "dnnl_test_common_ocl.hpp"
 #endif
 
-#if DNNL_ENABLE_BFLOAT16
 #include "src/common/bfloat16.hpp"
-#endif // DNNL_ENABLE_BFLOAT16
 #include "src/common/dnnl_thread.hpp"
 #include "src/common/float16.hpp"
 #include "src/common/memory_desc_wrapper.hpp"

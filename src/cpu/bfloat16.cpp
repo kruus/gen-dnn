@@ -18,16 +18,16 @@
 #if DNNL_ENABLE_BFLOAT16
 #include <memory>
 #include "bfloat16.hpp"
-#if DNNL_ENABLE_XBYAK
+#if TARGET_X86_JIT
 #include "jit_avx512_core_bf16cvt.hpp"
-#endif // DNNL_ENABLE_XBYAK
+#endif // TARGET_X86_JIT
 
 namespace dnnl {
 namespace impl {
 
-#if DNNL_ENABLE_XBYAK
+#if TARGET_X86_JIT
 using namespace cpu::bf16_support;
-#endif // DNNL_ENABLE_XBYAK
+#endif // TARGET_X86_JIT
 
 union float_raw {
     float fraw;
@@ -36,7 +36,7 @@ union float_raw {
 };
 
 bfloat16_t &bfloat16_t::operator=(float f) {
-#if DNNL_ENABLE_XBYAK
+#if TARGET_X86_JIT
     if (cpu::mayiuse(cpu::cpu_isa_t::avx512_core)) {
         jit_call_t p;
         p.inp = (void *)&f;
@@ -45,7 +45,7 @@ bfloat16_t &bfloat16_t::operator=(float f) {
                 1);
         cvt_one_ps_to_bf16.jit_ker(&p);
     } else
-#endif // DNNL_ENABLE_XBYAK
+#endif // TARGET_X86_JIT
     {
         float_raw r = {f};
         switch (std::fpclassify(f)) {
@@ -80,7 +80,7 @@ bfloat16_t::operator float() const {
 }
 
 void cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t size) {
-#if DNNL_ENABLE_XBYAK
+#if TARGET_X86_JIT
     if (cpu::mayiuse(cpu::cpu_isa_t::avx512_core)) {
         jit_call_t p_;
         p_.inp = (void *)inp;
@@ -89,7 +89,7 @@ void cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t size) {
         static const cpu::jit_avx512_core_cvt_ps_to_bf16_t cvt_ps_to_bf16;
         cvt_ps_to_bf16.jit_ker(&p_);
     } else
-#endif // DNNL_ENABLE_XBYAK
+#endif // TARGET_X86_JIT
     {
         for (size_t i = 0; i < size; ++i)
             out[i] = inp[i];
@@ -97,7 +97,7 @@ void cvt_float_to_bfloat16(bfloat16_t *out, const float *inp, size_t size) {
 }
 
 void cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t size) {
-#if DNNL_ENABLE_XBYAK
+#if TARGET_X86_JIT
     if (cpu::mayiuse(cpu::cpu_isa_t::avx512_core)) {
         jit_call_t p_;
         p_.inp = (void *)inp;
@@ -106,7 +106,7 @@ void cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t size) {
         static const cpu::jit_avx512_core_cvt_bf16_to_ps_t cvt_bf16_to_ps;
         cvt_bf16_to_ps.jit_ker(&p_);
     } else
-#endif // DNNL_ENABLE_XBYAK
+#endif // TARGET_X86_JIT
     {
         for (size_t i = 0; i < size; ++i)
             out[i] = inp[i];
@@ -115,7 +115,7 @@ void cvt_bfloat16_to_float(float *out, const bfloat16_t *inp, size_t size) {
 
 void add_floats_and_cvt_to_bfloat16(
         bfloat16_t *out, const float *inp0, const float *inp1, size_t size) {
-#if DNNL_ENABLE_XBYAK
+#if TARGET_X86_JIT
     if (cpu::mayiuse(cpu::cpu_isa_t::avx512_core)) {
         jit_call_t p_;
         p_.inp = (void *)inp0;
@@ -126,7 +126,7 @@ void add_floats_and_cvt_to_bfloat16(
                 add_cvt_ps_to_bf16;
         add_cvt_ps_to_bf16.jit_ker(&p_);
     } else
-#endif // DNNL_ENABLE_XBYAK
+#endif // TARGET_X86_JIT
     {
         for (size_t i = 0; i < size; ++i)
             out[i] = inp0[i] + inp1[i];

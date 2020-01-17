@@ -74,18 +74,18 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
 
     auto dst = CTX_OUT_MEM(data_t *, DNNL_ARG_DST);
     auto ws = CTX_OUT_MEM(uint8_t *, DNNL_ARG_WORKSPACE);
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
     acc_data_t *tmp_data_ = d_type == bf16
             ? scratchpad.template get<acc_data_t>(key_bnorm_bf16cvt)
             : nullptr;
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 
     const dim_t N = pd()->MB();
     const dim_t C = pd()->C();
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
     const int simd_w = 16;
     const dim_t C_align = utils::rnd_up(C, simd_w);
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
     const dim_t SP = pd()->H() * pd()->W() * pd()->D();
 
     const float eps = pd()->desc()->batch_norm_epsilon;
@@ -106,7 +106,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
                 for (dim_t sp = 0; sp < SP; sp++) {
                     const acc_data_t *_src;
                     const size_t s_off = (size_t)n * SP * C + sp * C;
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
                     if (d_type == bf16) {
                         // convert src from b16 to f32
                         acc_data_t *tmp_src = tmp_data_ + ithr * C_align;
@@ -114,7 +114,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
                                 tmp_src, (bfloat16_t *)src + s_off, C);
                         _src = tmp_src;
                     } else
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
                     {
                         _src = reinterpret_cast<const acc_data_t *>(
                                 src + s_off);
@@ -147,7 +147,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
                 for (dim_t sp = 0; sp < SP; sp++) {
                     const acc_data_t *_src;
                     const size_t s_off = (size_t)n * SP * C + sp * C;
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
                     if (d_type == bf16) {
                         // convert src from b16 to f32
                         acc_data_t *tmp_src = tmp_data_ + ithr * C_align;
@@ -155,7 +155,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
                                 tmp_src, (bfloat16_t *)src + s_off, C);
                         _src = tmp_src;
                     } else
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
                     {
                         _src = reinterpret_cast<const acc_data_t *>(
                                 src + s_off);
@@ -199,7 +199,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
                 acc_data_t *_dst;
                 const acc_data_t *_src;
                 const size_t s_off = (size_t)n * SP * C + sp * C;
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
                 if (d_type == bf16) {
                     // store dst to f32 buffer
                     _dst = tmp_data_ + ithr * C_align;
@@ -209,7 +209,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
                             tmp_src, (bfloat16_t *)src + s_off, C);
                     _src = tmp_src;
                 } else
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
                 {
                     _dst = reinterpret_cast<acc_data_t *>(dst + s_off);
                     _src = reinterpret_cast<const acc_data_t *>(src + s_off);
@@ -238,20 +238,20 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
                     }
                     _dst[c] = maybe_post_op(bn_res);
                 }
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
                 if (d_type == bf16)
                     // convert dst from f32 to b16
                     cvt_float_to_bfloat16((bfloat16_t *)dst + s_off, _dst, C);
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
             }
         }
     });
 }
 
 template struct nspc_batch_normalization_fwd_t<f32>;
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 template struct nspc_batch_normalization_fwd_t<bf16>;
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 
 template <data_type_t d_type>
 void nspc_batch_normalization_bwd_t<d_type>::execute_backward(
@@ -274,19 +274,19 @@ void nspc_batch_normalization_bwd_t<d_type>::execute_backward(
 
     const dim_t N = pd()->MB();
     const dim_t C = pd()->C();
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
     const int simd_w = 16;
     const dim_t C_align = utils::rnd_up(C, simd_w);
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
     const dim_t SP = pd()->D() * pd()->H() * pd()->W();
     acc_data_t *diff_gamma = diff_scaleshift, *diff_beta = diff_scaleshift + C;
     acc_data_t *ws_reduce
             = scratchpad.template get<acc_data_t>(key_bnorm_reduction);
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
     acc_data_t *tmp_data_ = d_type == bf16
             ? scratchpad.template get<acc_data_t>(key_bnorm_bf16cvt)
             : nullptr;
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 
     const float eps = pd()->desc()->batch_norm_epsilon;
     const bool use_scaleshift = pd()->use_scaleshift();
@@ -314,7 +314,7 @@ void nspc_batch_normalization_bwd_t<d_type>::execute_backward(
                 const acc_data_t *_diff_dst;
                 const acc_data_t *_src;
                 const size_t s_off = (size_t)n * SP * C + sp * C;
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
                 if (d_type == bf16) {
                     // convert diff_dst from b16 to f32
                     acc_data_t *tmp_diff_dst = tmp_data_ + ithr * C_align;
@@ -327,7 +327,7 @@ void nspc_batch_normalization_bwd_t<d_type>::execute_backward(
                             tmp_src, (bfloat16_t *)src + s_off, C);
                     _src = tmp_src;
                 } else
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
                 {
                     _diff_dst = reinterpret_cast<const acc_data_t *>(
                             diff_dst + s_off);
@@ -380,7 +380,7 @@ void nspc_batch_normalization_bwd_t<d_type>::execute_backward(
                 const acc_data_t *_diff_dst;
                 const acc_data_t *_src;
                 const size_t s_off = (size_t)n * SP * C + sp * C;
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
                 if (d_type == bf16) {
                     // store diff_src to f32 buffer
                     _diff_src = tmp_data_ + ithr * C_align;
@@ -399,7 +399,7 @@ void nspc_batch_normalization_bwd_t<d_type>::execute_backward(
                     } else
                         _src = nullptr; // to avoid compiler warning w/ gcc483
                 } else
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
                 {
                     _diff_src
                             = reinterpret_cast<acc_data_t *>(diff_src + s_off);
@@ -452,22 +452,22 @@ void nspc_batch_normalization_bwd_t<d_type>::execute_backward(
                     v_diff_src *= gamma * sqrt_variance;
                     _diff_src[nb_c_blk * c_blk + c] = v_diff_src;
                 }
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
                 if (d_type == bf16) {
                     // convert diff_src from f32 to b16
                     cvt_float_to_bfloat16(
                             (bfloat16_t *)diff_src + s_off, _diff_src, C);
                 }
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
             }
         }
     });
 }
 
 template struct nspc_batch_normalization_bwd_t<f32>;
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 template struct nspc_batch_normalization_bwd_t<bf16>;
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl

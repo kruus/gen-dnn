@@ -353,7 +353,7 @@ template void ref_lrn_bwd_t<data_type::f32>::execute_backward<format_tag::nhwc>(
 template void ref_lrn_bwd_t<data_type::f32>::execute_backward<format_tag::any>(
         const exec_ctx_t &ctx) const;
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 template void
 ref_lrn_fwd_t<data_type::bf16>::execute_forward<format_tag::nChw16c>(
         const exec_ctx_t &ctx) const;
@@ -380,7 +380,7 @@ ref_lrn_bwd_t<data_type::bf16>::execute_backward<format_tag::nhwc>(
         const exec_ctx_t &ctx) const;
 template void ref_lrn_bwd_t<data_type::bf16>::execute_backward<format_tag::any>(
         const exec_ctx_t &ctx) const;
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 
 } // namespace cpu
 } // namespace impl

@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 #include "cpu_isa_traits.hpp"
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 
 #include "c_types_map.hpp"
 #include "dnnl_thread.hpp"
@@ -34,7 +34,9 @@ using namespace dnnl::impl::data_type;
 using namespace dnnl::impl::format_tag;
 using namespace dnnl::impl::primitive_kind;
 using namespace memory_tracking::names;
-using namespace dnnl::impl::cpu::bf16_support;
+#if TARGET_X86_JIT
+//using namespace dnnl::impl::cpu::bf16_support; 
+#endif // TARGET_X86_JIT
 
 template <data_type_t dst_data_type>
 void gemm_bf16_inner_product_fwd_t<dst_data_type>::execute_forward(
@@ -212,4 +214,4 @@ template struct gemm_bf16_inner_product_bwd_weights_t<data_type::bf16>;
 } // namespace dnnl
 
 // vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16

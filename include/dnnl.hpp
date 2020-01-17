@@ -20,8 +20,6 @@
 #ifndef DNNL_HPP
 #define DNNL_HPP
 
-#include "dnnl_config.h"
-
 /// @cond DO_NOT_DOCUMENT_THIS
 #include <algorithm>
 #include <cstdlib>
@@ -9413,9 +9411,12 @@ inline status set_jit_profiling_jitdumpdir(const std::string &dir) {
 }
 
 /// @copydoc dnnl_cpu_isa_t
+/// \note logically, vanilla <= any < [cpu-specific] <= all
 enum class cpu_isa {
+    /// @copydoc dnnl_cpu_vanilla
+    vanilla = dnnl_cpu_vanilla,
     /// @copydoc dnnl_cpu_isa_all
-    all = dnnl_cpu_isa_all,
+    any = dnnl_cpu_isa_any,
     /// @copydoc dnnl_cpu_isa_sse41
     sse41 = dnnl_cpu_isa_sse41,
     /// @copydoc dnnl_cpu_isa_avx
@@ -9432,6 +9433,12 @@ enum class cpu_isa {
     avx512_core_vnni = dnnl_cpu_isa_avx512_core_vnni,
     /// @copydoc dnnl_cpu_isa_avx512_core_bf16
     avx512_core_bf16 = dnnl_cpu_isa_avx512_core_bf16,
+    /// @copydoc dnnl_cpu_isa_all
+    all = dnnl_cpu_isa_all,
+    /// @copydoc dnnl_cpu_isa_vednn
+    vednn = dnnl_cpu_isa_vednn,
+    /// @copydoc dnnl_cpu_isa_vejit
+    vejit = dnnl_cpu_isa_vejit
 };
 
 /// @copydoc dnnl_set_max_cpu_isa()

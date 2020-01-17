@@ -17,11 +17,6 @@
 #define CPU_TARGET_H
 /** \file
  * extra build-time cpu/isa macros, based dnnl_config.h ONLY.
- * (no more JITFUNCS or TARGET_VANILLA crap on compiler command line).
- *
- * Everything should be configured by cmake STRING options now.
- *
- * file MUST be split into a separate header to avoid include-file circular dependencies
  */
 
 #include "dnnl_config.h"
@@ -42,14 +37,15 @@
 //
 #if DNNL_TARGET_VANILLA
 #define TARGET_VANILLA
-//#warning "compat TARGET_VANILLA defined"
+#warning "compat TARGET_VANILLA defined"
 #else
-//#warning "TARGET_VANILLA undefined"
+#warning "TARGET_VANILLA undefined"
 #endif
 
 /// @defgroup cpu_target DNNL cpu and JIT macros
 /**
- * <em>gen-dnn</em> compile introduces "vanilla" target for a library that can run on any CPU.
+ * <em>gen-dnn</em> compile introduces "vanilla" target for a library that
+ * can run on any CPU.
  * It removes all xbyak code, and runs... slowly.
  * This can be set by compile time flag <b>-DTARGET_VANILLA</b>.
  * In this case we set JITFUNCS=JITFUNCS_NONE.
@@ -77,6 +73,8 @@
  * Default jit compile has JITFUNCS=100,
  *
  * *WIP* \sa cpu_isa_t
+ *
+ * \deprecated
  */
 #define JITFUNCS_NONE -1        /* remove? (or rename as JITFUNCS_VANILLA)? */
 #define JITFUNCS_ANY 0          /* xbyak jit supporting old x86 cpus (no vector ops) useful? */
@@ -99,57 +97,59 @@
 //
 // VANILLA, ANY and ALL should be available for all cpus, but do different things
 //
+// ALL THIS JITFUNCS CRAP MUST GO AWAY !!! XXX
+//
 #if DNNL_ISA == DNNL_ISA_VANILLA
 #if DNNL_TARGET_X86
 #define JITFUNCS JITFUNCS_VANILLA
-//#warning "vanilla compat x86 JITFUNCS_NONE"
+#warning "vanilla compat x86 JITFUNCS_NONE"
 #elif DNNL_TARGET_VE
 #define JITFUNCS JITFUNCS_VANILLA
-//#warning "vanilla compat ve JITFUNCS_VANILLA"
+#warning "vanilla compat ve JITFUNCS_VANILLA"
 #endif // DNNL_TARGET
 
 #elif DNNL_ISA == DNNL_ISA_ANY
 #if DNNL_TARGET_X86
 #define JITFUNCS JITFUNCS_ANY
-//#warning "any compat x86 JITFUNCS_ANY"
+#warning "any compat x86 JITFUNCS_ANY"
 #elif DNNL_TARGET_VE
 #define JITFUNCS JITFUNCS_VANILLA
-//#warning "any compat ve JITFUNCS_VANILLA"
+#warning "any compat ve JITFUNCS_VANILLA"
 #endif // DNNL_TARGET
 
 #elif DNNL_ISA == DNNL_ISA_ALL
 #if DNNL_TARGET_X86
 #define JITFUNCS JITFUNCS_AVX512
-//#warning "all compat x86 JITFUNCS_AVX512"
+#warning "all compat x86 JITFUNCS_AVX512"
 #elif DNNL_TARGET_VE
 #define JITFUNCS JITFUNCS_VE /* ? */
-//#warning "all compat ve JITFUNCS_VE /* ? */"
+#warning "all compat ve JITFUNCS_VE /* ? */"
 #endif // DNNL_TARGET
 
 #elif DNNL_ISA == DNNL_ISA_SSE41 /* || DNNL_ISA == DNNL_ISA_SSE42 ? */
 #define JITFUNCS JITFUNCS_SSE41
-//#warning "compat JITFUNCS_SSE41"
+#warning "compat JITFUNCS_SSE41"
 #elif DNNL_ISA == DNNL_ISA_AVX
 #define JITFUNCS JITFUNCS_AVX
-//#warning "compat JITFUNCS_AVX"
+#warning "compat JITFUNCS_AVX"
 #elif DNNL_ISA == DNNL_ISA_AVX2
 #define JITFUNCS JITFUNCS_AVX2
-//#warning "compat JITFUNCS_AVX2"
+#warning "compat JITFUNCS_AVX2"
 #elif DNNL_ISA == DNNL_ISA_AVX512_MIC
 #define JITFUNCS JITFUNCS_AVX2 /* not needed ? */
-//#warning "compat JITFUNCS_AVX2 /* not needed ? */"
+#warning "compat JITFUNCS_AVX2 /* not needed ? */"
 #elif DNNL_ISA == DNNL_ISA_AVX512_MIC_4OPS
 #define JITFUNCS JITFUNCS_AVX2 /* not needed ? */
-//#warning "compat JITFUNCS_AVX2 /* not needed ? */"
+#warning "compat JITFUNCS_AVX2 /* not needed ? */"
 #elif DNNL_ISA == DNNL_ISA_AVX512_CORE
 #define JITFUNCS JITFUNCS_AVX512
-//#warning "compat JITFUNCS_AVX512"
+#warning "compat JITFUNCS_AVX512"
 #elif DNNL_ISA == DNNL_ISA_AVX512_CORE_VNNI
 #define JITFUNCS JITFUNCS_AVX512
-//#warning "compat JITFUNCS_AVX512"
+#warning "compat JITFUNCS_AVX512"
 #elif DNNL_ISA == DNNL_ISA_AVX512_CORE_BF16
 #define JITFUNCS JITFUNCS_AVX512
-//#warning "compat JITFUNCS_AVX512"
+#warning "compat JITFUNCS_AVX512"
 #else
 #error "unhandled DNNL_ISA value for compatibility setting of JITFUNCS"
 #endif
@@ -158,7 +158,7 @@
  * available for your DNNL_CPU target
  */
 #if !defined(TARGET_VANILLA) && !defined(JITFUNCS)
-//#warning "neither TARGET_VANILLA nor JITFUNCS was set"
+#warning "neither TARGET_VANILLA nor JITFUNCS was set"
 #if DNNL_CPU == DNNL_CPU_X86
 #define JITFUNCS JITFUNCS_AVX512
 #elif DNNL_CPU == DNNL_CPU_VE
@@ -166,41 +166,45 @@
 #endif
 #endif
 
-//#warning "compat-mode JITFUNCS was set based on DNNL_ISA value"
+#warning "compat-mode JITFUNCS was set based on DNNL_ISA value"
 
 #if defined(TARGET_VANILLA) && !defined(JITFUNCS)
-//#warning "TARGET_VANILLA --> auto JITFUNCS"
+#warning "TARGET_VANILLA --> auto JITFUNCS"
 /** \addto group cpu_target
- * Compilation with -DTARGET_VANILLA should "just work" (and not require
- * any builtin jit, but greater control is afforded by compiling with
- * `-DJITFUNCS=n` special values.
+ * Here we expand on cmake variables transmitted to \ref dnnl_config.h.
+ * `cmake/options.cmake` describes various build options.
  *
- * JITFUNCS allows one to specify **max** level of JIT support with greater
- * precision.  For example JITFUNCS_NONE to JITFUNCS_AVX512 pertain to
- * x86 targets with varying level of simd vector op support.
+ * Relation to cmake:
  *
- * For example, TARGET_VANILLA includes NO Intel JIT code at all, and is suitable
- * for [cross-]compiling for other platforms.
+ * - This file expands on the generated file, \ref dnnl_config.h
+ * - The target cpu is autodetermined from \${CMAKE_SYSTEM_PROCESSOR}.
+ * - You can tell cmake about desired maximum ISA/libraries with
+ *   `cmake -DDNNL_ISA=`<em>string</em>.
+ * - DNNL_ISA quickly, but only \e partially, limits available impls.
+ *   - This is because for code deduplication, implementations like the
+ *     `jit_uni_*` can decide to handle different ISAs internally.
+ * - So you should \e also use runtime CPU dispatch (REF) to fully limit
+ *   the ISA
+ *   - Some build pruning may still be authoritative, like the drastic
+ *     DNNL_ISA=VANILLA option that elides \e all JIT (xbyak) support.
  *
- * This header guarantees that JITFUNCS is always defined, and ensures that
- * whenever JITFUNCS is equal to JITFUNCS_NONE or JITFUNCS_VANILLA or ...,
- * that TARGET_VANILLA is always defined.
- * (TARGET_VANILLA is an easier-to-read check for "generic C or C++ code, no jit")
+ * What we add to dnnl_config.h:
  *
- * \note TARGET_VANILLA impls may not be optimized for speed!
+ * - preprocessor macro booleans for desired build:
+ *   - shorter versions of various `TARGET_condition` macros, like
+ *     TARGET_X86, TARGET_VE, TARGET_X86_JIT
+ *   - some `DNNL_ENABLE_code` macros that disable larger feature sets,
+ *     like DNNL_ENABLE_RNN, DNNL_ENABLE_BFLOAT16.  These can help ports
+ *     to new CPUs.
+ *   - TODO a compile time MAYIUSE_foo, similar to \c mayiuse(cpu_isa,soft)
  *
- * - JITFUNCS is now always defined with a value
- * - TARGET_VANILLA is equivalent to JITFUNCS == anything that does not require x86 jit.
- * - DNNL_ENABLE_foo macros are internal shorthands defined in \ref utils.hpp
- *   - DNNL_ENABLE_XBYAK (0/1) is a new equivalent to "xbyak x86 jit required",
- *     and more closely expresses current tests for !defined(TARGET_VANILLA).
- *   - DNNL_ENABLE_BFLOAT16 and DNNL_ENABLE_RNN can be set by hand to
- *     avoid compiling some "difficult" or "needs optimization" code
- *     while porting to new cpus.
+ * \note builds like `cmake -DDNNL_ISA=VANILLA` may end up running much slower
+ * reference implementations.
  *
- * \note prefer `\#if DNNL_ENABLE_XBYAK` as a positive test to replace
- * `\#if !defined(TARGET_VANILLA)`, since other CPUs may have their own jit
- * capabilities.
+ * \deprecated TARGET_VANILLA and old JITFUNCS have been replaced by the new
+ * cmake build options.  We rely much less on transmitting options via
+ * CFLAGS/CXXFLAGS.  The new boolean preprocessor defines are more readable,
+ * \e positive tests covering many more conditions.
  */
 #if DNNL_CPU == DNNL_CPU_X86
 #define JITFUNCS JITFUNCS_VANILLA/*used to be JITFUNCS_NONE*/
@@ -215,41 +219,43 @@
 //     JITFUNCS == JITFUNCS_ANY(0) now means xbyak is enabled, but possibly with no vector ops
 //     --- see whether this might handle bfloat or other "simple" jit operations.
 #if defined(JITFUNCS) && !defined(TARGET_VANILLA)
-//#warning "JITFUNCS --> auto defined(TARGET_VANILLA)"
 #if JITFUNCS == JITFUNCS_NONE
 #define TARGET_VANILLA
-//#warning "JITFUNCS_NONE implies TARGET_VANILLA"
+#warning "JITFUNCS_NONE implies TARGET_VANILLA"
 #elif JITFUNCS == JITFUNCS_VANILLA
-//#warning "JITFUNCS_VANILA implies TARGET_VANILLA"
+#warning "JITFUNCS_VANILA implies TARGET_VANILLA"
 #define TARGET_VANILLA
 #elif JITFUNCS == JITFUNCS_VE
-//#warning "JITFUNCS_VE implies TARGET_VANILLA"
+#warning "JITFUNCS_VE implies TARGET_VANILLA"
 #define TARGET_VANILLA
 #else
-//#warning "JITFUNCS --> ** NOT DEFINING ** TARGET_VANILLA"
+#warning "JITFUNCS --> ** NOT DEFINING ** TARGET_VANILLA"
 #endif
 #endif
 
+#if 0 // old -- now DNNL_TARGET_X86_JIT is set by cmake, in dnnl_config.h
 // set DNNL_ENABLE_XBYAK = 0 or 1 (shorthand)
 #if (JITFUNCS >= JITFUNCS_ANY && JITFUNCS <= JITFUNCS_AVX2)
 #define DNNL_ENABLE_XBYAK 1
-//#warning "JITFUNCS value implis need x86 xbyak jit support"
+#warning "JITFUNCS value implis need x86 xbyak jit support"
 #if defined(TARGET_VANILLA)
 #error "-DTARGET_VANILLA is incompatible with JITFUNCS being one of the x86 SIMD types"
 #endif
 #else
 #define DNNL_ENABLE_XBYAK 0
 #endif
+#endif
 
 #ifndef JITFUNCS
 /* default mkl-dnn compile works as usual, JITFUNCS_ANY means include all impls,
  * which is effectively same as JITFUNCS_AVX512. */
 #define JITFUNCS JITFUNCS_ANY
+#error "Hmmm. Shouldn't JITFUNCS be defined by now? (historical check)"
 #endif
 
-//#if JITFUNCS == 0
-//#warning "JITFUNCS == 0"
-//#endif
+#if JITFUNCS == 0
+#warning "JITFUNCS == 0"
+#endif
 
 #if defined(__x86_64__) || defined(_M_X64)
 #define DNNL_X86_64
@@ -261,29 +267,11 @@
 #error "compiler incompatible with JITFUNCS > JITFUNCS_VANILLA (which are all non-x86 builds)"
 #endif
 
-//@{
-// These DNNL_ENABLE macros can help port to different CPUs incrementally
-// For VE compiles, I begin with these OFF...
-#if defined(TARGET_VANILLA)
-//#warning "disabling DNNL_ENABLE_BFLOAT16 and DNNL_ENABLE_RNN"
-#define DNNL_ENABLE_BFLOAT16 0/*remove bfloat.hpp entirely*/
-#define DNNL_ENABLE_RNN 0
-#endif
-
-#ifndef DNNL_ENABLE_BFLOAT16
-#define DNNL_ENABLE_BFLOAT16 1
-#endif
-
-#ifndef DNNL_ENABLE_RNN
-#define DNNL_ENABLE_RNN 1
-#endif
-//@}
-
 // sanity checks...
 #ifdef TARGET_VANILLA
-//#warning "cpu_target DONE TARGET_VANILLA defined"
+#warning "cpu_target DONE TARGET_VANILLA defined"
 #else
-//#warning "cpu_target DONE TARGET_VANILLA undefined"
+#warning "cpu_target DONE TARGET_VANILLA undefined"
 #endif
 
 // compat mode shortcuts, easier to read
@@ -292,28 +280,41 @@
 #define TARGET_VE       DNNL_TARGET_VE
 #define TARGET_VEDNN    DNNL_TARGET_VEDNN
 #define TARGET_VEJIT    DNNL_TARGET_VEJIT
+#define TARGET_BFLOAT16 DNNL_ENABLE_BFLOAT16/*maybe*/
+#define TARGET_RNN      DNNL_ENABLE_RNN/*maybe*/
 
-#if TARGET_X86
-//#warning "cpu target TARGET_X86 !"
-#endif
-#if TARGET_X86_JIT
-//#warning "cpu target TARGET_X86_JIT !"
-#endif
-#if TARGET_VE
-//#warning "cpu target TARGET_VE !"
-#endif
-#if TARGET_VEDNN
-//#warning "cpu target TARGET_VEDNN !"
-#endif
-#if TARGET_VEJIT
-//#warning "cpu target TARGET_VEJIT !"
-#endif
 #if !TARGET_X86 && !TARGET_VE
 #error "cpu target no true TARGET_foo !"
 #endif
-
 #if TARGET_X86 + TARGET_VE != 1
 #error "exactly one of TARGET_VE and TARGET_X86 should be set"
 #endif
+#if 1 // verbose compiler warnings, for debug
+#if TARGET_X86
+#warning "cpu target TARGET_X86 !"
+#endif
+#if TARGET_X86_JIT
+#warning "cpu target TARGET_X86_JIT !"
+#endif
+#if TARGET_VE
+#warning "cpu target TARGET_VE !"
+#endif
+#if TARGET_VEDNN
+#warning "cpu target TARGET_VEDNN !"
+#endif
+#if TARGET_VEJIT
+#warning "cpu target TARGET_VEJIT !"
+#endif
+#if DNNL_ENABLE_RNN
+#warning "DNNL_ENABLE_RNN is TRUE"
+#else
+#warning "DNNL_ENABLE_RNN is FALSE"
+#endif
+#if DNNL_ENABLE_BFLOAT16
+#warning "DNNL_ENABLE_BLOAT16 is TRUE"
+#else
+#warning "DNNL_ENABLE_BLOAT16 is FALSE"
+#endif
+#endif // verbose compiler warnings
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif // CPU_TARGET_H

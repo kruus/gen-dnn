@@ -4,10 +4,8 @@
  * \todo set libvednn parm struct as pd_t (set once), and use the libvednnx
  *       *_ok function during init functions.
  */
-#if !defined(VEJIT)
-#define VEJIT 0
-#endif
-#if VEJIT > 0
+#include "cpu_target.h"
+#if TARGET_VE
 
 #include <assert.h>
 
@@ -137,7 +135,7 @@ struct vednnx_convolution_fwd_t: public cpu_primitive_t {
 
     vednnx_convolution_fwd_t(const pd_t *pd, const input_vector &inputs,
             const output_vector &outputs)
-#ifdef TARGET_VANILLA
+#if TARGET_VEDNN // ??
         ; /* moved to .cpp file for more control & debug */
 #else
         : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
@@ -376,6 +374,6 @@ private:
 }
 }
 
-#endif // VEJIT > 0
+#endif // TARGET_VE
 // vim: et ts=4 sw=4 cindent cino=^l0,\:0,N-s
 #endif // VEDNNX_CONVOLUTION_HPP

@@ -19,9 +19,9 @@
 #include "utils.hpp"
 
 #include "cpu_isa_traits.hpp"
-#if !defined(TARGET_VANILLA)
-#include "jit_generator.hpp"
-#endif // !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
+//#include "jit_generator.hpp" // ? why?
+#endif // TARGET_X86_JIT
 
 #include "cpu_batch_normalization_utils.hpp"
 

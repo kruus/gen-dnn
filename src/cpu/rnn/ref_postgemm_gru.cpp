@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 #include "cpu_isa_traits.hpp"
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_RNN
 
 /*
  * Cell execution LSTM
@@ -23,9 +23,9 @@
 #include "dnnl_thread.hpp"
 #include "math_utils.hpp"
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 #include "jit_uni_rnn_common_postgemm_dispatcher.hpp"
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 
 namespace dnnl {
 namespace impl {
@@ -318,4 +318,4 @@ rnn_postgemm_sig(rnn_postgemm_bwd_bf16_t::gru_part2_postgemm) {
 } // namespace dnnl
 
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_RNN

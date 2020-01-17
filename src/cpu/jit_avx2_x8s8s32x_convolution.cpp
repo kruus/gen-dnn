@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 #include "cpu_isa_traits.hpp"
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 
 #include "c_types_map.hpp"
 #include "dnnl_thread.hpp"
@@ -431,4 +431,4 @@ template struct jit_avx2_x8s8s32x_convolution_fwd_t<data_type::u8,
 } // namespace dnnl
 
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT

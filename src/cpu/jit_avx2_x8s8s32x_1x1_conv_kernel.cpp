@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 #include "cpu_isa_traits.hpp"
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 
 #include <assert.h>
 
@@ -731,5 +731,5 @@ void jit_avx2_x8s8s32x_1x1_conv_kernel::init_scratchpad(
 } // namespace impl
 } // namespace dnnl
 
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

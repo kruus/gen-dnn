@@ -257,17 +257,17 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_dense(
 }
 
 template struct ref_eltwise_fwd_t<data_type::f32>;
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 template struct ref_eltwise_fwd_t<data_type::bf16>;
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 template struct ref_eltwise_fwd_t<data_type::s32>;
 template struct ref_eltwise_fwd_t<data_type::s8>;
 template struct ref_eltwise_fwd_t<data_type::u8>;
 
 template struct ref_eltwise_bwd_t<data_type::f32>;
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 template struct ref_eltwise_bwd_t<data_type::bf16>;
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 template struct ref_eltwise_bwd_t<data_type::s32>;
 
 } // namespace cpu

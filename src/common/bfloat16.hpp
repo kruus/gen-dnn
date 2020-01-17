@@ -17,7 +17,7 @@
 #ifndef BFLOAT16_HPP
 #define BFLOAT16_HPP
 
-#include "cpu_target.h"        // defined(TARGET_VANILLA), DNNL_ENABLE_BFLOAT16(0/1)
+#include "cpu_target.h"        // DNNL_ENABLE_BFLOAT16(0/1)
 #if DNNL_ENABLE_BFLOAT16
 #include <cmath>
 #include <cstddef>

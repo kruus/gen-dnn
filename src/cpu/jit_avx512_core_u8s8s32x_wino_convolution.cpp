@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 #include "cpu_isa_traits.hpp"
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 
 #include <assert.h>
 
@@ -1300,4 +1300,4 @@ template struct jit_avx512_core_u8s8s32x_wino_convolution_fwd_t<data_type::f32>;
 } // namespace dnnl
 
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT

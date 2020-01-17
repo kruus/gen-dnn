@@ -23,9 +23,9 @@
 #include <vector>
 
 #include "mkldnn.h"
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if DNNL_ENABLE_BFLOAT16
 #include "src/common/bfloat16.hpp"
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 #include "src/common/float16.hpp"
 #include "src/common/nstl.hpp"
 
@@ -59,14 +59,14 @@
 } while(0)
 
 /* aux */
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if DNNL_ENABLE_BFLOAT16
 using bfloat16_t = mkldnn::impl::bfloat16_t;
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 using float16_t = mkldnn::impl::float16_t;
 template <mkldnn_data_type_t> struct prec_traits;
-#if !(defined(TARGET_VANILLA) || (defined(JITFUNCS) && JITFUNCS<0))
+#if DNNL_ENABLE_BFLOAT16
 template <> struct prec_traits<mkldnn_bf16> { typedef bfloat16_t type; };
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 template <> struct prec_traits<mkldnn_f16> { typedef float16_t type; };
 template <> struct prec_traits<mkldnn_f32> { typedef float type; };
 template <> struct prec_traits<mkldnn_s32> { typedef int32_t type; };

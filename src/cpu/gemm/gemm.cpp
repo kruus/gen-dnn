@@ -14,19 +14,17 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "dnnl.h"
+#include "gemm.hpp"
+#include "gemm_driver.hpp"
 
+#include "dnnl.h"
 #include "dnnl_traits.hpp"
 #include "nstl.hpp"
 #include "utils.hpp"
 
-#include "cpu_isa_traits.hpp"
-
 #if MKLDNN_CPU_GEMM_JIT
 #include "jit_generator.hpp"
 #endif // MKLDNN_CPU_GEMM_JIT
-
-#include "gemm.hpp"
 
 #if MKLDNN_CPU_GEMM_JIT
 #include "f32/jit_avx512_common_gemm_f32.hpp"
@@ -34,12 +32,8 @@
 #endif // MKLDNN_CPU_GEMM_JIT
 #include "f32/ref_gemm_f32.hpp"
 
-#include "gemm_driver.hpp"
 #include "s8x8s32/ref_gemm_s8x8s32.hpp"
 #include "s8x8s32/simple_gemm_s8s8s32.hpp"
-
-#include "common/bfloat16.hpp"
-#include "os_blas.hpp"
 
 #define MKLDNN_TRACE_EXTENDED_SGEMM 0
 #if MKLDNN_TRACE_EXTENDED_SGEMM
@@ -130,7 +124,8 @@ dnnl_status_t extended_sgemm(const char *transa, const char *transb,
 #endif
     {
         // JITFUNCS is compile-time macro.  Can short-circuit mayiuse
-        if (JITFUNCS>=0 && JITFUNCS <= JITFUNCS_VANILLA && mayiuse(sse41)) {
+        //if (JITFUNCS>=0 && JITFUNCS <= JITFUNCS_VANILLA && mayiuse(sse41))
+        if (TARGET_X86_JIT && DNNL_ISA>=DNNL_ISA_SSE41 && mayiuse(sse41)) {
             float *dummy_ao = NULL;
             float *dummy_bo = NULL;
 
@@ -254,7 +249,7 @@ dnnl_status_t gemm_s8x8s32(const char *transa, const char *transb,
     return status;
 }
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 dnnl_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
         const int *M, const int *N, const int *K, const float *alpha,
         const bfloat16_t *A, const int *lda, const bfloat16_t *B,
@@ -276,7 +271,7 @@ dnnl_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
         return dnnl_unimplemented;
     }
 }
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
 } // namespace cpu
 } // namespace impl
@@ -340,7 +335,7 @@ dnnl_status_t dnnl_gemm_s8s8s32(char transa, char transb, char offsetc,
             C, &ldc_s32, co);
 }
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 extern "C" {
 dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32(char transa, char transb,
         dnnl_dim_t M, dnnl_dim_t N, dnnl_dim_t K, float alpha,
@@ -357,4 +352,4 @@ dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32(char transa, char transb,
             &ldb_s32, A, &lda_s32, &beta, C, &ldc_s32);
 }
 }//"C"
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16

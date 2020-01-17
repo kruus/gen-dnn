@@ -24,9 +24,9 @@
 #include "dnnl_traits.hpp"
 #include "dnnl_types.h"
 #include "f32/gemm_utils_f32.hpp"
+#include "common/bfloat16.hpp"
 #if MKLDNN_CPU_GEMM_JIT
 //#warning "gemm WITH jit..."
-#include "common/bfloat16.hpp"
 #include "f32/jit_avx512_common_gemm_f32.hpp"
 #include "f32/jit_avx_gemm_f32.hpp"
 #include "jit_generator.hpp"
@@ -1519,7 +1519,7 @@ static dnnl_status_t gemm_threading_driver(
 
     if ((arg->m <= 0) || (arg->n <= 0)) return dnnl_success;
 
-#if !defined(TARGET_VANILLA)
+#if MKLDNN_CPU_GEMM_JIT
     if (!is_a_packed && !is_b_packed && (arg->packing == pack_type::none)
             && jump_to_gemv_s8x8s32(arg))
         return dnnl_success;
@@ -1527,7 +1527,7 @@ static dnnl_status_t gemm_threading_driver(
     if (!is_a_packed && !is_b_packed && (arg->packing == pack_type::none)
             && jump_to_gemv(arg) == dnnl_success)
         return dnnl_success;
-#endif // !defined(TARGET_VANILLA)
+#endif // MKLDNN_CPU_GEMM_JIT
 
     if (is_a_packed && arg->bo != 0)
         if (!arg->a_packed->has_row_sums()) return dnnl_invalid_arguments;
@@ -1814,12 +1814,12 @@ dnnl_status_t gemm_driver(const char *transA, const char *transB,
             data_traits<a_type>::data_type, data_type::s8, data_type::u8);
     MAYBE_UNUSED(is_int8);
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
     // gemm_driver supports bfloat16 gemm for Intel AVX512 and
     // Intel AVX512 BF16.
     assert(IMPLICATION(data_traits<a_type>::data_type == data_type::bf16,
             mayiuse(avx512_core) && !force_nocopy));
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
     // gemm_driver supports 8-bit integer Intel AVX512, Intel AVX2 and
     // Intel DL Boost.
@@ -1848,7 +1848,7 @@ dnnl_status_t gemm_driver(const char *transA, const char *transB,
     return gemm_threading_driver(&args);
 }
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 template // Instantiate gemm_bf16bf16f32
         dnnl_status_t
         gemm_driver<bfloat16_t, bfloat16_t, float>(const char *transA,
@@ -1859,7 +1859,7 @@ template // Instantiate gemm_bf16bf16f32
                 const float *beta, float *c, const int *ldc, const float *oc,
                 const bool force_nocopy, pack_type packing,
                 gemm_pack_storage_t *pack_dst, bool measure_only);
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
 template // Instantiate gemm_s8s8s32
         dnnl_status_t

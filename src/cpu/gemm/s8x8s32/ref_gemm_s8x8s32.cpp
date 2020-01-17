@@ -22,9 +22,9 @@
 #include "../f32/ref_gemm_f32.hpp"
 #include "dnnl_thread.hpp"
 #include "dnnl_types.h"
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 #include "jit_generator.hpp"
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 #include "math_utils.hpp"
 #include "utils.hpp"
 

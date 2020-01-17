@@ -131,9 +131,9 @@ template struct simple_concat_t<data_type::f32>;
 template struct simple_concat_t<data_type::u8>;
 template struct simple_concat_t<data_type::s8>;
 template struct simple_concat_t<data_type::s32>;
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 template struct simple_concat_t<data_type::bf16>;
-#endif // !TARGET_VANILLA
+#endif // DNNL_ENABLE_BFLOAT16
 
 } // namespace cpu
 } // namespace impl

@@ -2074,8 +2074,22 @@ typedef struct {
 /// \sa dnnl::set_max_cpu_isa(cpu_isa) for the x86 partial ordering
 ///
 /// \note \c dnnl_cpu_vanilla, \c dnnl_cpu_isa_any and \c dnnl_cpu_isa_all
-///       ("VANILA", "ANY", "ALL") are supported by all CPUs, but might
-///       have slightly different implications for \c cpu_isa_t.
+///       ("VANILLA", "ANY", "ALL") are supported by all CPUs, but might
+///       have different interpretations as bit masks for \c cpu_isa_t.
+/**
+ * \todo XXX dnnl_cpu_isa_t are arbitrary values, and could be set to match
+ *       the build options.   They no longer have any relation to bit
+ *       flags.
+ *
+ * - I think the behavior is:
+ *   - "default from environment" (only an internal \e string useful)
+ *   - "you can override it via dnnl_set_max_cpu_isa(..) at most once"
+ *     - here an enum value is needed, but it has no relation to
+ *       any internal bit flags
+ * - So values are arbitrary (could as well be 1,2,3,4,...)
+ * - Would they be better replaced with dnnl_conf values directly from cmake?
+ *   - (might allow easier "hard" isa limit tests against DNNL_ISA build value)
+ */
 typedef enum {
     /// "vanilla" Any CPU, Any ISA.
     /// Run just plain C/C++ code.
@@ -2121,6 +2135,7 @@ typedef enum {
     /// Serves double duty for non-x86 builds (where actual value is irrelevant)
     dnnl_cpu_isa_all = 0xffff,
 
+    // cpu_isa "ve_common" is handled by "ANY"
     /// "vednn" VE build with libvednn public API calls
     dnnl_cpu_isa_vednn = 0x10001,
 

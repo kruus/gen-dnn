@@ -26,36 +26,57 @@ set(options_cmake_included true)
 # CPU and JIT
 # ===========
 
+#
+# Useful constants
+#
 # DNNL_CPU is directly determined from CMAKE_SYSTEM_PROCESSOR, and is
 # controlled by your cmake toolchain, or your CC/CXX environment.
 # Actual values agree with dnnl_types.h
 set(DNNL_CPU_X86 1)
 set(DNNL_CPU_VE  2)
-# all cpus support...
+#
+# JIT (or external libs) may be specified as cmake -DDNNL_ISA=<string>
+# all cpus support <string> = VANILLA, ALL, and ANY
+#
 set(DNNL_ISA_VANILLA 1)
-set(DNNL_ISA_ANY     2)
-set(DNNL_ISA_ALL     3)
-# x86-specific (note: values COULD agree with dnnl_cpu_isa_foo constants, I suppose)
-set(DNNL_ISA_SSE41              10)
-set(DNNL_ISA_AVX                11)
-set(DNNL_ISA_AVX2               12)
-set(DNNL_ISA_AVX512_MIC         13)
-set(DNNL_ISA_AVX512_MIC_4OPS    14)
-set(DNNL_ISA_AVX512_CORE        15)
-set(DNNL_ISA_AVX512_CORE_VNNI   16)
-set(DNNL_ISA_AVX512_CORE_BF16   17)
+#set(DNNL_ISA_ANY     2)  # value changes below, once cpu is known
+#set(DNNL_ISA_ALL     3)  # value changes below, once cpu is known
+# x86-specific JIT -- FIXME jit_uni drivers might bypass this XXX
+set(DNNL_ISA_X86                10)
+set(DNNL_ISA_SSE41              11)
+set(DNNL_ISA_AVX                12)
+set(DNNL_ISA_AVX2               13)
+set(DNNL_ISA_AVX512_MIC         14) # AVX_512_COMMON ?
+set(DNNL_ISA_AVX512_MIC_4OPS    15)
+set(DNNL_ISA_AVX512_CORE        16)
+set(DNNL_ISA_AVX512_CORE_VNNI   17)
+set(DNNL_ISA_AVX512_CORE_BF16   18)
+set(DNNL_ISA_X86_ALL            18)
 # ve-specific
-set(DNNL_ISA_VEDNN              20)
-set(DNNL_ISA_VEJIT              21)
+set(DNNL_ISA_VE                 20)
+set(DNNL_ISA_VEDNN              21)
+set(DNNL_ISA_VEJIT              22)
+set(DNNL_ISA_VE_ALL             22)
+
+#
+# Determine target CPU (governed by available compiler / environment CC)
+#
 if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
     set(DNNL_CPU ${DNNL_CPU_X86})
+    set(DNNL_ISA_ANY ${DNNL_ISA_X86})
+    set(DNNL_ISA_ALL ${DNNL_ISA_X86_ALL})
 elseif(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aurora")
     set(DNNL_CPU ${DNNL_CPU_VE})
+    set(DNNL_ISA_ANY ${DNNL_ISA_VE})
+    set(DNNL_ISA_ALL ${DNNL_ISA_VE_ALL})
 else()
     message(FATAL_ERROR "Unrecognized target CPU : ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 
-# DNNL_ISA is a CPU-specific option, with strings translated for dnnl_config.h.in
+#
+# You may specify additional CPU target info with cmake -DDNNL_ISA=<string>
+# This is used for dnnl_config.h.in
+#
 if(DNNL_CPU EQUAL DNNL_CPU_X86)
     set(DNNL_ISA "ALL" CACHE STRING
         "x86 cpu build styles include VANILLA, ALL(x86 jit w/o vec ops),
@@ -227,6 +248,27 @@ set(DNNL_USE_CLANG_SANITIZER "" CACHE STRING
     This feature is experimental and is only available on Linux.")
 
 option(_DNNL_USE_MKL "use BLAS functions from Intel MKL" OFF)
+
+# ==========================================
+# Development work helpers (expert use only)
+# ==========================================
+
+# FIXME test jit with and without bfloat16 (or just remove this option)
+# FIXME RNN ref impl !!!
+set(DNNL_ENABLE_BFLOAT16 0) # please commit with value 1
+set(DNNL_ENABLE_RNN 1)      # please commit with value 1
+# for development work, we may disable big chunks of code
+if(DNNL_CPU EQUAL DNNL_CPU_X86)
+    if(DNNL_ISA STREQUAL "VANILLA") # note: DNNL_ISA is a "string"
+        message(STATUS "x86 VANILLA compile removes rnn support (for now)")
+        set(DNNL_ENABLE_RNN 0) # FIXME - there is some jit entanglement
+    endif()
+elseif(DNNL_CPU EQUAL DNNL_CPU_VE)
+    message(STATUS "non-x86 compile wil disable BFLOAT16 and RNN support (for now)")
+    set(DNNL_ENABLE_BFLOAT16 0) # initially 0 for porting
+    set(DNNL_ENABLE_RNN 0)      # initially 0 for porting
+else() # unknown? try enabling everything
+endif()
 
 if(0)
 # ==============================================

@@ -54,9 +54,9 @@ public:
     template <typename T,
             typename = typename std::enable_if<std::is_arithmetic<T>::value
                     || std::is_same<T, float16_t>::value
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
                     || std::is_same<T, bfloat16_t>::value
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
                     >::type>
     void set_value(const T &value) {
         kind_ = kind_t::scalar;
@@ -97,9 +97,9 @@ public:
     template <class T,
             typename = typename std::enable_if<std::is_arithmetic<T>::value
                     || std::is_same<T, float16_t>::value
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
                     || std::is_same<T, bfloat16_t>::value
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
                     >::type>
     void set(int index, const T &value) {
         static_assert(

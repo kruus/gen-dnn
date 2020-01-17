@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 #include "cpu_isa_traits.hpp"
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 
 #include "c_types_map.hpp"
 #include "cpu_barrier.hpp"
@@ -1223,4 +1223,4 @@ jit_trans_dst_t *create_trans_dst(const jit_conv_conf_t *conf) {
 } // namespace dnnl
 
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT

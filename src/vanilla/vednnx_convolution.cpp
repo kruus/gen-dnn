@@ -1,5 +1,5 @@
 #include "vednnx_convolution.hpp"
-#if VEJIT > 0
+#if TARGET_VEDNN
 #if !defined(__ve)
 #error "libvednn convolution must have Aurora compiler predefines '__ve'"
 #endif
@@ -612,4 +612,4 @@ void vednnx_convolution_bwd_weights_t
 }
 
 // vim: et ts=4 sw=4 cindent cino=^l0,\:0,N-s
-#endif // VEJIT > 0
+#endif // TARGET_VEDNN

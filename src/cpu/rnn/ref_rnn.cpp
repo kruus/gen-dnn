@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 #include "cpu_target.h"
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_RNN
 
 /*
   General architecture
@@ -1154,12 +1154,12 @@ template struct _ref_rnn_common_t<prop_kind::forward, data_type::f32,
 template struct _ref_rnn_common_t<prop_kind::backward, data_type::f32,
         data_type::f32, data_type::f32>;
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 template struct _ref_rnn_common_t<prop_kind::forward, data_type::bf16,
         data_type::bf16, data_type::f32>;
 template struct _ref_rnn_common_t<prop_kind::backward, data_type::bf16,
         data_type::bf16, data_type::f32>;
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 
 template struct _ref_rnn_common_t<prop_kind::forward, data_type::u8,
         data_type::s8, data_type::s32>;
@@ -1168,5 +1168,5 @@ template struct _ref_rnn_common_t<prop_kind::forward, data_type::u8,
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_RNN
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

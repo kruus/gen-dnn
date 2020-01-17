@@ -68,9 +68,9 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::pp_ker_t(
     , do_bias_(false)
     , do_eltwise_(false)
     , do_sum_(false)
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     , eltwise_injector_(nullptr)
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
     , eltwise_(nullptr) {
     using namespace types;
 
@@ -103,7 +103,7 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::pp_ker_t(
     const int eltwise_ind = post_ops.find(primitive_kind::eltwise);
     do_eltwise_ = eltwise_ind != -1;
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     if (!mayiuse(avx512_core)) {
         if (do_eltwise_) {
             eltwise_ = new ref_eltwise_scalar_fwd_t(
@@ -122,12 +122,12 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::pp_ker_t(
         eltwise_ = new ref_eltwise_scalar_fwd_t(
                 post_ops.entry_[eltwise_ind].eltwise);
     }
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
     return;
 
 }
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 template <data_type_t src_type, data_type_t dst_type>
 void _gemm_x8s8s32x_convolution_fwd_t<src_type,
         dst_type>::pp_ker_t::generate() {
@@ -463,7 +463,7 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type,
 
     ker_ = getCode<decltype(ker_)>();
 }
-#endif // !TARGET_VANILLA
+#endif // TARGET_X86_JIT
 
 template <data_type_t src_type, data_type_t dst_type>
 void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator()(
@@ -474,7 +474,7 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator()(
 
     if (end <= start) return;
 
-#if defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
     if (ker_) {
         // JIT
         ker_args args;
@@ -491,7 +491,7 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator()(
         args.oc_offset = oc_offset;
         ker_(&args);
     } else
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
     {
         // Fallback
         const size_t first_oc = start % OC_;

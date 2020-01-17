@@ -56,12 +56,14 @@ private:
     bool initialized_;
     std::atomic<unsigned> state_;
     enum : unsigned { idle = 0, busy_setting = 1, locked_after_a_get = 2 };
+    static int const verbose=1;
 
 public:
     set_before_first_get_setting_t(T init = T(0))
         : value_ {init}, initialized_ {false}, state_ {0} {}
 
     bool set(T new_value) {
+        if(verbose) printf(" cpu_isa set(%lx)? ",(long)new_value);
         if (state_.load() == locked_after_a_get) return false;
 
         while (true) {
@@ -70,6 +72,7 @@ public:
             if (expected == locked_after_a_get) return false;
         }
 
+        if(verbose) printf(" YES! ");
         value_ = new_value;
         initialized_ = true;
         state_.store(idle);
@@ -87,6 +90,7 @@ public:
                 if (expected == locked_after_a_get) break;
             }
         }
+        if(verbose) printf(" cpu_isa get(%lx) ",(long)value_);
         return value_;
     }
 };
@@ -97,6 +101,7 @@ set_before_first_get_setting_t<cpu_isa_t> &max_cpu_isa() {
 }
 
 bool init_max_cpu_isa() {
+    static int const verbose=1;
     if (max_cpu_isa().initialized()) return false;
 
     cpu_isa_t max_cpu_isa_val =
@@ -138,6 +143,7 @@ bool init_max_cpu_isa() {
 #undef ELSEIF_HANDLE_CASE
     }
 
+    if(verbose) printf(" init_max_cpu_isa-->cpu_isa(%lx)\n",(long)max_cpu_isa_val);
     return max_cpu_isa().set(max_cpu_isa_val);
 }
 #endif // DNNL_ENABLE_MAX_CPU_ISA
@@ -147,10 +153,13 @@ cpu_isa_t get_max_cpu_isa(bool soft) {
 #ifdef DNNL_ENABLE_MAX_CPU_ISA
     init_max_cpu_isa();
     return max_cpu_isa().get(soft);
-#elif DNNL_CPU == DNNL_CPU_X86
+#else
+#if DNNL_CPU == DNNL_CPU_X86
+    // original
     return isa_all;
 #elif DNNL_CPU == DNNL_CPU_VE
     return isa_ve_all // TODO: support soft setting for VE
+#endif
 #endif
 }
 
@@ -192,8 +201,18 @@ dnnl_status_t dnnl_set_max_cpu_isa(dnnl_cpu_isa_t isa) {
 #endif
 }
 #else // new version
-/** returns a MASK of the possible \c cpu_isa_t flags. */
+/** set max_cpu_isa() to the \c cpu_isa_t mask corresponding to a
+ * \c dnnl_cpu_isa_t.
+ * When a \c cpu_isa trait field matches the dnnl \c isa value,
+ * remember \c cpu_isa value.
+ *
+ * This decouples dnnl cpu_isa values [public] from cpu_isa [internal] ones.
+ *
+ * \c max_cpu_isa() ensures we set a value at most once (subsequent calls
+ * should fail).
+ */
 dnnl_status_t dnnl_set_max_cpu_isa(dnnl_cpu_isa_t isa) {
+    static int const verbose=1;
     using namespace dnnl::impl::status;
 #ifdef DNNL_ENABLE_MAX_CPU_ISA
     using namespace dnnl::impl;
@@ -202,6 +221,7 @@ dnnl_status_t dnnl_set_max_cpu_isa(dnnl_cpu_isa_t isa) {
     cpu_isa_t isa_to_set = isa_any;
 #define HANDLE_CASE(cpu_isa) \
     case cpu_isa_traits<cpu_isa>::user_option_val: isa_to_set = cpu_isa; break;
+
     switch (isa) {
         // Note cases here should match init_max_cpu_isa()
         // All target cpus support "VANILLA", "ANY", and "ALL"
@@ -223,8 +243,11 @@ dnnl_status_t dnnl_set_max_cpu_isa(dnnl_cpu_isa_t isa) {
 #endif
         default: return invalid_arguments;
     }
-    assert(isa_to_set != isa_any);
 #undef HANDLE_CASE
+    if(verbose)
+        printf(" dnnl_set_max_cpu_isa(0x%lx) --> cpu_isa_t(0x%lx)\n",
+                (long)isa, (long)isa_to_set);
+    assert(isa_to_set != isa_any);
 
     if (max_cpu_isa().set(isa_to_set))
         return success;
@@ -232,7 +255,7 @@ dnnl_status_t dnnl_set_max_cpu_isa(dnnl_cpu_isa_t isa) {
         return invalid_arguments;
 #else
     return unimplemented;
-#endif
+#endif // DNNL_ENABLE_MAX_CPU_ISA
 }
 #endif
 

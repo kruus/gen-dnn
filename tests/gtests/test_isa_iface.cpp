@@ -21,6 +21,7 @@
 
 namespace dnnl {
 
+#if TARGET_X86_JIT // dnnl original
 class isa_set_once_test : public ::testing::Test {};
 TEST(isa_set_once_test, TestISASetOnce) {
     auto st = set_max_cpu_isa(cpu_isa::sse41);
@@ -29,5 +30,28 @@ TEST(isa_set_once_test, TestISASetOnce) {
     st = set_max_cpu_isa(cpu_isa::sse41);
     ASSERT_TRUE(st == status::invalid_arguments || st == status::unimplemented);
 };
+
+#elif TARGET_X86 // without jit
+// added so at least something gets tested.  Ref impls for vanilla
+// may not exist for everything you want, though :) XXX
+class isa_set_once_vanilla : public ::testing::Test {};
+TEST(isa_set_once_vanilla, TestISASetOnceVanilla) {
+    auto st = set_max_cpu_isa(cpu_isa::vanilla);
+    ASSERT_TRUE(st == status::success || st == status::unimplemented);
+    ASSERT_TRUE(impl::cpu::mayiuse(impl::cpu::vanilla));
+    st = set_max_cpu_isa(cpu_isa::vanilla);
+    ASSERT_TRUE(st == status::invalid_arguments || st == status::unimplemented);
+};
+
+#elif TARGET_VE
+class isa_set_once_ve : public ::testing::Test {};
+TEST(isa_set_once_ve, TestISASetOnceVE) {
+    auto st = set_max_cpu_isa(cpu_isa::vednn);
+    ASSERT_TRUE(st == status::success || st == status::unimplemented);
+    ASSERT_TRUE(impl::cpu::mayiuse(impl::cpu::vednn));
+    st = set_max_cpu_isa(cpu_isa::vednn);
+    ASSERT_TRUE(st == status::invalid_arguments || st == status::unimplemented);
+};
+#endif
 
 } // namespace dnnl

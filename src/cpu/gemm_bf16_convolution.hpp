@@ -217,7 +217,7 @@ private:
         int data_reg_base_idx_;
         size_t vlen_;
         cpu_isa_t isa_;
-        bf16_emulation_t *bf16_emu_;
+        bf16_emulation_t *bf16_emu_; /* note: defined in  jit_avx512_core_bf16cvt.hpp */
         jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
 
         void generate();

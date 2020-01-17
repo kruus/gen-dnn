@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 #include "cpu_target.h"
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_RNN
 
 /*
  * Cell execution GRU
@@ -79,9 +79,9 @@ rnn_cell_execution_sig((_ref_rnn_common_t<aprop, src_type, weights_type,
 }
 
 template rnn_cell_execution_sig(ref_rnn_fwd_f32_t::cell_execution_gru);
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 template rnn_cell_execution_sig(ref_rnn_fwd_bf16_t::cell_execution_gru);
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 template <>
 rnn_cell_execution_sig(ref_rnn_fwd_u8s8_t::cell_execution_gru) {
     assert(!"GRU int8 is not supported");
@@ -237,5 +237,5 @@ rnn_cell_execution_sig(ref_rnn_bwd_bf16_t::cell_execution_gru) {
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_RNN
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

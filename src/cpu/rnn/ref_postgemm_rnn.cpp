@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 #include "cpu_target.h"
-#if !defined(TARGET_VANILLA) // difficult JIT entanglement
+#if DNNL_ENABLE_RNN // problematic JIT entanglement
 
 /*
  * Cell execution of Vanilla RNN
@@ -23,9 +23,9 @@
 #include "dnnl_thread.hpp"
 #include "math_utils.hpp"
 
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 #include "jit_uni_rnn_common_postgemm_dispatcher.hpp"
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 
 namespace dnnl {
 namespace impl {
@@ -33,9 +33,9 @@ namespace cpu {
 
 using namespace dnnl::impl::utils;
 using namespace dnnl::impl::math;
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 using namespace rnn_utils;
-#endif // !defined(TARGET_VANILLA)
+#endif // TARGET_X86_JIT
 
 template <>
 float activation<alg_kind::eltwise_relu, prop_kind::forward>(
@@ -220,5 +220,5 @@ rnn_postgemm_sig(rnn_postgemm_bwd_bf16_t::rnn_postgemm) {
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_RNN
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

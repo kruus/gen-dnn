@@ -66,12 +66,12 @@ dnnl_status_t DNNL_API sgemm_pack(const char *identifier, const char *transa,
         const char *transb, const int *M, const int *N, const int *K,
         const int *lda, const int *ldb, const float *src, float *dst);
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 dnnl_status_t DNNL_API gemm_bf16bf16f32_pack(const char *identifier,
         const char *transa, const char *transb, const int *M, const int *N,
         const int *K, const int *lda, const int *ldb, const bfloat16_t *src,
         bfloat16_t *dst);
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 
 dnnl_status_t DNNL_API gemm_s8u8s32_pack(const char *identifier,
         const char *transa, const char *transb, const int *M, const int *N,
@@ -88,12 +88,12 @@ dnnl_status_t DNNL_API sgemm_compute(const char *transa, const char *transb,
         const int *lda, const float *B, const int *ldb, const float *beta,
         float *C, const int *ldc);
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 dnnl_status_t DNNL_API gemm_bf16bf16f32_compute(const char *transa,
         const char *transb, const int *M, const int *N, const int *K,
         const bfloat16_t *A, const int *lda, const bfloat16_t *B,
         const int *ldb, const float *beta, float *C, const int *ldc);
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 
 dnnl_status_t DNNL_API gemm_s8u8s32_compute(const char *transa,
         const char *transb, const char *offsetc, const int *M, const int *N,

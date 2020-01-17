@@ -75,12 +75,12 @@ struct data_traits<float16_t> {
     static constexpr data_type_t data_type = data_type::f16;
 };
 
-#if !defined(TARGET_VANILLA)
+#if DNNL_ENABLE_BFLOAT16
 template <>
 struct data_traits<bfloat16_t> {
     static constexpr data_type_t data_type = data_type::bf16;
 };
-#endif // !defined(TARGET_VANILLA)
+#endif // DNNL_ENABLE_BFLOAT16
 
 template <>
 struct data_traits<float> {

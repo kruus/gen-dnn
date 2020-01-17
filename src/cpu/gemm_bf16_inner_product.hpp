@@ -18,7 +18,7 @@
 #define CPU_GEMM_BF16_INNER_PRODUCT_HPP
 //#include "cpu_isa_traits.hpp"
 #include "cpu_target.h"
-#if TARGET_X86_JIT
+#if DNNL_ENABLE_BFLOAT16
 
 #include <assert.h>
 
@@ -268,6 +268,6 @@ private:
 } // namespace impl
 } // namespace dnnl
 
-#endif // TARGET_X86_JIT
+#endif // DNNL_ENABLE_BFLOAT16
 // vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
 #endif

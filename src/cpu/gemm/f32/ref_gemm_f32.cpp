@@ -21,7 +21,7 @@
 #include "utils.hpp"
 
 #include "cpu_isa_traits.hpp"
-#if !defined(TARGET_VANILLA)
+#if TARGET_X86_JIT
 #include "jit_generator.hpp"
 #endif
 

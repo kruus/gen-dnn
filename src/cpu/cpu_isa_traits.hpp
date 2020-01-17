@@ -46,7 +46,7 @@
  * FIXME: replace size_t parameters with the appropriate ones */
 #pragma warning(disable : 4267)
 #endif
-
+e
 #include "xbyak/xbyak.h"
 #include "xbyak/xbyak_util.h"
 #endif
@@ -347,6 +347,7 @@ static inline bool mayiuse(const cpu_isa_t cpu_isa, const bool soft = false) {
 
 #elif TARGET_X86 // and no jit, only "VANILLA" build is usable
 static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=false) {
+    // for a vanilla build, we should only be able to set to vanilla?
     return cpu_isa == vanilla; // ??
 }
 

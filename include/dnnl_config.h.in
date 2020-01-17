@@ -80,6 +80,12 @@
 //@{
 #cmakedefine DNNL_ISA ${DNNL_ISA_VALUE}
 //@}
+
+/// enable bfloat16 (for debug -- x86 jit releases will always have this enabled)
+#cmakedefine DNNL_ENABLE_BFLOAT16 ${DNNL_ENABLE_BFLOAT16}
+
+/// enable rnn code (for debug -- x86 jit releases will always have this enabled)
+#cmakedefine DNNL_ENABLE_RNN ${DNNL_ENABLE_RNN}
 //@}
 
 /// @defgroup cmake_build_constants cmake build constants
@@ -98,6 +104,7 @@
 #cmakedefine DNNL_ISA_ALL     ${DNNL_ISA_ALL}  // pull out all the stops, all options allowed
 ///@}
 ///@{ x86 isa settings govern jit instruction set support
+#cmakedefine DNNL_ISA_X86              ${DNNL_ISA_X86}
 #cmakedefine DNNL_ISA_SSE41            ${DNNL_ISA_SSE41}
 #cmakedefine DNNL_ISA_AVX              ${DNNL_ISA_AVX}
 #cmakedefine DNNL_ISA_AVX2             ${DNNL_ISA_AVX2}
@@ -106,10 +113,13 @@
 #cmakedefine DNNL_ISA_AVX512_CORE      ${DNNL_ISA_AVX512_CORE}
 #cmakedefine DNNL_ISA_AVX512_CORE_VNNI ${DNNL_ISA_AVX512_CORE_VNNI}
 #cmakedefine DNNL_ISA_AVX512_CORE_BF16 ${DNNL_ISA_AVX512_CORE_BF16}
+#cmakedefine DNNL_ISA_X86_ALL          ${DNNL_ISA_X86_ALL}
 ///@}
 ///@{ ve isa settings govern jit instruction set support
-#cmakedefine DNNL_ISA_VEDNN ${DNNL_ISA_VEDNN}
-#cmakedefine DNNL_ISA_VEJIT ${DNNL_ISA_VEJIT}
+#cmakedefine DNNL_ISA_VE     ${DNNL_ISA_VE}    // equiv to vanilla
+#cmakedefine DNNL_ISA_VEDNN  ${DNNL_ISA_VEDNN}
+#cmakedefine DNNL_ISA_VEJIT  ${DNNL_ISA_VEJIT}
+#cmakedefine DNNL_ISA_VE_ALL ${DNNL_ISA_VE_ALL}
 ///@}
 ///@}
 
