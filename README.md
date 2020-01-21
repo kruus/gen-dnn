@@ -4,13 +4,12 @@
 
 Soon the existing master and genv1.1 branch will be switched.
 
-* v1.1 branch has some "won't fix" issues fixed in branch genv1.1
+* v1 branch has some "won't fix" issues fixed in branch genv1.1
 * genv1.1 passes tests/examples/benchdnn on x86 with a `./build.sh -gTtttt`
   build
 
-### 
+### This fork of MKL-DNN provides the same API for non-Intel chips, targeting:
 
-This fork of MKL-DNN provides the same API for non-Intel chips, targeting:
 * NEC SX-Aurora TSUBASA chip, ncc compiler
 * NEC SX,            sxcc compiler (deprecated)
 
