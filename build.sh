@@ -802,7 +802,7 @@ if [ "${BUILDOK}" == "y" ]; then
         pwd -P
         ls "${BUILDDIR}/"*log
         for f in "${BUILDDIR}/"*log doxygen.log; do
-            cp -av "${f}" "${LOGDIR}/" || true
+            if [ -f "${f}" ]; then cp -av "${f}" "${LOGDIR}/" || true; fi
         done
     fi
 fi
