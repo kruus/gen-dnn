@@ -1,8 +1,18 @@
 # Generic MKL-DNN for vector compilers
 
+### Beware:  The master branch is now historical (at v0.16 mkl-dnn API)
+
+Soon the existing master and genv1.1 branch will be switched.
+
+* v1.1 branch has some "won't fix" issues fixed in branch genv1.1
+* genv1.1 passes tests/examples/benchdnn on x86 with a `./build.sh -gTtttt`
+  build
+
+### 
+
 This fork of MKL-DNN provides the same API for non-Intel chips, targeting:
 * NEC SX-Aurora TSUBASA chip, ncc compiler
-* NEC SX,            sxcc compiler
+* NEC SX,            sxcc compiler (deprecated)
 
 It provides a "vanilla" build that removes Intel-specific JIT instructions
 as well as an Aurora build with a few optimized instructions for Aurora.

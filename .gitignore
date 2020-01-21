@@ -17,11 +17,13 @@ buildd*
 build-sx*
 build-sxd*
 build-jit*
+build-gen*
 install
 install.bak
 install-sx*
 install-jit*
 install-dbg*
+install-gen*
 .*.sw?
 **.nm
 **.ii
