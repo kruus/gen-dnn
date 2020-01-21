@@ -56,7 +56,7 @@ private:
     bool initialized_;
     std::atomic<unsigned> state_;
     enum : unsigned { idle = 0, busy_setting = 1, locked_after_a_get = 2 };
-    static int const verbose=1;
+    static int const verbose=0;
 
 public:
     set_before_first_get_setting_t(T init = T(0))
@@ -72,7 +72,7 @@ public:
             if (expected == locked_after_a_get) return false;
         }
 
-        if(verbose) printf(" YES! ");
+        if(verbose) printf(" YES!\n");
         value_ = new_value;
         initialized_ = true;
         state_.store(idle);
@@ -90,19 +90,25 @@ public:
                 if (expected == locked_after_a_get) break;
             }
         }
-        if(verbose) printf(" cpu_isa get(%lx) ",(long)value_);
+        if(verbose) printf(" cpu_isa GET(0x%lx)-->state %d\n",(long)value_,(int)state_.load());
         return value_;
     }
 };
 
 set_before_first_get_setting_t<cpu_isa_t> &max_cpu_isa() {
     static set_before_first_get_setting_t<cpu_isa_t> max_cpu_isa_setting;
+    //printf(" max_cpu_isa_setting @ 0x%08llx ",(long long)&max_cpu_isa_setting);
     return max_cpu_isa_setting;
 }
 
 bool init_max_cpu_isa() {
-    static int const verbose=1;
-    if (max_cpu_isa().initialized()) return false;
+    static int const verbose=0;
+    if(verbose) printf("  init_max_cpu_isa!");
+    if (max_cpu_isa().initialized()){
+        if(verbose) printf("  (already initialized!)");
+        return false;
+    }
+    if (verbose) printf("  (not yet initialized!)");
 
     cpu_isa_t max_cpu_isa_val =
             (DNNL_CPU == DNNL_CPU_VE? ve_all: isa_all);
@@ -149,17 +155,26 @@ bool init_max_cpu_isa() {
 #endif // DNNL_ENABLE_MAX_CPU_ISA
 
 cpu_isa_t get_max_cpu_isa(bool soft) {
+    static int const verbose=0;
     MAYBE_UNUSED(soft);
 #ifdef DNNL_ENABLE_MAX_CPU_ISA
+#warning "with DNNL_ENABLE_MAX_CPU_ISA"
+    if(verbose) printf(" init_max_cpu_isa...\n");
     init_max_cpu_isa();
+    if(verbose) printf(" max_cpu_isa().get(soft=%d)...\n",(int)soft);
     return max_cpu_isa().get(soft);
 #else
+#warning " w/o DNNL_ENABLE_MAX_CPU_ISA"
+    cpu_isa_t ret = unknown;
 #if DNNL_CPU == DNNL_CPU_X86
     // original
-    return isa_all;
+    ret = isa_all;
 #elif DNNL_CPU == DNNL_CPU_VE
-    return isa_ve_all // TODO: support soft setting for VE
+    ret = isa_ve_all;
 #endif
+    static_assert(ret!=unknown, "unhandled get_max_cpu_isa case");
+    if(verbose) printf(" init_max_cpu_isa... trivial(0x%lx)\n",(long)ret);
+    return ret;;
 #endif
 }
 
@@ -212,42 +227,18 @@ dnnl_status_t dnnl_set_max_cpu_isa(dnnl_cpu_isa_t isa) {
  * should fail).
  */
 dnnl_status_t dnnl_set_max_cpu_isa(dnnl_cpu_isa_t isa) {
-    static int const verbose=1;
+    static int const verbose=0;
     using namespace dnnl::impl::status;
 #ifdef DNNL_ENABLE_MAX_CPU_ISA
     using namespace dnnl::impl;
     using namespace dnnl::impl::cpu;
 
-    cpu_isa_t isa_to_set = isa_any;
-#define HANDLE_CASE(cpu_isa) \
-    case cpu_isa_traits<cpu_isa>::user_option_val: isa_to_set = cpu_isa; break;
-
-    switch (isa) {
-        // Note cases here should match init_max_cpu_isa()
-        // All target cpus support "VANILLA", "ANY", and "ALL"
-        HANDLE_CASE(isa_all);
-        HANDLE_CASE(vanilla);
-        HANDLE_CASE(isa_any);   // for x86, adds generic x86 jit to vanilla
-#if TARGET_X86
-        HANDLE_CASE(sse41);     // x86 jit with vec ops
-        HANDLE_CASE(avx);
-        HANDLE_CASE(avx2);
-        HANDLE_CASE(avx512_mic);
-        HANDLE_CASE(avx512_mic_4ops);
-        HANDLE_CASE(avx512_core);
-        HANDLE_CASE(avx512_core_vnni);
-        HANDLE_CASE(avx512_core_bf16);
-#elif TARGET_VE
-        HANDLE_CASE(vednn);     // vanilla + libvednn "C" api
-        HANDLE_CASE(vejit);     // vednn + libvednn jit
-#endif
-        default: return invalid_arguments;
-    }
-#undef HANDLE_CASE
+    cpu_isa_t isa_to_set = from_dnnl(isa);
+    if (isa_to_set == unknown)
+        return invalid_arguments;
     if(verbose)
         printf(" dnnl_set_max_cpu_isa(0x%lx) --> cpu_isa_t(0x%lx)\n",
                 (long)isa, (long)isa_to_set);
-    assert(isa_to_set != isa_any);
 
     if (max_cpu_isa().set(isa_to_set))
         return success;

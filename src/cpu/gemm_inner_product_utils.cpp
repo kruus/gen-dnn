@@ -16,9 +16,9 @@
 
 #include "gemm_inner_product_utils.hpp"
 #include "dnnl_thread.hpp"
-#if TARGET_X86_JIT
+#if TARGET_X86_JIT 
 #include "jit_uni_eltwise_injector.hpp"
-#else
+#else // XXX above jit_uni_ may actually require sse41 ?
 #include "ref_eltwise.hpp"
 #endif // TARGET_X86_JIT
 #include "math_utils.hpp"
@@ -57,7 +57,7 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
     , scale_idx_mult_(0)
     , do_sum_(false)
     , do_dst_zero_points_(false)
-    , sum_scale_(0)
+    , sum_scale_(0) // XXX also only for jit?
 #if TARGET_X86_JIT
     , isa_(isa_any)
     , max_OC_loop_unroll_(13)
@@ -85,38 +85,30 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
     const int eltwise_ind = p.find(primitive_kind::eltwise);
     do_eltwise_ = eltwise_ind != -1;
     if (do_eltwise_) eltwise_ = p.entry_[eltwise_ind].eltwise;
-    // nb: post_ps_t::entry_t::eltwise_t eltwise_
-    //  vs ref_eltwise_scalar_fwd_t *ref_eltwise_
-    // Q: when related?
-#if TARGET_X86_JIT
-#else
-    ref_eltwise_ = new ref_eltwise_scalar_fwd_t(eltwise_.alg,
-            eltwise_.alpha, eltwise_.beta, eltwise_.scale);
-#endif
 
     const int sum_ind = p.find(primitive_kind::sum);
     do_sum_ = sum_ind != -1 && !skip_sum;
     if (do_sum_) {
         sum_scale_ = p.entry_[sum_ind].sum.scale;
-        //vreg_sum_scale = Zmm(idx_compute_vreg_start_++);
-        //compute_vreg_prev_dst_shift_ = compute_vregs_per_iter_++;
     }
 
-    //if (do_bias()) {
-    //    bias_data_type_size_ = data_type_size(bias_data_type_);
-    //    compute_vreg_bias_shift_ = compute_vregs_per_iter_++;
-    //}
+    if (do_bias()) {
+        bias_data_type_size_ = data_type_size(bias_data_type_);
+    }
 
-#if TARGET_X86_JIT
+    do_dst_zero_points_ = ! attr->zero_points_
+            .has_default_values(DNNL_ARG_DST);
+
+#if !TARGET_X86_JIT
+    if (do_eltwise_)
+        ref_eltwise_ = new ref_eltwise_scalar_fwd_t(eltwise_.alg,
+                eltwise_.alpha, eltwise_.beta, eltwise_.scale);
+#else
     using namespace Xbyak;
-    if (!attr->zero_points_.has_default_values(DNNL_ARG_DST)) {
-        do_dst_zero_points_ = true;
-        vreg_dst_zero_points = Zmm(idx_compute_vreg_start_++);
-    }
-
     if (do_scale_) {
         vreg_scale = Zmm(idx_compute_vreg_start_++);
     }
+
     if (dst_type == data_type::u8)
        vreg_zero = Zmm(idx_compute_vreg_start_++);
 
@@ -125,15 +117,11 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
         compute_vreg_prev_dst_shift_ = compute_vregs_per_iter_++;
     }
 
-    if (do_bias()) {
-        bias_data_type_size_ = data_type_size(bias_data_type_);
+    if (do_bias())
         compute_vreg_bias_shift_ = compute_vregs_per_iter_++;
-    }
 
-    if (!attr->zero_points_.has_default_values(DNNL_ARG_DST)) {
-        do_dst_zero_points_ = true;
+    if (do_dst_zero_points_)
         vreg_dst_zero_points = Zmm(idx_compute_vreg_start_++);
-    }
 
     if (!mayiuse(avx512_core)) {
         // use fallback code for older CPUs since they do not have optimized
@@ -163,10 +151,6 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
                     eltwise_reserved_2_);
         generate();
     }
-#else
-    if (do_eltwise_)
-        ref_eltwise_ = new ref_eltwise_scalar_fwd_t(eltwise_.alg,
-                eltwise_.alpha, eltwise_.beta, eltwise_.scale);
 #endif // TARGET_X86_JIT
     return;
 }
@@ -649,6 +633,7 @@ void pp_kernel_t<acc_type, dst_type>::generate() {
 }
 #endif // TARGET_X86_JIT
 
+/** "apply kernel", or apply reference impl. */
 template <data_type_t acc_type, data_type_t dst_type>
 void pp_kernel_t<acc_type, dst_type>::operator()(dst_data_t *dst,
         const acc_data_t *acc, const char *bias, const float *scales,

@@ -28,8 +28,6 @@
 
 #include "gemm_x8s8s32x_matmul.hpp"
 
-#include "gemm/gemm.hpp"
-
 namespace dnnl {
 namespace impl {
 namespace cpu {

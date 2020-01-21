@@ -134,9 +134,7 @@ struct _gemm_x8s8s32x_convolution_fwd_t : public primitive_impl_t {
 
     _gemm_x8s8s32x_convolution_fwd_t(const pd_t *apd)
         : primitive_impl_t(apd), pp_ker_(nullptr) {
-#if TARGET_X86_JIT
         pp_ker_ = new pp_ker_t(pd());
-#endif // TARGET_X86_JIT
     }
     ~_gemm_x8s8s32x_convolution_fwd_t() { delete pp_ker_; }
 
@@ -154,6 +152,7 @@ private:
     // XXX: this is throwaway code that will become unnecessary when we have a
     // sufficiently advanced igemm jit generator that supports quantization,
     // relu, and whatnot
+    /** This kernel type DOES support a reference impl */
     class pp_ker_t
 #if TARGET_X86_JIT
         : jit_generator

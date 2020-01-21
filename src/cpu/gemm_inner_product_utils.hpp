@@ -56,7 +56,7 @@ public:
 #endif // TARGET_X86_JIT
             if (ref_eltwise_) delete ref_eltwise_;
         }
-#if TARGET_X86_JIT
+#if TARGET_X86_JIT // (x86 jit without bfloat support is not supported)
         delete bf16_emu_;
 #endif // TARGET_X86_JIT
     }

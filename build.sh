@@ -17,6 +17,8 @@ DOGCC_VER=0
 NEC_FTRACE=0
 DOTARGET="x"
 VEJIT=0
+BFLOAT16="x"
+RNN="x"
 
 # see dnnl_config.h ...
 CPU_X86=1
@@ -24,8 +26,7 @@ CPU_VE=2
 CPU_SX=3
 #
 CPU=-1
-#old way (deprecate and use DNNL_TARGET
-JITFUNCS_VANILLA=6 # agree with src/cpu/cpu_isa_traits.cpp
+ISA="ALL"
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -45,7 +46,7 @@ usage() {
     echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
 }
-while getopts ":hjgaSstvPdDqQTwWbF1567iMrC" arg; do
+while getopts ":hjgaSstvPdDqQTwWbF1567iMrCm:bBrR" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         j) # force Intel x86 compile JIT (src/cpu/ JIT assembly code)
@@ -89,6 +90,18 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMrC" arg; do
             if [ ! "${DOTARGET}" == "x" ]; then echo "-v no good: already have -${DOTARGET}"; usage; fi
             if [ -d src/vanilla ]; then DOTARGET="v"; fi
             ;;
+        b) # no bfloat16 support or tests (not supported for x86 jit builds)
+            BFLOAT16="n"
+            ;;
+        B) # add bfloat16 support and tests
+            BFLOAT16="y"
+            ;;
+        r) # no rnn support or tests
+            RNN="n"
+            ;;
+        R) # add rnn support and tests
+            RNN="y"
+            ;;
         P) # Primitive extra tracing: VERBOSE_PRIMITIVE_CREATE, etc
             VERBOSE_PRIMITIVE_CREATE=y
             ;;
@@ -128,6 +141,10 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMrC" arg; do
         i) # try using icc
             DOGCC_VER=icc
             ;;
+        m) # -mISA "machine", ISA=[ALL]|VANILLA|ANY, SSE41|AVX|AVX2|AVX512..., VE...
+            ISA="${OPTARG}"
+            # check for valid ISA string values XXX
+            ;;
         M) # try _MKLDNN_USE_MKL [deprecated] option
             USE_MKL="y"
             ;;
@@ -143,8 +160,7 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMrC" arg; do
             ;;
     esac
 done
-# DOJIT, if defined, controls -DJITFUNCS_ANY=?? compile flag
-#      if undefined, default is set in cpu_isa_traits.hpp
+# DOJIT controls -DDNNL_ISA=${ISA} cmake options (deprecated)
 #DOJIT=0
 # if unspecified, autodetect target via $CC compiler variable
 if [ "${DOTARGET}" == "x" ]; then
@@ -152,7 +168,7 @@ if [ "${DOTARGET}" == "x" ]; then
         DOTARGET="s" # s for SX (C/C++ code, cross-compile)
     elif [ "${CC}" == "ncc" -a "${CXX}" == "nc++" ]; then
         echo "auto-detected '-a' Aurora compiler (ncc, nc++)"
-        # -1 ~ JITFUNCS_NONE; 7 ~ JITFUNCS_VE
+        # -1 ~ DOJIT; 7 ~ DOJIT
         DOTARGET="a"; DOJIT=-1; SIZE_T=64
         if [ `uname -n` = "zoro" ]; then JOBS="-j8"; else JOBS="-j1"; fi
         if [ -f vejit/include/vednn.h ]; then VEJIT=100; echo "auto-detected libvednn"; fi
@@ -242,14 +258,13 @@ else #if [ "$DOTARGET" != "a" ]; then
     fi
     if [ "$DOTARGET" == "j" ]; then
         # 5 ~ JITFUNCS_AVX512 max support in engine
-        DOJIT=5; INSTALLDIR="${INSTALLDIR}-jit"; BUILDDIR="${BUILDDIR}-jit";
+        DOJIT=5; INSTALLDIR="${INSTALLDIR}-jit-${ISA}"; BUILDDIR="${BUILDDIR}-jit-${ISA}";
     fi
     if [ "$DOTARGET" == "g" ]; then
         # -1 ~ JITFUNCS_NONE; 6 ~ JITFUNCS_VANILLA
-        DOJIT=$JITFUNCS_VANILLA
-        #DOJIT=-1; # JITFUNCS_NONE
+        DOJIT=6
         INSTALLDIR="${INSTALLDIR}-gen"; BUILDDIR="${BUILDDIR}-gen";
-        DOTARGET="j" # we have DOJIT=JITFUNCS_VANILLA, but henceforth identical to -j
+        DOTARGET="j" # henceforth identical to -j
     fi
 fi
 if [ ! "x${CC}" == "x" -a ! "`which ${CC}`" ]; then
@@ -262,12 +277,16 @@ if [ ! "x${CC}" == "x" -a ! "`which ${CC}`" ]; then
 fi
 
 if [ "$DOTARGET" == "v" ]; then
-    DOJIT=-1 # -1 ~ JITFUNCS_NONE; 7 ~ JITFUNCS_VE
+    DOJIT=-1 # -1 ~ NONE; 7 ~ VE (or ANY or VE_COMMON?)
 fi
 if [ "$DODEBUG" == "y" ]; then INSTALLDIR="${INSTALLDIR}-dbg"; BUILDDIR="${BUILDDIR}d"; fi
 if [ $NEC_FTRACE -gt 0 ]; then BUILDDIR="${BUILDDIR}F"; fi
 if [ $USE_CBLAS -gt 0 ]; then BUILDDIR="${BUILDDIR}C"; fi
 if [ "$BUILDDIR_SUFFIX" ]; then BUILDDIR="${BUILDDIR}${BUILDDIR_SUFFIX}"; fi
+if [ "$BFLOAT16" = "y" ]; then BUILDDIR="${BUILDDIR}-bf16"; fi
+if [ "$BFLOAT16" = "n" ]; then BUILDDIR="${BUILDDIR}-nobf16"; fi
+if [ "$RNN" = "y" ]; then BUILDDIR="${BUILDDIR}-rnn"; fi
+if [ "$RNN" = "n" ]; then BUILDDIR="${BUILDDIR}-nornn"; fi
 
 if [ $DOJUSTDOC -gt 0 ]; then
     echo "DOJUSTDOC = ${DOJUSTDOC}"
@@ -436,21 +455,17 @@ echo "PATH $PATH"
         ccxx_flags -DVERBOSE_PRIMITIVE_CREATE=1
     fi
 
-    # NO! this is mkl-dnn "internal" from cmake/platform.cmake
-    #    CMAKEOPT="${CMAKEOPT} -DCMAKE_CCXX_FLAGS=-DJITFUNCS=${DOJIT}"                                      
-    # OLD WAY:
-    #ccxx_flags -DJITFUNCS=${DOJIT}
-    # NEW WAY: add to CMAKEOPT instead, auto-propagate to dnnl_config.h
     #
-    # oops , we forgot this option
-    #if [ "${DOTARGET}" == "g" ]; then
-    if [ $DOJIT = $JITFUNCS_VANILLA ]; then
+    # XXX replace following section with:
+    # CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=${ISA}"
+    #
+    if [ $DOJIT = 6 ]; then # 6 ~ VANILLA
         CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=VANILLA"
-    #elif [ "${DOTARGET}" == "j" ]; then
-    elif [ $DOJIT == 5 ]; then
+    elif [ $DOJIT == 5 ]; then # 5 ~ AVX512, or ANY? ALL? (which? maybe use ANY|MAX XXX)
         : # default DNNL_ISA is ALL (for x86)
         #CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=ALL" 
-        CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=SSE41"
+        #CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=SSE41"
+        CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=${ISA}"
     elif [ "${DOTARGET}" == "a" ]; then
         # default DNNL_ISA is ALL (for VE)
         CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=VANILLA"
@@ -468,6 +483,30 @@ echo "PATH $PATH"
     else
         echo " ERROR: build.sh unknown cpu target : DOTARGET=${DOTARGET}"
         usage
+    fi
+    #
+    # -b or -B : BFLOAT16 support override
+    #
+    if [ "${BFLOAT16}" = "n" ]; then
+        CMAKEOPT="${CMAKEOPT} -DDNNL_BFLOAT16=0"
+        echo "BFLOAT16 support OFF"
+    elif [ "${BFLOAT16}" = "y" ]; then 
+        CMAKEOPT="${CMAKEOPT} -DDNNL_BFLOAT16=1"
+        echo "BFLOAT16 support ON"
+    else
+        echo "BFLOAT16 support = default"
+    fi
+    #
+    # -r or -R : RNN support override
+    #
+    if [ "${RNN}" = "n" ]; then
+        CMAKEOPT="${CMAKEOPT} -DDNNL_RNN=0"
+        echo "RNN    support OFF"
+    elif [ "${RNN}" = "y" ]; then 
+        CMAKEOPT="${CMAKEOPT} -DDNNL_RNN=1"
+        echo "RNN    support ON"
+    else
+        echo "RNN    support = default"
     fi
 
     # iterator debug code ?
@@ -497,19 +536,6 @@ echo "PATH $PATH"
     if [ $USE_MKL == "y" ]; then # deprecated in v1.0
         CMAKEOPT="${CMAKEOPT} -D_MKLDNN_USE_MKL=ON"
     fi
-    # removed -dTARGET_VANILLA (now set by CMAKEOPT -DDNNL_ISA=VANILLA)
-    #if [ "$DOJIT" -lt 0 -o "$DOJIT" -eq $JITFUNCS_VANILLA ]; then
-    #    # this would NOT affect the jit generator
-    #    #CMAKEOPT="${CMAKEOPT} -DMKLDN_ARCH_OPT_FLAGS=\"\""
-    #    CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
-    #    # TODO add an option for target CPU, 'NONE' ~ 'TARGET_VANILLA'
-    #    ccxx_flags -DTARGET_VANILLA
-    #fi
-    #if [ ! "$DOTARGET" == "j" ]; then
-    #    CMAKEOPT="${CMAKEOPT} -DTARGET_VANILLA=ON"
-    #    export CFLAGS="${CFLAGS} -DTARGET_VANILLA"
-    #    export CXXFLAGS="${CXXFLAGS} -DTARGET_VANILLA"
-    #fi
     if [ "$DOTARGET" == "a" ]; then
         TOOLCHAIN=../cmake/ve.cmake
         if [ ! -f "${TOOLCHAIN}" ]; then echo "Ohoh. ${TOOLCHAIN} not found?"; BUILDOK="n"; fi
@@ -635,7 +661,7 @@ echo "PATH $PATH"
             # Make some assembly-source translations automatically...
             #cxxfiles=`(cd ../tests/benchdnn && ls -1 conv/*conv?.cpp conv/*.cxx)`
             #echo "cxxfiles = $cxxfiles"
-            (cd tests/benchdnn && { for f in conv/*conv?.cpp conv/*.cxx; do if -f "${f}"; then echo $f.s; make -j1 VERBOSE=1 $f.s; fi; done; }) || true
+            (cd tests/benchdnn && { for f in conv/*conv?.cpp conv/*.cxx; do if [ -f "${f}"] ; then echo $f.s; make -j1 VERBOSE=1 $f.s; fi; done; }) || true
             pwd
             ls -l asm || true
         fi

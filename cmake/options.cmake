@@ -255,20 +255,38 @@ option(_DNNL_USE_MKL "use BLAS functions from Intel MKL" OFF)
 
 # FIXME test jit with and without bfloat16 (or just remove this option)
 # FIXME RNN ref impl !!!
-set(DNNL_ENABLE_BFLOAT16 0) # please commit with value 1
-set(DNNL_ENABLE_RNN 1)      # please commit with value 1
+# FIXME should allow this as option
+#   but jit codes have neither #if..BFLOAT16 not #if..RNN secions !
+set(DNNL_DEFAULT_ENABLE_BFLOAT16 1)
+set(DNNL_DEFAULT_ENABLE_RNN 1)
 # for development work, we may disable big chunks of code
 if(DNNL_CPU EQUAL DNNL_CPU_X86)
     if(DNNL_ISA STREQUAL "VANILLA") # note: DNNL_ISA is a "string"
         message(STATUS "x86 VANILLA compile removes rnn support (for now)")
-        set(DNNL_ENABLE_RNN 0) # FIXME - there is some jit entanglement
+        set(DNNL_DEFAULT_ENABLE_RNN 0) # FIXME - there is some jit entanglement
     endif()
 elseif(DNNL_CPU EQUAL DNNL_CPU_VE)
     message(STATUS "non-x86 compile wil disable BFLOAT16 and RNN support (for now)")
-    set(DNNL_ENABLE_BFLOAT16 0) # initially 0 for porting
-    set(DNNL_ENABLE_RNN 0)      # initially 0 for porting
+    set(DNNL_DEFAULT_ENABLE_BFLOAT16 1) # initially 0 for porting
+    set(DNNL_DEFAULT_ENABLE_RNN 0)      # initially 0 for porting
 else() # unknown? try enabling everything
 endif()
+option(DNNL_ENABLE_BFLOAT16
+    "Enable bfloat16 support (default ${DNNL_DEFAULT_ENABLE_BFLOAT16})"
+    ${DNNL_DEFAULT_ENABLE_BFLOAT16})
+option(DNNL_ENABLE_RNN
+    "Enable rnn support (default ${DNNL_DEFAULT_ENABLE_RNN}, for now requires x86 jit)"
+    ${DNNL_DEFAULT_ENABLE_RNN})
+# So dnnl_config.h always defines these as 0 or 1 values...
+MACRO(set_01 var)
+    if(${ARGN})
+        set(${var} 1)
+    else()
+        set(${var} 0)
+    endif()
+endmacro()
+set_01(DNNL_ENABLE_BFLOAT16_01 ${DNNL_ENABLE_BFLOAT16})
+set_01(DNNL_ENABLE_RNN_01      ${DNNL_ENABLE_RNN})
 
 if(0)
 # ==============================================

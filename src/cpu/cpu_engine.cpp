@@ -157,14 +157,14 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
     using namespace mkldnn::impl;
     using namespace mkldnn::impl::status;
     typedef typename prim::pd_t pd_t;
-    if(0){
+    if(VERBOSE_PRIMITIVE_CREATE >= 3){ // extremely verbose
         printf(" create-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
     }
     auto const ret = primitive_desc_t::create<pd_t>( pd, adesc, attr, engine,
             hint_fwd );
-    if( ret == success ) {
+    if (VERBOSE_PRIMITIVE_CREATE >= 1 && ret == success) {
         // actually the new 'info' call has it all..
-        printf(" prim %s\n", (*pd)->info());
+        printf("\nprim %s\n", (*pd)->info());
         //printf(" created descriptor %s name %s\n\t%s\n",
         //        mkldnn_prim_kind2str(adesc->kind), (*pd)->name(),
         //        (*pd)->info());
@@ -173,7 +173,7 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
         //mkldnn_primitive_desc_query( *pd, mkldnn_query_impl_info_str, 0, &result );
         //printf(" created descriptor %s\n", result);
         fflush(stdout);
-    }else if(ret == unimplemented){
+    }else if( VERBOSE_PRIMITIVE_CREATE >= 1 && ret == unimplemented) {
         printf(" skip-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
         if(/*opt.*/ adesc->kind == pd_t::base_pkind){
             if (adesc->kind == primitive_kind::deconvolution) {
@@ -210,7 +210,7 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
             }
         }
         printf(" unimpl\n"); fflush(stdout);
-    }else{
+    }else if(VERBOSE_PRIMITIVE_CREATE >= 2) {
         // printing wrong-kind msg not too interesting [and lengthy]
         printf(" no-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
     }

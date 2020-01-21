@@ -607,13 +607,17 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::execute_forward_thr(
                 ? wei_md.extra().scale_adjust
                 : 1.f;
 
+        if(!pp_ker_){
+            printf(" TODO: missing ref impl for pp_ker_ here ?");
+            assert(!" missing ref impl for pp_ker_ ?");
+        }
         parallel(0, [&](int ithr, int nthr) {
-            size_t start, end;
-            balance211((size_t)N * jcp.oc, nthr, ithr, start, end);
-            (*pp_ker_)(dst + (oh * jcp.ow + ow) * pp_ker_->dst_os_stride_, acc,
-                    bia_base, scales, nslope, sum_scale, 1.f / wei_adj_scale, g,
-                    start, end);
-        });
+                size_t start, end;
+                balance211((size_t)N * jcp.oc, nthr, ithr, start, end);
+                (*pp_ker_)(dst + (oh * jcp.ow + ow) * pp_ker_->dst_os_stride_, acc,
+                        bia_base, scales, nslope, sum_scale, 1.f / wei_adj_scale, g,
+                        start, end);
+                });
 
         nd_iterator_step(n, jcp.mb, g, jcp.ngroups, ohb, nb_oh, owb, nb_ow);
     }

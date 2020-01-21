@@ -53,7 +53,7 @@ dnnl_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
 #elif TARGET_X86_JIT
 #define GEMM_IMPL_STR "gemm:jit"
 #else
-#define GEMM_IMPL_STR "gemm:nojit"
+#define GEMM_IMPL_STR "gemm:ref"
 #endif
 
 #if USE_MKL_IGEMM

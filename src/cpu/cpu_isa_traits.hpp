@@ -46,7 +46,7 @@
  * FIXME: replace size_t parameters with the appropriate ones */
 #pragma warning(disable : 4267)
 #endif
-e
+
 #include "xbyak/xbyak.h"
 #include "xbyak/xbyak_util.h"
 #endif
@@ -119,6 +119,7 @@ enum cpu_isa_bit_t : unsigned {
 // We leave all of them available, because mayiuse will simply return
 // false if a cpu_isa_t doesn't make sense.
 enum cpu_isa_t : unsigned {
+    unknown             = 0,
     /** \enum vanilla
      * cpu-agnostic ref code only (possibly cblas/mkl calls).
      * \note non-jit builds may need to pull in some inline assembler.
@@ -172,7 +173,7 @@ struct cpu_isa_traits {}; /* ::vlen -> 32 (for avx2) */
 
 template <>
 struct cpu_isa_traits<vanilla> { // Note: should work for x86/VE cpu
-    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_vanilla;
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_vanilla;
     static constexpr const char *user_option_env = "VANILLA";
 };
 
@@ -303,11 +304,61 @@ cpu_isa_t DNNL_API get_max_cpu_isa(bool soft = false);
 
 namespace {
 
+/** Convert from public dnnl_cpu_isa value to internal bitflags value.
+ * Since dnnl.h dnnl_cpu_isa values and cpu_isa values are now decoupled,
+ * portable tests should *not* rely on equality between values of the
+ * two enum types.
+ * \return the appropriate cpu_isa enum value for the build target,
+ *         or \c unknown.
+ * \todo \c from_dnnl sig could use C++ enum as "cpu_isa_t from_dnnl(cpu_isa isa)" */
+static inline cpu_isa_t from_dnnl(dnnl_cpu_isa_t isa){
+    static int const verbose=0;
+    using namespace dnnl::impl;
+    using namespace dnnl::impl::cpu;
+
+    // return \c unknown if unrecognized
+    cpu_isa_t isa_to_set = unknown;
+#define HANDLE_CASE(cpu_isa) \
+    case cpu_isa_traits<cpu_isa>::user_option_val: isa_to_set = cpu_isa; break;
+
+    // convert a dnnl.h \c isa value to internal \c cpu_isa_t
+    switch (isa) {
+        // Note cases here should match init_max_cpu_isa()
+        // All target cpus support "VANILLA", "ANY", and "ALL"
+        HANDLE_CASE(isa_all);
+        HANDLE_CASE(vanilla);
+        HANDLE_CASE(isa_any);   // for x86, adds generic x86 jit to vanilla
+#if TARGET_X86
+        HANDLE_CASE(sse41);     // x86 jit with vec ops
+        HANDLE_CASE(avx);
+        HANDLE_CASE(avx2);
+        HANDLE_CASE(avx512_mic);
+        HANDLE_CASE(avx512_mic_4ops);
+        HANDLE_CASE(avx512_core);
+        HANDLE_CASE(avx512_core_vnni);
+        HANDLE_CASE(avx512_core_bf16);
+#elif TARGET_VE
+        HANDLE_CASE(vednn);     // vanilla + libvednn "C" api
+        HANDLE_CASE(vejit);     // vednn + libvednn jit
+#endif
+        default: /*unknown*/ ;
+    }
+#undef HANDLE_CASE
+    if(verbose)
+        printf(" from_dnnl(0x%lx) --> cpu_isa_t(0x%lx)\n",
+                (long)isa, (long)isa_to_set);
+    return isa_to_set;
+}
+
+
 #if TARGET_X86_JIT
 static Xbyak::util::Cpu cpu;
 /** mayiuse is a runtime check that an ISA is available on the target CPU,
  * and we respect a \c soft runtime limit.  Build time x86 limits are mostly
  * enforced by \c cpu_engine (by pruning the impl lists at compile time).
+ *
+ * \note It is \b not a required side effect of \c mayiuse that \c get_max_cpu_isa be called.  Tests relying on this should \e explicitly call
+ * \c get_max_cpu_isa(bool const soft).
  */
 static inline bool mayiuse(const cpu_isa_t cpu_isa, const bool soft = false) {
     unsigned cpu_isa_mask = get_max_cpu_isa(soft);
@@ -347,6 +398,9 @@ static inline bool mayiuse(const cpu_isa_t cpu_isa, const bool soft = false) {
 
 #elif TARGET_X86 // and no jit, only "VANILLA" build is usable
 static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=false) {
+    //unsigned cpu_isa_mask = get_max_cpu_isa(soft);
+    //if ((cpu_isa_mask & cpu_isa) != cpu_isa) return false;
+
     // for a vanilla build, we should only be able to set to vanilla?
     return cpu_isa == vanilla; // ??
 }
@@ -354,7 +408,8 @@ static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=fa
 #else // non-x86 target cpu
 static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=false) {
 #ifdef DNNL_ENABLE_MAX_CPU_ISA
-
+    //unsigned cpu_isa_mask = get_max_cpu_isa(soft);
+    //if ((cpu_isa_mask & cpu_isa) != cpu_isa) return false;
 #if TARGET_X86
     return cpu_isa == vanilla; // ??
 #elif TARGET_VE

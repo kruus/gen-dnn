@@ -64,7 +64,9 @@ struct gemm_bf16_convolution_fwd_t : public primitive_impl_t {
                     && post_ops_ok()
                     && memory_desc_matches_tag(*src_md(), dat_tag())
                     && memory_desc_matches_tag(*dst_md(), dat_tag())
-                    && memory_desc_matches_tag(*weights_md(), wei_tag());
+                    && memory_desc_matches_tag(*weights_md(), wei_tag())
+                    ;
+
             if (!ok) return status::unimplemented;
 
             auto scratchpad = scratchpad_registry().registrar();
@@ -99,6 +101,7 @@ struct gemm_bf16_convolution_fwd_t : public primitive_impl_t {
                                  : utils::pick(ndims() - 3, oiw, oihw, oidhw);
         }
 
+        /** \todo gemm_bf16_convolution needs a ref postops impl. */
         bool post_ops_ok() const {
             auto const &po = attr()->post_ops_;
             auto is_eltwise
@@ -107,8 +110,10 @@ struct gemm_bf16_convolution_fwd_t : public primitive_impl_t {
 
             switch (po.len_) {
                 case 0: return true; // no post_ops
+#if TARGET_X86_JIT // TODO ref impl for postops
                 case 1: return is_eltwise(0) || is_sum(0); // sum OR eltwise
                 case 2: return is_sum(0) && is_eltwise(1); // sum -> eltwise
+#endif // TARGET_X86_JIT
                 default: return false;
             }
             return false;

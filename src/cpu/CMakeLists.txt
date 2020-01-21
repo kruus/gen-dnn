@@ -57,6 +57,16 @@ if(MSVC)
         PROPERTIES COMPILE_FLAGS "/bigobj")
 endif()
 
+file(GLOB HPP_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp)
+set(SANITY_HPP ${CMAKE_BINARY_DIR}/sanity-checks.hpp)
+set(CMAKE_REQUIRED_FLAGS ${CMAKE_CXX_FLAGS})
+set(CMAKE_REQUIRED_INCLUDES ${CMAKE_CXX_FLAGS})
+include(CheckIncludeFileCXX)
+foreach(project_header ${HPP_HEADERS})
+    get_filename_component(header_name ${SANITY_HPP} NAME_WE)
+    check_include_file_cxx("${SANITY_HPP}" ${header_name}_IS_STANDALONE)
+endforeach()
+
 set(OBJ_LIB ${LIB_NAME}_cpu)
 add_library(${OBJ_LIB} OBJECT ${SOURCES})
 set(${LIB_NAME}_SUB_OBJS ${${LIB_NAME}_SUB_OBJS}

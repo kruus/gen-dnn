@@ -194,6 +194,7 @@ protected:
         BackwardData();
         BackwardWeights();
     }
+#if 0 // with some printfs
     void Forward() {
         auto aprop_kind = prop_kind::forward;
         deconvolution_test_params p = ::testing::TestWithParam<
@@ -279,6 +280,87 @@ protected:
             compute_bias_fwd<data_t>(dd, conv_src.get(), bias->get());
         compare_data<data_t>(conv_src.get(), dst->get());
     }
+#else
+    void Forward() {
+        auto aprop_kind = prop_kind::forward;
+        deconvolution_test_params p = ::testing::TestWithParam<
+                deconvolution_test_params>::GetParam();
+        auto conv_src = test_memory(*con_src_desc, eng);
+        auto conv_dst = src;
+        test_convolution_sizes_t dd = p.sizes;
+
+        fill_data<data_t>(src->get_size() / sizeof(data_t), src->get());
+
+        fill_data<data_t>(weights->get_size() / sizeof(data_t), weights->get());
+        if (with_bias) {
+            fill_data<data_t>(bias->get_size() / sizeof(data_t), bias->get());
+        }
+
+        auto weights_tr = memory(*con_weights_desc, eng);
+        transpose_wei<data_t>(dd, weights->get(), weights_tr);
+        auto deconv_desc = with_bias
+                ? deconvolution_forward::desc(aprop_kind,
+                        algorithm::deconvolution_direct, *dec_src_desc,
+                        *dec_weights_desc, *dec_bias_desc, *dec_dst_desc,
+                        {dd.strh, dd.strw}, {dd.padh, dd.padw}, padR)
+                : deconvolution_forward::desc(aprop_kind,
+                        algorithm::deconvolution_direct, *dec_src_desc,
+                        *dec_weights_desc, *dec_dst_desc, {dd.strh, dd.strw},
+                        {dd.padh, dd.padw}, padR);
+
+        auto deconv_primitive_desc
+                = deconvolution_forward::primitive_desc(deconv_desc, eng);
+        deconv_primitive_desc = deconvolution_forward::primitive_desc(
+                deconv_primitive_desc.get()); // test construction from a C pd
+
+        ASSERT_TRUE(
+                deconv_primitive_desc.query_md(query::exec_arg_md, DNNL_ARG_SRC)
+                == deconv_primitive_desc.src_desc());
+        ASSERT_TRUE(
+                deconv_primitive_desc.query_md(query::exec_arg_md, DNNL_ARG_DST)
+                == deconv_primitive_desc.dst_desc());
+        ASSERT_TRUE(deconv_primitive_desc.query_md(
+                            query::exec_arg_md, DNNL_ARG_WEIGHTS)
+                == deconv_primitive_desc.weights_desc());
+        ASSERT_TRUE(deconv_primitive_desc.query_md(
+                            query::exec_arg_md, DNNL_ARG_BIAS)
+                == deconv_primitive_desc.bias_desc());
+
+        deconvolution_forward(deconv_primitive_desc)
+                .execute(strm,
+                        {{DNNL_ARG_SRC, src->get()},
+                                {DNNL_ARG_WEIGHTS, weights->get()},
+                                {DNNL_ARG_BIAS, bias->get()},
+                                {DNNL_ARG_DST, dst->get()}});
+        strm.wait();
+
+        auto conv_desc = convolution_forward::desc(prop_kind::forward_training,
+                algorithm::convolution_direct, *con_src_desc, *con_weights_desc,
+                *con_dst_desc, {dd.strh, dd.strw}, {dd.padh, dd.padw}, padR);
+
+        auto conv_primitive_desc
+                = convolution_forward::primitive_desc(conv_desc, eng);
+
+        auto conv_bwd_data_desc = convolution_backward_data::desc(
+                algorithm::convolution_direct, *con_src_desc, *con_weights_desc,
+                *con_dst_desc, {dd.strh, dd.strw}, {dd.padh, dd.padw}, padR);
+
+        auto conv_bwd_data_primitive_desc
+                = convolution_backward_data::primitive_desc(
+                        conv_bwd_data_desc, eng, conv_primitive_desc);
+
+        convolution_backward_data(conv_bwd_data_primitive_desc)
+                .execute(strm,
+                        {{DNNL_ARG_DIFF_DST, conv_dst->get()},
+                                {DNNL_ARG_WEIGHTS, weights_tr},
+                                {DNNL_ARG_DIFF_SRC, conv_src.get()}});
+        strm.wait();
+
+        if (with_bias)
+            compute_bias_fwd<data_t>(dd, conv_src.get(), bias->get());
+        compare_data<data_t>(conv_src.get(), dst->get());
+    }
+#endif
 
     void BackwardData() {
         auto p = ::testing::TestWithParam<
@@ -349,8 +431,6 @@ protected:
     }
 
     void BackwardWeights() {
-        // DNNL v1.0.0 had an issue with supplying prop_kind forward_training and undef
-        // data_type for wei and dst descriptors?
         auto p = ::testing::TestWithParam<
                 deconvolution_test_params>::GetParam();
         auto conv_src = dst;
@@ -367,16 +447,13 @@ protected:
                 *dec_src_desc, *dec_weights_desc, *dec_bias_desc, *dec_dst_desc,
                 {dd.strh, dd.strw}, {dd.padh, dd.padw}, padR);
 
-        //printf("deconv_primitive_desc...\n"); fflush(stdout);
         auto deconv_primitive_desc
                 = deconvolution_forward::primitive_desc(deconv_desc, eng);
 
-        //printf("deconv_bwd_weights_desc...\n"); fflush(stdout);
         auto deconv_bwd_weights_desc = deconvolution_backward_weights::desc(
                 algorithm::deconvolution_direct, *dec_src_desc,
                 *dec_weights_desc, *dec_bias_desc, *dec_dst_desc,
                 {dd.strh, dd.strw}, {dd.padh, dd.padw}, padR);
-        //printf("deconv_bwd_weights_primitive_desc...\n"); fflush(stdout);
         auto deconv_bwd_weights_primitive_desc
                 = deconvolution_backward_weights::primitive_desc(
                         deconv_bwd_weights_desc, eng, deconv_primitive_desc);
@@ -477,7 +554,7 @@ CPU_INST_TEST_CASE(SimpleSmall_NCHW,
         PARAMS(nchw, oihw, x, nchw, 2, 1, 6, 4, 4, 4, 4, 4, 3, 3, 1, 1, 1, 1),
         PARAMS(nchw, oihw, x, nchw, 2, 1, 6, 2, 2, 4, 4, 4, 3, 3, 0, 0, 1, 1),
         PARAMS(nhwc, oihw, x, nhwc, 2, 1, 6, 2, 2, 4, 4, 4, 3, 3, 0, 0, 1, 1),
-        PARAMS(nhwc, hwio, x, nhwc, 2, 1, 6, 4, 4, 4, 4, 4, 3, 3, 1, 1, 1, 1),
+        PARAMS(nhwc, hwio, x, nhwc, 2, 1, 6, 4, 4, 4, 4, 4, 3, 3, 1, 1, 1, 1), // failed with SSE41
         PARAMS(nhwc, hwio, x, nhwc, 2, 1, 6, 2, 2, 4, 4, 4, 3, 3, 0, 0, 1, 1), // failed with VANILLA build XXX
         PARAMS(nhwc, goihw, x, nhwc, 2, 2, 6, 4, 4, 4, 4, 4, 3, 3, 0, 0, 1, 1),
         PARAMS(nhwc, hwigo, x, nhwc, 2, 2, 6, 4, 4, 4, 4, 4, 3, 3, 1, 1, 1, 1)

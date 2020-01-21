@@ -2068,12 +2068,12 @@ typedef struct {
 /// Environment variable \c DNNL_MAX_CPU_ISA strings map directly to
 /// one of the following values.  Inappropriate values get ignored,
 ///
-/// Values happen to reflect \e logical partial ordering for x86,
-/// but implementations may map them in arbitrary fashion to
+/// Values \b happen to reflect \e logical partial ordering for x86,
+/// but implementations may map them in \b arbitrary fashion to
 /// \c cpu_isa_t bitmasks within \ref cpu_isa_traits.hpp.
 /// \sa dnnl::set_max_cpu_isa(cpu_isa) for the x86 partial ordering
 ///
-/// \note \c dnnl_cpu_vanilla, \c dnnl_cpu_isa_any and \c dnnl_cpu_isa_all
+/// \note \c dnnl_cpu_isa_vanilla, \c dnnl_cpu_isa_any and \c dnnl_cpu_isa_all
 ///       ("VANILLA", "ANY", "ALL") are supported by all CPUs, but might
 ///       have different interpretations as bit masks for \c cpu_isa_t.
 /**
@@ -2091,16 +2091,17 @@ typedef struct {
  *   - (might allow easier "hard" isa limit tests against DNNL_ISA build value)
  */
 typedef enum {
-    /// "vanilla" Any CPU, Any ISA.
-    /// Run just plain C/C++ code.
-    dnnl_cpu_vanilla = 0x1, // new, 
+    /// "vanilla" Should run on any DNNL_CPU target
+    /// Run just plain C/C++ code, with very rare need for inline assembler,
+    /// and never any x86 JIT.
+    dnnl_cpu_isa_vanilla = 0x1, // new, can use for any build cpu
 
-    /// "any" Intel(R) x86 jit, no vector extensions.
-    /// OK for non-x86 DNNL_CPU too.
-    dnnl_cpu_isa_any = 0x3, // i.e. runs on all **x86** jit
+    /// "any" For Intel(R) x86 jit, no vector extensions.
+    /// For non-x86 maps to "standard basic options" for the DNNL_CPU target
+    dnnl_cpu_isa_any = 0x3, // x86 jit, but no vector op extensions [new, maybe not so useful?]
 
     /// "sse4.1" Intel(R) SSE4.1 jit.
-    dnnl_cpu_isa_sse41 = 0x7, //0x1,
+    dnnl_cpu_isa_sse41 = 0x7, //0x1, historical basic x86 jit requirement
 
     /// "avx" Intel(R) Advanced Vector Extensions.
     dnnl_cpu_isa_avx = 0xf, //0x3,
@@ -2131,8 +2132,10 @@ typedef enum {
     /// Scalable Family and / Intel(R) Core(TM) processor family.
     dnnl_cpu_isa_avx512_core_bf16 = 0x380 | dnnl_cpu_isa_avx2,
 
-    /// "all" Intel(R) any jit target OK (shorthand, no isa restrictions).
-    /// Serves double duty for non-x86 builds (where actual value is irrelevant)
+    /// For any build CPU, means "full set of options".
+    /// For Intel(R) means "provide all available jit implementations".
+    /// For non-x86, this may place added requirements on the run-time
+    /// environment.
     dnnl_cpu_isa_all = 0xffff,
 
     // cpu_isa "ve_common" is handled by "ANY"

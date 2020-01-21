@@ -25,9 +25,15 @@
 #include "../common/engine.hpp"
 #include "c_types_map.hpp"
 
+
 // oops SX VERBOSE_PRIMITIVE_CREATE uses unsupported c++1 features???
 #if defined(_SX)
+#undef VERBOSE_PRIMITIVE_CREATE
 #define VERBOSE_PRIMITIVE_CREATE 0
+#endif
+#if DNNL_ISA == DNNL_ISA_VANILLA
+#undef VERBOSE_PRIMITIVE_CREATE
+#define VERBOSE_PRIMITIVE_CREATE 1
 #endif
 
 #ifndef VERBOSE_PRIMITIVE_CREATE
@@ -43,7 +49,7 @@
 #define VERBOSE_PRIMITIVE_CREATE 0/*release mode compile*/
 #else
 // debug output here can be extremely lengthy for some tests, ex. "no-FOO" for every impl in cpu_engine list
-#define VERBOSE_PRIMITIVE_CREATE 0
+#define VERBOSE_PRIMITIVE_CREATE 1
 #endif
 #endif
 

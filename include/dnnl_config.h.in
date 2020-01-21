@@ -82,10 +82,10 @@
 //@}
 
 /// enable bfloat16 (for debug -- x86 jit releases will always have this enabled)
-#cmakedefine DNNL_ENABLE_BFLOAT16 ${DNNL_ENABLE_BFLOAT16}
+#define DNNL_ENABLE_BFLOAT16 ${DNNL_ENABLE_BFLOAT16_01}
 
 /// enable rnn code (for debug -- x86 jit releases will always have this enabled)
-#cmakedefine DNNL_ENABLE_RNN ${DNNL_ENABLE_RNN}
+#define DNNL_ENABLE_RNN ${DNNL_ENABLE_RNN_01}
 //@}
 
 /// @defgroup cmake_build_constants cmake build constants

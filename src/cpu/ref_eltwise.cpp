@@ -80,12 +80,13 @@ static float compute_eltwise_scalar_bwd(
 
 ref_eltwise_scalar_fwd_t::ref_eltwise_scalar_fwd_t(
         alg_kind_t alg, float alpha, float beta, float scale)
-    : alg_(alg), alpha_(alpha), beta_(beta), scale_(scale) {
+    : alg_(alg), alpha_(alpha), beta_(beta), scale_(scale)
+{
     assert(utils::one_of(alg_, eltwise_relu, eltwise_tanh, eltwise_elu,
-            eltwise_square, eltwise_abs, eltwise_sqrt, eltwise_linear,
-            eltwise_bounded_relu, eltwise_soft_relu, eltwise_logistic,
-            eltwise_exp, eltwise_gelu, eltwise_swish, eltwise_log,
-            eltwise_clip));
+                eltwise_square, eltwise_abs, eltwise_sqrt, eltwise_linear,
+                eltwise_bounded_relu, eltwise_soft_relu, eltwise_logistic,
+                eltwise_exp, eltwise_gelu, eltwise_swish, eltwise_log,
+                eltwise_clip));
 }
 
 ref_eltwise_scalar_fwd_t::ref_eltwise_scalar_fwd_t(

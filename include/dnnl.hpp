@@ -9413,8 +9413,8 @@ inline status set_jit_profiling_jitdumpdir(const std::string &dir) {
 /// @copydoc dnnl_cpu_isa_t
 /// \note logically, vanilla <= any < [cpu-specific] <= all
 enum class cpu_isa {
-    /// @copydoc dnnl_cpu_vanilla
-    vanilla = dnnl_cpu_vanilla,
+    /// @copydoc dnnl_cpu_isa_vanilla
+    vanilla = dnnl_cpu_isa_vanilla,
     /// @copydoc dnnl_cpu_isa_all
     any = dnnl_cpu_isa_any,
     /// @copydoc dnnl_cpu_isa_sse41

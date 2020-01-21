@@ -24,6 +24,7 @@
 #include "primitive_iterator.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+//#include "consistency.hpp"
 
 #include "cpu_convolution_pd.hpp"
 #include "cpu_deconvolution_pd.hpp"
@@ -45,9 +46,12 @@ static status_t compute_blocked_format(
         bool with_groups, const memory_desc_t *oi_md, memory_desc_t *io_md) {
     /* Computes blocking for *i*o* format from *o*i* format */
 
-    bool sanity_check_ok = true && oi_md->ndims == io_md->ndims
-            && oi_md->format_kind == format_kind::blocked;
-    if (!sanity_check_ok) return status::invalid_arguments;
+    Consistency ok("\ndeconv compute_blocked_format bad:");
+    AND_(oi_md->ndims == io_md->ndims
+            && oi_md->format_kind == format_kind::blocked);
+    //sanity_check_ok = true && oi_md->ndims == io_md->ndims
+    //        && oi_md->format_kind == format_kind::blocked;
+    if (!ok) return status::invalid_arguments;
 
     const blocking_desc_t &oi_blk = oi_md->format_desc.blocking;
     blocking_desc_t io_blk = io_md->format_desc.blocking;
@@ -167,6 +171,9 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
                                   ->support_bias();
                 bool ref_deconv_supports_bias = true
                         && desc()->accum_data_type == data_type::f32
+//#if !DNNL_ENABLE_BFLOAT16
+//                        && desc()->dst_desc.data_type == data_type::f32;
+//#else
                         && utils::one_of(desc()->dst_desc.data_type, f32, bf16)
                         && IMPLICATION(desc()->src_desc.data_type == bf16,
                                 memory_desc_matches_one_of_tag(
@@ -175,6 +182,7 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
                                                 ndims() - 3, ncw, nchw, ncdhw),
                                         utils::pick(ndims() - 3, nCw16c,
                                                 nChw16c, nCdhw16c)));
+//#endif
                 bool ok = true
                         && conv_pd_->weights_md()->extra.flags == 0
                         /* deconv reference code can process only f32 bias */
@@ -198,7 +206,7 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
                             alg_kind::deconvolution_winograd)
                     && attr()->has_default_values();
 #else
-            Consistency ok("deconvolution_fwd consistency:");
+            Consistency ok("\ndeconvolution_fwd bad init:");
             AND_( is_fwd() );
             AND_(utils::one_of(desc()->alg_kind,
                         alg_kind::deconvolution_direct,
@@ -381,7 +389,7 @@ struct ref_deconvolution_bwd_data_t : public primitive_impl_t {
                             alg_kind::deconvolution_winograd)
                     && attr()->has_default_values();
 #else
-            Consistency ok;
+            Consistency ok("\ndeconvolution_bwd_data bad init:");
             //AND_STR(mkldnn_prop_kind2str(desc()->prop_kind),
             //        desc()->prop_kind == prop_kind::backward_data);
             AND_(desc()->prop_kind == prop_kind::backward_data);
@@ -561,13 +569,13 @@ struct ref_deconvolution_bwd_weights_t : public primitive_impl_t {
                 return status::success;
             }
 #else
-            Consistency ok;
+            Consistency ok("\ndeconvolution_bwd_weights bad init:");
             DBG2("desc()->prop_kind ==",mkldnn_prop_kind2str(desc()->prop_kind));
 #if 1 // orig
-            //AND_(desc()->prop_kind == prop_kind::backward_weights);
+            AND_(desc()->prop_kind == prop_kind::backward_weights);
             // above failed in tests/gtests/test_deconvolution.cpp
-            AND_STR(mkldnn_prop_kind2str(desc()->prop_kind),
-                    desc()->prop_kind == prop_kind::backward_weights);
+            //AND_STR(mkldnn_prop_kind2str(desc()->prop_kind),
+            //        desc()->prop_kind == prop_kind::backward_weights);
             // sometimes it is forward_training !
 #else
             // but JUST forward_training does not fix much
@@ -577,22 +585,20 @@ struct ref_deconvolution_bwd_weights_t : public primitive_impl_t {
             DBG2("src_type",mkldnn_dt2str(src_type));
             DBG2("dwei_type",mkldnn_dt2str(dwei_type));
             DBG2("ddst_type",mkldnn_dt2str(ddst_type));
-#if DNNL_ENABLE_BFLOAT16
+#if 1 // DEBUG
+            {
+                // but also perhaps issues with undef data types in gtests
+                bool all_f32 = utils::everyone_is(f32,
+                        src_type, dwei_type, ddst_type);
+                if (ok && !all_f32)
+                    printf(" deconv data types src,dwei,ddst={%s, %s, %s}\n",
+                            mkldnn_dt2str(src_type), mkldnn_dt2str(dwei_type),
+                            mkldnn_dt2str(ddst_type));
+            }
+#endif
             AND_(utils::everyone_is(f32, src_type, dwei_type, ddst_type)
                     || (utils::one_of(dwei_type, f32, bf16)
                         && utils::everyone_is(bf16, src_type, ddst_type)));
-#else
-            {
-                // but also perhaps issues with undef data types in gtests
-                bool a=ok;
-                AND_(utils::everyone_is(f32, src_type, dwei_type, ddst_type));
-                bool b=ok;
-                if (a && !b) printf(" data types src,dwei,ddst={%s, %s, %s}\n",
-                        mkldnn_dt2str(src_type),
-                        mkldnn_dt2str(dwei_type),
-                        mkldnn_dt2str(ddst_type));
-            }
-#endif
             AND_(utils::one_of(desc()->alg_kind,
                         alg_kind::deconvolution_direct,
                         alg_kind::deconvolution_winograd));

@@ -17,9 +17,11 @@
 #ifndef COMMON_U8_HPP
 #define COMMON_U8_HPP
 #include "cpu_isa_traits.hpp"
-#if !defined(TARGET_X86_JIT)
-#error "common_u8.hpp is incompatible with a TARGET_VANILLA build
+#if !TARGET_X86_JIT
+#warning
+#error "common_u8.hpp is incompatible with !TARGET_X86_JIT"
 #else
+#warning "common_u8.hpp *enabled* because TARGET_X86_JIT is set"
 
 #include "jit_generator.hpp"
 

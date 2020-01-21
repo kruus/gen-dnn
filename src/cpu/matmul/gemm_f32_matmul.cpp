@@ -27,8 +27,6 @@
 
 #include "gemm_f32_matmul.hpp"
 
-#include "gemm/gemm.hpp"
-
 namespace dnnl {
 namespace impl {
 namespace cpu {
@@ -186,3 +184,4 @@ status_t gemm_f32_matmul_t::execute_ref(const exec_ctx_t &ctx) const {
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
