@@ -102,8 +102,8 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMrCm:bBrR" arg; do
         R) # add rnn support and tests
             RNN="y"
             ;;
-        P) # Primitive extra tracing: VERBOSE_PRIMITIVE_CREATE, etc
-            VERBOSE_PRIMITIVE_CREATE=y
+        P) # Primitive extra tracing verbosity, even for release build
+            VERBOSE_PRIMITIVE_SKIP=y
             ;;
         d) # [no] debug release
             DODEBUG="y"
@@ -432,7 +432,7 @@ echo "PATH $PATH"
     echo "DOJIT      $DOJIT"
     echo "USE_CBLAS  $USE_CBLAS"
     echo "USE_MKL    $USE_MKL"
-    echo "VERBOSE_PRIMITIVE_CREATE $VERBOSE_PRIMITIVE_CREATE"
+    echo "VERBOSE_PRIMITIVE_SKIP $VERBOSE_PRIMITIVE_SKIP"
     echo "DOTEST     $DOTEST"
     echo "DODEBUG    $DODEBUG"
     echo "DODOC      $DODOC"
@@ -444,15 +444,14 @@ echo "PATH $PATH"
         mkdir "${BUILDDIR}"
     fi
     cd "${BUILDDIR}"
-    function ccxx_flags {                                                                                                                                          
+    function ccxx_flags {
         export CFLAGS="${CFLAGS} $*"
         export CXXFLAGS="${CXXFLAGS} $*"
         echo "ccxx_flags CFLAGS --> ${CFLAGS}"
     }
-    # iterator debug code ?
-    #ccxx_flags -DVERBOSE_PRIMITIVE_CREATE=1
-    if [ "VERBOSE_PRIMITIVE_CREATE" == "y" ]; then
-        ccxx_flags -DVERBOSE_PRIMITIVE_CREATE=1
+    if [ "$VERBOSE_PRIMITIVE_SKIP" == "y" -o "${DODEBUG}" == "y" ]; then
+        # iterator print skipped impls if dnnl_get_verbose=3|4
+        CMAKEOPT="${CMAKEOPT} -DDNNL_VERBOSE=EXTRA"
     fi
 
     #
@@ -508,10 +507,6 @@ echo "PATH $PATH"
     else
         echo "RNN    support = default"
     fi
-
-    # iterator debug code ?
-    #export CFLAGS="${CFLAGS} -DVERBOSE_PRIMITIVE_CREATE=1"
-    #export CXXFLAGS="${CXXFLAGS} -DVERBOSE_PRIMITIVE_CREATE=1"
 
     #
     # CMAKEOPT="" # allow user to pass flag, ex. CMAKEOPT='--trace -LAH' ./build.sh
@@ -612,7 +607,6 @@ echo "PATH $PATH"
 
         # REMOVE WHEN FINISHED SX DEBUGGING
         SXOPT="${SXOPT} -g -traceback" # enable source code tracing ALWAYS
-        #SXOPT="${SXOPT} -DVERBOSE_PRIMITIVE_CREATE" # this DOES NOT COMPILE with sxcc: c++11 features missing
 
         export CFLAGS="${CFLAGS} -size_t${SIZE_T} -Kc99,gcc ${SXOPT}"
         # An object file that is generated with -Kexceptions and an object file
@@ -766,16 +760,16 @@ if [ "$BUILDOK" == "y" ]; then
         rm -f test1.log test2.log test3.log
         echo "Testing in ${BUILDDIR} ... test1"
         if [ true ]; then
-            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' MKLDNN_VERBOSE=2 ${TESTRUNNER} make VERBOSE=1 test) 2>&1 | tee "${BUILDDIR}/test1.log" || true
+            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' DNNL_VERBOSE=2 ${TESTRUNNER} make VERBOSE=1 test) 2>&1 | tee "${BUILDDIR}/test1.log" || true
         fi
         if [ $DOTEST -ge 2 ]; then
             echo "Testing ... test2"
             (cd "${BUILDDIR}" && ARGS='-VV -N' ${TESTRUNNER} make test \
-            && ARGS='-VV -R .*test_.*' MKLDNN_VERBOSE=2 ${TESTRUNNER}  make test) 2>&1 | tee "${BUILDDIR}/test2.log" || true
+            && ARGS='-VV -R .*test_.*' DNNL_VERBOSE=2 ${TESTRUNNER}  make test) 2>&1 | tee "${BUILDDIR}/test2.log" || true
         fi
         if [ $DOTEST -ge 3 ]; then
             if [ -x ./bench.sh ]; then
-                MKLDNN_VERBOSE=2 BUILDDIR=${BUILDDIR} ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
+                DNNL_VERBOSE=2 BUILDDIR=${BUILDDIR} ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
             fi
         fi
         echo "Tests done"

@@ -92,6 +92,7 @@ class concat_test : public ::testing::TestWithParam<concat_test_params> {
 
 protected:
     virtual void SetUp() {
+        ::show_dnnl_build();
         auto data_type = data_traits<data_t>::data_type;
         SKIP_IF(data_type == memory::data_type::f16
                         && get_test_engine_kind() == engine::kind::cpu,

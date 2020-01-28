@@ -18,6 +18,7 @@
 #include "gtest/gtest.h"
 
 #include "dnnl.hpp"
+
 namespace dnnl {
 
 struct test_pool_bwd_desc_t {
@@ -391,7 +392,6 @@ INSTANTIATE_TEST_SUITE_P(TestPoolingBackwardEF, pooling_bwd_test_float,
                         EXPAND_SIZES_2D(2, 4, 4, 4, 4, 4, 3, 3, 1, 1, 1, 1),
                         true, dnnl_invalid_arguments}));
 
-#if DNNL_TEST_BLOCKED_FORMATS
 INSTANTIATE_TEST_SUITE_P(TestPooling_nChw16c_padded, pooling_bwd_test_float,
         ::testing::Values(
                 pool_bwd_test_params_float {algorithm::pooling_max,
@@ -457,7 +457,6 @@ INSTANTIATE_TEST_SUITE_P(TestPooling_nChw8c_padded, pooling_bwd_test_float,
                         memory::format_tag::nChw8c, memory::format_tag::nChw8c,
                         EXPAND_SIZES_2D(
                                 4, 28, 60, 60, 31, 31, 4, 2, 1, 1, 2, 2)}));
-#endif // DNNL_TEST_BLOCKED_FORMATS
 
 CPU_INSTANTIATE_TEST_SUITE_P(TestPoolingBackwardMaxKernelSlipsToPadding,
         pooling_bwd_test_float,
@@ -470,7 +469,6 @@ CPU_INSTANTIATE_TEST_SUITE_P(TestPoolingBackwardMaxKernelSlipsToPadding,
                         memory::format_tag::nhwc, memory::format_tag::nhwc,
                         EXPAND_SIZES_2D(
                                 1, 16, 10, 10, 6, 6, 5, 5, 10, 10, 5, 5)}
-#if DNNL_TEST_BLOCKED_FORMATS
                 , pool_bwd_test_params_float {algorithm::pooling_max,
                         memory::format_tag::nChw8c, memory::format_tag::nChw8c,
                         EXPAND_SIZES_2D(
@@ -480,10 +478,8 @@ CPU_INSTANTIATE_TEST_SUITE_P(TestPoolingBackwardMaxKernelSlipsToPadding,
                         memory::format_tag::nChw16c,
                         EXPAND_SIZES_2D(
                                 1, 16, 10, 10, 6, 6, 5, 5, 10, 10, 5, 5)}
-#endif // DNNL_TEST_BLOCKED_FORMATS
                         ));
 
-#if DNNL_TEST_BLOCKED_FORMATS
 CPU_INSTANTIATE_TEST_SUITE_P(TestPooling3D_nCdhw16c, pooling_bwd_test_float,
         ::testing::Values(pool_bwd_test_params_float {algorithm::pooling_max,
                                   memory::format_tag::nCdhw16c,
@@ -524,7 +520,6 @@ CPU_INSTANTIATE_TEST_SUITE_P(TestPooling3D_nCdhw16c, pooling_bwd_test_float,
                         memory::format_tag::nCdhw16c,
                         EXPAND_SIZES_3D(2, 32, 30, 30, 30, 30, 30, 30, 3, 3, 3,
                                 1, 1, 1, 1, 1, 1)}));
-#endif // DNNL_TEST_BLOCKED_FORMATS
 
 CPU_INSTANTIATE_TEST_SUITE_P(TestPooling3D_ncdhw, pooling_bwd_test_float,
         ::testing::Values(
@@ -588,7 +583,6 @@ CPU_INSTANTIATE_TEST_SUITE_P(TestPooling3D_ndhwc, pooling_bwd_test_float,
                         EXPAND_SIZES_3D(2, 32, 30, 30, 30, 30, 30, 30, 3, 3, 3,
                                 1, 1, 1, 1, 1, 1)}));
 
-#if DNNL_TEST_BLOCKED_FORMATS
 CPU_INSTANTIATE_TEST_SUITE_P(TestPooling3D_nCdhw8c, pooling_bwd_test_float,
         ::testing::Values(pool_bwd_test_params_float {algorithm::pooling_max,
                                   memory::format_tag::nCdhw8c,
@@ -624,7 +618,6 @@ CPU_INSTANTIATE_TEST_SUITE_P(TestPooling3D_nCdhw8c, pooling_bwd_test_float,
                         memory::format_tag::nCdhw8c,
                         EXPAND_SIZES_3D(2, 32, 30, 30, 30, 30, 30, 30, 3, 3, 3,
                                 1, 1, 1, 1, 1, 1)}));
-#endif // DNNL_TEST_BLOCKED_FORMATS
 
 CPU_INSTANTIATE_TEST_SUITE_P(TestPoolingBackwardMax3DunetNCDHW,
         pooling_bwd_test_float,
@@ -700,7 +693,6 @@ CPU_INSTANTIATE_TEST_SUITE_P(TestPoolingBackwardMax, pooling_bwd_test_float,
                         memory::format_tag::nchw, memory::format_tag::nchw,
                         EXPAND_SIZES_2D(2, 4, 4, 4, 4, 4, 3, 3, 1, 1, 1, 1)}));
 
-#if DNNL_TEST_BLOCKED_FORMATS
 CPU_INSTANTIATE_TEST_SUITE_P(TestPoolingBackwardMaxBlocked,
         pooling_bwd_test_float,
         ::testing::Values(
@@ -731,9 +723,7 @@ CPU_INSTANTIATE_TEST_SUITE_P(TestPoolingBackwardMaxBlocked,
                         memory::format_tag::nChw8c, memory::format_tag::nChw8c,
                         EXPAND_SIZES_2D(
                                 122, 32, 32, 2, 32, 2, 3, 3, 1, 1, 1, 1)}));
-#endif // DNNL_TEST_BLOCKED_FORMATS
 
-#if DNNL_TEST_BLOCKED_FORMATS
 CPU_INSTANTIATE_TEST_SUITE_P(TestPoolingBackwardAvgBlocked,
         pooling_bwd_test_float,
         ::testing::Values(
@@ -1177,7 +1167,6 @@ GPU_INSTANTIATE_TEST_SUITE_P(TestPooling_ncdhw, pooling_bwd_test_float,
                         memory::format_tag::nCdhw16c,
                         EXPAND_SIZES_3D(3, 32, 14, 14, 14, 14, 14, 14, 3, 3, 3,
                                 1, 1, 1, 1, 1, 1)}));
-#endif // DNNL_TEST_BLOCKED_FORMATS
 
 } // namespace dnnl
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

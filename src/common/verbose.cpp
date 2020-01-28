@@ -51,7 +51,8 @@
 #include "ocl/verbose.hpp"
 #endif
 
-//@{ DNNL_ISA info via mayiuse scan in `char* get_isa_info()`
+/// @defgroup DNNL_ISA_strings via mayiuse scan during `char* get_isa_info()`
+//@{
 #define ISA_ANY "Intel 64 (jit allowed)"
 #define SSE41 "Intel SSE4.1"
 #define AVX "Intel AVX"
@@ -78,7 +79,7 @@ namespace impl {
 
 static setting_t<int> verbose {0};
 int get_verbose() {
-#if !defined(DISABLE_VERBOSE)
+#if DNNL_VERBOSE
     if (!verbose.initialized()) {
         const int len = 2;
         char val[len] = {0};
@@ -102,10 +103,6 @@ int get_verbose() {
     }
 #endif
     return verbose.get();
-}
-
-int dnnl_get_verbose() {
-    return dnnl::impl::verbose.get();
 }
 
 double get_msec() {
@@ -149,7 +146,7 @@ const char *get_isa_info() {
 
 /* init_info section */
 namespace {
-#if !defined(DISABLE_VERBOSE)
+#if DNNL_VERBOSE
 #define DNNL_VERBOSE_DAT_LEN 256
 #define DNNL_VERBOSE_ATTR_LEN 128
 #define DNNL_VERBOSE_AUX_LEN 384
@@ -908,7 +905,7 @@ static void init_info_resampling(pd_t *s, char *buffer) {
 
 #undef DPRINT
 
-#else // !defined(DISABLE_VERBOSE)
+#else // DNNL_VERBOSE
 
 #define DEFINE_STUB(name) \
     template <typename pd_t> \
@@ -935,7 +932,7 @@ DEFINE_STUB(shuffle);
 DEFINE_STUB(softmax);
 #undef DEFINE_STUB
 
-#endif // !defined(DISABLE_VERBOSE)
+#endif // DNNL_VERBOSE
 } // namespace
 
 void init_info(batch_normalization_pd_t *s, char *b) {
@@ -1002,6 +999,10 @@ dnnl_status_t dnnl_set_verbose(int level) {
     if ((level&0x3) > 2) return invalid_arguments; // bit 0-1 as usual
     dnnl::impl::verbose.set(level);
     return success;
+}
+
+int dnnl_get_verbose() {
+    return dnnl::impl::verbose.get();
 }
 
 const dnnl_version_t *dnnl_version() {

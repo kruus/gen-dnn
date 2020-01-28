@@ -37,9 +37,9 @@
 //
 #if DNNL_TARGET_VANILLA
 #define TARGET_VANILLA
-#warning "compat TARGET_VANILLA defined"
+//#warning "compat TARGET_VANILLA defined"
 #else
-#warning "TARGET_VANILLA undefined"
+//#warning "TARGET_VANILLA undefined"
 #endif
 
 /// @defgroup cpu_target DNNL cpu and JIT macros
@@ -102,54 +102,54 @@
 #if DNNL_ISA == DNNL_ISA_VANILLA
 #if DNNL_TARGET_X86
 #define JITFUNCS JITFUNCS_VANILLA
-#warning "vanilla compat x86 JITFUNCS_NONE"
+//#warning "vanilla compat x86 JITFUNCS_NONE"
 #elif DNNL_TARGET_VE
 #define JITFUNCS JITFUNCS_VANILLA
-#warning "vanilla compat ve JITFUNCS_VANILLA"
+//#warning "vanilla compat ve JITFUNCS_VANILLA"
 #endif // DNNL_TARGET
 
 #elif DNNL_ISA == DNNL_ISA_ANY
 #if DNNL_TARGET_X86
 #define JITFUNCS JITFUNCS_ANY
-#warning "any compat x86 JITFUNCS_ANY"
+//#warning "any compat x86 JITFUNCS_ANY"
 #elif DNNL_TARGET_VE
 #define JITFUNCS JITFUNCS_VANILLA
-#warning "any compat ve JITFUNCS_VANILLA"
+//#warning "any compat ve JITFUNCS_VANILLA"
 #endif // DNNL_TARGET
 
 #elif DNNL_ISA == DNNL_ISA_ALL
 #if DNNL_TARGET_X86
 #define JITFUNCS JITFUNCS_AVX512
-#warning "all compat x86 JITFUNCS_AVX512"
+//#warning "all compat x86 JITFUNCS_AVX512"
 #elif DNNL_TARGET_VE
 #define JITFUNCS JITFUNCS_VE /* ? */
-#warning "all compat ve JITFUNCS_VE /* ? */"
+//#warning "all compat ve JITFUNCS_VE /* ? */"
 #endif // DNNL_TARGET
 
 #elif DNNL_ISA == DNNL_ISA_SSE41 /* || DNNL_ISA == DNNL_ISA_SSE42 ? */
 #define JITFUNCS JITFUNCS_SSE41
-#warning "compat JITFUNCS_SSE41"
+//#warning "compat JITFUNCS_SSE41"
 #elif DNNL_ISA == DNNL_ISA_AVX
 #define JITFUNCS JITFUNCS_AVX
-#warning "compat JITFUNCS_AVX"
+//#warning "compat JITFUNCS_AVX"
 #elif DNNL_ISA == DNNL_ISA_AVX2
 #define JITFUNCS JITFUNCS_AVX2
-#warning "compat JITFUNCS_AVX2"
+//#warning "compat JITFUNCS_AVX2"
 #elif DNNL_ISA == DNNL_ISA_AVX512_MIC
 #define JITFUNCS JITFUNCS_AVX2 /* not needed ? */
-#warning "compat JITFUNCS_AVX2 /* not needed ? */"
+//#warning "compat JITFUNCS_AVX2 /* not needed ? */"
 #elif DNNL_ISA == DNNL_ISA_AVX512_MIC_4OPS
 #define JITFUNCS JITFUNCS_AVX2 /* not needed ? */
-#warning "compat JITFUNCS_AVX2 /* not needed ? */"
+//#warning "compat JITFUNCS_AVX2 /* not needed ? */"
 #elif DNNL_ISA == DNNL_ISA_AVX512_CORE
 #define JITFUNCS JITFUNCS_AVX512
-#warning "compat JITFUNCS_AVX512"
+//#warning "compat JITFUNCS_AVX512"
 #elif DNNL_ISA == DNNL_ISA_AVX512_CORE_VNNI
 #define JITFUNCS JITFUNCS_AVX512
-#warning "compat JITFUNCS_AVX512"
+//#warning "compat JITFUNCS_AVX512"
 #elif DNNL_ISA == DNNL_ISA_AVX512_CORE_BF16
 #define JITFUNCS JITFUNCS_AVX512
-#warning "compat JITFUNCS_AVX512"
+//#warning "compat JITFUNCS_AVX512"
 #else
 #error "unhandled DNNL_ISA value for compatibility setting of JITFUNCS"
 #endif
@@ -158,7 +158,7 @@
  * available for your DNNL_CPU target
  */
 #if !defined(TARGET_VANILLA) && !defined(JITFUNCS)
-#warning "neither TARGET_VANILLA nor JITFUNCS was set"
+//#warning "neither TARGET_VANILLA nor JITFUNCS was set"
 #if DNNL_CPU == DNNL_CPU_X86
 #define JITFUNCS JITFUNCS_AVX512
 #elif DNNL_CPU == DNNL_CPU_VE
@@ -166,10 +166,10 @@
 #endif
 #endif
 
-#warning "compat-mode JITFUNCS was set based on DNNL_ISA value"
+//#warning "compat-mode JITFUNCS was set based on DNNL_ISA value"
 
 #if defined(TARGET_VANILLA) && !defined(JITFUNCS)
-#warning "TARGET_VANILLA --> auto JITFUNCS"
+//#warning "TARGET_VANILLA --> auto JITFUNCS"
 /** \addto group cpu_target
  * Here we expand on cmake variables transmitted to \ref dnnl_config.h.
  * `cmake/options.cmake` describes various build options.
@@ -221,15 +221,15 @@
 #if defined(JITFUNCS) && !defined(TARGET_VANILLA)
 #if JITFUNCS == JITFUNCS_NONE
 #define TARGET_VANILLA
-#warning "JITFUNCS_NONE implies TARGET_VANILLA"
+//#warning "JITFUNCS_NONE implies TARGET_VANILLA"
 #elif JITFUNCS == JITFUNCS_VANILLA
-#warning "JITFUNCS_VANILA implies TARGET_VANILLA"
+//#warning "JITFUNCS_VANILA implies TARGET_VANILLA"
 #define TARGET_VANILLA
 #elif JITFUNCS == JITFUNCS_VE
-#warning "JITFUNCS_VE implies TARGET_VANILLA"
+//#warning "JITFUNCS_VE implies TARGET_VANILLA"
 #define TARGET_VANILLA
 #else
-#warning "JITFUNCS --> ** NOT DEFINING ** TARGET_VANILLA"
+//#warning "JITFUNCS --> ** NOT DEFINING ** TARGET_VANILLA"
 #endif
 #endif
 
@@ -237,7 +237,7 @@
 // set DNNL_ENABLE_XBYAK = 0 or 1 (shorthand)
 #if (JITFUNCS >= JITFUNCS_ANY && JITFUNCS <= JITFUNCS_AVX2)
 #define DNNL_ENABLE_XBYAK 1
-#warning "JITFUNCS value implis need x86 xbyak jit support"
+//#warning "JITFUNCS value implis need x86 xbyak jit support"
 #if defined(TARGET_VANILLA)
 #error "-DTARGET_VANILLA is incompatible with JITFUNCS being one of the x86 SIMD types"
 #endif
@@ -254,7 +254,7 @@
 #endif
 
 #if JITFUNCS == 0
-#warning "JITFUNCS == 0"
+//#warning "JITFUNCS == 0"
 #endif
 
 #if defined(__x86_64__) || defined(_M_X64)
@@ -269,9 +269,9 @@
 
 // sanity checks...
 #ifdef TARGET_VANILLA
-#warning "cpu_target DONE TARGET_VANILLA defined"
+//#warning "cpu_target DONE TARGET_VANILLA defined"
 #else
-#warning "cpu_target DONE TARGET_VANILLA undefined"
+//#warning "cpu_target DONE TARGET_VANILLA undefined"
 #endif
 
 // compat mode shortcuts, easier to read
@@ -291,29 +291,29 @@
 #endif
 #if 1 // verbose compiler warnings, for debug
 #if TARGET_X86
-#warning "cpu target TARGET_X86 !"
+//#warning "cpu target TARGET_X86 !"
 #endif
 #if TARGET_X86_JIT
-#warning "cpu target TARGET_X86_JIT !"
+//#warning "cpu target TARGET_X86_JIT !"
 #endif
 #if TARGET_VE
-#warning "cpu target TARGET_VE !"
+//#warning "cpu target TARGET_VE !"
 #endif
 #if TARGET_VEDNN
-#warning "cpu target TARGET_VEDNN !"
+//#warning "cpu target TARGET_VEDNN !"
 #endif
 #if TARGET_VEJIT
-#warning "cpu target TARGET_VEJIT !"
+//#warning "cpu target TARGET_VEJIT !"
 #endif
 #if DNNL_ENABLE_RNN
-#warning "DNNL_ENABLE_RNN is TRUE"
+//#warning "DNNL_ENABLE_RNN is TRUE"
 #else
-#warning "DNNL_ENABLE_RNN is FALSE"
+//#warning "DNNL_ENABLE_RNN is FALSE"
 #endif
 #if DNNL_ENABLE_BFLOAT16
-#warning "DNNL_ENABLE_BLOAT16 is TRUE"
+//#warning "DNNL_ENABLE_BLOAT16 is TRUE"
 #else
-#warning "DNNL_ENABLE_BLOAT16 is FALSE"
+//#warning "DNNL_ENABLE_BLOAT16 is FALSE"
 #endif
 #endif // verbose compiler warnings
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

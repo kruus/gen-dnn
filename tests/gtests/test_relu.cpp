@@ -14,8 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "gtest/gtest.h"
 #include "dnnl_test_common.hpp"
+#include "gtest/gtest.h"
 
 #include "mkldnn.hpp"
 

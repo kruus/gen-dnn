@@ -71,6 +71,9 @@ struct vednnx_convolution_fwd_t: public cpu_primitive_t {
             using namespace data_type;
             assert(this->engine()->kind() == engine_kind::cpu);
             Consistency ok("ve_conv init"); // default here is never-verbose, SCHK
+            // SCHKVV always prints failures, while
+            // SCHKV is active only with `cmake -DDNNL_VERBOSE=EXTRA` and dnnl_get_verbose>=3
+            // for Debug build type, -DDNNL_VERBOSE=EXTRA is the default.
 #define AND_(...) SCHKVV(ok,__VA_ARGS__)
             AND_(this->set_default_params() == status::success);
             AND_(utils::one_of(this->cdesc_().prop_kind, forward_training,

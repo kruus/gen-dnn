@@ -127,8 +127,10 @@ enable_testing()
 
 include_directories(include)
 
-message(STATUS "CMAKE_SYSTEM_PROCESSOR is ${CMAKE_SYSTEM_PROCESSOR}")
-message(STATUS "DNNL_CPU               is ${DNNL_CPU}")
+# Prepare build variables for export to config.h, and format a final
+# DNNL_BUILD_TARGET string recording non-default build options.
+include("cmake/options-config.cmake")
+message(STATUS "DNNL_BUILD_STRING ${DNNL_BUILD_STRING}")
 configure_file(
     "${PROJECT_SOURCE_DIR}/include/dnnl_config.h.in"
     "${PROJECT_BINARY_DIR}/include/dnnl_config.h"

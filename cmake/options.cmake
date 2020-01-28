@@ -27,7 +27,7 @@ set(options_cmake_included true)
 # ===========
 
 #
-# Useful constants
+# Useful constants (also shared to dnnl_config.h)
 #
 # DNNL_CPU is directly determined from CMAKE_SYSTEM_PROCESSOR, and is
 # controlled by your cmake toolchain, or your CC/CXX environment.
@@ -42,7 +42,7 @@ set(DNNL_ISA_VANILLA 1)
 #set(DNNL_ISA_ANY     2)  # value changes below, once cpu is known
 #set(DNNL_ISA_ALL     3)  # value changes below, once cpu is known
 # x86-specific JIT -- FIXME jit_uni drivers might bypass this XXX
-set(DNNL_ISA_X86                10)
+set(DNNL_ISA_X86                10) # here only for completeness
 set(DNNL_ISA_SSE41              11)
 set(DNNL_ISA_AVX                12)
 set(DNNL_ISA_AVX2               13)
@@ -107,9 +107,35 @@ message(STATUS "  DNNL_ISA=${DNNL_ISA} to DNNL_ISA_VALUE=DNNL_ISA_${DNNL_ISA}=${
 # Features
 # ========
 
-option(DNNL_VERBOSE
-    "allows DNNL be verbose whenever DNNL_VERBOSE
-    environment variable set to 1" ON) # enabled by default
+#option(DNNL_VERBOSE
+#    "allows DNNL be verbose whenever DNNL_VERBOSE
+#    environment variable set to 1" ON) # enabled by default
+#option(DNNL_VERBOSE_PRIMITIVE_CREATE
+#    "Add code to cpu_engine tracing primitive creation sequence.
+#    This adds some overhead to primitive creation.
+#    Todo: if DNNL_VERBOSE, allow dnnl_set_verbose() to control
+#    verbosity of these debug messages" ON 
+#    )
+# NEW: string (NONE or any false value) | "DEFAULT" | "EXTRA"
+set(DEFAULT_DNNL_VERBOSE "DEFAULT")
+if(CMAKE_BUILD_TYPE MATCHES "[Dd]ebug")
+    set(DEFAULT_DNNL_VERBOSE "EXTRA")
+endif()
+set(DNNL_VERBOSE "${DEFAULT_DNNL_VERBOSE}" CACHE STRING
+    "Possible values: NONE, DEFAULT, EXTRA.
+
+    NONE (or any false value) removes support for DNNL Verbose Mode.
+    
+    DEFAULT allows DNNL to respect DNNL_VERBOSE environment
+    variable or dnnl_set_verbose() calls.  Levels 0[default],
+    1, 2 become active.  Adds some runtime overhead.
+    Release mode build default to DEFAULT verbosity.
+    
+    EXTRA adds even more runtime overhead, and adds vebose levels 3,4(,5?).
+    These also trace unsuccessful cpu_engine primitive creation.
+    Some implementations may print a reason they were skipped.
+    Debug mode builds default to EXTRA verbosity."
+    )
 
 option(DNNL_ENABLE_CONCURRENT_EXEC
     "disables sharing a common scratchpad between primitives.
@@ -132,7 +158,11 @@ option(DNNL_ENABLE_MAX_CPU_ISA
 # =============================
 
 set(DNNL_LIBRARY_TYPE "SHARED" CACHE STRING
-    "specifies whether DNNL library should be SHARED or STATIC")
+    "specifies whether DNNL library should be SHARED or STATIC"
+    ) # default SHARED
+if(NOT ${DNNL_LIBRARY_TYPE} MATCHES "^(SHARED|STATIC)$")
+    message(FATAL_ERROR "Unsupported ${DNNL_LIBRARY_TYPE} variant: DNNL_ISA=${DNNL_ISA}")
+endif()
 option(DNNL_BUILD_EXAMPLES "builds examples"  ON)
 option(DNNL_BUILD_TESTS "builds tests" ON)
 option(DNNL_BUILD_FOR_CI "specifies whether DNNL library should be built for CI" OFF)
@@ -142,11 +172,16 @@ set(DNNL_INSTALL_MODE "DEFAULT" CACHE STRING
     "specifies installation mode; supports DEFAULT or BUNDLE.
 
     When BUNDLE option is set DNNL will be installed as a bundle
-    which contains examples and benchdnn.")
+    which contains examples and benchdnn."
+    )
+if(NOT ${DNNL_INSTALL_MODE} MATCHES "^(DEFAULT|BUNDLE)$")
+    message(FATAL_ERROR "Unsupported ${DNNL_INSTALL_MODE} variant: DNNL_ISA=${DNNL_ISA}")
+endif()
 
 set(DNNL_CODE_COVERAGE "OFF" CACHE STRING
     "specifies which supported tool for code coverage will be used
-    Currently only gcov supported")
+    Currently only gcov supported"
+    )
 if(NOT ${DNNL_CODE_COVERAGE} MATCHES "^(OFF|GCOV)$")
     message(FATAL_ERROR "Unsupported code coverage tool: ${DNNL_CODE_COVERAGE}")
 endif()
@@ -172,7 +207,9 @@ set(DNNL_ARCH_OPT_FLAGS "HostOpts" CACHE STRING
 
     If the library is to be built for generic architecture (e.g. built by a
     Linux distributive maintainer) one may want to specify DNNL_ARCH_OPT_FLAGS=\"\"
-    to not use any host specific instructions")
+    to not use any host specific instructions"
+    )
+message(STATUS "DNNL_ARCH_OPT_FLAGS ${DNNL_ARCH_OPT_FLAGS}")
 
 # ======================
 # Profiling capabilities
@@ -218,9 +255,17 @@ set(OPENCLROOT "" CACHE STRING
     "path to Intel(R) SDK for OpenCL(TM).
     Use this option to specify custom location for OpenCL.")
 
-set(DNNL_CPU_EXTERNAL_GEMM "NONE" CACHE STRING
-    "Use external GEMM (default NONE).  Supports MKL or CBLAS.  Typical use is
-    to allow in2col-gemm convolutions when X86 jit is unavailable"
+    set(DNNL_CPU_EXTERNAL_GEMM "NONE" CACHE STRING
+    "NONE uses an x86 jit gemm, or else a builtin portable gemm.
+    Note that DEFAULT will provide a gemm implementation for non-jit
+    or non-x86 targets. Other values are: MKL, CBLAS.
+    
+    MKL can be used for performance comparisons and may support gemm
+    operations with different data types/formats.
+
+    A native CBLAS might provide a performance boost when cross-compiling.
+    (For x86 vanilla build or cross-compilation, you may also investigate
+    changing DNNL_ARCH_OPT_FLAGS or playing with gemm:ref tuning)"
     )
 if(NOT ${DNNL_CPU_EXTERNAL_GEMM} MATCHES "^(NONE|MKL|CBLAS)$")
     message(FATAL_ERROR "Unsupported DNNL_CPU_EXTERNAL_GEMM value")
@@ -245,9 +290,11 @@ set(DNNL_USE_CLANG_SANITIZER "" CACHE STRING
     Memory: enables MemorySanitizer
     MemoryWithOrigin: enables MemorySanitizer with origin tracking
     Undefined: enables UndefinedBehaviourSanitizer
-    This feature is experimental and is only available on Linux.")
+    This feature is experimental and is only available on Linux."
+    )
 
-option(_DNNL_USE_MKL "use BLAS functions from Intel MKL" OFF)
+# now handled via DNNL_CPU_EXTERNAL_GEMM option, above
+#option(_DNNL_USE_MKL "use BLAS functions from Intel MKL" OFF)
 
 # ==========================================
 # Development work helpers (expert use only)
@@ -266,8 +313,8 @@ if(DNNL_CPU EQUAL DNNL_CPU_X86)
         set(DNNL_DEFAULT_ENABLE_RNN 0) # FIXME - there is some jit entanglement
     endif()
 elseif(DNNL_CPU EQUAL DNNL_CPU_VE)
-    message(STATUS "non-x86 compile wil disable BFLOAT16 and RNN support (for now)")
-    set(DNNL_DEFAULT_ENABLE_BFLOAT16 1) # initially 0 for porting
+    message(STATUS "non-x86 compile wil disable RNN support (for now)")
+    set(DNNL_DEFAULT_ENABLE_BFLOAT16 0) # initially 0 for porting
     set(DNNL_DEFAULT_ENABLE_RNN 0)      # initially 0 for porting
 else() # unknown? try enabling everything
 endif()
@@ -277,16 +324,6 @@ option(DNNL_ENABLE_BFLOAT16
 option(DNNL_ENABLE_RNN
     "Enable rnn support (default ${DNNL_DEFAULT_ENABLE_RNN}, for now requires x86 jit)"
     ${DNNL_DEFAULT_ENABLE_RNN})
-# So dnnl_config.h always defines these as 0 or 1 values...
-MACRO(set_01 var)
-    if(${ARGN})
-        set(${var} 1)
-    else()
-        set(${var} 0)
-    endif()
-endmacro()
-set_01(DNNL_ENABLE_BFLOAT16_01 ${DNNL_ENABLE_BFLOAT16})
-set_01(DNNL_ENABLE_RNN_01      ${DNNL_ENABLE_RNN})
 
 if(0)
 # ==============================================
@@ -313,3 +350,5 @@ if(DNNL_CPU EQUAL 1 AND TARGET_VANILLA) # x86 vanilla
     set(JITFUNCS -1) # JITFUNCS_NONE
 endif()
 endif()
+
+message(STATUS "cmake build target options: ${DNNL_BUILD_STRING}")

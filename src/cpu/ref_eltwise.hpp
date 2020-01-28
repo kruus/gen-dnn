@@ -70,14 +70,33 @@ struct ref_eltwise_fwd_t : public primitive_impl_t {
 
             const bool use_generic = !use_dense_ && !use_nCspBc_padded_;
 
+#if 0
             bool ok = true && is_fwd()
                     && everyone_is(data_type, desc()->data_desc.data_type)
+                    // actually bf16 gtests fail above line.
+                    // Why would data_desc.data_type not match ?
+                    // I guess src is always f32?
+#if DNNL_ENABLE_BFLOAT16
                     /*bf16<->f32 cvt operators don't work on non-avx512_core*/
-                    && IMPLICATION(
-                            desc()->data_desc.data_type == data_type::bf16,
-                            mayiuse(avx512_core))
+                    //&& IMPLICATION(
+                    //        desc()->data_desc.data_type == data_type::bf16,
+                    //        mayiuse(avx512_core))
+                    // actually 
+#endif // DNNL_ENABLE_BFLOAT16
                     && IMPLICATION(use_generic, one_of(src_d.ndims(), 4, 5))
                     && attr()->has_default_values();
+#else
+#define AND_(...) SCHKV(ok,__VA_ARGS__)
+            Consistency ok("\nref_eltwise_fwd_init !ok :");
+            AND_(is_fwd());
+            AND_(everyone_is(data_type, desc()->data_desc.data_type));
+            AND_(IMPLICATION(
+                    desc()->data_desc.data_type == data_type::bf16,
+                    mayiuse(avx512_core)));
+            AND_(IMPLICATION(use_generic, one_of(src_d.ndims(), 4, 5)));
+            AND_(attr()->has_default_values());
+#undef AND_
+#endif
             if (!ok) return status::unimplemented;
 
             return status::success;
@@ -119,12 +138,14 @@ struct ref_eltwise_bwd_t : public primitive_impl_t {
             bool ok = true && !is_fwd()
                     && everyone_is(data_type, desc()->data_desc.data_type,
                             desc()->diff_data_desc.data_type)
+#if DNNL_ENABLE_BFLOAT16
                     /*bf16<->f32 cvt operators don't work on non-avx512_core*/
                     && IMPLICATION(
                             desc()->data_desc.data_type == data_type::bf16,
                             mayiuse(avx512_core))
                     && set_default_formats_common()
                     && attr()->has_default_values();
+#endif // DNNL_ENABLE_BFLOAT16
             if (!ok) return status::unimplemented;
 
             auto diff_dst_d = memory_desc_wrapper(diff_dst_md());

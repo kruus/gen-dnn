@@ -57,8 +57,20 @@
 
 // clang-format off
 
-/// @defgroup cmake_build cmake build options
+/// @addtogroup cmake_build cmake build options
 //@{
+
+///@addtogroup cmake_supported cmake supported options
+/// Not all options are exposed as config variables, however all
+/// nonstandard supported build options should appear in DNNL_BUILD_STRING
+//@{
+
+/// [info] DNNL cmake Build Target String.
+/// This also records non-standard 'unsupported' options
+/** \note some options may be exposed only in the build string.
+ * Some build options will appear only via the build string. */
+#cmakedefine DNNL_BUILD_STRING "${DNNL_BUILD_STRING}"
+
 /// DNNL CPU threading runtime
 #cmakedefine DNNL_CPU_THREADING_RUNTIME DNNL_RUNTIME_${DNNL_CPU_THREADING_RUNTIME}
 
@@ -68,42 +80,99 @@
 /// DNNL GPU engine runtime
 #cmakedefine DNNL_GPU_RUNTIME DNNL_RUNTIME_${DNNL_GPU_RUNTIME}
 
-/** @defgroup CPU_constants CPU targets*/
-/// DNNL_CPU in \ref dnnl_config.h values correspond to CMAKE_SYSTEM_PROCESSOR.
-//@{
-/// DNNL CPU build target 1,2,etc = x86, ve, etc.
-#cmakedefine DNNL_CPU ${DNNL_CPU}
-///@}
+/// DNNL verbosity, from `cmake -DDNNL_VERBOSE={NONE|DEFAULT|EXTRA}`.
+/// This is '1' at levels above NONE, which allows verbosity
+/// \ref dev-guide-verbose "levels 0[default, quiet], 1 and 2".
+#define DNNL_VERBOSE ${_DNNL_VERBOSE}
 
-/// @defgroup cpu_isa cmake options communicating cpu-specific build options
-/// cpu target variants expand capability from VANILLA-->ANY-->(cpu-specific)-->ALL.
-//@{
-#cmakedefine DNNL_ISA ${DNNL_ISA_VALUE}
 //@}
 
-/// enable bfloat16 (for debug -- x86 jit releases will always have this enabled)
+/// 
+/// @addtogroup cmake_extra Other building options (subject to change)
+//@{
+
+/** DNNL CPU build target 1,2,etc = x86, ve, etc.
+ * Cmake sets this automatically based on CMAKE_SYSTEM_PROCESSOR.
+ * So almost always it will have the value \c DNN_CPU_X86.
+ */
+#cmakedefine DNNL_CPU ${DNNL_CPU}
+
+/// cpu target expand capability from VANILLA-->ANY-->(cpu-specific)-->ALL.
+/// The cmake default is -DDNNL_ISA=ALL, which means "provide full support".
+/// During compilation `\#if DNNL_ISA == DNNL_ISA_ALL` will be true.
+/** \internal
+ * This may prune \b some implementations from \c cpu_engine, but is non-normative.
+ * For example, jit\_uni\_ drivers may circumvent this, and even
+ * \ref dispatcher_control.md may not always suffice to force particular
+ * code variants to run.
+ */
+#cmakedefine DNNL_ISA ${DNNL_ISA_VALUE}
+
+/// [debug] enable bfloat16 (for debug -- x86 jit releases will always
+/// have this enabled). \deprecated
+/** \internal
+ * Sometimes useful for pruning gtests, but future code should
+ * prefer to do the weeding at runtime, in Setup().  Many times,
+ * it is OK to define the bfloat16 functions, but they will just
+ * return \e unimplemented or such. */
 #define DNNL_ENABLE_BFLOAT16 ${DNNL_ENABLE_BFLOAT16_01}
 
-/// enable rnn code (for debug -- x86 jit releases will always have this enabled)
+/// [debug] some targets cannot compile a correct ref impl yet.
 #define DNNL_ENABLE_RNN ${DNNL_ENABLE_RNN_01}
+
+/// [debug] trace cpu_engine 'create' attempts.
+/** Activates extra code when built with `cmake -DDNNL_VERBOSE=EXTRA`,
+ * which allows extra output at additional verbosity levels
+ * \ref dev-guide-verbose "levels 3 and 4".
+ *
+ * This allows tracing how cpu_engine skips various impls as it tries
+ * to create a primitive. Primitive creation will slow down even more.
+ * \ref consistency.hpp can help pinpoint the precise reason a
+ * particular init() failed. */
+#define DNNL_VERBOSE_EXTRA ${_DNNL_VERBOSE_EXTRA}
+
+/// [at own risk] gemm via MKL library.
+/// May provide support for packed and integer gemm variations not yet
+/// available via jit.
+#cmakedefine DNNL_USE_MKL ${_DNNL_USE_MKL}
+
+/// [at own risk] gemm via OS CBLAS (also implied by DNNL_USE_MKL)
+/// New: dnnl now comes with a reasonable reference gemm impl now,
+///      capable of running the tests in reasonable time frame,
+///      even without having cmake look for a cblas library.
+#cmakedefine DNNL_USE_CBLAS ${_DNNL_USE_CBLAS}
+
+//@}
 //@}
 
-/// @defgroup cmake_build_constants cmake build constants
-//@{ supported CPUs
+/// @addtogroup cmake_build_constants cmake build constants
+//@{
+/// @group
+/// target processor
+//@{
 #cmakedefine DNNL_CPU_X86 ${DNNL_CPU_X86}
 #cmakedefine DNNL_CPU_VE  ${DNNL_CPU_VE}
 //#cmakedefine DNNL_CPU_SX  ${DNNL_CPU_SX} /* deprecated */
 //@}
 
-///@{ cpu_isa cmake options describe flavors of the cpu build
-/// cmake strings tend to follow the DNNL_MAX_CPU_ISA cpu dispatch names.
-/// however for cpp, these defines are simple integers.
-///@{ all cpus support a few common settings.
+/// @group
+/// CPU_ISA_FOO cmake options describe flavors of the cpu build.
+/// May also serve to add \e extra capabilities like JIT,
+/// or external library features to the basic VANILLA builds.
+///@{
+/// @group
+/// all cpus support a few common settings.
+///@{
+/// Means "C/C++ code only, please".
 #cmakedefine DNNL_ISA_VANILLA ${DNNL_ISA_VANILLA}
-#cmakedefine DNNL_ISA_ANY     ${DNNL_ISA_ANY}  // least capable, maybe even same as vanilla
-#cmakedefine DNNL_ISA_ALL     ${DNNL_ISA_ALL}  // pull out all the stops, all options allowed
+/** Also provides a builtin gemm reference implementaion, so many
+ * common convolutions can run at decent speed during tests. */
+#cmakedefine DNNL_ISA_ANY     ${DNNL_ISA_ANY}
+/// pull out all the stops, all options & external support allowed.
+#cmakedefine DNNL_ISA_ALL     ${DNNL_ISA_ALL}
 ///@}
-///@{ x86 isa settings govern jit instruction set support
+/// @group x86 isa settings govern jit instruction set support
+///@{
 #cmakedefine DNNL_ISA_X86              ${DNNL_ISA_X86}
 #cmakedefine DNNL_ISA_SSE41            ${DNNL_ISA_SSE41}
 #cmakedefine DNNL_ISA_AVX              ${DNNL_ISA_AVX}
@@ -115,7 +184,9 @@
 #cmakedefine DNNL_ISA_AVX512_CORE_BF16 ${DNNL_ISA_AVX512_CORE_BF16}
 #cmakedefine DNNL_ISA_X86_ALL          ${DNNL_ISA_X86_ALL}
 ///@}
-///@{ ve isa settings govern jit instruction set support
+/// @group
+/// ve isa settings govern jit instruction set support
+///@{
 #cmakedefine DNNL_ISA_VE     ${DNNL_ISA_VE}    // equiv to vanilla
 #cmakedefine DNNL_ISA_VEDNN  ${DNNL_ISA_VEDNN}
 #cmakedefine DNNL_ISA_VEJIT  ${DNNL_ISA_VEJIT}

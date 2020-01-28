@@ -2918,6 +2918,9 @@ dnnl_status_t DNNL_API dnnl_stream_destroy(dnnl_stream_t stream);
 ///     success.
 dnnl_status_t DNNL_API dnnl_set_verbose(int level);
 
+/// Retrieve current dnnl verbosity, set from environment or `dnnl_set_verbose`
+int DNNL_API dnnl_get_verbose();
+
 /// Configures dumping of JIT-generated code.
 ///
 /// @note

@@ -1,15 +1,15 @@
 #ifndef CONSISTENCY_HPP
 #define CONSISTENCY_HPP
 /** \file
- * We provide macros for consistency checks that are:
+ * We provide macros for short-circuited consistency `init()` checks that are:
  *
- * - quiet [default]
- * - verbose
- *   - print failure location in debug mode,
- *   - for -DNDEBUG compile with -DDISABLE_VERBOSE, never print
- *   - for -DNDEBUG compile o/w, print if bit 3 is set: `dnnl_get_verbose() & 0x04`
- *     - this is a questionable extension of mkldnn_set_verbose(int level)
- * - very verbose [print failure location even if -DNDEBUG
+ * - SCHKV
+ *   - fast checks, much like original init() logic, never printing
+ * - SCHKV
+ *   - for `cmake -DDNNL_VERBOSE=EXTRA` (or Debug build type),
+ *     print failed checks iff dnnl_get_verbose() >= 3
+ * - SCHKVV
+ *   - very verbose [print failure location always]
  *
  * For optimized compile (-DNEBUG) default must be to never print stuff,
  * but for temporary file scope debug you can choose a more verbose macro
@@ -29,7 +29,7 @@ struct CondLoc { // Quiet default: never print, so struct is simpler
 //     for futher downstream use?   Ex. evaluate condition *and* store (say) mkldnn_status?
 struct CondLocV { // CondLoc with "verbose in debug compile" hint
     bool cond;
-#if !defined(DISABLE_VERBOSE)
+#if DNNL_VERBOSE_EXTRA
     char const* file;
     int line;
     char const* cond_msg;
@@ -46,7 +46,7 @@ struct CondLocVV { // CondLoc with "verbose always" hint (even in optimized -DND
 //@{
 #define COND_LOC(...) CondLoc{bool{!!(__VA_ARGS__)}}
 
-#if !defined(DISABLE_VERBOSE)
+#if DNNL_VERBOSE_EXTRA
 /** verbose for debug: always, for opt: use \c (*dnnl_get_verbose() & 0x04) flag */
 #define COND_LOCV(...) CondLocV{bool{!!(__VA_ARGS__)}, __FILE__, __LINE__, #__VA_ARGS__}
 #else
@@ -89,15 +89,9 @@ struct Consistency {
     /** Using '&& COND_LOCV(cond)' prints in debug mode [not if -DNDEBUG] */
     Consistency& operator &&(CondLocV const& cl){
         var = var && cl.cond;
-        // 1. always print failures in debug compile.
-        // 2. if -DNDEBUG and not -DDISABLE_VERBOSE,
-        //    then check 3rd LSB of mkldnn runtime verbosity
-#if !defined(DISABLE_VERBOSE)
+#if DNNL_VERBOSE_EXTRA
         if (!cl.cond
-#if defined(NDEBUG)
-                // optimized compile can still use MKLDNN_VERBOSE=N bit 2 to to print consistency failures
-                && (dnnl_get_verbose() & 0x04) // added a 3rd bit
-#endif
+                && dnnl_get_verbose() >= 3
            ){
             fprintf(stdout," %s [%s:%d] %s\n",
                     pfx, /*nclause,*/ cl.file, cl.line, cl.cond_msg);
@@ -129,6 +123,7 @@ struct Consistency {
  *        A=All (run all checks, do not short-circuit, might be dangerous)
  *        quiet is default (never print)
  *        V=Verbose[print unless -DNDEBUG=1].
+ *           new: 1 'V" means print according to dnnl_get_verbose()>=3
  *        V=Verbose[even print fails for -DNDEBUG=1].
  * suggested usage:
  * ```
@@ -173,14 +168,18 @@ struct Consistency {
 #define SCHKV(OK,...) (bool)((!OK)? OK: OK && COND_LOCV(__VA_ARGS__))
 #define SCHKVV(OK,...) (bool)((!OK)? OK: OK && COND_LOCVV(__VA_ARGS__))
 
-/** Often \c Consistency variable is named 'ok',
- * so provide a default macro verbose for debug compilation.
+/** A sample consistency macro.
+ * For a \c Consistency variable named 'ok',
+ * this short-circuiting check macro provides verbose failures for Debug
+ * builds when dnnl_get_verbose() is >= 3.
  * NOTE: please do not commit with this set to SCHKVV.
- *       releases should use SCHKV, for fastest optimized code. */
+ *       releases should use SCHK or SCHKV, for fastest optimized code,
+ */
 #define OK_AND(...) SCHKV(ok,__VA_ARGS__)
 
-/** like CHECK from \ref utils.hpp , returning error code immediately, but using
- * 'Consistency ok;', to inherit failure printing in debug compiles. */
+/** A sample consistency macro.
+ * Like CHECK from \ref utils.hpp , returning error code immediately, but
+ * using 'Consistency ok;', to inherit failure printing in debug compiles. */
 #define OK_CHECK(f) do { \
     status_t status; \
     OK_AND((status = (f)) == status::success); \

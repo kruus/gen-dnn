@@ -194,6 +194,10 @@ extern dnnl_engine_t engine_tgt;
 extern dnnl_stream_t stream_tgt;
 
 inline int init() {
+    printf("DNNL build : %s", DNNL_BUILD_STRING);
+    int const v = dnnl_get_verbose();
+    if(v>0) printf(" dnnl_get_verbose=%d", v);
+    printf("\n");
     if (!engine_tgt) {
         DNN_SAFE(dnnl_engine_create(&engine_tgt, engine_tgt_kind, 0), CRIT);
         DNN_SAFE(dnnl_stream_create(

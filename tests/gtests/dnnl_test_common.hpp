@@ -59,15 +59,17 @@ using dnnl::impl::f16_support::float16_t;
         ASSERT_EQ(s, dnnl_success); \
     } while (0)
 
-/** Allow tests with certain generic properties. For some systems, tests
- * of x86 or GPU blocked formats may not be desired. Set this to reduce
- * test time. \deprecated */
-#define DNNL_TEST_BLOCKED_FORMATS 1
-
 using memory = dnnl::memory;
 
 bool is_current_test_failed();
 dnnl::engine::kind get_test_engine_kind();
+
+inline void show_dnnl_build() {
+    printf("DNNL build : %s", DNNL_BUILD_STRING);
+    int const v = dnnl_get_verbose();
+    if(v>0) printf(" DNNL_VERBOSE=%d", v);
+    printf("\n");
+}
 
 template <typename data_t>
 struct data_traits {};

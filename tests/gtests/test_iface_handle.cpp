@@ -26,7 +26,9 @@ public:
     engine e;
 
 protected:
-    virtual void SetUp() { e = engine(get_test_engine_kind(), 0); }
+    virtual void SetUp() {
+        e = engine(get_test_engine_kind(), 0);
+    }
 };
 
 TEST_F(handle_test, TestHandleConstructorsAndOperators) {

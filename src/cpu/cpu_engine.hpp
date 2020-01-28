@@ -25,34 +25,11 @@
 #include "../common/engine.hpp"
 #include "c_types_map.hpp"
 
-
-// oops SX VERBOSE_PRIMITIVE_CREATE uses unsupported c++1 features???
-#if defined(_SX)
-#undef VERBOSE_PRIMITIVE_CREATE
-#define VERBOSE_PRIMITIVE_CREATE 0
-#endif
-#if DNNL_ISA == DNNL_ISA_VANILLA
-#undef VERBOSE_PRIMITIVE_CREATE
-#define VERBOSE_PRIMITIVE_CREATE 1
-#endif
-
-#ifndef VERBOSE_PRIMITIVE_CREATE
-#if defined(NDEBUG)
-/** Debug --- see every impl that was skipped as we iterate to find
- * an acceptable impl. This can be quite verbose.
- *
- * In particularly, with mods to various init() functions, you can use
- * this flag to also print out precisely why an impl was skipped.
- *
- * \deprecated Easier to dnnl_set_verbose(2) in cpu_engine constructor (see below)
- */
-#define VERBOSE_PRIMITIVE_CREATE 0/*release mode compile*/
-#else
-// debug output here can be extremely lengthy for some tests, ex. "no-FOO" for every impl in cpu_engine list
-#define VERBOSE_PRIMITIVE_CREATE 1
-#endif
-#endif
-
+/** NEW: this now gets activated solely by `cmake -DDNNL_VERBOSE=EXTRA`, as
+ * conveyed by \c DNNL_VERBOSE_EXTRA = 0/1 in \ref dnnl_config.h.
+ * This adds extra code to respect \c dnnl_set_verbose(int) or environment
+ * DNNL_VERBOSE values 3 or 4.   ?? enable by default in debug compile ?? */
+#define VERBOSE_PRIMITIVE_SKIP DNNL_VERBOSE_EXTRA
 
 namespace dnnl {
 namespace impl {

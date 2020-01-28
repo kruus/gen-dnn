@@ -27,7 +27,22 @@
  *  yes      no        jit calls OK; assert if cblas is ever called
  *  no       yes       system-dependent CBLAS
  *  no       no        gemm convolution (or other blas) N/A; create stubs
+ *
+ *  NEW:  The USE_MKL and USE_CBLAS flags are no longer propagated on the compiler
+ *  command line.  Instead, you compile with
+ *    `cmake -DDNNL_CPU_EXTERNAL_GEMM=NONE|MKL|CBLAS`.
+ *  Results are propagated via dnnl_config.h
  */
+#include "dnnl_config.h"
+
+#if defined(DNNL_USE_MKL)
+#define(USE_MKL)
+#endif
+
+#if defined(DNNL_USE_CBLAS)
+#define USE_CBLAS
+#endif
+// OK : dnnl_config.h --> same internal settings that used to come from command line
 
 #if defined(USE_MKL)
 

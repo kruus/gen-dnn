@@ -23,7 +23,6 @@ namespace dnnl {
 
 class attr_test : public ::testing::Test {
 protected:
-    virtual void SetUp() {}
 };
 
 TEST_F(attr_test, TestScratchpadMode) {

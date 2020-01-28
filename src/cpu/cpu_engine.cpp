@@ -130,15 +130,29 @@ using namespace dnnl::impl::data_type;
 //@{
 /** Debug support.
  *
- * 1. Conditionally include set of impls based on -DJITFUNCS value.
- *    - Compare JITFUNCS with JITFUNCS\_xxx for xxx == ANY SSE42 AVX2 or AVX512
- * 2. Set VERBOSE_PRIMITIVE_CREATE to print the names of created primitives.
+ * 1. Conditionally include set of impls based on -DJITFUNCS value.  - Compare
+ * JITFUNCS with JITFUNCS\_xxx for xxx == ANY SSE42 AVX2 or AVX512 2. Set
+ * VERBOSE_PRIMITIVE_SKIP to print the names of created primitives.
  */
-#if VERBOSE_PRIMITIVE_CREATE
-/** A verbose version of primitive_desc_t::create<pd_t>. \sa primitive_desc.hpp.
- * Note: now you can also just call dnnl_set_verbose(2) in cpu_engine constructor (or so),
- *       and get more detailed info about execution and construction.
- * So the only real use of this is to track failed/successful creations (and not the executions) */
+#if VERBOSE_PRIMITIVE_SKIP
+/** A verbose version of primitive_desc_t::create<pd_t>.
+ *
+ * This expands upon the default -DDNNL_VERBOSE setting, and adds additional
+ * code to trace how cpu_engine chooses a particular implementation. Primitive
+ * creation will be slower.
+ *
+ * Added code tracks failed/successful creations (not the executions) of
+ * implementations.
+ *
+ * When built with `cmake -DDNNL_VERBOSE_PRIMITIVE_SKIP`, additional debug
+ * levels for environment variable DNNL_VERBOSE or `dnnl_set_verbose()` 3 and 4
+ * become available.
+ *
+ * Some implementations may use \ref consistency.hpp to print the 1st reason
+ * they got skipped during their `primitive_impl_t::init()`.  This happens even
+ * if built with with DNNL_VERBOSE [default: ON] at verbosity level >= 3.
+
+ * \sa primitive_desc.hpp. */
 template<typename prim>
 #if !defined(_SX)
 static
@@ -157,62 +171,64 @@ mkldnn::impl::status_t verbose_primitive_desc_create(
     using namespace mkldnn::impl;
     using namespace mkldnn::impl::status;
     typedef typename prim::pd_t pd_t;
-    if(VERBOSE_PRIMITIVE_CREATE >= 3){ // extremely verbose
-        printf(" create-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
-    }
+
     auto const ret = primitive_desc_t::create<pd_t>( pd, adesc, attr, engine,
             hint_fwd );
-    if (VERBOSE_PRIMITIVE_CREATE >= 1 && ret == success) {
-        // actually the new 'info' call has it all..
-        printf("\nprim %s\n", (*pd)->info());
-        //printf(" created descriptor %s name %s\n\t%s\n",
-        //        mkldnn_prim_kind2str(adesc->kind), (*pd)->name(),
-        //        (*pd)->info());
-        // above line better; older mkl-dnn used mkldnn_primitive_desc_query
-        //char const* result;
-        //mkldnn_primitive_desc_query( *pd, mkldnn_query_impl_info_str, 0, &result );
-        //printf(" created descriptor %s\n", result);
-        fflush(stdout);
-    }else if( VERBOSE_PRIMITIVE_CREATE >= 1 && ret == unimplemented) {
-        printf(" skip-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
-        if(/*opt.*/ adesc->kind == pd_t::base_pkind){
-            if (adesc->kind == primitive_kind::deconvolution) {
-                // DNNL v1.0.0 bug with deconvolution private data constructors
-                // not dealing with memory format undef in 'init()' routine
-                //
-                // gtest effect :
-                //   debug compile --> UNIMPL
-                //   release compile --> segfault
-                //
-                // - for some reason, format type undef leads to difficulty in constructing
-                //   an unattached ref_deconvolution private data object...
-                // - forward deconv also tries to find whether bkwd deconv also exists
-                //   (iter over impls) ?
-                printf("-avoid_pd:name_unknown)");
-            }else{
-                printf("-pd"); fflush(stdout);
-                // partially construct (no init(), no init_info()) to get the name()
-                //     This allows printing right-kind-but-skipped messages
-                //                      [see src/common/primitive_desc.hpp]
-                // TODO: primitive_desc.hpp can return an optional const char* name()
-                //       result, sometimes, even if the full construction failed.
-                //    Q: Is prop_kind a universal attribute of all prim? Probably not.
-                using pd_op_desc_t = typename pkind_traits<pd_t::base_pkind>::desc_type;
-                auto _pd = new pd_t(engine, (const pd_op_desc_t *)adesc, attr,
-                        reinterpret_cast<const typename pd_t::hint_class *> (hint_fwd));
-                if (_pd != nullptr){ // get the 'name()' ~ short impl_name string
-                    char const* name = _pd->name();
-                    printf(":%s", name); fflush(stdout);
-                    delete _pd;
+    if (ret == success) {
+        /* verbosity >= 2 already prints a 'dnnl_verbose,create' message */
+        return ret;
+    }
+    
+    /* otherwise, can add info about things that didn't work */
+    int const verbose = dnnl_get_verbose();
+    if (verbose >= 3) {
+        if( ret == unimplemented) {
+            printf(" skip-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
+            if(/*opt.*/ adesc->kind == pd_t::base_pkind){
+                if (adesc->kind == primitive_kind::deconvolution) {
+                    // FIXME: is this still the case?
+                    //
+                    // DNNL v1.0.0 bug with deconvolution private data constructors
+                    // not dealing with memory format undef in 'init()' routine
+                    //
+                    // gtest effect :
+                    //   debug compile --> UNIMPL
+                    //   release compile --> segfault
+                    //
+                    // - for some reason, format type undef leads to difficulty in constructing
+                    //   an unattached ref_deconvolution private data object...
+                    // - forward deconv also tries to find whether bkwd deconv also exists
+                    //   (iter over impls) ?
+                    printf("-avoid_pd:name_unknown)");
                 }else{
-                    printf(":bad"); fflush(stdout);
+                    printf("-pd"); fflush(stdout);
+                    //
+                    // This is rather ugly and slow.  Is there a better way to get the
+                    // name of the particular implementation that was 'unimplemented'?
+                    //
+                    // partially construct (no init(), no init_info()) to get the name()
+                    //     This allows printing right-kind-but-skipped messages
+                    //                      [see src/common/primitive_desc.hpp]
+                    // TODO: primitive_desc.hpp can return an optional const char* name()
+                    //       result, sometimes, even if the full construction failed.
+                    //    Q: Is prop_kind a universal attribute of all prim? Probably not.
+                    using pd_op_desc_t = typename pkind_traits<pd_t::base_pkind>::desc_type;
+                    auto _pd = new pd_t(engine, (const pd_op_desc_t *)adesc, attr,
+                            reinterpret_cast<const typename pd_t::hint_class *> (hint_fwd));
+                    if (_pd != nullptr){ // get the 'name()' ~ short impl_name string
+                        char const* name = _pd->name();
+                        printf(":%s", name); fflush(stdout);
+                        delete _pd;
+                    }else{
+                        printf(":bad"); fflush(stdout);
+                    }
                 }
             }
+            printf(" unimpl\n"); fflush(stdout);
+        }else if(verbose >= 4) {
+            // printing wrong-kind msg not too interesting [and lengthy]
+            printf(" no-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
         }
-        printf(" unimpl\n"); fflush(stdout);
-    }else if(VERBOSE_PRIMITIVE_CREATE >= 2) {
-        // printing wrong-kind msg not too interesting [and lengthy]
-        printf(" no-%s", mkldnn_prim_kind2str(adesc->kind)); fflush(stdout);
     }
     return ret;
 }

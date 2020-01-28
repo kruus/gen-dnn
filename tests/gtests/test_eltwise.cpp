@@ -308,15 +308,6 @@ private:
 protected:
     virtual void SetUp() {
         data_type = data_traits<data_t>::data_type;
-#if ! DNNL_TEST_BLOCKED_FORMATS
-        // is there an is_blocked function?
-        auto constexpr blk = [](memory::format_tag const mft){
-            /* maintain sync with dnnl_types.h */
-            return mft > dnnl_decab;
-        };
-        SKIP_IF(blk(p.data_format), "data_format is blocked");
-        SKIP_IF(blk(p.diff_format), "diff_format is blocked");
-#endif
         SKIP_IF(data_type == memory::data_type::f16
                         && get_test_engine_kind() == engine::kind::cpu,
                 "CPU does not support f16 data type.");
@@ -355,8 +346,8 @@ protected:
 
         data_t data_median = data_t(0);
         data_t data_deviation = (p.alg_kind == algorithm::eltwise_elu
-                                        || p.alg_kind == algorithm::eltwise_exp)
-                        || (p.alg_kind == algorithm::eltwise_swish)
+                || p.alg_kind == algorithm::eltwise_exp)
+                || (p.alg_kind == algorithm::eltwise_swish)
                 ? data_t(1.0)
                 : p.alg_kind == algorithm::eltwise_square ? data_t(6.0)
                                                           : data_t(100.0);

@@ -32,12 +32,14 @@ struct verbose_t {
     int level;
 };
 
-int get_verbose();              ///< get environment DNNL_VERBOSE (MKLDNN_VERBOSE) value
-int dnnl_get_verbose();         ///< current `dnnl_set_verbose(int)` setting
+/** get environment DNNL_VERBOSE (MKLDNN_VERBOSE) value.
+ * \note Do not confuse with `dnnl_get_verbose()`, which is the current
+ * verbosity, which also reflects calls to `dnnl_set_verbose(int)`. */
+int get_verbose();
 double get_msec();
 const char *get_isa_info();
 
-#if !defined(DISABLE_VERBOSE)
+#if DNNL_VERBOSE
 #define DNNL_VERBOSE_BUF_LEN 1024
 #else
 #define DNNL_VERBOSE_BUF_LEN 1
