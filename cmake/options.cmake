@@ -257,8 +257,8 @@ set(OPENCLROOT "" CACHE STRING
 
     set(DNNL_CPU_EXTERNAL_GEMM "NONE" CACHE STRING
     "NONE uses an x86 jit gemm, or else a builtin portable gemm.
-    Note that DEFAULT will provide a gemm implementation for non-jit
-    or non-x86 targets. Other values are: MKL, CBLAS.
+    DEFAULT provides a gemm implementation for non-jit or non-x86
+    targets. Other values are: MKL, CBLAS.
     
     MKL can be used for performance comparisons and may support gemm
     operations with different data types/formats.
@@ -268,7 +268,7 @@ set(OPENCLROOT "" CACHE STRING
     changing DNNL_ARCH_OPT_FLAGS or playing with gemm:ref tuning)"
     )
 if(NOT ${DNNL_CPU_EXTERNAL_GEMM} MATCHES "^(NONE|MKL|CBLAS)$")
-    message(FATAL_ERROR "Unsupported DNNL_CPU_EXTERNAL_GEMM value")
+    message(FATAL_ERROR "Unsupported DNNL_CPU_EXTERNAL_GEMM=${DNNL_CPU_EXTERNAL_GEMM}, expected NONE|MKL|CBLAS")
 endif()
 
 # =============
@@ -317,6 +317,8 @@ elseif(DNNL_CPU EQUAL DNNL_CPU_VE)
     set(DNNL_DEFAULT_ENABLE_BFLOAT16 0) # initially 0 for porting
     set(DNNL_DEFAULT_ENABLE_RNN 0)      # initially 0 for porting
 else() # unknown? try enabling everything
+    set(DNNL_DEFAULT_ENABLE_BFLOAT16 1) # initially 0 for porting
+    set(DNNL_DEFAULT_ENABLE_RNN 1)      # initially 0 for porting
 endif()
 option(DNNL_ENABLE_BFLOAT16
     "Enable bfloat16 support (default ${DNNL_DEFAULT_ENABLE_BFLOAT16})"
