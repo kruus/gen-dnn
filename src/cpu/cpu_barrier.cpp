@@ -160,7 +160,7 @@ void barrier(ctx_t *ctx, int nthr) {
         size_t sense_sav;
 
         /* take and save current sense */
-        register size_t tmp = ctx->sense;
+        /*register*/ size_t tmp = ctx->sense;       // (register is deprecated)
         *&sense_sav = tmp; // "push"
 
         tmp = 1U;

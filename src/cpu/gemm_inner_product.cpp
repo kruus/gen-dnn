@@ -19,7 +19,7 @@
 #include "type_helpers.hpp"
 
 #include "gemm_inner_product.hpp"
-#include "mkldnn_os.h"
+//#include "dnnl_os.h"
 
 namespace dnnl {
 namespace impl {

@@ -194,12 +194,12 @@ private:
         const bool is_igo = pd()->itag_ == format_tag::ldigo;
 
         /* Quantize input & compute compensation */
-        auto quantized
-                = (int8_t * __restrict) ctx.get_scratchpad_grantor()
+        int8_t * __restrict quantized
+                = (int8_t *) ctx.get_scratchpad_grantor()
                           .template get<void>(memory_tracking::names::
                                           key_reorder_rnn_weights_quantization);
-        auto reduction
-                = (int32_t * __restrict) ctx.get_scratchpad_grantor()
+        int32_t * __restrict reduction
+                = (int32_t *) ctx.get_scratchpad_grantor()
                           .template get<void>(memory_tracking::names::
                                           key_reorder_rnn_weights_reduction);
         float *comp = reinterpret_cast<float *>(

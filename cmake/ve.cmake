@@ -20,9 +20,6 @@ set(CMAKE_EXE_LINKER_FLAGS_INIT "-v -Wl,--verbose -Wl,-z,-origin")
 set(CMAKE_SHARED_LINKER_FLAGS_INIT "-v -Wl,--verbose -Wl,-z,-origin")
 
 macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS _compiler _flags _incVar _preincVar)
-    #
-    # TODO return more useful things, since this can be run very very early,
-    #      and might be more trustworthy than hardwired path guesses.
     # Input:
     #           _compiler  : ncc or nc++ [or nfort?]
     #           _flags     : compiler flags
@@ -41,19 +38,22 @@ macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS _compiler _flags _incVar _preincVar)
     #         -I/opt/nec/ve/nfort/0.0.28/include
     #         -I/opt/nec/ve/musl/include
     #         dummy
-    set(_verbose 1)
-    # Oh, CMAKE_C/CXX_foo might not be set yet.
-    #if(_verbose GREATER 0)
-    #    message(STATUS "  CMAKE_C_COMPILER_ID           : ${CMAKE_C_COMPILER_ID}")
-    #    message(STATUS "  CMAKE_CXX_COMPILER_ID           : ${CMAKE_CXX_COMPILER_ID}")
-    #endif()
+    set(_verbose 3)
+    if(_verbose GREATER 0)
+        message(STATUS "  CMAKE_C_COMPILER_ID           : ${CMAKE_C_COMPILER_ID}")
+        message(STATUS "  CMAKE_CXX_COMPILER_ID         : ${CMAKE_CXX_COMPILER_ID}")
+        message(STATUS "  CMAKE_C_COMPILER              : ${CMAKE_C_COMPILER}")
+        message(STATUS "  _compiler                     : ${_compiler}")
+    endif()
     #if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
     #    message(WARNING "CXX compiler not GNU, so may not be able to determine CXX sys includes")
     #endif()
     file(WRITE "${CMAKE_BINARY_DIR}/CMakeFiles/dummy" "\n")
     separate_arguments(_buildFlags UNIX_COMMAND "${_flags}")
     #execute_process(COMMAND ${_compiler} ${_buildFlags} -v -E dummy
-    set(_cmd ${_compiler} -v -E dummy)
+    #set(_cmd ${CMAKE_C_COMPILER} -v -E dummy)
+    set(_cmd ${_compiler} ${_flags} -v -E dummy)
+    message(STATUS "_cmd      : ${_cmd}")
     execute_process(COMMAND ${_cmd}
         WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/CMakeFiles"
         OUTPUT_QUIET
@@ -70,34 +70,49 @@ macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS _compiler _flags _incVar _preincVar)
         message(STATUS "_compArgs   : ${_compArgs}")
     endif()
     set(_nextType "boring")
-    list(GET _compArgs 0 _ccom) # e.g. /opt/nec/ve/ncc/0.0.28/libexec/ccom
-    message(STATUS "_ccom ${_ccom}")
-    get_filename_component(_compRoot ${_ccom} DIRECTORY)
+    # ncc 2.5.x changes output style
+    #list(GET _compArgs 0 _ccom) # e.g. /opt/nec/ve/ncc/0.0.28/libexec/ccom
+    #message(STATUS "_ccom = ${_ccom}")
+    #get_filename_component(_compRoot ${_ccom} DIRECTORY)
+    #message(STATUS "--> _compRoot = ${_compRoot}")
+    #get_filename_component(_compRoot ${_compRoot} DIRECTORY)
+    #message(STATUS "--> _compRoot = ${_compRoot}")
+    set(_compArgs2 "${_compArgs}")
+    #message(STATUS "begin with _compArgs2 = ${_compArgs2}")
+    list(FILTER _compArgs2 INCLUDE REGEX "ccom")
+    message(STATUS "ccom at ${_compArgs2}")
+    get_filename_component(_compRoot ${_compArgs2} DIRECTORY)
+    #message(STATUS "--> _compRoot = ${_compRoot}")
     get_filename_component(_compRoot ${_compRoot} DIRECTORY)
-    message(STATUS "_compRoot ${_compRoot}")
+    message(STATUS "--> _compRoot = ${_compRoot}")
     if(_verbose GREATER 0)
         if(EXISTS ${_compRoot}/etc/ncc.conf)
             file(READ ${_compRoot}/etc/ncc.conf _etc_ncc_conf)
             message(STATUS "${_compRoot}/etc/ncc.conf\n${_etc_ncc_conf}")
         endif()
     endif()
+    # grab -isystem;dir pairs into _incVar
     foreach(_compArg ${_compArgs})
         if(_verbose GREATER 2)
             message(STATUS "_nextType=${nextType}, _compArg=${_compArg}")
         endif()
-        if(${_nextType} STREQUAL "-isystem")
+        # ncc 3.0.25 seems to use -icompiler instead of -isystem
+        if(${_nextType} STREQUAL "-isystem" OR ${_nextType} STREQUAL "-icompiler")
             list(APPEND ${_incVar} ${_compArg})
             set(_nextType "boring")
         elseif(${_compArg} STREQUAL "-isystem")
             set(_nextType ${_compArg})
         endif()
     endforeach()
+    # and now look for preinclude path (removing from system _incVar)
     foreach(_compArg ${_compArgs})
         if(_verbose GREATER 2)
             message(STATUS "_nextType=${nextType}, _compArg=${_compArg}")
         endif()
         if(${_nextType} STREQUAL "--preinclude-path")
-            list(REMOVE_ITEM ${_incVar} ${_compArg})
+            if(NOT ${_incvar})
+                list(REMOVE_ITEM ${_incVar} ${_compArg})
+            endif()
             list(APPEND ${_preincVar} ${_compArg})
             set(_nextType "boring")
         elseif(${_compArg} STREQUAL "--preinclude-path")
@@ -106,7 +121,7 @@ macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS _compiler _flags _incVar _preincVar)
     endforeach()
     if(_verbose GREATER 0)
         message(STATUS "Compiler       : ${_compiler}")
-        message(STATUS "  Flags        : ${_compiler}")
+        message(STATUS "  Flags        : ${_flags}")
         message(STATUS "  pre-includes : ${${_preincVar}}")
         message(STATUS "  sys-includes : ${${_incVar}}")
     endif()
@@ -121,8 +136,10 @@ endmacro()
 #     If so, this might be better than any hard-wired path we might wish to use.
 # [a] if $CC is some ncc, use that; else use 'ncc'
 set(_compiler FALSE)
-if(EXISTS "$ENV{CC}")
+message(STATUS "ENV{CC} --> $ENV{CC}")
+if(NOT x"$ENV{CC}" STREQUAL x)
     execute_process(COMMAND $ENV{CC} --version OUTPUT_QUIET ERROR_VARIABLE _ccVersion)
+    message(STATUS "ENV{CC} version : ${_ccVersion}")
     if(${_ccVersion} MATCHES "^ncc")
         set(_compiler $ENV{CC})
     endif()
@@ -135,7 +152,7 @@ if(NOT _compiler) # OK, CC is not an ncc.  Is there an 'ncc' in current path?
     endif()
 endif()
 if(_compiler)
-    DETERMINE_NCC_SYSTEM_INCLUDES_DIRS(ncc "-pthread" VE_C_SYSINC VE_C_PREINC)
+    DETERMINE_NCC_SYSTEM_INCLUDES_DIRS("${_compiler}" "-pthread" VE_C_SYSINC VE_C_PREINC)
     message(STATUS "ve.cmake [test]:  C pre-inc dirs  : ${VE_C_PREINC}")
     message(STATUS "ve.cmake [test]:  C sys-inc dirs  : ${VE_C_SYSINC}")
     set(VE_C_PREINC ${VE_C_PREINC} CACHE INTERNAL "ncc pre-include directory[ies]")
@@ -149,10 +166,12 @@ else()
     # unverified standard compiler names
     set(CMAKE_C_COMPILER   ncc)
 endif()
+message(STATUS "Using Aurora CMAKE_C_COMPILER ${CMAKE_C_COMPILER}")
 set(_compiler FALSE)
-if(EXISTS "$ENV{CXX}")
+if(NOT x"$ENV{CXX}" STREQUAL x)
     execute_process(COMMAND $ENV{CXX} --version OUTPUT_QUIET ERROR_VARIABLE _ccVersion)
     if(${_ccVersion} MATCHES "^nc\\+\\+")
+        message(STATUS "Found _compiler from ENV : ${_compiler}")
         set(_compiler $ENV{CXX})
     endif()
 endif()
@@ -164,7 +183,7 @@ if(NOT _compiler) # OK, CC is not an ncc.  Is there an 'ncc' in current path?
     endif()
 endif()
 if(_compiler)
-    DETERMINE_NCC_SYSTEM_INCLUDES_DIRS(nc++ "-pthread" VE_CXX_SYSINC VE_CXX_PREINC)
+    DETERMINE_NCC_SYSTEM_INCLUDES_DIRS("${_compiler}" "-pthread" VE_CXX_SYSINC VE_CXX_PREINC)
     message(STATUS "ve.cmake [test]:  C pre-inc dirs  : ${VE_CXX_PREINC}")
     message(STATUS "ve.cmake [test]:  C sys-inc dirs  : ${VE_CXX_SYSINC}")
     set(VE_CXX_PREINC ${VE_CXX_PREINC} CACHE INTERNAL "nc++ pre-include directory[ies]")
@@ -176,6 +195,12 @@ else()
     set(CMAKE_CXX_COMPILER   ncc)
 endif()
 unset(_compiler)
+message(STATUS "Using Aurora CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER}")
+set(CMAKE_C_COMPILER_INIT "${CMAKE_C_COMPILER}")
+set(CMAKE_C_COMPILER_NAMES "${CMAKE_C_COMPILER}")
+set(CMAKE_CXX_COMPILER_INIT "${CMAKE_CXX_COMPILER}")
+set(CMAKE_CXX_COMPILER_NAMES "${CMAKE_CXX_COMPILER}")
+set(_compiler FALSE)
 
 #  There are some options here:
 #   [1] [current] check VE_OPT (maybe from ENV) or fixed path /opt/nec/ve/bin/ncc
@@ -183,7 +208,6 @@ unset(_compiler)
 #   [2] if 'ncc' can be executed in current environment, grab paths directly from
 #       execute_process(... ncc ...)
 # TODO [2] is above, but can that optional info help us in what follows?
-set(CMAKE_CXX_COMPILER nc++)
 # [1] determine important VE cross-compiler dirs
 #  TODO update dir determination if VE
 if(NOT VE_OPT)
@@ -199,6 +223,9 @@ if(NOT VE_NCC)
 endif()
 get_filename_component(VE_OPT ${VE_NCC} DIRECTORY) # VE_OPT/bin 
 get_filename_component(VE_OPT ${VE_OPT} DIRECTORY) # VE_OPT 
+# Is this any different from before?
+message(STATUS "Compare VE_OPT    = ${VE_OPT}")
+message(STATUS "   with _compRoot = ${_compRoot}")
 # final check on VE_OPT
 find_program(VE_NCC NAMES ${CMAKE_C_COMPILER} PATHS ${VE_OPT} PATH_SUFFIXES bin)
 if(NOT VE_NCC)
@@ -299,7 +326,7 @@ function(NLC_PRELIM_SETTINGS)
             message(STATUS "  using NLC_HOME from environment: ${NLC_HOME} (assuming nlcvar.{sh|csh} has been sourced)")
             set(NLC_VERSION "$ENV{NLC_VERSION}")
             set(NLC_HOME "$ENV{NLC_HOME}")
-            set(ASL_HOME "$ENV{ASL_HOME")
+            set(ASL_HOME "$ENV{ASL_HOME}")
             set(NLC_LIB_I64 "$ENV{NLC_LIB_I64}")
             set(ASL_LIB_I64 "$ENV{ASL_LIB_I64}")
             set(NLC_LIB_MPI "$ENV{NLC_LIB_MPI}")
@@ -971,7 +998,12 @@ function(show_cmake_stuff MSG)
     message(STATUS "    -------------------------------")
 endfunction()
 
-macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS _compiler _flags _incVar _preincVar)
+show_cmake_stuff("End of ve.cmake")
+
+macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS__old _compiler _flags _incVar _preincVar)
+    #
+    # TODO return more useful things, since this can be run very very early,
+    #      and might be more trustworthy than hardwired path guesses.
     # Input:
     #           _compiler  : ncc or nc++ [or nfort?]
     #           _flags     : compiler flags
@@ -990,18 +1022,20 @@ macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS _compiler _flags _incVar _preincVar)
     #         -I/opt/nec/ve/nfort/0.0.28/include
     #         -I/opt/nec/ve/musl/include
     #         dummy
-    set(_verbose 1)
-    if(_verbose GREATER 0)
-        message(STATUS "  CMAKE_C_COMPILER_ID           : ${CMAKE_C_COMPILER_ID}")
-        message(STATUS "  CMAKE_CXX_COMPILER_ID           : ${CMAKE_CXX_COMPILER_ID}")
-    endif()
-    if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
-        message(WARNING "CXX compiler not GNU, so may not be able to determine CXX sys includes")
-    endif()
+    set(_verbose 2)
+    # Oh, CMAKE_C/CXX_foo might not be set yet.
+    #if(_verbose GREATER 0)
+    #    message(STATUS "  CMAKE_C_COMPILER_ID           : ${CMAKE_C_COMPILER_ID}")
+    #    message(STATUS "  CMAKE_CXX_COMPILER_ID           : ${CMAKE_CXX_COMPILER_ID}")
+    #endif()
+    #if(NOT "${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
+    #    message(WARNING "CXX compiler not GNU, so may not be able to determine CXX sys includes")
+    #endif()
     file(WRITE "${CMAKE_BINARY_DIR}/CMakeFiles/dummy" "\n")
     separate_arguments(_buildFlags UNIX_COMMAND "${_flags}")
     #execute_process(COMMAND ${_compiler} ${_buildFlags} -v -E dummy
-    set(_cmd ${CMAKE_C_COMPILER} -v -E dummy)
+    set(_cmd ${_compiler} -v -E dummy)
+    message(STATUS "_cmd      : ${_cmd}")
     execute_process(COMMAND ${_cmd}
         WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/CMakeFiles"
         OUTPUT_QUIET
@@ -1013,16 +1047,23 @@ macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS _compiler _flags _incVar _preincVar)
         message(STATUS "_compiler   : ${_compiler}")
         message(STATUS "_flags      : ${_flags}")
         message(STATUS "_buildflags : ${_buildflags}")
-        #message(STATUS "_compOut0   : ${_compOut0}")
         message(STATUS "_compOut    : ${_compOut}")
         message(STATUS "_compArgs   : ${_compArgs}")
     endif()
     set(_nextType "boring")
-    list(GET _compArgs 0 _ccom) # e.g. /opt/nec/ve/ncc/0.0.28/libexec/ccom
-    message(STATUS "_ccom ${_ccom}")
-    get_filename_component(_compRoot ${_ccom} DIRECTORY)
+    # The -v output cas changed
+    #list(GET _compArgs 0 _ccom) # e.g. /opt/nec/ve/ncc/0.0.28/libexec/ccom
+    #message(STATUS "_ccom ${_ccom}")
+    #get_filename_component(_compRoot ${_ccom} DIRECTORY)
+    #get_filename_component(_compRoot ${_compRoot} DIRECTORY)
+    set(_compArgs2 "${_compArgs}")
+    #message(STATUS "begin with _compArgs2 = ${_compArgs2}")
+    list(FILTER _compArgs2 INCLUDE REGEX "ccom")
+    message(STATUS "ccom at ${_compArgs2}")
+    get_filename_component(_compRoot ${_compArgs2} DIRECTORY)
+    #message(STATUS "--> _compRoot = ${_compRoot}")
     get_filename_component(_compRoot ${_compRoot} DIRECTORY)
-    message(STATUS "_compRoot ${_compRoot}")
+    message(STATUS "--> _compRoot = ${_compRoot}")
     if(_verbose GREATER 0)
         if(EXISTS ${_compRoot}/etc/ncc.conf)
             file(READ ${_compRoot}/etc/ncc.conf _etc_ncc_conf)
@@ -1059,7 +1100,5 @@ macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS _compiler _flags _incVar _preincVar)
         message(STATUS "  sys-includes : ${${_incVar}}")
     endif()
 endmacro()
-
-show_cmake_stuff("End of ve.cmake")
 
 # vim: et ts=4 sw=4 ai

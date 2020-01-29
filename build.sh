@@ -161,7 +161,7 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMrCm:bBrR" arg; do
     esac
 done
 # DOJIT controls -DDNNL_ISA=${ISA} cmake options (deprecated)
-#DOJIT=0
+DOJIT=0
 # if unspecified, autodetect target via $CC compiler variable
 if [ "${DOTARGET}" == "x" ]; then
     if [ "${CC##sx}" == "sx" -o "${CXX##sx}" == "sx" ]; then
@@ -224,6 +224,7 @@ BUILDDIR=build
 #
 if [ "$DOTARGET" == "s" ]; then DODOC="n"; DOTEST=0; INSTALLDIR='install-sx'; BUILDDIR='build-sx';
 elif [ "$DOTARGET" == "a" ]; then
+    DOJIT=-1
     if [ "$VEJIT" -gt 0 ]; then
         INSTALLDIR="${INSTALLDIR}-vej"; BUILDDIR="${BUILDDIR}-vej";
     fi
@@ -535,8 +536,11 @@ echo "PATH $PATH"
         TOOLCHAIN=../cmake/ve.cmake
         if [ ! -f "${TOOLCHAIN}" ]; then echo "Ohoh. ${TOOLCHAIN} not found?"; BUILDOK="n"; fi
         CMAKEOPT="${CMAKEOPT} -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN}"
+
         # adjust here for VE shared library and Openmp use
-        CMAKEOPT="${CMAKEOPT} -DUSE_SHAREDLIB=OFF"
+        #CMAKEOPT="${CMAKEOPT} -DUSE_SHAREDLIB=OFF" # deprecated
+        CMAKEOPT="${CMAKEOPT} -DDNNL_LIBRARY_TYPE=STATIC"
+
         # USE_OPENMP defaults to off, so force it on (VE openmp has improved)
         if [ "a" == "z" ]; then
             CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=OFF"

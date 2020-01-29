@@ -84,10 +84,14 @@ if(MSVC)
         append(CMAKE_CCXX_FLAGS "-Wno-pass-failed")
     endif()
 elseif(UNIX OR MINGW)
-    append(CMAKE_CCXX_FLAGS "-Wall -Wno-unknown-pragmas")
     append_if(DNNL_WERROR CMAKE_CCXX_FLAGS "-Werror")
-    append(CMAKE_CCXX_FLAGS "-fvisibility=internal")
-    append(CMAKE_CXX_FLAGS "-fvisibility-inlines-hidden")
+    if(NOT NECVE)
+        append(CMAKE_CCXX_FLAGS "-Wall -Wno-unknown-pragmas")
+        append(CMAKE_CCXX_FLAGS "-fvisibility=internal")
+        append(CMAKE_CXX_FLAGS "-fvisibility-inlines-hidden")
+    else() # ncc 3.0+ has diverged even more
+        append(CMAKE_CCXX_FLAGS "-Wall -Wunknown-pragma")
+    endif()
     append(CMAKE_CCXX_NOEXCEPT_FLAGS "-fno-exceptions")
     # compiler specific settings
     if(NECVE) # masquerades as GNU 6.0.0, but does not quite support all the flags
@@ -171,8 +175,8 @@ if(DNNL_ARCH_OPT_FLAGS STREQUAL "HostOpts")
     set(DNNL_ARCH_OPT_FLAGS "${DEF_ARCH_OPT_FLAGS}")
 endif()
 
-append(CMAKE_C_FLAGS "${CMAKE_CCXX_FLAGS} ${DNNL_ARCH_OPT_FLAGS}")
-append(CMAKE_CXX_FLAGS "${CMAKE_CCXX_FLAGS} ${DNNL_ARCH_OPT_FLAGS}")
+append(CMAKE_C_FLAGS "-Dplatform_beg ${CMAKE_CCXX_FLAGS} ${DNNL_ARCH_OPT_FLAGS} -Dplatform_end")
+append(CMAKE_CXX_FLAGS "-Dplatform_beg ${CMAKE_CCXX_FLAGS} ${DNNL_ARCH_OPT_FLAGS} -Dplatform_end")
 
 if(APPLE)
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)

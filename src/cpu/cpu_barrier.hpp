@@ -54,6 +54,8 @@ inline void barrier(ctx_t *ctx, int nthr){
 //? });
 #ifdef _WIN32
 #define CTX_ALIGNMENT 64
+#elif TARGET_VE
+#define CTX_ALIGNMENT 128/*VE LLC cache line bytes*/
 #else
 #define CTX_ALIGNMENT 4096
 #endif

@@ -15,7 +15,7 @@
 *******************************************************************************/
 
 #include <cstdint>
-#if defined(_MSC_VER)
+#if TARGET_VE || defined(_MSC_VER)
 #include <malloc.h>
 #endif
 
@@ -40,13 +40,14 @@
 //? #include "mkldnn_types.h"
 #include "nstl.hpp"
 #include "utils.hpp"
+#include "dnnl_os.h"    // alignas macro (if required)
 
 namespace dnnl {
 namespace impl {
 namespace cpu {
 
 template <typename c_type>
-struct alignas(64) gemm_per_thread_t {
+struct ALIGNAS(64) gemm_per_thread_t {
     volatile int32_t result;
     volatile int32_t compute_done;
     int32_t thr_k_stride;
@@ -434,7 +435,10 @@ void gemm_kernel(const dim_t m, const dim_t n, const dim_t k, const float alpha,
 
     // Since m and n are limited by blocking, stack overflow may not happen;
     // it's up to 32kB
-#if !defined(_MSC_VER)
+#if TARGET_VE
+    c_type *col_offset = (c_type *)alloca(sizeof(*col_offset) * m);
+    c_type *row_offset = (c_type *)alloca(sizeof(*row_offset) * n);
+#elif !defined(_MSC_VER)
     c_type col_offset[m];
     c_type row_offset[n];
 #else

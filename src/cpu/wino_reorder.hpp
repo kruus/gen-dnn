@@ -384,12 +384,16 @@ private:
         auto input = CTX_IN_MEM(const in_data_t *, DNNL_ARG_FROM);
         auto output = CTX_OUT_MEM(out_data_t *, DNNL_ARG_TO);
 
-        auto wspace = (in_data_t * __restrict) ctx.get_scratchpad_grantor()
-                              .template get<void>(memory_tracking::names::
-                                              key_reorder_wino_transform_space);
-        auto tmp_wei = (out_data_t * __restrict) ctx.get_scratchpad_grantor()
-                               .template get<void>(memory_tracking::names::
-                                               key_reorder_wino_plain);
+	// warning: type qualifier is meaningless on cast type
+	// auto wspace = (in_data_t * __restrict) ctx.get_scratchpad_grantor()
+        in_data_t * __restrict wspace = (in_data_t *) ctx
+		.get_scratchpad_grantor()
+		.template get<void>(memory_tracking::names::
+				key_reorder_wino_transform_space);
+        out_data_t * __restrict tmp_wei = (out_data_t *) ctx
+		.get_scratchpad_grantor()
+		.template get<void>(memory_tracking::names::
+				key_reorder_wino_plain);
 
         transform(tmp_wei, input, wspace);
 

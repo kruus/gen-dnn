@@ -58,7 +58,7 @@ namespace impl {
 
 #define DNNL_DISALLOW_COPY_AND_ASSIGN(T) \
     T(const T &) = delete; \
-    T &operator=(const T &) = delete;
+    T &operator=(const T &) = delete
 
 // Sanity check for 64 bits
 static_assert(sizeof(void *) == 8, "DNNL supports 64 bit only");

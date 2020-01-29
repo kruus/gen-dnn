@@ -143,9 +143,10 @@ struct ref_eltwise_bwd_t : public primitive_impl_t {
                     && IMPLICATION(
                             desc()->data_desc.data_type == data_type::bf16,
                             mayiuse(avx512_core))
-                    && set_default_formats_common()
-                    && attr()->has_default_values();
 #endif // DNNL_ENABLE_BFLOAT16
+                    && set_default_formats_common()
+                    && attr()->has_default_values()
+            ;
             if (!ok) return status::unimplemented;
 
             auto diff_dst_d = memory_desc_wrapper(diff_dst_md());

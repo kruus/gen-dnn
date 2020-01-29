@@ -15,6 +15,8 @@
 *******************************************************************************/
 /** \file handle various compiler/os retrictions.
  *
+ * \deprecated -- move this into src/common/opt_pragmas
+ *
  * - These provide OS workarounds - libc pecularities, - and compiler
  * workarounds - like support for \e restrict or \e alignment - and C++ OpenMP
  * support pragmas.
@@ -30,11 +32,11 @@
  * OpenMP C++ Pragma macros because different different \c DNNL_CPU targets)
  * have widely varying degrees of OpenMP support.
  *
- * \todo Can ENABLE_OPT_PRAGMAS be replaced in dnnl_os.h by (DNNL_CPU_RUNTIME &
- * DNNL_RUNTIME_SEQ)
  */
-#ifndef DNNL_OS_H #define DNNL_OS_H
+#ifndef DNNL_OS_H
+#define DNNL_OS_H
 
+// How can I avoid this, and still be useful ?
 #include "dnnl_config.h"        // TODO use DNNL_TARGET_FOO conditionals
 // this also includes dnnl_types.h, so DNNL_RUNTIME_CPU build flags are available
 
@@ -78,7 +80,7 @@
  * \e vim note: adding '\\\\;' is an ugly kludge to avoid next-line indent
  * after prefixing a for loop with an OpenMP macro.
  */
-#define ENABLE_OPT_PRAGMAS (DNNL_CPU_RUNTIME & DNNL_RUNTIME_SEQ)
+#define ENABLE_OPT_PRAGMAS (DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP)
 //#define ENABLE_OPT_PRAGMAS 0 /* may help debug */
 //#define ENABLE_OPT_PRAGMAS 1 /* old default (auto-determine) */
 #endif
@@ -96,6 +98,7 @@
 #define ENABLE_OMP 1
 #endif
 #endif
+
 
 // -------- compiler-specific pragmas --------
 // __ve compile does something with pragma omp, but it is not officially supported,
@@ -122,10 +125,20 @@
 //
 // Oh! ALLOC_ON_VREG cannot "decay" into RETAIN, because syntax is different
 // -----------------------------------
-//#define BENCHDNN_YPRAGMA(str) do{int ypr=str;}while(0);
+#ifdef _MSC_VER // uses __pragma takes an unquoted arg UNTESTED (see z_magic.hpp)
+#define BENCHDNN_MPRAGMA(...) __pragma(__VA_ARGS__)
+#define BENCHDNN_EVAL(...) __VA_ARGS__
+#define PragmaQuote(...) BENCHDNN_MPRAGMA(BENCHDNN_STRINGIZE(__VA_ARGS__))
+#else
 #define BENCHDNN_MPRAGMA(str) _Pragma(str)
 #define BENCHDNN_STRINGIZE(...) #__VA_ARGS__
 #define PragmaQuote(...) BENCHDNN_MPRAGMA(BENCHDNN_STRINGIZE(__VA_ARGS__))
+#endif
+
+//
+// deprecated / unused
+//#   define PRAGMASIMD(...) PragmaQuote(simd __VA_ARGS__)
+//
 
 #if ENABLE_OPT_PRAGMAS && defined(_SX)
 // SX preprocessor generates _Pragma(XXX) and sxc++ might be ignoring
@@ -153,6 +166,7 @@
 #   define ShortLoopTest() _Pragma("_NEC shortloop_reduction")
 #   define IVDEP() _Pragma("_NEC ivdep")
 #   define UNROLL(x) PragmaQuote(_NEC unroll(x))
+//# define PRAGMA_OMP_SIMD(...) // default: not supported
 
 #elif ENABLE_OPT_PRAGMAS && defined(__INTEL_COMPILER)
 // restrict keyword requires the "-restrict" CFLAG; __restrict__ works anyway
@@ -172,6 +186,7 @@
 //  taken from MSVC code in mkldnn_thread.hpp
 //# warning "MSVC still supports omp 2.0 only"
 #   define collapse(x)
+#   define simdlen(x)
 //#  define PRAGMA_OMP_SIMD(...) ... below
 //--------------------------------------------
 #   define VREG(...)
@@ -205,42 +220,57 @@
 
 #endif
 
+// PRAGMA_OMP_SIMD move up from src/common/dnnl_thread.hpp ? NO !!!
+//#if ENABLE_OPT_PRAGMAS
+//#   define PRAGMA_OMP(...) PragmaQuote(omp __VA_ARGS__)
+//#   if defined(__ve)
+//#      warning "__ve enabling #pragma omp"
+//#   endif
+//#   if defined(_SX) // no support for "simd" pragmas
+//#   elif defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+//#      define collapse(x)
+//#   else // defined(__GNUC) or intel or ...
+//#      if defined(__ve)
+//#         warning "__ve enabling #pragma [omp] simd"
+//#      endif
+//#      define OMPSIMD(...) PragmaQuote(omp simd __VA_ARGS__)
+//#      ifndef PRAGMA_OMP_SIMD // original was in mkldnn_thread.hpp
+//#         define PRAGMA_OMP_SIMD(...) PragmaQuote(omp simd __VA_ARGS__)
+//#      endif
+//#   endif
+//#endif
+#define OMPSIMD(...) ("OMPSIMD deprecated" ^ "use PRAGMA_OMP_SIMD instead")
+#define OMP(...) ("OMP deprecated" ^ "use PRAGMA_OMP instead")
 
-#if ENABLE_OMP
-#   define OMP(...) PragmaQuote(omp __VA_ARGS__)
-#   if defined(__ve)
-#      warning "__ve enabling #pragma omp"
-#   endif
-#   if defined(_SX) // no support for "simd" pragmas
-#   elif defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
-#   else // defined(__GNUC) or intel or ...
-#      if defined(__ve)
-#         warning "__ve enabling #pragma [omp] simd"
-#      endif
-#      define PRAGMASIMD(...) PragmaQuote(simd __VA_ARGS__)
-#      define OMPSIMD(...) PragmaQuote(omp simd __VA_ARGS__)
-#      ifndef PRAGMA_OMP_SIMD // original was in mkldnn_thread.hpp
-#         define PRAGMA_OMP_SIMD(...) PragmaQuote(omp simd __VA_ARGS__)
-#      endif
-#   endif
-#endif
-
+//#ifndef PRAGMA_OMP
+//#   define PRAGMA_OMP(...)
+//#endif
+//#ifndef OMPSIMD
+//#   define OMPSIMD(...)
+//#endif
 #ifndef PRAGMASIMD
 #   define PRAGMASIMD(...)
 #endif
-#ifndef OMPSIMD
-#   define OMPSIMD(...)
-#endif
-#ifndef PRAGMA_OMP_SIMD
-#   define PRAGMA_OMP_SIMD(...)
-#endif
 
-#ifndef OMP
-#   define OMP(...)
-#if defined(REF_LRN_HPP) // mostly ignore: show for cpu_engine compile at least
-#   warning "not enabling #pragma omp (mkldnn_os.h)"
-#endif
-#endif
+// process simdlen; it is supported for Clang >= 3.9; ICC >= 17.0; GCC >= 6.1
+// No support on Windows.
+//#if (defined(__clang_major__) \
+//        && (__clang_major__ < 3 \
+//                || (__clang_major__ == 3 && __clang_minor__ < 9))) \
+//        || (defined(__INTEL_COMPILER) && __INTEL_COMPILER < 1700) \
+//        || (!defined(__INTEL_COMPILER) && !defined(__clang__) \
+//                && (defined(_MSC_VER) || __GNUC__ < 6 \
+//                        || (__GNUC__ == 6 && __GNUC_MINOR__ < 1)))
+//#define simdlen(x)
+//#endif // long simdlen if
+
+//#ifndef OMP
+//#   define OMP(...)
+//#if defined(REF_LRN_HPP) // mostly ignore: show for cpu_engine compile at least
+//#   warning "not enabling #pragma omp (mkldnn_os.h)"
+//#endif
+//#endif
+#define OMP(...) ("OMP macro deprecated" ^ "use PRAGMA_OMP instead")
 
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif // DNNL_OS_H

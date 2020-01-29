@@ -127,7 +127,7 @@ bool init_max_cpu_isa() {
         IF_HANDLE_CASE(isa_all);        // "ALL" CPU-specific
         ELSEIF_HANDLE_CASE(vanilla);    // "VANILLA"
         ELSEIF_HANDLE_CASE(isa_any);    // "ANY" (x86 jit ok, no vec ops; ve same as vanilla)
-#if DNNL_CPU == DNNL_CPU_X86
+#if TARGET_X86
         ELSEIF_HANDLE_CASE(sse41);
         ELSEIF_HANDLE_CASE(avx);
         ELSEIF_HANDLE_CASE(avx2);
@@ -138,7 +138,7 @@ bool init_max_cpu_isa() {
         ELSEIF_HANDLE_CASE(avx512_core_bf16);
         else if(verbose)
             printf("Bad DNNL_MAX_CPU_ISA=%s environment for x86", buf);
-#elif DNN_CPU == DNNL_CPU_VE
+#elif TARGET_VE
         ELSEIF_HANDLE_CASE(vednn);
         ELSEIF_HANDLE_CASE(vejit);
         else if(verbose)

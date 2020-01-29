@@ -19,7 +19,7 @@
 #define _MKLDNN_OS_H_
 
 #if 1
-#include "dnnl.h"
+#include "dnnl_os.h"
 #else // old code
 
 //#include "os_common.hpp" // not available -- we use mkldnn public API only.

@@ -415,9 +415,9 @@ static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=fa
 #elif TARGET_VE
     // soft limit for VE TBD XXX
     return (cpu_isa==isa_any? true
-            : cpu_isa==vednn? (CPU_ISA >= CPU_ISA_VEDNN)
-            : cpu_isa==vejit? (CPU_ISA >= CPU_ISA_VEJIT)
-            : false
+            : cpu_isa==vednn? (DNNL_ISA >= DNNL_ISA_VEDNN)
+            : cpu_isa==vejit? (DNNL_ISA >= DNNL_ISA_VEJIT)
+            : false);
 #else
 #error "unhandled DNNL_CPU target cpu"
 #endif
@@ -433,9 +433,7 @@ static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=fa
 namespace {
 inline unsigned int get_cache_size(int level, bool per_core = true){
     unsigned int l = level - 1;
-#if TARGET_VE
-    unsigned const cpuDataCacheLevels = 1;
-#elif TARGET_X86_JIT
+#if TARGET_X86_JIT
     unsigned const cpuDataCacheLevels = cpu.getDataCacheLevels();
 #else
     unsigned const cpuDataCacheLevels = 0; // use default settings
@@ -443,9 +441,18 @@ inline unsigned int get_cache_size(int level, bool per_core = true){
     // Currently, if XByak is not able to fetch the cache topology
     // we default to 32KB of L1, 512KB of L2 and 1MB of L3 per core.
     if (cpuDataCacheLevels == 0){
+#if TARGET_VE
+        const int L1_cache_per_core = 32000; // each, for data and instruction
+        const int L2_cache_per_core = 256000;
+        const int L3_cache_per_core = 16*1024*1024 / 8; // 16G per chip of 8 processors (today)
+#else
         const int L1_cache_per_core = 32000;
         const int L2_cache_per_core = 512000;
         const int L3_cache_per_core = 1024000;
+#if ! TARGET_X86
+#warning "Guessed cache sizes for this CPU!"
+#endif
+#endif
         int num_cores = per_core ? 1 : dnnl_get_max_threads();
         switch(l){
         case(0): return L1_cache_per_core * num_cores;
@@ -454,17 +461,13 @@ inline unsigned int get_cache_size(int level, bool per_core = true){
         default: return 0;
         }
     }
+#if TARGET_X86_JIT
     if (l < cpuDataCacheLevels) {
-#if TARGET_VE
         return cpu.getDataCacheSize(l)
                 / (per_core ? cpu.getCoresSharingDataCache(l) : 1);
-#else
-        size_t const cpuDataCacheSize = 16*1024*1024;
-        return cpuDataCacheSize
-                / (per_core ? dnnl_get_max_threads() : 1);
+    }
 #endif
-    } else
-        return 0;
+    return 0;
 }
 
 inline bool isa_has_bf16(cpu_isa_t isa) {

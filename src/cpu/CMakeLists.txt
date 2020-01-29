@@ -21,10 +21,17 @@ file(GLOB_RECURSE SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
     )
 
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/xbyak
-    )
+if(NOT TARGET_X86)
+    message(STATUS "no x86 JIT: removing all '.*jit.*' source code")
+    message(STATUS "\nbegin:\n${SOURCES}\n")
+    list(FILTER SOURCES EXCLUDE REGEX ".*(jit|xbyak).*")
+    message(STATUS "\nend:\n${SOURCES}\n")
+endif()
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+if(TARGET_X86)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/xbyak)
+endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
     # to make computations more stable and to align the jitted code
@@ -58,14 +65,15 @@ if(MSVC)
 endif()
 
 file(GLOB HPP_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp)
-set(SANITY_HPP ${CMAKE_BINARY_DIR}/sanity-checks.hpp)
-set(CMAKE_REQUIRED_FLAGS ${CMAKE_CXX_FLAGS})
-set(CMAKE_REQUIRED_INCLUDES ${CMAKE_CXX_FLAGS})
-include(CheckIncludeFileCXX)
-foreach(project_header ${HPP_HEADERS})
-    get_filename_component(header_name ${project_header} NAME_WE)
-    check_include_file_cxx("${project_header}" ${header_name}_IS_STANDALONE)
-endforeach()
+
+# Hmmm. not quite working? (missing include_directories)
+#set(CMAKE_REQUIRED_FLAGS ${CMAKE_CXX_FLAGS})
+#set(CMAKE_REQUIRED_INCLUDES ${CMAKE_CXX_FLAGS})
+#include(CheckIncludeFileCXX)
+#foreach(project_header ${HPP_HEADERS})
+#    get_filename_component(header_name ${project_header} NAME_WE)
+#    check_include_file_cxx("${project_header}" ${header_name}_IS_STANDALONE)
+#endforeach()
 
 set(OBJ_LIB ${LIB_NAME}_cpu)
 add_library(${OBJ_LIB} OBJECT ${SOURCES})

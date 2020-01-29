@@ -17,6 +17,7 @@
 #ifndef DNNL_THREAD_HPP
 #define DNNL_THREAD_HPP
 
+//#include "dnnl_os.h"    // various OMP macros (if supported by compiler/os)
 #include "utils.hpp"
 #include "z_magic.hpp"
 
@@ -91,7 +92,14 @@ inline tbb::static_partitioner dnnl_tbb_partitioner() {
 
 #endif
 
-#ifndef PRAGMA_OMP_SIMD // [ejk] pragma macros moved upward to include/mkldnn_os.h
+//
+// --------------- reintroduce here, and move away include/dnnl_os.h
+// --------------- into src/opt_pragmas.h for other stuff.
+// src/common/opt_pragmas.h is controlled by separate
+//     ENABLE_OPT_PRAGMAS and ENABLE_OMP_PRAGMAS flags (set here!)
+//
+// [ejk] pragma macros --> include/mkldnn_os.h, handles more cases
+#ifndef PRAGMA_OMP_SIMD
 // MSVC still supports omp 2.0 only
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
 #define collapse(x)

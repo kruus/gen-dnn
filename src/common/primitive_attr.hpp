@@ -238,12 +238,12 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
             dnnl::impl::alg_kind_t alg;
             float scale, alpha, beta;
         };
+        // sometimes "warning: types cannot be declared in anonymous unions"
+        struct sum_t { float scale; };
 
         dnnl::impl::primitive_kind_t kind;
         union {
-            struct {
-                float scale;
-            } sum;
+            sum_t sum;
             eltwise_t eltwise;
         };
 
@@ -412,4 +412,5 @@ inline dnnl_primitive_attr::skip_mask_t operator~(
             ~static_cast<unsigned>(rhs));
 }
 
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif
