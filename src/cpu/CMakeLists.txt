@@ -21,10 +21,24 @@ file(GLOB_RECURSE SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
     )
 
-if(NOT TARGET_X86)
+#macro(list_filter_exclude _list _regexp)
+#    # list_filter_exclude(<list> <regexp>)
+#    # behave like list(FILTER <list> EXCLUDE REGEX <regexp>)
+#    set(_kept)
+#    foreach(_item ${_list})
+#        string(REGEX MATCH "${_regexp}" _ok ${_item})
+#        if(NOT _ok)
+#            list(APPEND _kept _item)
+#        endif()
+#    endif()
+#    set(${_list} _kept)
+#endmacro()
+
+if(NOT TARGET_X86_JIT)
     message(STATUS "no x86 JIT: removing all '.*jit.*' source code")
     message(STATUS "\nbegin:\n${SOURCES}\n")
-    list(FILTER SOURCES EXCLUDE REGEX ".*(jit|xbyak).*")
+    #list(FILTER SOURCES EXCLUDE REGEX ".*(jit|xbyak).*") # not in older cmake
+    list_filter_exclude(SOURCES ".*(jit|xbyak).*") # not in older cmake
     message(STATUS "\nend:\n${SOURCES}\n")
 endif()
 

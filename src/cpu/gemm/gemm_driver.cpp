@@ -47,7 +47,7 @@ namespace impl {
 namespace cpu {
 
 template <typename c_type>
-struct ALIGNAS(64) gemm_per_thread_t {
+struct alignas(64) gemm_per_thread_t {
     volatile int32_t result;
     volatile int32_t compute_done;
     int32_t thr_k_stride;

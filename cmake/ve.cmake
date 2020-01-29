@@ -1,6 +1,11 @@
-# this one is important
+#
+# This is the VE Aurora toolchain file.
+# It sets things so cmake is not too confused.
+# Works in conjunction with Platform files while building libdnnl
+#
 # ve.cmake toolchain is invoked by cmake PROJECT command, after cmake
 # using uname (or whatever) to determine a host system such as 'Linux'
+#
 if(${CMAKE_HOST_SYSTEM_NAME})
     set(CMAKE_SYSTEM_NAME ${CMAKE_HOST_SYSTEM_NAME})
 else()
@@ -18,6 +23,19 @@ set(CMAKE_BUILD_TYPE_INIT "RelWithDebInfo")
 # for now, want verbose linking...
 set(CMAKE_EXE_LINKER_FLAGS_INIT "-v -Wl,--verbose -Wl,-z,-origin")
 set(CMAKE_SHARED_LINKER_FLAGS_INIT "-v -Wl,--verbose -Wl,-z,-origin")
+
+# list_filter_include(<list> <regexp>)
+# behave like list(FILTER <list> INCLUDE REGEX <regexp>)
+macro(list_filter_include _list _regexp)
+    set(_kept)
+    foreach(_item ${${_list}})
+        string(REGEX MATCH "${_regexp}" _ok "${_item}")
+        if(_ok)
+            list(APPEND _kept "${_item}")
+        endif()
+    endforeach()
+    set(${_list} "${_kept}")
+endmacro()
 
 macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS _compiler _flags _incVar _preincVar)
     # Input:
@@ -79,7 +97,8 @@ macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS _compiler _flags _incVar _preincVar)
     #message(STATUS "--> _compRoot = ${_compRoot}")
     set(_compArgs2 "${_compArgs}")
     #message(STATUS "begin with _compArgs2 = ${_compArgs2}")
-    list(FILTER _compArgs2 INCLUDE REGEX "ccom")
+    #list(FILTER _compArgs2 INCLUDE REGEX "ccom") # avail in cmake 3.x
+    list_filter_include(_compArg2 "ccom")
     message(STATUS "ccom at ${_compArgs2}")
     get_filename_component(_compRoot ${_compArgs2} DIRECTORY)
     #message(STATUS "--> _compRoot = ${_compRoot}")
@@ -1058,8 +1077,8 @@ macro(DETERMINE_NCC_SYSTEM_INCLUDES_DIRS__old _compiler _flags _incVar _preincVa
     #get_filename_component(_compRoot ${_compRoot} DIRECTORY)
     set(_compArgs2 "${_compArgs}")
     #message(STATUS "begin with _compArgs2 = ${_compArgs2}")
-    list(FILTER _compArgs2 INCLUDE REGEX "ccom")
-    message(STATUS "ccom at ${_compArgs2}")
+    list_filter_include(_compArgs2 "ccom")
+    #message(STATUS "ccom at ${_compArgs2}")
     get_filename_component(_compRoot ${_compArgs2} DIRECTORY)
     #message(STATUS "--> _compRoot = ${_compRoot}")
     get_filename_component(_compRoot ${_compRoot} DIRECTORY)
