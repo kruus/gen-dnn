@@ -97,9 +97,13 @@ extern "C"
 }
 #endif // defined(__ve)
 
+#if 0
+// For g++, adding this skips running the destructors when threads are joined.
 extern "C" int __cxa_thread_atexit(void (*dtor)(void*), void* obj, void* dso_symbol) 
 {
+    return 1;
 }
+#endif
 
 struct TlsInt {
     int t_num;
@@ -112,6 +116,7 @@ struct TlsInt {
         t_num = i;
         lock_guard<mutex> guard(coutMutex);
         cout<<" t_num @ "<<(void*)this<<" : "<<old<<" --> "<<t_num<<endl;
+        return *this;
     }
     ~TlsInt(){
         lock_guard<mutex> guard(coutMutex);
