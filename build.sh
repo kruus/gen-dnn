@@ -656,12 +656,21 @@ echo "PATH $PATH"
             set +x
         fi
         if [ "$BUILDOK" == "y" ]; then
-            # Make some assembly-source translations automatically...
-            #cxxfiles=`(cd ../tests/benchdnn && ls -1 conv/*conv?.cpp conv/*.cxx)`
-            #echo "cxxfiles = $cxxfiles"
-            (cd tests/benchdnn && { for f in conv/*conv?.cpp conv/*.cxx; do if [ -f "${f}"] ; then echo $f.s; make -j1 VERBOSE=1 $f.s; fi; done; }) || true
-            pwd
-            ls -l asm || true
+            # If you have some test convolutions in special-named files
+            # make some assembly-source translations automatically...
+            cxxfiles=`(cd ../tests/benchdnn && ls -1 conv/*conv?.cpp conv/*.cxx)`
+            if [ "$cxxfiles" ]; then (
+                cd tests/benchdnn && { for f in $cxxfiles; do
+                if [ -f "${f}" ]; then
+                    g=`basename "${f}" .cpp`; echo $f.s; make -j1 VERBOSE=1 conv/$f.s;
+                fi; done; }
+                ) || true
+            else
+                echo "No .s files to generate from test code in tests/benchdnn/conv"
+            fi
+            # maybe copy them into ../asm, for perusal?
+            #pwd
+            #ls -l ../asm || true
         fi
 
     else # skip the build, just run cmake ...

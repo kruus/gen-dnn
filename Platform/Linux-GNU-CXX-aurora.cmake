@@ -27,6 +27,7 @@ set(CMAKE_CXX_FLAGS_MINSIZEREL_INIT CMAKE_CXX_FLAGS_RELEASE_INIT)
 #  list(APPEND CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES /usr/include )
 #  list(APPEND CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES /usr/include )
 #  list(APPEND CMAKE_CUDA_IMPLICIT_INCLUDE_DIRECTORIES /usr/include )
+# ... so we'll remove them and use some VE paths ...
 list(INSERT CMAKE_SYSTEM_PREFIX_PATH 0 ${VE_OPT} ${NLC_HOME})
 list(REMOVE_DUPLICATES CMAKE_SYSTEM_PREFIX_PATH)
 list(REMOVE_DUPLICATES CMAKE_SYSTEM_LIBRARY_PATH)
@@ -57,7 +58,24 @@ list(REMOVE_DUPLICATES CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES)
 message(STATUS "  CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES -> ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES}")
 
 # help debug library linking and RPATH stuff {perhaps paranoid]
-set(CMAKE_CXX_LINK_FLAGS "-v -Wl,--verbose -Wl,-z,origin")
+#set(CMAKE_CXX_LINK_FLAGS "-v -Wl,--verbose -Wl,-z,origin")
 VE_PARANOID_RPATH()
 
+#set(CMAKE_CXX_LINK_FLAGS "-Dcmake_cxx_link_flags ${CMAKE_CXX_LINK_FLAGS} -v -Wl,-origin -Wl,-rpath,$ORIGIN/../lib ${VE_LINK_RPATH}")
+# the following **DO** influence executables and libraries
+# remove -Wl,-origin for ncc ?
+# added rpath-link to compiler/lib dir ?
+#       (but this SHOULD be in the RUNPATH of libmkldnn.so already!)
+# (cmake might still be missing some COMPILER library info)
+#
+#  Note: nld has messages about not respecting ORIGIN in rpath.
+#  This might explain some of the ugly link paths here ...
+set(CMAKE_CXX_LINK_FLAGS "-Dcmake_c_link_flags ${CMAKE_CXX_LINK_FLAGS} -v -Wl,-origin -Wl,-rpath,$ORIGIN/../lib")
+# very ugly!
+set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -Wl,-rpath-link,${VE_CXX_ROOTDIR}/lib")
+set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} ${VE_LINK_RPATH}")
+
+set(CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS "-Dcmake_shared_library_create_cxx_flags ${CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS} ${VE_LINK_RPATH}")
+
+show_cmake_stuff("End of Platform/Linux-GNU-CXX-aurora.cmake")
 # vim: et ts=4 sw=4 ai

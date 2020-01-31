@@ -32,6 +32,15 @@
 
 #include "cpu_isa_traits.hpp"
 #include "simple_q10n.hpp"
+#include "cpu_target.h"
+
+// VE compiler bogs down horribly with huge number of reorders
+//#define REORDER_ENABLE_CONV_S8S8 (! TARGET_VE) /* remove, eventually XXX */
+#if TARGET_VE
+#define REORDER_ENABLE_CONV_S8S8 0
+#else
+#define REORDER_ENABLE_CONV_S8S8 1
+#endif
 
 namespace dnnl {
 namespace impl {
@@ -59,7 +68,9 @@ namespace spec {
 struct direct_copy {};
 struct direct_copy_except_dim_0 {};
 struct reference {};
+#if REORDER_ENABLE_CONV_S8S8
 struct conv_s8s8 {};
+#endif // REORDER_ENABLE_CONV_S8S8
 } // namespace spec
 
 #define SIMPLE_REORDER_TEMPL_DECL \
@@ -115,6 +126,7 @@ bool simple_attr_check(const primitive_attr_t *attr, bool many_scales_support,
 }
 } // namespace
 
+#if REORDER_ENABLE_CONV_S8S8
 /* specific reorders: implementation */
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
@@ -453,6 +465,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         return status::success;
     }
 };
+#endif // REORDER_ENABLE_CONV_S8S8
 
 #if DNNL_ENABLE_BFLOAT16
 template <SIMPLE_REORDER_TEMPL_DECL>

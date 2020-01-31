@@ -167,4 +167,6 @@ else()
     install(FILES ${PROJECT_BINARY_DIR}/README DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${LIB_NAME})
 endif()
 
-show_cmake_stuff("At end of CMakeLists.txt")
+if(NECVE) # toolchain debug
+    show_cmake_stuff("At end of CMakeLists.txt")
+endif()

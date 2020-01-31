@@ -64,6 +64,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
 #endif // DNNL_ENABLE_BFLOAT16
         rnn_weights_reorder_s8_t<f32>::pd_t::create,
 
+#if REORDER_ENABLE_CONV_S8S8
         /* conv reorders w/ compensation */
         REG_SR(f32, any, s8, hwio, fmt_order::keep, spec::conv_s8s8),
         REG_SR(f32, any, s8, hwigo, fmt_order::keep, spec::conv_s8s8),
@@ -147,10 +148,11 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
         REG_SR(s8, goiw, s8, Goiw8g, fmt_order::keep, spec::conv_s8s8),
         REG_SR(s8, goihw, s8, Goihw8g, fmt_order::keep, spec::conv_s8s8),
         REG_SR(s8, hwigo, s8, Goihw8g, fmt_order::keep, spec::conv_s8s8),
+#endif // REORDER_ENABLE_CONV_S8S8
 
 /* regular reorders */
 
-#if defined(__INTEL_COMPILER) || (defined(__GNUC__) && !defined(__clang__))
+#if defined(__INTEL_COMPILER) || (defined(__GNUC__) && !defined(__clang__)) || !TARGET_X86_JIT
         /* Direct copy for icc which is faster than jitted code;
      * Direct copy for gcc which might or might not be faster than jitted
      * code, but still worth it because doesn't require jitting, i.e. much
@@ -159,7 +161,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
         REG_SR_DIRECT_COPY(f32, f32),
 #endif
 
-#ifdef __INTEL_COMPILER
+#if defined(__INTEL_COMPILER) || !TARGET_X86_JIT
         /* direct copy for icc, which is faster than jitted code */
         REG_SR_DIRECT_COPY(f32, s32),
         REG_SR_DIRECT_COPY(f32, s8),

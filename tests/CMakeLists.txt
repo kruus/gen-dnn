@@ -48,7 +48,7 @@ if(UNIX OR MINGW)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel"
             AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "17.0")
         append(CMAKE_TEST_CCXX_NOWARN_FLAGS "-diag-disable:1478")
-    else()
+    elseif(NOT NECVE)
         append(CMAKE_TEST_CCXX_NOWARN_FLAGS "-Wno-deprecated-declarations")
     endif()
 elseif(WIN32 AND NOT MINGW)

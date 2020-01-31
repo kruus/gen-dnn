@@ -34,6 +34,11 @@
 #include "dnnl.h"
 #include "utils.hpp"
 
+#if defined(__ve)
+// N/A      #include <stdatomic.h>
+#include <atomic> // avail ncc-2.3.20
+#endif
+
 namespace dnnl {
 namespace impl {
 
@@ -115,7 +120,8 @@ int32_t fetch_and_add(int32_t *dst, int32_t val) {
 #ifdef _WIN32
     return InterlockedExchangeAdd(reinterpret_cast<long *>(dst), val);
 #else
-    return __sync_fetch_and_add(dst, val);
+    // ve: N/A return atomic_fetch_add(dst, val);
+    return __sync_fetch_and_add(dst, val); // compiles but undefined symbol for VE
 #endif
 }
 
