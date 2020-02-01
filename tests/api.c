@@ -23,6 +23,9 @@
 
 #define for_ for
 
+#define VERBOSE 1
+
+#if VERBOSE==0
 #define CHECK(f) \
     do { \
         dnnl_status_t s = f; \
@@ -41,6 +44,30 @@
             exit(2); \
         } \
     } while (0)
+#else
+#define CHECK(f) \
+    do { \
+        dnnl_status_t s = f; \
+        if (s != dnnl_success) { \
+            printf("[%s:%d] error: %s returns %d\n", __FILE__, __LINE__, #f, \
+                    s); \
+            exit(2); \
+        } else { \
+            printf(" OK: %s\n", #f); \
+        } \
+    } while (0)
+
+#define CHECK_TRUE(expr) \
+    do { \
+        int e_ = expr; \
+        if (!e_) { \
+            printf("[%s:%d] %s failed\n", __FILE__, __LINE__, #expr); \
+            exit(2); \
+        } else { \
+            printf(" OK: %s\n", #expr); \
+        } \
+    } while (0)
+#endif
 
 static size_t product(dnnl_dim_t *arr, size_t size) {
     size_t prod = 1;
@@ -345,3 +372,4 @@ int main() {
     test3();
     return 0;
 }
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
