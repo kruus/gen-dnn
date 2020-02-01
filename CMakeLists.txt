@@ -167,6 +167,9 @@ else()
     install(FILES ${PROJECT_BINARY_DIR}/README DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${LIB_NAME})
 endif()
 
+# record some cmake variables in the build tree, for shell scripts
+configure_file(${CMAKE_SOURCE_DIR}/cmake/bash_help.inc.in
+    ${PROJECT_BINARY_DIR}/bash_help.inc)
 if(NECVE) # toolchain debug
     show_cmake_stuff("At end of CMakeLists.txt")
 endif()

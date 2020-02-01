@@ -5,6 +5,18 @@
 using namespace std;
 mutex coutMutex; // shared with all threads
 
+#if 1
+// For g++, adding this skips running the destructors when threads are joined.
+//
+// For ve, this allows linking, but when run we have a
+// segfault during thread creation !
+//
+extern "C" int __cxa_thread_atexit(void (*dtor)(void*), void* obj, void* dso_symbol) throw()
+{
+    return 1;
+}
+#endif
+
 #if 0 //defined(__ve)
 //
 // This is copied from https://github.com/llvm-mirror/libcxxabi/blob/master/src/cxa_thread_atexit.cpp
@@ -97,14 +109,6 @@ extern "C"
 }
 #endif // defined(__ve)
 
-#if 0
-// For g++, adding this skips running the destructors when threads are joined.
-extern "C" int __cxa_thread_atexit(void (*dtor)(void*), void* obj, void* dso_symbol) 
-{
-    return 1;
-}
-#endif
-
 struct TlsInt {
     int t_num;
     TlsInt(){
@@ -134,6 +138,7 @@ void setTlsInt(int const num){ // each thread assigns to its object
 }
 
 int main(){
+    cout<<"\nHello!"<<endl;
     thread t1(setTlsInt,1); 
     thread t2(setTlsInt,2); 
     thread t3(setTlsInt,3); 

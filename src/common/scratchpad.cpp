@@ -67,7 +67,12 @@ struct global_scratchpad_t : public scratchpad_t {
         UNUSED(engine);
         if (size > size_) {
             auto *mem_storage = create_scratchpad_memory_storage(engine, size);
+#if !TARGET_VE
             mem_storage_.reset(mem_storage);
+#else
+            delete mem_storage_;
+            mem_storage_ = mem_storage;
+#endif
             size_ = size;
         }
         reference_count_++;
@@ -76,23 +81,41 @@ struct global_scratchpad_t : public scratchpad_t {
     ~global_scratchpad_t() {
         reference_count_--;
         if (reference_count_ == 0) {
+#if !TARGET_VE
             mem_storage_.reset();
+#else
+            delete mem_storage_;
+            mem_storage_ = nullptr;
+#endif
             size_ = 0;
         }
     }
 
     virtual const memory_storage_t *get_memory_storage() const override {
+#if !TARGET_VE
         return mem_storage_.get();
+#else
+        return mem_storage_;
+#endif
     }
 
 private:
+#if !TARGET_VE
     thread_local static std::unique_ptr<memory_storage_t> mem_storage_;
+#else // workaround lack of support for thread_local C++ objects
+    thread_local static memory_storage_t * mem_storage_;
+    // ? atexit ?
+#endif
     thread_local static size_t size_;
     thread_local static unsigned int reference_count_;
 };
 
+#if !TARGET_VE
 thread_local std::unique_ptr<memory_storage_t>
         global_scratchpad_t::mem_storage_(nullptr);
+#else
+thread_local memory_storage_t * global_scratchpad_t::mem_storage_ = nullptr;
+#endif
 thread_local size_t global_scratchpad_t::size_ = 0;
 thread_local unsigned int global_scratchpad_t::reference_count_ = 0;
 

@@ -16,7 +16,8 @@ all: tls_ok tls_bad
 NCXX=nc++
 GCXX=g++
 
-.PHONY: tls_ok tls_bad
+.PHONY: tls_ok tls_bad ve
+ve: simple_tls-ve threadlocal-ve
 tls_ok: simple_tls simple_tls-ve
 tls_bad: threadlocal threadlocal-ve
 
@@ -28,7 +29,7 @@ simple_tls-ve: simple_tls.cpp
 threadlocal: threadlocal.cpp
 	$(GCXX) -Wall -o $@ -std=gnu++11 -pthread $< && ./$@
 threadlocal-ve: threadlocal.cpp
-	$(NCXX) -Wall -o $@ -std=gnu++11 -pthread $< && ./$@
+	$(NCXX) -Wall -o $@ -std=gnu++11 -pthread -g2 $< && ./$@
 threadlocal-ve2: threadlocal.cpp
 	$(NCXX) -std=gnu++11 -O3 -pthread -c $< -o $@.o
 	nnm $@.o | grep tls
