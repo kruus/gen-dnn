@@ -172,10 +172,20 @@ struct ref_matmul_t : public primitive_impl_t {
             return memory_desc_init_by_tag(md_, format_tag::x);
         }
 
+#if 0 // orig
         memory_desc_t a0_md_ = memory_desc_t();
         memory_desc_t b0_md_ = memory_desc_t();
         memory_desc_t c0_md_ = memory_desc_t();
         memory_desc_t scales_md_ = memory_desc_t();
+#else
+        // Note: [abc]0_md_ might contain garbage (default init POD type),
+        // depending on compiler. During init() they are partially initialized,
+        // so to be safe let's try harder to zero initialize them.
+        memory_desc_t a0_md_ = memory_desc_t({0});
+        memory_desc_t b0_md_ = memory_desc_t({0});
+        memory_desc_t c0_md_ = memory_desc_t({0});
+        memory_desc_t scales_md_ = memory_desc_t({0});
+#endif
         int eltwise_idx_ = -1;
     };
 

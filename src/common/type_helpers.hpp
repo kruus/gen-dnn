@@ -149,10 +149,16 @@ inline bool rnn_packed_desc_is_equal(
 }
 
 inline memory_desc_t zero_md() {
-    auto zero = memory_desc_t();
+    //auto zero = memory_desc_t(); // default-constructed "C" POD type
+    // some compilers do not zero-initialize the above, leading to sporadic errors
+    // To be safe, some occurences of memory_desc_t() may need to take extra care.
+    auto zero = memory_desc_t({0});
     return zero;
 }
 
+// Following compares ALL elements of the struct (not just 'ndims==0')
+// so we had better be absolutely certain the default-constructed POD
+// type is fully initialized, in 'zero_md()' above.
 inline bool is_zero_md(const memory_desc_t *md) {
     return md == nullptr || *md == zero_md();
 }

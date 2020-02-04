@@ -23,6 +23,15 @@
 #include "gemm/gemm.hpp"
 #include "gemm_convolution_utils.hpp"
 #include "ref_eltwise.hpp"
+#include "consistency.hpp"
+
+#if !defined(MKLDNN_REF_CONV_DBG)
+#if !defined(NDEBUG)
+#define MKLDNN_REF_CONV_DBG 1
+#else
+#define MKLDNN_REF_CONV_DBG 1
+#endif
+#endif
 
 #include "cpu_convolution_pd.hpp"
 
@@ -42,6 +51,23 @@ struct gemm_convolution_fwd_t : public primitive_impl_t {
                 GEMM_IMPL_STR, gemm_convolution_fwd_t, USE_GLOBAL_SCRATCHPAD);
 
         status_t init() {
+#if MKLDNN_REF_CONV_DBG
+#define AND_(...) SCHKVV(ok,__VA_ARGS__)
+            Consistency ok("cpu_gemm_conv_fwd");
+	    AND_(is_fwd());
+	    AND_(set_default_alg_kind(alg_kind::convolution_direct));
+	    AND_(expect_data_types(data_type::f32, data_type::f32,
+				    data_type::f32, data_type::f32, data_type::f32));
+	    AND_(!has_zero_dim_memory());
+	    AND_(set_default_formats_common(
+				    dat_tag(), wei_tag(), dat_tag()));
+	    AND_(attr()->has_default_values(
+				    primitive_attr_t::skip_mask_t::post_ops));
+	    AND_(post_ops_ok());
+	    AND_(memory_desc_matches_tag(*src_md(), dat_tag()));
+	    AND_(memory_desc_matches_tag(*dst_md(), dat_tag()));
+	    AND_(memory_desc_matches_tag(*weights_md(), wei_tag()));
+#else
             bool ok = true && is_fwd()
                     && set_default_alg_kind(alg_kind::convolution_direct)
                     && expect_data_types(data_type::f32, data_type::f32,
@@ -55,6 +81,7 @@ struct gemm_convolution_fwd_t : public primitive_impl_t {
                     && memory_desc_matches_tag(*src_md(), dat_tag())
                     && memory_desc_matches_tag(*dst_md(), dat_tag())
                     && memory_desc_matches_tag(*weights_md(), wei_tag());
+#endif
             if (!ok) return status::unimplemented;
 
             auto scratchpad = scratchpad_registry().registrar();

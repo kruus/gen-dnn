@@ -23,7 +23,7 @@
 
 #define for_ for
 
-#define VERBOSE 1
+#define VERBOSE 0
 
 #if VERBOSE==0
 #define CHECK(f) \

@@ -33,7 +33,7 @@ using namespace dnnl::impl::data_type;
 
 namespace dnnl {
 namespace impl {
-memory_desc_t glob_zero_md = memory_desc_t();
+memory_desc_t glob_zero_md = memory_desc_t({0});
 }
 } // namespace dnnl
 
@@ -97,7 +97,8 @@ status_t dnnl_memory_desc_init_by_tag(memory_desc_t *memory_desc, int ndims,
             && memory_desc_sanity_check(ndims, dims, data_type, format_kind);
     if (!args_ok) return invalid_arguments;
 
-    auto md = memory_desc_t();
+    //auto md = memory_desc_t();
+    auto md = memory_desc_t({0}); // perhaps not all elements are zeroed (padded_offsets,offset0,extra)
     md.ndims = ndims;
     array_copy(md.dims, dims, ndims);
     md.data_type = data_type;
@@ -135,7 +136,8 @@ status_t dnnl_memory_desc_init_by_strides(memory_desc_t *memory_desc, int ndims,
                     ndims, dims, data_type, format_kind::undef);
     if (!args_ok) return invalid_arguments;
 
-    auto md = memory_desc_t();
+    //auto md = memory_desc_t();
+    auto md = memory_desc_t({0}); // perhaps not all elements are zeroed (padded_offsets,offset0,extra)
     md.ndims = ndims;
     array_copy(md.dims, dims, ndims);
     md.data_type = data_type;
@@ -239,7 +241,8 @@ status_t dnnl_memory_desc_reshape(memory_desc_t *out_md,
     for (int d = in_md->ndims; d < ndims; ++d)
         if (dims[d] != 1) return invalid_arguments;
 
-    auto md = memory_desc_t();
+    //auto md = memory_desc_t();
+    auto md = memory_desc_t({0}); // perhaps not all elements are zeroed (padded_offsets,offset0,extra)
 
     // copy values from in_md to md
     md.ndims = ndims;

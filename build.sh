@@ -693,6 +693,7 @@ echo "PATH $PATH"
         echo "DOTEST    $DOTEST"
         echo "DODEBUG   $DODEBUG"
         echo "DODOC     $DODOC"
+        export DNNL_VERBOSE=7
         source "./bash_help.inc" # we are already in ${BUILDDIR}
         if [ "${CMAKE_CROSSCOMPILING_EMULATOR}" ]; then
             VE_EXEC="${CMAKE_CROSSCOMPILING_EMULATOR}"
@@ -704,10 +705,17 @@ echo "PATH $PATH"
         #if [ -x tests/api-io-c ]; then
         #    { echo "api-io-c                ..."; ${TESTRUNNER} ${VE_EXEC} tests/api-io-c || BUILDOK="n"; }
         #else
-            { echo "api-c                ..."; ${TESTRUNNER} ${VE_EXEC} tests/api-c || BUILDOK="n"; }
+            { echo "api-c                   ...";
+                ${TESTRUNNER} ${VE_EXEC} tests/api-c \
+                || xBUILDOK="n";
+            } 
         #fi
-        if [ $DOTEST -eq 0 -a $DOJIT -ge 0 ]; then # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
-            { echo "simple-training-net-cpp ..."; ${TESTRUNNER}  ${VE_EXEC} examples/simple-training-net-cpp || BUILDOK="n"; }
+        if [ $DOTEST -eq 0 -a $DOJIT -ge 0 ]; then
+            # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
+            { echo "simple-training-net-cpp ...";
+                ${TESTRUNNER}  ${VE_EXEC} examples/simple-training-net-cpp \
+                || BUILDOK="n";
+            }
         fi
     fi
     if [ "$BUILDOK" == "y" -a "$DOTARGET" == "s" ]; then

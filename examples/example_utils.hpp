@@ -29,6 +29,23 @@
 #include "dnnl.hpp"
 #include "dnnl_debug.h"
 
+#if 1 // pause for gdb
+#include <stdio.h>
+static void inline myflush(FILE *in) {
+	int ch;
+	do
+		ch = fgetc ( in ); 
+	while ( ch != EOF && ch != '\n' ); 
+	clearerr ( in );
+}
+static void inline mypause() { 
+	printf ( "Press [Enter] to continue . . ." );
+	fflush ( stdout );
+	getchar();
+} 
+#else
+void mypause() {}
+#endif
 // Exception class to indicate that the example uses a feature that is not
 // available on the current systems. It is not treated as an error then, but
 // just notifies a user.
@@ -57,9 +74,11 @@ inline int handle_example_errors(
         std::cout << "DNNL error caught: " << std::endl
                   << "\tStatus: " << dnnl_status2str(e.status) << std::endl
                   << "\tMessage: " << e.what() << std::endl;
+        mypause(); //debug!
         exit_code = 1;
     } catch (std::exception &e) {
         std::cout << "Error in the example: " << e.what() << "." << std::endl;
+        mypause(); // debug!
         exit_code = 2;
     }
 
@@ -176,4 +195,5 @@ inline void write_to_dnnl_memory(void *handle, dnnl::memory &mem) {
 #endif
 }
 
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

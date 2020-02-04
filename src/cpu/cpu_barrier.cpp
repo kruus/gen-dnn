@@ -152,7 +152,7 @@ void barrier(ctx_t *ctx, int nthr) {
 }
 
 #elif defined(__ve) //TARGET_VE
-#warning "Aurora: if xatomic0.h usable, using _Atomic_counter_t might give a trivial impl"
+//#warning "Aurora: if xatomic0.h usable, using _Atomic_counter_t might give a trivial impl"
 
 // TODO: check that ncc uses proper fences for volatile variables
 void barrier(ctx_t *ctx, int nthr) {

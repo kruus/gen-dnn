@@ -94,6 +94,9 @@
 #include "dnnl.hpp"
 
 #include "example_utils.hpp"
+#include <iostream>
+using std::cout;
+using std::endl;
 
 using namespace dnnl;
 
@@ -101,6 +104,8 @@ using namespace dnnl;
 /// @section memory_format_propagation_tutorial memory_format_propagation() function
 ///
 void memory_format_propagation_tutorial(engine::kind engine_kind) {
+    int const v=1; // verbose debug
+
     /// @page memory_format_propagation_cpp
     /// @subsection memory_format_propagation_sub1 Initialization
     ///
@@ -149,6 +154,7 @@ void memory_format_propagation_tutorial(engine::kind engine_kind) {
     ///
     // @snippet memory_format_propagation.cpp Create convolution and pooling primitive descriptors
     // [Create convolution and pooling primitive descriptors]
+    if(v){cout<<"\n conv primitive desc..."<<endl; cout.flush();}
     auto conv_pd = convolution_forward::primitive_desc(
             {prop_kind::forward_inference, algorithm::convolution_auto,
                     conv_src_md, conv_weights_md,
@@ -156,6 +162,7 @@ void memory_format_propagation_tutorial(engine::kind engine_kind) {
                     {1, 1}, // strides
                     {1, 1}, {1, 1}}, // left and right padding
             eng);
+    if(v){cout<<"\n pooling primitive desc..."<<endl; cout.flush();}
     auto pool_pd = pooling_forward::primitive_desc(
             {prop_kind::forward_inference, algorithm::pooling_max,
                     conv_pd.dst_desc(), pool_dst_md, // shape information
@@ -174,6 +181,7 @@ void memory_format_propagation_tutorial(engine::kind engine_kind) {
     ///
     /// @snippet memory_format_propagation.cpp Create source and destination memory objects
     // [Create source and destination memory objects]
+    if(v){cout<<"\n nchw memories..."<<endl; cout.flush();}
     auto src_mem = memory(
             {{N, IC, H, W}, memory::data_type::f32, memory::format_tag::nchw},
             eng);
@@ -251,6 +259,7 @@ void memory_format_propagation_tutorial(engine::kind engine_kind) {
     /// asynchronous execution.
     ///
     /// @snippet memory_format_propagation.cpp Perform reorders for source data if necessary
+    if(v){cout<<" reorder..."<<endl; cout.flush();}
     // [Perform reorders for source data if necessary]
     if (need_reorder_src) {
         auto reorder_src = reorder(src_mem, conv_src_mem);
@@ -308,6 +317,8 @@ void memory_format_propagation_tutorial(engine::kind engine_kind) {
 }
 
 int main(int argc, char **argv) {
+    dnnl_set_verbose(7);
+    cout<<" dnnl_get_verbose()-->"<<dnnl_get_verbose()<<endl;
     return handle_example_errors(
             memory_format_propagation_tutorial, parse_engine_kind(argc, argv));
 }
@@ -355,3 +366,4 @@ int main(int argc, char **argv) {
 ///   dnnl::memory::format_tag::ABcd8b8a optimized memory format (output (A)
 ///   and input (B) channel dimensions blocked by 8) which we also had to
 ///   reorder the initial weights to since they are in the OIHW memory format.
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

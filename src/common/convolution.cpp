@@ -21,6 +21,10 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 #include "consistency.hpp" // debug: print reason for consistency failures
+#include <iostream>
+#include <cstring>
+using std::cout;
+using std::endl;
 
 using namespace dnnl::impl;
 using namespace dnnl::impl::utils;
@@ -36,6 +40,8 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
         const memory_desc_t *weights_desc, const memory_desc_t *bias_desc,
         const memory_desc_t *dst_desc, const dims_t strides,
         const dims_t dilates, const dims_t padding_l, const dims_t padding_r) {
+    //if(bias_desc==nullptr) cout<<" conv_desc_init:bias_desc=NULL";
+    //else cout<<" conv_desc_init::WITH-BIAS"<<endl;
     bool args_ok = true
             && !any_null(conv_desc, src_desc, weights_desc, dst_desc, strides,
                     padding_l)
@@ -54,10 +60,16 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
     cd.diff_dst_desc = cd.dst_desc = zero_md();
     cd.diff_weights_desc = cd.weights_desc = zero_md();
     cd.diff_bias_desc = cd.bias_desc = zero_md();
+    //if(memory_desc_wrapper(cd.bias_desc).is_zero()) cout<<" cd.bias_desc.is_zero()!";
+    //if(is_zero_md(&cd.bias_desc)) cout<<" is_zero_md(&cd.bias_desc)";
 
     const bool is_fwd = one_of(prop_kind, forward_training, forward_inference);
     const bool with_bias
             = bias_desc && bias_desc->format_kind != format_kind::undef;
+#define SHORTFILE (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+#define DBG(MSG) do{ cout<<SHORTFILE<<":"<<__LINE__<<": "<<MSG; }while(0)
+    // next: no influence on bug
+    //DBG(" conv_desc_init : bias_desc@"<<(void*)bias_desc<<", with_bias="<<with_bias<<endl);
     const bool with_groups = weights_desc->ndims == src_desc->ndims + 1;
 
     bool runtime_dims_or_strides

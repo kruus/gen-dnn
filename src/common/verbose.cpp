@@ -67,7 +67,7 @@
     "Intel AVX-512 with AVX512_4FMAPS and AVX512_4VNNIW extensions"
 #define AVX512_CORE_BF16 \
     "Intel AVX-512 with Intel DL Boost and bfloat16 support"
-#define VEJIT "NEC Aurora (VE) with libvednn jit"
+#define VEDNNJIT "NEC Aurora (VE) with libvednn jit"
 #define VEDNN "NEC Aurora (VE) with libvednn C api calls"
 #define VE_COMMON \
         "NEC Aurora (VE) (C/C++-only vanilla build)"
@@ -86,11 +86,12 @@ int get_verbose() {
         if (getenv("MKLDNN_VERBOSE", val, len) == 1) verbose.set(atoi(val));
         if (getenv("DNNL_VERBOSE", val, len) == 1) verbose.set(atoi(val));
     }
-    static bool version_printed = true;
+    static bool version_printed = false;
     if (!version_printed && verbose.get() > 0) {
-        printf("dnnl_verbose,info,DNNL v%d.%d.%d (commit %s)\n",
+        printf("dnnl_verbose,info,DNNL v%d.%d.%d (commit %s), DNNL_VERBOSE=%d\n",
                 dnnl_version()->major, dnnl_version()->minor,
-                dnnl_version()->patch, dnnl_version()->hash);
+                dnnl_version()->patch, dnnl_version()->hash,
+                verbose.get());
         printf("dnnl_verbose,info,cpu,runtime:%s\n",
                 dnnl_runtime2str(dnnl_version()->cpu_runtime));
         printf("dnnl_verbose,info,cpu,isa:%s\n", get_isa_info());
@@ -130,7 +131,7 @@ const char *get_isa_info() {
     if (mayiuse(avx2)) return AVX2;
     if (mayiuse(avx)) return AVX;
     if (mayiuse(sse41)) return SSE41;
-    if (mayiuse(vejit)) return VEJIT;
+    if (mayiuse(vejit)) return VEDNNJIT;
     if (mayiuse(vednn)) return VEDNN;
     if (mayiuse(ve_common)) return VE_COMMON;
     if (mayiuse(vanilla)) return VANILLA;
@@ -995,8 +996,8 @@ void init_info(sum_pd_t *s, char *b) {
 
 dnnl_status_t dnnl_set_verbose(int level) {
     using namespace dnnl::impl::status;
-    if ((level & ~0x7)) return invalid_arguments; // bit 2-3 make consistency.hpp more verbose
-    if ((level&0x3) > 2) return invalid_arguments; // bit 0-1 as usual
+    //if ((level & ~0x7)) return invalid_arguments; // bit 2-3 make consistency.hpp more verbose
+    //if ((level&0x3) > 2) return invalid_arguments; // bit 0-1 as usual
     dnnl::impl::verbose.set(level);
     return success;
 }
