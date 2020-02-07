@@ -367,6 +367,7 @@ inline bool nd_iterator_step() {
 }
 template <typename U, typename W, typename... Args>
 inline bool nd_iterator_step(U &x, const W &X, Args &&... tuple) {
+#if 0
     // nc++: err(1813) Cannot branch into or out of OpenMP construct.
     bool ret = false;
     if (nd_iterator_step(utils::forward<Args>(tuple)...)) {
@@ -374,6 +375,11 @@ inline bool nd_iterator_step(U &x, const W &X, Args &&... tuple) {
         ret = (x == 0);
     }
     return ret;
+#endif
+    // can nc++ do better with a one-liner?
+    return nd_iterator_step(utils::forward<Args>(tuple)...)
+            ? (x = (x + 1) % X) == 0
+            : false;
 }
 
 template <typename U, typename W, typename Y>

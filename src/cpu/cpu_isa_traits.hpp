@@ -398,35 +398,64 @@ static inline bool mayiuse(const cpu_isa_t cpu_isa, const bool soft = false) {
 }
 
 #elif TARGET_X86 // and no jit, only "VANILLA" build is usable
+#error "I want to test TARGET_VE today"
 static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=false) {
+    static_assert(vanilla==1, "mayiuse(cpu_isa_t) may need some work")
     //unsigned cpu_isa_mask = get_max_cpu_isa(soft);
     //if ((cpu_isa_mask & cpu_isa) != cpu_isa) return false;
-
-    // for a vanilla build, we should only be able to set to vanilla?
-    return cpu_isa == vanilla; // ??
+    return cpu_isa == vanilla;
+    // non-jit x86 build: only valid cpu_isa_t is vanilla
 }
 
-#else // non-x86 target cpu
-static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=false) {
+#elif TARGET_VE // non-x86 target cpu
+//static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=false) {
+static inline bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=false) {
 #ifdef DNNL_ENABLE_MAX_CPU_ISA
+#warning "GOOD! I want to print out mayiuse for debugging"
     //unsigned cpu_isa_mask = get_max_cpu_isa(soft);
     //if ((cpu_isa_mask & cpu_isa) != cpu_isa) return false;
-#if TARGET_VE
+    //
+    // non-x86 don't yet have a reason to call mayiuse...
+    //return ((void)soft,(void)cpu_isa, false);
+    //
     // soft limit for VE TBD XXX
+    //
+#if 1 // debug
+    bool ret=false;
+    if((cpu_isa & ve_all) != cpu_isa){
+        printf(" mayiuse(%d)=NO(wrong cpu)",(int)cpu_isa);
+    }else if(cpu_isa==vanilla){
+        printf(" ve-mayiuse(vanilla)=true");
+        ret=true;
+    }else if(cpu_isa==isa_any){
+        printf(" ve-mayiuse(any)=true");
+        ret=true;
+    }else if(cpu_isa==vednn){
+        ret = (DNNL_ISA >= DNNL_ISA_VEDNN);
+        printf(" ve-mayiuse(vednn)=%d\n",(int)ret);
+    }else if(cpu_isa==vejit){
+        ret = (DNNL_ISA >= DNNL_ISA_VEJIT);
+        printf(" ve-mayiuse(vednn)=%d\n",(int)ret);
+    }else{
+        printf(" unhandled case, mayiuse=false");
+    }
+    return ret;
+#else
     return (cpu_isa==vanilla? true
-            : cpu_isa==isa_any? true
+            : cpu_isa==isa_any || cpu_isa==ve_common? true
             : cpu_isa==vednn? (DNNL_ISA >= DNNL_ISA_VEDNN)
             : cpu_isa==vejit? (DNNL_ISA >= DNNL_ISA_VEJIT)
-            : false);
-#else
-#error "unhandled DNNL_CPU target cpu"
+            : false;
 #endif
 #else
-    // non-x86 don't yet have a reason to call mayiuse...
-    return ((void)soft,(void)cpu_isa, false);
+#error "I want only DNNL_ENABLE_MAX_CPU_ISA code for now"
+    return ((void)soft,(void)cpu_isa,
+        cpu_isa==vanilla || cpu_isa==isa_any);
 #endif // DNNL_ENABLE_MAX_CPU_ISA
 }
 
+#else
+#error "unhandled DNNL_CPU target cpu -- please write a 'mayiuse' function"
 #endif // TARGET_* mayiuse variations
 } // namespace
 

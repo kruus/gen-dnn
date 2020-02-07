@@ -90,7 +90,7 @@ public:
                 if (expected == locked_after_a_get) break;
             }
         }
-        if(verbose) printf(" cpu_isa GET(0x%lx)-->state %d\n",(long)value_,(int)state_.load());
+        if(verbose) printf(" cpu_isa GET set-once value 0x%lx, then state-->%d\n",(long)value_,(int)state_.load());
         return value_;
     }
 };

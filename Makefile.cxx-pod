@@ -1,0 +1,12 @@
+all: cxx-pod
+CXX:=nc++
+CFLAGS=-minit-stack=0xbadfaced
+%.cpp.o: %.cpp
+	$(CXX) -std=gnu++11 -Wall -O4 $(CFLAGS) -o $@ -c $<
+cxx-pod: cxx-pod.cpp.o cxx-pod-fill.cpp.o cxx-pod-test.cpp.o cxx-pod2.cpp.o
+	$(CXX) -std=gnu++11 -Wall -O4 -o $(LDFLAGS) $@ $^
+	./$@
+clean:
+	rm -f *.o
+realclean: clean
+	rm -f cxx-pod
