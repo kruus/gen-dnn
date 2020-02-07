@@ -15,10 +15,10 @@ bool is_zero(T const* const t){
     char const* const p = reinterpret_cast<char const*>(t);
     size_t const psz = sizeof(T);
     size_t nz=0U;
-    cout<<" nonzerobytes(sizeof(T)="<<sizeof(T)<<")="<<nz;
     for(size_t i=0; i<psz; ++i){
         if( p[i] != '\0' ) ++nz;
     }
+    cout<<" nonzerobytes(sizeof(T)="<<sizeof(T)<<")="<<nz;
     return nz>0;
 }
 

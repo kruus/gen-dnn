@@ -23,6 +23,7 @@
 
 #include "dnnl_thread.hpp"      // dnnl_get_max_threads
 #include "dnnl_types.h"
+#include "dnnl_config.h"
 #include "utils.hpp"
 
 #if defined(_WIN32) && !defined(__GNUC__)
@@ -420,7 +421,7 @@ static inline bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=false) {
     //
     // soft limit for VE TBD XXX
     //
-#if 1 // debug
+#if 0 // debug
     bool ret=false;
     if((cpu_isa & ve_all) != cpu_isa){
         printf(" mayiuse(%d)=NO(wrong cpu)",(int)cpu_isa);
@@ -441,10 +442,14 @@ static inline bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=false) {
     }
     return ret;
 #else
-    return (cpu_isa==vanilla? true
-            : cpu_isa==isa_any || cpu_isa==ve_common? true
+    static_assert(isa_any == (int)ve_common, "changed VE alias for cpu_isa 'any'?");
+    static_assert(isa_all == (int)ve_bits, "changed VE alias for cpu_isa 'all'?");
+    return (cpu_isa==vanilla || cpu_isa==ve_common)? true
+            //: cpu_isa==isa_any? true /*aliased to ve_common*/
             : cpu_isa==vednn? (DNNL_ISA >= DNNL_ISA_VEDNN)
             : cpu_isa==vejit? (DNNL_ISA >= DNNL_ISA_VEJIT)
+            : cpu_isa==isa_all? true /*why would you ever ask?*/
+            //(cpu_isa & ve_all) != cpu_isa)? false /*not likely to occur*/
             : false;
 #endif
 #else

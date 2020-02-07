@@ -97,11 +97,23 @@ protected:
 };
 
 TEST_P(isa_test, TestISA) {}
+#if TARGET_X86
 INSTANTIATE_TEST_SUITE_P(TestISACompatibility, isa_test,
         ::testing::Values(cpu_isa::vanilla, cpu_isa::sse41, cpu_isa::avx,
             cpu_isa::avx2, cpu_isa::avx512_mic, cpu_isa::avx512_mic_4ops,
             cpu_isa::avx512_core, cpu_isa::avx512_core_vnni,
             cpu_isa::avx512_core_bf16));
+#elif TARGET_VE
+INSTANTIATE_TEST_SUITE_P(TestISACompatibility, isa_test,
+        ::testing::Values(
+            cpu_isa::vanilla,
+            //cpu_isa::any, // probably aliased
+            //cpu_isa::all, // probably aliased
+            //cpu_isa::ve_common, // not there
+            cpu_isa::vednn,
+            cpu_isa::vejit
+            ));
+#endif
 
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 } // namespace dnnl

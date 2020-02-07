@@ -80,6 +80,12 @@
 /// DNNL GPU engine runtime
 #cmakedefine DNNL_GPU_RUNTIME DNNL_RUNTIME_${DNNL_GPU_RUNTIME}
 
+/// DNNL CPU enable runtime cpu dispatch.
+///   respect env DNNL_MAX_CPU_ISA, enable dnnl_set_max_cpu_isa(dnnl_cpu_isa_t)
+#ifndef DNNL_ENABLE_MAX_CPU_ISA /* XXX remove from cmake files XXX */
+#cmakedefine DNNL_ENABLE_MAX_CPU_ISA
+#endif
+
 /// DNNL verbosity, from `cmake -DDNNL_VERBOSE={NONE|DEFAULT|EXTRA}`.
 /// This is '1' at levels above NONE, which allows verbosity
 /// \ref dev-guide-verbose "levels 0[default, quiet], 1 and 2".
