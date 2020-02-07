@@ -32,6 +32,10 @@
 
 #include "example_utils.hpp"
 
+#include <iostream>
+using std::cout;
+using std::endl;
+
 using namespace dnnl;
 
 memory::dim product(const memory::dims &dims) {
@@ -164,21 +168,29 @@ void simple_net(engine::kind engine_kind) {
     const float alpha = 0.0001f;
     const float beta = 0.75f;
     const float k = 1.0f;
+#if 0 // debug mode assertion:
+3: dnnl_verbose,create,cpu,lrn,lrn_ref:any,forward_training,data_f32::blocked:abcd:f0 diff_undef::undef::f0,,alg:lrn_across_channels,mb32ic96ih55iw55ls5beta0.75,0.0761719
+3: cnn-training-f32-cpp: /usr/uhome/aurora/4gi/nlabhpg/work/kruus/v11/src/common/memory_desc_wrapper.hpp:121: unsigned long dnnl::impl::memory_desc_wrapper::additional_buffer_size() const: Assertion `cmask == 1 || cmask == 3 || cmask == 27' failed.
+#endif
 
     // create a lrn primitive descriptor
+    cout<<" lrn_desc..."<<endl;
     auto lrn_desc = lrn_forward::desc(prop_kind::forward,
             algorithm::lrn_across_channels, relu_pd.dst_desc(), local_size,
             alpha, beta, k);
     auto lrn_pd = lrn_forward::primitive_desc(lrn_desc, eng);
 
     // create lrn dst memory
+    cout<<" lrn_dst_memory..."<<endl;
     auto lrn_dst_memory = memory(lrn_pd.dst_desc(), eng);
 
     // create workspace only in training and only for forward primitive
     // query lrn_pd for workspace, this memory will be shared with forward lrn
+    cout<<" lrn_workspace_memory..."<<endl;
     auto lrn_workspace_memory = memory(lrn_pd.workspace_desc(), eng);
 
     // finally create a lrn primitive
+    cout<<" lrn_forward..."<<endl;
     net_fwd.push_back(lrn_forward(lrn_pd));
     net_fwd_args.push_back(
             {{DNNL_ARG_SRC, relu_dst_memory}, {DNNL_ARG_DST, lrn_dst_memory},
@@ -189,20 +201,24 @@ void simple_net(engine::kind engine_kind) {
     // kernel: {3, 3}
     // strides: {2, 2}
 
+    cout<<" memory::dims ..."<<endl;
     memory::dims pool_dst_tz = {batch, 96, 27, 27};
     memory::dims pool_kernel = {3, 3};
     memory::dims pool_strides = {2, 2};
     memory::dims pool_padding = {0, 0};
 
     // create memory for pool dst data in user format
+    cout<<" pool_user_dst_memory..."<<endl;
     auto pool_user_dst_memory
             = memory({{pool_dst_tz}, dt::f32, tag::nchw}, eng);
     write_to_dnnl_memory(net_dst.data(), pool_user_dst_memory);
 
     // create pool dst memory descriptor in format any
+    cout<<" pool_dst_md (format any)..."<<endl;
     auto pool_dst_md = memory::desc({pool_dst_tz}, dt::f32, tag::any);
 
     // create a pooling primitive descriptor
+    cout<<" pool_desc..."<<endl;
     auto pool_desc = pooling_forward::desc(prop_kind::forward,
             algorithm::pooling_max, lrn_dst_memory.get_desc(), pool_dst_md,
             pool_strides, pool_kernel, pool_padding, pool_padding);

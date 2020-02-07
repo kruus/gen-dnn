@@ -149,10 +149,14 @@ inline bool rnn_packed_desc_is_equal(
 }
 
 inline memory_desc_t zero_md() {
-    //auto zero = memory_desc_t(); // default-constructed "C" POD type
+    auto zero = memory_desc_t(); // default-constructed "C" POD type
     // some compilers do not zero-initialize the above, leading to sporadic errors
     // To be safe, some occurences of memory_desc_t() may need to take extra care.
-    auto zero = memory_desc_t({0});
+    //auto zero = memory_desc_t({0}); // fixes SOME bugs, not all
+    //auto zero = memory_desc_t();
+    memset(&zero, 0, sizeof(memory_desc_t));
+    //
+    //auto zero = memory_desc_t{};
     return zero;
 }
 

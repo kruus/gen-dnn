@@ -28,6 +28,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+//#include <cstring> // VE debug
 
 #include "dnnl.h"
 
@@ -1992,13 +1993,26 @@ struct memory : public handle<dnnl_memory_t> {
 
     /// A memory descriptor.
     struct desc {
+      //private:
+      //  static const int verbose=1;
+      //  void msg(char const* m){
+      //      if(verbose){
+      //          printf("%s,@0x%llx,md@%llx",m,(unsigned long long)(void*)this,(unsigned long long)(void*)(&this->data));
+      //          fflush(stdout);
+      //      }
+      //  }
+      //public:
         friend struct memory;
         /// The underlying C API data structure.
         dnnl_memory_desc_t data;
 
         /// Constructs a zero (empty) memory descriptor. Such a memory
         /// descriptor can be used to indicate absence of an argument.
-        desc() : data() {}
+        //desc() : data(dnnl_memory_desc_t DNNL_ZERO_MEMORY_DESC_T) {} // VE debug
+        desc() : data() {
+            std::memset(&data, 0, sizeof(dnnl_memory_desc_t));
+            //msg(" +desc()");
+        } // VE debug
 
         /// Constructs a memory descriptor.
         ///
@@ -2012,8 +2026,13 @@ struct memory : public handle<dnnl_memory_t> {
         /// @param data_type Data precision/type.
         /// @param format_tag Memory format tag.
         desc(const memory::dims &dims, data_type data_type,
-                format_tag format_tag) {
+                format_tag format_tag)
+        : data()
+        //: data(dnnl_memory_desc_t DNNL_ZERO_MEMORY_DESC_T) // VE debug
+        {
+            std::memset(&data, 0, sizeof(dnnl_memory_desc_t)); // VE debug
             validate_dims(dims);
+            //msg(" +desc(dims,data_type,format_tag)");
             error::wrap_c_api(
                     dnnl_memory_desc_init_by_tag(&data, (int)dims.size(),
                             dims.size() == 0 ? nullptr : &dims[0],
@@ -2034,8 +2053,13 @@ struct memory : public handle<dnnl_memory_t> {
         /// @param data_type Data precision/type.
         /// @param strides The strides for each dimension.
         desc(const memory::dims &dims, data_type data_type,
-                const memory::dims &strides) {
+                const memory::dims &strides)
+        : data()
+        //: data(dnnl_memory_desc_t DNNL_ZERO_MEMORY_DESC_T)
+        {
+            std::memset(&data, 0, sizeof(dnnl_memory_desc_t)); // VE debug
             validate_dims(dims);
+            //msg(" +desc(dims,data_type,strides)");
             error::wrap_c_api(
                     dnnl_memory_desc_init_by_strides(&data, (int)dims.size(),
                             dims.size() == 0 ? nullptr : &dims[0],
@@ -2047,7 +2071,20 @@ struct memory : public handle<dnnl_memory_t> {
         /// Constructs a memory descriptor from a C API data structure.
         ///
         /// @param data A C API ::dnnl_memory_desc_t structure.
-        desc(const dnnl_memory_desc_t &data) : data(data) {}
+        desc(const dnnl_memory_desc_t &data) : data(data) {
+            //msg(" +desc(dnnl_memory_desc_t)COPY");
+            //if(verbose){
+            //    printf("-FROM-md@0x%llx", (unsigned long long)(void*)&data);
+            //    printf(" tag %lx-->%lx\n",
+            //            (long)      data.extra.flags,
+            //            (long)this->data.extra.flags);
+            //    fflush(stdout);
+            //}
+        }
+
+        ~desc(){
+            //msg(" -desc");
+        }
 
         /// Constructs a memory descriptor for a region inside an area
         /// described by this memory descriptor.
@@ -9515,4 +9552,5 @@ inline void primitive::execute(
 
 /// @} dnnl_api
 
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

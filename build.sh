@@ -60,7 +60,7 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMrCm:bBrR" arg; do
         a) # NEC Aurora VE
             if [ ! "${DOTARGET}" == "x" ]; then echo "-a no good: already have -${DOTARGET}"; usage; fi
             DOTARGET="a"; SIZE_T=64;
-            JOBS="-j1" # -j1 to avoid SIGSEGV in ccom
+            JOBS="-j8" # -j1 to avoid SIGSEGV in ccom
             if [ `uname -n` = "zoro" ]; then JOBS="-j8"; fi
             ;;
         S) # SX cross-compile (size_t=64, built in build-sx/, NEW: default if $CC==sxcc)
@@ -126,7 +126,7 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMrCm:bBrR" arg; do
         T) # cmake --trace
             CMAKETRACE="--trace --debug-trycompile"
             ;;
-        1) # make -j1
+        1) # make -j1 (default is usually -j8)
             JOBS="-j1"
             ;;
         5) # gcc-5, if found
@@ -170,7 +170,7 @@ if [ "${DOTARGET}" == "x" ]; then
         echo "auto-detected '-a' Aurora compiler (ncc, nc++)"
         # -1 ~ DOJIT; 7 ~ DOJIT
         DOTARGET="a"; DOJIT=-1; SIZE_T=64
-        if [ `uname -n` = "zoro" ]; then JOBS="-j8"; else JOBS="-j1"; fi
+        #if [ `uname -n` = "zoro" ]; then JOBS="-j8"; else JOBS="-j1"; fi
         if [ -f vejit/include/vednn.h ]; then VEJIT=100; echo "auto-detected libvednn"; fi
     elif [ -d src/vanilla ]; then
         DOTARGET="v" # v for vanilla (C/C++ code)

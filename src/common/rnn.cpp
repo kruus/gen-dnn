@@ -51,7 +51,8 @@ memory_desc_t copy_maybe_null(const memory_desc_t *md) {
 }
 
 rnn_desc_t zero_rnn_desc() {
-    auto rd = rnn_desc_t();
+#if 0
+    auto rd = rnn_desc_t{};
     rd.src_layer_desc = zero_md();
     rd.src_iter_desc = zero_md();
     rd.weights_layer_desc = zero_md();
@@ -66,6 +67,9 @@ rnn_desc_t zero_rnn_desc() {
     rd.diff_bias_desc = zero_md();
     rd.diff_dst_layer_desc = zero_md();
     rd.diff_dst_iter_desc = zero_md();
+#else
+    auto rd = zero<rnn_desc_t>();
+#endif
     return rd;
 }
 

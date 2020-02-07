@@ -152,6 +152,33 @@ inline T &&forward(typename utils::remove_reference<T>::type &&t) {
 template <typename T>
 inline typename remove_reference<T>::type zero() {
     auto zero = typename remove_reference<T>::type();
+    //
+    // Some compilers, like nc++, may [reproducibly] elide value-intialization.
+    // filling (parts of?) objects indeterminate (whatever happened to be on stack).
+    //
+    // So global changes
+    //    auto x = foo_t();
+    // to
+    //    auto x = foo_t{}; // ohoh, maybe not even this works always?
+    // or
+    //    auto x = utils::zero<foo_t>() (in src/common/utils.hpp)
+    //        which calls memset(void*dst,0,sizeof(foo_t))
+    // can force C types to zero-initialize, for those bad compilers.
+    //auto zero = typename remove_reference<T>::type{};
+#if 0 // old debugging...
+    // inserting the following code made the [compiler] bug go away?
+    bool bad_compiler = false;
+    for(size_t i=0; i<sizeof(T); ++i){
+        if( ((char*)(void*)&zero)[i] != '\0' ){
+            printf("\nError: Your C++ compiler fails to value-initialize properly!\n");
+            bad_compiler = true;
+            break;
+        }
+    }
+#endif
+#if TARGET_VE /* original heavy-handed way */
+    memset(&zero, 0, sizeof(T));
+#endif
     return zero;
 }
 

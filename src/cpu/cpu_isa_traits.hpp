@@ -367,6 +367,7 @@ static inline bool mayiuse(const cpu_isa_t cpu_isa, const bool soft = false) {
     using namespace Xbyak::util;
 
     switch (cpu_isa) {
+        case vanilla: return true;
         case isa_any: return true;
         case sse41: return cpu.has(Cpu::tSSE41);
         case avx: return cpu.has(Cpu::tAVX);
@@ -410,11 +411,10 @@ static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=fa
 #ifdef DNNL_ENABLE_MAX_CPU_ISA
     //unsigned cpu_isa_mask = get_max_cpu_isa(soft);
     //if ((cpu_isa_mask & cpu_isa) != cpu_isa) return false;
-#if TARGET_X86
-    return cpu_isa == vanilla; // ??
-#elif TARGET_VE
+#if TARGET_VE
     // soft limit for VE TBD XXX
-    return (cpu_isa==isa_any? true
+    return (cpu_isa==vanilla? true
+            : cpu_isa==isa_any? true
             : cpu_isa==vednn? (DNNL_ISA >= DNNL_ISA_VEDNN)
             : cpu_isa==vejit? (DNNL_ISA >= DNNL_ISA_VEJIT)
             : false);

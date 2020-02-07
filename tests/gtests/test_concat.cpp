@@ -68,6 +68,7 @@ class concat_test : public ::testing::TestWithParam<concat_test_params> {
             for_(memory::dim c = 0; c < C; c++)
             for_(memory::dim d = 0; d < D; d++)
             for_(memory::dim h = 0; h < H; h++)
+#pragma _NEC novector
             for (memory::dim w = 0; w < W; w++) {
                 auto src_idx = w + W * h + H * W * d + D * H * W * c
                         + C_PADDED * D * H * W * n;

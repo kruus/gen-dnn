@@ -58,7 +58,8 @@ status_t eltwise_desc_init(eltwise_desc_t *eltwise_desc, prop_kind_t prop_kind,
                            .has_runtime_dims_or_strides();
     if (runtime_dims_or_strides) return unimplemented;
 
-    auto ed = eltwise_desc_t();
+    //auto ed = eltwise_desc_t{};
+    auto ed = zero<eltwise_desc_t>();
     ed.primitive_kind = primitive_kind::eltwise;
     ed.prop_kind = prop_kind;
     ed.alg_kind = alg_kind;

@@ -954,6 +954,7 @@ typedef struct {
     /// For future backwards compatibility
     char reserved[64];
 } dnnl_memory_extra_desc_t;
+#define DNNL_ZERO_MEMORY_EXTRA_DESC_T {0,0,0.f,'\0'}
 
 /// Memory descriptor. The description is based on a number of dimensions,
 /// dimensions themselves, plus information about elements type and memory
@@ -994,6 +995,10 @@ typedef struct {
 
     /// Memory format kind.
     dnnl_format_kind_t format_kind;
+
+    /// moved from last position to here, (VE debug)
+    dnnl_memory_extra_desc_t extra;
+
     union {
         /// Description of the data layout for memory formats that use
         /// blocking.
@@ -1005,8 +1010,12 @@ typedef struct {
         // ... other descriptions possible
     } format_desc;
 
-    dnnl_memory_extra_desc_t extra;
 } dnnl_memory_desc_t;
+#define DNNL_ZERO_MEMORY_DESC_T { 0/*ndims*/, {0}/*dims*/, \
+    dnnl_data_type_undef/*data_type*/, {0}/*padded_dims*/, \
+    {0}/*padded_offsets*/, 0/*offset0*/, \
+    dnnl_format_kind_undef/*format_kind*/, \
+    DNNL_ZERO_MEMORY_EXTRA_DESC_T, {0}/*format_desc*/ }
 
 /// @struct dnnl_memory
 /// An opaque structure to describe a memory.

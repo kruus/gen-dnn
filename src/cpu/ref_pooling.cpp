@@ -81,7 +81,8 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                                         data_type::u8>::type>::max());
                 ws[off] = value;
             } else
-                reinterpret_cast<int *>(ws)[off] = value;
+                //reinterpret_cast<int *>(ws)[off] = value;
+                reinterpret_cast<int32_t *>(ws)[off] = value;
         }
     };
 

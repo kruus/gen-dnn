@@ -28,11 +28,44 @@ using namespace dnnl::impl::prop_kind;
 using namespace dnnl::impl::alg_kind;
 using namespace dnnl::impl::types;
 
+#if 0 // ostream output for various memory things (stack clobbering debug, maybe lifetime?)
+#include "dnnl_debug.h"
+#include <iostream>
+using std::cout; // ouch
+using std::endl; // ouch
+
+// memory has mane different wrappers, from descriptive to containing
+// actual memory resources.
+inline std::ostream& operator<<(std::ostream& os, dnnl_memory_desc_t const* const md){
+	char str[121] = {'\0'};
+	int nchar = dnnl_md2fmt_str(&str[0], 120, md);
+    if(nchar){
+        str[nchar]='\0';
+        os<<str;
+    }else{
+        os<<"???";
+    }
+	return os;
+}
+//inline std::ostream& operator<<(std::ostream& os, dnnl::memory::desc const& mem){
+//    return os<<&mem.data;
+//}
+//inline std::ostream& operator<<(std::ostream& os, dnnl::memory const& mem){
+//    return os<<mem.get_desc();  // get the dnnl::memory::desc and print
+//}
+// ohoh. this is an opaque type from src/common/memory.hpp
+//std::ostream& operator<<(std::ostream& os, ::dnnl_memory const& mem){
+//    return os<<mem.md()<<endl;
+//}
+#endif
+
 namespace {
 status_t pooling_desc_init(pooling_desc_t *pool_desc, prop_kind_t prop_kind,
         alg_kind_t alg_kind, const memory_desc_t *src_desc,
         const memory_desc_t *dst_desc, const dims_t strides,
         const dims_t kernel, const dims_t padding_l, const dims_t padding_r) {
+    //static const int verbose=1;
+    //if(verbose) cout<<" pooling_desc_init ";
     bool args_ok = true
             && !any_null(
                     pool_desc, src_desc, dst_desc, strides, kernel, padding_l)
@@ -42,7 +75,8 @@ status_t pooling_desc_init(pooling_desc_t *pool_desc, prop_kind_t prop_kind,
 
     if (padding_r == nullptr) padding_r = padding_l;
 
-    auto pd = pooling_desc_t();
+    //auto pd = pooling_desc_t{};
+    auto pd = zero<pooling_desc_t>();
     pd.primitive_kind = primitive_kind::pooling;
     pd.prop_kind = prop_kind;
     pd.alg_kind = alg_kind;
@@ -99,7 +133,17 @@ status_t pooling_desc_init(pooling_desc_t *pool_desc, prop_kind_t prop_kind,
 
     if (!consistency) return invalid_arguments;
 
+    //if(verbose)
+    //    cout<<"\ntmp pool_desc pd@"<<(void*)&pd
+    //        <<" pd.src_desc             = "<<&pd.src_desc<<" @"<<(void*)(&pd.src_desc)
+    //        <<" pd.dst_desc             = "<<&pd.dst_desc<<" @"<<(void*)(&pd.dst_desc)
+    //        <<"\n[*pool_desc = pd]... ";
     *pool_desc = pd;
+    //if(verbose)
+    //    cout<<"\ncopied pool_desc@"<<(void*)pool_desc
+    //        <<" pool_desc->src_desc copy= "<<&pool_desc->src_desc<<" @"<<(void*)(&pool_desc->src_desc)
+    //        <<" pool_desc->dst_desc copy= "<<&pool_desc->dst_desc<<" @"<<(void*)(&pool_desc->dst_desc)
+    //        <<endl;
     return success;
 }
 } // namespace

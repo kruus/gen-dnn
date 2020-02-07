@@ -21,10 +21,10 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 #include "consistency.hpp" // debug: print reason for consistency failures
-#include <iostream>
-#include <cstring>
-using std::cout;
-using std::endl;
+//#include <iostream>
+//#include <cstring>
+//using std::cout;
+//using std::endl;
 
 using namespace dnnl::impl;
 using namespace dnnl::impl::utils;
@@ -51,7 +51,8 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
 
     if (padding_r == nullptr) padding_r = padding_l;
 
-    auto cd = convolution_desc_t();
+    //auto cd = convolution_desc_t{};
+    auto cd = zero<convolution_desc_t>();
     cd.primitive_kind = primitive_kind::convolution;
     cd.prop_kind = prop_kind;
     cd.alg_kind = alg_kind;
@@ -66,8 +67,8 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
     const bool is_fwd = one_of(prop_kind, forward_training, forward_inference);
     const bool with_bias
             = bias_desc && bias_desc->format_kind != format_kind::undef;
-#define SHORTFILE (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
-#define DBG(MSG) do{ cout<<SHORTFILE<<":"<<__LINE__<<": "<<MSG; }while(0)
+//#define SHORTFILE (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+//#define DBG(MSG) do{ cout<<SHORTFILE<<":"<<__LINE__<<": "<<MSG; }while(0)
     // next: no influence on bug
     //DBG(" conv_desc_init : bias_desc@"<<(void*)bias_desc<<", with_bias="<<with_bias<<endl);
     const bool with_groups = weights_desc->ndims == src_desc->ndims + 1;

@@ -2991,8 +2991,8 @@ dnnl_status_t DNNL_API dnnl_set_jit_profiling_flags(unsigned flags);
 dnnl_status_t DNNL_API dnnl_set_jit_profiling_jitdumpdir(const char *dir);
 
 /// Sets the maximal ISA DNNL can dispatch to on the CPU. See
-/// #dnnl_cpu_isa_t and #dnnl::cpu_isa for the list of the values accepted by
-/// the C and C++ API functions respectively.
+/// #dnnl_cpu_isa_t and #dnnl::cpu_isa for the [matching] list of values
+/// accepted by C and C++ API functions respectively.
 ///
 /// This function has effect only before the first JIT kernel is generated and
 /// will return an error afterwards.

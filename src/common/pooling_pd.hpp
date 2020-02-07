@@ -23,6 +23,9 @@
 #include "primitive_desc.hpp"
 #include "type_helpers.hpp"
 
+//#include "dnnl_debug.h"
+//#include <iostream>
+
 namespace dnnl {
 namespace impl {
 
@@ -31,12 +34,40 @@ struct pooling_fwd_pd_t;
 struct pooling_pd_t : public primitive_desc_t {
     static constexpr auto base_pkind = primitive_kind::pooling;
 
+    //protected: // VE debug
+    //int const verbose=1;
+    //static void md_out(std::ostream& os, dnnl_memory_desc_t const* const md){
+    //    char str[121] = {'\0'};
+    //    int nchar = dnnl_md2fmt_str(&str[0], 120, md);
+    //    if(nchar){
+    //        str[nchar]='\0';
+    //        os<<str;
+    //    }else{
+    //        os<<"???";
+    //    }
+    //    os<<"@"<<(void*)md;
+    //}
+    //private:
+    //void msg(){
+    //    using std::cout;
+    //    using std::endl;
+    //    // desc() return &desc_, a pooling_desc_t*
+    //    // src/dest_desc() return a dnnl_memory_desc_t& depending on fwd/bkwd
+    //    cout<<"pooling_pd_t:  pooling_fwd_pd_t sends us adesc with memory descriptors,\n src=";
+    //    md_out(cout, &src_desc());
+    //    cout<<" dst=";
+    //    md_out(cout, &dst_desc());
+    //    cout<<endl;
+    //}
+    //public:
     pooling_pd_t(engine_t *engine, const pooling_desc_t *adesc,
             const primitive_attr_t *attr, const pooling_fwd_pd_t *hint_fwd_pd)
         : primitive_desc_t(engine, attr, base_pkind)
         , desc_(*adesc)
         , hint_fwd_pd_(hint_fwd_pd)
-        , ws_md_() {}
+        , ws_md_() {
+            //if(verbose) this->msg();
+        }
 
     const pooling_desc_t *desc() const { return &desc_; }
     virtual const op_desc_t *op_desc() const override {
@@ -138,12 +169,25 @@ private:
 struct pooling_fwd_pd_t : public pooling_pd_t {
     typedef pooling_fwd_pd_t base_class;
     typedef pooling_fwd_pd_t hint_class;
+    //private:
+    //void msg() {
+    //    using std::cout;
+    //    using std::endl;
+    //    cout<<" pooling_fwd_pd_t saves a copy of src_md and dst_md,\n src=";
+    //    md_out(cout,&this->src_md_);
+    //    cout<<" dst=";
+    //    md_out(cout, &this->dst_md_);
+    //    cout<<endl;
+    //}
+    //public:
 
     pooling_fwd_pd_t(engine_t *engine, const pooling_desc_t *adesc,
             const primitive_attr_t *attr, const pooling_fwd_pd_t *hint_fwd_pd)
         : pooling_pd_t(engine, adesc, attr, hint_fwd_pd)
         , src_md_(desc_.src_desc)
-        , dst_md_(desc_.dst_desc) {}
+        , dst_md_(desc_.dst_desc) {
+            //if(verbose) this->msg();
+        }
 
     virtual arg_usage_t arg_usage(int arg) const override {
         if (arg == DNNL_ARG_SRC) return arg_usage_t::input;

@@ -33,7 +33,10 @@ using namespace dnnl::impl::data_type;
 
 namespace dnnl {
 namespace impl {
-memory_desc_t glob_zero_md = memory_desc_t({0});
+//memory_desc_t glob_zero_md = memory_desc_t();
+//memory_desc_t glob_zero_md = memory_desc_t(dnnl_memory_desc_t DNNL_ZERO_MEMORY_DESC_T);
+memory_desc_t glob_zero_md = types::zero_md();
+//memory_desc_t glob_zero_md = memory_desc_t{};
 }
 } // namespace dnnl
 
@@ -98,7 +101,9 @@ status_t dnnl_memory_desc_init_by_tag(memory_desc_t *memory_desc, int ndims,
     if (!args_ok) return invalid_arguments;
 
     //auto md = memory_desc_t();
-    auto md = memory_desc_t({0}); // perhaps not all elements are zeroed (padded_offsets,offset0,extra)
+    //auto md = memory_desc_t(dnnl_memory_desc_t DNNL_ZERO_MEMORY_DESC_T); // perhaps not all elements are zeroed (padded_offsets,offset0,extra)
+    auto md = types::zero_md();
+    //auto md = memory_desc_t{};
     md.ndims = ndims;
     array_copy(md.dims, dims, ndims);
     md.data_type = data_type;
@@ -137,7 +142,9 @@ status_t dnnl_memory_desc_init_by_strides(memory_desc_t *memory_desc, int ndims,
     if (!args_ok) return invalid_arguments;
 
     //auto md = memory_desc_t();
-    auto md = memory_desc_t({0}); // perhaps not all elements are zeroed (padded_offsets,offset0,extra)
+    //auto md = memory_desc_t(dnnl_memory_desc_t DNNL_ZERO_MEMORY_DESC_T); // perhaps not all elements are zeroed (padded_offsets,offset0,extra)
+    auto md = types::zero_md();
+    //auto md = memory_desc_t{};
     md.ndims = ndims;
     array_copy(md.dims, dims, ndims);
     md.data_type = data_type;
@@ -242,7 +249,8 @@ status_t dnnl_memory_desc_reshape(memory_desc_t *out_md,
         if (dims[d] != 1) return invalid_arguments;
 
     //auto md = memory_desc_t();
-    auto md = memory_desc_t({0}); // perhaps not all elements are zeroed (padded_offsets,offset0,extra)
+    //auto md = memory_desc_t(dnnl_memory_desc_t DNNL_ZERO_MEMORY_DESC_T); // perhaps not all elements are zeroed (padded_offsets,offset0,extra)
+    auto md = types::zero_md();
 
     // copy values from in_md to md
     md.ndims = ndims;

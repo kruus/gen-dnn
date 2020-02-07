@@ -24,6 +24,9 @@
 #include "primitive_iterator.hpp"
 #include "type_helpers.hpp"
 
+//#include <iostream>
+//using std::cout;
+//using std::endl;
 using namespace dnnl::impl;
 using namespace dnnl::impl::status;
 
@@ -32,6 +35,8 @@ status_t dnnl_primitive_desc_iterator_create(
         const primitive_attr_t *attr, engine_t *engine,
         const primitive_desc_t *hint_fwd_pd) {
     const op_desc_t *op_desc = (const op_desc_t *)c_op_desc;
+    //static int verbose=1;
+    //if(verbose){ cout<<" iter-op_desc@"<<(void*)c_op_desc<<endl; cout.flush(); }
     if (utils::any_null(iterator, op_desc, engine)) return invalid_arguments;
 
     auto it = new primitive_desc_iterator_t(engine, op_desc, attr, hint_fwd_pd);

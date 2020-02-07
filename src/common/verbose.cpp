@@ -665,20 +665,20 @@ static void init_info_pool(pd_t *s, char *buffer) {
     DECL_DAT_AUX_PRB_STRS();
 
     { // src
-        auto md = s->is_fwd() ? s->src_md() : s->diff_src_md();
+        auto mds = s->is_fwd() ? s->src_md() : s->diff_src_md();
         DPRINT(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, "src_");
-        MD2STR(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, md);
+        MD2STR(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, mds);
     }
     { // dst
-        auto md = s->is_fwd() ? s->dst_md() : s->diff_dst_md();
+        auto mdd = s->is_fwd() ? s->dst_md() : s->diff_dst_md();
         DPRINT(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, " dst_");
-        MD2STR(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, md);
+        MD2STR(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, mdd);
     }
     { // ws
-        auto md = s->workspace_md();
-        if (md) {
+        auto mdw = s->workspace_md();
+        if (mdw) {
             DPRINT(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, " ws_");
-            MD2STR(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, md);
+            MD2STR(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, mdw);
         }
     }
 

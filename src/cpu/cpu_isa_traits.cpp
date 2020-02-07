@@ -56,7 +56,7 @@ private:
     bool initialized_;
     std::atomic<unsigned> state_;
     enum : unsigned { idle = 0, busy_setting = 1, locked_after_a_get = 2 };
-    static int const verbose=0;
+    static int const verbose=1;
 
 public:
     set_before_first_get_setting_t(T init = T(0))
@@ -102,7 +102,7 @@ set_before_first_get_setting_t<cpu_isa_t> &max_cpu_isa() {
 }
 
 bool init_max_cpu_isa() {
-    static int const verbose=0;
+    static int const verbose=1;
     if(verbose) printf("  init_max_cpu_isa!");
     if (max_cpu_isa().initialized()){
         if(verbose) printf("  (already initialized!)");
@@ -155,7 +155,7 @@ bool init_max_cpu_isa() {
 #endif // DNNL_ENABLE_MAX_CPU_ISA
 
 cpu_isa_t get_max_cpu_isa(bool soft) {
-    static int const verbose=0;
+    static int const verbose=1;
     MAYBE_UNUSED(soft);
 #ifdef DNNL_ENABLE_MAX_CPU_ISA
 #warning "with DNNL_ENABLE_MAX_CPU_ISA"

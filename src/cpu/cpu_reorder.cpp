@@ -45,10 +45,12 @@ using namespace dnnl::impl::format_tag;
     REG_SR(idt, ifmt, odt, ofmt, fmt_order::keep), \
             REG_SR(idt, ifmt, odt, ofmt, fmt_order::reverse)
 
+#if REORDER_ENABLE_DIRECT_COPY
 #define REG_SR_DIRECT_COPY(idt, odt) \
     REG_SR(idt, any, odt, any, fmt_order::any, spec::direct_copy), \
             REG_SR(idt, any, odt, any, fmt_order::any, \
                     spec::direct_copy_except_dim_0)
+#endif // REORDER_ENABLE_DIRECT_COPY
 
 static const rpd_create_f cpu_reorder_impl_list[] = {
         /* winograd */
@@ -152,6 +154,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
 
 /* regular reorders */
 
+#if REORDER_ENABLE_DIRECT_COPY
 #if defined(__INTEL_COMPILER) || (defined(__GNUC__) && !defined(__clang__)) || !TARGET_X86_JIT
         /* Direct copy for icc which is faster than jitted code;
      * Direct copy for gcc which might or might not be faster than jitted
@@ -179,12 +182,14 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
         REG_SR_DIRECT_COPY(u8, s8),
         REG_SR_DIRECT_COPY(u8, u8),
 #endif
+#endif // REORDER_ENABLE_DIRECT_COPY
 
 #if TARGET_X86_JIT
         /* jit */
         jit_uni_reorder_create,
 #endif // TARGET_X86_JIT
 
+#if REORDER_ENABLE_ANY_TO_BLOCKED // FIXME (split source files?)
         /* fp32: flat <-> blocked with tail */
         REG_SR_BIDIR(f32, any, f32, nCw4c),
         REG_SR_BIDIR(f32, any, f32, nCw8c),
@@ -259,7 +264,9 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
         REG_SR_BIDIR(f32, any, f32, gOdhwi16o),
         REG_SR_BIDIR(f32, any, f32, gOIdhw16o16i),
         REG_SR_BIDIR(f32, any, f32, gOIdhw16i16o),
+#endif // REORDER_ENABLE_ANY_TO_BLOCKED
 
+#if REORDER_ENABLE_SIMPLE_BLOCKED_CONVERIONS
         /* fp32: blocked <-> blocked with tail */
         REG_SR_BIDIR(f32, nCw4c, f32, nCw16c),
         REG_SR_BIDIR(f32, nCw8c, f32, nCw16c),
@@ -267,6 +274,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
         REG_SR_BIDIR(f32, nChw8c, f32, nChw16c),
         REG_SR_BIDIR(f32, nCdhw4c, f32, nCdhw16c),
         REG_SR_BIDIR(f32, nCdhw8c, f32, nCdhw16c),
+#endif // REORDER_ENABLE_SIMPLE_BLOCKED_CONVERIONS
 
 #if DNNL_ENABLE_BFLOAT16
         /* bf16 */
@@ -280,16 +288,21 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
         REG_SR(f32, goihw, bf16, gIOhw8o16i2o, fmt_order::keep),
         REG_SR(f32, oihw, bf16, OIhw16i16o, fmt_order::keep),
         REG_SR(f32, goihw, bf16, gOIhw16i16o, fmt_order::keep),
+#endif
 
+#if REORDER_ENABLE_REFERENCE
+#if DNNL_ENABLE_BFLOAT16
         REG_SR(bf16, any, bf16, any, fmt_order::any, spec::reference),
         REG_SR(bf16, any, f32, any, fmt_order::any, spec::reference),
         REG_SR(f32, any, bf16, any, fmt_order::any, spec::reference),
 #endif // DNNL_ENABLE_BFLOAT16
-
         REG_SR(f16, any, f16, any, fmt_order::any, spec::reference),
         REG_SR(f16, any, f32, any, fmt_order::any, spec::reference),
         REG_SR(f32, any, f16, any, fmt_order::any, spec::reference),
+#endif // REORDER_ENABLE_REFERENCE
 
+#if REORDER_ENABLE_ANY_TO_BLOCKED /* integer varieties */
+#if !TARGET_VE
         /* int: flat <-> blocked with tail */
         REG_SR_BIDIR(f32, any, s32, nChw16c),
         REG_SR_BIDIR(f32, any, s8, nChw16c),
@@ -315,7 +328,10 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
         REG_SR_BIDIR(s8, any, f32, gOIhw4i16o4i),
         REG_SR_BIDIR(f32, any, f32, gOIhw4i16o4i),
         REG_SR_BIDIR(s8, any, s8, gOIhw4i16o4i),
+#endif
+#endif
 
+#if REORDER_ENABLE_REFERENCE
         /* reference: the last line of defence */
         REG_SR(f32, any, f32, any, fmt_order::any, spec::reference),
         REG_SR(f32, any, s32, any, fmt_order::any, spec::reference),
@@ -336,6 +352,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
         REG_SR(u8, any, s32, any, fmt_order::any, spec::reference),
         REG_SR(u8, any, u8, any, fmt_order::any, spec::reference),
         REG_SR(u8, any, s8, any, fmt_order::any, spec::reference),
+#endif
 
         /* eol */
         nullptr,
@@ -343,7 +360,28 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
 } // namespace
 
 const rpd_create_f *cpu_engine_t::get_reorder_implementation_list() const {
+#if 1 || !TARGET_VE
     return cpu_reorder_impl_list;
+#else
+    // TODO : How to split into smaller compilation units? (Does it help?)
+    static bool init = false;
+    if(!init){
+        extern const rpd_create_f cpu_reorder_impl_list1[];
+        extern const rpd_create_f cpu_reorder_impl_list2[];
+        extern const rpd_create_f cpu_reorder_impl_list3[];
+        extern const rpd_create_f cpu_reorder_impl_list4[];
+        // how many entries?
+        size_t const nreorder = cpu_reorder_size1()
+                + cpu_reorder_size2()
+                + cpu_reorder_size3()
+                + cpu_reorder_size4()
+                + 1U /*nullptr*/
+                ;
+        if(nreorder > NREORDER){
+            
+        init=true;
+    }
+#endif
 }
 
 } // namespace cpu

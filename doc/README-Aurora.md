@@ -31,3 +31,8 @@ CC=ncc CXX=nc++ ./build.sh -a
 *cmake* invoked with the ve.cmake TOOLCHAIN (as in *build.sh -a*) will set up
 *ncc* directories by looking in standard locations, even if not in your PATH.
 
+#### dnnl v1.1 port
+
+- nc++ still has sporadic (reproducible) initialization errors
+  - it sometimes does not 'zero-initialize' POD structs in C++ code.
+- nc++ has trouble with reorders (too many functions?)

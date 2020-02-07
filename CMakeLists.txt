@@ -100,8 +100,8 @@ if(UNIX OR MINGW)
         # "It may avoid by initializing the area to zero to compile with “-minit-stack=zero” and
         # execute with the environment variable VE_INIT_HEAP=ZERO. Correction of a
         # program is recommended to resolve a potential problem."
-        string(APPEND CMAKE_C_FLAGS   " -minit-stack=zero")
-        string(APPEND CMAKE_CXX_FLAGS " -minit-stack=zero")
+        string(APPEND CMAKE_C_FLAGS   " -minit-stack=0xDeadBeef")
+        string(APPEND CMAKE_CXX_FLAGS " -minit-stack=0xDefaced1")
     else()
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
     endif()

@@ -46,6 +46,38 @@ static void inline mypause() {
 #else
 void mypause() {}
 #endif
+
+#if 1 // ostream output for various memory things (stack clobbering debug, maybe lifetime?)
+#include "dnnl_debug.h"
+#include <iostream>
+using std::cout; // ouch
+using std::endl; // ouch
+
+// memory has mane different wrappers, from descriptive to containing
+// actual memory resources.
+inline std::ostream& operator<<(std::ostream& os, dnnl_memory_desc_t const* const md){
+	char str[121] = {'\0'};
+	int nchar = dnnl_md2fmt_str(&str[0], 120, md);
+    if(nchar){
+        str[nchar]='\0';
+        os<<str;
+    }else{
+        os<<"???";
+    }
+	return os;
+}
+inline std::ostream& operator<<(std::ostream& os, dnnl::memory::desc const& mem){
+    return os<<&mem.data;
+}
+inline std::ostream& operator<<(std::ostream& os, dnnl::memory const& mem){
+    return os<<mem.get_desc();  // get the dnnl::memory::desc and print
+}
+// ohoh. this is an opaque type from src/common/memory.hpp
+//std::ostream& operator<<(std::ostream& os, ::dnnl_memory const& mem){
+//    return os<<mem.md()<<endl;
+//}
+#endif
+
 // Exception class to indicate that the example uses a feature that is not
 // available on the current systems. It is not treated as an error then, but
 // just notifies a user.
