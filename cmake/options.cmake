@@ -308,9 +308,12 @@ set(DNNL_DEFAULT_ENABLE_BFLOAT16 1)
 set(DNNL_DEFAULT_ENABLE_RNN 1)
 # for development work, we may disable big chunks of code
 if(DNNL_CPU EQUAL DNNL_CPU_X86)
+    set(TARGET_X86 TRUE)
     if(DNNL_ISA STREQUAL "VANILLA") # note: DNNL_ISA is a "string"
         message(STATUS "x86 VANILLA compile removes rnn support (for now)")
         set(DNNL_DEFAULT_ENABLE_RNN 0) # FIXME - there is some jit entanglement
+    else()
+        set(TARGET_X86_JIT TRUE)
     endif()
 elseif(DNNL_CPU EQUAL DNNL_CPU_VE)
     message(STATUS "non-x86 compile wil disable RNN support (for now)")

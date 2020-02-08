@@ -399,9 +399,8 @@ static inline bool mayiuse(const cpu_isa_t cpu_isa, const bool soft = false) {
 }
 
 #elif TARGET_X86 // and no jit, only "VANILLA" build is usable
-#error "I want to test TARGET_VE today"
 static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=false) {
-    static_assert(vanilla==1, "mayiuse(cpu_isa_t) may need some work")
+    static_assert(vanilla==1, "mayiuse(cpu_isa_t) may need some work");
     //unsigned cpu_isa_mask = get_max_cpu_isa(soft);
     //if ((cpu_isa_mask & cpu_isa) != cpu_isa) return false;
     return cpu_isa == vanilla;

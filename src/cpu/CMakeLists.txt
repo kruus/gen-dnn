@@ -43,7 +43,7 @@ if(NOT TARGET_X86_JIT)
 endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-if(TARGET_X86)
+if(TARGET_X86_JIT)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/xbyak)
 endif()
 

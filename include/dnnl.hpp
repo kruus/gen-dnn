@@ -20,6 +20,8 @@
 #ifndef DNNL_HPP
 #define DNNL_HPP
 
+#include "dnnl_config.h" // some DNNL_TARGET_xxx targets needed debugging :(
+
 /// @cond DO_NOT_DOCUMENT_THIS
 #include <algorithm>
 #include <cstdlib>
@@ -28,7 +30,20 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-//#include <cstring> // VE debug
+#if DNNL_TARGET_VE
+#define DNNL_MD_DEBUG 1
+#define DNNL_MD_VERBOSE 0
+#elif (DNNL_TARGET_X86 && !DNNL_TARGET_X86_JIT)
+#define DNNL_MD_DEBUG 0
+#define DNNL_MD_VERBOSE 0
+#else
+#warning " normal dnnl::memory::desc"
+#define DNNL_MD_DEBUG 0
+#define DNNL_MD_VERBOSE 0
+#endif
+#if DNNL_MD_VERBOSE
+#include <cstring> // VE debug
+#endif
 
 #include "dnnl.h"
 
@@ -1993,15 +2008,26 @@ struct memory : public handle<dnnl_memory_t> {
 
     /// A memory descriptor.
     struct desc {
-      //private:
-      //  static const int verbose=1;
-      //  void msg(char const* m){
-      //      if(verbose){
-      //          printf("%s,@0x%llx,md@%llx",m,(unsigned long long)(void*)this,(unsigned long long)(void*)(&this->data));
-      //          fflush(stdout);
-      //      }
-      //  }
-      //public:
+      private:
+#if DNNL_MD_DEBUG
+            void zero_data() { // buggy C++ compilers...
+                std::memset(&data, 0, sizeof(dnnl_memory_desc_t));
+            }
+#else
+            void zero_data() {}
+#endif
+#if DNNL_MD_VERBOSE // debug
+        void msg(char const* m) const {
+            typedef unsigned long long ull;
+            printf("%s,@0x%llx,md@%llx",m,
+                    (ull)(void*)this, (ull)(void*)(&this->data));
+            //if(data.ndims){ dnnl_debug print of data; } if necessary.
+            fflush(stdout);
+        }
+#else
+	void msg(char const*m) const {}
+#endif
+      public:
         friend struct memory;
         /// The underlying C API data structure.
         dnnl_memory_desc_t data;
@@ -2010,8 +2036,8 @@ struct memory : public handle<dnnl_memory_t> {
         /// descriptor can be used to indicate absence of an argument.
         //desc() : data(dnnl_memory_desc_t DNNL_ZERO_MEMORY_DESC_T) {} // VE debug
         desc() : data() {
-            std::memset(&data, 0, sizeof(dnnl_memory_desc_t));
-            //msg(" +desc()");
+            if(DNNL_MD_DEBUG) zero_data();
+            if(DNNL_MD_VERBOSE) msg(" +desc()");
         } // VE debug
 
         /// Constructs a memory descriptor.
@@ -2030,9 +2056,9 @@ struct memory : public handle<dnnl_memory_t> {
         : data()
         //: data(dnnl_memory_desc_t DNNL_ZERO_MEMORY_DESC_T) // VE debug
         {
-            std::memset(&data, 0, sizeof(dnnl_memory_desc_t)); // VE debug
+            if(DNNL_MD_DEBUG) zero_data();
             validate_dims(dims);
-            //msg(" +desc(dims,data_type,format_tag)");
+            if(DNNL_MD_VERBOSE) msg(" +desc(dims,data_type,format_tag)");
             error::wrap_c_api(
                     dnnl_memory_desc_init_by_tag(&data, (int)dims.size(),
                             dims.size() == 0 ? nullptr : &dims[0],
@@ -2055,11 +2081,10 @@ struct memory : public handle<dnnl_memory_t> {
         desc(const memory::dims &dims, data_type data_type,
                 const memory::dims &strides)
         : data()
-        //: data(dnnl_memory_desc_t DNNL_ZERO_MEMORY_DESC_T)
         {
-            std::memset(&data, 0, sizeof(dnnl_memory_desc_t)); // VE debug
+            if(DNNL_MD_DEBUG) zero_data();
             validate_dims(dims);
-            //msg(" +desc(dims,data_type,strides)");
+            if(DNNL_MD_VERBOSE) msg(" +desc(dims,data_type,strides)");
             error::wrap_c_api(
                     dnnl_memory_desc_init_by_strides(&data, (int)dims.size(),
                             dims.size() == 0 ? nullptr : &dims[0],
@@ -2072,18 +2097,18 @@ struct memory : public handle<dnnl_memory_t> {
         ///
         /// @param data A C API ::dnnl_memory_desc_t structure.
         desc(const dnnl_memory_desc_t &data) : data(data) {
-            //msg(" +desc(dnnl_memory_desc_t)COPY");
-            //if(verbose){
-            //    printf("-FROM-md@0x%llx", (unsigned long long)(void*)&data);
-            //    printf(" tag %lx-->%lx\n",
-            //            (long)      data.extra.flags,
-            //            (long)this->data.extra.flags);
-            //    fflush(stdout);
-            //}
+            if(DNNL_MD_VERBOSE){
+                msg(" +desc(dnnl_memory_desc_t)COPY");
+                printf("-FROM-md@0x%llx", (unsigned long long)(void*)&data);
+                printf(" tag %lx-->%lx\n",
+                        (long)      data.extra.flags,
+                        (long)this->data.extra.flags);
+                fflush(stdout);
+            }
         }
 
         ~desc(){
-            //msg(" -desc");
+            if(DNNL_MD_VERBOSE) msg(" -desc");
         }
 
         /// Constructs a memory descriptor for a region inside an area
@@ -2095,7 +2120,11 @@ struct memory : public handle<dnnl_memory_t> {
         /// @returns A memory descriptor for the region.
         desc submemory_desc(
                 const memory::dims &dims, const memory::dims &offsets) const {
-            dnnl_memory_desc_t sub_md;
+            dnnl_memory_desc_t sub_md; // NB: must fully init
+#if DNNL_MD_DEBUG
+            std::memset(&sub_md, 0, sizeof(dnnl_memory_desc_t)); // VE debug
+#endif
+            if(DNNL_MD_VERBOSE) msg(" submemory-from");
             error::wrap_c_api(dnnl_memory_desc_init_submemory(
                                       &sub_md, &data, &dims[0], &offsets[0]),
                     "could not construct a sub-memory");
@@ -2109,6 +2138,10 @@ struct memory : public handle<dnnl_memory_t> {
         /// @returns A new memory descriptor with new dimensions.
         desc reshape(const memory::dims &dims) const {
             dnnl_memory_desc_t out_md;
+#if DNNL_MD_DEBUG
+            std::memset(&out_md, 0, sizeof(dnnl_memory_desc_t)); // VE debug
+#endif
+            if(DNNL_MD_VERBOSE) msg(" reshape-from");
             error::wrap_c_api(dnnl_memory_desc_reshape(&out_md, &data,
                                       (int)dims.size(), &dims[0]),
                     "could not reshape a memory descriptor");

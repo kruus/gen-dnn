@@ -168,10 +168,6 @@ void simple_net(engine::kind engine_kind) {
     const float alpha = 0.0001f;
     const float beta = 0.75f;
     const float k = 1.0f;
-#if 0 // debug mode assertion:
-3: dnnl_verbose,create,cpu,lrn,lrn_ref:any,forward_training,data_f32::blocked:abcd:f0 diff_undef::undef::f0,,alg:lrn_across_channels,mb32ic96ih55iw55ls5beta0.75,0.0761719
-3: cnn-training-f32-cpp: /usr/uhome/aurora/4gi/nlabhpg/work/kruus/v11/src/common/memory_desc_wrapper.hpp:121: unsigned long dnnl::impl::memory_desc_wrapper::additional_buffer_size() const: Assertion `cmask == 1 || cmask == 3 || cmask == 27' failed.
-#endif
 
     // create a lrn primitive descriptor
     cout<<" lrn_desc..."<<endl;
