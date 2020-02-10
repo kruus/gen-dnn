@@ -6,9 +6,13 @@ using namespace std;
 
 namespace test {
 int test1(){
+    SHOW(sizeof(AH));
+    SHOW(sizeof(B));
+    SHOW(sizeof(C));
     auto z = zero_ah();
     int sum = sumah(&z);
     cout<<"test1:sum="<<sum<<endl; cout.flush();
+
     return sum;
 }
 int test2(){
@@ -35,6 +39,7 @@ int test4(){
 int test5(){
     using namespace cxxpod;
     Big big;
+    SHOW(sizeof(Big));
     int status = big.test();
     cout<<"test 5 status="<<status<<endl;
     return status;
@@ -43,7 +48,7 @@ int test6(){
     using namespace cxxpod;
     cout<<" test6 begins by default constructing a Big"<<endl;
     Big big;
-    int status = big.test();
+    bool status = big.test();
     cout<<"test 6 status="<<status<<endl;
     assert( status == true  && "default-constructed Big must be all-zero");
     cout<<" writing to big.ah..."<<endl;
@@ -57,17 +62,20 @@ int test6(){
             <<big.ah.f<<", "
             <<big.ah.g<<", "
             <<endl;
+    cout<<" big.test() again..."<<endl;
     status = big.test();
-    cout<<"test 6 status="<<status<<" (expected big.ah bad)"<<endl;
+    cout<<"test 6 status="<<status<<" (expect "<<false<<")"<<endl;
     assert( status == false );
     cout<<" copying AHxx() into big.ah..."<<endl;
     big.ah = AHxx();
     status = big.test();
     cout<<"test 6 status="<<status<<endl;
+    assert( status == true ); // now big.ah should be all-zero again
     cout<<" copying AHxx{} into big.ah..."<<endl;
     big.ah = AHxx{};
     status = big.test();
     cout<<"test 6 FINAL status="<<status<<endl;
+    assert( status == true ); // same here
     return status;
 }
 }//test::

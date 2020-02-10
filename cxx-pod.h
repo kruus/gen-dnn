@@ -14,9 +14,9 @@ extern "C" {
 		int h;
 	};
 
-    struct B { int b[128]; };
+    struct B { int b[1023]; };
 
-    struct C { int c[128]; };
+    struct C { int c[1023]; };
 
 #ifdef __cplusplus
 }//"C"

@@ -2,7 +2,17 @@
 #include <assert.h>
 
 #include <iostream>
+#include <iomanip>
 using namespace std;
+
+struct NullBuffer : public std::streambuf
+{
+    // the function called when buffer needs to output data
+    int overflow(int c) { return c; }
+};
+static NullBuffer null_buffer;
+
+std::ostream no_out(&null_buffer);
 
 int sumah( AH const*ah ){
     return ah->a + ah->b + ah->c + ah->d + ah->e + ah->f + ah->g + ah->h;

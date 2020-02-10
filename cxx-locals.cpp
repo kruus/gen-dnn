@@ -1,16 +1,25 @@
 
-#include <iostream>
-extern "C" {
+#include <stddef.h>
 
+extern "C" {
+extern int hash; // print at exit to try avoiding over-optimization
+extern int clobberhash_impl(char const* const p, size_t const psz);
+}
+
+extern "C" {
 struct A {
 	int a;
-	int pad[15];
+	int pad[1023];
 };
-
 struct B {
 	int B;
 	A a;
 };
+}//extern "C"
+
+#include <iostream>
+#include <iomanip>
+using namespace std;
 
 inline size_t nz_bytes(char const* const p, size_t psz){
     size_t nz = 0U;
@@ -21,33 +30,43 @@ inline size_t nz_bytes(char const* const p, size_t psz){
 }
 
 template<typename T>
-inline size_t nz_bytes(typename T const* const t){
-    size_t nz=0U;
+inline size_t nz_bytes(T const* const t){
     char const* const p = reinterpret_cast<char const*>(t);
     size_t const psz = sizeof(T);
     return nz_bytes(p, psz);
 };
 
+/** clobber memory, setting it to nonzero characters, modifying "C" 'hash', and
+ * returning number of original non-zero chars in memory region of \c t. */
+template<typename T>
+inline int clobberhash(T * const t){
+    char * const p = reinterpret_cast<char *>(t);
+    size_t const psz = sizeof(T);
+    return clobberhash_impl(p, psz);
+}
+    
 struct NullBuffer : public std::streambuf
 {
     // the function called when buffer needs to output data
     int overflow(int c) { return c; }
 };
 NullBuffer null_buffer;
-std::ostream no_out(&null_buffer)
+std::ostream no_out(&null_buffer);
 
-using namespace std;
 inline ostream& check(bool cond, char const* str, char const* file, size_t line){
     if(cond){
+        return no_out;
+    }else{
         cout<<"\n"<<file<<":"<<line<<" failed check "<<str<<" ";
         return cout;
-    }else{
-        return no_out;
     }
 }
-#define CHECK(COND) check(COND,#COND,__FILE__,__LINE__)
+#define EXPAND(...) __VA_ARGS__
+#define CHECK(...) check((EXPAND(__VA_ARGS__)),#__VA_ARGS__,__FILE__,__LINE__)
+#define SHOW(STUFF) do{cout<<right<<setw(30)<<#STUFF<<left<<" "<<STUFF<<endl;}while(0)
 int main(int,char**){
-#if defined(__ve) // compile with -minit-stack=0xdecabbed or something
+    int bogus = 0;
+#if defined(__ve) // compile with -minit-stack=0xbadfaced or something
     if(1){
         A a;
         B b;
@@ -58,12 +77,28 @@ int main(int,char**){
     }
 #endif
     if(1){
-        char const name[16]=""; // C++ must zero-initialize excess chars
-        CHECK(nz_bytes(&name[0], 16) == 16)
+        char name[16]=""; // C++ must zero-initialize excess chars
+        //SHOW(nz_bytes(&name[0], 16));
+        CHECK(nz_bytes(&name[0], 16) == 0)
                 <<"C++ must initialized remainder of char X[n]="" with zeroes"<<endl;
-        char const len8[16]="12345678";
+        char len8[16]="12345678";
+        //SHOW( nz_bytes(&len8[0], 16));
+        CHECK(nz_bytes(&len8[0], 16) == 8U)
+                <<"C++ must initialized remainder of char X[n]="" with zeroes"<<endl;
+        bogus += clobberhash(name);
+        bogus += clobberhash(len8);
+        bogus += clobberhash(name);
+        bogus += clobberhash(len8);
+    }
+    if(1){
+        char name[16]=""; // C++ must zero-initialize excess chars
+        CHECK(nz_bytes(&name[0], 16) == 0)
+                <<"C++ must initialized remainder of char X[n]="" with zeroes"<<endl;
+        char len8[16]="12345678";
         CHECK(nz_bytes(&len8[0], 16) == 8)
                 <<"C++ must initialized remainder of char X[n]="" with zeroes"<<endl;
+        bogus += clobberhash(name);
+        bogus += clobberhash(len8);
     }
     if(1){ // statics always get initialized
         static A static_a;
@@ -100,17 +135,31 @@ int main(int,char**){
         CHECK(nz_bytes(&a) == 0)
                 <<"assign from nameless A() must be value-intiialized"<<endl;
         auto b =B();
+        CHECK(nz_bytes(&b) == 0)
+                <<"assign from nameless A() must be value-intiialized"<<endl;
+        bogus += clobberhash(&a);
+        bogus += clobberhash(&b);
+    }
+    // if CXX zeroes stack frame, repeating *might* be a stronger test...
+    if(1){ // nameless temporary T() is value-initialized (any C++)
+        auto a = A();
         CHECK(nz_bytes(&a) == 0)
                 <<"assign from nameless A() must be value-intiialized"<<endl;
+        auto b =B();
+        CHECK(nz_bytes(&b) == 0)
+                <<"assign from nameless A() must be value-intiialized"<<endl;
+        bogus += clobberhash(&a);
+        bogus += clobberhash(&b);
     }
     if(1){ // nameless temporary T{} is value-initialized (>= c++11)
-        auto a = A{};
+        auto a = A{};   // aggregate-init N/A
         CHECK(nz_bytes(&a) == 0)
                 <<"assign from nameless A() must be value-intiialized"<<endl;
         auto b =B{};
-        CHECK(nz_bytes(&a) == 0)
+        CHECK(nz_bytes(&b) == 0)
                 <<"assign from nameless A() must be value-intiialized"<<endl;
     }
+    cout<<"\nGoodbye -- bogus = "<<bogus<<endl;
 
 }//"C"
 

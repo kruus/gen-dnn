@@ -4,6 +4,21 @@
 
 #include <cstddef>  // size_t
 #include <iostream>
+#include <iomanip>
+#define SHOW(STUFF) do{cout<<right<<setw(30)<<#STUFF<<left<<" "<<STUFF<<endl;}while(0)
+
+extern std::ostream no_out;
+
+inline std::ostream& check(bool cond, char const* str, char const* file, size_t line){
+    if(cond){
+        return no_out;
+    }else{
+        std::cout<<"\n"<<file<<":"<<line<<" failed check "<<str<<" ";
+        return std::cout;
+    }
+}
+#define EXPAND(...) __VA_ARGS__
+#define CHECK(...) check((EXPAND(__VA_ARGS__)),#__VA_ARGS__,__FILE__,__LINE__)
 
 typedef AH AHxx;
 typedef B Bxx;
@@ -18,9 +33,24 @@ bool is_zero(T const* const t){
     for(size_t i=0; i<psz; ++i){
         if( p[i] != '\0' ) ++nz;
     }
-    cout<<" nonzerobytes(sizeof(T)="<<sizeof(T)<<")="<<nz;
-    return nz>0;
+    //cout<<" nonzerobytes(sizeof(T)="<<sizeof(T)<<")="<<nz;
+    return nz==0;
 }
+
+inline size_t nz_bytes(char const* const p, size_t psz){
+    size_t nz = 0U;
+    for(size_t i=0; i<psz; ++i){
+        if( p[i] != '\0' ) ++nz;
+    }
+    return nz;
+}
+
+template<typename T>
+inline size_t nz_bytes(T const* const t){
+    char const* const p = reinterpret_cast<char const*>(t);
+    size_t const psz = sizeof(T);
+    return nz_bytes(p, psz);
+};
 
 namespace cxxpod {
 struct Big {
@@ -42,8 +72,9 @@ struct Big {
     AHxx ah;
     Bxx b;
     Cxx *pc;
+    int d[10]; // also uninitialized
 };
 }//cxxpod::
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif // CXX_POD_HPP
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
