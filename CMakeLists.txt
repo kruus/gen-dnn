@@ -80,12 +80,6 @@ endif()
 # commands (for Makefile and Ninja generators)
 add_definitions(-DCMAKE_EXPORT_COMPILE_COMMANDS=1)
 
-message(STATUS "CMAKE_TOOLCHAIN_PREFIX = ${CMAKE_TOOLCHAIN_PREFIX}")
-if("${CMAKE_BUILD_TYPE}" STREQUAL "")
-    message(STATUS "CMAKE_BUILD_TYPE is unset, defaulting to RelWithDebInfo")
-    set(CMAKE_BUILD_TYPE "RelWithDebInfo")
-endif()
-
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 set(CMAKE_SRC_CCXX_FLAGS)       # SRC specifics
