@@ -54,6 +54,12 @@ struct prb_t {
     alg_t alg;
     float alpha, beta;
     bool inplace;
+
+    bool use_dst() const {
+        return alg == alg_t::RELU_DST || alg == alg_t::TANH_DST
+                || alg == alg_t::ELU_DST || alg == alg_t::SQRT_DST
+                || alg == alg_t::LOGISTIC_DST || alg == alg_t::EXP_DST;
+    }
 };
 std::ostream &operator<<(std::ostream &s, const prb_t &p);
 
@@ -69,6 +75,8 @@ struct perf_report_t : public base_perf_report_t {
         s << attr_t::post_ops_t::kind2str(p_->alg);
     }
 
+    virtual void dump_desc(std::ostream &s) const override { s << p_->dims; }
+
     virtual void dump_desc_csv(std::ostream &s) const override {
         s << p_->dims;
     }
@@ -83,6 +91,7 @@ private:
 
 extern const char *skip_impl; /* NULL or "" means do not skip anything */
 
+bool check_extreme_values(const float &a, const float &b, alg_t alg);
 void compute_ref_fwd(const prb_t *p, const dnn_mem_t &src, dnn_mem_t &dst);
 void compute_ref_bwd(const prb_t *p, const dnn_mem_t &src,
         const dnn_mem_t &diff_dst, dnn_mem_t &diff_src);

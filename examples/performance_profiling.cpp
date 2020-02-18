@@ -74,6 +74,7 @@
 /// user's source data entering DNNL with the NCHW format.
 /// @page performance_profiling_cpp
 /// @snippet performance_profiling.cpp Set dimensions
+/// @note Here the library allocates memory.
 /// @page performance_profiling_cpp
 /// @snippet performance_profiling.cpp Create memory objects
 /// @page performance_profiling_cpp
@@ -105,10 +106,8 @@ const memory::dims padding = {0, 0};
 // function to init data
 void init_data(memory &m, float v) {
     size_t size = m.get_desc().get_size() / sizeof(float);
-    std::vector<float> data(size);
-    read_from_dnnl_memory(data.data(), m);
-    for (size_t i = 0; i < size; ++i)
-        data[i] = v;
+    std::vector<float> data(size, v);
+    write_to_dnnl_memory(data.data(), m);
 }
 
 // function to execute non-fused relu
@@ -190,7 +189,7 @@ void conv_relu_naive(memory user_src, memory user_wei, memory user_dst,
     // create convolution primitive
     auto conv = convolution_forward(conv_pd);
     // [Create conv_primitive]
-    // @page performance_profiling_cpp
+    /// @page performance_profiling_cpp
     /// @snippet performance_profiling.cpp Add to stream
     // [Add to stream]
     // execute convolution by adding it to the stream s
@@ -516,7 +515,7 @@ void performance_profiling(engine::kind engine_kind, int argc, char **argv) {
     stream s(eng);
     // [Set dimensions]
     // set dimensions for synthetic data and weights
-    const memory::dim BATCH = 1000;
+    const memory::dim BATCH = (engine_kind == engine::kind::cpu ? 1000 : 100);
     const memory::dim IC = 3, OC = 96;
     const memory::dim IH = 227, KH = 11, OH = 55;
     const memory::dim IW = 227, KW = 11, OW = 55;
@@ -524,7 +523,6 @@ void performance_profiling(engine::kind engine_kind, int argc, char **argv) {
 
     // [Create memory objects]
     // create DNNL memory objects for user's tensors (in nchw and oihw formats)
-    // @note here the library allocates memory
     auto user_src = memory({{BATCH, IC, IH, IW}, memory::data_type::f32,
                                    memory::format_tag::nchw},
             eng);

@@ -75,7 +75,3 @@ A3-*.log
 minifwd*.log
 minibwd*.log
 BWD*.log
-cxx-locals
-cxx-pod
-cxx_incomplete_value_init
-clang-7139

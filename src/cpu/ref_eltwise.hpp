@@ -70,26 +70,21 @@ struct ref_eltwise_fwd_t : public primitive_impl_t {
 
             const bool use_generic = !use_dense_ && !use_nCspBc_padded_;
 
-#if 0
+#if 1 || defined(NDEBUG)
             bool ok = true && is_fwd()
                     && everyone_is(data_type, desc()->data_desc.data_type)
-                    // actually bf16 gtests fail above line.
-                    // Why would data_desc.data_type not match ?
-                    // I guess src is always f32?
-#if DNNL_ENABLE_BFLOAT16
                     /*bf16<->f32 cvt operators don't work on non-avx512_core*/
-                    //&& IMPLICATION(
-                    //        desc()->data_desc.data_type == data_type::bf16,
-                    //        mayiuse(avx512_core))
-                    // actually 
-#endif // DNNL_ENABLE_BFLOAT16
+                    && IMPLICATION(
+                            desc()->data_desc.data_type == data_type::bf16,
+                            mayiuse(avx512_core))
                     && IMPLICATION(use_generic, one_of(src_d.ndims(), 4, 5))
                     && attr()->has_default_values();
-#else
+#else // debug
 #define AND_(...) SCHKV(ok,__VA_ARGS__)
             Consistency ok("\nref_eltwise_fwd_init !ok :");
             AND_(is_fwd());
             AND_(everyone_is(data_type, desc()->data_desc.data_type));
+            /*bf16<->f32 cvt operators don't work on non-avx512_core*/
             AND_(IMPLICATION(
                     desc()->data_desc.data_type == data_type::bf16,
                     mayiuse(avx512_core)));
@@ -145,8 +140,7 @@ struct ref_eltwise_bwd_t : public primitive_impl_t {
                             mayiuse(avx512_core))
 #endif // DNNL_ENABLE_BFLOAT16
                     && set_default_formats_common()
-                    && attr()->has_default_values()
-            ;
+                    && attr()->has_default_values();
             if (!ok) return status::unimplemented;
 
             auto diff_dst_d = memory_desc_wrapper(diff_dst_md());
@@ -188,4 +182,4 @@ private:
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

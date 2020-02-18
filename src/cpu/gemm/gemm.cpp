@@ -14,10 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "gemm.hpp"
-#include "gemm_driver.hpp"
-
 #include "dnnl.h"
+
 #include "dnnl_traits.hpp"
 #include "nstl.hpp"
 #include "utils.hpp"
@@ -26,12 +24,15 @@
 #include "jit_generator.hpp"
 #endif // MKLDNN_CPU_GEMM_JIT
 
+#include "gemm.hpp"
+
 #if MKLDNN_CPU_GEMM_JIT
 #include "f32/jit_avx512_common_gemm_f32.hpp"
 #include "f32/jit_avx_gemm_f32.hpp"
 #endif // MKLDNN_CPU_GEMM_JIT
 #include "f32/ref_gemm_f32.hpp"
 
+#include "gemm_driver.hpp"
 #include "s8x8s32/ref_gemm_s8x8s32.hpp"
 #include "s8x8s32/simple_gemm_s8s8s32.hpp"
 
@@ -39,6 +40,9 @@
 #if MKLDNN_TRACE_EXTENDED_SGEMM
 #include <stdio.h>
 #endif
+
+#include "common/bfloat16.hpp" // XXX needed?
+#include "os_blas.hpp"         // XXX needed?
 
 namespace dnnl {
 namespace impl {
@@ -110,7 +114,6 @@ dnnl_status_t extended_sgemm(const char *transa, const char *transb,
 #endif
         cblas_sgemm(CblasColMajor, Cblas_trA, Cblas_trB, *M, *N, *K, *alpha, A,
                 *lda, B, *ldb, *beta, C, *ldc);
-
         if (bias) {
             // Add bias if necessary (bias is applied to columns of C)
             int incx = 1, incy = 1;
@@ -119,40 +122,34 @@ dnnl_status_t extended_sgemm(const char *transa, const char *transb,
                 cblas_saxpy(*M, 1.0, bias, incx, C + offset, incy);
             });
         }
-        status = dnnl_success;
-    } else
-#endif
-    {
-        // JITFUNCS is compile-time macro.  Can short-circuit mayiuse
-        //if (JITFUNCS>=0 && JITFUNCS <= JITFUNCS_VANILLA && mayiuse(sse41))
-        if (TARGET_X86_JIT && DNNL_ISA>=DNNL_ISA_SSE41 && mayiuse(sse41)) {
-            float *dummy_ao = NULL;
-            float *dummy_bo = NULL;
-
-#if MKLDNN_TRACE_EXTENDED_SGEMM
-            printf("gemm_driver(%c,%c,%s;MNK=%d,%d,%d;alpha=%f"
-                   ",A@ld=%dx,B@ld=%dx,beta=%f,C@ld=%d,bias%s)\n",
-                   *transa,*transb,(bias?"C":"x"), *M,*N,*K, *alpha,
-                   *lda,*ldb, *beta, *ldc, (force_jit_nocopy_gemm?"(nocopy)":""));
-#endif
-            status = gemm_driver(transa, transb, bias ? "C" : NULL, M, N, K,
-                    alpha, A, lda, dummy_ao, B, ldb, dummy_bo, beta, C, ldc,
-                    bias, force_jit_nocopy_gemm);
-        } else {
-#if MKLDNN_TRACE_EXTENDED_SGEMM
-            printf("ref_gemm<float>(%c,%c;MNK=%d,%d,%d;alpha=%f"
-                   ",A@ld=%d,B@ld=%d,beta=%f,C@ld=%d,bias)\n",
-                   *transa,*transb, *M,*N,*K, *alpha, *lda,*ldb, *beta, *ldc);
-#endif
-            status = ref_gemm<float>(transa, transb, M, N, K, alpha, A, lda, B,
-                    ldb, beta, C, ldc, bias);
-        }
-    }
-
-    if (status == dnnl_success)
         msan_unpoison_matrix(C, *M, *N, *ldc, sizeof(*C));
+        return status;
+    }
+#endif
+    if (TARGET_X86_JIT && DNNL_ISA >= DNNL_ISA_SSE41 && mayiuse(sse41)) {
+        float *dummy_ao = NULL;
+        float *dummy_bo = NULL;
+
+#if MKLDNN_TRACE_EXTENDED_SGEMM
+        printf("gemm_driver(%c,%c,%s;MNK=%d,%d,%d;alpha=%f"
+               ",A@ld=%dx,B@ld=%dx,beta=%f,C@ld=%d,bias%s)\n",
+                *transa, *transb, (bias ? "C" : "x"), *M, *N, *K, *alpha, *lda,
+                *ldb, *beta, *ldc, (force_jit_nocopy_gemm ? "(nocopy)" : ""));
+#endif
+        status = gemm_driver(transa, transb, bias ? "C" : NULL, M, N, K, alpha,
+                A, lda, dummy_ao, B, ldb, dummy_bo, beta, C, ldc, bias,
+                force_jit_nocopy_gemm);
+    } else {
+#if MKLDNN_TRACE_EXTENDED_SGEMM
+        printf("ref_gemm<float>(%c,%c;MNK=%d,%d,%d;alpha=%f"
+               ",A@ld=%d,B@ld=%d,beta=%f,C@ld=%d,bias)\n",
+                *transa, *transb, *M, *N, *K, *alpha, *lda, *ldb, *beta, *ldc);
+#endif
+        status = ref_gemm<float>(transa, transb, M, N, K, alpha, A, lda, B, ldb,
+                beta, C, ldc, bias);
+    }
     return status;
-}
+} // namespace cpu
 
 // Tries calling Intel MKL cblas_gemm_s8u8s32 if applicable and available
 dnnl_status_t try_cblas_gemm_s8u8s32(const char *transa, const char *transb,
@@ -183,6 +180,7 @@ dnnl_status_t try_cblas_gemm_s8u8s32(const char *transa, const char *transb,
             : (OCisC ? CblasColOffset : CblasFixOffset);
     cblas_gemm_s8u8s32(CblasColMajor, Cblas_trA, Cblas_trB, Cblas_offsetc, *M,
             *N, *K, *alpha, A, *LDA, ao_s8, B, *LDB, bo_s8, *beta, C, *LDC, co);
+    msan_unpoison_matrix(C, *M, *N, *LDC, sizeof(*C));
     return dnnl_success;
 #else
     return dnnl_unimplemented;
@@ -212,8 +210,6 @@ dnnl_status_t gemm_s8x8s32(const char *transa, const char *transb,
         status = ref_gemm_s8x8s32(transa, transb, offsetc, M, N, K, alpha, A,
                 LDA, ao, B, LDB, bo, beta, C, LDC, co);
 
-    if (status == dnnl_success)
-        msan_unpoison_matrix(C, *M, *N, *LDC, sizeof(*C));
     return status;
 }
 
@@ -244,8 +240,6 @@ dnnl_status_t gemm_s8x8s32(const char *transa, const char *transb,
         status = ref_gemm_s8x8s32(transa, transb, offsetc, M, N, K, alpha, A,
                 LDA, ao, B, LDB, bo, beta, C, LDC, co);
 
-    if (status == dnnl_success)
-        msan_unpoison_matrix(C, *M, *N, *LDC, sizeof(*C));
     return status;
 }
 

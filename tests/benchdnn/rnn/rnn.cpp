@@ -67,9 +67,73 @@ void create_dnnl_rnn_attr(const prb_t &p, dnnl_primitive_attr_t *dnnl_attr) {
     }
 }
 
+int check_s8s8_reorder(const prb_t &p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp) {
+    // TODO: enable for all cpu_kind when supported
+    if (engine_tgt_kind != dnnl_cpu) return OK;
+
+    // In the main test, we fill buffers with f32 and reorder to s8
+    // with quantization.
+
+    // The endgoal is to check that the reorder
+    // f32_plain_nonquantized --reorder--> s8_packed_quantized
+    // gives the same output as the sequence
+    // f32_plain --quant--> s8_plain_quantized --reorder--> s8_packed_quantized
+
+    // Here,
+    // 1. we quantize the f32 plain memory to s8 plain memory,
+    // 2. we reorder the s8 plain to s8 packed (queried from rnn primitive desc)
+    // 3. we check that the two memory are bitwise identical.
+
+    // Note: the two s8 packed memories need to have the same
+    // alignment as packed buffer is aligned internally and the offset
+    // is kept in the metadata.
+    // Works fine with dnn_mem_t as it is align to 2MB large page boundary
+    dnn_mem_t mem_s8_src(mem_fp.md_, dnnl_s8, engine_tgt);
+    dnn_mem_t mem_s8_dst(mem_dt.md_, dnnl_s8, engine_tgt);
+
+    /* 1. compute f32_plain --quant--> s8_plain_quantized */
+    /* Do fixed partitioning to have same filling for any number of threads */
+    auto nelems = mem_fp.nelems();
+    const int64_t n_chunks = 16;
+    const int64_t chunk_size = div_up(nelems, n_chunks);
+    dnnl::impl::parallel_nd(n_chunks, [&](int idx_chunk) {
+        int64_t idx_start = idx_chunk * chunk_size;
+        int64_t idx_end = MIN2(idx_start + chunk_size, nelems);
+        for (int64_t idx = idx_start; idx < idx_end; ++idx) {
+            const float current_scale = p.scale_policy == policy_t::PER_OC
+                    ? p.wei_oc_scales[idx % (p.dic * p.n_gates())]
+                    : p.wei_scale;
+            float val_f32 = mem_fp.get_elem(idx);
+            //int8_t val_s8 = saturate<dnnl_s8>(val_f32);
+            int8_t val_s8 = saturate<dnnl_s8>(val_f32 * current_scale);
+            mem_s8_src.set_elem(idx, val_s8);
+        }
+    });
+
+    /* 2. compute s8_plain_quantized --reorder--> s8_packed_quantized */
+    mem_s8_dst.reorder(mem_s8_src);
+
+    /* 3. we check that the two memory are bitwise identical. */
+    auto sz = mem_dt.size();
+    uint8_t *s8_dst_handle = (uint8_t *)mem_s8_dst;
+    uint8_t *mem_dt_handle = (uint8_t *)mem_dt;
+
+    // check that both have the same size
+    assert(mem_dt.size() == mem_s8_dst.size());
+    // check that both have the same alignment modulo align_data in gemm_pack_storage.hpp
+    assert((uint64_t)s8_dst_handle % 0x1000
+            == (uint64_t)mem_dt_handle % 0x1000);
+    for (size_t i = 0; i < sz; ++i) {
+        if (s8_dst_handle[i] != mem_dt_handle[i]) { return FAIL; }
+    }
+
+    return OK;
+}
+
 int fill_memory(const prb_t &p, rnn_data_kind_t kind, dnn_mem_t &mem_dt,
         dnn_mem_t &mem_fp, dnnl_data_type_t dt, float mean, float stddev,
-        float min, float max, const_dnnl_primitive_attr_t attr = nullptr) {
+        float min, float max, const_dnnl_primitive_attr_t attr = nullptr,
+        bool flip_sign = false) {
 #ifdef CALL_DNNL_RNN
     const auto nelems = mem_dt.nelems();
     assert(mem_dt.nelems() == mem_fp.nelems());
@@ -121,12 +185,20 @@ int fill_memory(const prb_t &p, rnn_data_kind_t kind, dnn_mem_t &mem_dt,
                     ? p.wei_oc_scales[idx % (p.dic * p.n_gates())]
                     : scale;
             val = (val - shift) / current_scale; // change only int8-case
-
+            /* we flip the sign of only a few value per mb to avoid
+             * too much cancellation in the bwd pass. Here we assume
+             * the p.slc/p.sic is not "too large" */
+            if (flip_sign) {
+                float sign = ((7 * idx + 3) % p.sic == 0) ? -1.0f : 1.0f;
+                val *= sign;
+            }
             mem_fp.set_elem(idx, val);
         }
     });
 
     mem_dt.reorder(mem_fp, {reorder_attr});
+    if ((reorder_attr != nullptr) && (dt == dnnl_s8))
+        if (check_s8s8_reorder(p, mem_dt, mem_fp) != OK) return FAIL;
 
     // Bullet 4.a holds: quantize weights for int8 benchdnn reference RNN
     if (p.is_int8() && (kind == weights_input || kind == weights_states)) {
@@ -150,10 +222,26 @@ int fill_memory(const prb_t &p, rnn_data_kind_t kind, dnn_mem_t &mem_dt,
 }
 
 int fill_memory(const prb_t &p, rnn_data_kind_t kind, dnn_mem_t &mem_dt,
-        dnn_mem_t &mem_fp, const_dnnl_primitive_attr_t attr = nullptr) {
+        dnn_mem_t &mem_fp, const_dnnl_primitive_attr_t attr = nullptr,
+        bool flip_sign = false) {
     dt_conf_t c = p.cfg[kind];
     return fill_memory(p, kind, mem_dt, mem_fp, c.dt, c.f_mean, c.f_stddev,
-            c.f_min, c.f_max, attr);
+            c.f_min, c.f_max, attr, flip_sign);
+}
+
+int fill_activation(const prb_t &p, rnn_data_kind_t kind, dnn_mem_t &mem_dt,
+        dnn_mem_t &mem_fp, const_dnnl_primitive_attr_t attr = nullptr) {
+    // In general, we mostly want to use positive values to avoid
+    // cancellation from happening during computation.  The only case
+    // where we actually want negative values to appear is for 1 layer
+    // 1 iteration tests using vanilla_rnn and non-zero alpha. In that
+    // case, we want to check that alpha is applied accordingly. Here
+    // skip_nonlinear is checked as we want to test relu with non-zero
+    // alpha, and not the linear function that would replace it under
+    // skip_nonlinear=true.
+    bool flip_sign = p.skip_nonlinear == false && p.alg == VANILLA_RNN
+            && p.activation == RELU;
+    return fill_memory(p, kind, mem_dt, mem_fp, attr, flip_sign);
 }
 
 int fill_c_states(const prb_t &p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp,
@@ -682,8 +770,8 @@ int doit(const prb_t &p, res_t *r) {
     const_dnnl_primitive_attr_t rnn_attr;
     DNN_SAFE(dnnl_primitive_desc_get_attr(rpd[0], &rnn_attr), WARN);
 
-    SAFE(fill_memory(p, input, input_dt, input_fp, rnn_attr), WARN);
-    SAFE(fill_memory(p, states, states_dt, states_fp, rnn_attr), WARN);
+    SAFE(fill_activation(p, input, input_dt, input_fp, rnn_attr), WARN);
+    SAFE(fill_activation(p, states, states_dt, states_fp, rnn_attr), WARN);
     if (p.alg == VANILLA_LSTM)
         SAFE(fill_c_states(p, c_states_dt, c_states_fp, rnn_attr), WARN);
     SAFE(fill_weights(p, weights_input, weights_input_dt, weights_input_fp,
@@ -693,9 +781,10 @@ int doit(const prb_t &p, res_t *r) {
                  rnn_attr),
             WARN);
     SAFE(fill_memory(p, bias, bias_dt, bias_fp), WARN);
-    SAFE(fill_memory(p, dst_last_layer, dst_last_layer_dt, dst_last_layer_fp),
+    SAFE(fill_activation(
+                 p, dst_last_layer, dst_last_layer_dt, dst_last_layer_fp),
             WARN);
-    SAFE(fill_memory(p, dst_last_iteration, dst_last_iteration_dt,
+    SAFE(fill_activation(p, dst_last_iteration, dst_last_iteration_dt,
                  dst_last_iteration_fp),
             WARN);
     if (p.alg == VANILLA_LSTM)
@@ -706,10 +795,10 @@ int doit(const prb_t &p, res_t *r) {
     if (is_bwd) {
         SAFE(bwd_weights_states_dt.reorder(weights_states_dt), WARN);
         SAFE(bwd_weights_input_dt.reorder(weights_input_dt), WARN);
-        SAFE(fill_memory(
+        SAFE(fill_activation(
                      p, dst_diff_input, dst_diff_input_dt, dst_diff_input_fp),
                 WARN);
-        SAFE(fill_memory(p, dst_diff_states, dst_diff_states_dt,
+        SAFE(fill_activation(p, dst_diff_states, dst_diff_states_dt,
                      dst_diff_states_fp),
                 WARN);
         if (p.alg == VANILLA_LSTM)
@@ -724,10 +813,10 @@ int doit(const prb_t &p, res_t *r) {
                 WARN);
         SAFE(fill_bias(p, dst_diff_bias, dst_diff_bias_dt, dst_diff_bias_fp),
                 WARN);
-        SAFE(fill_memory(p, diff_last_layer, diff_last_layer_dt,
+        SAFE(fill_activation(p, diff_last_layer, diff_last_layer_dt,
                      diff_last_layer_fp),
                 WARN);
-        SAFE(fill_memory(p, diff_last_iteration, diff_last_iteration_dt,
+        SAFE(fill_activation(p, diff_last_iteration, diff_last_iteration_dt,
                      diff_last_iteration_fp),
                 WARN);
         if (p.alg == VANILLA_LSTM)

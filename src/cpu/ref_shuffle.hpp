@@ -20,11 +20,13 @@
 #include <assert.h>
 
 #include "c_types_map.hpp"
-#include "cpu_isa_traits.hpp"
+#include "dnnl_thread.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
 #include "cpu_shuffle_pd.hpp"
+
+#include "cpu_isa_traits.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -113,4 +115,4 @@ private:
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

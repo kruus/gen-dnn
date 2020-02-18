@@ -13,8 +13,6 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include "cpu_isa_traits.hpp"
-#if TARGET_X86_JIT
 
 #include <assert.h>
 
@@ -97,7 +95,7 @@ struct jit_bnorm_base_t : public jit_generator {
 
     void load_common_params() {
         mov(reg_tmp, float2int(1.0f));
-        movq(xone, reg_tmp);
+        uni_vmovq(xone, reg_tmp);
         uni_vbroadcastss(vone, xone);
 
 #define PARAM_OFF(x) offsetof(call_params_t, x)
@@ -543,6 +541,3 @@ template struct jit_uni_batch_normalization_s8_fwd_t<avx2>;
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // TARGET_X86_JIT

@@ -16,10 +16,10 @@
 
 #include "dnnl.h"
 
-#include "utils.hpp"
 #include "c_types_map.hpp"
 #include "primitive_attr.hpp"
 #include "type_helpers.hpp"
+#include "utils.hpp"
 
 using namespace dnnl::impl;
 using namespace dnnl::impl::status;
@@ -27,6 +27,12 @@ using namespace dnnl::impl::utils;
 
 namespace dnnl {
 namespace impl {
+
+const primitive_attr_t &default_attr() {
+    // 'static' forces zero-initialization: cf. impls::zero<primitive_attr_t>()
+    static const primitive_attr_t default_attr_instance;
+    return default_attr_instance;
+}
 
 status_t scales_t::set(dim_t count, int mask, const float *scales) {
     cleanup();
@@ -51,10 +57,29 @@ status_t scales_t::set(dim_t count, int mask, const float *scales) {
     return status::success;
 }
 
+status_t arg_scales_t::set(
+        int arg, dim_t count, int mask, const float *scales) {
+    if (!check_arg(arg)) return status::invalid_arguments;
+
+    scales_[arg] = scales_t(count, mask, scales);
+    return status::success;
+}
+
+status_t arg_scales_t::get(
+        int arg, dim_t *count, int *mask, const float **scales) const {
+    if (!check_arg(arg)) return status::invalid_arguments;
+    const auto &s = get(arg);
+
+    *count = s.count_;
+    *mask = s.mask_;
+    *scales = s.scales_;
+    return status::success;
+}
+
 status_t zero_points_t::get(
         int arg, dim_t *count, int *mask, const int **zero_points) const {
     if (count) *count = 1;
-    if (mask) *mask = 0;
+    if (mask) *mask = get_mask(arg);
     if (zero_points) *zero_points = get(arg);
     return status::success;
 }
@@ -65,16 +90,27 @@ status_t zero_points_t::set(
 
     const bool supported_arg
             = utils::one_of(arg, DNNL_ARG_SRC, DNNL_ARG_WEIGHTS, DNNL_ARG_DST);
-    const bool ok = count == 1 && mask == 0
+    const bool ok = count == 1
+            && IMPLICATION(mask != 0,
+                    arg == DNNL_ARG_DST
+                            && zero_points[0] == DNNL_RUNTIME_S32_VAL)
             && IMPLICATION(!supported_arg, *zero_points == 0);
     if (!ok) return status::unimplemented;
 
     switch (arg) {
-        case DNNL_ARG_SRC: zero_point_src = *zero_points; break;
-        case DNNL_ARG_WEIGHTS: zero_point_wei = *zero_points; break;
-        case DNNL_ARG_DST: zero_point_dst = *zero_points; break;
+        case DNNL_ARG_SRC:
+            zero_point_src = *zero_points;
+            mask_src = mask;
+            break;
+        case DNNL_ARG_WEIGHTS:
+            zero_point_wei = *zero_points;
+            mask_wei = mask;
+            break;
+        case DNNL_ARG_DST:
+            zero_point_dst = *zero_points;
+            mask_dst = mask;
+            break;
     }
-
     return status::success;
 }
 
@@ -94,6 +130,8 @@ bool primitive_attr_t::has_default_values(
     return true
             && IMPLICATION((bool)(~mask & skip_mask_t::oscale),
                     output_scales_.has_default_values())
+            && IMPLICATION((bool)(~mask & skip_mask_t::scales),
+                    scales_.has_default_values())
             && IMPLICATION((bool)(~mask & skip_mask_t::zero_points),
                     zero_points_.has_default_values())
             && IMPLICATION((bool)(~mask & skip_mask_t::post_ops),
@@ -132,17 +170,8 @@ status_t post_ops_t::append_sum(float scale) {
 
 status_t post_ops_t::append_eltwise(
         float scale, alg_kind_t alg, float alpha, float beta) {
-    using namespace dnnl::impl::alg_kind;
-    bool known_alg = one_of(alg, eltwise_relu, eltwise_tanh, eltwise_elu,
-            eltwise_square, eltwise_abs, eltwise_sqrt, eltwise_linear,
-            eltwise_bounded_relu, eltwise_soft_relu, eltwise_logistic,
-            eltwise_exp, eltwise_gelu, eltwise_swish, eltwise_log,
-            eltwise_clip);
-    if (!known_alg) return invalid_arguments;
-
-    bool ok = true && IMPLICATION(alg == eltwise_bounded_relu, alpha >= 0)
-            && IMPLICATION(alg == eltwise_clip, beta >= alpha);
-    if (!ok) return invalid_arguments;
+    if (!math::is_eltwise_ok(data_type::undef, alg, alpha, beta))
+        return invalid_arguments;
 
     if (len_ == capacity) return out_of_memory;
 
@@ -239,10 +268,28 @@ status_t dnnl_primitive_attr_get_output_scales(const primitive_attr_t *attr,
 
 status_t dnnl_primitive_attr_set_output_scales(
         primitive_attr_t *attr, dim_t count, int mask, const float *scales) {
-    bool ok = !any_null(attr, scales) && count > 0 && mask >= 0;
+    bool ok = !any_null(attr, scales) && count > 0 && mask >= 0
+            && attr->scales_.has_default_values();
     if (!ok) return invalid_arguments;
 
     return attr->output_scales_.set(count, mask, scales);
+}
+
+status_t dnnl_primitive_attr_set_scales(primitive_attr_t *attr, int arg,
+        dim_t count, int mask, const float *scales) {
+    bool ok = !any_null(attr, scales) && count > 0 && mask >= 0 && arg >= 0
+            && attr->output_scales_.has_default_values();
+    if (!ok) return invalid_arguments;
+
+    return attr->scales_.set(arg, count, mask, scales);
+}
+
+status_t dnnl_primitive_attr_get_scales(primitive_attr_t *attr, int arg,
+        dim_t *count, int *mask, const float **scales) {
+    bool ok = !any_null(attr, count, mask, scales) && arg >= 0;
+    if (!ok) return invalid_arguments;
+
+    return attr->scales_.get(arg, count, mask, scales);
 }
 
 status_t dnnl_primitive_attr_get_zero_points(const primitive_attr_t *attr,

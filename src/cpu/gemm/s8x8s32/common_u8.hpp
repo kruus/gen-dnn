@@ -18,10 +18,9 @@
 #define COMMON_U8_HPP
 #include "cpu_isa_traits.hpp"
 #if !TARGET_X86_JIT
-#warning
 #error "common_u8.hpp is incompatible with !TARGET_X86_JIT"
 #else
-#warning "common_u8.hpp *enabled* because TARGET_X86_JIT is set"
+//#warning "common_u8.hpp *enabled* because TARGET_X86_JIT is set"
 
 #include "jit_generator.hpp"
 
@@ -150,7 +149,6 @@ public:
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-
 #endif // TARGET_X86_JIT
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif // COMMON_U8_HPP

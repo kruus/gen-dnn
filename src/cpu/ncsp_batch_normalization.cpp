@@ -112,7 +112,7 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
         if (do_blocking) {
             size_t working_set_size = N * SP * sizeof(data_t);
             bnorm_utils::cache_balance(
-                    working_set_size, C, C_blks_per_iter, iters);
+                    working_set_size, C, N, nthr, C_blks_per_iter, iters);
         } else
             C_blks_per_iter = C;
         int64_t last_iter_blks = C - (iters - 1) * C_blks_per_iter;
@@ -124,6 +124,7 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
         int SP_N_ithr = N_ithr * S_nthr + S_ithr;
         int SP_N_nthr = N_nthr * S_nthr;
         for (int64_t it = 0; it < iters; ++it) {
+            size_t C_off = it * C_blks_per_iter;
             if (it == iters - 1 && iters > 1) {
                 // On the last iteration the access pattern to ws_reduce
                 // might change (due to re-balance on C). So sync the
@@ -135,11 +136,11 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
                         spatial_thr_allowed, ithr, nthr, N, last_iter_blks, SP,
                         C_ithr, C_nthr, C_blk_s, C_blk_e, N_ithr, N_nthr, N_s,
                         N_e, S_ithr, S_nthr, S_s, S_e);
+                C_blks_per_iter = last_iter_blks;
                 balance211(last_iter_blks, nthr, ithr, C_blk_gl_s, C_blk_gl_e);
                 SP_N_ithr = N_ithr * S_nthr + S_ithr;
                 SP_N_nthr = N_nthr * S_nthr;
             }
-            size_t C_off = it * C_blks_per_iter;
 #if DNNL_ENABLE_BFLOAT16
             const auto S_chunk = nstl::max(dim_t(0), S_e - S_s);
 #endif // DNNL_ENABLE_BFLOAT16
@@ -368,7 +369,7 @@ void ncsp_batch_normalization_bwd_t<d_type>::execute_backward(
         if (do_blocking) {
             size_t working_set_size = 2 * N * SP * sizeof(data_t);
             bnorm_utils::cache_balance(
-                    working_set_size, C, C_blks_per_iter, iters);
+                    working_set_size, C, N, nthr, C_blks_per_iter, iters);
         } else
             C_blks_per_iter = C;
         int64_t last_iter_blks = C - (iters - 1) * C_blks_per_iter;
@@ -381,6 +382,7 @@ void ncsp_batch_normalization_bwd_t<d_type>::execute_backward(
         int SP_N_nthr = N_nthr * S_nthr;
 
         for (int64_t it = 0; it < iters; ++it) {
+            size_t C_off = it * C_blks_per_iter;
             if (it == iters - 1 && iters > 1) {
                 // On the last iteration the access pattern to ws_reduce
                 // might change (due to re-balance on C). So sync the
@@ -393,13 +395,13 @@ void ncsp_batch_normalization_bwd_t<d_type>::execute_backward(
                         C_ithr, C_nthr, C_blk_s, C_blk_e, N_ithr, N_nthr, N_s,
                         N_e, S_ithr, S_nthr, S_s, S_e);
                 balance211(last_iter_blks, nthr, ithr, C_blk_gl_s, C_blk_gl_e);
+                C_blks_per_iter = last_iter_blks;
                 SP_N_ithr = N_ithr * S_nthr + S_ithr;
                 SP_N_nthr = N_nthr * S_nthr;
             }
 #if DNNL_ENABLE_BFLOAT16
             const auto S_chunk = nstl::max(dim_t(0), S_e - S_s);
 #endif // DNNL_ENABLE_BFLOAT16
-            size_t C_off = it * C_blks_per_iter;
             // On the last iteration the access pattern to ws_reduce
             // might change (due to re-balance on C). Since sync is not always
             // possible (in case of TBB) use different parts of ws for each

@@ -25,7 +25,9 @@
  * Include dnnl_thread.hpp instead if you want to use the balancing
  * and parallel_nd tools.
  *
- * Typically included via dnnL-thread.hpp, which adds parallel_nd etc.
+ * Typically included via \ref dnnl_thread.hpp, which adds \c parallel_nd etc.
+ *
+ * \sa dnnl_optimize.h for compiler-specific optimizations unrelated to OpenMP
  */
 
 #include "z_magic.hpp"

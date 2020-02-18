@@ -42,13 +42,13 @@ std::vector<policy_t> scale_policy {policy_t::NONE};
 attr_t attr;
 bool allow_unimpl = false;
 unsigned int flags = 0x0;
-float alpha = 0.0f;
+float alpha = .9f;
 float beta = 0.0f;
 const char *perf_template_csv
         = "perf,%engine%,%name%,%prop%,%cfg%,%alg%,%activation%,%direction%,"
           "%DESC%,%Gops%,%Gfreq%,%-time%,%-Gflops%,%0time%,%0Gflops%";
 const char *perf_template_def
-        = "perf,%engine%,%name%,%desc%,%Gops%,%Gfreq%,%-time%,%-Gflops%,"
+        = "perf,%engine%,%name%,%prb%,%Gops%,%Gfreq%,%-time%,%-Gflops%,"
           "%0time%,%0Gflops%";
 const char *perf_template = perf_template_def;
 
@@ -62,6 +62,8 @@ void reset_parameters() {
     attr = attr_t();
     scale_policy = {policy_t::NONE};
     allow_unimpl = false;
+    alpha = .9f;
+    beta = 0.0f;
 }
 
 void check_correctness(const desc_t *c) {

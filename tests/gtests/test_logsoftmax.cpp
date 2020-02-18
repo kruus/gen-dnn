@@ -54,9 +54,7 @@ protected:
         // logsoftmax specific types and values
         using op_desc_t = logsoftmax_forward::desc;
         using pd_t = logsoftmax_forward::primitive_desc;
-        bool supports_oscale = false;
-        bool supports_po_sum = false;
-        bool supports_po_eltwise = false;
+        allows_attr_t aa {0}; // doesn't support anything
 
         auto eng = engine(get_test_engine_kind(), 0);
         auto strm = stream(eng);
@@ -76,8 +74,7 @@ protected:
         // regular pd ctor
         ASSERT_NO_THROW(pd = pd_t(op_desc, eng));
         // test all pd ctors
-        test_fwd_pd_constructors<op_desc_t, pd_t>(
-                pd, supports_oscale, supports_po_sum, supports_po_eltwise);
+        test_fwd_pd_constructors<op_desc_t, pd_t>(op_desc, pd, aa);
         pd_fwd_hint = std::make_shared<pd_t>(pd);
 
         // default primitive ctor
@@ -139,9 +136,7 @@ protected:
         using op_desc_t = logsoftmax_backward::desc;
         using pd_t = logsoftmax_backward::primitive_desc;
         using hint_pd_t = logsoftmax_forward::primitive_desc;
-        bool supports_oscale = false;
-        bool supports_po_sum = false;
-        bool supports_po_eltwise = false;
+        allows_attr_t aa {0}; // doesn't support anything
 
         auto eng = engine(get_test_engine_kind(), 0);
         auto strm = stream(eng);
@@ -159,8 +154,8 @@ protected:
         // regular pd ctor
         ASSERT_NO_THROW(pd = pd_t(op_desc, eng, *pd_fwd_hint));
         // test all pd ctors
-        test_bwd_pd_constructors<op_desc_t, pd_t, hint_pd_t>(pd, *pd_fwd_hint,
-                supports_oscale, supports_po_sum, supports_po_eltwise);
+        test_bwd_pd_constructors<op_desc_t, pd_t, hint_pd_t>(
+                op_desc, pd, *pd_fwd_hint, aa);
 
         // default primitive ctor
         auto logsoftmax = logsoftmax_backward();
@@ -214,9 +209,7 @@ protected:
 
 using logsoftmax_forward_test_float = logsoftmax_test<float>;
 using logsoftmax_forward_test_half = logsoftmax_test<float16_t>;
-#if DNNL_ENABLE_BFLOAT16
 using logsoftmax_forward_test_bfloat16 = logsoftmax_test<bfloat16_t>;
-#endif
 
 using logsoftmax_backward_test_float = logsoftmax_test<float>;
 
@@ -255,7 +248,6 @@ INSTANTIATE_TEST_SUITE_P(TestLogSoftmaxForwardFloat,
                 test_params<float> {prop_kind::forward_inference, tag::nChw8c,
                         tag::undef, {2, 1011, 32, 1}, 2}));
 
-#if DNNL_ENABLE_BFLOAT16
 TEST_P(logsoftmax_forward_test_bfloat16, TestsLogSoftmax) {}
 GPU_INSTANTIATE_TEST_SUITE_P(TestLogSoftmaxForwardBfloat16,
         logsoftmax_forward_test_bfloat16,
@@ -287,7 +279,6 @@ GPU_INSTANTIATE_TEST_SUITE_P(TestLogSoftmaxForwardBfloat16,
                         tag::nChw8c, tag::undef, {64, 1011, 1, 1}, 1},
                 test_params<bfloat16_t> {prop_kind::forward_inference,
                         tag::nChw8c, tag::undef, {2, 1011, 32, 1}, 2}));
-#endif
 
 TEST_P(logsoftmax_forward_test_half, TestsLogSoftmax) {}
 GPU_INSTANTIATE_TEST_SUITE_P(TestLogSoftmaxForwardHalf,

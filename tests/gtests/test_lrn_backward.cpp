@@ -477,7 +477,6 @@ static auto RegressionWeightFormat_cases = [](algorithm lk) {
             fmt::oihw, fmt::oihw, {2, 64, 56, 56, 5, 1.0e-4f, 0.75f, 1.0f}});
 };
 
-// TODO: #if MKLDNN_TEST_BLOCKED_FORMATS ...
 #define INST_TEST_CASE(test, lk) \
     TEST_P(test, TestsLRN) {} \
     INSTANTIATE_TEST_SUITE_P(Backward_padded, test, padded_cases(lk)); \

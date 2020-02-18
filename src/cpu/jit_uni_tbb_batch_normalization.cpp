@@ -13,8 +13,6 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include "cpu_isa_traits.hpp"
-#if TARGET_X86_JIT
 
 #include <assert.h>
 
@@ -468,7 +466,7 @@ struct jit_bnorm_fwd_statistics_t : jit_generator {
         const int S = bdesc_->D() * bdesc_->H() * bdesc_->W();
         mov(reg_tmp, float2int(bdesc_->MB() * S));
         Xmm xtmp = Xmm(vtmp.getIdx());
-        movq(xtmp, reg_tmp);
+        uni_vmovq(xtmp, reg_tmp);
         uni_vbroadcastss(vNS, xtmp);
 
         xor_(reg_off_c, reg_off_c);
@@ -634,11 +632,11 @@ struct jit_bnorm_fwd_t : jit_generator {
         Xmm x = Xmm(v.getIdx());
 
         mov(reg_tmp, float2int(bdesc_->desc()->batch_norm_epsilon));
-        movq(x, reg_tmp);
+        uni_vmovq(x, reg_tmp);
         uni_vbroadcastss(veps, x);
 
         mov(reg_tmp, float2int(1.f));
-        movq(x, reg_tmp);
+        uni_vmovq(x, reg_tmp);
         uni_vbroadcastss(vone, x);
 
         mov(reg_blk_has_tail, dword[PARAM_ADDR(blk_has_tail)]);
@@ -848,16 +846,16 @@ struct jit_bnorm_bwd_t : public jit_generator {
         Xmm x = Xmm(v.getIdx());
 
         mov(reg_tmp, float2int(bdesc_->desc()->batch_norm_epsilon));
-        movq(x, reg_tmp);
+        uni_vmovq(x, reg_tmp);
         uni_vbroadcastss(veps, x);
 
         mov(reg_tmp, float2int(1.f));
-        movq(x, reg_tmp);
+        uni_vmovq(x, reg_tmp);
         uni_vbroadcastss(vone, x);
 
         const int S = bdesc_->D() * bdesc_->H() * bdesc_->W();
         mov(reg_tmp, float2int(bdesc_->MB() * S));
-        movq(x, reg_tmp);
+        uni_vmovq(x, reg_tmp);
         uni_vbroadcastss(vNS, x);
 
         mov(reg_blk_has_tail, dword[PARAM_ADDR(blk_has_tail)]);
@@ -1092,11 +1090,11 @@ struct jit_bnorm_bwd_diff_ss_t : public jit_generator {
         Xmm x = Xmm(v.getIdx());
 
         mov(reg_tmp, float2int(bdesc_->desc()->batch_norm_epsilon));
-        movq(x, reg_tmp);
+        uni_vmovq(x, reg_tmp);
         uni_vbroadcastss(veps, x);
 
         mov(reg_tmp, float2int(1.f));
-        movq(x, reg_tmp);
+        uni_vmovq(x, reg_tmp);
         uni_vbroadcastss(vone, x);
 
         mov(reg_blk_has_tail, dword[PARAM_ADDR(blk_has_tail)]);
@@ -1864,6 +1862,3 @@ template struct jit_uni_tbb_batch_normalization_bwd_t<avx512_common>;
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // TARGET_X86_JIT

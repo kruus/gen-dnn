@@ -339,4 +339,3 @@ template dnnl_status_t ref_gemm<double>(const char *transa_,
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

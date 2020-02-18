@@ -117,13 +117,13 @@ struct memory_desc_wrapper : public c_compatible {
         if (extra().flags
                 & (memory_extra_flags::compensation_conv_s8s8
                         | memory_extra_flags::gpu_rnn_u8s8_compensation)) {
-            printf(" NB: extra().flags & ... compensation ... CHECKME really ?\n");
             int cmask = extra().compensation_mask;
-            // VE debug mode failed assertion...  (bad struct zeroing?)
+#ifndef NDEBUG // had a struct zeroing bug here...
             if(!(cmask==1||cmask==3||cmask==27)){
                 printf("\nerror: unexpected compensation mask %d\n",
                         (int)cmask);
             }
+#endif
             assert(cmask == 1 || cmask == 3 || cmask == 27);
             dim_t prod = 1;
             for (int d = 0; d < ndims(); ++d)
@@ -442,7 +442,6 @@ inline bool memory_desc_wrapper::similar_to(const memory_desc_wrapper &rhs,
 
 inline bool memory_desc_wrapper::consistent_with(
         const memory_desc_wrapper &rhs) const {
-#if 1 || !defined(__ve)
     if (ndims() == rhs.ndims()) {
         for (int d = 0; d < ndims(); ++d) {
             if (dims()[d] != rhs.dims()[d]) return false;
@@ -456,17 +455,6 @@ inline bool memory_desc_wrapper::consistent_with(
          * not, at least for now */
         return false;
     }
-#else
-    bool ret=false;
-    if (ndims() == rhs.ndims()) {
-        ret = true;
-        // shortloop...
-        for (int d = 0; d < ndims(); ++d) {
-            if (dims()[d] != rhs.dims()[d]) {ret = false; break;}
-        }
-    }
-    return ret;
-#endif
 }
 
 } // namespace impl

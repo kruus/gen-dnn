@@ -59,9 +59,9 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "")
         "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel ...")
 endif()
 
-set(PROJECT_NAME "DNNL generic")
-set(PROJECT_FULL_NAME "Deep Neural Network Library (DNNL) generic")
-set(PROJECT_VERSION "1.1.0")
+set(PROJECT_NAME "DNNL")
+set(PROJECT_FULL_NAME "Deep Neural Network Library (DNNL)")
+set(PROJECT_VERSION "1.2.0")
 
 set(LIB_NAME dnnl)
 
@@ -76,10 +76,6 @@ if (NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "DNNL supports 64 bit platforms only")
 endif()
 
-# If enabled, generate a compile_commands.json file of the exact compiler
-# commands (for Makefile and Ninja generators)
-add_definitions(-DCMAKE_EXPORT_COMPILE_COMMANDS=1)
-
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
 set(CMAKE_SRC_CCXX_FLAGS)       # SRC specifics
@@ -90,10 +86,6 @@ if(UNIX OR MINGW)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
     if(NECVE)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")
-        # uninitialized variable debug:
-        # "It may avoid by initializing the area to zero to compile with “-minit-stack=zero” and
-        # execute with the environment variable VE_INIT_HEAP=ZERO. Correction of a
-        # program is recommended to resolve a potential problem."
         string(APPEND CMAKE_C_FLAGS   " -minit-stack=0xDeadBeef")
         string(APPEND CMAKE_CXX_FLAGS " -minit-stack=0xDefaced1")
     else()
@@ -160,10 +152,12 @@ add_subdirectory(tests)
 
 if(DNNL_INSTALL_MODE STREQUAL "BUNDLE")
     install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_PREFIX})
+    install(FILES THIRD-PARTY-PROGRAMS DESTINATION ${CMAKE_INSTALL_PREFIX})
     install(FILES ${PROJECT_BINARY_DIR}/README DESTINATION ${CMAKE_INSTALL_PREFIX})
 else()
     # Cannot use CMAKE_INSTALL_DOCDIR since it uses PROJECT_NAME and not LIB_NAME
     install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${LIB_NAME})
+    install(FILES THIRD-PARTY-PROGRAMS DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${LIB_NAME})
     install(FILES ${PROJECT_BINARY_DIR}/README DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${LIB_NAME})
 endif()
 
@@ -173,3 +167,5 @@ configure_file(${CMAKE_SOURCE_DIR}/cmake/bash_help.inc.in
 if(NECVE) # toolchain debug
     show_cmake_stuff("At end of CMakeLists.txt")
 endif()
+# enable just to see what cmake compiler feature checks you have:
+message(STATUS, "Supported cmake feature checks:\n${CMAKE_CXX_COMPILE_FEATURES}")

@@ -119,8 +119,9 @@ namespace dnnl {
 namespace impl {
 namespace cpu {
 
-// Get pack-size functions.  Note: the "gemm_pack.hpp" header is not included,
-// so this must match original in src/cpu/gemm/gemm_pack.hpp
+// Get pack-size functions.
+// TODO: the "gemm_pack.hpp" header is not included,
+// so this must match original in src/cpu/gemm/gemm_pack.hpp XXX move the DNNL_API function up, and delete this copy-paste
 extern dnnl_status_t sgemm_pack_get_size(const char *identifier,
         const char *transa, const char *transb, const int *M, const int *N,
         const int *K, const int *lda, const int *ldb, size_t *size,

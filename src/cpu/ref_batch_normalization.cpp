@@ -21,7 +21,6 @@
 #include "c_types_map.hpp"
 #include "dnnl_thread.hpp"
 #include "memory_tracking.hpp"
-// XXX #include "dnnl_thread.hpp"
 #include "ref_batch_normalization.hpp"
 #include "simple_q10n.hpp"
 #include "type_helpers.hpp"

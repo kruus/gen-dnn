@@ -48,7 +48,6 @@ struct binary_pd_t : public primitive_desc_t {
     virtual const op_desc_t *op_desc() const override {
         return reinterpret_cast<const op_desc_t *>(this->desc());
     }
-    virtual void init_info() override { impl::init_info(this, this->info_); }
 
     virtual status_t query(query_t what, int idx, void *result) const override {
         switch (what) {
@@ -128,6 +127,17 @@ protected:
         }
 
         return status;
+    }
+
+    bool attr_post_ops_ok() const {
+        using namespace primitive_kind;
+        const auto &p = attr()->post_ops_;
+        switch (p.len_) {
+            case 0: return true;
+            case 1: return p.contain(sum, 0) || p.contain(eltwise, 0);
+            case 2: return p.contain(sum, 0) && p.contain(eltwise, 1);
+            default: return false;
+        }
     }
 
 private:

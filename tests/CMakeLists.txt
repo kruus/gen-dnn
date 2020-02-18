@@ -21,9 +21,6 @@ endif()
 if(POLICY CMP0065)
     cmake_policy(SET CMP0065 NEW)
 endif()
-if(POLICY CMP0060)
-    cmake_policy(SET CMP0060 NEW)
-endif()
 
 # propagate TEST specific flags
 append(CMAKE_C_FLAGS "${CMAKE_TEST_CCXX_FLAGS}")
@@ -48,7 +45,7 @@ if(UNIX OR MINGW)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel"
             AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "17.0")
         append(CMAKE_TEST_CCXX_NOWARN_FLAGS "-diag-disable:1478")
-    elseif(NOT NECVE)
+    else()
         append(CMAKE_TEST_CCXX_NOWARN_FLAGS "-Wno-deprecated-declarations")
     endif()
 elseif(WIN32 AND NOT MINGW)
@@ -75,7 +72,7 @@ if(UNIX OR MINGW)
     set(test_c_symbols "${CMAKE_CURRENT_BINARY_DIR}/test_c_symbols.c")
     add_custom_command(
         OUTPUT ${test_c_symbols}
-        COMMAND /bin/bash ${CMAKE_CURRENT_SOURCE_DIR}/generate_c_symbols_refs.sh
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/generate_c_symbols_refs.sh
         ${CMAKE_CURRENT_SOURCE_DIR}/.. ${test_c_symbols} ${include_dirs}
     )
     register_exe(test_c_symbols-c ${test_c_symbols} "test")

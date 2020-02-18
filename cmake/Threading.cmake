@@ -26,7 +26,7 @@ set(Threading_cmake_included true)
 # sequential, OpenMP or TBB. In future it may be different from CPU runtime.
 set(DNNL_CPU_THREADING_RUNTIME "${DNNL_CPU_RUNTIME}")
 
-if(TRUE AND NECVE)
+if(NECVE) # possibly OK to use always?
     set(CMAKE_THREAD_PREFER_PTHREAD 1)
     set(THREADS_PREFER_PTHREAD_FLAG 1)
     set(Threads_FIND_QUIETLY FALSE)

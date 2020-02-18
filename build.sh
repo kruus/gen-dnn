@@ -635,13 +635,24 @@ echo "PATH $PATH"
     #    TODO: cblas / mathkeisan alternatives?
     if [ "$BUILDOK" == "y" ]; then
         BUILDOK="n"
+        if [ "" ]; then # original, just use 'make' to build
+            BUILD_CMD="make VERBOSE=1 ${JOBS}"
+            BUILD_CMD_AGAIN="make VERBOSE=1"
+        else # using cmake to build will propagate parallelism to sub-makes
+            BUILD_CMD="cmake --build . -- ${JOBS}"
+            BUILD_CMD_AGAIN="cmake --build . -- -j1"
+            # could also use '-j 8' as a 'cmake --build' arg (oops, not supported in older cmake)
+            # note also 'cmake --build' has '--clean-first' and '--target <tgt>' options
+        fi
         if [ $QUICK -gt 1 ]; then
             rm -f ./stamp-BUILDOK
             echo '# rebuild in existing directory, WITHOUT rerunning cmake'
             pwd
-            { { make VERBOSE=1 ${JOBS} || make VERBOSE=1; } \
+            { { ${BUILD_CMD} || ${BUILD_CMD_AGAIN}; } \
                 && BUILDOK="y" || echo "build failed: ret code $?"; }
         else
+            BUILD_CMD="${BUILD_CMD} VERBOSE=1"
+            BUILD_CMD_AGAIN="${BUILD_CMD_AGAIN} VERBOSE=1"
             rm -f ./stamp-BUILDOK ./CMakeCache.txt
             echo "CMAKEENV: ${CMAKEENV}"
             echo "CMAKEOPT: ${CMAKEOPT}"
@@ -651,7 +662,8 @@ echo "PATH $PATH"
             # { if [ -nz "${CMAKEENV}" ]; then ${CMAKEENV}; fi; \
             { if [[ -n "${CMAKEENV}" && "${CMAKEENV}" != "\"\"" ]]; then ${CMAKEENV}; fi; \
                 cmake ${CMAKEOPT} ${CMAKETRACE} .. \
-                && { make VERBOSE=1 ${JOBS} || make VERBOSE=1; } \
+                && make help \
+                && { ${BUILD_CMD} || ${BUILD_CMD_AGAIN}; } \
                 && BUILDOK="y" || echo "build failed: ret code $?"; }
             set +x
         fi

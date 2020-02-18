@@ -13,8 +13,6 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include "cpu_isa_traits.hpp"
-#if TARGET_X86_JIT
 
 #include <assert.h>
 
@@ -1204,7 +1202,7 @@ struct driver_t : public c_compatible {
             size_t working_set_size
                     = dt_size_ * (N * D * H * W * simd_w) * num_tensors;
             bnorm_utils::cache_balance(
-                    working_set_size, C_blks, C_blks_per_iter, iters);
+                    working_set_size, C_blks, N, nthr, C_blks_per_iter, iters);
         }
 
         bool spatial_thr_allowed = bnorm_utils::thread_balance(do_blocking_,
@@ -1495,6 +1493,3 @@ template struct jit_uni_batch_normalization_bwd_t<avx512_common>;
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // TARGET_X86_JIT

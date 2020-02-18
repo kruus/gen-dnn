@@ -13,10 +13,10 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include "cpu_isa_traits.hpp"
-#if TARGET_X86_JIT
 
 #include "jit_avx_gemv_t_f32_kern.hpp"
+
+#include "cpu_isa_traits.hpp"
 #include "jit_generator.hpp"
 
 #ifdef _WIN32
@@ -121,7 +121,7 @@ void jit_avx_gemv_t_f32_kern::innerloop(int unroll_m, int unroll_n) {
 void jit_avx_gemv_t_f32_kern::outerloop(
         int unroll_x, int unroll_y, Label *&cur_outerloop_label) {
     if ((unroll_x > M_UNROLL_) || (unroll_y > N_UNROLL_) || (unroll_y < 0)
-            || (unroll_y < 0))
+            || (unroll_x < 0))
         return;
 
     Label label_m_loop, label_n_loop, label_m_remainder_loops[5];
@@ -359,6 +359,3 @@ jit_avx_gemv_t_f32_kern::jit_avx_gemv_t_f32_kern()
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // TARGET_X86_JIT

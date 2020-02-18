@@ -681,7 +681,8 @@ CPU_INST_TEST_CASE(TestGEMM_heavy,
         test_params {'t', 't', 3000, 3000, 3000, 1.99f, 2.19f, 3000, 3000, 3000,
                 fix_use_oc});
 
-#if 1 // TARGET_X86_JIT  // not quite right, MKL also handles packed gemm XXX
+#if 1 // TARGET_X86_JIT  // not quite right, MKL also handles packed gemm XXX (should differentiate cblas vs mkl)
+// if leave in, they should SKIP ??
 CPU_INST_TEST_CASE(TestGEMM_packed,
         make_test_params_pack({false, true}, 'N', 'n', 30, 20, 10, 1.0f, 1.0f,
                 60, 50, 80, fix_use_oc),
@@ -813,4 +814,5 @@ CPU_INST_TEST_CASE(TestGEMM_packed_heavy,
         make_test_params_pack({false, true}, 't', 'n', 200, 300, 8000, 1.0f,
                 0.0f, 200, 300, 300, col_use_oc));
 #endif // packed gemm
+
 #endif

@@ -274,46 +274,46 @@
 //#warning "cpu_target DONE TARGET_VANILLA undefined"
 #endif
 
-// compat mode shortcuts, easier to read
+// compat mode shortcuts, easier to read.  0/1 values
 #define TARGET_X86      DNNL_TARGET_X86
 #define TARGET_X86_JIT  DNNL_TARGET_X86_JIT
 #define TARGET_VE       DNNL_TARGET_VE
 #define TARGET_VEDNN    DNNL_TARGET_VEDNN
 #define TARGET_VEJIT    DNNL_TARGET_VEJIT
-#define TARGET_BFLOAT16 DNNL_ENABLE_BFLOAT16/*maybe*/
-#define TARGET_RNN      DNNL_ENABLE_RNN/*maybe*/
 
+// exactly one cpu target must be active
 #if !TARGET_X86 && !TARGET_VE
 #error "cpu target no true TARGET_foo !"
 #endif
 #if TARGET_X86 + TARGET_VE != 1
 #error "exactly one of TARGET_VE and TARGET_X86 should be set"
 #endif
-#if 1 // verbose compiler warnings, for debug
+
+#if 0 // verbose compiler warnings, for debug
 #if TARGET_X86
-//#warning "cpu target TARGET_X86 !"
+#warning "cpu target TARGET_X86 !"
 #endif
 #if TARGET_X86_JIT
-//#warning "cpu target TARGET_X86_JIT !"
+#warning "cpu target TARGET_X86_JIT !"
 #endif
 #if TARGET_VE
-//#warning "cpu target TARGET_VE !"
+#warning "cpu target TARGET_VE !"
 #endif
 #if TARGET_VEDNN
-//#warning "cpu target TARGET_VEDNN !"
+#warning "cpu target TARGET_VEDNN !"
 #endif
 #if TARGET_VEJIT
-//#warning "cpu target TARGET_VEJIT !"
+#warning "cpu target TARGET_VEJIT !"
 #endif
 #if DNNL_ENABLE_RNN
-//#warning "DNNL_ENABLE_RNN is TRUE"
+#warning "DNNL_ENABLE_RNN is TRUE"
 #else
-//#warning "DNNL_ENABLE_RNN is FALSE"
+#warning "DNNL_ENABLE_RNN is FALSE"
 #endif
 #if DNNL_ENABLE_BFLOAT16
-//#warning "DNNL_ENABLE_BLOAT16 is TRUE"
+#warning "DNNL_ENABLE_BLOAT16 is TRUE"
 #else
-//#warning "DNNL_ENABLE_BLOAT16 is FALSE"
+#warning "DNNL_ENABLE_BLOAT16 is FALSE"
 #endif
 #endif // verbose compiler warnings
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

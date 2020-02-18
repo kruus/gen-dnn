@@ -176,7 +176,7 @@ struct _ref_rnn_common_t : public primitive_impl_t {
             }
 
 #if !TARGET_X86_JIT
-            CHECK(nullptr == "TODO: write a JITFUNCS_VANILLA version for rnn");
+#warning "TODO: RNN support for VANILLA build"
 #endif // TARGET_X86_JIT
             init_scratchpad(scratchpad_sz);
 

@@ -44,6 +44,7 @@
 #include "mkldnn.hpp"
 
 #if DNNL_ENABLE_RNN
+
 // MSVC doesn't support collapse clause in omp parallel
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
 #define collapse(x)

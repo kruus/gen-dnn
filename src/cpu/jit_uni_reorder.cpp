@@ -13,8 +13,6 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include "cpu_isa_traits.hpp"
-#if TARGET_X86_JIT
 
 #include <assert.h>
 
@@ -981,7 +979,6 @@ struct jit_uni_reorder_t : public primitive_impl_t {
             }
             _pd->prb_ = prb;
             _pd->ker_desc_ = ker_desc;
-            _pd->init_info();
             _pd->init_scratchpad_md();
             return safe_ptr_assign<reorder_pd_t>(*reorder_pd, _pd);
         }
@@ -1139,6 +1136,3 @@ status_t jit_uni_reorder_create(reorder_pd_t **reorder_pd, engine_t *engine,
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // TARGET_X86_JIT

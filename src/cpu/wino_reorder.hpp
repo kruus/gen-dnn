@@ -41,14 +41,14 @@ struct wino_reorder_t : public primitive_impl_t {
             const memory_desc_wrapper id(src_md), od(dst_md);
             bool args_ok = true && id.data_type() == type_i
                     && od.data_type() == type_o
-                    && (id.matches_tag(utils::pick(id.ndims() - 4,
-                                format_tag::oihw, format_tag::goihw))
-                            || id.matches_tag(utils::pick(id.ndims() - 4,
-                                    format_tag::hwio, format_tag::hwigo)))
                     && od.format_kind() == format_kind::wino
                     && utils::one_of(od.wino_desc().wino_format,
                             dnnl_wino_wei_aaOIoi, dnnl_wino_wei_aaOio,
-                            dnnl_wino_wei_aaOBiOo, dnnl_wino_wei_OBaaIBOIio);
+                            dnnl_wino_wei_aaOBiOo, dnnl_wino_wei_OBaaIBOIio)
+                    && (id.matches_tag(utils::pick(id.ndims() - 4,
+                                format_tag::oihw, format_tag::goihw))
+                            || id.matches_tag(utils::pick(id.ndims() - 4,
+                                    format_tag::hwio, format_tag::hwigo)));
             if (!args_ok) return status::invalid_arguments;
 
             auto _pd = new pd_t(
@@ -58,7 +58,6 @@ struct wino_reorder_t : public primitive_impl_t {
                 delete _pd;
                 return status::unimplemented;
             }
-            _pd->init_info();
             _pd->init_scratchpad_md();
             return safe_ptr_assign<reorder_pd_t>(*reorder_pd, _pd);
         }
@@ -384,16 +383,12 @@ private:
         auto input = CTX_IN_MEM(const in_data_t *, DNNL_ARG_FROM);
         auto output = CTX_OUT_MEM(out_data_t *, DNNL_ARG_TO);
 
-	// warning: type qualifier is meaningless on cast type
-	// auto wspace = (in_data_t * __restrict) ctx.get_scratchpad_grantor()
-        in_data_t * __restrict wspace = (in_data_t *) ctx
-		.get_scratchpad_grantor()
-		.template get<void>(memory_tracking::names::
-				key_reorder_wino_transform_space);
-        out_data_t * __restrict tmp_wei = (out_data_t *) ctx
-		.get_scratchpad_grantor()
-		.template get<void>(memory_tracking::names::
-				key_reorder_wino_plain);
+        auto wspace = (in_data_t * __restrict) ctx.get_scratchpad_grantor()
+                              .template get<void>(memory_tracking::names::
+                                              key_reorder_wino_transform_space);
+        auto tmp_wei = (out_data_t * __restrict) ctx.get_scratchpad_grantor()
+                               .template get<void>(memory_tracking::names::
+                                               key_reorder_wino_plain);
 
         transform(tmp_wei, input, wspace);
 

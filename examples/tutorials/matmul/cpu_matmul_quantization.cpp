@@ -14,103 +14,102 @@
 * limitations under the License.
 *******************************************************************************/
 
-/** @example cpu_matmul_quantization.cpp
- * > Annotated version: @ref cpu_matmul_quantization_cpp
- *
- * @page cpu_matmul_quantization_cpp_short
- * C++ API example demonstrating how one can perform reduced precision
- * matrix-matrix multiplication using [MatMul](@ref dev_guide_matmul) and the
- * accuracy of the result compared to the floating point computations.
- *
- * Concepts:
- * - **Static** and **dynamic** quantization
- * - Asymmetric quantization
- *   - Run-time output scales: dnnl::primitive_attr::set_output_scales() and
- *     #DNNL_RUNTIME_F32_VAL
- *   - Run-time zero points: dnnl::primitive_attr::set_zero_points() and
- *     #DNNL_RUNTIME_S32_VAL
- *
- * @page cpu_matmul_quantization_cpp MatMul Tutorial: Quantization
- * @copydetails cpu_matmul_quantization_cpp_short
- *
- * The example is focused around the following computation:
- * \f[
- *  C = A \times B
- * \f]
- *
- * First, we produce the reference result, having the original matrices
- * \f$A\f$ and \f$B\f$ be in #dnnl::memory::data_type::f32 data type.
- *
- * For reduced precision computations, the matrices \f$A\f$ and \f$C\f$ will
- * use #dnnl::memory::data_type::u8 data type and would have the appropriate
- * zero points. For the matrix \f$B\f$, we will use the
- * #dnnl::memory::data_type::s8 data type, assuming that the data is centered
- * around zero (hence, the zero point would be simply 0).
- *
- * The quantization formula is:
- * \f[
- *     X_{f32}(:) := scale\_X \cdot (X_{int8}(:) - zp\_X),
- * \f]
- *
- * where:
- * - \f$X_{f32}(:)\f$  -- original matrix;
- *
- * - \f$X_{int8}(:)\f$ -- quantized matrix, where `int8` is either `u8`
- *                        (`uint8_t`) for the matrices \f$A\f$ and \f$C\f$, or
- *                        `s8` (`int8_t`) for the matrix \f$B\f$;
- *
- * - \f$scale\_X\f$    -- `f32` scaling factor. For simplicity we will use a
- *                        single scale factor for each matrix, though for
- *                        better accuracy it might be a good idea to use
- *                        per-N-dimension scaling factor for the matrix B.
- *
- * - \f$zp\_X\f$       -- integer quantization parameter "zero point"
- *                        (essentially, the representation of the real 0 in
- *                        the quantized data type).
- *
- * For a given matrix \f$X_{f32}\f$ and `int8` data type (`u8` or `s8`), the
- * process of finding the proper \f$scale\_X\f$ and \f$zp\_X\f$ is a research
- * problem and can be different depending on the domain. For example purposes,
- * we will use the simplest approach by mapping the maximum (minimum)
- * \f$X_{f32}\f$ elements to the maximum (minimum) number in the corresponding
- * integer data type, using the following formulas:
- *
- * 1. Since:
- *   - \f$max(X_{f32}(:)) = scale\_X \cdot (max_{int8} - zp\_X)\f$
- *   - \f$min(X_{f32}(:)) = scale\_X \cdot (min_{int8} - zp\_X)\f$
- *
- * 2. Hence:
- *   - \f$scale\_X = \
- *     \frac{max(X_{f32}(:)) - min(X_{f32}(:))}{max_{int8} - min_{int8}}\f$
- *   - \f$zp\_X = max_{int8} - \frac{max(X_{f32}(:))}{scale\_X}\f$
- *
- * It is worth noting that quantization parameters are not always computed at
- * actual run-time. For example, if we perform MatMul operation for _similar_
- * matrices (in a sense that data distribution is similar between the runs) we
- * can simply _guess_ the proper quantization parameters by collecting some
- * statistics during the early runs. This approach is called **static**
- * quantization. It gives good performance (since no cycles are spent on
- * computing those parameters) and is typically used in reduced precision
- * CNN inference. However, the **static** quantization has an obvious
- * disadvantage -- the _guessed_ parameters might not work well for some
- * particular matrices. For example, that would most likely be the case if we
- * could not guarantee the similarity of the input matrices. In this case, the
- * **dynamic** quantization would be used, i.e. the parameters (re-)computed at
- * runtime. This gives slightly worse performance, but that might be inevitable
- * due to accuracy considerations.
- *
- * Both approaches are demonstrated in this example.
- *
- * Other details:
- * - For simplicity all matrices will be stored in Row-Major format.
- * - The shapes of the matrices are assumed to be known at creation time.
- *   However, for dynamic quantization we would consider q10n parameters
- *   (\f$scale\_X\f$ and \f$zp\_X\f$) to be known at run-time only. On the
- *   contrary, for the static quantization these parameters are known at
- *   creation time as well.
- *
- * @include cpu_matmul_quantization.cpp
- */
+/// @example cpu_matmul_quantization.cpp
+/// > Annotated version: @ref cpu_matmul_quantization_cpp
+///
+/// @page cpu_matmul_quantization_cpp_short
+/// C++ API example demonstrating how one can perform reduced precision
+/// matrix-matrix multiplication using [MatMul](@ref dev_guide_matmul) and the
+/// accuracy of the result compared to the floating point computations.
+///
+/// Concepts:
+/// - **Static** and **dynamic** quantization
+/// - Asymmetric quantization
+///   - Run-time output scales: dnnl::primitive_attr::set_output_scales() and
+///     #DNNL_RUNTIME_F32_VAL
+///   - Run-time zero points: dnnl::primitive_attr::set_zero_points() and
+///     #DNNL_RUNTIME_S32_VAL
+///
+/// @page cpu_matmul_quantization_cpp MatMul Tutorial: Quantization
+/// @copydetails cpu_matmul_quantization_cpp_short
+///
+/// The example is focused around the following computation:
+/// \f[
+///     C = A \times B
+/// \f]
+///
+/// First, we produce the reference result, having the original matrices
+/// \f$A\f$ and \f$B\f$ be in #dnnl::memory::data_type::f32 data type.
+///
+/// For reduced precision computations, the matrices \f$A\f$ and \f$C\f$ will
+/// use #dnnl::memory::data_type::u8 data type and would have the appropriate
+/// zero points. For the matrix \f$B\f$, we will use the
+/// #dnnl::memory::data_type::s8 data type, assuming that the data is centered
+/// around zero (hence, the zero point would be simply 0).
+///
+/// The quantization formula is:
+/// \f[
+///     X_{f32}(:) := scale\_X \cdot (X_{int8}(:) - zp\_X),
+/// \f]
+///
+/// where:
+/// - \f$X_{f32}(:)\f$  -- original matrix;
+///
+/// - \f$X_{int8}(:)\f$ -- quantized matrix, where `int8` is either `u8`
+///                        (`uint8_t`) for the matrices \f$A\f$ and \f$C\f$, or
+///                        `s8` (`int8_t`) for the matrix \f$B\f$;
+///
+/// - \f$scale\_X\f$    -- `f32` scaling factor. For simplicity we will use a
+///                        single scale factor for each matrix, though for
+///                        better accuracy it might be a good idea to use
+///                        per-N-dimension scaling factor for the matrix B.
+///
+/// - \f$zp\_X\f$       -- integer quantization parameter "zero point"
+///                        (essentially, the representation of the real 0 in
+///                        the quantized data type).
+///
+/// For a given matrix \f$X_{f32}\f$ and `int8` data type (`u8` or `s8`), the
+/// process of finding the proper \f$scale\_X\f$ and \f$zp\_X\f$ is a research
+/// problem and can be different depending on the domain. For example purposes,
+/// we will use the simplest approach by mapping the maximum (minimum)
+/// \f$X_{f32}\f$ elements to the maximum (minimum) number in the corresponding
+/// integer data type, using the following formulas:
+///
+/// 1. Since:
+///   - \f$max(X_{f32}(:)) = scale\_X \cdot (max_{int8} - zp\_X)\f$
+///   - \f$min(X_{f32}(:)) = scale\_X \cdot (min_{int8} - zp\_X)\f$
+///
+/// 2. Hence:
+///   - \f$scale\_X =
+///     \frac{max(X_{f32}(:)) - min(X_{f32}(:))}{max_{int8} - min_{int8}}\f$
+///   - \f$zp\_X = max_{int8} - \frac{max(X_{f32}(:))}{scale\_X}\f$
+///
+/// It is worth noting that quantization parameters are not always computed at
+/// actual run-time. For example, if we perform MatMul operation for _similar_
+/// matrices (in a sense that data distribution is similar between the runs) we
+/// can simply _guess_ the proper quantization parameters by collecting some
+/// statistics during the early runs. This approach is called **static**
+/// quantization. It gives good performance (since no cycles are spent on
+/// computing those parameters) and is typically used in reduced precision
+/// CNN inference. However, the **static** quantization has an obvious
+/// disadvantage -- the _guessed_ parameters might not work well for some
+/// particular matrices. For example, that would most likely be the case if we
+/// could not guarantee the similarity of the input matrices. In this case, the
+/// **dynamic** quantization would be used, i.e. the parameters (re-)computed at
+/// runtime. This gives slightly worse performance, but that might be inevitable
+/// due to accuracy considerations.
+///
+/// Both approaches are demonstrated in this example.
+///
+/// Other details:
+/// - For simplicity all matrices will be stored in Row-Major format.
+/// - The shapes of the matrices are assumed to be known at creation time.
+///   However, for dynamic quantization we would consider q10n parameters
+///   (\f$scale\_X\f$ and \f$zp\_X\f$) to be known at run-time only. On the
+///   contrary, for the static quantization these parameters are known at
+///   creation time as well.
+///
+/// @include cpu_matmul_quantization.cpp
 
 #include <cassert>
 #include <cctype>

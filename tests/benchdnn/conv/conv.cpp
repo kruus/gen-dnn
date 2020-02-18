@@ -28,6 +28,7 @@
 #include "norm.hpp"
 
 #include "conv/conv_common.hpp"
+#include "eltwise/eltwise.hpp"
 
 namespace conv {
 
@@ -115,6 +116,16 @@ inline void get_result(const prb_t *p, const data_kind_t kind, res_t *r,
     if (r->errors) r->state = FAILED;
 }
 
+static inline int eltwise_index(const prb_t *p) {
+    using pk = attr_t::post_ops_t::kind_t;
+    const auto &po = p->attr.post_ops;
+    for (int i = 0; i < po.len; ++i) {
+        auto k = po.entry[i].kind;
+        if (k != pk::SUM && k < pk::KIND_TOTAL) return i;
+    }
+    return -1;
+}
+
 inline int compare_dat(const prb_t *p, data_kind_t kind, dnn_mem_t &mem_dt,
         dnn_mem_t &mem_fp, res_t *r, bool final_compare = false) {
     const bool dont_complain
@@ -127,6 +138,9 @@ inline int compare_dat(const prb_t *p, data_kind_t kind, dnn_mem_t &mem_dt,
     int in = 0, below = 0, above = 0;
     int in_ok = 0, below_ok = 0, above_ok = 0;
     int non_zero = 0;
+
+    const int eltwise_idx = eltwise_index(p);
+    const bool has_eltwise = eltwise_idx >= 0;
 
     diff_norm_t diff_norm;
 
@@ -145,48 +159,37 @@ inline int compare_dat(const prb_t *p, data_kind_t kind, dnn_mem_t &mem_dt,
         if (fp < p->cfg[kind].min) {
             diff_norm.update(p->cfg[kind].min, dt);
             ok = dt == p->cfg[kind].min;
+            if (!ok && has_eltwise)
+                ok = eltwise::check_extreme_values(
+                        fp, dt, p->attr.post_ops.entry[eltwise_idx].kind);
             below += 1;
             below_ok += ok;
         } else if (fp > p->cfg[kind].max) {
             diff_norm.update(p->cfg[kind].max, dt);
             ok = dt == p->cfg[kind].max;
+            if (!ok && has_eltwise)
+                ok = eltwise::check_extreme_values(
+                        fp, dt, p->attr.post_ops.entry[eltwise_idx].kind);
             above += 1;
             above_ok += ok;
         } else {
             diff_norm.update(fp, dt);
             ok = (fabs(fp) > 1e-5 ? rel_diff : diff) <= get_eps(p, kind);
+            if (!ok && has_eltwise)
+                ok = eltwise::check_extreme_values(
+                        fp, dt, p->attr.post_ops.entry[eltwise_idx].kind);
             in += 1;
             in_ok += ok;
         }
-        if (!ok) {
-            r->errors++;
-            if ((!dont_complain && r->errors < 10) || verbose >= 10) {
-                int64_t mb_or_g = 0, g_or_oc = 0, c = 0, d = 0, h = 0, w = 0;
-                switch (kind) {
-                    case SRC:
-                        inv_src_off_f(p, i, mb_or_g, g_or_oc, c, d, h, w);
-                        break;
-                    case WEI:
-                        inv_wei_off_f(p, i, mb_or_g, g_or_oc, c, d, h, w);
-                        break;
-                    case BIA: inv_bia_off_f(p, i, mb_or_g, g_or_oc); break;
-                    case DST:
-                        inv_dst_off_f(p, i, mb_or_g, g_or_oc, c, d, h, w);
-                        break;
-                }
-                print(0,
-                        "[%4ld][%s%s]"
-                        "[" IFMT "," IFMT "," IFMT "," IFMT "," IFMT "," IFMT
-                        "] "
-                        "fp:%8g fp0:%8g dt:%8g diff:%8g rdiff:%8g\n",
-                        (long)i, final_compare ? "" : "REORDER ", skind,
-                        mb_or_g, g_or_oc, c, d, h, w, fp, fp0, dt, diff,
-                        rel_diff);
-            }
-        }
 
-        /* for debug purposes only: dump the output */
-        if (final_compare && verbose >= 50 && i < 30) {
+        r->errors += !ok;
+
+        bool dump
+                = (!ok && ((!dont_complain && r->errors < 10) || verbose >= 10))
+                || (final_compare
+                        && ((verbose >= 50 && i < 30) || (verbose >= 99)));
+
+        if (dump) {
             int64_t mb_or_g = 0, g_or_oc = 0, c = 0, d = 0, h = 0, w = 0;
             switch (kind) {
                 case SRC:
@@ -200,13 +203,13 @@ inline int compare_dat(const prb_t *p, data_kind_t kind, dnn_mem_t &mem_dt,
                     inv_dst_off_f(p, i, mb_or_g, g_or_oc, c, d, h, w);
                     break;
             }
-
             print(0,
-                    "[%4ld][%s]"
+                    "[%4ld][%s%s]"
                     "[" IFMT "," IFMT "," IFMT "," IFMT "," IFMT "," IFMT
                     "] "
-                    "fp:%8g fp0:%8g dt:%8g\n",
-                    (long)i, skind, mb_or_g, g_or_oc, c, d, h, w, fp, fp0, dt);
+                    "fp:% 12.6g fp0:% 12.6g dt:% 12.6g diff:%8g rdiff:%8g\n",
+                    (long)i, final_compare ? "" : "REORDER ", skind, mb_or_g,
+                    g_or_oc, c, d, h, w, fp, fp0, dt, diff, rel_diff);
         }
 
         non_zero += fp != 0;
@@ -428,7 +431,6 @@ inline int init_pd(dnnl_engine_t eng, const prb_t *p,
         dnnl_format_tag_t dst_tag = dnnl_format_tag_undef) {
     dnnl_memory_desc_t src_d, wei_d, bia_d, dst_d;
 
-    int ndims = is_problem_3d(p) ? 5 : is_problem_1d(p) ? 3 : 4;
     dnnl_dims_t src_1d_dims = {p->mb, p->ic, p->iw};
     dnnl_dims_t src_2d_dims = {p->mb, p->ic, p->ih, p->iw};
     dnnl_dims_t src_3d_dims = {p->mb, p->ic, p->id, p->ih, p->iw};
@@ -454,28 +456,26 @@ inline int init_pd(dnnl_engine_t eng, const prb_t *p,
     if (bia_tag == dnnl_format_tag_undef) bia_tag = dnnl_format_tag_any;
     if (dst_tag == dnnl_format_tag_undef) dst_tag = p->dtag;
 
-    DNN_SAFE(dnnl_memory_desc_init_by_tag(&src_d, ndims,
-                     is_problem_3d(p)
-                             ? src_3d_dims
-                             : is_problem_1d(p) ? src_1d_dims : src_2d_dims,
+    DNN_SAFE(dnnl_memory_desc_init_by_tag(&src_d, p->ndims,
+                     p->ndims == 5 ? src_3d_dims
+                                   : p->ndims == 3 ? src_1d_dims : src_2d_dims,
                      src_dt, src_tag),
             WARN);
 
-    DNN_SAFE(dnnl_memory_desc_init_by_tag(&wei_d, ndims + p->has_groups,
-                     is_problem_3d(p)
+    DNN_SAFE(dnnl_memory_desc_init_by_tag(&wei_d, p->ndims + p->has_groups,
+                     p->ndims == 5
                              ? &wei_3d_dims[!p->has_groups]
-                             : is_problem_1d(p) ? &wei_1d_dims[!p->has_groups]
-                                                : &wei_2d_dims[!p->has_groups],
+                             : p->ndims == 3 ? &wei_1d_dims[!p->has_groups]
+                                             : &wei_2d_dims[!p->has_groups],
                      wei_dt, wei_tag),
             WARN);
 
     DNN_SAFE(dnnl_memory_desc_init_by_tag(&bia_d, 1, bia_dims, bia_dt, bia_tag),
             WARN);
 
-    DNN_SAFE(dnnl_memory_desc_init_by_tag(&dst_d, ndims,
-                     is_problem_3d(p)
-                             ? dst_3d_dims
-                             : is_problem_1d(p) ? dst_1d_dims : dst_2d_dims,
+    DNN_SAFE(dnnl_memory_desc_init_by_tag(&dst_d, p->ndims,
+                     p->ndims == 5 ? dst_3d_dims
+                                   : p->ndims == 3 ? dst_1d_dims : dst_2d_dims,
                      dst_dt, dst_tag),
             WARN);
 
@@ -483,7 +483,7 @@ inline int init_pd(dnnl_engine_t eng, const prb_t *p,
     dnnl_dim_t dilates_nd[] = {p->dd, p->dh, p->dw};
     dnnl_dim_t padding_nd[] = {p->pd, p->ph, p->pw};
 
-    auto bph = [&](int64_t ih, int64_t oh, int64_t kh, int64_t sh, int64_t ph,
+    auto bph = [](int64_t ih, int64_t oh, int64_t kh, int64_t sh, int64_t ph,
                        int64_t dh) {
         return (oh - 1) * sh - ih + ((kh - 1) * (dh + 1) + 1) - ph;
     };
@@ -491,10 +491,10 @@ inline int init_pd(dnnl_engine_t eng, const prb_t *p,
             bph(p->ih, p->oh, p->kh, p->sh, p->ph, p->dh),
             bph(p->iw, p->ow, p->kw, p->sw, p->pw, p->dw)};
 
-    dnnl_dim_t *strides = strides_nd + (5 - ndims);
-    dnnl_dim_t *dilates = dilates_nd + (5 - ndims);
-    dnnl_dim_t *padding = padding_nd + (5 - ndims);
-    dnnl_dim_t *padding_r = padding_r_nd + (5 - ndims);
+    dnnl_dim_t *strides = strides_nd + (5 - p->ndims);
+    dnnl_dim_t *dilates = dilates_nd + (5 - p->ndims);
+    dnnl_dim_t *padding = padding_nd + (5 - p->ndims);
+    dnnl_dim_t *padding_r = padding_r_nd + (5 - p->ndims);
 
     dnnl_alg_kind_t alg = dnnl_convolution_direct;
     if (p->alg == WINO) alg = dnnl_convolution_winograd;
@@ -611,12 +611,9 @@ int doit(const prb_t *p, res_t *r) {
     dnnl_primitive_t c_ref = nullptr;
     dnnl_engine_t engine_ref = nullptr;
 
-    int src_ndims = is_problem_3d(p) ? 5 : is_problem_1d(p) ? 3 : 4;
-    int wei_ndims = src_ndims + p->has_groups;
-
     const auto fp = dnnl_f32;
-    auto src_tag = get_default_tag(src_ndims);
-    auto wei_tag = get_default_tag(wei_ndims);
+    auto src_tag = get_default_tag(p->ndims);
+    auto wei_tag = get_default_tag(p->ndims + p->has_groups);
 
     if (bench_mode & CORR && engine_tgt_kind == dnnl_gpu && fast_ref_gpu) {
         SAFE(dnnl_engine_create(&engine_ref, dnnl_cpu, 0), WARN);

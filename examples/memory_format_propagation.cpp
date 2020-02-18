@@ -94,11 +94,10 @@
 #include "dnnl.hpp"
 
 #include "example_utils.hpp"
-#include <iostream>
-using std::cout;
-using std::endl;
 
 using namespace dnnl;
+using std::cout;
+using std::endl;
 
 /// @page memory_format_propagation_cpp
 /// @section memory_format_propagation_tutorial memory_format_propagation() function
@@ -152,9 +151,9 @@ void memory_format_propagation_tutorial(engine::kind engine_kind) {
     /// Next, we pass the memory descriptors to primitive descriptors
     /// constructors.
     ///
-    // @snippet memory_format_propagation.cpp Create convolution and pooling primitive descriptors
-    // [Create convolution and pooling primitive descriptors]
+    /// @snippet memory_format_propagation.cpp Create convolution and pooling primitive descriptors
     if(v){cout<<"\n conv primitive desc..."<<endl; cout.flush();}
+    // [Create convolution and pooling primitive descriptors]
     auto conv_pd = convolution_forward::primitive_desc(
             {prop_kind::forward_inference, algorithm::convolution_auto,
                     conv_src_md, conv_weights_md,

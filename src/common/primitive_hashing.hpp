@@ -82,12 +82,23 @@ static inline size_t get_attr_hash(const primitive_attr_t *attr) {
     size_t seed = 0;
     // scratchpad_mode
     seed = hash_combine(seed, static_cast<size_t>(attr->scratchpad_mode_));
-    // output_scales: mask
-    seed = hash_combine(seed, attr->output_scales_.mask_);
-    // output_scales: scales[:]
-    if (attr->output_scales_.scales_) {
-        for (int i = 0; i < attr->output_scales_.count_; i++) {
-            seed = hash_combine(seed, attr->output_scales_.scales_[i]);
+
+    if (!attr->output_scales_.has_default_values()) {
+        // output_scales: mask
+        seed = hash_combine(seed, attr->output_scales_.mask_);
+        // output_scales: scales[:]
+        if (attr->output_scales_.scales_) {
+            for (int i = 0; i < attr->output_scales_.count_; i++) {
+                seed = hash_combine(seed, attr->output_scales_.scales_[i]);
+            }
+        }
+    } else if (!attr->scales_.has_default_values()) {
+        // go through scales for all arguments
+        for (const auto &p : attr->scales_.scales_) {
+            seed = hash_combine(seed, p.second.mask_);
+            for (int i = 0; i < p.second.count_; i++) {
+                seed = hash_combine(seed, p.second.scales_[i]);
+            }
         }
     }
     // zero_points
@@ -315,21 +326,26 @@ size_t get_desc_hash<gemm_desc_t>(const op_desc_t *op_desc) {
     seed = hash_combine(seed, static_cast<size_t>(desc->transa));
     seed = hash_combine(seed, static_cast<size_t>(desc->transb));
     // M, N, K
+    seed = hash_combine(seed, desc->batch);
     seed = hash_combine(seed, desc->m);
     seed = hash_combine(seed, desc->n);
     seed = hash_combine(seed, desc->k);
+    // Strides
+    seed = hash_combine(seed, desc->stride_a);
+    seed = hash_combine(seed, desc->stride_b);
+    seed = hash_combine(seed, desc->stride_c);
     // LDA, LDB, LDC
     seed = hash_combine(seed, desc->lda);
     seed = hash_combine(seed, desc->ldb);
     seed = hash_combine(seed, desc->ldc);
-    // Alpha, beta
-    seed = hash_combine(seed, desc->alpha);
-    seed = hash_combine(seed, desc->beta);
-    // a_type, b_type, c_type, acc_type
+    // bias mask
+    seed = hash_combine(seed, static_cast<size_t>(desc->bias_mask));
+    // a_type, b_type, c_type, acc_type, bias_type
     seed = hash_combine(seed, static_cast<size_t>(desc->a_type));
     seed = hash_combine(seed, static_cast<size_t>(desc->b_type));
     seed = hash_combine(seed, static_cast<size_t>(desc->c_type));
     seed = hash_combine(seed, static_cast<size_t>(desc->acc_type));
+    seed = hash_combine(seed, static_cast<size_t>(desc->bias_type));
     // Combined hash for gemm desc
     return seed;
 }

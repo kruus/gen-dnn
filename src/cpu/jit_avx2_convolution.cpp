@@ -13,8 +13,6 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include "cpu_isa_traits.hpp"
-#if TARGET_X86_JIT
 
 #include "c_types_map.hpp"
 #include "dnnl_thread.hpp"
@@ -467,5 +465,4 @@ void jit_avx2_convolution_bwd_weights_t::execute_backward_weights(
 } // namespace impl
 } // namespace dnnl
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // TARGET_X86_JIT
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

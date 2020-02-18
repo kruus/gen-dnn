@@ -20,25 +20,6 @@
 
 #include "dnnl.hpp"
 
-#define FMT_DEBUG 0
-#if FMT_DEBUG
-#include "dnnl_debug.h" // TODO dnnl_debug.hpp (move things from mkldnn_io.hpp
-//#include "mkldnn_io.hpp"
-#include <iostream>
-using std::cout;
-using std::endl;
-#define SHOW(msg,what) std::cout<<msg<<what<<std::endl;
-inline std::ostream& operator<<(std::ostream& os, fmt const& f){
-    return os << mkldnn_fmt2str((mkldnn_memory_format_t)f);
-}
-// SHOX should agree with EXP_VALS_NUM ...
-#define SHOX(msg,what) std::cout<<msg<<what[0]<<" / "<<what[1]<<" / "<<what[2]<<std::endl;
-
-#else
-#define SHOW(msg,what)
-#define SHOX(msg,what)
-#endif
-
 namespace dnnl {
 
 using tag = memory::format_tag;

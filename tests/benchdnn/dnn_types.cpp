@@ -134,6 +134,13 @@ const char *data_kind2str(data_kind_t kind) {
     return "incorrect data kind";
 }
 
+static const std::map<int, const char *> arg2str = {
+        {DNNL_ARG_SRC, "src:"},
+        {DNNL_ARG_SRC_1, "src1:"},
+        {DNNL_ARG_WEIGHTS, "wei:"},
+        {DNNL_ARG_DST, "dst:"},
+};
+
 attr_t::scale_t::policy_t attr_t::scale_t::str2policy(const char *str) {
 #define CASE(_plc) \
     if (!strcasecmp(STRINGIFY(_plc), str)) return _plc
@@ -197,12 +204,6 @@ int attr_t::scale_t::str2scale(const char *str, const char **end_s) {
     return OK;
 }
 
-const std::map<int, const char *> attr_t::zero_points_t::NAME_MAP = {
-        {DNNL_ARG_SRC, "src:"},
-        {DNNL_ARG_WEIGHTS, "wei:"},
-        {DNNL_ARG_DST, "dst:"},
-};
-
 int attr_t::zero_points_t::from_str(const char *str, const char **end_s) {
     *this = attr_t::zero_points_t();
 
@@ -213,7 +214,7 @@ int attr_t::zero_points_t::from_str(const char *str, const char **end_s) {
     s = str;
 
     while (isalpha(*s)) {
-        for (const auto &arg : NAME_MAP) {
+        for (const auto &arg : arg2str) {
             const size_t arg_name_len = strlen(arg.second);
             if (!strncasecmp(arg.second, s, arg_name_len)) {
                 s += arg_name_len;
@@ -241,76 +242,115 @@ int attr_t::zero_points_t::from_str(const char *str, const char **end_s) {
     return OK;
 }
 
-attr_t::post_ops_t::kind_t attr_t::post_ops_t::str2kind(const char *str) {
-#define CASE(_knd) \
-    if (!strcasecmp(STRINGIFY(_knd), str)) return _knd
-    CASE(SUM);
-    CASE(RELU);
-    CASE(TANH);
-    CASE(ELU);
-    CASE(SQUARE);
-    CASE(ABS);
-    CASE(SQRT);
-    CASE(LINEAR);
-    CASE(BRELU);
-    CASE(SRELU);
-    CASE(LOGISTIC);
-    CASE(EXP);
-    CASE(GELU);
-    CASE(SWISH);
-    CASE(LOG);
-    CASE(CLIP);
-#undef CASE
-    assert(!"unknown attr::post_ops::kind");
-    return KIND_TOTAL;
+int attr_t::arg_scales_t::from_str(const char *str, const char **end_s) {
+    *this = attr_t::arg_scales_t();
+
+    if (str == NULL) return FAIL;
+
+    const char *s_;
+    const char *&s = end_s ? *end_s : s_;
+    s = str;
+    // skip '
+    ++s;
+
+    while (true) {
+        if (*s == '\'') {
+            ++s;
+            return OK;
+        }
+        const char *s_init_pos = s;
+        for (const auto &arg : arg2str) {
+            const size_t arg_name_len = strlen(arg.second);
+            if (!strncasecmp(arg.second, s, arg_name_len)) {
+                s += arg_name_len;
+                scale_t::policy_t policy;
+                for (scale_t::policy_t p = scale_t::NONE; true;
+                        p = (scale_t::policy_t)((int)p + 1)) {
+                    if (p == scale_t::POLICY_TOTAL) return FAIL;
+
+                    const char *ps = scale_t::policy2str(p);
+                    if (!strncasecmp(ps, s, strlen(ps))) {
+                        policy = p;
+                        s += strlen(ps);
+                        break;
+                    }
+                }
+                // skip :
+                s++;
+                char *end;
+                float scale = strtof(s, &end);
+                if (scale < 0 || end == s) return FAIL;
+                set(arg.first, policy, scale);
+                s = end;
+                break;
+            }
+        }
+        if (s_init_pos == s) return FAIL;
+        while (*s == '_' || isspace(*s))
+            ++s;
+    }
+    assert(*s == '\0' || *s == ';');
+    return OK;
 }
 
-const char *attr_t::post_ops_t::kind2str(attr_t::post_ops_t::kind_t kind) {
-#define CASE(_knd, str) \
-    if (kind == _knd) return str
-    CASE(SUM, "sum");
-    CASE(RELU, "relu");
-    CASE(TANH, "tanh");
-    CASE(ELU, "elu");
-    CASE(SQUARE, "square");
-    CASE(ABS, "abs");
-    CASE(SQRT, "sqrt");
-    CASE(LINEAR, "linear");
-    CASE(BRELU, "brelu");
-    CASE(SRELU, "srelu");
-    CASE(LOGISTIC, "logistic");
-    CASE(EXP, "exp");
-    CASE(GELU, "gelu");
-    CASE(SWISH, "swish");
-    CASE(LOG, "log");
-    CASE(CLIP, "clip");
-#undef CASE
+using pk_t = attr_t::post_ops_t::kind_t;
+
+typedef struct {
+    pk_t kind;
+    const char *kind_name;
+    dnnl_alg_kind_t dnnl_kind;
+} po_table_entry_t;
+
+static po_table_entry_t kind_table[] = {{pk_t::SUM, "sum", dnnl_alg_kind_undef},
+        {pk_t::RELU, "relu", dnnl_eltwise_relu},
+        {pk_t::TANH, "tanh", dnnl_eltwise_tanh},
+        {pk_t::ELU, "elu", dnnl_eltwise_elu},
+        {pk_t::SQUARE, "square", dnnl_eltwise_square},
+        {pk_t::ABS, "abs", dnnl_eltwise_abs},
+        {pk_t::SQRT, "sqrt", dnnl_eltwise_sqrt},
+        {pk_t::LINEAR, "linear", dnnl_eltwise_linear},
+        {pk_t::BRELU, "brelu", dnnl_eltwise_bounded_relu},
+        {pk_t::SRELU, "srelu", dnnl_eltwise_soft_relu},
+        {pk_t::LOGISTIC, "logistic", dnnl_eltwise_logistic},
+        {pk_t::EXP, "exp", dnnl_eltwise_exp},
+        {pk_t::GELU, "gelu", dnnl_eltwise_gelu},
+        {pk_t::SWISH, "swish", dnnl_eltwise_swish},
+        {pk_t::LOG, "log", dnnl_eltwise_log},
+        {pk_t::CLIP, "clip", dnnl_eltwise_clip},
+        {pk_t::POW, "pow", dnnl_eltwise_pow},
+
+        {pk_t::RELU_DST, "relu_dst", dnnl_eltwise_relu_use_dst_for_bwd},
+        {pk_t::TANH_DST, "tanh_dst", dnnl_eltwise_tanh_use_dst_for_bwd},
+        {pk_t::ELU_DST, "elu_dst", dnnl_eltwise_elu_use_dst_for_bwd},
+        {pk_t::SQRT_DST, "sqrt_dst", dnnl_eltwise_sqrt_use_dst_for_bwd},
+        {pk_t::LOGISTIC_DST, "logistic_dst",
+                dnnl_eltwise_logistic_use_dst_for_bwd},
+        {pk_t::EXP_DST, "exp_dst", dnnl_eltwise_exp_use_dst_for_bwd},
+
+        {pk_t::KIND_TOTAL, "unknown", dnnl_alg_kind_undef}};
+
+pk_t attr_t::post_ops_t::str2kind(const char *str) {
+    for (const auto &e : kind_table) {
+        if (!strcasecmp(e.kind_name, str)) return e.kind;
+    }
     assert(!"unknown attr::post_ops::kind");
-    return "unknown attr::post_ops::kind";
+    return kind_table[KIND_TOTAL].kind;
 }
 
-dnnl_alg_kind_t attr_t::post_ops_t::kind2dnnl_kind(
-        attr_t::post_ops_t::kind_t kind) {
-#define CASE(_knd, _mknd) \
-    if (kind == _knd) return _mknd
-    CASE(RELU, dnnl_eltwise_relu);
-    CASE(TANH, dnnl_eltwise_tanh);
-    CASE(ELU, dnnl_eltwise_elu);
-    CASE(SQUARE, dnnl_eltwise_square);
-    CASE(ABS, dnnl_eltwise_abs);
-    CASE(SQRT, dnnl_eltwise_sqrt);
-    CASE(LINEAR, dnnl_eltwise_linear);
-    CASE(BRELU, dnnl_eltwise_bounded_relu);
-    CASE(SRELU, dnnl_eltwise_soft_relu);
-    CASE(LOGISTIC, dnnl_eltwise_logistic);
-    CASE(EXP, dnnl_eltwise_exp);
-    CASE(GELU, dnnl_eltwise_gelu);
-    CASE(SWISH, dnnl_eltwise_swish);
-    CASE(LOG, dnnl_eltwise_log);
-    CASE(CLIP, dnnl_eltwise_clip);
-#undef CASE
-    assert(!"unknown attr::post_ops::kind");
-    return dnnl_alg_kind_undef;
+const char *attr_t::post_ops_t::kind2str(pk_t kind) {
+    if (kind >= KIND_TOTAL) {
+        assert(!"unknown attr::post_ops::kind");
+        return kind_table[KIND_TOTAL].kind_name;
+    }
+    return kind_table[kind].kind_name;
+}
+
+dnnl_alg_kind_t attr_t::post_ops_t::kind2dnnl_kind(pk_t kind) {
+    if (kind >= KIND_TOTAL) {
+        assert(!"unknown attr::post_ops::kind");
+        return kind_table[KIND_TOTAL].dnnl_kind;
+    }
+    return kind_table[kind].dnnl_kind;
 }
 
 int attr_t::post_ops_t::from_str(const char *str, const char **end_s) {
@@ -382,8 +422,7 @@ int attr_t::post_ops_t::from_str(const char *str, const char **end_s) {
     return FAIL; /* unreachable */
 }
 
-int attr_t::post_ops_t::find(
-        attr_t::post_ops_t::kind_t kind, int start, int stop) const {
+int attr_t::post_ops_t::find(pk_t kind, int start, int stop) const {
     if (stop == -1) stop = len;
     stop = MIN2(stop, len);
     for (int idx = start; idx < stop; ++idx)
@@ -392,7 +431,8 @@ int attr_t::post_ops_t::find(
 }
 
 bool attr_t::is_def() const {
-    return oscale.is_def() && zero_points.is_def() && post_ops.is_def();
+    return oscale.is_def() && scales.is_def() && zero_points.is_def()
+            && post_ops.is_def();
 }
 
 int str2attr(attr_t *attr, const char *str) {
@@ -426,10 +466,16 @@ int str2attr(attr_t *attr, const char *str) {
             if (rc != OK) return rc;
         }
 
-        if (rc != OK) return FAIL;
+        param = "scales=";
+        if (!strncasecmp(param, s, strlen(param))) {
+            s += strlen(param);
+            rc = attr->scales.from_str(s, &s);
+            if (rc != OK) return rc;
+        }
+
+        if (rc != OK) return rc;
         if (*s == ';') ++s;
     }
-
     return OK;
 }
 
@@ -446,10 +492,25 @@ std::ostream &operator<<(
         if (!first) s << '_';
         first = false;
 
-        s << zero_points.NAME_MAP.at(point.first) << point.second.value;
+        s << arg2str.at(point.first) << point.second.value;
         if (point.second.runtime) s << '*';
     }
 
+    return s;
+}
+
+std::ostream &operator<<(std::ostream &s, const attr_t::arg_scales_t &scales) {
+    const char *delim = "";
+    s << "'";
+    for (const auto &v : scales.scales) {
+        if (!v.second.is_def()) {
+            s << delim << arg2str.at(v.first)
+              << attr_t::scale_t::policy2str(v.second.policy) << ":"
+              << v.second.scale;
+            delim = "_";
+        }
+    }
+    s << "'";
     return s;
 }
 
@@ -462,37 +523,21 @@ std::ostream &operator<<(std::ostream &s, const attr_t::post_ops_t &post_ops) {
         if (idx > 0) s << ";";
         const auto &e = post_ops.entry[idx];
 
-        using pk = attr_t::post_ops_t::kind_t;
-        switch (e.kind) {
-            case pk::SUM:
-                s << kind2str(e.kind);
-                if (e.sum.scale != 1.0f) s << ":" << e.sum.scale;
-                break;
-            case pk::RELU:
-            case pk::TANH:
-            case pk::ELU:
-            case pk::SQUARE:
-            case pk::ABS:
-            case pk::SQRT:
-            case pk::LINEAR:
-            case pk::BRELU:
-            case pk::SRELU:
-            case pk::LOGISTIC:
-            case pk::EXP:
-            case pk::GELU:
-            case pk::SWISH:
-            case pk::LOG:
-            case pk::CLIP:
-                s << kind2str(e.kind);
-                if (e.eltwise.scale != 1.f)
-                    s << ":" << e.eltwise.alpha << ":" << e.eltwise.beta << ":"
-                      << e.eltwise.scale;
-                else if (e.eltwise.beta != 0.f)
-                    s << ":" << e.eltwise.alpha << ":" << e.eltwise.beta;
-                else if (e.eltwise.alpha != 0.f)
-                    s << ":" << e.eltwise.alpha;
-                break;
-            default: assert(!"unknown kind"); s << "unknown_kind";
+        if (e.kind == pk_t::SUM) {
+            s << kind2str(e.kind);
+            if (e.sum.scale != 1.0f) s << ":" << e.sum.scale;
+        } else if (e.kind < pk_t::KIND_TOTAL) {
+            s << kind2str(e.kind);
+            if (e.eltwise.scale != 1.f)
+                s << ":" << e.eltwise.alpha << ":" << e.eltwise.beta << ":"
+                  << e.eltwise.scale;
+            else if (e.eltwise.beta != 0.f)
+                s << ":" << e.eltwise.alpha << ":" << e.eltwise.beta;
+            else if (e.eltwise.alpha != 0.f)
+                s << ":" << e.eltwise.alpha;
+        } else {
+            assert(!"unknown kind");
+            s << "unknown_kind";
         }
     }
 
@@ -506,11 +551,12 @@ std::ostream &operator<<(std::ostream &s, const attr_t &attr) {
     if (!attr.zero_points.is_def())
         s << "zero_points=" << attr.zero_points << ";";
     if (!attr.post_ops.is_def()) s << "post_ops=" << attr.post_ops << ";";
+    if (!attr.scales.is_def()) s << "scales=" << attr.scales << ";";
     return s;
 }
 
 std::ostream &dump_global_params(std::ostream &s) {
-    if (engine_tgt_kind != dnnl_cpu)
+    if (canonical || engine_tgt_kind != dnnl_cpu)
         s << "--engine=" << engine_kind2str(engine_tgt_kind) << " ";
 
     s << "--" << driver_name << " ";
@@ -560,8 +606,9 @@ dnnl_primitive_attr_t create_dnnl_attr(const attr_t &attr, int64_t scale_cnt,
     dnnl_primitive_attr_t dnnl_attr = NULL;
     DNN_SAFE_V(dnnl_primitive_attr_create(&dnnl_attr));
 
+    using P = attr_t::scale_t::policy_t;
+
     if (!attr.oscale.is_def()) {
-        using P = attr_t::scale_t::policy_t;
         int64_t count = attr.oscale.policy == P::COMMON ? 1 : scale_cnt;
         if (scale_mask == -1)
             scale_mask = attr.oscale.policy == P::PER_OC ? 1 << 1 : 0;
@@ -580,8 +627,19 @@ dnnl_primitive_attr_t create_dnnl_attr(const attr_t &attr, int64_t scale_cnt,
 
         DNN_SAFE_V(dnnl_primitive_attr_set_output_scales(dnnl_attr, count,
                 scale_mask, runtime ? &DNNL_RUNTIME_F32_VAL : scales));
-
         if (gen_scs) zfree(gen_scs);
+    } else if (!attr.scales.is_def()) {
+        // Only common policy is supported at this point
+        for (const auto &s : attr.scales.scales) {
+            int64_t count = -1;
+            int mask = -1;
+            count = s.second.policy == P::COMMON ? 1 : scale_cnt;
+            if (scale_mask == -1)
+                mask = s.second.policy == P::PER_OC ? 1 << 1 : 0;
+
+            DNN_SAFE_V(dnnl_primitive_attr_set_scales(
+                    dnnl_attr, s.first, count, mask, &s.second.scale));
+        }
     }
 
     if (!attr.zero_points.is_def()) {
@@ -599,30 +657,13 @@ dnnl_primitive_attr_t create_dnnl_attr(const attr_t &attr, int64_t scale_cnt,
         DNN_SAFE_V(dnnl_post_ops_create(&ops));
         for (int idx = 0; idx < attr.post_ops.len; ++idx) {
             const auto &e = attr.post_ops.entry[idx];
-            switch (attr.post_ops.entry[idx].kind) {
-                case attr_t::post_ops_t::SUM:
-                    DNN_SAFE_V(dnnl_post_ops_append_sum(ops, e.sum.scale));
-                    break;
-                case attr_t::post_ops_t::RELU:
-                case attr_t::post_ops_t::TANH:
-                case attr_t::post_ops_t::ELU:
-                case attr_t::post_ops_t::SQUARE:
-                case attr_t::post_ops_t::ABS:
-                case attr_t::post_ops_t::SQRT:
-                case attr_t::post_ops_t::LINEAR:
-                case attr_t::post_ops_t::BRELU:
-                case attr_t::post_ops_t::SRELU:
-                case attr_t::post_ops_t::LOGISTIC:
-                case attr_t::post_ops_t::EXP:
-                case attr_t::post_ops_t::GELU:
-                case attr_t::post_ops_t::SWISH:
-                case attr_t::post_ops_t::LOG:
-                case attr_t::post_ops_t::CLIP:
-                    DNN_SAFE_V(dnnl_post_ops_append_eltwise(ops,
-                            e.eltwise.scale, e.eltwise.alg, e.eltwise.alpha,
-                            e.eltwise.beta));
-                    break;
-                default: assert(!"unknown attr::post_ops::kind");
+            if (e.kind == pk_t::SUM) {
+                DNN_SAFE_V(dnnl_post_ops_append_sum(ops, e.sum.scale));
+            } else if (e.kind < pk_t::KIND_TOTAL) {
+                DNN_SAFE_V(dnnl_post_ops_append_eltwise(ops, e.eltwise.scale,
+                        e.eltwise.alg, e.eltwise.alpha, e.eltwise.beta));
+            } else {
+                assert(!"unknown attr::post_ops::kind");
             }
         }
         DNN_SAFE_V(dnnl_primitive_attr_set_post_ops(dnnl_attr, ops));
@@ -645,7 +686,7 @@ dnnl_format_tag_t get_default_tag(int ndims) {
         case 4: return dnnl_abcd;
         case 5: return dnnl_abcde;
         case 6: return dnnl_abcdef;
-        default: assert(!"unknown kind");
+        default: assert(!"unsupported ndims");
     }
     return dnnl_format_tag_undef;
 }
@@ -661,53 +702,69 @@ void maybe_scale(float &d, float *scales, int64_t oc, const attr_t &attr) {
     }
 }
 
-float compute_eltwise_fwd(attr_t::post_ops_t::kind_t kind, float src,
-        float scale, float alpha, float beta) {
+float compute_eltwise_fwd(
+        pk_t kind, float src, float scale, float alpha, float beta) {
     using namespace dnnl::impl::math;
-    using pk = attr_t::post_ops_t::kind_t;
 
     switch (kind) {
-        case pk::RELU: return scale * relu_fwd(src, alpha);
-        case pk::TANH: return scale * tanh_fwd(src);
-        case pk::ELU: return scale * elu_fwd(src, alpha);
-        case pk::SQUARE: return scale * square_fwd(src);
-        case pk::ABS: return scale * abs_fwd(src);
-        case pk::SQRT: return scale * sqrt_fwd(src);
-        case pk::LINEAR: return scale * linear_fwd(src, alpha, beta);
-        case pk::BRELU: return scale * bounded_relu_fwd(src, alpha);
-        case pk::SRELU: return scale * soft_relu_fwd(src);
-        case pk::LOGISTIC: return scale * logistic_fwd(src);
-        case pk::EXP: return scale * exp_fwd(src);
-        case pk::GELU: return scale * gelu_fwd(src);
-        case pk::SWISH: return scale * swish_fwd(src, alpha);
-        case pk::LOG: return scale * log_fwd(src);
-        case pk::CLIP: return scale * clip_fwd(src, alpha, beta);
+        case pk_t::RELU: return scale * relu_fwd(src, alpha);
+        case pk_t::TANH: return scale * tanh_fwd(src);
+        case pk_t::ELU: return scale * elu_fwd(src, alpha);
+        case pk_t::SQUARE: return scale * square_fwd(src);
+        case pk_t::ABS: return scale * abs_fwd(src);
+        case pk_t::SQRT: return scale * sqrt_fwd(src);
+        case pk_t::LINEAR: return scale * linear_fwd(src, alpha, beta);
+        case pk_t::BRELU: return scale * bounded_relu_fwd(src, alpha);
+        case pk_t::SRELU: return scale * soft_relu_fwd(src);
+        case pk_t::LOGISTIC: return scale * logistic_fwd(src);
+        case pk_t::EXP: return scale * exp_fwd(src);
+        case pk_t::GELU: return scale * gelu_fwd(src);
+        case pk_t::SWISH: return scale * swish_fwd(src, alpha);
+        case pk_t::LOG: return scale * log_fwd(src);
+        case pk_t::CLIP: return scale * clip_fwd(src, alpha, beta);
+        case pk_t::POW: return scale * pow_fwd(src, alpha, beta);
+
+        case pk_t::RELU_DST: return scale * relu_fwd(src, alpha);
+        case pk_t::TANH_DST: return scale * tanh_fwd(src);
+        case pk_t::ELU_DST: return scale * elu_fwd(src, alpha);
+        case pk_t::SQRT_DST: return scale * sqrt_fwd(src);
+        case pk_t::LOGISTIC_DST: return scale * logistic_fwd(src);
+        case pk_t::EXP_DST: return scale * exp_fwd(src);
+
         default: assert(!"unknown attr::post_ops::kind");
     };
     return NAN;
 }
 
-float compute_eltwise_bwd(attr_t::post_ops_t::kind_t kind, float d_dst,
-        float src, float alpha, float beta) {
+float compute_eltwise_bwd(
+        pk_t kind, float d_dst, float src, float alpha, float beta) {
     using namespace dnnl::impl::math;
-    using pk = attr_t::post_ops_t::kind_t;
 
     switch (kind) {
-        case pk::RELU: return relu_bwd(d_dst, src, alpha);
-        case pk::TANH: return tanh_bwd(d_dst, src);
-        case pk::ELU: return elu_bwd(d_dst, src, alpha);
-        case pk::SQUARE: return square_bwd(d_dst, src);
-        case pk::ABS: return abs_bwd(d_dst, src);
-        case pk::SQRT: return sqrt_bwd(d_dst, src);
-        case pk::LINEAR: return linear_bwd(d_dst, src, alpha, beta);
-        case pk::BRELU: return bounded_relu_bwd(d_dst, src, alpha);
-        case pk::SRELU: return soft_relu_bwd(d_dst, src);
-        case pk::LOGISTIC: return logistic_bwd(d_dst, src);
-        case pk::EXP: return exp_bwd(d_dst, src);
-        case pk::GELU: return gelu_bwd(d_dst, src);
-        case pk::SWISH: return swish_bwd(d_dst, src, alpha);
-        case pk::LOG: return log_bwd(d_dst, src);
-        case pk::CLIP: return clip_bwd(d_dst, src, alpha, beta);
+        case pk_t::RELU: return relu_bwd(d_dst, src, alpha);
+        case pk_t::TANH: return tanh_bwd(d_dst, src);
+        case pk_t::ELU: return elu_bwd(d_dst, src, alpha);
+        case pk_t::SQUARE: return square_bwd(d_dst, src);
+        case pk_t::ABS: return abs_bwd(d_dst, src);
+        case pk_t::SQRT: return sqrt_bwd(d_dst, src);
+        case pk_t::LINEAR: return linear_bwd(d_dst, src, alpha, beta);
+        case pk_t::BRELU: return bounded_relu_bwd(d_dst, src, alpha);
+        case pk_t::SRELU: return soft_relu_bwd(d_dst, src);
+        case pk_t::LOGISTIC: return logistic_bwd(d_dst, src);
+        case pk_t::EXP: return exp_bwd(d_dst, src);
+        case pk_t::GELU: return gelu_bwd(d_dst, src);
+        case pk_t::SWISH: return swish_bwd(d_dst, src, alpha);
+        case pk_t::LOG: return log_bwd(d_dst, src);
+        case pk_t::CLIP: return clip_bwd(d_dst, src, alpha, beta);
+        case pk_t::POW: return pow_bwd(d_dst, src, alpha, beta);
+
+        case pk_t::RELU_DST: return relu_bwd_use_dst(d_dst, src, alpha);
+        case pk_t::TANH_DST: return tanh_bwd_use_dst(d_dst, src);
+        case pk_t::ELU_DST: return elu_bwd_use_dst(d_dst, src, alpha);
+        case pk_t::SQRT_DST: return sqrt_bwd_use_dst(d_dst, src);
+        case pk_t::LOGISTIC_DST: return logistic_bwd_use_dst(d_dst, src);
+        case pk_t::EXP_DST: return exp_bwd_use_dst(d_dst, src);
+
         default: assert(!"unknown attr::post_ops::kind");
     }
     return NAN;
@@ -718,14 +775,13 @@ void maybe_post_ops(float &d, float dst, const attr_t &attr) {
 
     const auto &ops = attr.post_ops;
     for (int idx = 0; idx < ops.len; ++idx) {
-        using pk = attr_t::post_ops_t::kind_t;
         const auto &e = ops.entry[idx];
 
         const auto &s = e.eltwise.scale;
         const auto &a = e.eltwise.alpha;
         const auto &b = e.eltwise.beta;
 
-        if (e.kind == pk::SUM)
+        if (e.kind == pk_t::SUM)
             d += e.sum.scale * dst;
         else
             d = compute_eltwise_fwd(e.kind, d, s, a, b);

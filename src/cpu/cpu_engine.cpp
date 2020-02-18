@@ -24,6 +24,7 @@
 #include "cpu_stream.hpp"
 #include "memory.hpp"
 
+#if 0
 #if DNNL_ENABLE_BFLOAT16
 #include "cpu/matmul/gemm_bf16_matmul.hpp"
 #endif // DNNL_ENABLE_BFLOAT16
@@ -91,15 +92,16 @@
 #include "cpu/ref_deconvolution.hpp"
 #include "cpu/ref_eltwise.hpp"
 #include "cpu/ref_inner_product.hpp"
-
-#if DNNL_TARGET_VEDNN // VE cpu, fast libvednn routines allowed
-#include "vanilla/vednnx_convolution.hpp"
-#endif
 #include "cpu/ref_layer_normalization.hpp"
 #include "cpu/ref_lrn.hpp"
 #include "cpu/ref_pooling.hpp"
 #include "cpu/ref_shuffle.hpp"
 #include "cpu/ref_softmax.hpp"
+
+#if DNNL_TARGET_VEDNN // VE cpu, fast libvednn routines allowed
+#include "vanilla/vednnx_convolution.hpp"
+#endif
+#endif
 
 namespace dnnl {
 namespace impl {
@@ -122,6 +124,7 @@ status_t cpu_engine_t::create_stream(stream_t **stream, unsigned flags) {
     return safe_ptr_assign<stream_t>(*stream, new cpu_stream_t(this, flags));
 }
 
+#if 0 // v2.1 cleans this up into separate lists
 using pd_create_f = dnnl::impl::engine_t::primitive_desc_create_f;
 
 namespace {
@@ -608,8 +611,8 @@ static const pd_create_f cpu_impl_list[] = {
         INSTANCE(matmul::gemm_f32_matmul_t)
 #if DNNL_ENABLE_BFLOAT16
         INSTANCE(matmul::gemm_bf16_matmul_t<f32>)
-#endif
         INSTANCE_sse41(matmul::gemm_bf16_matmul_t<bf16>)
+#endif
         INSTANCE(matmul::gemm_x8s8s32x_matmul_t<s8, s8, f32>)
         INSTANCE(matmul::gemm_x8s8s32x_matmul_t<s8, s8, s32>)
         INSTANCE(matmul::gemm_x8s8s32x_matmul_t<s8, s8, s8>)
@@ -645,8 +648,9 @@ static const pd_create_f cpu_impl_list[] = {
 const pd_create_f *cpu_engine_t::get_implementation_list() const {
     return cpu_impl_list;
 }
+#endif // v2.1 cleanup
 
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

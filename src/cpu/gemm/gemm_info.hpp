@@ -23,6 +23,7 @@
 #include "c_types_map.hpp"
 #include "gemm_pack_storage.hpp"
 #include "gemm_threading.hpp"
+
 // MKLDNN_CPU_GEMM_JIT *might* be different from TARGET_X86_JIT, because
 // of USE_CBLAS or USE_MKL build options.  There may be issues here FIXME
 #if defined(MKLDNN_CPU_GEMM_JIT)

@@ -15,16 +15,19 @@
 *******************************************************************************/
 
 #include "cpu_barrier.hpp"
-#if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
+
+#if BARRIER_SHOULD_THROW
 // nothing to do (barrier throws if nthr > 1, o/w does nothing)
 
 #else // provide a nontrivial barrier impl
 
-#if defined(__ve) //TARGET_VE
+#if TARGET_VE
 //#include "C++/xatomic.h" // things like std::_Atomic_fetch_add_8, and _Atomic_counter_t
-#include <memory>          // shared pointer support defines memory_order_seq_cst
+#include <memory> // shared pointer support defines memory_order_seq_cst
+
 #elif !TARGET_X86_JIT
-#include <atomic>          // the usual place we expect memory_order_seq_cst
+#include <atomic> // the usual place we expect memory_order_seq_cst
+
 #endif
 
 namespace dnnl {
@@ -113,10 +116,10 @@ void barrier(ctx_t *ctx, int nthr) {
     j.barrier(ctx, nthr);
 }
 
-#elif TARGET_X86
+#elif TARGET_X86 /* and no jit */
 void barrier(ctx_t *ctx, int nthr) {
     // assume ctx_init zeroes out ctx
-    if (nthr > 1){
+    if (nthr > 1) {
         size_t sense_sav;
 
         /* take and save current sense */
@@ -127,21 +130,20 @@ void barrier(ctx_t *ctx, int nthr) {
         //__sync_fetch_and_add( &ctx->ctr, tmp );
         //tmp += 1U;
         // simpler:
-        //__sync_add_and_fetch( &ctx->ctr, tmp);  // N/A for __ve (NEC Aurora)
-        //__atomic_add_fetch( &ctx->ctr, tmp, __ATOMIC_SEQ_CST); // maybe this one exists?
-        __atomic_add_fetch( &ctx->ctr, tmp, std::memory_order_seq_cst); // maybe this one exists?
+        __atomic_add_fetch(&ctx->ctr, tmp,
+                std::memory_order_seq_cst); // maybe this one exists?
 
         bool last_thread = (tmp == static_cast<size_t>(nthr));
         tmp = *&sense_sav; // "pop"
-        if (last_thread){
-            ctx->ctr = 0U;      // reset thread counter
+        if (last_thread) {
+            ctx->ctr = 0U; // reset thread counter
             // notify waiting threads
             tmp = !tmp;
             ctx->sense = tmp;
             //goto barrier_exit_restore_label;
-        }else{
+        } else {
             //spin_label:
-            while (ctx->sense == tmp){
+            while (ctx->sense == tmp) {
                 __builtin_ia32_pause(); // gcc perhaps has this
             }
         }
@@ -152,45 +154,42 @@ void barrier(ctx_t *ctx, int nthr) {
 }
 
 #elif defined(__ve) //TARGET_VE
-//#warning "Aurora: if xatomic0.h usable, using _Atomic_counter_t might give a trivial impl"
-
-// TODO: check that ncc uses proper fences for volatile variables
+//#warning "Aurora: if xatomic0.h usable, consider _Atomic_counter_t"
+// XXX check __NEC_VERSION__ (ex. nc++ -dM -E empty.cpp --> #define __NEC_VERSION__ 30025)
+//     because level atomic support has been improving in recent compiler versions
+// XXX check that ncc uses proper fences for volatile variables
 void barrier(ctx_t *ctx, int nthr) {
-    if (nthr > 1){
-        size_t sense_sav;
+    if (nthr > 1) {
+        volatile size_t sense_sav;
 
         /* take and save current sense */
-        /*register*/ size_t tmp = ctx->sense;       // (register is deprecated)
+        /*register*/ size_t tmp = ctx->sense; // (register is deprecated)
         *&sense_sav = tmp; // "push"
 
         tmp = 1U;
         //__sync_fetch_and_add( &ctx->ctr, tmp );
         //tmp += 1U;
         //__sync_add_and_fetch( &ctx->ctr, tmp);
-        assert( sizeof(ctx->ctr) == 8 );
+        assert(sizeof(ctx->ctr) == 8);
         //std::_Atomic_fetch_add_8( reinterpret_cast<volatile std::_Uint8_t*>(&ctx->ctr), tmp, std::memory_order_seq_cst );
         //__atomic_add_fetch( &ctx->ctr, tmp, __ATOMIC_SEQ_CST); // maybe this one exists?
-        __atomic_add_fetch( &ctx->ctr, tmp, std::memory_order_seq_cst); // maybe this one exists?
+        __atomic_add_fetch(&ctx->ctr, tmp,
+                std::memory_order_seq_cst); // maybe this one exists?
 
         bool last_thread = (tmp == static_cast<size_t>(nthr));
         tmp = *&sense_sav; // "pop"
-        if (last_thread){
-            ctx->ctr = 0U;      // reset thread counter
+        if (last_thread) {
+            ctx->ctr = 0U; // reset thread counter
             // notify waiting threads
             tmp = !tmp;
             ctx->sense = tmp;
-            //goto barrier_exit_restore_label;
-        }else{
-            //spin_label:
-            // XXX: do we need to explicitly clear caches w/ FENCE?
-            // XXX shouldd this use the .nc "Not cached on ADB" suffix for the load?
-            while (ctx->sense == tmp){
+        } else {
+            // XXX do we need to explicitly clear caches w/ FENCE?
+            // XXX should this use the .nc "Not cached on ADB" suffix for the load?
+            while (ctx->sense == tmp) {
                 asm("nop" :::);
             }
         }
-        //barrier_exit_restore_label:
-        // (nothing to do)
-        //barrier_exit_label:
     }
 }
 
@@ -206,4 +205,4 @@ void barrier(ctx_t *ctx, int nthr) {
 } // namespace dnnl
 
 #endif // DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
-// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

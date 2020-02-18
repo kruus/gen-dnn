@@ -586,55 +586,97 @@ inline std::string to_string(dnnl_engine_kind_t engine_kind) {
 }
 
 // testing all available C++ primitive descriptor constructors
+struct allows_attr_t {
+    bool oscale;
+    bool po_sum;
+    bool po_eltwise;
+    bool zp;
+    bool scales;
+};
+
+using engine = dnnl::engine;
 // forward
-template <typename pd_t>
-void test_fwd_pd_attr(const pd_t &pd) {
+template <typename op_desc_t, typename pd_t>
+void test_fwd_pd_attr(const op_desc_t &op_desc, const engine &eng) {
     dnnl::primitive_attr attr;
-    pd_t new_pd {};
-    EXPECT_NO_THROW(new_pd = pd_t(pd.op_desc(), attr, pd.get_engine()));
+    EXPECT_NO_THROW(pd_t pd(op_desc, attr, eng));
 }
 
-template <typename pd_t>
-void test_fwd_pd_attr_oscale(const pd_t &pd, bool supports_oscale) {
+template <typename op_desc_t, typename pd_t>
+void test_fwd_pd_attr_oscale(
+        const op_desc_t &op_desc, const engine &eng, bool supports_oscale) {
     dnnl::primitive_attr attr_oscale;
-    attr_oscale.set_output_scales(0, {2.});
-    pd_t new_pd {};
+    attr_oscale.set_output_scales(0, {2.f});
     if (supports_oscale)
-        EXPECT_NO_THROW(
-                new_pd = pd_t(pd.op_desc(), attr_oscale, pd.get_engine()));
+        EXPECT_NO_THROW(pd_t pd(op_desc, attr_oscale, eng));
     else
-        EXPECT_ANY_THROW(
-                new_pd = pd_t(pd.op_desc(), attr_oscale, pd.get_engine()));
+        EXPECT_ANY_THROW(pd_t pd(op_desc, attr_oscale, eng));
 }
 
-template <typename pd_t>
-void test_fwd_pd_attr_po_sum(const pd_t &pd, bool supports_po_sum) {
-    dnnl::primitive_attr attr_po_sum;
+template <typename op_desc_t, typename pd_t>
+void test_fwd_pd_attr_po_sum(
+        const op_desc_t &op_desc, const engine &eng, bool supports_po_sum) {
     dnnl::post_ops ops_sum;
     ops_sum.append_sum(1.1f);
+    dnnl::primitive_attr attr_po_sum;
     attr_po_sum.set_post_ops(ops_sum);
-    pd_t new_pd {};
     if (supports_po_sum)
-        EXPECT_NO_THROW(
-                new_pd = pd_t(pd.op_desc(), attr_po_sum, pd.get_engine()));
+        EXPECT_NO_THROW(pd_t pd(op_desc, attr_po_sum, eng));
     else
-        EXPECT_ANY_THROW(
-                new_pd = pd_t(pd.op_desc(), attr_po_sum, pd.get_engine()));
+        EXPECT_ANY_THROW(pd_t pd(op_desc, attr_po_sum, eng));
 }
 
-template <typename pd_t>
-void test_fwd_pd_attr_po_eltwise(const pd_t &pd, bool supports_po_eltwise) {
-    dnnl::primitive_attr attr_po_eltwise;
+template <typename op_desc_t, typename pd_t>
+void test_fwd_pd_attr_po_eltwise(
+        const op_desc_t &op_desc, const engine &eng, bool supports_po_eltwise) {
     dnnl::post_ops ops_eltwise;
     ops_eltwise.append_eltwise(1.0f, dnnl::algorithm::eltwise_relu, 0.f, 0.f);
+    dnnl::primitive_attr attr_po_eltwise;
     attr_po_eltwise.set_post_ops(ops_eltwise);
-    pd_t new_pd {};
     if (supports_po_eltwise)
-        EXPECT_NO_THROW(
-                new_pd = pd_t(pd.op_desc(), attr_po_eltwise, pd.get_engine()));
+        EXPECT_NO_THROW(pd_t pd(op_desc, attr_po_eltwise, eng));
     else
-        EXPECT_ANY_THROW(
-                new_pd = pd_t(pd.op_desc(), attr_po_eltwise, pd.get_engine()));
+        EXPECT_ANY_THROW(pd_t pd(op_desc, attr_po_eltwise, eng));
+}
+
+template <typename op_desc_t, typename pd_t>
+void test_fwd_pd_attr_zp(
+        const op_desc_t &op_desc, const engine &eng, bool supports_zero_point) {
+    dnnl::primitive_attr attr_zp;
+    attr_zp.set_zero_points(DNNL_ARG_SRC, 0, {1});
+    if (supports_zero_point)
+        EXPECT_NO_THROW(pd_t pd(op_desc, attr_zp, eng));
+    else
+        EXPECT_ANY_THROW(pd_t pd(op_desc, attr_zp, eng));
+}
+
+template <typename op_desc_t, typename pd_t>
+void test_fwd_pd_attr_scales(
+        const op_desc_t &op_desc, const engine &eng, bool supports_scales) {
+    using dt_t = memory::data_type;
+
+    dnnl::primitive_attr attr_scales;
+    attr_scales.set_scales(DNNL_ARG_SRC, 0, {2.f});
+
+    pd_t new_pd(op_desc, eng);
+    const auto dt = new_pd.src_desc().data.data_type;
+    const bool dt_is_integral
+            = dt == dt_t::s32 || dt == dt_t::s8 || dt == dt_t::u8;
+
+    // Scales are supposed to work on int8 data type only.
+    if (supports_scales && dt_is_integral) {
+        EXPECT_NO_THROW(pd_t pd(op_desc, attr_scales, eng));
+
+        // Check oscale and scales don't work together
+        dnnl::primitive_attr attr_oscale_scales;
+        attr_oscale_scales.set_output_scales(0, {2.f});
+        EXPECT_ANY_THROW(attr_oscale_scales.set_scales(DNNL_ARG_SRC, 0, {2.f}));
+
+        dnnl::primitive_attr attr_scales_oscale;
+        attr_scales_oscale.set_scales(DNNL_ARG_SRC, 0, {2.f});
+        EXPECT_ANY_THROW(attr_scales_oscale.set_output_scales(0, {2.f}));
+    } else
+        EXPECT_ANY_THROW(pd_t pd(op_desc, attr_scales, eng));
 }
 
 template <typename op_desc_t, typename pd_t>
@@ -647,75 +689,86 @@ void test_fwd_pd_allow_empty(const pd_t &pd) {
 
 // Note: requires a valid primitive descriptor!
 template <typename op_desc_t, typename pd_t>
-void test_fwd_pd_constructors(const pd_t &pd, bool supports_oscale,
-        bool supports_po_sum, bool supports_po_eltwise) {
+void test_fwd_pd_constructors(
+        const op_desc_t &op_desc, const pd_t &pd, const allows_attr_t &aa) {
     auto test_pd = pd_t();
+    auto eng = pd.get_engine();
     // ctor from C pd, should not throw
     ASSERT_NO_THROW(test_pd = pd_t(pd.get()));
     // ctor w/ empty attr, should not throw
-    test_fwd_pd_attr<pd_t>(test_pd);
-    // ctor w/ attr + output scales, depends on pd support
-    test_fwd_pd_attr_oscale<pd_t>(test_pd, supports_oscale);
-    // ctor w/ attr + post op sum, depends on pd support
-    test_fwd_pd_attr_po_sum<pd_t>(test_pd, supports_po_sum);
-    // ctor w/ attr + post op eltwise, depends on pd support
-    test_fwd_pd_attr_po_eltwise<pd_t>(test_pd, supports_po_eltwise);
+    test_fwd_pd_attr<op_desc_t, pd_t>(op_desc, eng);
+    // following ctors w/ attrs may throw based on pd support
+    test_fwd_pd_attr_oscale<op_desc_t, pd_t>(op_desc, eng, aa.oscale);
+    test_fwd_pd_attr_po_sum<op_desc_t, pd_t>(op_desc, eng, aa.po_sum);
+    test_fwd_pd_attr_po_eltwise<op_desc_t, pd_t>(op_desc, eng, aa.po_eltwise);
+    test_fwd_pd_attr_zp<op_desc_t, pd_t>(op_desc, eng, aa.zp);
+    test_fwd_pd_attr_scales<op_desc_t, pd_t>(op_desc, eng, aa.scales);
     // check allow empty, should not throw
     test_fwd_pd_allow_empty<op_desc_t, pd_t>(test_pd);
 }
 
 // backward: has hint
-template <typename pd_t, typename hint_pd_t>
-void test_bwd_pd_attr(const pd_t &pd, const hint_pd_t &hint) {
+template <typename op_desc_t, typename pd_t, typename hint_pd_t>
+void test_bwd_pd_attr(
+        const op_desc_t &op_desc, const engine &eng, const hint_pd_t &hint) {
     dnnl::primitive_attr attr;
-    pd_t new_pd {};
-    EXPECT_NO_THROW(new_pd = pd_t(pd.op_desc(), attr, pd.get_engine(), hint));
+    EXPECT_NO_THROW(pd_t pd(op_desc, attr, eng, hint));
 }
 
-template <typename pd_t, typename hint_pd_t>
-void test_bwd_pd_attr_oscale(
-        const pd_t &pd, const hint_pd_t &hint, bool supports_oscale) {
+template <typename op_desc_t, typename pd_t, typename hint_pd_t>
+void test_bwd_pd_attr_oscale(const op_desc_t &op_desc, const engine &eng,
+        const hint_pd_t &hint, bool supports_oscale) {
     dnnl::primitive_attr attr_oscale;
-    attr_oscale.set_output_scales(0, {2.});
-    pd_t new_pd {};
+    attr_oscale.set_output_scales(0, {2.f});
     if (supports_oscale)
-        EXPECT_NO_THROW(new_pd
-                = pd_t(pd.op_desc(), attr_oscale, pd.get_engine(), hint));
+        EXPECT_NO_THROW(pd_t pd(op_desc, attr_oscale, eng, hint));
     else
-        EXPECT_ANY_THROW(new_pd
-                = pd_t(pd.op_desc(), attr_oscale, pd.get_engine(), hint));
+        EXPECT_ANY_THROW(pd_t pd(op_desc, attr_oscale, eng, hint));
 }
 
-template <typename pd_t, typename hint_pd_t>
-void test_bwd_pd_attr_po_sum(
-        const pd_t &pd, const hint_pd_t &hint, bool supports_po_sum) {
-    dnnl::primitive_attr attr_po_sum;
+template <typename op_desc_t, typename pd_t, typename hint_pd_t>
+void test_bwd_pd_attr_po_sum(const op_desc_t &op_desc, const engine &eng,
+        const hint_pd_t &hint, bool supports_po_sum) {
     dnnl::post_ops ops_sum;
     ops_sum.append_sum(1.1f);
+    dnnl::primitive_attr attr_po_sum;
     attr_po_sum.set_post_ops(ops_sum);
-    pd_t new_pd {};
     if (supports_po_sum)
-        EXPECT_NO_THROW(new_pd
-                = pd_t(pd.op_desc(), attr_po_sum, pd.get_engine(), hint));
+        EXPECT_NO_THROW(pd_t pd(op_desc, attr_po_sum, eng, hint));
     else
-        EXPECT_ANY_THROW(new_pd
-                = pd_t(pd.op_desc(), attr_po_sum, pd.get_engine(), hint));
+        EXPECT_ANY_THROW(pd_t pd(op_desc, attr_po_sum, eng, hint));
 }
 
-template <typename pd_t, typename hint_pd_t>
-void test_bwd_pd_attr_po_eltwise(
-        const pd_t &pd, const hint_pd_t &hint, bool supports_po_eltwise) {
-    dnnl::primitive_attr attr_po_eltwise;
+template <typename op_desc_t, typename pd_t, typename hint_pd_t>
+void test_bwd_pd_attr_po_eltwise(const op_desc_t &op_desc, const engine &eng,
+        const hint_pd_t &hint, bool supports_po_eltwise) {
     dnnl::post_ops ops_eltwise;
-    ops_eltwise.append_eltwise(1.0f, dnnl::algorithm::eltwise_relu, 0.f, 0.f);
+    ops_eltwise.append_eltwise(1.f, dnnl::algorithm::eltwise_relu, 0.f, 0.f);
+    dnnl::primitive_attr attr_po_eltwise;
     attr_po_eltwise.set_post_ops(ops_eltwise);
-    pd_t new_pd {};
     if (supports_po_eltwise)
-        EXPECT_NO_THROW(new_pd
-                = pd_t(pd.op_desc(), attr_po_eltwise, pd.get_engine(), hint));
+        EXPECT_NO_THROW(pd_t pd(op_desc, attr_po_eltwise, eng, hint));
     else
-        EXPECT_ANY_THROW(new_pd
-                = pd_t(pd.op_desc(), attr_po_eltwise, pd.get_engine(), hint));
+        EXPECT_ANY_THROW(pd_t pd(op_desc, attr_po_eltwise, eng, hint));
+}
+
+template <typename op_desc_t, typename pd_t, typename hint_pd_t>
+void test_bwd_pd_attr_zp(const op_desc_t &op_desc, const engine &eng,
+        const hint_pd_t &hint, bool supports_zero_point) {
+    dnnl::primitive_attr attr_zp;
+    attr_zp.set_zero_points(DNNL_ARG_SRC, 0, {1});
+    if (supports_zero_point)
+        EXPECT_NO_THROW(pd_t pd(op_desc, attr_zp, eng, hint));
+    else
+        EXPECT_ANY_THROW(pd_t pd(op_desc, attr_zp, eng, hint));
+}
+
+template <typename op_desc_t, typename pd_t, typename hint_pd_t>
+void test_bwd_pd_attr_scales(const op_desc_t &op_desc, const engine &eng,
+        const hint_pd_t &hint, bool supports_scales) {
+    dnnl::primitive_attr attr_scales;
+    attr_scales.set_scales(DNNL_ARG_SRC, 0, {2.f});
+    EXPECT_ANY_THROW(pd_t pd(op_desc, attr_scales, eng, hint));
 }
 
 template <typename op_desc_t, typename pd_t, typename hint_pd_t>
@@ -729,20 +782,22 @@ void test_bwd_pd_allow_empty(const pd_t &pd, const hint_pd_t &hint) {
 
 // Note: requires a valid primitive descriptor!
 template <typename op_desc_t, typename pd_t, typename hint_pd_t>
-void test_bwd_pd_constructors(const pd_t &pd, const hint_pd_t &hint,
-        bool supports_oscale, bool supports_po_sum, bool supports_po_eltwise) {
+void test_bwd_pd_constructors(const op_desc_t &op_desc, const pd_t &pd,
+        const hint_pd_t &hint, const allows_attr_t &aa) {
     auto test_pd = pd_t();
     auto hint_pd = hint;
+    auto eng = pd.get_engine();
     // ctor from C pd, should not throw
     ASSERT_NO_THROW(test_pd = pd_t(pd.get()));
     // ctor w/ empty attr, should not throw
-    test_bwd_pd_attr<pd_t>(test_pd, hint_pd);
-    // ctor w/ attr + output scales, depends on pd support
-    test_bwd_pd_attr_oscale<pd_t>(test_pd, hint_pd, supports_oscale);
-    // ctor w/ attr + post op sum, depends on pd support
-    test_bwd_pd_attr_po_sum<pd_t>(test_pd, hint_pd, supports_po_sum);
-    // ctor w/ attr + post op eltwise, depends on pd support
-    test_bwd_pd_attr_po_eltwise<pd_t>(test_pd, hint_pd, supports_po_eltwise);
+    test_bwd_pd_attr<op_desc_t, pd_t>(op_desc, eng, hint_pd);
+    // following ctors w/ attrs may throw based on pd support
+    test_bwd_pd_attr_oscale<op_desc_t, pd_t>(op_desc, eng, hint_pd, aa.oscale);
+    test_bwd_pd_attr_po_sum<op_desc_t, pd_t>(op_desc, eng, hint_pd, aa.po_sum);
+    test_bwd_pd_attr_po_eltwise<op_desc_t, pd_t>(
+            op_desc, eng, hint_pd, aa.po_eltwise);
+    test_bwd_pd_attr_zp<op_desc_t, pd_t>(op_desc, eng, hint_pd, aa.zp);
+    test_bwd_pd_attr_scales<op_desc_t, pd_t>(op_desc, eng, hint_pd, aa.scales);
     // check allow empty, should not throw
     test_bwd_pd_allow_empty<op_desc_t, pd_t>(test_pd, hint_pd);
 }

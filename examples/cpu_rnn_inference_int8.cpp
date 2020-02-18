@@ -42,7 +42,6 @@
 #include <string>
 
 #include "dnnl.hpp"
-
 #include "example_utils.hpp"
 
 #if DNNL_ENABLE_RNN
@@ -204,8 +203,10 @@ void copy_context(
     for (dim_t k = 1; k < n_layers; k++)
         for (dim_t j = 0; j < batch; j++)
             for (dim_t i = 0; i < feature_size; i++)
-                src_iter[(k * batch + j) * (feature_size + feature_size) + i]
-                        = src_iter[j * (feature_size + feature_size) + i];
+                src_iter[(k * batch + j) * (feature_size + feature_size)
+                        + feature_size + i]
+                        = src_iter[j * (feature_size + feature_size)
+                                + feature_size + i];
 }
 
 void simple_net() {
@@ -249,8 +250,8 @@ void simple_net() {
     const dim_t scales_half = lstm_n_gates * feature_size / 2;
     std::fill(
             weights_scales.begin(), weights_scales.begin() + scales_half, 30.f);
-    std::fill(weights_scales.begin() + scales_half + 1, weights_scales.end(),
-            65.5f);
+    std::fill(
+            weights_scales.begin() + scales_half, weights_scales.end(), 65.5f);
     //[quantize]
 
     ///

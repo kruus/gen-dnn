@@ -21,9 +21,10 @@
  * utilities/macros that are also useful to non-jit programs.
  */
 
-#include "dnnl_thread.hpp"      // dnnl_get_max_threads
-#include "dnnl_types.h"
 #include "dnnl_config.h"
+#include "dnnl_types.h"
+
+#include "dnnl_thread.hpp"
 #include "utils.hpp"
 
 #if defined(_WIN32) && !defined(__GNUC__)
@@ -168,6 +169,33 @@ enum cpu_isa_t : unsigned {
     isa_all = ve_bits,           // all types of VE optimizations
 #endif
 };
+#if 0 // dnnl version
+enum cpu_isa_bit_t : unsigned {
+    sse41_bit = 1u << 0,
+    avx_bit = 1u << 1,
+    avx2_bit = 1u << 2,
+    avx512_common_bit = 1u << 3,
+    avx512_mic_bit = 1u << 4,
+    avx512_mic_4ops_bit = 1u << 5,
+    avx512_core_bit = 1u << 6,
+    avx512_core_vnni_bit = 1u << 7,
+    avx512_core_bf16_bit = 1u << 8,
+};
+
+enum cpu_isa_t : unsigned {
+    isa_any = 0u,
+    sse41 = sse41_bit,
+    avx = avx_bit | sse41,
+    avx2 = avx2_bit | avx,
+    avx512_common = avx512_common_bit | avx2,
+    avx512_mic = avx512_mic_bit | avx512_common,
+    avx512_mic_4ops = avx512_mic_4ops_bit | avx512_mic,
+    avx512_core = avx512_core_bit | avx512_common,
+    avx512_core_vnni = avx512_core_vnni_bit | avx512_core,
+    avx512_core_bf16 = avx512_core_bf16_bit | avx512_core_vnni,
+    isa_all = ~0u,
+};
+#endif
 
 template <cpu_isa_t>
 struct cpu_isa_traits {}; /* ::vlen -> 32 (for avx2) */
@@ -299,9 +327,11 @@ struct cpu_isa_traits<ve_all> : public cpu_isa_traits<ve_common> {
     static constexpr int vlen = 256*8; // 2 kByte vector regs (256 cwdouble or 512 packed float)
     static constexpr int n_vregs = 64;
 };
+// END cpu_isa_traits (vector register defaults)
 
 cpu_isa_t DNNL_API get_max_cpu_isa(bool soft = false);
-// END cpu_isa_traits (vector register defaults)
+
+dnnl::impl::status_t DNNL_API set_max_cpu_isa(dnnl_cpu_isa_t isa, bool force); // here? not in include? XXX
 
 namespace {
 
@@ -311,7 +341,8 @@ namespace {
  * two enum types.
  * \return the appropriate cpu_isa enum value for the build target,
  *         or \c unknown.
- * \todo \c from_dnnl sig could use C++ enum as "cpu_isa_t from_dnnl(cpu_isa isa)" */
+ * \todo \c from_dnnl sig could use C++ enum as "cpu_isa_t from_dnnl(cpu_isa isa)"
+ * \todo perhaps remove this function \sa tests/gtests/test_isa_iface.cpp */
 static inline cpu_isa_t from_dnnl(dnnl_cpu_isa_t isa){
     static int const verbose=0;
     using namespace dnnl::impl;
@@ -362,10 +393,10 @@ static Xbyak::util::Cpu cpu;
  * \c get_max_cpu_isa(bool const soft).
  */
 static inline bool mayiuse(const cpu_isa_t cpu_isa, const bool soft = false) {
+    using namespace Xbyak::util;
+
     unsigned cpu_isa_mask = get_max_cpu_isa(soft);
     if ((cpu_isa_mask & cpu_isa) != cpu_isa) return false;
-
-    using namespace Xbyak::util;
 
     switch (cpu_isa) {
         case vanilla: return true;
@@ -525,7 +556,6 @@ inline bool isa_has_bf16(cpu_isa_t isa) {
     : (isa) == avx512_mic         ? (prefix STRINGIFY(avx512_mic)) \
     : (isa) == avx512_mic_4ops    ? (prefix STRINGIFY(avx512_mic_4ops)) \
     : (isa) == avx512_core_bf16   ? (prefix STRINGIFY(avx512_core_bf16)) \
-    : (isa) == avx512_core_bf16   ? (prefix STRINGIFY(avx512_core_bf16)) \
     : prefix suffix_if_any)
 
 #else
@@ -539,5 +569,5 @@ inline bool isa_has_bf16(cpu_isa_t isa) {
 } // namespace impl
 } // namespace dnnl
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
 #endif

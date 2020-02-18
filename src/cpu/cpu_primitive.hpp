@@ -17,77 +17,6 @@
 #ifndef CPU_PRIMITIVE_HPP
 #define CPU_PRIMITIVE_HPP
 
-#if 0 // BIG CHANGES for dnnl v1.1.0
-#include "mkldnn.h"
-
-#include "c_types_map.hpp"
-#include "memory_tracking.hpp"
-#include "primitive.hpp"
-#include "primitive_exec_types.hpp"
-#include "scratchpad.hpp"
-
-#include <type_traits>
-
-#define ARG_TYPE(t) \
-    typename std::remove_cv<typename std::remove_pointer<t>::type>::type
-
-#define CTX_IN_MEM(type, arg) \
-    static_cast<const ARG_TYPE(type) *>(CTX_IN_STORAGE(arg).data_handle())
-
-#define CTX_OUT_MEM(type, arg) \
-    static_cast<ARG_TYPE(type) *>(CTX_OUT_STORAGE(arg).data_handle())
-
-namespace mkldnn {
-namespace impl {
-namespace cpu {
-
-struct cpu_primitive_t: public primitive_t {
-    cpu_primitive_t(const primitive_desc_t *pd,
-            bool use_global_scratchpad = false)
-        : primitive_t(pd)
-        , scratchpad_buffer_(nullptr)
-        , global_scratchpad_(nullptr)
-    {
-        const size_t scratchpad_size =
-            this->pd()->scratchpad_size(scratchpad_mode::library);
-
-        if (scratchpad_size) {
-            if (use_global_scratchpad)
-                global_scratchpad_ = create_scratchpad(scratchpad_size);
-            else
-                scratchpad_buffer_ = malloc(scratchpad_size, 64);
-    }
-    }
-
-    virtual ~cpu_primitive_t() {
-        delete global_scratchpad_;
-        free(scratchpad_buffer_);
-    }
-
-protected:
-    memory_tracking::grantor_t scratchpad(const exec_ctx_t &ctx) const {
-        void *ptr = nullptr;
-        if (pd()->attr()->scratchpad_mode_ == scratchpad_mode::user) {
-            ptr = CTX_OUT_MEM(void *, MKLDNN_ARG_SCRATCHPAD);
-        } else {
-            ptr = global_scratchpad_
-                ? global_scratchpad_->get() : scratchpad_buffer_;
-        }
-
-        return pd()->scratchpad_registry().grantor(ptr);
-    }
-
-private:
-    void *scratchpad_buffer_;
-    scratchpad_t *global_scratchpad_;
-};
-
-}
-}
-}
-
-#else // dnnl v1.1.0
-
 #include <assert.h>
 
 #include "dnnl_types.h"
@@ -145,7 +74,5 @@ private:
         zero_point = *zero_points_ptr; \
     } \
     MAYBE_UNUSED(zero_point);
-#endif // dnnl v1.1+ version
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif // CPU_PRIMITIVE_HPP

@@ -17,6 +17,23 @@
 #include "gtest/gtest.h"
 
 #include "dnnl.hpp"
+#if 0 // original, for reference...
+#include "src/cpu/cpu_isa_traits.hpp"
+
+namespace dnnl {
+
+class isa_set_once_test : public ::testing::Test {};
+TEST(isa_set_once_test, TestISASetOnce) {
+    auto st = set_max_cpu_isa(cpu_isa::sse41);
+    ASSERT_TRUE(st == status::success || st == status::unimplemented);
+    ASSERT_TRUE(impl::cpu::mayiuse(impl::cpu::sse41));
+    st = set_max_cpu_isa(cpu_isa::sse41);
+    ASSERT_TRUE(st == status::invalid_arguments || st == status::unimplemented);
+};
+
+} // namespace dnnl
+#endif
+
 #include "dnnl_debug.h"
 #include "src/cpu/cpu_isa_traits.hpp"
 

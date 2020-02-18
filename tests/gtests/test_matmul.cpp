@@ -92,6 +92,7 @@ protected:
     virtual void SetUp() {
         matmul_test_params p
                 = ::testing::TestWithParam<decltype(p)>::GetParam();
+
         SKIP_IF(p.base.src.dt == memory::data_type::f16
                         && get_test_engine_kind() == engine::kind::cpu,
                 "CPU does not support f16 data type.");
@@ -282,6 +283,18 @@ protected:
         memory weights_m(init_md(p.base.weights, true), eng);
         memory dst_m(init_md(p.base.dst, true), eng);
 
+        // Initialize memory to make sanitizers happy
+        auto set_to_zero = [](memory &m) {
+            if (m) {
+                auto p = map_memory<char>(m);
+                memset(p, 0, m.get_desc().get_size());
+            }
+        };
+        set_to_zero(src_m);
+        set_to_zero(weights_m);
+        set_to_zero(dst_m);
+        set_to_zero(bia_m);
+
         matmul_p.execute(strm,
                 {
                         {DNNL_ARG_SRC, src_m},
@@ -427,7 +440,6 @@ INSTANTIATE_TEST_SUITE_P(Generic_f32, iface, cases_f(data_type::f32));
 
 //INSTANTIATE_TEST_SUITE_P(Generic_bf16, iface, cases_f(data_type::bf16));
 // "could not create a primitive descriptor iterator" thrown in SetUp()
-
 
 static auto cases_x8 = [](memory::data_type src_dt, memory::data_type dst_dt) {
     std::vector<matmul_test_params> cases;

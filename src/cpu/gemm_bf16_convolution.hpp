@@ -64,9 +64,7 @@ struct gemm_bf16_convolution_fwd_t : public primitive_impl_t {
                     && post_ops_ok()
                     && memory_desc_matches_tag(*src_md(), dat_tag())
                     && memory_desc_matches_tag(*dst_md(), dat_tag())
-                    && memory_desc_matches_tag(*weights_md(), wei_tag())
-                    ;
-
+                    && memory_desc_matches_tag(*weights_md(), wei_tag());
             if (!ok) return status::unimplemented;
 
             auto scratchpad = scratchpad_registry().registrar();
@@ -104,18 +102,20 @@ struct gemm_bf16_convolution_fwd_t : public primitive_impl_t {
         /** \todo gemm_bf16_convolution needs a ref postops impl. */
         bool post_ops_ok() const {
             auto const &po = attr()->post_ops_;
+#if TARGET_X86_JIT
             auto is_eltwise
                     = [&](int idx) { return po.entry_[idx].is_eltwise(); };
             auto is_sum = [&](int idx) { return po.entry_[idx].is_sum(); };
 
             switch (po.len_) {
                 case 0: return true; // no post_ops
-#if TARGET_X86_JIT // TODO ref impl for postops
                 case 1: return is_eltwise(0) || is_sum(0); // sum OR eltwise
                 case 2: return is_sum(0) && is_eltwise(1); // sum -> eltwise
-#endif // TARGET_X86_JIT
                 default: return false;
             }
+#else
+            if (po.len_ == 0) return true; // XXX need ref postops here!
+#endif // TARGET_X86_JIT
             return false;
         }
     };
@@ -223,7 +223,7 @@ private:
         size_t vlen_;
         cpu_isa_t isa_;
         bf16_emulation_t *bf16_emu_; /* note: defined in  jit_avx512_core_bf16cvt.hpp */
-        jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
+        jit_uni_eltwise_injector_f32<avx512_core> *eltwise_injector_;
 
         void generate();
         int vreg_dst_idx(int iter) {

@@ -13,8 +13,6 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include "cpu_isa_traits.hpp"
-#if TARGET_X86_JIT
 
 #include <assert.h>
 
@@ -1083,18 +1081,19 @@ void jit_avx512_common_convolution_winograd_bwd_weights_t::
     array_offset_calculator<float, 2> diff_bias_prv(
             scratchpad.get<float>(key_conv_bia_reduction), nthreads, jcp.oc);
 
-    PRAGMA_OMP(parallel num_threads(nthreads)) {
+    PRAGMA_OMP(parallel num_threads(nthreads))
+    {
         if (jcp.with_bias) {
             parallel_nd_in_omp(nthreads, jcp.oc, [&](int ithr, int ofm) {
                 diff_bias_prv(ithr, ofm) = 0.0f;
             });
 
-PRAGMA_OMP(for nowait)
-for (int bofm = 0; bofm < jcp.oc / simd_w; bofm++) {
-    PRAGMA_OMP_SIMD()
-    for (int v = 0; v < simd_w; v++)
-        diff_bias(bofm, v) = 0.0f;
-}
+            PRAGMA_OMP(for nowait)
+            for (int bofm = 0; bofm < jcp.oc / simd_w; bofm++) {
+                PRAGMA_OMP_SIMD()
+                for (int v = 0; v < simd_w; v++)
+                    diff_bias(bofm, v) = 0.0f;
+            }
         }
 
         const int ithread = dnnl_get_thread_num();
@@ -1156,18 +1155,18 @@ for (int bofm = 0; bofm < jcp.oc / simd_w; bofm++) {
                 });
 
         if (jcp.with_bias) {
-PRAGMA_OMP(for)
-for (int ofm1 = 0; ofm1 < jcp.oc / simd_w; ofm1++) {
-    for (int ithr = 0; ithr < nthreads; ithr++) {
-        float *base_bias_ptr = &(diff_bias(ofm1, 0));
-        float *base_bias_prv_ptr
-                = &(diff_bias_prv(ithr * jcp.oc + ofm1 * simd_w));
-        PRAGMA_OMP_SIMD()
-        for (int ofm2 = 0; ofm2 < simd_w; ofm2++) {
-            base_bias_ptr[ofm2] += base_bias_prv_ptr[ofm2];
-        }
-    }
-}
+            PRAGMA_OMP(for)
+            for (int ofm1 = 0; ofm1 < jcp.oc / simd_w; ofm1++) {
+                for (int ithr = 0; ithr < nthreads; ithr++) {
+                    float *base_bias_ptr = &(diff_bias(ofm1, 0));
+                    float *base_bias_prv_ptr
+                            = &(diff_bias_prv(ithr * jcp.oc + ofm1 * simd_w));
+                    PRAGMA_OMP_SIMD()
+                    for (int ofm2 = 0; ofm2 < simd_w; ofm2++) {
+                        base_bias_ptr[ofm2] += base_bias_prv_ptr[ofm2];
+                    }
+                }
+            }
         }
     }
 
@@ -1177,6 +1176,4 @@ for (int ofm1 = 0; ofm1 < jcp.oc / simd_w; ofm1++) {
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // TARGET_X86_JIT
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

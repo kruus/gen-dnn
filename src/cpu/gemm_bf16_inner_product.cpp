@@ -34,9 +34,9 @@ using namespace dnnl::impl::data_type;
 using namespace dnnl::impl::format_tag;
 using namespace dnnl::impl::primitive_kind;
 using namespace memory_tracking::names;
-#if TARGET_X86_JIT
-//using namespace dnnl::impl::cpu::bf16_support; 
-#endif // TARGET_X86_JIT
+#if TARGET_X86_JIT // only available via src/cpu/jit_avx512_core_bf16cvt.hpp
+using namespace dnnl::impl::cpu::bf16_support; 
+#endif
 
 template <data_type_t dst_data_type>
 void gemm_bf16_inner_product_fwd_t<dst_data_type>::execute_forward(

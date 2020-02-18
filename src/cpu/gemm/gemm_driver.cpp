@@ -1,18 +1,18 @@
 /*******************************************************************************
-* Copyright 2018-2019 Intel Corporation
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*******************************************************************************/
+ * Copyright 2018-2019 Intel Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *******************************************************************************/
 
 #include <cstdint>
 #if TARGET_VE || defined(_MSC_VER)
@@ -21,10 +21,10 @@
 
 #include "gemm_driver.hpp"
 
+#include "common/bfloat16.hpp"
 #include "dnnl_traits.hpp"
 #include "dnnl_types.h"
 #include "f32/gemm_utils_f32.hpp"
-#include "common/bfloat16.hpp"
 #if MKLDNN_CPU_GEMM_JIT
 //#warning "gemm WITH jit..."
 #include "f32/jit_avx512_common_gemm_f32.hpp"
@@ -32,15 +32,13 @@
 #include "jit_generator.hpp"
 #include "s8x8s32/jit_avx512_core_gemv_s8x8s32.hpp"
 #endif // MKLDNN_CPU_GEMM_JIT
+#include "dnnl_os.h" // alignas macro (if required)
 #include "gemm_info.hpp"
 #include "gemm_partition.hpp"
 #include "gemm_threading.hpp"
 #include "gemv_driver.hpp"
-//? #include "mkldnn_traits.hpp"
-//? #include "mkldnn_types.h"
 #include "nstl.hpp"
 #include "utils.hpp"
-#include "dnnl_os.h"    // alignas macro (if required)
 
 namespace dnnl {
 namespace impl {
@@ -529,6 +527,7 @@ void gemm_kernel(const dim_t m, const dim_t n, const dim_t k, const float alpha,
      */
     arg->kernel[isBeta0][col_req][row_req](
             &m, &n, &k, &alpha, a, b, c, ldc, col_offset, row_offset);
+    msan_unpoison_matrix(c, m, n, ldc, sizeof(*c));
 
     // sgemm kernels don't support bias yet.
     if (data_traits<a_type>::data_type == data_type::f32) {
@@ -728,8 +727,6 @@ static dnnl_status_t gemm_kernel_driver(int ithr, dim_t m, dim_t n, dim_t k,
                                 bufferB, 0.0f, bufferC + Um, ldc_buf,
                                 a_row_sum_eff, b_col_sum, (c_type *)NULL,
                                 offset_type::none, arg);
-                        msan_unpoison_matrix(bufferC + Um, sizeUM, sizeN,
-                                ldc_buf, sizeof(c_type));
 
                         /* Finish the block adding the necessary alpha, beta
                          * and offsets.
@@ -902,6 +899,7 @@ static inline bool nocopy_checker_avx512(int nthr, const int transa,
         const dim_t lda, const dim_t ldb, const dim_t ldc) {
     // Constants definition
     static const dim_t BAD_LD_MULT = 256;
+    static const dim_t VERYBAD_LD_MULT = 1024;
     static const dim_t M_TRANSB_PER_THR = 28;
     static const dim_t N_TRANSB_PER_THR = 28;
     static const dim_t K_TRANSB_PER_THR = 1;
@@ -909,20 +907,41 @@ static inline bool nocopy_checker_avx512(int nthr, const int transa,
     static const dim_t K_NOTRANSB_PER_THR = 1;
     static const double FORCE_NOCOPY_THRESH = 0.00196;
 
-    // Crude threshold to nocopy kernels if copy overhead is significant.
-    if (1.0 / m + 1.0 / n >= FORCE_NOCOPY_THRESH) { return true; }
+    bool is_NT_case = transa == no_trans && transb == do_trans;
+    bool is_TN_case = transa == do_trans && transb == no_trans;
 
-    // Do not use no copy kernels on "bad" leading dimensions, which are
-    // multiples of 256 if M or N is too small, then skip this leading
-    // dimension check (no-copy is still helpful there).
-    // For LSTM use cases, seems that for N=16 no-copy is still beneficial
-    // with bad leading dimension when K is not too large and A non
-    // transpose and M != 4096
-    if (m >= 32
-            && (n > 16 || (n == 16 && (k >= 6400 || transa == 0 || m == 4096)))
-            && (lda % BAD_LD_MULT == 0 || ldb % BAD_LD_MULT == 0
-                    || ldc % BAD_LD_MULT == 0))
+    bool is_lda_bad = lda % BAD_LD_MULT == 0;
+    bool is_ldb_bad = ldb % BAD_LD_MULT == 0;
+    bool is_ldc_bad = ldc % BAD_LD_MULT == 0;
+    bool is_ld_bad = is_lda_bad || is_ldb_bad || is_ldc_bad;
+
+    bool is_lda_verybad = lda % VERYBAD_LD_MULT == 0;
+
+    // Crude threshold to nocopy kernels if copy overhead is significant
+    // and nthr greater than 1.
+    if (nthr > 1 && 1.0 / m + 1.0 / n >= FORCE_NOCOPY_THRESH
+            && !(is_lda_verybad && is_NT_case)) {
+        return true;
+    }
+
+    // Copy-based performs better for TN case with small N in sequential case.
+    if (nthr == 1 && is_TN_case && m > 100 && m < 1200 && n < 200 && k < 1200)
         return false;
+
+    // Copy strategy usually performs better than nocopy on "bad" leading
+    // dimensions.
+    if (is_ld_bad) {
+        bool use_copy_based = false;
+
+        if (m >= 32 && n > 16) use_copy_based = true;
+
+        // Nocopy outperforms copy-based in certain conditions.
+        if (m >= 32 && n == 16
+                && (k >= 6400 || transa == do_trans || m == 4096))
+            use_copy_based = true;
+
+        if (use_copy_based) return false;
+    }
 
     if (m <= 378 && n <= 378 && k >= nthr * 378) return false;
 
@@ -1765,7 +1784,7 @@ static dnnl_status_t gemm_threading_driver(
                         }
                         thread_arg[ithr].result = dnnl_success;
 #else
-                        thread_arg[ithr].result = dnnl_invalid_arguments;
+            thread_arg[ithr].result = dnnl_invalid_arguments;
 #endif
                         break;
                 }
@@ -1900,4 +1919,5 @@ template // Instantiate sgemm
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
+
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

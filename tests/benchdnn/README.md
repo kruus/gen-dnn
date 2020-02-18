@@ -7,6 +7,7 @@ The purpose of the benchmark is extended and robust correctness verification of
 the primitives provided by DNNL.
 **benchdnn** itself is a harness for different primitive-specific drivers.
 So far it supports and uses the following drivers:
+* [binary](doc/driver_binary.md)
 * [batch normalization](doc/driver_bnorm.md)
 * [concatenation](doc/driver_concat.md)
 * [convolution](doc/driver_conv.md)
@@ -34,15 +35,16 @@ So far it supports and uses the following drivers:
                [--max-ms-per-prb=INT] [--fix-times-per-prb=INT] \
                [-vINT|--verbose=INT] [--fast-ref-gpu=BOOL] \
                [--skip-impl=SKIP_IMPL] [--allow-unimpl=BOOL] \
+               [--canonical=BOOL] \
                [--perf-template=PERF_TEMPLATE] [DRIVER-OPTS] \
                PROBLEM-DESCRIPTION [--batch=FILE]
 ```
 
 where:
 
- - `--DRIVER` -- is either `bnorm`, `concat`, `conv` [default], `deconv`,
-            `eltwise`, `ip`, `lrn`, `pool`, `reorder`, `rnn`, `shuffle`,
-            `softmax`, or `sum`.
+ - `--DRIVER` -- is either `binary`, `bnorm`, `concat`, `conv` [default],
+            `deconv`, `eltwise`, `ip`, `lrn`, `pool`, `reorder`, `rnn`,
+            `shuffle`, `softmax`, or `sum`.
  - `--engine=ENGINE_KIND` -- specifies the engine kind to use for the benchmark.
             Can be `cpu` [default] or `gpu`.
  - `--mode=MODE` -- string that contains flags for benchmark mode.
@@ -61,6 +63,8 @@ where:
             (see dnnl_query_impl_info_str), default `""`.
  - `--allow-unimpl=true|false` -- do not treat unimplemented configuration
             as an error. Default is `false`.
+ - `--canonical=true|false` -- If `true`, print all problem and descriptor
+            settings with default values. Default is `false`.
  - `--perf-template={def [default], csv, CUSTOM_TEMPLATE}` -- A template to
             provide the output for a performance run. Refer to
             [performance report](doc/knobs_perf_report.md) for details.
@@ -87,6 +91,7 @@ Returns `0` on success (all tests passed) or non-zero in case of any error.
 | od, oh, ow    | Output depth, height and width
 | kd, kh, kw    | Kernel (filter, weights) depth, height and width
 | sd, sh, sw    | Convolution stride over depth, height and width
+| dd, dh, dw    | Convolution dilation by depth, height and width
 | pd, ph, pw    | Convolution front, top and left padding
 | mb            | Minibatch (amount of images processed at once)
 | g             | Groups (a way to reduce the amount of computations, see Alexnet topology)

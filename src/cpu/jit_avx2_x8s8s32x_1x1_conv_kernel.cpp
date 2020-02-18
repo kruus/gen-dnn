@@ -13,8 +13,6 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include "cpu_isa_traits.hpp"
-#if TARGET_X86_JIT
 
 #include <assert.h>
 
@@ -198,11 +196,10 @@ void jit_avx2_x8s8s32x_1x1_conv_kernel::reduce_loop(
                 const auto ptr_scales_offset = jcp.is_oc_scale
                         * (sizeof(float) * jcp.oc_block * i_load);
                 if (mask_flag) {
+                    vpxor(ymm_zero, ymm_zero, ymm_zero);
                     cvt2ps(data_type::f32, ymm_zero, reg_ptr_scales,
                             ptr_scales_offset, get_tail_size());
                     vmulps(r, r, ymm_zero);
-                    vpxor(ymm_zero, ymm_zero, ymm_zero);
-                    vblendps(r, ymm_zero, r, ((1 << get_tail_size()) - 1));
                 } else
                     vmulps(r, r, ptr[reg_ptr_scales + ptr_scales_offset]);
             }
@@ -730,6 +727,3 @@ void jit_avx2_x8s8s32x_1x1_conv_kernel::init_scratchpad(
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-
-#endif // TARGET_X86_JIT
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

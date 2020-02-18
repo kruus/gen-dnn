@@ -199,6 +199,7 @@ typedef enum {
     dnnl_cdba, ///< permuted 4D tensor
     dnnl_cdeba, ///< permuted 5D tensor
     dnnl_decab, ///< permuted 5D tensor
+    dnnl_defcab, ///< permuted 6D tensor
 
     // Opaque blocked formats
 
@@ -309,18 +310,22 @@ typedef enum {
     dnnl_aCBdef8b16c2b,
     dnnl_aBCdef8c8b,
     dnnl_aBdc16b,
+    dnnl_aBdC16b2c,
     dnnl_aBdc4b,
     dnnl_aBdc8b,
     dnnl_aBdec16b,
+    dnnl_aBdeC16b2c,
     dnnl_aBdec32b,
     dnnl_aBdec4b,
     dnnl_aBdec8b,
     dnnl_aBdefc16b,
+    dnnl_aBdefC16b2c,
     dnnl_aCBdef16c16b,
     dnnl_aBdefc4b,
     dnnl_aBdefc8b,
     dnnl_Abcdef16a,
     dnnl_Acb16a,
+    dnnl_AcB16a2b,
     dnnl_Acb4a,
     dnnl_Acb8a,
     dnnl_aCBd16b16c,
@@ -328,10 +333,12 @@ typedef enum {
     dnnl_aCBde16b16c,
     dnnl_aCBde16c16b,
     dnnl_Acdb16a,
+    dnnl_AcdB16a2b,
     dnnl_Acdb32a,
     dnnl_Acdb4a,
     dnnl_Acdb8a,
     dnnl_Acdeb16a,
+    dnnl_AcdeB16a2b,
     dnnl_Acdeb4a,
     dnnl_Acdeb8a,
     dnnl_BAc16a16b,
@@ -413,6 +420,8 @@ typedef enum {
     dnnl_goidhw = dnnl_abcdef,
     /// 6D CNN weights tensor (incl. groups), an alias to #dnnl_acbdef
     dnnl_giodhw = dnnl_acbdef,
+    /// 6D CNN weights tensor (incl. groups), an alias to #dnnl_defcab
+    dnnl_dhwigo = dnnl_defcab,
 
     /// 3D RNN data tensor in the format (seq_length, batch, input channels).
     dnnl_tnc = dnnl_abc,
@@ -496,6 +505,7 @@ typedef enum {
     dnnl_IOw8o16i2o = dnnl_BAc8a16b2a,
     dnnl_OIw8o8i = dnnl_ABc8a8b,
     dnnl_Owi16o = dnnl_Acb16a,
+    dnnl_OwI16o2i = dnnl_AcB16a2b,
     dnnl_Owi4o = dnnl_Acb4a,
     dnnl_Owi8o = dnnl_Acb8a,
 
@@ -503,6 +513,7 @@ typedef enum {
     dnnl_IOhw16i16o = dnnl_BAcd16b16a,
     dnnl_IOhw16o16i = dnnl_BAcd16a16b,
     dnnl_Ohwi16o = dnnl_Acdb16a,
+    dnnl_OhwI16o2i = dnnl_AcdB16a2b,
     dnnl_Ohwi32o = dnnl_Acdb32a,
     dnnl_Ohwi4o = dnnl_Acdb4a,
     dnnl_Ohwi8o = dnnl_Acdb8a,
@@ -522,6 +533,7 @@ typedef enum {
 
     // weights, 5D
     dnnl_Odhwi16o = dnnl_Acdeb16a,
+    dnnl_OdhwI16o2i = dnnl_AcdeB16a2b,
     dnnl_Odhwi4o = dnnl_Acdeb4a,
     dnnl_Odhwi8o = dnnl_Acdeb8a,
     dnnl_OIdhw16i16o = dnnl_ABcde16b16a,
@@ -558,6 +570,7 @@ typedef enum {
     dnnl_gIOw8o16i2o = dnnl_aCBd8b16c2b,
     dnnl_gOIw8o8i = dnnl_aBCd8b8c,
     dnnl_gOwi16o = dnnl_aBdc16b,
+    dnnl_gOwI16o2i = dnnl_aBdC16b2c,
     dnnl_gOwi4o = dnnl_aBdc4b,
     dnnl_gOwi8o = dnnl_aBdc8b,
 
@@ -565,6 +578,7 @@ typedef enum {
     dnnl_gIOhw16i16o = dnnl_aCBde16c16b,
     dnnl_gIOhw16o16i = dnnl_aCBde16b16c,
     dnnl_gOhwi16o = dnnl_aBdec16b,
+    dnnl_gOhwI16o2i = dnnl_aBdeC16b2c,
     dnnl_gOhwi32o = dnnl_aBdec32b,
     dnnl_gOhwi4o = dnnl_aBdec4b,
     dnnl_gOhwi8o = dnnl_aBdec8b,
@@ -592,6 +606,7 @@ typedef enum {
     // weights w/ groups, 6D
     dnnl_gIOdhw16i16o = dnnl_aCBdef16c16b,
     dnnl_gOdhwi16o = dnnl_aBdefc16b,
+    dnnl_gOdhwI16o2i = dnnl_aBdefC16b2c,
     dnnl_gOdhwi4o = dnnl_aBdefc4b,
     dnnl_gOdhwi8o = dnnl_aBdefc8b,
     dnnl_gOIdhw16i16o = dnnl_aBCdef16c16b,
@@ -705,7 +720,7 @@ typedef enum {
     dnnl_eltwise_relu = 0x1f,
     /// Eltwise: hyperbolic tangent non-linearity (tanh)
     dnnl_eltwise_tanh = 0x2f,
-    /// Eltwise: parametric exponential linear unit (elu)
+    /// Eltwise: exponential linear unit (elu)
     dnnl_eltwise_elu = 0x3f,
     /// Eltwise: square
     dnnl_eltwise_square = 0x4f,
@@ -734,6 +749,20 @@ typedef enum {
     dnnl_eltwise_log = 0xef,
     /// Eltwise: clip
     dnnl_eltwise_clip = 0xff,
+    /// Eltwise: pow
+    dnnl_eltwise_pow = 0x20,
+    /// Eltwise: ReLU (dst for backward)
+    dnnl_eltwise_relu_use_dst_for_bwd = 0x100,
+    /// Eltwise: hyperbolic tangent non-linearity (tanh) (dst for backward)
+    dnnl_eltwise_tanh_use_dst_for_bwd = 0x101,
+    /// Eltwise: exponential linear unit (elu) (dst for backward)
+    dnnl_eltwise_elu_use_dst_for_bwd = 0x102,
+    /// Eltwise: square root (dst for backward)
+    dnnl_eltwise_sqrt_use_dst_for_bwd = 0x103,
+    /// Eltwise: logistic (dst for backward)
+    dnnl_eltwise_logistic_use_dst_for_bwd = 0x104,
+    /// Eltwise: exp (dst for backward)
+    dnnl_eltwise_exp_use_dst_for_bwd = 0x105,
     /// Max pooling
     dnnl_pooling_max = 0x1ff,
     /// Average pooling include padding
@@ -764,6 +793,10 @@ typedef enum {
     dnnl_binary_add = 0x1fff0,
     /// Binary mul
     dnnl_binary_mul = 0x1fff1,
+    /// Binary max
+    dnnl_binary_max = 0x1fff2,
+    /// Binary min
+    dnnl_binary_min = 0x1fff3,
     /// Nearest Neighbor Resampling Method
     dnnl_resampling_nearest = 0x2fff0,
     /// Linear Resampling Method
@@ -954,6 +987,8 @@ typedef struct {
     /// For future backwards compatibility
     char reserved[64];
 } dnnl_memory_extra_desc_t;
+
+// XXX CHECKME used?
 #define DNNL_ZERO_MEMORY_EXTRA_DESC_T {0,0,0.f,'\0'}
 
 /// Memory descriptor. The description is based on a number of dimensions,
@@ -995,10 +1030,6 @@ typedef struct {
 
     /// Memory format kind.
     dnnl_format_kind_t format_kind;
-
-    /// moved from last position to here, (VE debug)
-    dnnl_memory_extra_desc_t extra;
-
     union {
         /// Description of the data layout for memory formats that use
         /// blocking.
@@ -1010,7 +1041,10 @@ typedef struct {
         // ... other descriptions possible
     } format_desc;
 
+    dnnl_memory_extra_desc_t extra;
 } dnnl_memory_desc_t;
+
+// XXX CHECKME used?
 #define DNNL_ZERO_MEMORY_DESC_T { 0/*ndims*/, {0}/*dims*/, \
     dnnl_data_type_undef/*data_type*/, {0}/*padded_dims*/, \
     {0}/*padded_offsets*/, 0/*offset0*/, \
@@ -1139,7 +1173,13 @@ typedef struct {
     /// #dnnl_eltwise_abs, #dnnl_eltwise_sqrt, #dnnl_eltwise_linear,
     /// #dnnl_eltwise_bounded_relu, #dnnl_eltwise_soft_relu,
     /// #dnnl_eltwise_logistic, #dnnl_eltwise_exp, #dnnl_eltwise_gelu,
-    /// #dnnl_eltwise_swish, #dnnl_eltwise_log, #dnnl_eltwise_clip.
+    /// #dnnl_eltwise_swish, #dnnl_eltwise_log, #dnnl_eltwise_clip,
+    /// #dnnl_eltwise_pow.
+    /// Possible values for passing destination memory on backward:
+    /// #dnnl_eltwise_relu_use_dst_for_bwd, #dnnl_eltwise_tanh_use_dst_for_bwd,
+    /// #dnnl_eltwise_elu_use_dst_for_bwd, #dnnl_eltwise_sqrt_use_dst_for_bwd,
+    /// #dnnl_eltwise_logistic_use_dst_for_bwd,
+    /// #dnnl_eltwise_exp_use_dst_for_bwd.
     dnnl_alg_kind_t alg_kind;
     /// Source and destination memory descriptor.
     dnnl_memory_desc_t data_desc;
@@ -1162,6 +1202,7 @@ typedef struct {
     ///  - #dnnl_eltwise_swish: @p alpha -- sigmoid arg scaling, @p beta ignored
     ///  - #dnnl_eltwise_log: @p alpha and @p beta ignored
     ///  - #dnnl_eltwise_clip: @p alpha -- lower bound, @p beta -- upper bound
+    ///  - #dnnl_eltwise_pow: @p alpha -- scale, @p beta -- exponent
     float alpha, beta;
 } dnnl_eltwise_desc_t;
 
@@ -1473,7 +1514,8 @@ typedef struct {
     /// descriptor. Must be #dnnl_binary.
     dnnl_primitive_kind_t primitive_kind;
     /// The kind of the binary algorithm. Possible values:
-    /// #dnnl_binary_add and #dnnl_binary_mul.
+    /// #dnnl_binary_add, #dnnl_binary_mul, #dnnl_binary_max and
+    /// #dnnl_binary_min.
     dnnl_alg_kind_t alg_kind;
     /// Source memory descriptors.
     dnnl_memory_desc_t src_desc[2];
@@ -1976,67 +2018,8 @@ typedef const struct dnnl_stream *const_dnnl_stream_t;
 /// TBB runtime (CPU only)
 #define DNNL_RUNTIME_TBB 4u
 
-/// \todo cblas runtime will avoiding x86 jit gemm. replace old USE_CBLAS flag
-//#define DNNL_USE_CBLAS
-
-/// \todo use mkl gemm routines, replace old USE_MKL flag, implies DNNL_USE_CBLAS
-//#define DNNL_USE_MKL_GEMM
-
-/// \todo for DNNL_CPU_VE, DNNL_CPU_RUNTIME can allow libvednn calls (or jit?)
-//#define DNNL_LIBVEDNN
-
 /// OpenCL runtime
 #define DNNL_RUNTIME_OCL 256u
-
-/// XXX should we use some system cblas (old way used USE_CBLAS)
-
-#if 0 // these configuration constants are set from dnnl_config.h.in now
-/// @defgroup target_cpu target cpu flags for DNNL_CPU
-/// DNNL_CPU of \ref dnnl_config.h is determined from CMAKE_SYSTEM_PROCESSOR)
-/// These option values must agree with cmake/options.cmake.
-//@{
-#define DNNL_CPU_X86 1
-#define DNNL_CPU_VE  2
-//@}
-/// @defgroup target_isa describe flavors of the cpu build, coming from cmake
-//@{
-///@{ all cpus support a few common settings.
-#define DNNL_ISA_VANILLA 1
-#define DNNL_ISA_ANY 2  // least capable, maybe even same as vanilla
-#define DNNL_ISA_ALL 3  // pull out all the stops, all options allowed
-///@}
-///@{ x86 isa settings govern jit instruction set support
-#define DNNL_ISA_SSE41              10
-#define DNNL_ISA_AVX                11
-#define DNNL_ISA_AVX2               12
-#define DNNL_ISA_AVX512_MIC         13
-#define DNNL_ISA_AVX512_MIC_4OPS    14
-#define DNNL_ISA_AVX512_CORE        15
-#define DNNL_ISA_AVX512_CORE_VNNI   16
-#define DNNL_ISA_AVX512_CORE_BF16   17
-///@}
-///@{ ve isa settings govern jit instruction set support
-/// libvednn C api
-#define DNNL_ISA_VEDNN              20
-/// libvednn + jit allowed (requires gcc+clang development environment to run)
-#define DNNL_ISA_VEJIT              21
-///@}
-///@}
-#endif
-
-#if 0
-/// @defgroup target_cpu_jit target cpu jit capability
-/// These additionally qualify \ref target_cpu bits
-/// DNNL_CPU of \ref dnnl_config.h is determined from CMAKE_SYSTEM_PROCESSOR)
-//@{
-/** no builtin jit capability (xbyak disabled for DNNL_CPU_X86) */
-#define DNNL_JIT_NONE 0x0100u
-/** jit capability possible, whatever DNNL_CPU_foo */
-#define DNNL_JIT_ANY  0x0200u
-/** all jit possibilities left open (including jit via external libraries) */
-#define DNNL_JIT_ALL  0x0400u
-///@}
-#endif
 
 /// Structure containing version information as per [Semantic
 /// Versioning](https://semver.org)
@@ -2048,7 +2031,7 @@ typedef struct {
     unsigned cpu_runtime; ///< CPU runtime
     unsigned gpu_runtime; ///< GPU runtime
     unsigned cpu; ///< XXX CPU DNNL_CPU_{X86|VE}
-    unsigned jit; ///< XXX jit flags DNNL_JIT_{NONE|ANY|ALL} etc.
+    unsigned jit; ///< XXX change to cpu_isa NONE|ANY|ALL|... ??
 } dnnl_version_t;
 
 /// Disable profiling completely
@@ -2105,7 +2088,8 @@ typedef enum {
     /// and never any x86 JIT.
     dnnl_cpu_isa_vanilla = 0x1, // new, can use for any build cpu
 
-    /// "any" For Intel(R) x86 jit, no vector extensions.
+    // XXX remove cpu_isa_any, make it equivalent to vanilla ??
+    /// "any" For x86, Intel(R) x86 jit, no vector extensions (none so far
     /// For non-x86 maps to "standard basic options" for the DNNL_CPU target
     dnnl_cpu_isa_any = 0x3, // x86 jit, but no vector op extensions [new, maybe not so useful?]
 
@@ -2155,6 +2139,43 @@ typedef enum {
     /// Also requires a VE development tools (ncc, clang)
     dnnl_cpu_isa_vejit = 0x30001,
 
+#if 0 // dnnl version, for reference
+/// CPU instruction set flags
+typedef enum {
+    /// Any ISA (no restrictions)
+    dnnl_cpu_isa_all = 0x0,
+
+    /// Intel(R) SSE4.1.
+    dnnl_cpu_isa_sse41 = 0x1,
+
+    /// Intel(R) Advanced Vector Extensions.
+    dnnl_cpu_isa_avx = 0x3,
+
+    /// Intel(R) Advanced Vector Extensions 2.
+    dnnl_cpu_isa_avx2 = 0x7,
+
+    /// Intel(R) Advanced Vector Extensions 512 subset for Intel(R) Xeon
+    /// Phi(TM) Processors x200 Series.
+    dnnl_cpu_isa_avx512_mic = 0xf,
+
+    /// Intel(R) Advanced Vector Extensions 512 subset for Intel(R) Xeon
+    /// Phi(TM) Processors 7235, 7285, 7295 Series.
+    dnnl_cpu_isa_avx512_mic_4ops = 0x1f,
+
+    /// Intel(R) Advanced Vector Extensions 512 for Intel(R) Xeon(R) Processor
+    /// Scalable Family and Intel(R) Core(TM) processor family.
+    dnnl_cpu_isa_avx512_core = 0x27,
+
+    /// Intel(R) Advanced Vector Extensions 512 with Intel(R) DL Boost Support
+    /// for Intel(R) Xeon(R) Processor Scalable Family and Intel(R) Core(TM)
+    /// processor family.
+    dnnl_cpu_isa_avx512_core_vnni = 0x67,
+
+    /// Intel(R) Advanced Vector Extensions 512 with Intel(R) DL Boost and
+    /// Bfloat16 Support for Intel(R) Xeon(R) Processor Scalable Family and
+    /// Intel(R) Core(TM) processor family.
+    dnnl_cpu_isa_avx512_core_bf16 = 0xe7,
+#endif
 } dnnl_cpu_isa_t;
 
 /// @} dnnl_api_service
@@ -2165,5 +2186,5 @@ typedef enum {
 }
 #endif
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s syntax=cpp.doxygen
 #endif

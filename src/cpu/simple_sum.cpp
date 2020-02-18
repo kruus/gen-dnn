@@ -16,9 +16,7 @@
 
 #include "cpu_isa_traits.hpp"
 #include "simple_sum.hpp"
-#if DNNL_ENABLE_BFLOAT16
 #include "bfloat16.hpp"
-#endif // DNNL_ENABLE_BFLOAT16
 #include "dnnl_thread.hpp"
 
 namespace dnnl {

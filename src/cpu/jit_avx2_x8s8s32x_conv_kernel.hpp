@@ -33,7 +33,7 @@ struct _jit_avx2_x8s8s32x_fwd_kernel : public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(_jit_avx2_x8s8s32x_conv_fwd_ker_t_)
 
     _jit_avx2_x8s8s32x_fwd_kernel(
-            jit_conv_conf_t ajcp, const primitive_attr_t &attr)
+            const jit_conv_conf_t &ajcp, const primitive_attr_t &attr)
         : jcp(ajcp), attr_(attr), eltwise_injector_(nullptr) {
         if (jcp.with_eltwise)
             eltwise_injector_
@@ -70,7 +70,9 @@ private:
     const Xbyak::Reg64 aux_reg_inp = r11;
     const Xbyak::Reg64 reg_ptr_sum_scale = r11;
     const Xbyak::Reg64 aux_reg_ker = r12;
+    const Xbyak::Reg64 aux_reg_inp_d = r13;
     const Xbyak::Reg64 reg_compensation = r14;
+    const Xbyak::Reg64 aux_reg_ker_d = r15;
 
     /* counter regs */
     const Xbyak::Reg64 reg_bias_alpha = abi_not_param1;
@@ -79,6 +81,7 @@ private:
     const Xbyak::Reg64 reg_oc_blocks = rsi;
     const Xbyak::Reg64 reg_owb = aux_reg_ker;
     const Xbyak::Reg64 reg_scratch = reg_compensation;
+    const Xbyak::Reg64 reg_ki = reg_compensation;
     const Xbyak::Reg64 reg_kj = reg_ptr_scales;
     const Xbyak::Reg64 reg_overflow = reg_ptr_scales;
     const Xbyak::Reg64 reg_icb = reg_bias;
@@ -165,7 +168,7 @@ private:
 struct jit_avx2_x8s8s32x_fwd_kernel {
 
     jit_avx2_x8s8s32x_fwd_kernel(
-            jit_conv_conf_t ajcp, const primitive_attr_t &attr)
+            const jit_conv_conf_t &ajcp, const primitive_attr_t &attr)
         : jit_ker(nullptr), ymm_kernel_(nullptr), xmm_kernel_(nullptr) {
         int ch_block = ajcp.is_depthwise ? ajcp.ch_block : ajcp.ic_block;
         switch (ch_block) {
@@ -200,6 +203,9 @@ struct jit_avx2_x8s8s32x_fwd_kernel {
     void (*jit_ker)(jit_conv_call_s *);
     _jit_avx2_x8s8s32x_fwd_kernel<Xbyak::Ymm> *ymm_kernel_;
     _jit_avx2_x8s8s32x_fwd_kernel<Xbyak::Xmm> *xmm_kernel_;
+
+private:
+    DNNL_DISALLOW_COPY_AND_ASSIGN(jit_avx2_x8s8s32x_fwd_kernel);
 };
 
 } // namespace cpu

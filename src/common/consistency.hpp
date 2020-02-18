@@ -28,7 +28,7 @@ struct CondLoc { // Quiet default: never print, so struct is simpler
 // Q:: could templating this allow one to store the generic type of the evaluated expression
 //     for futher downstream use?   Ex. evaluate condition *and* store (say) mkldnn_status?
 struct CondLocV { // CondLoc with "verbose in debug compile" hint
-    bool cond;
+    bool cond;          // streamlined for cmake -DDNNL_VERBOSE=NONE|DEFAULT
 #if DNNL_VERBOSE_EXTRA
     char const* file;
     int line;
@@ -47,7 +47,6 @@ struct CondLocVV { // CondLoc with "verbose always" hint (even in optimized -DND
 #define COND_LOC(...) CondLoc{bool{!!(__VA_ARGS__)}}
 
 #if DNNL_VERBOSE_EXTRA
-/** verbose for debug: always, for opt: use \c (*dnnl_get_verbose() & 0x04) flag */
 #define COND_LOCV(...) CondLocV{bool{!!(__VA_ARGS__)}, __FILE__, __LINE__, #__VA_ARGS__}
 #else
 #define COND_LOCV(...) CondLocV{bool{!!(__VA_ARGS__)}}
@@ -86,7 +85,7 @@ struct Consistency {
         var = var && cl.cond;
         return *this;
     }
-    /** Using '&& COND_LOCV(cond)' prints in debug mode [not if -DNDEBUG] */
+    /** Using '&& COND_LOCV(cond)' will print failure only if dnnl_get_verbose() >= 3. */
     Consistency& operator &&(CondLocV const& cl){
         var = var && cl.cond;
 #if DNNL_VERBOSE_EXTRA
@@ -94,7 +93,7 @@ struct Consistency {
                 && dnnl_get_verbose() >= 3
            ){
             fprintf(stdout," %s [%s:%d] %s\n",
-                    pfx, /*nclause,*/ cl.file, cl.line, cl.cond_msg);
+                    pfx, cl.file, cl.line, cl.cond_msg);
             fflush(stdout);
         }
 #endif

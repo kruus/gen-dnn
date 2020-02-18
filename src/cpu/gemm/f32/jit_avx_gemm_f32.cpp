@@ -13,8 +13,6 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include "cpu_isa_traits.hpp"
-#if TARGET_X86_JIT
 
 #include <cmath>
 #include <mutex>
@@ -22,6 +20,7 @@
 #include "dnnl_thread.hpp"
 #include "utils.hpp"
 
+#include "../gemm_driver.hpp"
 #include "gemm_utils_f32.hpp"
 #include "jit_avx_gemm_f32.hpp"
 #include "ref_gemm_f32.hpp"
@@ -2446,6 +2445,7 @@ void sgemm_nocopy_driver(const char *transa, const char *transb, int m, int n,
             }
         }
     }
+    msan_unpoison_matrix(c, m, n, ldc, sizeof(*c));
 }
 
 } // namespace avx_gemm_f32
@@ -2703,5 +2703,4 @@ dnnl_status_t jit_avx_gemm_f32(const char *transa, const char *transb,
 } // namespace impl
 } // namespace dnnl
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // TARGET_X86_JIT
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

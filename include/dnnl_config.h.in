@@ -91,6 +91,10 @@
 /// \ref dev-guide-verbose "levels 0[default, quiet], 1 and 2".
 #define DNNL_VERBOSE ${_DNNL_VERBOSE}
 
+/// OS/compiler workaround for CPU scratchpad (0/1 values)
+#define DNNL_USE_STATIC_THREAD_LOCAL_OBJECTS ${DNNL_USE_STATIC_THREAD_LOCAL_OBJECTS}
+#define DNNL_BUG_VALUE_INITIALIZATION        ${DNNL_BUG_VALUE_INITIALIZATION}
+
 //@}
 
 /// 
@@ -171,13 +175,20 @@
 ///@{
 /// Means "C/C++ code only, please".
 #cmakedefine DNNL_ISA_VANILLA ${DNNL_ISA_VANILLA}
-/** Also provides a builtin gemm reference implementaion, so many
- * common convolutions can run at decent speed during tests. */
+
+/** Also provides a builtin gemm reference implementation, so many common
+ * convolutions can run at decent speed during tests. */
 #cmakedefine DNNL_ISA_ANY     ${DNNL_ISA_ANY}
+
 /// pull out all the stops, all options & external support allowed.
 #cmakedefine DNNL_ISA_ALL     ${DNNL_ISA_ALL}
 ///@}
-/// @group x86 isa settings govern jit instruction set support
+
+/** @group
+ * max x86 jit instruction set support.
+ * This might not be respected by jit uni [unified] drivers CHECKME.
+ * DNNL_ISA_ALL, on x86 cpu will be equivalent to DNNL_ISA_X86_ALL
+ */
 ///@{
 #cmakedefine DNNL_ISA_X86              ${DNNL_ISA_X86}
 #cmakedefine DNNL_ISA_SSE41            ${DNNL_ISA_SSE41}
@@ -201,12 +212,36 @@
 ///@}
 
 /// @defgroup cmake_bool handy conditional tests for cmake build target
-/// \note \ref cpu_target.h can these into shorter internal versions
+/** \note \ref cpu_target.h can these into shorter internal versions.
+ * They expand to either 0 or 1. */
 //@{
+/** Turn conditions into 0/1 value.  Then -E compile and -dM will show a 0 or 1
+ * values (easier to read) XXX verify function CHECKME. */
+#define DNNL_EXPAND_01(...) !!(__VA_ARGS__)
+
+/** No x86 jit -- only uses <em>reference implementation</em> code.  This is a
+ * good build target to begin supporting non-x86 chipsets. Typical customization
+ * issues for cross-compilers will be:
+ *
+ * - providing a cmake TOOLCHAIN file
+ * - dealing with atomic support and timer routines.  Maybe you need some minimal
+ *   amount of inline assembler for this.
+ * - Although DNNL reference gemm is now pretty fast, you should set cache sizes
+ *   for your target correctly.
+ * - You may also want to use some system blas
+ *   - (DNNL_EXTERNAL_GEMM XXX what did I call it?)
+ *
+ * - note: DNNL_a.k.a. TARGET_XXX
+ * \todo not all features are available with vanilla implementation
+ * (DNNL_ISA==DNL_ISA_VANILLA)
+ */
 #define DNNL_TARGET_VANILLA (DNNL_ISA == DNNL_ISA_VANILLA || DNNL_CPU == DNNL_CPU_VE/*to start debug*/)
-// should be, someday, ...
+// not yet sure if we DNNL_ISA_ANY should be supported XXX all vs any is always confusing XXX
 //#define DNNL_TARGET_VANILLA (DNNL_ISA == DNNL_ISA_VANILLA || (DNNL_CPU == DNNL_CPU_VE && DNNL_ISA <= DNNL_ISA_ANY))
 
+/** Can use DNNL_TARGET_VANILLA == (DNNL_TARGET_X86 && !DNNL_TARGET_X86_JIT).
+ * \detail dnnl impls often include \ref src/common/cpu_target.h and will write
+ *         `TARGET_X86` for readability. */
 #define DNNL_TARGET_X86     (DNNL_CPU == DNNL_CPU_X86)
 #define DNNL_TARGET_X86_JIT (DNNL_TARGET_X86 && DNNL_ISA >= DNNL_ISA_ANY && DNNL_ISA <= DNNL_ISA_ALL)
 

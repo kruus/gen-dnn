@@ -20,11 +20,11 @@
 #include "gemm_info.hpp"
 #include "dnnl_traits.hpp"
 #include "dnnl_types.h"
+#include "cpu_isa_traits.hpp"
 #include "common/bfloat16.hpp"
 #if MKLDNN_CPU_GEMM_JIT
 #include "bf16/common_s16.hpp"
 #include "bf16/jit_avx512_core_gemm_bf16bf16f32_kern.hpp"
-#include "common/bfloat16.hpp"
 #include "f32/common_f32.hpp"
 #include "f32/jit_avx2_kernel_sgemm_kern.hpp"
 #include "f32/jit_avx_gemv_t_f32_kern.hpp"

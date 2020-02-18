@@ -20,7 +20,7 @@
 #include "utils.hpp"
 
 #define ENABLE_OMP_MACROS (DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP)
-#include "dnnl_omp.h"       // omp portable macro definitions, if needed
+#include "dnnl_omp.h"       // omp compiler-portable macro definitions, if needed
 
 #if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
 #define DNNL_THR_SYNC 1
@@ -40,7 +40,6 @@ inline void dnnl_thr_barrier() {}
 
 #elif DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP
 #include <omp.h>
-#include "dnnl_omp.h"
 #define DNNL_THR_SYNC 1
 
 inline int dnnl_get_max_threads() {
@@ -88,13 +87,28 @@ inline tbb::static_partitioner dnnl_tbb_partitioner() {
 
 #endif
 
-//
-// --------------- reintroduce here, and move away include/dnnl_os.h
-// --------------- into src/opt_pragmas.h for other stuff.
-// src/common/opt_pragmas.h is controlled by separate
-//     ENABLE_OPT_PRAGMAS and ENABLE_OMP_PRAGMAS flags (set here!)
-//
-// [ejk] pragma macros --> include/mkldnn_os.h, handles more cases
+#if 0 // moved to dnnl_omp.h (with more cpus/compilers, have more optimization macros)
+, have more optimization macros)// MSVC still supports omp 2.0 only
+#if defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+#define collapse(x)
+#define PRAGMA_OMP_SIMD(...)
+#else
+#define PRAGMA_OMP_SIMD(...) PRAGMA_MACRO(CHAIN2(omp, simd __VA_ARGS__))
+#endif // defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+
+// process simdlen; it is supported for Clang >= 3.9; ICC >= 17.0; GCC >= 6.1
+// No support on Windows.
+#if (defined(__clang_major__) \
+        && (__clang_major__ < 3 \
+                || (__clang_major__ == 3 && __clang_minor__ < 9))) \
+        || (defined(__INTEL_COMPILER) && __INTEL_COMPILER < 1700) \
+        || (!defined(__INTEL_COMPILER) && !defined(__clang__) \
+                && (defined(_MSC_VER) || __GNUC__ < 6 \
+                        || (__GNUC__ == 6 && __GNUC_MINOR__ < 1)))
+#define simdlen(x)
+#endif // long simdlen if
+#endif // moved to dnnl_omp.h
+
 namespace dnnl {
 namespace impl {
 

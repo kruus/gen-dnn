@@ -36,10 +36,9 @@ append(CMAKE_CXX_FLAGS "${CMAKE_CCXX_NOWARN_FLAGS}")
 append(CMAKE_C_FLAGS "${CMAKE_CCXX_SANITIZER_FLAGS}")
 append(CMAKE_CXX_FLAGS "${CMAKE_CCXX_SANITIZER_FLAGS}")
 
-# now via config.h :
-#if(NOT DNNL_VERBOSE)
-#    add_definitions(-DDISABLE_VERBOSE)
-#endif()
+if(NOT DNNL_VERBOSE)
+    add_definitions(-DDISABLE_VERBOSE)
+endif()
 
 if(DNNL_ENABLE_CONCURRENT_EXEC)
     add_definitions(-DDNNL_ENABLE_CONCURRENT_EXEC)
@@ -74,15 +73,15 @@ if(WIN32)
 endif()
 
 add_subdirectory(common)
-add_subdirectory(compute)
 add_subdirectory(cpu)
 
-if(DNNL_GPU_RUNTIME STREQUAL "OCL")
-    add_subdirectory(ocl)
+if(NOT DNNL_GPU_RUNTIME STREQUAL "NONE")
+    add_subdirectory(gpu)
 endif()
 
+get_property(LIB_DEPS GLOBAL PROPERTY DNNL_LIB_DEPS)
 add_library(${LIB_NAME} ${DNNL_LIBRARY_TYPE}
-    ${VERSION_RESOURCE_FILE} ${HEADERS} ${${LIB_NAME}_SUB_OBJS})
+    ${VERSION_RESOURCE_FILE} ${HEADERS} ${LIB_DEPS})
 
 set_property(TARGET ${LIB_NAME} PROPERTY VERSION "${DNNL_VERSION_MAJOR}.${DNNL_VERSION_MINOR}")
 set_property(TARGET ${LIB_NAME} PROPERTY SOVERSION "${DNNL_VERSION_MAJOR}")
@@ -180,6 +179,7 @@ else()
 endif()
 
 # Install custom find modules for transitive dependencies
+set(LIB_CONFIG_INSTALL_DIR_COMPAT "${CMAKE_INSTALL_LIBDIR}/cmake/mkldnn")
 if(DNNL_CPU_RUNTIME STREQUAL "TBB")
     if(WIN32)
         install(FILES "../cmake/win/TBBConfig.cmake" RENAME "FindTBB.cmake"
@@ -191,12 +191,16 @@ if(DNNL_CPU_RUNTIME STREQUAL "TBB")
         install(FILES "../cmake/lnx/TBBConfig.cmake" RENAME "FindTBB.cmake"
             DESTINATION ${LIB_CONFIG_INSTALL_DIR})
     endif()
+    install(FILES "${CMAKE_INSTALL_PREFIX}/${LIB_CONFIG_INSTALL_DIR}/FindTBB.cmake"
+            DESTINATION ${LIB_CONFIG_INSTALL_DIR_COMPAT})
 endif()
 
 if(DNNL_GPU_RUNTIME STREQUAL "OCL")
     install(FILES
         "../cmake/FindOpenCL.cmake"
         DESTINATION ${LIB_CONFIG_INSTALL_DIR})
+    install(FILES "${CMAKE_INSTALL_PREFIX}/${LIB_CONFIG_INSTALL_DIR}/FindOpenCL.cmake"
+            DESTINATION ${LIB_CONFIG_INSTALL_DIR_COMPAT})
 endif()
 
 # On Windows we need to add dnnl.dll path to CTESTCONFIG_PATH which is later

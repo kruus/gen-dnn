@@ -110,12 +110,6 @@ message(STATUS "  DNNL_ISA=${DNNL_ISA} to DNNL_ISA_VALUE=DNNL_ISA_${DNNL_ISA}=${
 #option(DNNL_VERBOSE
 #    "allows DNNL be verbose whenever DNNL_VERBOSE
 #    environment variable set to 1" ON) # enabled by default
-#option(DNNL_VERBOSE_PRIMITIVE_CREATE
-#    "Add code to cpu_engine tracing primitive creation sequence.
-#    This adds some overhead to primitive creation.
-#    Todo: if DNNL_VERBOSE, allow dnnl_set_verbose() to control
-#    verbosity of these debug messages" ON 
-#    )
 # NEW: string (NONE or any false value) | "DEFAULT" | "EXTRA"
 set(DEFAULT_DNNL_VERBOSE "DEFAULT")
 if(CMAKE_BUILD_TYPE MATCHES "[Dd]ebug")
@@ -158,8 +152,7 @@ option(DNNL_ENABLE_MAX_CPU_ISA
 # =============================
 
 set(DNNL_LIBRARY_TYPE "SHARED" CACHE STRING
-    "specifies whether DNNL library should be SHARED or STATIC"
-    ) # default SHARED
+    "specifies whether DNNL library should be SHARED or STATIC")
 if(NOT ${DNNL_LIBRARY_TYPE} MATCHES "^(SHARED|STATIC)$")
     message(FATAL_ERROR "Unsupported ${DNNL_LIBRARY_TYPE} variant: DNNL_ISA=${DNNL_ISA}")
 endif()
@@ -172,8 +165,7 @@ set(DNNL_INSTALL_MODE "DEFAULT" CACHE STRING
     "specifies installation mode; supports DEFAULT or BUNDLE.
 
     When BUNDLE option is set DNNL will be installed as a bundle
-    which contains examples and benchdnn."
-    )
+    which contains examples and benchdnn.")
 if(NOT ${DNNL_INSTALL_MODE} MATCHES "^(DEFAULT|BUNDLE)$")
     message(FATAL_ERROR "Unsupported ${DNNL_INSTALL_MODE} variant: DNNL_ISA=${DNNL_ISA}")
 endif()
@@ -182,6 +174,13 @@ set(DNNL_CODE_COVERAGE "OFF" CACHE STRING
     "specifies which supported tool for code coverage will be used
     Currently only gcov supported"
     )
+if(NOT ${DNNL_CODE_COVERAGE} MATCHES "^(OFF|GCOV)$")
+    message(FATAL_ERROR "Unsupported code coverage tool: ${DNNL_CODE_COVERAGE}")
+endif()
+
+set(DNNL_CODE_COVERAGE "OFF" CACHE STRING
+    "specifies which supported tool for code coverage will be used
+    Currently only gcov supported")
 if(NOT ${DNNL_CODE_COVERAGE} MATCHES "^(OFF|GCOV)$")
     message(FATAL_ERROR "Unsupported code coverage tool: ${DNNL_CODE_COVERAGE}")
 endif()
@@ -207,8 +206,7 @@ set(DNNL_ARCH_OPT_FLAGS "HostOpts" CACHE STRING
 
     If the library is to be built for generic architecture (e.g. built by a
     Linux distributive maintainer) one may want to specify DNNL_ARCH_OPT_FLAGS=\"\"
-    to not use any host specific instructions"
-    )
+    to not use any host specific instructions")
 message(STATUS "DNNL_ARCH_OPT_FLAGS ${DNNL_ARCH_OPT_FLAGS}")
 
 # ======================
@@ -323,6 +321,8 @@ else() # unknown? try enabling everything
     set(DNNL_DEFAULT_ENABLE_BFLOAT16 1) # initially 0 for porting
     set(DNNL_DEFAULT_ENABLE_RNN 1)      # initially 0 for porting
 endif()
+
+# Some depending on CPU & jit options, some parts of dnnl may not be ready
 option(DNNL_ENABLE_BFLOAT16
     "Enable bfloat16 support (default ${DNNL_DEFAULT_ENABLE_BFLOAT16})"
     ${DNNL_DEFAULT_ENABLE_BFLOAT16})
@@ -330,30 +330,5 @@ option(DNNL_ENABLE_RNN
     "Enable rnn support (default ${DNNL_DEFAULT_ENABLE_RNN}, for now requires x86 jit)"
     ${DNNL_DEFAULT_ENABLE_RNN})
 
-if(0)
-# ==============================================
-# Some options depend on compiler/toolchain
-# TARGET_VANILLA is a historical gen-dnn option
-# JITFUNCS is also historical
-# CPU_JIT is for the new dnnl-config.h.in
-# ==============================================
-if(NECVE)
-    set(TARGET_VANILLA ON)
-    set(JITFUNCS 7) # JITFUNCS_VE
-    set(DNNL_CPU_JIT 29) # 2 ~ VE # deprecated
-elseif(NECSX)
-    set(DNNL_CPU "SX")
-    set(TARGET_VANILLA ON)
-    set(JITFUNCS 0)
-    set(DNNL_CPU_JIT 30) # 3 ~ SX # deprecated
-else() # target via compiler, probably x86
-    # redo when build.sh is updated to use -DDNNL_CPU=ANY instead of TARGET_VANILLA
-    OPTION(TARGET_VANILLA "Use only pure C/C++ source_code (no x86 jit)" OFF)
-endif()
-if(DNNL_CPU EQUAL 1 AND TARGET_VANILLA) # x86 vanilla
-    set(DNNL_CPU_JIT -1) # cpu ANY and no x86 jit # deprecated
-    set(JITFUNCS -1) # JITFUNCS_NONE
-endif()
-endif()
-
-message(STATUS "cmake build target options: ${DNNL_BUILD_STRING}")
+# XXX now DNNL_CPU_EXTERNAL_GEMM MATCHES "^(NONE|MKL|CBLAS)$"
+#option(_DNNL_USE_MKL "use BLAS functions from Intel MKL" OFF)

@@ -13,8 +13,6 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include "cpu_isa_traits.hpp"
-#if TARGET_X86_JIT
 
 #include "jit_avx512_core_kernel_gemv_s8x8s32_kern.hpp"
 
@@ -389,6 +387,3 @@ jit_avx512_core_gemv_s8x8s32_kern::generate<gemv_u8s8s32_kernel_t>(int);
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // TARGET_X86_JIT

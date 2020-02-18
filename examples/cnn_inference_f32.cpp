@@ -216,17 +216,12 @@ void simple_net(engine::kind engine_kind, int times = 100) {
     const float k1 = 1.0f;
 
     // create lrn primitive and add it to net
-    cout<<" lrn1_desc..."<<endl;
     auto lrn1_desc = lrn_forward::desc(prop_kind::forward_inference,
             algorithm::lrn_across_channels, conv1_dst_memory.get_desc(),
             local1_size, alpha1, beta1, k1);
     auto lrn1_prim_desc = lrn_forward::primitive_desc(lrn1_desc, eng);
-    cout<<" lrn1_dst_memory... dst_desc()="<<lrn1_prim_desc.dst_desc()<<endl;
     auto lrn1_dst_memory = memory(lrn1_prim_desc.dst_desc(), eng);
-    // above is an opaque ::dnnl_memory object,
-    // declared in dnnl_types.h, defined in src/common/memory.hpp
 
-    cout<<" lrn_forward..."<<endl;
     net.push_back(lrn_forward(lrn1_prim_desc));
     net_args.push_back({{DNNL_ARG_SRC, conv1_dst_memory},
             {DNNL_ARG_DST, lrn1_dst_memory}});
@@ -235,15 +230,12 @@ void simple_net(engine::kind engine_kind, int times = 100) {
     // {batch, 96, 55, 55} -> {batch, 96, 27, 27}
     // kernel: {3, 3}
     // strides: {2, 2}
-    cout<<" memory::dims..."<<endl;
     memory::dims pool1_dst_tz = {batch, 96, 27, 27};
     memory::dims pool1_kernel = {3, 3};
     memory::dims pool1_strides = {2, 2};
     memory::dims pool_padding = {0, 0};
 
-    cout<<" pool1_dst_md..."<<endl;
     auto pool1_dst_md = memory::desc({pool1_dst_tz}, dt::f32, tag::any);
-    cout<<" pool1_dst_md = "<<pool1_dst_md<<endl;
 
     /// For training execution, pooling requires a private workspace memory
     /// to perform the backward pass. However, pooling should not use 'workspace'
@@ -253,28 +245,12 @@ void simple_net(engine::kind engine_kind, int times = 100) {
     /// The example continues to create more layers according
     /// to the AlexNet topology.
     //[Create pooling primitive]
-    cout<<"\n pool1_desc..."<<endl;
     auto pool1_desc = pooling_forward::desc(prop_kind::forward_inference,
             algorithm::pooling_max, lrn1_dst_memory.get_desc(), pool1_dst_md,
             pool1_strides, pool1_kernel, pool_padding, pool_padding);
-    cout<<" pool1_desc.data is dnnl_pooling_desc_t"<<endl;
-    cout<<" pool1_desc.data src_desc = "<<pool1_desc.data.src_desc<<endl;
-    cout<<" pool1_desc.data dst_desc = "<<pool1_desc.data.dst_desc<<endl;
-    cout<<"\n pool1_pd..."<<endl;
     auto pool1_pd = pooling_forward::primitive_desc(pool1_desc, eng);
-    // XXX VE prints (with -minit_stack=0xdefaced1)
-    //  pool1_dst_memory... desc = f32::blocked:abcd:fdefaced1defaced1
-    //src_desc() in dnnl.hpp returns base::src_desc(0) i.e. dnnl::primitive_desc::src_desc(0)
-    //  +dnnl::primitive_desc creates and iterator
-    //  base class primitive_desc_base uses query interface to get src_desc(0)
-    auto tmp_pool1_pd_src_desc = pool1_pd.src_desc();
-    auto tmp_pool1_pd_dst_desc = pool1_pd.dst_desc();
-    cout<<"\n pool1_dst_memory... desc = "<<tmp_pool1_pd_dst_desc<<" @ "<<(void*)(&tmp_pool1_pd_dst_desc)<<endl;
-    cout<<" pool1_src_memory... desc = "<<tmp_pool1_pd_src_desc<<" @ "<<(void*)(&tmp_pool1_pd_src_desc)<<endl;
-    cout<<" pool1_pd impl_info_str = "<<pool1_pd.impl_info_str()<<endl;
     auto pool1_dst_memory = memory(pool1_pd.dst_desc(), eng);
 
-    cout<<"\n pooling_forward(pool1_pd)..."<<endl;
     net.push_back(pooling_forward(pool1_pd));
     net_args.push_back({{DNNL_ARG_SRC, lrn1_dst_memory},
             {DNNL_ARG_DST, pool1_dst_memory}});
@@ -820,4 +796,3 @@ int main(int argc, char **argv) {
     return handle_example_errors(
             cnn_inference_f32, parse_engine_kind(argc, argv));
 }
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

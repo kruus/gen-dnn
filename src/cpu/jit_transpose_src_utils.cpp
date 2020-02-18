@@ -13,8 +13,6 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
-#include "cpu_isa_traits.hpp"
-#if TARGET_X86_JIT
 
 #include "c_types_map.hpp"
 #include "cpu_barrier.hpp"
@@ -433,8 +431,17 @@ void jit_trans_iw_ic_int16_t::transpose(
             int store_pad = div_up(r_pad, 2);
             int addr_shift = r_pad % 2;
             add(reg_tr_src_tmp, (nrows - addr_shift) * typesize);
-            padding(reg_tr_src_tmp, store_pad);
-            sub(reg_tr_src_tmp, (nrows - addr_shift) * typesize);
+            // note: r_pad can be bigger than 16 because of dilation
+            int tail = store_pad % transpose_size;
+            int pad_rows = store_pad / transpose_size;
+            for (int pad = 0; pad < pad_rows; pad++) {
+                padding(reg_tr_src_tmp, transpose_size);
+                add(reg_tr_src_tmp, 2 * transpose_size * typesize);
+            }
+            if (tail > 0) padding(reg_tr_src_tmp, tail);
+            sub(reg_tr_src_tmp,
+                    (pad_rows * 2 * transpose_size + nrows - addr_shift)
+                            * typesize);
         }
 
         int store_tail = rnd_up(nrows, 2);
@@ -1221,6 +1228,3 @@ jit_trans_dst_t *create_trans_dst(const jit_conv_conf_t *conf) {
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // TARGET_X86_JIT

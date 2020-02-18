@@ -718,7 +718,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 #else
-    std::cerr << "message: " << "development build -- no rnn support" << std::endl;
+    std::cout << " disabled - no(rnn support" << std::endl;
 #endif
     return 0;
 }

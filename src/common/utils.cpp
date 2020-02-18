@@ -120,8 +120,9 @@ int32_t fetch_and_add(int32_t *dst, int32_t val) {
 #ifdef _WIN32
     return InterlockedExchangeAdd(reinterpret_cast<long *>(dst), val);
 #else
-    // ve: N/A return atomic_fetch_add(dst, val);
-    return __sync_fetch_and_add(dst, val); // compiles but undefined symbol for VE
+    // XXX #elif defined(__ve) && __NEC_VERSION__ < 30000 use atomic_fetch_add(dst, val)
+    // o/w VE compile may compile but give undefined symbol during link.
+    return __sync_fetch_and_add(dst, val);
 #endif
 }
 

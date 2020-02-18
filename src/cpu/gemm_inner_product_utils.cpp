@@ -18,7 +18,7 @@
 #include "dnnl_thread.hpp"
 #if TARGET_X86_JIT 
 #include "jit_uni_eltwise_injector.hpp"
-#else // XXX above jit_uni_ may actually require sse41 ?
+#else
 #include "ref_eltwise.hpp"
 #endif // TARGET_X86_JIT
 #include "math_utils.hpp"
@@ -36,17 +36,19 @@ using namespace math;
 template <data_type_t acc_type, data_type_t dst_type>
 pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
         const primitive_attr_t *attr, data_type_t bias_dt, bool skip_sum)
+#if TARGET_X86_JIT
+#define __J__(...) , __VA_ARGS__
+#else
+#define __J__(...)
+#endif
+// clang-format off
     : ker_(nullptr)
     , ref_eltwise_(nullptr)
-    //, do_bias_(pd->with_bias())
-    //, bias_data_type_(data_type::undef)
-#if TARGET_X86_JIT
-    , eltwise_injector_(nullptr)
-    , bf16_emu_(nullptr)
-    , vreg_zero()
-    , vreg_scale()
-    , vreg_sum_scale()
-#endif // TARGET_X86_JIT
+    __J__(eltwise_injector_(nullptr))
+    __J__(bf16_emu_(nullptr))
+    __J__(vreg_zero())
+    __J__(vreg_scale())
+    __J__(vreg_sum_scale())
     , OC_(OC)
     , MB_(MB)
     , bias_data_type_(bias_dt)
@@ -58,17 +60,17 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
     , do_sum_(false)
     , do_dst_zero_points_(false)
     , sum_scale_(0) // XXX also only for jit?
-#if TARGET_X86_JIT
-    , isa_(isa_any)
-    , max_OC_loop_unroll_(13)
-    , idx_compute_vreg_start_(0)
-    , idx_compute_vreg_max_(31)
-    , compute_vregs_per_iter_(1)
-    , compute_vreg_bias_shift_(0)
-    , compute_vreg_prev_dst_shift_(0)
-    , mb_blk_kernel(false)
-#endif // TARGET_X86_JIT
+    __J__(isa_(isa_any))
+    __J__(max_OC_loop_unroll_(13))
+    __J__(idx_compute_vreg_start_(0))
+    __J__(idx_compute_vreg_max_(31))
+    __J__(compute_vregs_per_iter_(1))
+    __J__(compute_vreg_bias_shift_(0))
+    __J__(compute_vreg_prev_dst_shift_(0))
+    __J__(mb_blk_kernel(false))
+#undef __J__
 {
+    // clang-format on
     using namespace types;
     //using namespace Xbyak;
 
@@ -117,11 +119,17 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
         compute_vreg_prev_dst_shift_ = compute_vregs_per_iter_++;
     }
 
-    if (do_bias())
+    if (do_bias()) {
         compute_vreg_bias_shift_ = compute_vregs_per_iter_++;
+    }
 
     if (do_dst_zero_points_)
         vreg_dst_zero_points = Zmm(idx_compute_vreg_start_++);
+
+    if (!attr->zero_points_.has_default_values(DNNL_ARG_DST)) {
+        do_dst_zero_points_ = true;
+        vreg_dst_zero_points = Zmm(idx_compute_vreg_start_++);
+    }
 
     if (!mayiuse(avx512_core)) {
         // use fallback code for older CPUs since they do not have optimized
@@ -554,7 +562,6 @@ void pp_kernel_t<acc_type, dst_type>::compute_mb_blk() {
         sub(reg_len, mb_oc_blk);
         jmp(mb_main_loop, T_NEAR);
     }
-    L(end_main_loop);
 
     if (mb_tail > 0) {
         Label mb_tail_loop, end_tail_loop;
@@ -666,7 +673,6 @@ void pp_kernel_t<acc_type, dst_type>::operator()(dst_data_t *dst,
         size_t oc = start % OC;
         for (size_t i = start; i < end; i++) {
             float d = (float)acc[i];
-            // surprise, bias gets passed to both extended_sgemm AND here ?
             if (do_bias()) d += get_bias(bias, oc, bias_data_type_);
             if (do_scale_) d *= scales[oc * scale_idx_mult_];
             if (do_sum_) d += sum_scale_ * dst[i];
@@ -693,4 +699,3 @@ template class pp_kernel_t<f32, bf16>;
 } // namespace impl
 } // namespace dnnl
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-

@@ -50,29 +50,6 @@ memory_desc_t copy_maybe_null(const memory_desc_t *md) {
     return md ? *md : zero_md();
 }
 
-rnn_desc_t zero_rnn_desc() {
-#if 0
-    auto rd = rnn_desc_t{};
-    rd.src_layer_desc = zero_md();
-    rd.src_iter_desc = zero_md();
-    rd.weights_layer_desc = zero_md();
-    rd.weights_iter_desc = zero_md();
-    rd.bias_desc = zero_md();
-    rd.dst_layer_desc = zero_md();
-    rd.dst_iter_desc = zero_md();
-    rd.diff_src_layer_desc = zero_md();
-    rd.diff_src_iter_desc = zero_md();
-    rd.diff_weights_layer_desc = zero_md();
-    rd.diff_weights_iter_desc = zero_md();
-    rd.diff_bias_desc = zero_md();
-    rd.diff_dst_layer_desc = zero_md();
-    rd.diff_dst_iter_desc = zero_md();
-#else
-    auto rd = zero<rnn_desc_t>();
-#endif
-    return rd;
-}
-
 status_t check_data_type_consistency_fwd(dnnl_alg_kind_t cell_kind,
         prop_kind_t prop_kind, const memory_desc_t *src_layer_desc,
         const memory_desc_t *src_iter_desc,
@@ -370,7 +347,7 @@ status_t rnn_common_fwd_desc_init(dnnl_rnn_desc_t *rnn_desc,
             dst_iter_c_desc));
 
     // Create the descriptor
-    dnnl_rnn_desc_t rd = zero_rnn_desc();
+    dnnl_rnn_desc_t rd = zero<rnn_desc_t>();
 
     rd.primitive_kind = primitive_kind::rnn;
     rd.prop_kind = prop_kind;
@@ -523,7 +500,7 @@ status_t rnn_common_bwd_desc_init(dnnl_rnn_desc_t *rnn_desc,
             diff_weights_layer_desc, diff_weights_iter_desc, diff_bias_desc,
             diff_dst_layer_desc, diff_dst_iter_desc, diff_dst_iter_c_desc));
 
-    dnnl_rnn_desc_t rd = zero_rnn_desc();
+    dnnl_rnn_desc_t rd = zero<rnn_desc_t>();
 
     rd.primitive_kind = primitive_kind::rnn;
     rd.prop_kind = prop_kind;

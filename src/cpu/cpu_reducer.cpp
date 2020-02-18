@@ -290,7 +290,7 @@ inline reducer_2d_driver_t<data_type> *create_reduce_2d_drv(int n_src,
     else if (mayiuse(avx2))
         return new reducer_2d_driver_f_s_32_t<data_type, avx2>(
                 n_src, src_ld, src_step, dst_step, nullify_dst);
-    assert(!"unimplemented"); // questionable (what if CPU dispatch to sse41?)
+    assert(!"unimplemented"); // dnnl v2.1 believes this is OK for sse41.
 #endif // TARGET_X86_JIT
     return nullptr;
 }
@@ -370,8 +370,9 @@ void cpu_reducer_t<data_type>::reduce_nolock(int ithr, data_t *dst,
 
     (*drv_)(d, space, 1, len);
 
-#else
-    assert(drv_==nullptr);
+#else // v2.1 default: ref impl never available in jit build (except via SIMPLE_IMPL)
+    // (VANILLA or non-x86 builds should always provide ref impl)
+    assert(drv_ == nullptr);
     if (balancer().id_in_group(ithr) != 0)
         return; /* only threads 0 do the reduction */
 
@@ -460,8 +461,8 @@ void cpu_reducer_2d_t<data_type>::reduce_block(const data_t *space_base,
             + ny_start * conf_.job_size_x_ + nx_start;
 #if TARGET_X86_JIT && !defined(SIMPLE_IMPL)
     (*drv_)(d, space, ny_step, nx_step);
-#else
-    assert(drv_==nullptr);
+#else // special SIMPLE_IMPL compile, or VANILLA build, or non-x86 cpu...
+    assert(drv_ == nullptr);
     for (int idg = 0; idg < balancer().nthr_per_group_; ++idg) {
         const data_t *w = &space[idg * space_per_thread(balancer())];
         for (int y = 0; y < ny_step; ++y)

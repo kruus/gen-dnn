@@ -23,6 +23,7 @@
 #include "primitive_desc.hpp"
 #include "utils.hpp"
 
+#ifdef DNNL_VERBOSE_EXTRA
 #include "consistency.hpp"
 
 #include <iostream>
@@ -31,6 +32,7 @@
 #define DNNL_CONV_PD_DBG(MSG) do{ using std::cout; using std::endl; \
     cout<<DNNL_SHORTFILENAME<<":"<<__LINE__<<": "<<MSG; \
 }while(0)
+#endif // NDEBUG
 
 namespace dnnl {
 namespace impl {
@@ -40,6 +42,15 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
         const memory_desc_t *weights_desc, const memory_desc_t *bias_desc,
         const memory_desc_t *dst_desc, const dims_t strides,
         const dims_t dilates, const dims_t padding_l, const dims_t padding_r);
+
+memory_desc_t *conv_prop_invariant_src_d(convolution_desc_t *desc);
+memory_desc_t *conv_prop_invariant_wei_d(convolution_desc_t *desc);
+memory_desc_t *conv_prop_invariant_bia_d(convolution_desc_t *desc);
+memory_desc_t *conv_prop_invariant_dst_d(convolution_desc_t *desc);
+const memory_desc_t *conv_prop_invariant_src_d(const convolution_desc_t *desc);
+const memory_desc_t *conv_prop_invariant_wei_d(const convolution_desc_t *desc);
+const memory_desc_t *conv_prop_invariant_bia_d(const convolution_desc_t *desc);
+const memory_desc_t *conv_prop_invariant_dst_d(const convolution_desc_t *desc);
 
 struct convolution_fwd_pd_t;
 
@@ -57,7 +68,6 @@ struct convolution_pd_t : public primitive_desc_t {
     virtual const op_desc_t *op_desc() const override {
         return reinterpret_cast<const op_desc_t *>(this->desc());
     }
-    virtual void init_info() override { impl::init_info(this, this->info_); }
 
     virtual status_t query(query_t what, int idx, void *result) const override {
         switch (what) {
@@ -139,10 +149,7 @@ struct convolution_pd_t : public primitive_desc_t {
         auto *bia_d = desc()->prop_kind == prop_kind::backward_weights
                 ? &desc()->diff_bias_desc
                 : &desc()->bias_desc;
-        //return !memory_desc_wrapper(bia_d).is_zero();
-        bool ret = !memory_desc_wrapper(bia_d).is_zero();
-        //DNNL_CONV_PD_DBG(ret?" with_bias!":" no-bias");
-        return ret;
+        return !memory_desc_wrapper(bia_d).is_zero();
     }
     bool with_groups() const {
         return invariant_wei_md()->ndims == ndims() + 1;
@@ -206,10 +213,8 @@ protected:
         if (wei_md.format_kind == format_kind::any
                 && !utils::one_of(wei_tag, any, undef))
             IS_OK(memory_desc_init_by_tag(wei_md, wei_tag));
-        if (with_bias() && bia_md.format_kind == format_kind::any){
-            //DNNL_CONV_PD_DBG(" with_bias() && bias format md"<<endl);
+        if (with_bias() && bia_md.format_kind == format_kind::any)
             IS_OK(memory_desc_init_by_tag(bia_md, x));
-        }
 #undef IS_OK
 
         return true;
@@ -225,19 +230,7 @@ protected:
 
     bool expect_data_types(data_type_t src_dt, data_type_t wei_dt,
             data_type_t bia_dt, data_type_t dst_dt, data_type_t acc_dt) const {
-#if 0
-        bool ok = true
-                && (src_dt == data_type::undef
-                        || invariant_src_md()->data_type == src_dt)
-                && (wei_dt == data_type::undef
-                        || invariant_wei_md()->data_type == wei_dt)
-                && (dst_dt == data_type::undef
-                        || invariant_dst_md()->data_type == dst_dt)
-                && (acc_dt == data_type::undef
-                        || desc_.accum_data_type == acc_dt);
-        if (with_bias() && bia_dt != data_type::undef)
-            ok = ok && invariant_bia_md()->data_type == bia_dt;
-#else
+#if DNNL_VERBOSE_EXTRA
 #define AND_(...) SCHKVV(ok,__VA_ARGS__)
         Consistency ok("conv_pd_fwd");
         // with following, no bug
@@ -260,6 +253,18 @@ protected:
             AND_(invariant_bia_md()->data_type == bia_dt);
         }
 #undef AND_
+#else
+        bool ok = true
+                && (src_dt == data_type::undef
+                        || invariant_src_md()->data_type == src_dt)
+                && (wei_dt == data_type::undef
+                        || invariant_wei_md()->data_type == wei_dt)
+                && (dst_dt == data_type::undef
+                        || invariant_dst_md()->data_type == dst_dt)
+                && (acc_dt == data_type::undef
+                        || desc_.accum_data_type == acc_dt);
+        if (with_bias() && bia_dt != data_type::undef)
+            ok = ok && invariant_bia_md()->data_type == bia_dt;
 #endif
         //DNNL_CONV_PD_DBG(" expect_data_types="<<(bool)ok<<endl);
         return ok;

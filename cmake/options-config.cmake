@@ -14,9 +14,9 @@
 # limitations under the License.
 #===============================================================================
 
+# This file has two purposes:
 # 1. Construct a Build Target string describing non-default target options
 # 2. Further option processing for creating dnnl_config.h
-# Split from options.cmake, to keep former a bit more readable.
 #===============================================================================
 
 if(options_config_included)
@@ -31,7 +31,8 @@ include("cmake/options.cmake")
 MACRO(set_01 var)
     # Usage: set_01{foo condition}
     # Result: ${foo} is set to 1 or 0 based on evaluating condition
-    # Why: easier to read FOO instead of defined(FOO)
+    # Why: easier to read '#if FOO' than '#if defined(FOO)'
+    # note: related macro 'set_ternary' in utils.cmake
     if(${ARGN})
         set(${var} 1)
     else()
@@ -164,6 +165,10 @@ endif()
 if(NOT DNNL_ENABLE_RNN)
     set(DNNL_BUILD_STRING "${DNNL_BUILD_STRING} no-rnn")
 endif()
+
+########################## compiler restrictions
+set_01(DNNL_USE_STATIC_THREAD_LOCAL_OBJECTS ${DNNL_OK_STATIC_THREAD_LOCAL_OBJECTS})
+set_01(DNNL_BUG_VALUE_INITIALIZATION NOT ${DNNL_OK_VALUE_INITIALIZATION})
 
 append_map(DNNL_BUILD_STRING DNNL_CPU_EXTERNAL_GEMM "NONE.;MKL. gemm:MKL;CBLAS gemm:CBLAS")
 

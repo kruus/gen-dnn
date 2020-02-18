@@ -238,11 +238,17 @@ void check_eltwise_bwd(const eltwise_test_params &p, const memory::desc &md,
     const dnnl::impl::memory_desc_wrapper data_mdw(data_d.data);
     const dnnl::impl::memory_desc_wrapper diff_data_mdw(diff_data_d.data);
 
-    const data_t eps = static_cast<data_t>(
-            (p.alg_kind == algorithm::eltwise_soft_relu
-                    || p.alg_kind == algorithm::eltwise_tanh)
-                    ? 2e-6f
-                    : (p.alg_kind == algorithm::eltwise_gelu ? 1e-5f : 1e-6f));
+    float eps_f = 0;
+    if (p.alg_kind == algorithm::eltwise_soft_relu) {
+        eps_f = 2e-6f;
+    } else if (p.alg_kind == algorithm::eltwise_tanh) {
+        eps_f = (get_test_engine_kind() == engine::kind::gpu) ? 2e-5f : 2e-6f;
+    } else if (p.alg_kind == algorithm::eltwise_gelu) {
+        eps_f = 1e-5f;
+    } else {
+        eps_f = 1e-6f;
+    }
+    data_t eps = static_cast<data_t>(eps_f);
 
     memory::dim n = n_elems(md);
     for (memory::dim i = 0; i < n; ++i) {
@@ -333,9 +339,7 @@ protected:
         strm = stream(eng);
 
         Forward();
-        if (data_type != memory::data_type::f16) {
-            Backward();
-        }
+        Backward();
     }
 
     void Forward() {
@@ -346,8 +350,8 @@ protected:
 
         data_t data_median = data_t(0);
         data_t data_deviation = (p.alg_kind == algorithm::eltwise_elu
-                || p.alg_kind == algorithm::eltwise_exp)
-                || (p.alg_kind == algorithm::eltwise_swish)
+                                        || p.alg_kind == algorithm::eltwise_exp)
+                        || (p.alg_kind == algorithm::eltwise_swish)
                 ? data_t(1.0)
                 : p.alg_kind == algorithm::eltwise_square ? data_t(6.0)
                                                           : data_t(100.0);
@@ -416,16 +420,14 @@ protected:
 };
 
 using eltwise_test_f16 = eltwise_test<float16_t>;
+using eltwise_test_bf16 = eltwise_test<bfloat16_t>;
 using eltwise_test_f32 = eltwise_test<float>;
 using eltwise_test_s32 = eltwise_test<int>;
 using eltwise_test_s8 = eltwise_test<int8_t>;
 
 TEST_P(eltwise_test_f16, TestsEltwise) {}
 
-#if DNNL_ENABLE_BFLOAT16
-using eltwise_test_bf16 = eltwise_test<bfloat16_t>;
 TEST_P(eltwise_test_bf16, TestsEltwise) {}
-#endif // DNNL_ENABLE_BFLOAT16
 
 TEST_P(eltwise_test_f32, TestsEltwise) {}
 
@@ -455,13 +457,11 @@ TEST_P(eltwise_test_s8, TestsEltwise) {}
             EXPAND(PARAMS(eltwise_exp, __VA_ARGS__)), \
             EXPAND(PARAMS(eltwise_swish, __VA_ARGS__))
 
-// sqrt removed -- get nans
 #define PARAMS_ALL_ALG_SDPART(...) \
-    /*EXPAND(PARAMS(eltwise_sqrt, __VA_ARGS__)),*/\
     EXPAND(PARAMS(eltwise_linear, __VA_ARGS__)), \
-    EXPAND(PARAMS(eltwise_soft_relu, __VA_ARGS__)), \
-    EXPAND(PARAMS(eltwise_bounded_relu, __VA_ARGS__)), \
-    EXPAND(PARAMS(eltwise_logistic, __VA_ARGS__))
+            EXPAND(PARAMS(eltwise_soft_relu, __VA_ARGS__)), \
+            EXPAND(PARAMS(eltwise_bounded_relu, __VA_ARGS__)), \
+            EXPAND(PARAMS(eltwise_logistic, __VA_ARGS__))
 
 #define _CPU_INST_TEST_CASE(str, data_t, ...) \
     CPU_INSTANTIATE_TEST_SUITE_P(str##_##data_t, eltwise_test_##data_t, \
@@ -471,12 +471,9 @@ TEST_P(eltwise_test_s8, TestsEltwise) {}
     INSTANTIATE_TEST_SUITE_P_(str##_##data_t, eltwise_test_##data_t, \
             ::testing::Values(__VA_ARGS__))
 
-#if DNNL_ENABLE_BFLOAT16
 #define CPU_INST_TEST_CASE_BF16(str, ...) \
     _CPU_INST_TEST_CASE(str, bf16, __VA_ARGS__);
 #define INST_TEST_CASE_BF16(str, ...) _INST_TEST_CASE(str, bf16, __VA_ARGS__);
-#endif // DNNL_ENABLE_BFLOAT16
-
 #define GPU_INST_TEST_CASE_F16(str, ...) \
     GPU_INSTANTIATE_TEST_SUITE_P_(TEST_CONCAT(str, _f16), eltwise_test_f16, \
             ::testing::Values(__VA_ARGS__));
@@ -490,7 +487,6 @@ TEST_P(eltwise_test_s8, TestsEltwise) {}
     _CPU_INST_TEST_CASE(str, s8, __VA_ARGS__);
 #define INST_TEST_CASE_S8(str, ...) _INST_TEST_CASE(str, s8, __VA_ARGS__);
 
-#if DNNL_ENABLE_BFLOAT16
 #define CPU_INST_TEST_CASE(str, ...) \
     CPU_INST_TEST_CASE_F32(str, __VA_ARGS__) \
     CPU_INST_TEST_CASE_BF16(str, __VA_ARGS__) \
@@ -503,20 +499,6 @@ TEST_P(eltwise_test_s8, TestsEltwise) {}
     INST_TEST_CASE_F32(str, __VA_ARGS__) \
     INST_TEST_CASE_S32(str, __VA_ARGS__) \
     INST_TEST_CASE_S8(str, __VA_ARGS__)
-#else
-#define CPU_INST_TEST_CASE(str, ...) \
-    CPU_INST_TEST_CASE_F32(str, __VA_ARGS__) \
-    /* CPU_INST_TEST_CASE_BF16(str, __VA_ARGS__) */ \
-    CPU_INST_TEST_CASE_S32(str, __VA_ARGS__) \
-    CPU_INST_TEST_CASE_S8(str, __VA_ARGS__)
-
-#define INST_TEST_CASE(str, ...) \
-    GPU_INST_TEST_CASE_F16(str, __VA_ARGS__) \
-    /* INST_TEST_CASE_BF16(str, __VA_ARGS__) */ \
-    INST_TEST_CASE_F32(str, __VA_ARGS__) \
-    INST_TEST_CASE_S32(str, __VA_ARGS__) \
-    INST_TEST_CASE_S8(str, __VA_ARGS__)
-#endif
 
 INST_TEST_CASE(SimpleZeroDim,
         PARAMS_ALL_ALG(ncdhw, nCdhw8c, 0.1f, 0.f, 0, 2, 4, 4, 4),
@@ -611,4 +593,3 @@ INST_TEST_CASE(AlexNet_NCHW,
 INST_TEST_CASE(Simple_X, PARAMS_ALL_ALG(x, x, 0.f, 0.f, 55));
 
 } // namespace dnnl
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

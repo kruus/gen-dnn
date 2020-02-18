@@ -14,6 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include <cmath>
 #include <stdlib.h>
 
 #include "dnnl.h"
@@ -164,7 +165,6 @@ int compare_bootstrap(dnn_mem_t &mem_ref, dnn_mem_t &mem_got, res_t *r) {
 
 static int compare(const prb_t *p, const dnn_mem_t &mem_ref,
         const dnn_mem_t &mem_got, const attr_bundle_t &attr_bundle, res_t *r) {
-    using std::isinf;
     const auto nelems = mem_got.nelems();
     r->errors = 0;
     r->total = nelems;
@@ -198,7 +198,7 @@ static int compare(const prb_t *p, const dnn_mem_t &mem_ref,
         bool ok = rel_diff <= tolerance;
 
         // f32->f16 results in inf for FLT_MAX input
-        if (!ok) ok = isinf(fp) && isinf(dt);
+        if (!ok) ok = std::isinf(fp) && std::isinf(dt);
 
         r->errors += !ok;
 

@@ -79,5 +79,5 @@ dnnl_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
 } // namespace impl
 } // namespace dnnl
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
 #endif // GEMM_HPP

@@ -17,12 +17,10 @@
 #ifndef JIT_AVX512_CORE_BF16CVT_HPP
 #define JIT_AVX512_CORE_BF16CVT_HPP
 
-#include "cpu_isa_traits.hpp"
-#if DNNL_ENABLE_BFLOAT16
-
 #include <assert.h>
 
 #include "c_types_map.hpp"
+#include "cpu_isa_traits.hpp"
 #include "dnnl_debug.h"
 #include "nstl.hpp"
 #include "type_helpers.hpp"
@@ -124,6 +122,7 @@ struct bf16_emulation_t {
         host_->vpbroadcastd(selector_, scratch_.cvt32());
     }
 
+    // XXX some files may require ONLY bf16_emulation_t::get_isa() to succeed
     static cpu_isa_t get_isa() { return avx512_core; }
 
 private:
@@ -647,6 +646,4 @@ private:
 } // namespace impl
 } // namespace dnnl
 
-#endif // DNNL_ENABLE_BFLOAT16
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

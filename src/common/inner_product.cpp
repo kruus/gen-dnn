@@ -33,12 +33,7 @@ status_t ip_desc_init(inner_product_desc_t *ip_desc, prop_kind_t prop_kind,
         const memory_desc_t *src_desc, const memory_desc_t *weights_desc,
         const memory_desc_t *bias_desc, const memory_desc_t *dst_desc) {
     bool args_ok = !any_null(ip_desc, src_desc, weights_desc, dst_desc);
-    if (!args_ok){
-        printf(" ip_desc_init: null args!"); fflush(stdout);
-        return invalid_arguments;
-    }
 
-    //auto id = inner_product_desc_t{};
     auto id = zero<inner_product_desc_t>();
     id.primitive_kind = primitive_kind::inner_product;
     id.prop_kind = prop_kind;
@@ -93,10 +88,8 @@ status_t dnnl_inner_product_forward_desc_init(inner_product_desc_t *ip_desc,
         prop_kind_t prop_kind, const memory_desc_t *src_desc,
         const memory_desc_t *weights_desc, const memory_desc_t *bias_desc,
         const memory_desc_t *dst_desc) {
-    if (!one_of(prop_kind, forward_training, forward_inference)){
-        printf(" (ip:not fwd) "); fflush(stdout);
+    if (!one_of(prop_kind, forward_training, forward_inference))
         return invalid_arguments;
-    }
     return ip_desc_init(
             ip_desc, prop_kind, src_desc, weights_desc, bias_desc, dst_desc);
 }

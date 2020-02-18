@@ -35,7 +35,7 @@ struct _jit_avx512_core_x8s8s32x_1x1_conv_kernel : public jit_generator {
             const jit_1x1_conv_conf_t &ajcp, const primitive_attr_t &attr)
         : jcp(ajcp), attr_(attr), eltwise_injector_(nullptr) {
         if (jcp.with_eltwise)
-            eltwise_injector_ = new jit_uni_eltwise_injector_f32<avx512_common>(
+            eltwise_injector_ = new jit_uni_eltwise_injector_f32<avx512_core>(
                     this, jcp.eltwise);
 
         this->generate();
@@ -50,7 +50,7 @@ struct _jit_avx512_core_x8s8s32x_1x1_conv_kernel : public jit_generator {
     void (*jit_ker)(jit_1x1_conv_call_s *);
 
 private:
-    jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
+    jit_uni_eltwise_injector_f32<avx512_core> *eltwise_injector_;
 
     const Xbyak::Reg64 reg_last_load = r8;
     const Xbyak::Reg64 reg_bcast_data = r8;
@@ -79,6 +79,7 @@ private:
     const Vmm vmm_tmp = Vmm(28);
     const Vmm vmm_one = Vmm(29);
     const Vmm vmm_zero = Vmm(30);
+    const Vmm vmm_prev_dst = Vmm(30);
     const Vmm vmm_shift = Vmm(30);
     const Vmm vmm_bcast = Vmm(31);
     const Vmm vmm_bias_alpha = Vmm(31);
@@ -150,6 +151,9 @@ struct jit_avx512_core_x8s8s32x_1x1_conv_kernel {
     _jit_avx512_core_x8s8s32x_1x1_conv_kernel<Xbyak::Zmm> *zmm_kernel_;
     _jit_avx512_core_x8s8s32x_1x1_conv_kernel<Xbyak::Ymm> *ymm_kernel_;
     _jit_avx512_core_x8s8s32x_1x1_conv_kernel<Xbyak::Xmm> *xmm_kernel_;
+
+private:
+    DNNL_DISALLOW_COPY_AND_ASSIGN(jit_avx512_core_x8s8s32x_1x1_conv_kernel);
 };
 
 } // namespace cpu

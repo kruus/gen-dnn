@@ -16,24 +16,19 @@
 
 #ifndef CPU_JIT_GENERATOR_HPP
 #define CPU_JIT_GENERATOR_HPP
-#if !TARGET_X86_JIT
-#warning "jit_generator.hpp is only appropriate for TARGET_X86_JIT builds"
-#else
 
 #include <limits.h>
 
-#include "dnnl_thread.hpp"
+#include "bit_cast.hpp"
 #include "utils.hpp"
 
 #include "cpu_isa_traits.hpp"
 #include "jit_utils/jit_utils.hpp"
 
-#if 0 // is this used in dnnl v1.1.0+ ?  (it might go into cpu_isa_traits.hpp)
 #if defined(_WIN32) && !defined(__GNUC__)
 #define STRUCT_ALIGN(al, ...) __declspec(align(al)) __VA_ARGS__
 #else
 #define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__(al)))
-#endif
 #endif
 
 #if defined(_WIN32)
@@ -51,12 +46,11 @@ namespace cpu {
 // TODO: move this to jit_generator class?
 namespace {
 
-#if 0 // moved to cpu_isa_traits (also used for non-jit malloc size)    
-typedef enum {
-    PAGE_4K = 4096,
-    PAGE_2M = 2097152,
-} cpu_page_size_t;
-#endif
+// in dnnl::impl::cpu from cpu_isa_traits.hpp now
+//typedef enum {
+//    PAGE_4K = 4096,
+//    PAGE_2M = 2097152,
+//} cpu_page_size_t;
 
 typedef enum {
     MAX_CODE_SIZE = 256 * 1024,
@@ -65,12 +59,7 @@ typedef enum {
 // TODO: move this somewhere else? Although this is only used by jit kernels
 // (Roma)
 static inline int float2int(float x) {
-    union {
-        float vfloat;
-        int vint;
-    } cvt;
-    cvt.vfloat = x;
-    return cvt.vint;
+    return utils::bit_cast<int>(x);
 }
 
 // TODO: A GPR class that hides ABI details from the JIT kernels and allows
@@ -114,32 +103,6 @@ static const Xbyak::Reg64 abi_param1(Xbyak::Operand::RDI),
         abi_param4(Xbyak::Operand::RCX), abi_param5(Xbyak::Operand::R8),
         abi_param6(Xbyak::Operand::R9), abi_not_param1(Xbyak::Operand::RCX);
 #endif
-#endif
-
-#if 0 // --> cpu_isa_traits.hpp (maybe not right place for it)
-// XXX sometimes called from non-jit code!!!
-inline unsigned int get_cache_size(int level, bool per_core = true) {
-    unsigned int l = level - 1;
-    // Currently, if XByak is not able to fetch the cache topology
-    // we default to 32KB of L1, 512KB of L2 and 1MB of L3 per core.
-    if (cpu.getDataCacheLevels() == 0) {
-        const int L1_cache_per_core = 32000;
-        const int L2_cache_per_core = 512000;
-        const int L3_cache_per_core = 1024000;
-        int num_cores = per_core ? 1 : dnnl_get_max_threads();
-        switch (l) {
-            case (0): return L1_cache_per_core * num_cores;
-            case (1): return L2_cache_per_core * num_cores;
-            case (2): return L3_cache_per_core * num_cores;
-            default: return 0;
-        }
-    }
-    if (l < cpu.getDataCacheLevels()) {
-        return cpu.getDataCacheSize(l)
-                / (per_core ? cpu.getCoresSharingDataCache(l) : 1);
-    } else
-        return 0;
-}
 #endif
 
 } // namespace
@@ -861,6 +824,19 @@ public:
         vmovmskps(x1, x2);
     }
 
+    void uni_vmovq(const Xbyak::Xmm &x, const Xbyak::Reg64 &r) {
+        if (mayiuse(avx))
+            vmovq(x, r);
+        else
+            movq(x, r);
+    }
+    void uni_vmovq(const Xbyak::Address &addr, const Xbyak::Xmm &x) {
+        if (mayiuse(avx))
+            vmovq(addr, x);
+        else
+            movq(addr, x);
+    }
+
     void uni_vpackssdw(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
             const Xbyak::Operand &op) {
         assert(x1.getIdx() == x1.getIdx());
@@ -1417,6 +1393,4 @@ public:
 } // namespace impl
 } // namespace dnnl
 
-#endif // TARGET_X86_JIT
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

@@ -29,24 +29,6 @@
 #include "dnnl.hpp"
 #include "dnnl_debug.h"
 
-#if 1 // pause for gdb
-#include <stdio.h>
-static void inline myflush(FILE *in) {
-	int ch;
-	do
-		ch = fgetc ( in ); 
-	while ( ch != EOF && ch != '\n' ); 
-	clearerr ( in );
-}
-static void inline mypause() { 
-	printf ( "Press [Enter] to continue . . ." );
-	fflush ( stdout );
-	getchar();
-} 
-#else
-void mypause() {}
-#endif
-
 #if 1 // ostream output for various memory things (stack clobbering debug, maybe lifetime?)
 #include "dnnl_debug.h"
 #include <iostream>
@@ -106,11 +88,9 @@ inline int handle_example_errors(
         std::cout << "DNNL error caught: " << std::endl
                   << "\tStatus: " << dnnl_status2str(e.status) << std::endl
                   << "\tMessage: " << e.what() << std::endl;
-        mypause(); //debug!
         exit_code = 1;
     } catch (std::exception &e) {
         std::cout << "Error in the example: " << e.what() << "." << std::endl;
-        mypause(); // debug!
         exit_code = 2;
     }
 

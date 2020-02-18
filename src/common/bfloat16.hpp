@@ -24,6 +24,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
+
 #include "dnnl.h"
 
 namespace dnnl {

@@ -27,6 +27,8 @@
 
 #include "gemm_f32_matmul.hpp"
 
+#include "gemm/gemm.hpp"
+
 namespace dnnl {
 namespace impl {
 namespace cpu {

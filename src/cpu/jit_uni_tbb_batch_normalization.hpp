@@ -25,6 +25,7 @@
 
 #include "cpu_batch_normalization_pd.hpp"
 #include "cpu_isa_traits.hpp"
+//#include "jit_avx512_core_bf16cvt.hpp" // XXX .hpp requires bf16_emulation_t::get_isa()
 
 namespace dnnl {
 namespace impl {

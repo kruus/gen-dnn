@@ -17,7 +17,6 @@
 #ifndef NSTL_HPP
 #define NSTL_HPP
 
-#include "cpu_target.h"
 #include <float.h>
 #include <limits.h>
 #include <stdint.h>
@@ -120,6 +119,10 @@ struct numeric_limits<bfloat16_t> {
     static constexpr bfloat16_t max() { return bfloat16_t(0x7f7f, true); }
 
     static constexpr int digits = 8;
+
+    static constexpr bfloat16_t epsilon() {
+        return bfloat16_t(((0x7f - (digits - 1)) << (digits - 1)), true);
+    }
 };
 #endif // DNNL_ENABLE_BFLOAT16
 
@@ -130,6 +133,10 @@ struct numeric_limits<float16_t> {
     static constexpr float16_t max() { return float16_t(0x7bff, true); }
 
     static constexpr int digits = 11;
+
+    static constexpr float16_t epsilon() {
+        return float16_t(((0x0f - (digits - 1)) << (digits - 1)), true);
+    }
 };
 
 template <typename T>

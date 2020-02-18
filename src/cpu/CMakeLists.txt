@@ -21,20 +21,11 @@ file(GLOB_RECURSE SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
     )
 
-#macro(list_filter_exclude _list _regexp)
-#    # list_filter_exclude(<list> <regexp>)
-#    # behave like list(FILTER <list> EXCLUDE REGEX <regexp>)
-#    set(_kept)
-#    foreach(_item ${_list})
-#        string(REGEX MATCH "${_regexp}" _ok ${_item})
-#        if(NOT _ok)
-#            list(APPEND _kept _item)
-#        endif()
-#    endif()
-#    set(${_list} _kept)
-#endmacro()
-
+# vanilla-x86 and non-x86 targets should ignore all x86 jit files
 if(NOT TARGET_X86_JIT)
+    # XXX rnn directory has to be there for API-completeness, but no
+    #     ref impls will be available
+    # XXX reference bfloat support may also not be available
     message(STATUS "no x86 JIT: removing all '.*jit.*' source code")
     message(STATUS "\nbegin:\n${SOURCES}\n")
     #list(FILTER SOURCES EXCLUDE REGEX ".*(jit|xbyak).*") # not in older cmake
@@ -78,9 +69,8 @@ if(MSVC)
         PROPERTIES COMPILE_FLAGS "/bigobj")
 endif()
 
-file(GLOB HPP_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp)
-
-# Hmmm. not quite working? (missing include_directories)
+# Check that all headers will compile "standalone"
+# Hmmm. not quite working. how did I do this before?
 #set(CMAKE_REQUIRED_FLAGS ${CMAKE_CXX_FLAGS})
 #set(CMAKE_REQUIRED_INCLUDES ${CMAKE_CXX_FLAGS})
 #include(CheckIncludeFileCXX)
@@ -91,5 +81,5 @@ file(GLOB HPP_HEADERS ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp)
 
 set(OBJ_LIB ${LIB_NAME}_cpu)
 add_library(${OBJ_LIB} OBJECT ${SOURCES})
-set(${LIB_NAME}_SUB_OBJS ${${LIB_NAME}_SUB_OBJS}
-    $<TARGET_OBJECTS:${OBJ_LIB}> PARENT_SCOPE)
+set_property(GLOBAL APPEND PROPERTY DNNL_LIB_DEPS
+    $<TARGET_OBJECTS:${OBJ_LIB}>)

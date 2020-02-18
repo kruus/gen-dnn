@@ -85,6 +85,5 @@ private:
 } // namespace impl
 } // namespace dnnl
 #endif // DNNL_ENABLE_BFLOAT16
-
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

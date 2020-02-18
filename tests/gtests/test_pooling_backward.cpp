@@ -468,8 +468,8 @@ CPU_INSTANTIATE_TEST_SUITE_P(TestPoolingBackwardMaxKernelSlipsToPadding,
                 pool_bwd_test_params_float {algorithm::pooling_max,
                         memory::format_tag::nhwc, memory::format_tag::nhwc,
                         EXPAND_SIZES_2D(
-                                1, 16, 10, 10, 6, 6, 5, 5, 10, 10, 5, 5)}
-                , pool_bwd_test_params_float {algorithm::pooling_max,
+                                1, 16, 10, 10, 6, 6, 5, 5, 10, 10, 5, 5)},
+                pool_bwd_test_params_float {algorithm::pooling_max,
                         memory::format_tag::nChw8c, memory::format_tag::nChw8c,
                         EXPAND_SIZES_2D(
                                 1, 16, 10, 10, 6, 6, 5, 5, 10, 10, 5, 5)},
@@ -477,8 +477,7 @@ CPU_INSTANTIATE_TEST_SUITE_P(TestPoolingBackwardMaxKernelSlipsToPadding,
                         memory::format_tag::nChw16c,
                         memory::format_tag::nChw16c,
                         EXPAND_SIZES_2D(
-                                1, 16, 10, 10, 6, 6, 5, 5, 10, 10, 5, 5)}
-                        ));
+                                1, 16, 10, 10, 6, 6, 5, 5, 10, 10, 5, 5)}));
 
 CPU_INSTANTIATE_TEST_SUITE_P(TestPooling3D_nCdhw16c, pooling_bwd_test_float,
         ::testing::Values(pool_bwd_test_params_float {algorithm::pooling_max,

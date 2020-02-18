@@ -13,7 +13,8 @@ element-wise:
         src0(\overline{x}) \mathbin{op} src1(\overline{x}),
 \f]
 
-where \f$op\f$ is addition or multiplication.
+where \f$op\f$ is addition, multiplication, get maximum value or get minimum
+value.
 
 The binary primitive does not have a notion of forward or backward propagations.
 
@@ -43,12 +44,18 @@ The binary primitive does not have a notion of forward or backward propagations.
 
 ### Post-ops and Attributes
 
-The binary primitive does not support any post-ops or attributes.
+The following attributes are supported:
+
+| Type      | Operation     | Restrictions       | Description
+| :--       | :--           | :--                | :--
+| Attribute | [Scales](@ref dnnl::primitive_attr::set_scales) | The corresponding tensor has integer data type. Only one scale per tensor is supported. Input tensors only. | Scales the corresponding input tensor by the given scale factor(s).
+| Post-op   | [Sum](@ref dnnl::post_ops::append_sum)          | Must precede eltwise post-op. | Adds the operation result to the destination tensor instead of overwriting it. |
+| Post-op   | [Eltwise](@ref dnnl::post_ops::append_eltwise)  |                               | Applies an @ref dnnl_api_eltwise operation to the result. |
 
 ### Data Types Support
 
-The source and destination tensors may have `f32` or `bf16` data types. See @ref
-dev_guide_data_types page for more details.
+The source and destination tensors may have `f32`, `bf16`, or `int8` data types.
+See @ref dev_guide_data_types page for more details.
 
 ### Data Representation
 
@@ -63,8 +70,9 @@ meaning associated with any of tensors dimensions.
 1. Refer to @ref dev_guide_data_types for limitations related to data types
    support.
 
+2. No post-ops or attributes support on GPU.
 
 ## Performance Tips
 
-1. Whenever possible, avoid specifying the destination memory format so that
-   the primitive is able to choose the most appropriate one.
+1. Whenever possible, avoid specifying different memory formats for source
+   tensors.

@@ -23,13 +23,16 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+
 #include <memory>
+#include <string>
 
 #include "cpu_target.h" // dnnl_config, with some extra build macro settings
-#include "c_types_map.hpp"
-#include "nstl.hpp"
-#include "z_magic.hpp"
 
+// XXX CHECKME where is DNNL_X86_64 used? is it equivalent to TARGET_X86?
+#if defined(__x86_64__) || defined(_M_X64)
+#define DNNL_X86_64
+#endif
 
 #define MSAN_ENABLED 0
 #define ATTR_NO_MSAN
@@ -42,6 +45,10 @@
 #include <sanitizer/msan_interface.h>
 #endif
 #endif
+
+#include "c_types_map.hpp"
+#include "nstl.hpp"
+#include "z_magic.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -149,35 +156,24 @@ inline T &&forward(typename utils::remove_reference<T>::type &&t) {
     return static_cast<T &&>(t);
 }
 
+/** Zero memory of structs in DNNL's 'C' API.
+ * Buggy compilers \e might elide zeroing during statements like
+ * `auto x = CPodType();`, at least in some contexts that DNNL code triggers
+ *
+ * For DNNL purposes, setting such POD types (with trivial default
+ * constructors) to zero with `memset` is a good enough workaround. */
 template <typename T>
 inline typename remove_reference<T>::type zero() {
+    // NO static_assert(std::is_pod<typename remove_reference<T>::type>::value, "Please zero<T> only POD objects");
+    // NO static_assert(std::is_trivial<typename remove_reference<T>::type>::value, "zero<T> should have trivial T");
+    static_assert(std::is_standard_layout<typename remove_reference<T>::type>::value, "zero<T> should have standard layout");
     auto zero = typename remove_reference<T>::type();
-    //
-    // Some compilers, like nc++, may [reproducibly] elide value-intialization.
-    // filling (parts of?) objects indeterminate (whatever happened to be on stack).
-    //
-    // So global changes
-    //    auto x = foo_t();
-    // to
-    //    auto x = foo_t{}; // ohoh, maybe not even this works always?
-    // or
-    //    auto x = utils::zero<foo_t>() (in src/common/utils.hpp)
-    //        which calls memset(void*dst,0,sizeof(foo_t))
-    // can force C types to zero-initialize, for those bad compilers.
-    //auto zero = typename remove_reference<T>::type{};
-#if 0 // old debugging...
-    // inserting the following code made the [compiler] bug go away?
-    bool bad_compiler = false;
-    for(size_t i=0; i<sizeof(T); ++i){
-        if( ((char*)(void*)&zero)[i] != '\0' ){
-            printf("\nError: Your C++ compiler fails to value-initialize properly!\n");
-            bad_compiler = true;
-            break;
-        }
-    }
-#endif
-#if TARGET_VE /* original heavy-handed way */
-    memset(&zero, 0, sizeof(T));
+#if DNNL_BUG_VALUE_INITIALIZATION
+    // sometimes zero is used for non-POD types.  Bug is for pod types.
+    // Ex. dnnl_concat_desc_t includes a std::vector of dnnl_memory_desc_t,
+    //     so hope compiler gets this one right.
+    if (std::is_pod<typename remove_reference<T>::type>::value)
+        memset(&zero, 0, sizeof(T));
 #endif
     return zero;
 }
@@ -301,6 +297,11 @@ inline void simultaneous_sort(
     }
 }
 
+template <typename T>
+inline const T &saturate(const T &low, const T &upper, const T &a) {
+    return nstl::max(low, nstl::min(upper, a));
+}
+
 template <typename T, typename U>
 inline typename remove_reference<T>::type div_up(const T a, const U b) {
     assert(b);
@@ -336,7 +337,8 @@ T *align_ptr(T *ptr, uintptr_t alignment) {
 }
 
 template <typename T, typename U, typename V>
-inline U this_block_size(const T offset, const U max, const V block_size) {
+inline typename remove_reference<U>::type this_block_size(
+        const T offset, const U max, const V block_size) {
     assert(offset < max);
     // TODO (Roma): can't use nstl::max() due to circular dependency... we
     // need to fix this
@@ -367,7 +369,13 @@ inline bool nd_iterator_step() {
 }
 template <typename U, typename W, typename... Args>
 inline bool nd_iterator_step(U &x, const W &X, Args &&... tuple) {
-#if 0
+#if !TARGET_VE // dnnl original
+    if (nd_iterator_step(utils::forward<Args>(tuple)...)) {
+        x = (x + 1) % X;
+        return x == 0;
+    }
+    return false;
+#else
     // nc++: err(1813) Cannot branch into or out of OpenMP construct.
     bool ret = false;
     if (nd_iterator_step(utils::forward<Args>(tuple)...)) {
@@ -375,11 +383,11 @@ inline bool nd_iterator_step(U &x, const W &X, Args &&... tuple) {
         ret = (x == 0);
     }
     return ret;
+    // can nc++ do better with a one-liner? (no)
+    //return nd_iterator_step(utils::forward<Args>(tuple)...)
+    //        ? (x = (x + 1) % X) == 0
+    //        : false;
 #endif
-    // can nc++ do better with a one-liner?
-    return nd_iterator_step(utils::forward<Args>(tuple)...)
-            ? (x = (x + 1) % X) == 0
-            : false;
 }
 
 template <typename U, typename W, typename Y>

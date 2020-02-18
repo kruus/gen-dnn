@@ -67,7 +67,7 @@ struct global_scratchpad_t : public scratchpad_t {
         UNUSED(engine);
         if (size > size_) {
             auto *mem_storage = create_scratchpad_memory_storage(engine, size);
-#if !TARGET_VE
+#if DNNL_USE_STATIC_THREAD_LOCAL_OBJECTS
             mem_storage_.reset(mem_storage);
 #else
             delete mem_storage_;
@@ -81,7 +81,7 @@ struct global_scratchpad_t : public scratchpad_t {
     ~global_scratchpad_t() {
         reference_count_--;
         if (reference_count_ == 0) {
-#if !TARGET_VE
+#if DNNL_USE_STATIC_THREAD_LOCAL_OBJECTS
             mem_storage_.reset();
 #else
             delete mem_storage_;
@@ -92,7 +92,7 @@ struct global_scratchpad_t : public scratchpad_t {
     }
 
     virtual const memory_storage_t *get_memory_storage() const override {
-#if !TARGET_VE
+#if DNNL_USE_STATIC_THREAD_LOCAL_OBJECTS
         return mem_storage_.get();
 #else
         return mem_storage_;
@@ -100,17 +100,16 @@ struct global_scratchpad_t : public scratchpad_t {
     }
 
 private:
-#if !TARGET_VE
+#if DNNL_USE_STATIC_THREAD_LOCAL_OBJECTS
     thread_local static std::unique_ptr<memory_storage_t> mem_storage_;
 #else // workaround lack of support for thread_local C++ objects
     thread_local static memory_storage_t * mem_storage_;
-    // ? atexit ?
 #endif
     thread_local static size_t size_;
     thread_local static unsigned int reference_count_;
 };
 
-#if !TARGET_VE
+#if DNNL_USE_STATIC_THREAD_LOCAL_OBJECTS
 thread_local std::unique_ptr<memory_storage_t>
         global_scratchpad_t::mem_storage_(nullptr);
 #else

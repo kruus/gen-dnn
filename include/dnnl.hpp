@@ -20,7 +20,7 @@
 #ifndef DNNL_HPP
 #define DNNL_HPP
 
-#include "dnnl_config.h" // some DNNL_TARGET_xxx targets needed debugging :(
+#include "dnnl_config.h"
 
 /// @cond DO_NOT_DOCUMENT_THIS
 #include <algorithm>
@@ -30,6 +30,8 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+
+// XXX debug stuff --- should remove
 #if DNNL_TARGET_VE
 #define DNNL_MD_DEBUG 1
 #define DNNL_MD_VERBOSE 0
@@ -37,7 +39,7 @@
 #define DNNL_MD_DEBUG 0
 #define DNNL_MD_VERBOSE 0
 #else
-#warning " normal dnnl::memory::desc"
+//#warning " normal dnnl::memory::desc"
 #define DNNL_MD_DEBUG 0
 #define DNNL_MD_VERBOSE 0
 #endif
@@ -481,7 +483,7 @@ enum class algorithm {
     eltwise_relu = dnnl_eltwise_relu,
     /// Elementwise: hyperbolic tangent non-linearity (tanh)
     eltwise_tanh = dnnl_eltwise_tanh,
-    /// Elementwise: parametric exponential linear unit (elu)
+    /// Elementwise: exponential linear unit (elu)
     eltwise_elu = dnnl_eltwise_elu,
     /// Elementwise: square
     eltwise_square = dnnl_eltwise_square,
@@ -505,8 +507,22 @@ enum class algorithm {
     eltwise_gelu = dnnl_eltwise_gelu,
     /// Elementwise: natural logarithm
     eltwise_log = dnnl_eltwise_log,
-    /// Eltwise: clip
+    /// Elementwise: clip
     eltwise_clip = dnnl_eltwise_clip,
+    /// Elementwise: pow
+    eltwise_pow = dnnl_eltwise_pow,
+    /// Elementwise: ReLU (dst for backward)
+    eltwise_relu_use_dst_for_bwd = dnnl_eltwise_relu_use_dst_for_bwd,
+    /// Elementwise: hyperbolic tangent non-linearity (tanh) (dst for backward)
+    eltwise_tanh_use_dst_for_bwd = dnnl_eltwise_tanh_use_dst_for_bwd,
+    /// Elementwise: exponential linear unit (elu) (dst for backward)
+    eltwise_elu_use_dst_for_bwd = dnnl_eltwise_elu_use_dst_for_bwd,
+    /// Elementwise: square root (dst for backward)
+    eltwise_sqrt_use_dst_for_bwd = dnnl_eltwise_sqrt_use_dst_for_bwd,
+    /// Elementwise: logistic (dst for backward)
+    eltwise_logistic_use_dst_for_bwd = dnnl_eltwise_logistic_use_dst_for_bwd,
+    /// Elementwise: exponent (dst for backward)
+    eltwise_exp_use_dst_for_bwd = dnnl_eltwise_exp_use_dst_for_bwd,
     /// Local response normalization (LRN) across multiple channels
     lrn_across_channels = dnnl_lrn_across_channels,
     /// LRN within a single channel
@@ -539,6 +555,10 @@ enum class algorithm {
     binary_add = dnnl_binary_add,
     /// Binary mul
     binary_mul = dnnl_binary_mul,
+    /// Binary max
+    binary_max = dnnl_binary_max,
+    /// Binary min
+    binary_min = dnnl_binary_min,
     /// Nearest Neighbor resampling method
     resampling_nearest = dnnl_resampling_nearest,
     /// Linear (Bilinear, Trilinear) resampling method
@@ -1037,8 +1057,54 @@ struct primitive_attr : public handle<dnnl_primitive_attr_t> {
                 "could not set primitive output scales attribute");
     }
 
-    /// Returns zero points correspondence mask and values for a given memory
+    /// Returns scaling factors correspondence mask and values for a given
+    /// memory argument.
+    ///
+    /// @param arg Parameter argument index as passed to the
+    ///     primitive::execute() call.
+    /// @param mask Scaling factors correspondence mask that defines the
+    ///     correspondence between the output tensor dimensions and the @p
+    ///     scales vector. The set i-th bit indicates that a dedicated scaling
+    ///     factor is used for each index along that dimension. Set the mask to
+    ///     0 to use a common scaling factor for the whole output tensor.
+    /// @param scales Output vector of scaling factors.
+    void get_scales(int arg, int &mask, std::vector<float> &scales) const {
+        dnnl_dim_t count;
+        int c_mask;
+        const float *c_scales;
+        error::wrap_c_api(dnnl_primitive_attr_get_scales(
+                                  get(), arg, &count, &c_mask, &c_scales),
+                "could not get scales");
+        scales.resize(count);
+
+        mask = c_mask;
+        for (dnnl_dim_t c = 0; c < count; ++c)
+            scales[c] = c_scales[c];
+    }
+
+    /// Sets scaling factors for primitive operations for a given memory
     /// argument.
+    ///
+    /// @sa dnnl_primitive_attr_set_scales
+    /// @sa dnnl::primitive_attr::set_output_scales
+    ///
+    /// @param arg Parameter argument index as passed to the
+    ///     primitive::execute() call.
+    /// @param mask Scaling factors correspondence mask that defines the
+    ///     correspondence between the tensor dimensions and the @p scales
+    ///     vector. The set i-th bit indicates that a dedicated scaling factor
+    ///     is used for each index along that dimension. Set the mask to 0 to
+    ///     use a common scaling factor for the whole output tensor.
+    /// @param scales Constant vector of scaling factors. The following equality
+    ///     must hold:
+    ///     \f[scales.size() = \prod\limits_{d \in mask} argument.dims[d].\f]
+    void set_scales(int arg, int mask, const std::vector<float> &scales) {
+        error::wrap_c_api(dnnl_primitive_attr_set_scales(get(), arg,
+                                  (dnnl_dim_t)scales.size(), mask, &scales[0]),
+                "could not set scales");
+    }
+
+    /// Returns zero points correspondence mask and values.
     ///
     /// @param arg Parameter argument index as passed to the
     ///     primitive::execute() call.
@@ -1666,6 +1732,8 @@ struct memory : public handle<dnnl_memory_t> {
         abcdef = dnnl_abcdef,
         /// plain 6D tensor
         acbdef = dnnl_acbdef,
+        /// plain 6D tensor
+        defcab = dnnl_defcab,
 
         /// 1D tensor; an alias for #dnnl::memory::format_tag::a
         x = a,
@@ -1735,6 +1803,8 @@ struct memory : public handle<dnnl_memory_t> {
         goidhw = abcdef,
         /// 6D CNN weights tensor with groups; an alias for #dnnl::memory::format_tag::abcdef
         giodhw = acbdef,
+        /// 6D CNN weights tensor with groups; an alias for #dnnl::memory::format_tag::defcab
+        dhwigo = defcab,
 
         /// 3D RNN data tensor in the format (seq_length, batch, input channels).
         tnc = abc,
@@ -1917,10 +1987,12 @@ struct memory : public handle<dnnl_memory_t> {
         OIw8o16i2o = dnnl_OIw8o16i2o,
         OIw8o8i = dnnl_OIw8o8i,
         Owi16o = dnnl_Owi16o,
+        OwI16o2i = dnnl_OwI16o2i,
         Owi4o = dnnl_Owi4o,
         Owi8o = dnnl_Owi8o,
         IOhw16o16i = dnnl_IOhw16o16i,
         Ohwi16o = dnnl_Ohwi16o,
+        OhwI16o2i = dnnl_OhwI16o2i,
         Ohwi4o = dnnl_Ohwi4o,
         Ohwi8o = dnnl_Ohwi8o,
         OIhw16i16o = dnnl_OIhw16i16o,
@@ -1936,6 +2008,7 @@ struct memory : public handle<dnnl_memory_t> {
         OIhw8o8i = dnnl_OIhw8o8i,
         OIhw2i8o4i = dnnl_OIhw2i8o4i,
         Odhwi16o = dnnl_Odhwi16o,
+        OdhwI16o2i = dnnl_OdhwI16o2i,
         Odhwi4o = dnnl_Odhwi4o,
         Odhwi8o = dnnl_Odhwi8o,
         OIdhw16i16o = dnnl_OIdhw16i16o,
@@ -1963,12 +2036,14 @@ struct memory : public handle<dnnl_memory_t> {
         gOIw8o16i2o = dnnl_gOIw8o16i2o,
         gOIw8o8i = dnnl_gOIw8o8i,
         gOwi16o = dnnl_gOwi16o,
+        gOwI16o2i = dnnl_gOwI16o2i,
         gOwi4o = dnnl_gOwi4o,
         gOwi8o = dnnl_gOwi8o,
         Goiw8g = dnnl_Goiw8g,
         Goiw16g = dnnl_Goiw16g,
         gIOhw16o16i = dnnl_gIOhw16o16i,
         gOhwi16o = dnnl_gOhwi16o,
+        gOhwI16o2i = dnnl_gOhwI16o2i,
         gOhwi4o = dnnl_gOhwi4o,
         gOhwi8o = dnnl_gOhwi8o,
         Goihw16g = dnnl_Goihw16g,
@@ -1991,6 +2066,7 @@ struct memory : public handle<dnnl_memory_t> {
         gOIhw8o8i = dnnl_gOIhw8o8i,
         gIOdhw16i16o = dnnl_gIOdhw16i16o,
         gOdhwi16o = dnnl_gOdhwi16o,
+        gOdhwI16o2i = dnnl_gOdhwI16o2i,
         gOdhwi4o = dnnl_gOdhwi4o,
         gOdhwi8o = dnnl_gOdhwi8o,
         gOIdhw16i16o = dnnl_gOIdhw16i16o,
@@ -2051,20 +2127,23 @@ struct memory : public handle<dnnl_memory_t> {
         /// @param dims Tensor dimensions.
         /// @param data_type Data precision/type.
         /// @param format_tag Memory format tag.
+        /// @param allow_empty A flag signifying whether construction is
+        ///     allowed to fail without throwing an exception. In this case a
+        ///     zero memory descriptor will be constructed. This flag is
+        ///     optional and defaults to false.
         desc(const memory::dims &dims, data_type data_type,
-                format_tag format_tag)
-        : data()
-        //: data(dnnl_memory_desc_t DNNL_ZERO_MEMORY_DESC_T) // VE debug
-        {
+                format_tag format_tag, bool allow_empty = false)
+            : data() {
             if(DNNL_MD_DEBUG) zero_data();
             validate_dims(dims);
             if(DNNL_MD_VERBOSE) msg(" +desc(dims,data_type,format_tag)");
-            error::wrap_c_api(
-                    dnnl_memory_desc_init_by_tag(&data, (int)dims.size(),
-                            dims.size() == 0 ? nullptr : &dims[0],
-                            convert_to_c(data_type), convert_to_c(format_tag)),
-                    "could not construct a memory descriptor using a format "
-                    "tag");
+            dnnl_status_t status = dnnl_memory_desc_init_by_tag(&data,
+                    (int)dims.size(), dims.size() == 0 ? nullptr : &dims[0],
+                    convert_to_c(data_type), convert_to_c(format_tag));
+            if (!allow_empty)
+                error::wrap_c_api(status,
+                        "could not construct a memory descriptor using a "
+                        "format tag");
         }
 
         /// Constructs a memory descriptor by strides.
@@ -2078,19 +2157,24 @@ struct memory : public handle<dnnl_memory_t> {
         /// @param dims Tensor dimensions.
         /// @param data_type Data precision/type.
         /// @param strides The strides for each dimension.
+        /// @param allow_empty A flag signifying whether construction is
+        ///     allowed to fail without throwing an exception. In this case a
+        ///     zero memory descriptor will be constructed. This flag is
+        ///     optional and defaults to false.
         desc(const memory::dims &dims, data_type data_type,
-                const memory::dims &strides)
-        : data()
-        {
+                const memory::dims &strides, bool allow_empty = false)
+            : data() {
             if(DNNL_MD_DEBUG) zero_data();
             validate_dims(dims);
             if(DNNL_MD_VERBOSE) msg(" +desc(dims,data_type,strides)");
-            error::wrap_c_api(
-                    dnnl_memory_desc_init_by_strides(&data, (int)dims.size(),
-                            dims.size() == 0 ? nullptr : &dims[0],
-                            convert_to_c(data_type),
-                            strides.size() == 0 ? nullptr : &strides[0]),
-                    "could not construct a memory descriptor using strides");
+            dnnl_status_t status = dnnl_memory_desc_init_by_strides(&data,
+                    (int)dims.size(), dims.size() == 0 ? nullptr : &dims[0],
+                    convert_to_c(data_type),
+                    strides.size() == 0 ? nullptr : &strides[0]);
+            if (!allow_empty)
+                error::wrap_c_api(status,
+                        "could not construct a memory descriptor using "
+                        "strides");
         }
 
         /// Constructs a memory descriptor from a C API data structure.
@@ -2107,44 +2191,133 @@ struct memory : public handle<dnnl_memory_t> {
             }
         }
 
-        ~desc(){
-            if(DNNL_MD_VERBOSE) msg(" -desc");
-        }
-
         /// Constructs a memory descriptor for a region inside an area
         /// described by this memory descriptor.
         //
         /// @param dims Sizes of the region.
         /// @param offsets Offsets to the region from the encompassing
         ///     memory object in each dimension.
+        /// @param allow_empty A flag signifying whether construction is
+        ///     allowed to fail without throwing an exception. In this case a
+        ///     zero memory descriptor will be returned. This flag is optional
+        ///     and defaults to false.
         /// @returns A memory descriptor for the region.
-        desc submemory_desc(
-                const memory::dims &dims, const memory::dims &offsets) const {
-            dnnl_memory_desc_t sub_md; // NB: must fully init
+        desc submemory_desc(const memory::dims &dims,
+                const memory::dims &offsets, bool allow_empty = false) const {
+            dnnl_memory_desc_t sub_md = dnnl_memory_desc_t();
 #if DNNL_MD_DEBUG
             std::memset(&sub_md, 0, sizeof(dnnl_memory_desc_t)); // VE debug
 #endif
             if(DNNL_MD_VERBOSE) msg(" submemory-from");
-            error::wrap_c_api(dnnl_memory_desc_init_submemory(
-                                      &sub_md, &data, &dims[0], &offsets[0]),
-                    "could not construct a sub-memory");
+            dnnl_status_t status = dnnl_memory_desc_init_submemory(
+                    &sub_md, &data, &dims[0], &offsets[0]);
+            if (!allow_empty)
+                error::wrap_c_api(status, "could not construct a sub-memory");
             return desc(sub_md);
         }
 
-        /// Constructs a memory descriptor by reshaping existing one.
-        //
+        /// Constructs a memory descriptor by reshaping an existing one. The
+        /// new memory descriptor inherits the data type. This operation is
+        /// valid only for memory descriptors that have format_kind set to
+        /// #dnnl::memory::format_kind::blocked or
+        /// #dnnl::memory::format_kind::any.
+        ///
+        /// The operation ensures that the transformation of the physical memory
+        /// format corresponds to the transformation of the logical dimensions.
+        /// If such transformation is impossible, the function either throws an
+        /// exception (default) or returns a zero memory descriptor depending on
+        /// the `allow_empty` flag.
+        ///
+        /// The reshape operation can be described as a combination of the
+        /// following basic operations:
+        /// 1. Add a dimension of size `1`. This is always possible.
+        /// 2. Remove a dimension of size `1`. This is possible only if the
+        ///    dimension has no padding (i.e.
+        ///    `padded_dims[dim] == dims[dim] && dims[dim] == 1`).
+        /// 3. Split a dimension into multiple ones. This is possible only if
+        ///    the size of the dimension is exactly equal to the product of the
+        ///    split ones and the dimension does not have padding (i.e.
+        ///    `padded_dims[dim] = dims[dim]`).
+        /// 4. Joining multiple consecutive dimensions into a single one. As in
+        ///    the cases above, this requires that the dimensions do not have
+        ///    padding and that the memory format is such that in physical
+        ///    memory these dimensions are dense and have the same order as
+        ///    their logical counterparts. This also assumes that these
+        ///    dimensions are not blocked.
+        ///    - Here, dense means:
+        ///      `stride for dim[i] == (stride for dim[i + 1]) * dim[i + 1]`;
+        ///    - And same order means:
+        ///      `i < j <=> stride for dim[i] < stride for dim[j]`.
+        ///
+        /// @warning
+        ///     Some combinations of physical memory layout and/or offsets or
+        ///     dimensions may result in a failure to make a reshape.
+        ///
         /// @param dims New dimensions. The product of dimensions must
-        /// remain constant.
+        ///     remain constant.
+        /// @param allow_empty A flag signifying whether construction is
+        ///     allowed to fail without throwing an exception. In this case a
+        ///     zero memory descriptor will be returned. This flag is optional
+        ///     and defaults to false.
         /// @returns A new memory descriptor with new dimensions.
-        desc reshape(const memory::dims &dims) const {
-            dnnl_memory_desc_t out_md;
+        desc reshape(const memory::dims &dims, bool allow_empty = false) const {
+            dnnl_memory_desc_t out_md = dnnl_memory_desc_t();
 #if DNNL_MD_DEBUG
             std::memset(&out_md, 0, sizeof(dnnl_memory_desc_t)); // VE debug
 #endif
             if(DNNL_MD_VERBOSE) msg(" reshape-from");
-            error::wrap_c_api(dnnl_memory_desc_reshape(&out_md, &data,
-                                      (int)dims.size(), &dims[0]),
-                    "could not reshape a memory descriptor");
+            dnnl_status_t status = dnnl_memory_desc_reshape(
+                    &out_md, &data, (int)dims.size(), &dims[0]);
+            if (!allow_empty)
+                error::wrap_c_api(
+                        status, "could not reshape a memory descriptor");
+            return desc(out_md);
+        }
+
+        /// Constructs a memory descriptor by permuting axes in an existing
+        /// one.
+        ///
+        /// The physical memory layout representation is adjusted accordingly
+        /// to maintain the consistency between the logical and physical parts
+        /// of the memory descriptor.
+        ///
+        /// The new memory descriptor inherits the data type. This operation is
+        /// valid only for memory descriptors that have format_kind set to
+        /// #dnnl::memory::format_kind::blocked or
+        /// #dnnl::memory::format_kind::any.
+        ///
+        /// The logical axes will be permuted in the following manner:
+        /// ```
+        /// for (i: 0 .. ndims())
+        ///     new_desc.dims()[permutation[i]] = dims()[i];
+        /// ```
+        ///
+        /// Example:
+        /// @code
+        ///     std::vector<int> permutation = {1, 0}; // swap the first and
+        ///                                            // the second axes
+        ///     dnnl::memory::desc in_md(
+        ///             {2, 3}, data_type, memory::format_tag::ab);
+        ///     dnnl::memory::desc expect_out_md(
+        ///             {3, 2}, data_type, memory::format_tag::ba);
+        ///
+        ///     assert(in_md.permute_axes(permutation) == expect_out_md);
+        /// @endcode
+        ///
+        /// @param permutation Axes permutation.
+        /// @param allow_empty A flag signifying whether construction is
+        ///     allowed to fail without throwing an exception. In this case a
+        ///     zero memory descriptor will be returned. This flag is optional
+        ///     and defaults to false.
+        /// @returns A new memory descriptor with new dimensions.
+        desc permute_axes(const std::vector<int> &permutation,
+                bool allow_empty = false) const {
+            dnnl_memory_desc_t out_md = dnnl_memory_desc_t();
+            dnnl_status_t status = dnnl_memory_desc_permute_axes(
+                    &out_md, &data, &permutation[0]);
+            if (!allow_empty)
+                error::wrap_c_api(status,
+                        "could not permute axes of a memory descriptor");
             return desc(out_md);
         }
 
@@ -5029,10 +5202,9 @@ struct pooling_backward : public primitive {
 /// @warning
 ///     Because the original source data is required for backward propagation,
 ///     in-place forward propagation is not generally supported in the
-///     training mode.  However, for namely ReLU with the alpha parameter set
-///     to 0, either dst or src can be used for the backward propagation,
-///     which makes it possible to get performance benefit even in the
-///     training mode.
+///     training mode.  However, for algorithms supporting destination as input
+///     memory, dst can be used for the backward propagation, which makes it
+///     possible to get performance benefit even in the training mode.
 ///
 /// @sa @ref dev_guide_eltwise in developer guide
 ///
@@ -5288,19 +5460,6 @@ struct softmax_forward : public primitive {
                     "could not create a descriptor for a softmax forward "
                     "propagation primitive");
         }
-
-        /// Constructs a descriptor for a softmax forward propagation
-        /// primitive from a C API counterpart.
-        ///
-        /// @param data C API descriptor for a softmax forward propagation
-        ///     primitive.
-        desc(dnnl_softmax_desc_t data) {
-            error::wrap_c_api(
-                    dnnl_softmax_forward_desc_init(&this->data, data.prop_kind,
-                            &data.data_desc, data.softmax_axis),
-                    "could not create a descriptor for a softmax forward "
-                    "propagation primitive");
-        }
     };
 
     /// Primitive descriptor for a softmax forward propagation primitive.
@@ -5350,18 +5509,6 @@ struct softmax_forward : public primitive {
                     dnnl::prop_kind::forward_training,
                     dnnl::prop_kind::forward_inference) {}
 
-        /// Returns the underlying descriptor for primitive.
-        /// @returns The descriptor for the primitive.
-        desc op_desc() const {
-            dnnl_softmax_desc_t *data;
-            error::wrap_c_api(
-                    dnnl_primitive_desc_query(
-                            get(), dnnl::convert_to_c(query::op_d), 0, &data),
-                    "could not retrieve a descriptor from a primitive "
-                    "descriptor for a softmax forward propagation primitive");
-            return desc(*data);
-        }
-
         /// @copydoc dnnl::primitive_desc_base::src_desc()const
         memory::desc src_desc() const { return base::src_desc(0); }
 
@@ -5405,19 +5552,6 @@ struct softmax_backward : public primitive {
             error::wrap_c_api(
                     dnnl_softmax_backward_desc_init(&data, &diff_data_desc.data,
                             &data_desc.data, softmax_axis),
-                    "could not create a descriptor for a softmax backward "
-                    "propagation primitive");
-        }
-
-        /// Constructs a descriptor for a softmax backward propagation
-        /// primitive from a C API counterpart.
-        ///
-        /// @param data C API descriptor for a softmax backward propagation
-        ///     primitive.
-        desc(dnnl_softmax_desc_t data) {
-            error::wrap_c_api(dnnl_softmax_backward_desc_init(&this->data,
-                                      &data.diff_desc, &data.data_desc,
-                                      data.softmax_axis),
                     "could not create a descriptor for a softmax backward "
                     "propagation primitive");
         }
@@ -5477,17 +5611,6 @@ struct softmax_backward : public primitive {
         primitive_desc(dnnl_primitive_desc_t pd)
             : dnnl::primitive_desc(pd, dnnl::primitive::kind::softmax,
                     dnnl::prop_kind::backward_data) {}
-
-        /// @copydoc dnnl::softmax_forward::primitive_desc::op_desc()const
-        desc op_desc() const {
-            dnnl_softmax_desc_t *data;
-            error::wrap_c_api(
-                    dnnl_primitive_desc_query(
-                            get(), dnnl::convert_to_c(query::op_d), 0, &data),
-                    "could not retrieve a descriptor from a primitive "
-                    "descriptor for a softmax backward propagation primitive");
-            return desc(*data);
-        }
 
         /// @copydoc dnnl::primitive_desc_base::dst_desc()const
         memory::desc dst_desc() const { return base::dst_desc(0); }
@@ -5549,19 +5672,6 @@ struct logsoftmax_forward : public primitive {
                     "could not create a descriptor for a logsoftmax forward "
                     "propagation primitive");
         }
-
-        /// Constructs a descriptor for a logsoftmax forward propagation
-        /// primitive from a C API counterpart.
-        ///
-        /// @param data C API descriptor for a logsoftmax forward propagation
-        ///     primitive.
-        desc(dnnl_logsoftmax_desc_t data) {
-            error::wrap_c_api(
-                    dnnl_logsoftmax_forward_desc_init(&this->data,
-                            data.prop_kind, &data.data_desc, data.softmax_axis),
-                    "could not create a descriptor for a logsoftmax forward "
-                    "propagation primitive");
-        }
     };
 
     /// Primitive descriptor for a logsoftmax forward propagation primitive.
@@ -5615,18 +5725,6 @@ struct logsoftmax_forward : public primitive {
                     dnnl::prop_kind::forward_training,
                     dnnl::prop_kind::forward_inference) {}
 
-        /// @copydoc dnnl::softmax_forward::primitive_desc::op_desc()const
-        desc op_desc() const {
-            dnnl_logsoftmax_desc_t *data;
-            error::wrap_c_api(
-                    dnnl_primitive_desc_query(
-                            get(), dnnl::convert_to_c(query::op_d), 0, &data),
-                    "could not retrieve a descriptor from a primitive "
-                    "descriptor for a logsoftmax forward propagation "
-                    "primitive");
-            return desc(*data);
-        }
-
         /// @copydoc dnnl::primitive_desc_base::src_desc()const
         memory::desc src_desc() const { return base::src_desc(0); }
 
@@ -5671,19 +5769,6 @@ struct logsoftmax_backward : public primitive {
             error::wrap_c_api(dnnl_logsoftmax_backward_desc_init(&data,
                                       &diff_data_desc.data, &data_desc.data,
                                       logsoftmax_axis),
-                    "could not create a descriptor for a logsoftmax backward "
-                    "propagation primitive");
-        }
-
-        /// Constructs a descriptor for a logsoftmax backward propagation
-        /// primitive from a C API counterpart.
-        ///
-        /// @param data C API descriptor for a logsoftmax backward propagation
-        ///     primitive.
-        desc(dnnl_logsoftmax_desc_t data) {
-            error::wrap_c_api(dnnl_logsoftmax_backward_desc_init(&this->data,
-                                      &data.diff_desc, &data.data_desc,
-                                      data.softmax_axis),
                     "could not create a descriptor for a logsoftmax backward "
                     "propagation primitive");
         }
@@ -5747,17 +5832,6 @@ struct logsoftmax_backward : public primitive {
                     // must be softmax and not logsoftmax.
                     dnnl::primitive::kind::softmax,
                     dnnl::prop_kind::backward_data) {}
-
-        /// @copydoc dnnl::softmax_forward::primitive_desc::op_desc()const
-        desc op_desc() const {
-            dnnl_logsoftmax_desc_t *data;
-            error::wrap_c_api(
-                    dnnl_primitive_desc_query(
-                            get(), dnnl::convert_to_c(query::op_d), 0, &data),
-                    "could not retrieve a descriptor from a primitive "
-                    "descriptor for logsoftmax backward propagation primitive");
-            return desc(*data);
-        }
 
         /// @copydoc dnnl::primitive_desc_base::dst_desc()const
         memory::desc dst_desc() const { return base::dst_desc(0); }
@@ -8922,6 +8996,9 @@ struct binary : public primitive {
     struct desc {
         /// Underlying C operation descriptor.
         dnnl_binary_desc_t data;
+
+        /// Default constructor. Produces an empty object.
+        desc() = default;
 
         /// Constructs a descriptor for an elementwise binary operator
         /// primitive.

@@ -24,13 +24,12 @@
 #include "cpu_target.h"
 #include "dnnl.h"
 
+#include "bit_cast.hpp"
 #include "c_types_map.hpp"
 #include "dnnl_traits.hpp"
 #include "math_utils.hpp"
 #include "nstl.hpp"
 #include "utils.hpp"
-
-//? #include <type_traits>
 
 namespace dnnl {
 namespace impl {
@@ -116,13 +115,28 @@ inline bool memory_extra_desc_is_equal(
                     lhs.scale_adjust == rhs.scale_adjust);
 }
 
-inline bool blocking_desc_is_equal(const blocking_desc_t &lhs,
-        const blocking_desc_t &rhs, int ndims = DNNL_MAX_NDIMS) {
+inline bool blocking_desc_is_equal(const memory_desc_t &lhs_md,
+        const memory_desc_t &rhs_md, bool ignore_strides = false) {
     using dnnl::impl::utils::array_cmp;
-    return true && lhs.inner_nblks == rhs.inner_nblks
-            && array_cmp(lhs.strides, rhs.strides, ndims)
+
+    assert(lhs_md.format_kind == format_kind::blocked);
+    assert(rhs_md.format_kind == format_kind::blocked);
+
+    const auto &lhs = lhs_md.format_desc.blocking;
+    const auto &rhs = rhs_md.format_desc.blocking;
+    bool equal = lhs.inner_nblks == rhs.inner_nblks
             && array_cmp(lhs.inner_blks, rhs.inner_blks, lhs.inner_nblks)
             && array_cmp(lhs.inner_idxs, rhs.inner_idxs, lhs.inner_nblks);
+    if (ignore_strides) return equal;
+
+    // Check the strides.
+    // Note: for dimensions of size `1` the stride doesn't really matter.
+    for (int d = 0; d < lhs_md.ndims; ++d) {
+        if (lhs_md.dims[d] == 1 && lhs_md.padded_dims[d] == 1) continue;
+        equal = equal && lhs.strides[d] == rhs.strides[d];
+    }
+
+    return equal;
 }
 
 inline bool wino_desc_is_equal(const wino_desc_t &lhs, const wino_desc_t &rhs) {
@@ -150,13 +164,9 @@ inline bool rnn_packed_desc_is_equal(
 
 inline memory_desc_t zero_md() {
     auto zero = memory_desc_t(); // default-constructed "C" POD type
-    // some compilers do not zero-initialize the above, leading to sporadic errors
-    // To be safe, some occurences of memory_desc_t() may need to take extra care.
-    //auto zero = memory_desc_t({0}); // fixes SOME bugs, not all
-    //auto zero = memory_desc_t();
+#if DNNL_VALUE_INITIALIZATION_BUG
     memset(&zero, 0, sizeof(memory_desc_t));
-    //
-    //auto zero = memory_desc_t{};
+#endif
     return zero;
 }
 
@@ -226,8 +236,7 @@ inline bool operator==(const memory_desc_t &lhs, const memory_desc_t &rhs) {
     if (!base_equal) return false;
     if (!types::memory_extra_desc_is_equal(lhs.extra, rhs.extra)) return false;
     if (lhs.format_kind == format_kind::blocked)
-        return types::blocking_desc_is_equal(
-                lhs.format_desc.blocking, rhs.format_desc.blocking, lhs.ndims);
+        return types::blocking_desc_is_equal(lhs, rhs);
     else if (lhs.format_kind == format_kind::wino)
         return types::wino_desc_is_equal(
                 lhs.format_desc.wino_desc, rhs.format_desc.wino_desc);
@@ -317,7 +326,6 @@ inline bool operator==(const gemm_desc_t &lhs, const gemm_desc_t &rhs) {
             && COMPARE_DESC_MEMBERS(m) && COMPARE_DESC_MEMBERS(n)
             && COMPARE_DESC_MEMBERS(k) && COMPARE_DESC_MEMBERS(lda)
             && COMPARE_DESC_MEMBERS(ldb) && COMPARE_DESC_MEMBERS(ldc)
-            && COMPARE_DESC_MEMBERS(alpha) && COMPARE_DESC_MEMBERS(beta)
             && COMPARE_DESC_MEMBERS(a_type) && COMPARE_DESC_MEMBERS(b_type)
             && COMPARE_DESC_MEMBERS(c_type) && COMPARE_DESC_MEMBERS(acc_type);
     return ret;
@@ -612,11 +620,7 @@ format_tag_t memory_desc_matches_one_of_tag(
 
 /** returns true if fp32 value denotes DNNL_RUNTIME_F32_VAL */
 inline bool is_runtime_value(float val) {
-    union {
-        float f;
-        unsigned u;
-    } tmp {val};
-    return tmp.u == DNNL_RUNTIME_F32_VAL_REP.u;
+    return utils::bit_cast<unsigned>(val) == DNNL_RUNTIME_F32_VAL_REP.u;
 }
 
 /** returns true if s32 value denotes DNNL_RUNTIME_S32_VAL */

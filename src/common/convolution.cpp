@@ -21,10 +21,6 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 #include "consistency.hpp" // debug: print reason for consistency failures
-//#include <iostream>
-//#include <cstring>
-//using std::cout;
-//using std::endl;
 
 using namespace dnnl::impl;
 using namespace dnnl::impl::utils;
@@ -40,8 +36,6 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
         const memory_desc_t *weights_desc, const memory_desc_t *bias_desc,
         const memory_desc_t *dst_desc, const dims_t strides,
         const dims_t dilates, const dims_t padding_l, const dims_t padding_r) {
-    //if(bias_desc==nullptr) cout<<" conv_desc_init:bias_desc=NULL";
-    //else cout<<" conv_desc_init::WITH-BIAS"<<endl;
     bool args_ok = true
             && !any_null(conv_desc, src_desc, weights_desc, dst_desc, strides,
                     padding_l)
@@ -51,7 +45,6 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
 
     if (padding_r == nullptr) padding_r = padding_l;
 
-    //auto cd = convolution_desc_t{};
     auto cd = zero<convolution_desc_t>();
     cd.primitive_kind = primitive_kind::convolution;
     cd.prop_kind = prop_kind;
@@ -61,16 +54,10 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
     cd.diff_dst_desc = cd.dst_desc = zero_md();
     cd.diff_weights_desc = cd.weights_desc = zero_md();
     cd.diff_bias_desc = cd.bias_desc = zero_md();
-    //if(memory_desc_wrapper(cd.bias_desc).is_zero()) cout<<" cd.bias_desc.is_zero()!";
-    //if(is_zero_md(&cd.bias_desc)) cout<<" is_zero_md(&cd.bias_desc)";
 
     const bool is_fwd = one_of(prop_kind, forward_training, forward_inference);
     const bool with_bias
             = bias_desc && bias_desc->format_kind != format_kind::undef;
-//#define SHORTFILE (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
-//#define DBG(MSG) do{ cout<<SHORTFILE<<":"<<__LINE__<<": "<<MSG; }while(0)
-    // next: no influence on bug
-    //DBG(" conv_desc_init : bias_desc@"<<(void*)bias_desc<<", with_bias="<<with_bias<<endl);
     const bool with_groups = weights_desc->ndims == src_desc->ndims + 1;
 
     bool runtime_dims_or_strides
@@ -106,21 +93,8 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
     const int g = with_groups ? weights_desc->dims[0] : 1;
     const int bias_dim = prop_kind == backward_data ? src_desc->dims[1]
                                                     : dst_desc->dims[1];
-#if 0 // orig
-
-    bool consistency = true && memory_desc_wrapper(weights_desc).nelems()
-            && src_desc->ndims == dst_desc->ndims
-            && utils::one_of(src_desc->ndims, 3, 4, 5)
-            && utils::one_of(
-                    weights_desc->ndims, src_desc->ndims, src_desc->ndims + 1)
-            && (with_bias ? bias_desc->ndims == 1 : true)
-            && (with_bias ? bias_desc->dims[0] == bias_dim : true)
-            && src_desc->dims[0] == dst_desc->dims[0]
-            && src_desc->dims[1] == g * weights_desc->dims[with_groups + 1]
-            && dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0];
-
-#else
-#define AND_(...) SCHKV(consistency,__VA_ARGS__)
+#define AND_(...) SCHKV(consistency,__VA_ARGS__) /* also avail: SCHK, SCHKVV */
+#if DNNL_VERBOSE_EXTRA // build allows some additional trace levels
     Consistency consistency("conv_desc_init consistency:");
     AND_(memory_desc_wrapper(weights_desc).nelems());
     AND_(src_desc->ndims == dst_desc->ndims);
@@ -132,6 +106,18 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
     AND_(src_desc->dims[0] == dst_desc->dims[0]);
     AND_(src_desc->dims[1] == g * weights_desc->dims[with_groups + 1]);
     AND_(dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0]);
+#else // default full build
+    bool consistency = true && memory_desc_wrapper(weights_desc).nelems()
+            && src_desc->ndims == dst_desc->ndims
+            && utils::one_of(src_desc->ndims, 3, 4, 5)
+            && utils::one_of(
+                    weights_desc->ndims, src_desc->ndims, src_desc->ndims + 1)
+            && (with_bias ? bias_desc->ndims == 1 : true)
+            && (with_bias ? bias_desc->dims[0] == bias_dim : true)
+            && src_desc->dims[0] == dst_desc->dims[0]
+            && src_desc->dims[1] == g * weights_desc->dims[with_groups + 1]
+            && dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0];
+
 #endif
     for (int i = 2; i < src_desc->ndims; ++i) {
         int src = src_desc->dims[i];
@@ -143,16 +129,16 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
         int dst = dst_desc->dims[i];
         int ker_range = 1 + (ker - 1) * (dil + 1);
 
-#if 0 // orig
-        if (str < 1) return invalid_arguments;
-        consistency = consistency && dil >= 0 && pad_l >= 0 && pad_r + str > 0
-                && (src - ker_range + pad_l + pad_r) / str + 1 == dst;
-#else
+#if DNNL_VERBOSE_EXTRA
         AND_(str >= 1);
         AND_(dil >= 0);
         AND_(pad_l >= 0);
         AND_(pad_r + str > 0);
         AND_((src - ker_range + pad_l + pad_r) / str + 1 == dst);
+#else // default full build
+        if (str < 1) return invalid_arguments;
+        consistency = consistency && dil >= 0 && pad_l >= 0 && pad_r + str > 0
+                && (src - ker_range + pad_l + pad_r) / str + 1 == dst;
 #endif
     }
 #undef AND_

@@ -41,7 +41,6 @@ struct reorder_pd_t : public primitive_desc_t {
         , dst_md_(*dst_md) {
 
         // Fill a desc that is intended for internal use only
-        //desc_ = reorder_desc_t{};
         desc_ = utils::zero<reorder_desc_t>();
         desc_.primitive_kind = primitive_kind::reorder;
         desc_.src_md = src_md_;
@@ -54,8 +53,6 @@ struct reorder_pd_t : public primitive_desc_t {
     virtual const op_desc_t *op_desc() const override {
         return reinterpret_cast<const op_desc_t *>(this->desc());
     }
-
-    virtual void init_info() override { impl::init_info(this, this->info_); }
 
     virtual arg_usage_t arg_usage(int arg) const override {
         if (arg == DNNL_ARG_FROM) return arg_usage_t::input;

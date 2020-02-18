@@ -14,7 +14,6 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "cpu_target.h"
 #include <stdlib.h>
 #ifndef _WIN32
 #include <sys/time.h>
@@ -48,12 +47,11 @@
 #include "sum_pd.hpp"
 
 #if DNNL_GPU_RUNTIME == DNNL_RUNTIME_OCL
-#include "ocl/verbose.hpp"
+#include "gpu/ocl/verbose.hpp"
 #endif
 
-/// @defgroup DNNL_ISA_strings via mayiuse scan during `char* get_isa_info()`
-//@{
-#define ISA_ANY "Intel 64 (jit allowed)"
+//@{ DNNL_ISA info via mayiuse scan in `char* get_isa_info()`
+#define ISA_ANY "Intel 64"
 #define SSE41 "Intel SSE4.1"
 #define AVX "Intel AVX"
 #define AVX2 "Intel AVX2"
@@ -67,7 +65,7 @@
     "Intel AVX-512 with AVX512_4FMAPS and AVX512_4VNNIW extensions"
 #define AVX512_CORE_BF16 \
     "Intel AVX-512 with Intel DL Boost and bfloat16 support"
-#define VEDNNJIT "NEC Aurora (VE) with libvednn jit"
+#define VEJIT "NEC Aurora (VE) with libvednn jit"
 #define VEDNN "NEC Aurora (VE) with libvednn C api calls"
 #define VE_COMMON \
         "NEC Aurora (VE) (C/C++-only vanilla build)"
@@ -79,7 +77,7 @@ namespace impl {
 
 static setting_t<int> verbose {0};
 int get_verbose() {
-#if DNNL_VERBOSE
+#if !defined(DISABLE_VERBOSE)
     if (!verbose.initialized()) {
         const int len = 2;
         char val[len] = {0};
@@ -88,17 +86,16 @@ int get_verbose() {
     }
     static bool version_printed = false;
     if (!version_printed && verbose.get() > 0) {
-        printf("dnnl_verbose,info,DNNL v%d.%d.%d (commit %s), DNNL_VERBOSE=%d\n",
+        printf("dnnl_verbose,info,DNNL v%d.%d.%d (commit %s)\n",
                 dnnl_version()->major, dnnl_version()->minor,
-                dnnl_version()->patch, dnnl_version()->hash,
-                verbose.get());
+                dnnl_version()->patch, dnnl_version()->hash);
         printf("dnnl_verbose,info,cpu,runtime:%s\n",
                 dnnl_runtime2str(dnnl_version()->cpu_runtime));
         printf("dnnl_verbose,info,cpu,isa:%s\n", get_isa_info());
         printf("dnnl_verbose,info,gpu,runtime:%s\n",
                 dnnl_runtime2str(dnnl_version()->gpu_runtime));
 #if DNNL_GPU_RUNTIME == DNNL_RUNTIME_OCL
-        ocl::print_verbose_header();
+        gpu::ocl::print_verbose_header();
 #endif
         version_printed = true;
     }
@@ -131,7 +128,8 @@ const char *get_isa_info() {
     if (mayiuse(avx2)) return AVX2;
     if (mayiuse(avx)) return AVX;
     if (mayiuse(sse41)) return SSE41;
-    if (mayiuse(vejit)) return VEDNNJIT;
+    //return ISA_ANY;
+    if (mayiuse(vejit)) return VEJIT;
     if (mayiuse(vednn)) return VEDNN;
     if (mayiuse(ve_common)) return VE_COMMON;
     if (mayiuse(vanilla)) return VANILLA;
@@ -145,9 +143,13 @@ const char *get_isa_info() {
 #endif
 }
 
+#if defined(DISABLE_VERBOSE)
+void pd_info_t::init(const primitive_desc_t *) {}
+
+#else
+
 /* init_info section */
 namespace {
-#if DNNL_VERBOSE
 #define DNNL_VERBOSE_DAT_LEN 256
 #define DNNL_VERBOSE_ATTR_LEN 128
 #define DNNL_VERBOSE_AUX_LEN 384
@@ -233,6 +235,22 @@ void attr2str(char *str, int len, int written, const primitive_attr_t *attr) {
         DPRINT(str, len, written, ";");
     }
 
+    const arg_scales_t &as = attr->scales_;
+    if (!as.has_default_values()) {
+        const char *delim = "";
+        DPRINT(str, len, written, "scales:'");
+        for (const auto &map_entry : as.scales_) {
+            const auto &val = map_entry.second;
+            if (!val.has_default_values()) {
+                DPRINT(str, len, written, "%ssrc:%d", delim, val.mask_);
+                if (val.mask_ == 0)
+                    DPRINT(str, len, written, ":%g", val.scales_[0]);
+                delim = "_";
+            }
+        }
+        DPRINT(str, len, written, "';");
+    }
+
     const post_ops_t &po = attr->post_ops_;
     if (!po.has_default_values()) {
         DPRINT(str, len, written, "post_ops:'");
@@ -300,7 +318,7 @@ void verbose_templ(char *buffer, dnnl_engine_t engine,
 }
 
 template <typename pd_t>
-static void init_info_bnorm(pd_t *s, char *buffer) {
+static void init_info_batch_normalization(pd_t *s, char *buffer) {
     DECL_DAT_AUX_PRB_STRS();
 
     { // data
@@ -362,7 +380,7 @@ static void init_info_concat(pd_t *s, char *buffer) {
 }
 
 template <typename pd_t>
-static void init_info_conv(pd_t *s, char *buffer) {
+static void init_info_convolution(pd_t *s, char *buffer) {
     DECL_DAT_AUX_PRB_STRS();
 
     { // src
@@ -444,6 +462,11 @@ static void init_info_conv(pd_t *s, char *buffer) {
 }
 
 template <typename pd_t>
+static void init_info_deconvolution(pd_t *s, char *buffer) {
+    init_info_convolution(s, buffer);
+}
+
+template <typename pd_t>
 static void init_info_shuffle(pd_t *s, char *buffer) {
     DECL_DAT_AUX_PRB_STRS();
 
@@ -501,19 +524,17 @@ static void init_info_gemm(pd_t *s, char *buffer) {
     attr2str(attr_str, DNNL_VERBOSE_ATTR_LEN, attr_written, s->attr());
 
     DPRINT(prb_str, DNNL_VERBOSE_PRB_LEN, dat_written,
-            "m" DFMT "n" DFMT "k" DFMT
-            "a_dt:%sb_dt:%sc_dt:%sacc_dt:%salpha%fbeta%f",
+            "m" DFMT "n" DFMT "k" DFMT "a_dt:%s b_dt:%s c_dt:%s acc_dt:%s",
             s->desc()->m, s->desc()->n, s->desc()->k,
             dnnl_dt2str(s->desc()->a_type), dnnl_dt2str(s->desc()->b_type),
-            dnnl_dt2str(s->desc()->c_type), dnnl_dt2str(s->desc()->acc_type),
-            s->desc()->alpha, s->desc()->beta);
+            dnnl_dt2str(s->desc()->c_type), dnnl_dt2str(s->desc()->acc_type));
 
     verbose_templ(buffer, s->engine(), s->kind(), s->name(), prop_kind::undef,
             dat_str, attr_str, aux_str, prb_str);
 }
 
 template <typename pd_t>
-static void init_info_iprod(pd_t *s, char *buffer) {
+static void init_info_inner_product(pd_t *s, char *buffer) {
     DECL_DAT_AUX_PRB_STRS();
 
     { // src
@@ -569,7 +590,7 @@ static void init_info_iprod(pd_t *s, char *buffer) {
 }
 
 template <typename pd_t>
-static void init_info_lnorm(pd_t *s, char *buffer) {
+static void init_info_layer_normalization(pd_t *s, char *buffer) {
     DECL_DAT_AUX_PRB_STRS();
 
     { // data
@@ -661,24 +682,34 @@ static void init_info_mem(pd_t *s, char *buffer) {
 }
 
 template <typename pd_t>
-static void init_info_pool(pd_t *s, char *buffer) {
+static void init_info_reorder(pd_t *s, char *buffer) {
+    init_info_mem(s, buffer);
+}
+
+template <typename pd_t>
+static void init_info_sum(pd_t *s, char *buffer) {
+    init_info_mem(s, buffer);
+}
+
+template <typename pd_t>
+static void init_info_pooling(pd_t *s, char *buffer) {
     DECL_DAT_AUX_PRB_STRS();
 
     { // src
-        auto mds = s->is_fwd() ? s->src_md() : s->diff_src_md();
+        auto md = s->is_fwd() ? s->src_md() : s->diff_src_md();
         DPRINT(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, "src_");
-        MD2STR(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, mds);
+        MD2STR(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, md);
     }
     { // dst
-        auto mdd = s->is_fwd() ? s->dst_md() : s->diff_dst_md();
+        auto md = s->is_fwd() ? s->dst_md() : s->diff_dst_md();
         DPRINT(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, " dst_");
-        MD2STR(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, mdd);
+        MD2STR(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, md);
     }
     { // ws
-        auto mdw = s->workspace_md();
-        if (mdw) {
+        auto md = s->workspace_md();
+        if (md) {
             DPRINT(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, " ws_");
-            MD2STR(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, mdw);
+            MD2STR(dat_str, DNNL_VERBOSE_DAT_LEN, dat_written, md);
         }
     }
 
@@ -741,6 +772,11 @@ static void init_info_softmax(pd_t *s, char *buffer) {
 
     verbose_templ(buffer, s->engine(), s->kind(), s->name(),
             s->desc()->prop_kind, dat_str, attr_str, aux_str, prb_str);
+}
+
+template <typename pd_t>
+static void init_info_logsoftmax(pd_t *s, char *buffer) {
+    init_info_softmax(s, buffer);
 }
 
 template <typename pd_t>
@@ -905,99 +941,55 @@ static void init_info_resampling(pd_t *s, char *buffer) {
 }
 
 #undef DPRINT
-
-#else // DNNL_VERBOSE
-
-#define DEFINE_STUB(name) \
-    template <typename pd_t> \
-    static void CONCAT2(init_info_, name)(pd_t * s, char *buffer) { \
-        UNUSED(s); \
-        UNUSED(buffer); \
-    }
-
-DEFINE_STUB(binary);
-DEFINE_STUB(bnorm);
-DEFINE_STUB(concat);
-DEFINE_STUB(conv);
-DEFINE_STUB(eltwise);
-DEFINE_STUB(gemm);
-DEFINE_STUB(iprod);
-DEFINE_STUB(lnorm);
-DEFINE_STUB(lrn);
-DEFINE_STUB(matmul);
-DEFINE_STUB(mem);
-DEFINE_STUB(pool);
-DEFINE_STUB(resampling);
-DEFINE_STUB(rnn);
-DEFINE_STUB(shuffle);
-DEFINE_STUB(softmax);
-#undef DEFINE_STUB
-
-#endif // DNNL_VERBOSE
 } // namespace
 
-void init_info(batch_normalization_pd_t *s, char *b) {
-    init_info_bnorm(s, b);
+void pd_info_t::init(const primitive_desc_t *pd) {
+    if (is_initialized_) return;
+
+    std::call_once(initialization_flag_, [&] {
+        str_.resize(DNNL_VERBOSE_BUF_LEN, '\0');
+
+        using logsoftmax_pd_t = softmax_pd_t;
+#define CASE(kind) \
+    case primitive_kind::kind: \
+        init_info_##kind((const kind##_pd_t *)pd, &str_[0]); \
+        break
+
+        switch (pd->kind()) {
+            CASE(batch_normalization);
+            CASE(binary);
+            CASE(concat);
+            CASE(convolution);
+            CASE(deconvolution);
+            CASE(eltwise);
+            CASE(gemm);
+            CASE(inner_product);
+            CASE(layer_normalization);
+            CASE(lrn);
+            CASE(logsoftmax);
+            CASE(matmul);
+            CASE(pooling);
+            CASE(reorder);
+            CASE(resampling);
+            CASE(rnn);
+            CASE(shuffle);
+            CASE(softmax);
+            CASE(sum);
+            default: assert(!"unknown primitive kind");
+        }
+#undef CASE
+
+        is_initialized_ = true;
+    });
 }
-void init_info(binary_pd_t *s, char *b) {
-    init_info_binary(s, b);
-}
-void init_info(concat_pd_t *s, char *b) {
-    init_info_concat(s, b);
-}
-void init_info(convolution_pd_t *s, char *b) {
-    init_info_conv(s, b);
-}
-void init_info(deconvolution_pd_t *s, char *b) {
-    init_info_conv(s, b);
-}
-void init_info(eltwise_pd_t *s, char *b) {
-    init_info_eltwise(s, b);
-}
-void init_info(gemm_pd_t *s, char *b) {
-    init_info_gemm(s, b);
-}
-void init_info(inner_product_pd_t *s, char *b) {
-    init_info_iprod(s, b);
-}
-void init_info(layer_normalization_pd_t *s, char *b) {
-    init_info_lnorm(s, b);
-}
-void init_info(lrn_pd_t *s, char *b) {
-    init_info_lrn(s, b);
-}
-void init_info(matmul_pd_t *s, char *b) {
-    init_info_matmul(s, b);
-}
-void init_info(pooling_pd_t *s, char *b) {
-    init_info_pool(s, b);
-}
-void init_info(reorder_pd_t *s, char *b) {
-    init_info_mem(s, b);
-}
-void init_info(resampling_pd_t *s, char *b) {
-    init_info_resampling(s, b);
-}
-void init_info(rnn_pd_t *s, char *b) {
-    init_info_rnn(s, b);
-}
-void init_info(shuffle_pd_t *s, char *b) {
-    init_info_shuffle(s, b);
-}
-void init_info(softmax_pd_t *s, char *b) {
-    init_info_softmax(s, b);
-}
-void init_info(sum_pd_t *s, char *b) {
-    init_info_mem(s, b);
-}
+#endif
 
 } // namespace impl
 } // namespace dnnl
 
 dnnl_status_t dnnl_set_verbose(int level) {
     using namespace dnnl::impl::status;
-    //if ((level & ~0x7)) return invalid_arguments; // bit 2-3 make consistency.hpp more verbose
-    //if ((level&0x3) > 2) return invalid_arguments; // bit 0-1 as usual
+    if (level < 0 || level > 2) return invalid_arguments;
     dnnl::impl::verbose.set(level);
     return success;
 }
@@ -1007,12 +999,10 @@ int dnnl_get_verbose() {
 }
 
 const dnnl_version_t *dnnl_version() {
-    static dnnl_version_t ver
+    static const dnnl_version_t ver
             = {DNNL_VERSION_MAJOR, DNNL_VERSION_MINOR, DNNL_VERSION_PATCH,
                     DNNL_VERSION_HASH, DNNL_CPU_RUNTIME, DNNL_GPU_RUNTIME,
-                    // new...
                     DNNL_CPU, DNNL_ISA
             };
     return &ver;
 }
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
