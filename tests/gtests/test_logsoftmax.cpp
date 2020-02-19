@@ -209,7 +209,9 @@ protected:
 
 using logsoftmax_forward_test_float = logsoftmax_test<float>;
 using logsoftmax_forward_test_half = logsoftmax_test<float16_t>;
+#if DNNL_ENABLE_BFLOAT16
 using logsoftmax_forward_test_bfloat16 = logsoftmax_test<bfloat16_t>;
+#endif // DNNL_ENABLE_BFLOAT16
 
 using logsoftmax_backward_test_float = logsoftmax_test<float>;
 
@@ -248,6 +250,7 @@ INSTANTIATE_TEST_SUITE_P(TestLogSoftmaxForwardFloat,
                 test_params<float> {prop_kind::forward_inference, tag::nChw8c,
                         tag::undef, {2, 1011, 32, 1}, 2}));
 
+#if DNNL_ENABLE_BFLOAT16
 TEST_P(logsoftmax_forward_test_bfloat16, TestsLogSoftmax) {}
 GPU_INSTANTIATE_TEST_SUITE_P(TestLogSoftmaxForwardBfloat16,
         logsoftmax_forward_test_bfloat16,
@@ -279,6 +282,7 @@ GPU_INSTANTIATE_TEST_SUITE_P(TestLogSoftmaxForwardBfloat16,
                         tag::nChw8c, tag::undef, {64, 1011, 1, 1}, 1},
                 test_params<bfloat16_t> {prop_kind::forward_inference,
                         tag::nChw8c, tag::undef, {2, 1011, 32, 1}, 2}));
+#endif // DNNL_ENABLE_BFLOAT16
 
 TEST_P(logsoftmax_forward_test_half, TestsLogSoftmax) {}
 GPU_INSTANTIATE_TEST_SUITE_P(TestLogSoftmaxForwardHalf,

@@ -420,14 +420,18 @@ protected:
 };
 
 using eltwise_test_f16 = eltwise_test<float16_t>;
+#if DNNL_ENABLE_BFLOAT16
 using eltwise_test_bf16 = eltwise_test<bfloat16_t>;
+#endif // DNNL_ENABLE_BFLOAT16
 using eltwise_test_f32 = eltwise_test<float>;
 using eltwise_test_s32 = eltwise_test<int>;
 using eltwise_test_s8 = eltwise_test<int8_t>;
 
 TEST_P(eltwise_test_f16, TestsEltwise) {}
 
+#if DNNL_ENABLE_BFLOAT16
 TEST_P(eltwise_test_bf16, TestsEltwise) {}
+#endif // DNNL_ENABLE_BFLOAT16
 
 TEST_P(eltwise_test_f32, TestsEltwise) {}
 
@@ -471,9 +475,14 @@ TEST_P(eltwise_test_s8, TestsEltwise) {}
     INSTANTIATE_TEST_SUITE_P_(str##_##data_t, eltwise_test_##data_t, \
             ::testing::Values(__VA_ARGS__))
 
+#if DNNL_ENABLE_BFLOAT16
 #define CPU_INST_TEST_CASE_BF16(str, ...) \
     _CPU_INST_TEST_CASE(str, bf16, __VA_ARGS__);
 #define INST_TEST_CASE_BF16(str, ...) _INST_TEST_CASE(str, bf16, __VA_ARGS__);
+#else
+#define CPU_INST_TEST_CASE_BF16(str, ...)
+#define INST_TEST_CASE_BF16(str, ...)
+#endif
 #define GPU_INST_TEST_CASE_F16(str, ...) \
     GPU_INSTANTIATE_TEST_SUITE_P_(TEST_CONCAT(str, _f16), eltwise_test_f16, \
             ::testing::Values(__VA_ARGS__));

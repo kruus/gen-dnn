@@ -37,8 +37,10 @@ static const pd_create_f impl_list[] = {
         INSTANCE_avx512(jit_uni_eltwise_fwd_t<avx512_common, s32>)
         INSTANCE_avx512(jit_uni_eltwise_fwd_t<avx512_common, s8>)
         INSTANCE_avx512(jit_uni_eltwise_bwd_t<avx512_common, f32>)
+#if DNNL_ENABLE_BFLOAT16
         INSTANCE_avx512(jit_uni_eltwise_fwd_t<avx512_core, bf16>)
         INSTANCE_avx512(jit_uni_eltwise_bwd_t<avx512_core, bf16>)
+#endif // DNNL_ENABLE_BFLOAT16
         INSTANCE_avx2(jit_uni_eltwise_fwd_t<avx2, f32>)
         INSTANCE_avx2(jit_uni_eltwise_fwd_t<avx2, s32>)
         INSTANCE_avx2(jit_uni_eltwise_fwd_t<avx2, s8>)
@@ -49,8 +51,10 @@ static const pd_create_f impl_list[] = {
         INSTANCE_sse41(jit_uni_eltwise_bwd_t<sse41, f32>)
         INSTANCE(ref_eltwise_fwd_t<f32>)
         INSTANCE(ref_eltwise_bwd_t<f32>)
+#if DNNL_ENABLE_BFLOAT16
         INSTANCE(ref_eltwise_fwd_t<bf16>)
         INSTANCE(ref_eltwise_bwd_t<bf16>)
+#endif // DNNL_ENABLE_BFLOAT16
         INSTANCE(ref_eltwise_fwd_t<s32>)
         INSTANCE(ref_eltwise_fwd_t<s8>)
         INSTANCE(ref_eltwise_fwd_t<u8>)

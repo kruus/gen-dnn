@@ -17,6 +17,7 @@
 #include <map>
 #include <set>
 
+#include "dnnl.h"
 //#include "dnnl_test_common.hpp"
 #include "gtest/gtest.h"
 
@@ -70,7 +71,11 @@ protected:
         // soft version of mayiuse that allows resetting the max_cpu_isa
         auto test_mayiuse = [](cpu_isa_t isa) { return mayiuse(isa, true); };
 
-        status st = set_max_cpu_isa(isa);
+        //status st = set_max_cpu_isa(isa);
+        // equiv:
+        dnnl_cpu_isa_t dnnlcpuisa = static_cast<dnnl_cpu_isa_t>(isa);
+        status st = (status)dnnl_set_max_cpu_isa(dnnlcpuisa);
+
         // status::unimplemented if the feature was disabled at compile time
         if (st == status::unimplemented) return;
 

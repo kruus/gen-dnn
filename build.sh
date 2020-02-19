@@ -488,10 +488,10 @@ echo "PATH $PATH"
     # -b or -B : BFLOAT16 support override
     #
     if [ "${BFLOAT16}" = "n" ]; then
-        CMAKEOPT="${CMAKEOPT} -DDNNL_BFLOAT16=0"
+        CMAKEOPT="${CMAKEOPT} -DDNNL_ENABLE_BFLOAT16=0"
         echo "BFLOAT16 support OFF"
     elif [ "${BFLOAT16}" = "y" ]; then 
-        CMAKEOPT="${CMAKEOPT} -DDNNL_BFLOAT16=1"
+        CMAKEOPT="${CMAKEOPT} -DDNNL_ENABLE_BFLOAT16=1"
         echo "BFLOAT16 support ON"
     else
         echo "BFLOAT16 support = default"
@@ -500,10 +500,10 @@ echo "PATH $PATH"
     # -r or -R : RNN support override
     #
     if [ "${RNN}" = "n" ]; then
-        CMAKEOPT="${CMAKEOPT} -DDNNL_RNN=0"
+        CMAKEOPT="${CMAKEOPT} -DDNNL_ENABLE_RNN=0"
         echo "RNN    support OFF"
     elif [ "${RNN}" = "y" ]; then 
-        CMAKEOPT="${CMAKEOPT} -DDNNL_RNN=1"
+        CMAKEOPT="${CMAKEOPT} -DDNNL_ENABLE_RNN=1"
         echo "RNN    support ON"
     else
         echo "RNN    support = default"

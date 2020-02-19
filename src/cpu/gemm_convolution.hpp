@@ -66,6 +66,7 @@ struct gemm_convolution_fwd_t : public primitive_impl_t {
             AND_(memory_desc_matches_tag(*src_md(), dat_tag()));
             AND_(memory_desc_matches_tag(*dst_md(), dat_tag()));
             AND_(memory_desc_matches_tag(*weights_md(), wei_tag()));
+#undef AND_
 #else
             bool ok = true && is_fwd()
                     && set_default_alg_kind(alg_kind::convolution_direct)

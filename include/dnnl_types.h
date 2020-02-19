@@ -2175,6 +2175,7 @@ typedef enum {
     /// Bfloat16 Support for Intel(R) Xeon(R) Processor Scalable Family and
     /// Intel(R) Core(TM) processor family.
     dnnl_cpu_isa_avx512_core_bf16 = 0xe7,
+}
 #endif
 } dnnl_cpu_isa_t;
 

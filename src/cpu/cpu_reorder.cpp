@@ -100,9 +100,11 @@ using impl_list_map_t = std::map<reorder_impl_key_t, std::vector<rpd_create_f>>;
 
 static const impl_list_map_t regular_impl_list_map {
     // f32 -> bf16
+#if DNNL_ENABLE_BFLOAT16
     {{f32, bf16, 0}, {
+#if DNNL_ENABLE_RNN
         rnn_weights_reorder_t<f32, bf16>::pd_t::create,
-
+#endif
         _IF_JIT(jit_uni_reorder_create)
 
         REG_SR_BIDIR(f32, any, bf16, nChw16c),
@@ -121,6 +123,7 @@ static const impl_list_map_t regular_impl_list_map {
 
         nullptr,
     }},
+#endif // DNNL_ENABLE_BFLOAT16
 
     // f32 -> f16
     {{f32, f16, 0}, {
@@ -324,6 +327,7 @@ static const impl_list_map_t regular_impl_list_map {
     }},
 
     // bf16 ->
+#if DNNL_ENABLE_BFLOAT16
     {{bf16, data_type::undef, 0}, {
         rnn_weights_reorder_t<bf16, bf16>::pd_t::create,
 
@@ -343,6 +347,7 @@ static const impl_list_map_t regular_impl_list_map {
 
         nullptr,
     }},
+#endif // DNNL_ENABLE_BFLOAT16
 
     // f16 ->
     {{f16, data_type::undef, 0}, {

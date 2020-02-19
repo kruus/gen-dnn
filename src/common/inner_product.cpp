@@ -33,6 +33,7 @@ status_t ip_desc_init(inner_product_desc_t *ip_desc, prop_kind_t prop_kind,
         const memory_desc_t *src_desc, const memory_desc_t *weights_desc,
         const memory_desc_t *bias_desc, const memory_desc_t *dst_desc) {
     bool args_ok = !any_null(ip_desc, src_desc, weights_desc, dst_desc);
+    if (!args_ok) return invalid_arguments;
 
     auto id = zero<inner_product_desc_t>();
     id.primitive_kind = primitive_kind::inner_product;

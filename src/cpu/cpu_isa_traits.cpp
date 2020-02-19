@@ -19,7 +19,6 @@
 #include <mutex>
 
 #include "cpu_isa_traits.hpp"
-#include "utils.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -169,6 +168,7 @@ cpu_isa_t get_max_cpu_isa(bool soft) {
 } // namespace impl
 } // namespace dnnl
 
+extern "C" {
 /** set max_cpu_isa() to the \c cpu_isa_t mask corresponding to a
  * \c dnnl_cpu_isa_t.
  * When a \c cpu_isa trait field matches the dnnl \c isa value,
@@ -187,13 +187,13 @@ dnnl_status_t dnnl_set_max_cpu_isa(dnnl_cpu_isa_t isa) {
 
     static int const verbose = 0;
     // XXX see if we can get rid of from_dnnl, at least in the header (see also tests/gtests/test_isa_*)
-    cpu_isa_t isa_to_set = from_dnnl(isa);
+    cpu_isa_t isa_to_set = ::dnnl::impl::cpu::from_dnnl(isa);
     if (isa_to_set == unknown) return invalid_arguments;
     if (verbose)
         printf(" dnnl_set_max_cpu_isa(0x%lx) --> cpu_isa_t(0x%lx)\n", (long)isa,
                 (long)isa_to_set);
 
-    if (max_cpu_isa().set(isa_to_set))
+    if (::dnnl::impl::cpu::max_cpu_isa().set(isa_to_set))
         return success;
     else
         return invalid_arguments;
@@ -201,5 +201,6 @@ dnnl_status_t dnnl_set_max_cpu_isa(dnnl_cpu_isa_t isa) {
     return unimplemented;
 #endif // DNNL_ENABLE_MAX_CPU_ISA
 }
+} // extern "C"
 
 // vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

@@ -98,6 +98,7 @@ static const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
         INSTANCE(ref_convolution_fwd_t<f32>)
         nullptr,
     }},
+#if DNNL_ENABLE_BFLOAT16
     {{forward, bf16, bf16, f32}, {
         INSTANCE_avx512(jit_uni_dw_convolution_fwd_t<avx512_core, bf16, f32>)
         INSTANCE_avx512(jit_avx512_core_bf16_1x1_convolution_fwd_t<f32>)
@@ -112,6 +113,7 @@ static const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
         INSTANCE(gemm_bf16_convolution_fwd_t<bf16>)
         nullptr,
     }},
+#endif // DNNL_ENABLE_BFLOAT16
     // BWD_D fp
     {{backward_data, f32, f32, f32}, {
         INSTANCE_avx512(jit_avx512_common_dw_convolution_bwd_data_t)
@@ -127,6 +129,7 @@ static const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
         INSTANCE(ref_convolution_bwd_data_t<f32, f32, f32, f32>)
         nullptr,
     }},
+#if DNNL_ENABLE_BFLOAT16
     {{backward_data, f32, bf16, bf16}, {
         INSTANCE_avx512(jit_uni_dw_convolution_bwd_data_t<avx512_core, bf16, f32>)
         INSTANCE_avx512(jit_avx512_core_bf16_1x1_convolution_bwd_data_t<f32>)
@@ -141,6 +144,7 @@ static const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
         INSTANCE(gemm_bf16_convolution_bwd_data_t<bf16>)
         nullptr,
     }},
+#endif // DNNL_ENABLE_BFLOAT16
     // BWD_W fp
     {{backward_weights, f32, f32, f32}, {
         INSTANCE_avx512(jit_avx512_common_dw_convolution_bwd_weights_t)
@@ -156,6 +160,7 @@ static const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
         INSTANCE(ref_convolution_bwd_weights_t<f32, f32, f32, f32>)
         nullptr,
     }},
+#if DNNL_ENABLE_BFLOAT16
     {{backward_weights, bf16, f32, bf16}, {
         INSTANCE_avx512(jit_uni_dw_convolution_bwd_weights_t<avx512_core, bf16, f32>)
         INSTANCE_avx512(jit_avx512_core_bf16_1x1_convolution_bwd_weights_t<f32>)
@@ -170,6 +175,7 @@ static const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
         INSTANCE(gemm_bf16_convolution_bwd_weights_t<bf16>)
         nullptr,
     }},
+#endif // DNNL_ENABLE_BFLOAT16
     // FWD int8 (src:s8)
     {{forward, s8, s8, f32}, {
         INSTANCE_avx512(jit_avx512_core_x8s8s32x_1x1_convolution_fwd_t<s8, f32>)

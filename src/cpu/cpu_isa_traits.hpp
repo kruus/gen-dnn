@@ -21,8 +21,9 @@
  * utilities/macros that are also useful to non-jit programs.
  */
 
-#include "dnnl_config.h"
+#include "dnnl.h"
 #include "dnnl_types.h"
+#include "dnnl_config.h"
 
 #include "dnnl_thread.hpp"
 #include "utils.hpp"
@@ -439,7 +440,7 @@ static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=fa
 }
 
 #elif TARGET_VE // non-x86 target cpu
-//static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=false) {
+//static inline constexpr bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=false)
 static inline bool mayiuse(cpu_isa_t const cpu_isa, bool const soft=false) {
 #ifdef DNNL_ENABLE_MAX_CPU_ISA
 #warning "GOOD! I want to print out mayiuse for debugging"

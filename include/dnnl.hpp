@@ -31,6 +31,13 @@
 #include <vector>
 #include <unordered_map>
 
+#include "dnnl.h"
+
+#if DNNL_GPU_RUNTIME == DNNL_RUNTIME_OCL
+#include <CL/cl.h>
+#endif
+/// @endcond
+
 // XXX debug stuff --- should remove
 #if DNNL_TARGET_VE
 #define DNNL_MD_DEBUG 1
@@ -46,13 +53,6 @@
 #if DNNL_MD_VERBOSE
 #include <cstring> // VE debug
 #endif
-
-#include "dnnl.h"
-
-#if DNNL_GPU_RUNTIME == DNNL_RUNTIME_OCL
-#include <CL/cl.h>
-#endif
-/// @endcond
 
 // __cpp_exceptions is referred from
 // https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_exceptions.html
@@ -9591,7 +9591,7 @@ enum class cpu_isa {
 /// @copydoc dnnl_set_max_cpu_isa()
 inline status set_max_cpu_isa(cpu_isa isa) {
     return static_cast<status>(
-            dnnl_set_max_cpu_isa(static_cast<dnnl_cpu_isa_t>(isa)));
+            ::dnnl_set_max_cpu_isa(static_cast<dnnl_cpu_isa_t>(isa)));
 }
 
 /// @} dnnl_api_service

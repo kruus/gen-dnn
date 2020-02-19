@@ -426,9 +426,13 @@ struct rnn_weights_reorder_t : public primitive_impl_t {
 
             const memory_desc_wrapper id(src_md), od(dst_md);
             bool args_ok = true
+#if DNNL_ENABLE_BFLOAT16
                     && IMPLICATION(type_o == data_type::bf16
                                     || type_i == data_type::bf16,
                             mayiuse(avx512_core))
+#else
+                    && type_o != data_type::bf16 && type_i != data_type::bf16
+#endif
                     && id.data_type() == type_i && od.data_type() == type_o
                     && od.format_kind() == format_kind::rnn_packed
                     && utils::one_of(od.rnn_packed_desc().format, dnnl_ldigo_p,
@@ -523,6 +527,7 @@ private:
 
         /* Convert fp32 input to bf16 */
         out_data_t *input_cvt = (out_data_t *)input;
+#if DNNL_ENABLE_BFLOAT16
         if (type_i == data_type::f32 && type_o == data_type::bf16) {
             input_cvt
                     = (out_data_t *)ctx.get_scratchpad_grantor()
@@ -533,6 +538,7 @@ private:
                         (float *)input + ld * G * O * I, G * O * I);
             });
         }
+#endif // DNNL_ENABLE_BFLOAT16
 
         /* Transpose weights prior to packing to ensure that packed GEMM
          * algorithm will be dispatched */
@@ -567,6 +573,7 @@ private:
                     int m_p = to_igo ? parts[p] * O : I;
                     int k_p = to_igo ? I : parts[p] * O;
                     dnnl_status_t st;
+#if DNNL_ENABLE_BFLOAT16
                     if (type_o == data_type::bf16) {
                         st = gemm_bf16bf16f32_pack("A", "N", "N", &m_p, &n,
                                 &k_p, &lda, &ldb,
@@ -574,7 +581,9 @@ private:
                                                 ? off_igo(l, d, 0, g, 0)
                                                 : off_goi(l, d, 0, g, 0)],
                                 (bfloat16_t *)output);
-                    } else {
+                    } else
+#endif // DNNL_ENABLE_BFLOAT16
+                    {
                         st = sgemm_pack("A", "N", "N", &m_p, &n, &k_p, &lda,
                                 &ldb,
                                 (float *)&input_tr[to_igo
