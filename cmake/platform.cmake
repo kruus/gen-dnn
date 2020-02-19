@@ -212,6 +212,5 @@ message(STATUS "DNNL_OK_STATIC_THREAD_LOCAL_OBJECTS ${DNNL_OK_STATIC_THREAD_LOCA
 
 include(CheckCXXSourceRuns)
 file(READ cmake/test_value_initialized_bug.cpp _source)
-check_cxx_source_runs("${_source}"
-    DNNL_OK_VALUE_INITIALIZATION)
+check_cxx_source_runs("${_source}" DNNL_OK_VALUE_INITIALIZATION)
 message(STATUS "DNNL_OK_VALUE_INITIALIZATION ${DNNL_OK_VALUE_INITIALIZATION}")

@@ -71,9 +71,11 @@ using impl_list_map_t = std::map<reorder_impl_key_t, std::vector<rpd_create_f>>;
             REG_SR(idt, any, odt, any, fmt_order::any, \
                     spec::direct_copy_except_dim_0)
 
-#if defined(__INTEL_COMPILER) || (defined(__GNUC__) && !defined(__clang__))
-/* Direct copy for icc which is faster than jitted code;
- * Direct copy for gcc which might or might not be faster than jitted
+#if !TARGET_X86_JIT || (TARGET_X86_JIT && \
+    defined(__INTEL_COMPILER) || (defined(__GNUC__) && !defined(__clang__)))
+/* Without x86 jit, always try direct copy.
+ * Direct copy for icc is faster than jitted code.
+ * Direct copy for gcc might or might not be faster than jitted
  * code, but still worth it because doesn't require jitting, i.e. much
  * faster creation time. This is tentative solution and should be
  * removed later (when we will cache jitted code?...). */
