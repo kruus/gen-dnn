@@ -297,13 +297,11 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
             float scale, alpha, beta;
         };
         // sometimes "warning: types cannot be declared in anonymous unions"
-        //struct sum_t { float scale; };
+        struct sum_t { float scale; };
 
         dnnl::impl::primitive_kind_t kind;
         union {
-            struct {
-                float scale;
-            } sum;
+            sum_t sum;
             eltwise_t eltwise;
         };
 
