@@ -16,7 +16,17 @@
 
 #include <assert.h>
 
-#include "cpu_reorder_lists.hpp"
+#include <assert.h>
+#include <map>
+#include <vector>
+
+#include "cpu_target.h"
+#if TARGET_X86_JIT
+#include "cpu/jit_uni_reorder.hpp"
+#endif // TARGET_X86_JIT
+#include "cpu/rnn/rnn_reorders.hpp"
+#include "cpu/simple_reorder.hpp"
+#include "cpu/wino_reorder.hpp"
 
 namespace dnnl {
 namespace impl {
