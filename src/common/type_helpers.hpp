@@ -162,7 +162,7 @@ inline bool rnn_packed_desc_is_equal(
 
 inline memory_desc_t zero_md() {
     auto zero = memory_desc_t(); // default-constructed "C" POD type
-#if DNNL_VALUE_INITIALIZATION_BUG
+#if DNNL_VALUE_INITIALIZATION_BUG /* a "good enough" workaround */
     memset(&zero, 0, sizeof(memory_desc_t));
 #endif
     return zero;

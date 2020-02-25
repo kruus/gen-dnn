@@ -42,6 +42,7 @@
 #include <string>
 
 #include "dnnl.hpp"
+
 #include "example_utils.hpp"
 
 #if DNNL_ENABLE_RNN

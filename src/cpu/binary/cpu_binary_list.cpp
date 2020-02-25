@@ -16,11 +16,8 @@
 
 #include "cpu_engine.hpp"
 
-#if TARGET_X86_JIT
-#include "cpu/jit_uni_batch_normalization.hpp"
 #include "cpu/binary/jit_uni_binary.hpp"
 #include "cpu/binary/jit_uni_i8i8_binary.hpp"
-#endif // TARGET_X86_JIT
 #include "cpu/binary/ref_binary.hpp"
 
 namespace dnnl {
@@ -52,6 +49,7 @@ static const pd_create_f impl_list[] = {
         /* eol */
         nullptr,
 };
+#undef INSTANCE
 } // namespace
 
 const pd_create_f *get_binary_impl_list(const binary_desc_t *desc) {

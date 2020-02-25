@@ -35,15 +35,11 @@ struct dnnl_primitive_desc : public dnnl::impl::c_compatible {
     dnnl_primitive_desc(dnnl::impl::engine_t *engine,
             const dnnl::impl::primitive_attr_t *attr,
             dnnl::impl::primitive_kind_t kind)
-        : engine_(engine), attr_(*attr), kind_(kind) {
-            //info_[0] = '\0'; // paranoia? removed in 2.1?
-        }
+        : engine_(engine), attr_(*attr), kind_(kind) {}
 
     dnnl_primitive_desc(
             dnnl::impl::engine_t *engine, dnnl::impl::primitive_kind_t kind)
-        : engine_(engine), kind_(kind) {
-            //info_[0] = '\0'; // paranoia? removed in 2.1?
-        }
+        : engine_(engine), kind_(kind) {}
 
     virtual dnnl_primitive_desc *clone() const = 0;
     virtual ~dnnl_primitive_desc() {}
@@ -165,7 +161,6 @@ struct dnnl_primitive_desc : public dnnl::impl::c_compatible {
             delete _pd;
             return unimplemented;
         }
-        //_pd->init_info(); // removed in v2.1
 
         _pd->init_scratchpad_md();
         *pd = _pd;

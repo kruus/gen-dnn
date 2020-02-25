@@ -723,9 +723,8 @@ echo "PATH $PATH"
             } 
         #fi
         if [ $DOTEST -eq 0 -a $DOJIT -ge 0 ]; then
-            # this is fast ONLY with JIT (< 5 secs vs > 5 mins)
-            { echo "simple-training-net-cpp ...";
-                ${TESTRUNNER}  ${VE_EXEC} examples/simple-training-net-cpp \
+            { echo "cpu-cnn-training-f32-c"
+                ${TESTRUNNER}  ${VE_EXEC} examples/cpu-cnn-training-f32-c \
                 || BUILDOK="n";
             }
         fi

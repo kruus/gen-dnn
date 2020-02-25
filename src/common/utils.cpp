@@ -63,13 +63,13 @@ int getenv(const char *name, char *buffer, int buffer_size) {
         int int_value_length = (int)value_length;
         if (int_value_length >= buffer_size) {
             result = -int_value_length;
-            } else {
+        } else {
             term_zero_idx = int_value_length;
             result = int_value_length;
 #ifndef _WIN32
             if (value) strncpy(buffer, value, buffer_size - 1);
 #endif
-    }
+        }
     }
 
     if (buffer != NULL) buffer[term_zero_idx] = '\0';

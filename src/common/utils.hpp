@@ -164,14 +164,12 @@ inline T &&forward(typename utils::remove_reference<T>::type &&t) {
  * constructors) to zero with `memset` is a good enough workaround. */
 template <typename T>
 inline typename remove_reference<T>::type zero() {
-    // NO static_assert(std::is_pod<typename remove_reference<T>::type>::value, "Please zero<T> only POD objects");
-    // NO static_assert(std::is_trivial<typename remove_reference<T>::type>::value, "zero<T> should have trivial T");
     static_assert(std::is_standard_layout<typename remove_reference<T>::type>::value, "zero<T> should have standard layout");
     auto zero = typename remove_reference<T>::type();
 #if DNNL_BUG_VALUE_INITIALIZATION
-    // sometimes zero is used for non-POD types.  Bug is for pod types.
-    // Ex. dnnl_concat_desc_t includes a std::vector of dnnl_memory_desc_t,
-    //     so hope compiler gets this one right.
+    // Adjust bug handling as required for bad compilers.
+    // So far bug is for pod types.
+    // Note some desc_t are non-POD, like dnnl_concat_desc_t with a std::vector
     if (std::is_pod<typename remove_reference<T>::type>::value)
         memset(&zero, 0, sizeof(T));
 #endif
@@ -224,7 +222,8 @@ template <typename T>
 inline bool array_cmp(const T *a1, const T *a2, size_t size) {
 #if defined(__ve)
     bool ret=true;
-    for (size_t i = 0; i < size; ++i) if (a1[i] != a2[i]) {ret=false; break; }
+    for (size_t i = 0; i < size; ++i)
+        if (a1[i] != a2[i]) {ret=false; break; }
     return ret;
 #else
     for (size_t i = 0; i < size; ++i)
@@ -356,9 +355,9 @@ inline T nd_iterator_init(T start) {
 template <typename T, typename U, typename W, typename... Args>
 inline T nd_iterator_init(T start, U &x, const W &X, Args &&... tuple) {
     start = nd_iterator_init(start, utils::forward<Args>(tuple)...);
-    x = static_cast<U>(start % static_cast<T>(X));
+    x = static_cast<U>(start % static_cast<T>(X)); // ignore "loss of precision" warnings
     return start / static_cast<T>(X);
-    // .. or maybe do in "larger-of" type ?
+    // ... maybe do in "larger-of" type ?
     //typedef decltype(start + x) TU_t;
     //x = static_cast<U>( (TU_t)(start) % (TU_t)(X));
     //return static_cast<T>(start / X);

@@ -24,12 +24,14 @@ set(SDL_cmake_included true)
 include("cmake/utils.cmake")
 
 set(CMAKE_CCXX_FLAGS)
-if(NECVE) # cross-compilers may not support much
+if(NECVE) # handle cross-compiler toolchains separately
     set(CMAKE_CCXX_FLAGS "-fPIC")
     # no stack protector
 elseif(UNIX)
     # what about DNNL_LIBRARY_TYPE not needing -fPIC?
     set(CMAKE_CCXX_FLAGS "-fPIC -Wformat -Wformat-security")
+    append(CMAKE_CXX_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2")
+    append(CMAKE_C_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2")
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.9)
             append(CMAKE_CCXX_FLAGS "-fstack-protector-all")
@@ -48,7 +50,7 @@ elseif(UNIX)
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
         append(CMAKE_CCXX_FLAGS "-fstack-protector-all")
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
-        append(CMAKE_CXX_FLAGS "-fstack-protector")
+        append(CMAKE_CCXX_FLAGS "-fstack-protector")
     endif()
     if(APPLE)
         append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-bind_at_load")

@@ -1052,13 +1052,6 @@ typedef struct {
     dnnl_memory_extra_desc_t extra;
 } dnnl_memory_desc_t;
 
-// XXX CHECKME used?
-#define DNNL_ZERO_MEMORY_DESC_T { 0/*ndims*/, {0}/*dims*/, \
-    dnnl_data_type_undef/*data_type*/, {0}/*padded_dims*/, \
-    {0}/*padded_offsets*/, 0/*offset0*/, \
-    dnnl_format_kind_undef/*format_kind*/, \
-    DNNL_ZERO_MEMORY_EXTRA_DESC_T, {0}/*format_desc*/ }
-
 /// @struct dnnl_memory
 /// An opaque structure to describe a memory.
 struct dnnl_memory;

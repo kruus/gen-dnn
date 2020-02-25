@@ -386,13 +386,9 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
 struct dnnl_primitive_attr : public dnnl::impl::c_compatible {
     dnnl_primitive_attr()
             : scratchpad_mode_(dnnl::impl::scratchpad_mode::library)
-#if 0 // paranoia?
-            , output_scales_()
-            , zero_points_()
-            , post_ops_()
-            , rnn_data_qparams_()
-            , rnn_weights_qparams_()
-            , rnn_tparams_()
+#if 0 // paranoia
+            , output_scales_() , zero_points_() , post_ops_() , rnn_data_qparams_()
+            , rnn_weights_qparams_() , rnn_tparams_()
 #endif
     {}
 

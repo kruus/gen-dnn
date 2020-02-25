@@ -18,12 +18,9 @@
 #include "dnnl_thread.hpp"
 #include "utils.hpp"
 
-#include "cpu_isa_traits.hpp"
-
-// Q: why would jit ever be required?
 //#include "jit_generator.hpp"
-
 #include "cpu_batch_normalization_utils.hpp"
+#include "cpu_isa_traits.hpp"           // get_cache_size
 
 namespace dnnl {
 namespace impl {
