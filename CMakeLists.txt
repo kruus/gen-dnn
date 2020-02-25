@@ -97,7 +97,6 @@ include("cmake/mkldnn_compat.cmake")
 
 include("cmake/utils.cmake")
 include("cmake/options.cmake")
-include("cmake/asm.cmake")
 include("cmake/OpenMP.cmake")
 include("cmake/TBB.cmake")
 include("cmake/OpenCL.cmake")
@@ -105,12 +104,14 @@ include("cmake/platform.cmake")
 include("cmake/SDL.cmake")
 include("cmake/MKL.cmake")
 include("cmake/cblas.cmake")
-#include("cmake/NLC.cmake")
 include("cmake/Doxygen.cmake")
 include("cmake/version.cmake")
-# XXX hack (debug function to print various cmake things)
-include("Platform/SX-util.cmake")
 include("cmake/coverage.cmake")
+if(NECVE)
+    #include("cmake/asm.cmake") # annotated assembler?
+    #include("cmake/NLC.cmake") # VE cblas settings now in toolchain file
+    #include("Platform/SX-util.cmake") # cmake toolchain debug
+endif()
 
 # Handle cases when OpenMP runtime is requested but not found: override CPU
 # runtime to be sequential
