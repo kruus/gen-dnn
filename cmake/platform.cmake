@@ -1,5 +1,5 @@
-#== == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == =
-#Copyright 2016 - 2019 Intel Corporation
+#===============================================================================
+# Copyright 2016-2020 Intel Corporation
 #
 #Licensed under the Apache License, Version 2.0(the "License");
 #you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ set(platform_cmake_included true)
 
 include("cmake/utils.cmake")
 
-add_definitions(-DDNNL_DLL -DDNNL_DLL_EXPORTS)
+add_definitions(-DDNNL_DLL)
 
 # UINT8_MAX-like macros are a part of the C99 standard and not a part of the
 # C++ standard (see C99 standard 7.18.2 and 7.18.4)
@@ -73,7 +73,9 @@ if(MSVC)
         append(CMAKE_CCXX_NOWARN_FLAGS "-Qdiag-disable:15009")
         #disable : disabling user - directed function packaging(COMDATs)
         append(CMAKE_CCXX_NOWARN_FLAGS "-Qdiag-disable:11031")
-        #disable : disabling optimization; runtime debug checks enabled
+        # disable: decorated name length exceeded, name was truncated
+        append(CMAKE_CCXX_NOWARN_FLAGS "-Qdiag-disable:2586")
+        # disable: disabling optimization; runtime debug checks enabled
         append(CMAKE_CXX_FLAGS_DEBUG "-Qdiag-disable:10182")
     endif()
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")

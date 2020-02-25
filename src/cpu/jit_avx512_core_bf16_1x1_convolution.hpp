@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2019 Intel Corporation
+* Copyright 2019-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -83,9 +83,10 @@ struct jit_avx512_core_bf16_1x1_convolution_fwd_t : public primitive_impl_t {
     protected:
         bool set_default_formats() {
             using namespace format_tag;
-            auto dat_tag = utils::pick(ndims() - 3, nCw16c, nChw16c);
+            auto dat_tag = utils::pick(ndims() - 3, nCw16c, nChw16c, nCdhw16c);
             auto wei_tag = utils::pick(2 * ndims() - 6 + with_groups(),
-                    OIw8i16o2i, gOIw8i16o2i, OIhw8i16o2i, gOIhw8i16o2i);
+                    OIw8i16o2i, gOIw8i16o2i, OIhw8i16o2i, gOIhw8i16o2i,
+                    OIdhw8i16o2i, gOIdhw8i16o2i);
 
             return set_default_formats_common(dat_tag, wei_tag, dat_tag);
         }
@@ -172,9 +173,10 @@ struct jit_avx512_core_bf16_1x1_convolution_bwd_data_t
         bool set_default_formats() {
             using namespace format_tag;
 
-            auto dat_tag = utils::pick(ndims() - 3, nCw16c, nChw16c);
+            auto dat_tag = utils::pick(ndims() - 3, nCw16c, nChw16c, nCdhw16c);
             auto wei_tag = utils::pick(2 * ndims() - 6 + with_groups(),
-                    IOw8o16i2o, gIOw8o16i2o, IOhw8o16i2o, gIOhw8o16i2o);
+                    IOw8o16i2o, gIOw8o16i2o, IOhw8o16i2o, gIOhw8o16i2o,
+                    IOdhw8o16i2o, gIOdhw8o16i2o);
 
             return set_default_formats_common(dat_tag, wei_tag, dat_tag);
         }
@@ -276,9 +278,10 @@ struct jit_avx512_core_bf16_1x1_convolution_bwd_weights_t
         bool set_default_formats() {
             using namespace format_tag;
 
-            auto dat_tag = utils::pick(ndims() - 3, nCw16c, nChw16c);
+            auto dat_tag = utils::pick(ndims() - 3, nCw16c, nChw16c, nCdhw16c);
             auto wei_tag = utils::pick(2 * ndims() - 6 + with_groups(),
-                    OIw16i16o, gOIw16i16o, OIhw16i16o, gOIhw16i16o);
+                    OIw16i16o, gOIw16i16o, OIhw16i16o, gOIhw16i16o, OIdhw16i16o,
+                    gOIdhw16i16o);
 
             bool ok = set_default_formats_common(dat_tag, wei_tag, dat_tag);
             return ok;
@@ -305,10 +308,7 @@ struct jit_avx512_core_bf16_1x1_convolution_bwd_weights_t
         delete kernel_;
         delete reducer_bias_;
         delete rtus_driver_;
-
-#ifndef BF16_CONV_1x1_BWD_W_JIT_KER_USES_PERMW_TRANSPOSITION
         delete tr_reorder_;
-#endif
     }
 
     virtual status_t execute(const exec_ctx_t &ctx) const override {
@@ -332,9 +332,7 @@ private:
     /* reduction to unit stride */
     rtus_driver_t<avx512_common> *rtus_driver_;
 
-#ifndef BF16_CONV_1x1_BWD_W_JIT_KER_USES_PERMW_TRANSPOSITION
     jit_avx512_core_bf16_reorder_s16c_to_S16c2s_t *tr_reorder_;
-#endif
 };
 
 } // namespace cpu

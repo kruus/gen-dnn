@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2019 Intel Corporation
+* Copyright 2016-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -58,7 +58,8 @@ enum conv_kernel_kind_t { embd_bcast, expl_bcast };
 enum conv_harness_t {
     harness_2d_reduction,
     harness_3d_reduction,
-    harness_mb_reduction
+    harness_mb_reduction,
+    harness_compute_full_spatial
 };
 
 enum {
@@ -127,7 +128,8 @@ struct jit_conv_conf_t {
     /* fma avx512_core */
     conv_kernel_kind_t kernel_kind;
     /* 4fma */
-    int tr_iw;
+    int tr_iw, tr_ih;
+    int tr_kw, tr_kh;
     int tr_src_num_guard_elems;
     /* 1st conv: 4fma */
     int tr_ld;
@@ -153,7 +155,7 @@ struct jit_conv_conf_t {
     int src_offsets[28];
     int src_count;
     bool expl_bcast;
-    bool large_spatial;
+    bool large_spatial, large_w_filter;
     int is_oc_scale;
     int max_regs_ur; // maximum accumulation registers
     // dw conv
@@ -174,6 +176,7 @@ struct jit_conv_conf_t {
     cpu_isa_t isa;
     // bf16 bwdw conv
     int tr_ow;
+    bool is_hw_transp; // spatial dim height-width transposed
 };
 
 // calculates filter size taking into account dilation
@@ -467,6 +470,7 @@ struct jit_1x1_conv_conf_t {
     float wei_adj_scale;
 
     cpu_isa_t isa;
+    bool uses_permw_transposition;
 };
 
 struct jit_gemm_conv_conf_t {

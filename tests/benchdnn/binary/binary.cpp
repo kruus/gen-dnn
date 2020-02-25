@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2019 Intel Corporation
+* Copyright 2019-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -21,10 +21,12 @@
 
 #include "src/common/dnnl_thread.hpp"
 
+#include "dnn_types.hpp"
 #include "dnnl_common.hpp"
 #include "dnnl_memory.hpp"
 
 #include "binary/binary.hpp"
+#include "eltwise/eltwise.hpp"
 
 namespace binary {
 
@@ -88,6 +90,9 @@ static int compare(const prb_t *p, const dnn_mem_t &fp_mem,
     r->total = nelems;
     const float trh = epsilon_dt(p->ddt == dnnl_f16 ? dnnl_f16 : dnnl_f32)
             * p->n_inputs();
+    const int eltwise_idx = p->attr.post_ops.eltwise_index();
+
+    const bool has_eltwise = eltwise_idx >= 0;
 
     for (int64_t i = 0; i < nelems; i++) {
         const float dt = dt_mem.get_elem(i);
@@ -96,7 +101,10 @@ static int compare(const prb_t *p, const dnn_mem_t &fp_mem,
 
         const float diff = fabsf(fp - dt);
         const float rel_diff = diff / (fabsf(fp) > FLT_MIN ? fabsf(fp) : 1);
-        const bool ok = (fabsf(fp) > 1e-5 ? rel_diff : diff) <= trh;
+        bool ok = (fabsf(fp) > 1e-5 ? rel_diff : diff) <= trh;
+        if (!ok && has_eltwise)
+            ok = eltwise::check_extreme_values(
+                    fp, dt, p->attr.post_ops.entry[eltwise_idx].kind);
 
         r->errors += !ok;
 

@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2019 Intel Corporation
+* Copyright 2017-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -156,11 +156,12 @@ struct attr_t {
             SRELU,
             LOGISTIC,
             EXP,
-            GELU,
+            GELU_TANH,
             SWISH,
             LOG,
             CLIP,
             POW,
+            GELU_ERF,
 
             RELU_DST,
             TANH_DST,
@@ -195,6 +196,7 @@ struct attr_t {
 
         bool is_def() const { return len == 0; }
         int find(kind_t kind, int start = 0, int stop = -1) const;
+        int eltwise_index() const;
 
         enum { capacity = 4 };
         int len;
@@ -270,4 +272,5 @@ float compute_eltwise_fwd(attr_t::post_ops_t::kind_t kind, float src,
 float compute_eltwise_bwd(attr_t::post_ops_t::kind_t kind, float d_dst,
         float src, float alpha, float beta);
 void maybe_post_ops(float &d, float dst, const attr_t &attr);
+
 #endif

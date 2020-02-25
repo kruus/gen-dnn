@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2019 Intel Corporation
+* Copyright 2016-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ T elu_bwd(T dd, T s, A alpha) {
 }
 
 template <typename T>
-T gelu_fwd(T s) {
+T gelu_tanh_fwd(T s) {
     const float a = 0.797884;
     const float b = 0.044715;
     const float g = a * s * (1 + b * s * s);
@@ -58,7 +58,7 @@ T gelu_fwd(T s) {
 }
 
 template <typename T>
-T gelu_bwd(T dd, T s) {
+T gelu_tanh_bwd(T dd, T s) {
     const float a = 0.797884;
     const float b = 0.044715;
     const float g = a * s * (1 + b * s * s);
@@ -153,6 +153,22 @@ T swish_bwd(T dd, T s, A alpha) {
     return dd * (v + s * alpha * v * (1 - v));
 }
 
+template <typename T>
+T gelu_erf_fwd(T s) {
+    const float sqrt_2_over_2 = 0.707106;
+    float v = s * sqrt_2_over_2;
+    return (T)(sqrt_2_over_2 * v * (1.f + ::erff(v)));
+}
+
+template <typename T>
+T gelu_erf_bwd(T dd, T s) {
+    const float two_over_sqrt_pi = 1.128379;
+    const float sqrt_2_over_2 = 0.707106;
+    float v = s * sqrt_2_over_2;
+    return (T)(dd * 0.5f
+            * (1.f + ::erff(v) + v * two_over_sqrt_pi * ::expf(-v * v)));
+}
+
 struct eltwise_test_params {
     algorithm alg_kind;
     memory::format_tag data_format;
@@ -196,8 +212,9 @@ void check_eltwise_fwd(const eltwise_test_params &p, const memory::desc &md,
             case algorithm::eltwise_soft_relu: ref_d = soft_relu_fwd(s); break;
             case algorithm::eltwise_logistic: ref_d = logistic_fwd(s); break;
             case algorithm::eltwise_exp: ref_d = exp_fwd(s); break;
-            case algorithm::eltwise_gelu: ref_d = gelu_fwd(s); break;
+            case algorithm::eltwise_gelu_tanh: ref_d = gelu_tanh_fwd(s); break;
             case algorithm::eltwise_swish: ref_d = swish_fwd(s, p.alpha); break;
+            case algorithm::eltwise_gelu_erf: ref_d = gelu_erf_fwd(s); break;
             default: assert(!"unknown alg_kind");
         }
         dst_data[i] = ref_d;
@@ -218,7 +235,8 @@ void compare_eltwise_fwd(const eltwise_test_params &p, const memory::desc &md,
                                 == memory::data_type::bf16)
                         ? 5e-2
                         : (p.alg_kind == algorithm::eltwise_elu
-                                  || p.alg_kind == algorithm::eltwise_gelu)
+                                  || p.alg_kind == algorithm::eltwise_gelu_tanh
+                                  || p.alg_kind == algorithm::eltwise_gelu_erf)
                                 ? 2e-5
                                 : p.alg_kind == algorithm::eltwise_soft_relu
                                         ? 2e-6
@@ -243,7 +261,8 @@ void check_eltwise_bwd(const eltwise_test_params &p, const memory::desc &md,
         eps_f = 2e-6f;
     } else if (p.alg_kind == algorithm::eltwise_tanh) {
         eps_f = (get_test_engine_kind() == engine::kind::gpu) ? 2e-5f : 2e-6f;
-    } else if (p.alg_kind == algorithm::eltwise_gelu) {
+    } else if (p.alg_kind == algorithm::eltwise_gelu_tanh
+            || p.alg_kind == algorithm::eltwise_gelu_erf) {
         eps_f = 1e-5f;
     } else {
         eps_f = 1e-6f;
@@ -282,11 +301,14 @@ void check_eltwise_bwd(const eltwise_test_params &p, const memory::desc &md,
                 ref_ds = logistic_bwd(ref_dd, ref_s);
                 break;
             case algorithm::eltwise_exp: ref_ds = exp_bwd(ref_dd, ref_s); break;
-            case algorithm::eltwise_gelu:
-                ref_ds = gelu_bwd(ref_dd, ref_s);
+            case algorithm::eltwise_gelu_tanh:
+                ref_ds = gelu_tanh_bwd(ref_dd, ref_s);
                 break;
             case algorithm::eltwise_swish:
                 ref_ds = swish_bwd(ref_dd, ref_s, p.alpha);
+                break;
+            case algorithm::eltwise_gelu_erf:
+                ref_ds = gelu_erf_bwd(ref_dd, ref_s);
                 break;
             default: assert(!"unknown alg_kind");
         }
@@ -448,14 +470,15 @@ TEST_P(eltwise_test_s8, TestsEltwise) {}
     }
 
 #define PARAMS_ALL_ALG(...) \
-    EXPAND(PARAMS(eltwise_gelu, __VA_ARGS__)), \
+    EXPAND(PARAMS(eltwise_gelu_tanh, __VA_ARGS__)), \
             EXPAND(PARAMS(eltwise_relu, __VA_ARGS__)), \
             EXPAND(PARAMS(eltwise_tanh, __VA_ARGS__)), \
             EXPAND(PARAMS(eltwise_elu, __VA_ARGS__)), \
             EXPAND(PARAMS(eltwise_square, __VA_ARGS__)), \
             EXPAND(PARAMS(eltwise_abs, __VA_ARGS__)), \
             EXPAND(PARAMS(eltwise_exp, __VA_ARGS__)), \
-            EXPAND(PARAMS(eltwise_swish, __VA_ARGS__))
+            EXPAND(PARAMS(eltwise_swish, __VA_ARGS__)), \
+            EXPAND(PARAMS(eltwise_gelu_erf, __VA_ARGS__))
 
 #define PARAMS_ALL_ALG_SDPART(...) \
     EXPAND(PARAMS(eltwise_linear, __VA_ARGS__)), \

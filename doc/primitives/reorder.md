@@ -9,7 +9,7 @@ The reorder primitive copies data between different memory formats but doesn't
 change the tensor from mathematical perspective:
 
 \f[
-    dst(\overline{x}) = src(\overline{x})
+    \dst(\overline{x}) = \src(\overline{x})
 \f]
 
 As described in @ref dev_guide_basic_concepts in order to achieve the best
@@ -21,6 +21,15 @@ data between the memory formats.
 
 Using the attributes and post-ops users can also use reorder primitive to
 quantize the data (and if necessary change the memory format simultaneously).
+
+## Execution Arguments
+When executed, the inputs and outputs should be mapped to an execution
+argument index as specified by the following table.
+| Primitive intput/output | Execution argument index |
+| ---                     | ---                      |
+| \src                    | DNNL_ARG_FROM            |
+| \dst                    | DNNL_ARG_TO              |
+
 
 ## Implementation Details
 
@@ -92,9 +101,9 @@ For instance, the following pseudo-code
 would lead to the following operation:
 
 \f[
-    dst(\overline{x}) =
-            \alpha \cdot src(\overline{x}) +
-            \beta  \cdot dst(\overline{x})
+    \dst(\overline{x}) =
+            \alpha \cdot \src(\overline{x}) +
+            \beta  \cdot \dst(\overline{x})
 \f]
 
 @note The intermediate operations are being done using single precision

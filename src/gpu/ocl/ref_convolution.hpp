@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2019 Intel Corporation
+* Copyright 2019-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -102,7 +102,7 @@ struct ref_convolution_fwd_t : public primitive_impl_t {
         float sum_scale() const {
             const int sum_idx = attr()->post_ops_.find(primitive_kind::sum);
             return with_sum() ? attr()->post_ops_.entry_[sum_idx].sum.scale
-                              : 1.0f;
+                              : 0.0f;
         }
 
         alg_kind_t eltwise_alg_kind() const {

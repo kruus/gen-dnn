@@ -9,8 +9,8 @@ The concat primitive concatenates \f$N\f$ tensors over `concat_axis` (here
 designated as \f$C\f$ axis) and defined as:
 
 \f[
-    dst(\overline{ou}, c, \overline{in}) =
-        src_i(\overline{ou}, c', \overline{in}),
+    \dst(\overline{ou}, c, \overline{in}) =
+        \src_i(\overline{ou}, c', \overline{in}),
 \f]
 
 where \f$c = C_1 + .. + C_{i-1} {}_{} + c'\f$.
@@ -19,11 +19,18 @@ The concat primitive doesn't have a notion of forward or backward propagations.
 The backward propagation for the concatenation operation is simply an identity
 operation.
 
+## Execution Arguments
+When executed, the inputs and outputs should be mapped to an execution argument index as specified by the following table.
+| Primitive intput/output | Execution argument index |
+| ---                     | ---                      |
+| \src                    | DNNL_ARG_MULTIPLE_SRC    |
+| \dst                    | DNNL_ARG_DST             |
+
 ## Implementation Details
 
 ### General Notes
 
-1. The \f$dst\f$ memory format can be either specified by a user or derived by
+1. The \dst memory format can be either specified by a user or derived by
    the primitive. The recommended way is to allow the primitive to choose the
    most appropriate format.
 
@@ -52,7 +59,7 @@ The concat primitive doesn't support any post-ops or attributes.
 
 ## Implementation Limitations
 
-1. The primitive works with blocked memory formats, such as plain formats
+1. The primitive works with several memory formats, such as plain formats
    #dnnl_nchw, #dnnl_nhwc, and blocked formats #dnnl_nChw16c, #dnnl_nCdhw8c that
    appear in convolutions. The primitive does not support non-blocked formats
    that are typically used in prepacked weights, such as:

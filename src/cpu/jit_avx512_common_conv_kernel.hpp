@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2019 Intel Corporation
+* Copyright 2016-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -291,8 +291,10 @@ private:
     inline void store_output(int ur_w);
     inline void compute_loop_4fma(int ur_w, int l_overflow, int r_overflow);
     inline void compute_loop_fma(int ur_w, int l_overflow, int r_overflow);
-    inline void compute_loop_fma_core(int ur_w, int l_overflow, int r_overflow);
-    inline void compute_loop(int ur_w, int l_overflow, int r_overflow);
+    inline void compute_loop_fma_core(
+            int ur_w, int l_overflow, int r_overflow, int k_offset);
+    inline void compute_loop(
+            int ur_w, int l_overflow, int r_overflow, int k_offset = 0);
     void generate();
 
     inline int get_iw_start(int ki, int l_overflow) {

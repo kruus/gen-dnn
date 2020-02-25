@@ -9,14 +9,23 @@ The binary primitive computes an operation between source 0 and source 1
 element-wise:
 
 \f[
-    dst(\overline{x}) =
-        src0(\overline{x}) \mathbin{op} src1(\overline{x}),
+    \dst(\overline{x}) =
+        \src_0(\overline{x}) \mathbin{op} \src_1(\overline{x}),
 \f]
 
 where \f$op\f$ is addition, multiplication, get maximum value or get minimum
 value.
 
 The binary primitive does not have a notion of forward or backward propagations.
+
+## Execution Arguments
+When executed, the inputs and outputs should be mapped to an execution
+argument index as specified by the following table.
+| Primitive intput/output | Execution argument index |
+| ---                     | ---                      |
+| \f$\src_0\f$            | DNNL_ARG_SRC0            |
+| \f$\src_1\f$            | DNNL_ARG_SRC1            |
+| \dst                    | DNNL_ARG_DST             |
 
 ## Implementation Details
 
@@ -29,7 +38,7 @@ The binary primitive does not have a notion of forward or backward propagations.
    means that if some dimension has value of one, this value will be used to
    compute an operation with each point of source 0 for this dimension.
 
- * The \f$dst\f$ memory format can be either specified explicitly or be
+ * The \dst memory format can be either specified explicitly or by
    #dnnl::memory::format_tag::any (recommended), in which case the primitive
    will derive the most appropriate memory format based on the format of the
    source 0 tensor.
@@ -69,8 +78,6 @@ meaning associated with any of tensors dimensions.
 
 1. Refer to @ref dev_guide_data_types for limitations related to data types
    support.
-
-2. No post-ops or attributes support on GPU.
 
 ## Performance Tips
 

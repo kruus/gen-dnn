@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2019 Intel Corporation
+* Copyright 2019-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -74,7 +74,7 @@ void check_correctness() {
             case alg_t::ABS:
             case alg_t::EXP:
             case alg_t::EXP_DST:
-            case alg_t::GELU:
+            case alg_t::GELU_TANH:
             case alg_t::LOG:
             case alg_t::LOGISTIC:
             case alg_t::LOGISTIC_DST:
@@ -84,6 +84,7 @@ void check_correctness() {
             case alg_t::SRELU:
             case alg_t::TANH:
             case alg_t::TANH_DST:
+            case alg_t::GELU_ERF:
                 // Skip everything but alpha = 0 and beta = 0
                 if (i_alpha != 0 || i_beta != 0) continue;
             case alg_t::ELU:

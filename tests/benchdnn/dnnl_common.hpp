@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2019 Intel Corporation
+* Copyright 2017-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -182,6 +182,8 @@ inline float maybe_saturate(dnnl_data_type_t dt, float value) {
     }
     return value;
 }
+
+float round_to_nearest_representable(dnnl_data_type_t dt, float value);
 
 /* simplification */
 extern dnnl_engine_kind_t engine_tgt_kind;

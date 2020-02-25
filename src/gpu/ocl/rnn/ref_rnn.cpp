@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2019 Intel Corporation
+* Copyright 2019-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -469,6 +469,7 @@ status_t _ref_rnn_common_t<aprop>::pd_t::init() {
 
     bool ok = true
             && one_of(cell_kind, alg_kind::vanilla_rnn, alg_kind::vanilla_lstm)
+            && !this->is_lstm_peephole()
             && IMPLICATION(aprop == prop_kind::forward,
                     one_of(this->desc()->prop_kind, forward_training,
                             forward_inference))

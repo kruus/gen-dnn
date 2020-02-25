@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2019 Intel Corporation
+* Copyright 2019-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -289,18 +289,19 @@ struct rnn_postgemm_dispatcher {
             rnn_postgemm_->execute(rnn, cell_position, ws_gates_,
                     scratch_gates_, states_t_l_, c_states_t_l_, states_tm1_l_,
                     c_states_tm1_l_, diff_states_t_l_, diff_states_t_lp1_,
-                    diff_states_tp1_l_, bias_, ws_grid_, scratch_cell_,
-                    states_t_l_copy_);
+                    diff_states_tp1_l_, weights_peephole_, bias_, ws_grid_,
+                    scratch_cell_, states_t_l_copy_);
             unpoison(rnn, cell_position, ws_gates_, scratch_gates_, states_t_l_,
                     c_states_t_l_, states_tm1_l_, c_states_tm1_l_,
                     diff_states_t_l_, diff_states_t_lp1_, diff_states_tp1_l_,
-                    bias_, ws_grid_, scratch_cell_, states_t_l_copy_);
+                    weights_peephole_, bias_, ws_grid_, scratch_cell_,
+                    states_t_l_copy_);
         } else
             (this->*postgemm_func)(rnn, cell_position, ws_gates_,
                     scratch_gates_, states_t_l_, c_states_t_l_, states_tm1_l_,
                     c_states_tm1_l_, diff_states_t_l_, diff_states_t_lp1_,
-                    diff_states_tp1_l_, bias_, ws_grid_, scratch_cell_,
-                    states_t_l_copy_);
+                    diff_states_tp1_l_, weights_peephole_, bias_, ws_grid_,
+                    scratch_cell_, states_t_l_copy_);
     }
 
     // template <typename src_data_t, typename acc_data_t>
@@ -309,18 +310,19 @@ struct rnn_postgemm_dispatcher {
             rnn_postgemm_part2_->execute(rnn, cell_position, ws_gates_,
                     scratch_gates_, states_t_l_, c_states_t_l_, states_tm1_l_,
                     c_states_tm1_l_, diff_states_t_l_, diff_states_t_lp1_,
-                    diff_states_tp1_l_, bias_, ws_grid_, scratch_cell_,
-                    states_t_l_copy_);
+                    diff_states_tp1_l_, weights_peephole_, bias_, ws_grid_,
+                    scratch_cell_, states_t_l_copy_);
             unpoison(rnn, cell_position, ws_gates_, scratch_gates_, states_t_l_,
                     c_states_t_l_, states_tm1_l_, c_states_tm1_l_,
                     diff_states_t_l_, diff_states_t_lp1_, diff_states_tp1_l_,
-                    bias_, ws_grid_, scratch_cell_, states_t_l_copy_);
+                    weights_peephole_, bias_, ws_grid_, scratch_cell_,
+                    states_t_l_copy_);
         } else
             (this->*postgemm_part2_func)(rnn, cell_position, ws_gates_,
                     scratch_gates_, states_t_l_, c_states_t_l_, states_tm1_l_,
                     c_states_tm1_l_, diff_states_t_l_, diff_states_t_lp1_,
-                    diff_states_tp1_l_, bias_, ws_grid_, scratch_cell_,
-                    states_t_l_copy_);
+                    diff_states_tp1_l_, weights_peephole_, bias_, ws_grid_,
+                    scratch_cell_, states_t_l_copy_);
     }
 
 private:

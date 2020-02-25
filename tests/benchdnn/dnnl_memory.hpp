@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2019 Intel Corporation
+* Copyright 2017-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -99,6 +99,8 @@ struct dnn_mem_t {
 
     int64_t nelems(bool with_padded_dims = false) const {
         auto dims = with_padded_dims ? md_.padded_dims : md_.dims;
+        if (md_.ndims == 0) return 0;
+
         int64_t n = 1;
         for (int i = 0; i < md_.ndims; ++i)
             n *= dims[i];

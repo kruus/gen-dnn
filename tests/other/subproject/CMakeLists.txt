@@ -1,5 +1,5 @@
 #===============================================================================
-# Copyright 2018-2019 Intel Corporation
+# Copyright 2018-2020 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,6 +23,18 @@
 cmake_minimum_required(VERSION 2.8.11)
 
 set(PROJECT_NAME "Project")
+
+# force CPU runtime
+set(DNNL_CPU_RUNTIME "SEQ" CACHE STRING "" FORCE)
+
+# set SEQ variable
+#set(SEQ "some-value")
+
+# force GPU runtime
+set(DNNL_GPU_RUNTIME "NONE" CACHE STRING "" FORCE)
+
+# set SEQ variable
+set(NONE "some-value")
 
 # include DNNL
 set(DNNL_DIR "../../..")

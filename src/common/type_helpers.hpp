@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2019 Intel Corporation
+* Copyright 2016-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ namespace dnnl {
 namespace impl {
 
 // Global zero memory descriptor. Mostly used for queries to return
-extern memory_desc_t glob_zero_md;
+extern memory_desc_t DNNL_API glob_zero_md;
 
 template <typename T>
 status_t safe_ptr_assign(T *&lhs, T *rhs) {
@@ -422,8 +422,8 @@ inline bool operator==(const rnn_desc_t &lhs, const rnn_desc_t &rhs) {
             && COMPARE_DESC_MEMBERS(dst_layer_desc)
             && COMPARE_DESC_MEMBERS(dst_iter_desc)
             && COMPARE_DESC_MEMBERS(dst_iter_c_desc)
+            && COMPARE_DESC_MEMBERS(weights_peephole_desc)
             && COMPARE_DESC_MEMBERS(placeholder_desc)
-            && COMPARE_DESC_MEMBERS(placeholder2_desc)
             && COMPARE_DESC_MEMBERS(diff_src_layer_desc)
             && COMPARE_DESC_MEMBERS(diff_src_iter_desc)
             && COMPARE_DESC_MEMBERS(diff_src_iter_c_desc)
@@ -433,8 +433,8 @@ inline bool operator==(const rnn_desc_t &lhs, const rnn_desc_t &rhs) {
             && COMPARE_DESC_MEMBERS(diff_dst_layer_desc)
             && COMPARE_DESC_MEMBERS(diff_dst_iter_desc)
             && COMPARE_DESC_MEMBERS(diff_dst_iter_c_desc)
+            && COMPARE_DESC_MEMBERS(diff_weights_peephole_desc)
             && COMPARE_DESC_MEMBERS(diff_placeholder_desc)
-            && COMPARE_DESC_MEMBERS(diff_placeholder2_desc)
             && COMPARE_DESC_MEMBERS(flags)
             && COMPARE_DESC_MEMBERS(activation_kind)
             && COMPARE_DESC_MEMBERS(alpha) && COMPARE_DESC_MEMBERS(beta);

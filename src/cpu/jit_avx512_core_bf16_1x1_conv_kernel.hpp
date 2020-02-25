@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2019 Intel Corporation
+* Copyright 2019-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -22,8 +22,6 @@
 #include "jit_generator.hpp"
 #include "jit_primitive_conf.hpp"
 #include "jit_uni_eltwise_injector.hpp"
-
-#define BF16_CONV_1x1_BWD_W_JIT_KER_USES_PERMW_TRANSPOSITION
 
 namespace dnnl {
 namespace impl {
@@ -122,10 +120,8 @@ private:
     jit_uni_eltwise_injector_f32<avx512_core> *eltwise_injector_;
 
     int bcast_loop_work_offt = 0;
-#ifdef BF16_CONV_1x1_BWD_W_JIT_KER_USES_PERMW_TRANSPOSITION
     int perm_reg_offset = 8;
     int broadcast_space = 24;
-#endif
     int stack_space_needed = 352;
 
     void bcast_loop(int load_loop_blk);
