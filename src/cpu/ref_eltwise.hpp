@@ -133,12 +133,10 @@ struct ref_eltwise_bwd_t : public primitive_impl_t {
             bool ok = true && !is_fwd()
                     && everyone_is(data_type, desc()->data_desc.data_type,
                             desc()->diff_data_desc.data_type)
-#if DNNL_ENABLE_BFLOAT16
                     /*bf16<->f32 cvt operators don't work on non-avx512_core*/
                     && IMPLICATION(
                             desc()->data_desc.data_type == data_type::bf16,
                             mayiuse(avx512_core))
-#endif // DNNL_ENABLE_BFLOAT16
                     && set_default_formats_common()
                     && attr()->has_default_values();
             if (!ok) return status::unimplemented;

@@ -35,10 +35,8 @@ static const pd_create_f impl_list[] = {
         INSTANCE(simple_resampling_bwd_t<f32>)
         INSTANCE(ref_resampling_fwd_t<f32>)
         INSTANCE(ref_resampling_bwd_t<f32>)
-#if DNNL_ENABLE_BFLOAT16
         INSTANCE(ref_resampling_fwd_t<bf16>)
         INSTANCE(ref_resampling_bwd_t<bf16>)
-#endif // DNNL_ENABLE_BFLOAT16
         /* eol */
         nullptr,
 };

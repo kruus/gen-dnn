@@ -174,7 +174,6 @@ dnnl_status_t sgemm_pack_get_size(const char *identifier, const char *transa,
     return dnnl_success;
 }
 
-#if DNNL_ENABLE_BFLOAT16
 dnnl_status_t gemm_bf16bf16f32_pack_get_size(const char *identifier,
         const char *transa, const char *transb, const int *M, const int *N,
         const int *K, const int *lda, const int *ldb, size_t *size,
@@ -208,7 +207,6 @@ dnnl_status_t gemm_bf16bf16f32_pack_get_size(const char *identifier,
 
     return dnnl_success;
 }
-#endif // DNNL_ENABLE_BFLOAT16
 
 template <typename a_dt, typename b_dt>
 dnnl_status_t gemm_x8x8s32_pack_get_size(const char *identifier,
@@ -304,7 +302,6 @@ dnnl_status_t sgemm_pack(const char *identifier, const char *transa,
 #endif
 }
 
-#if DNNL_ENABLE_BFLOAT16
 dnnl_status_t gemm_bf16bf16f32_pack(const char *identifier, const char *transa,
         const char *transb, const int *M, const int *N, const int *K,
         const int *lda, const int *ldb, const bfloat16_t *src,
@@ -329,7 +326,6 @@ dnnl_status_t gemm_bf16bf16f32_pack(const char *identifier, const char *transa,
             transb, &M_s32, &N_s32, &K_s32, alpha, &lda_s32, &ldb_s32, src,
             &pack_dst, false);
 }
-#endif // DNNL_ENABLE_BFLOAT16
 
 template <typename a_dt, typename b_dt>
 dnnl_status_t gemm_x8x8s32_pack(const char *identifier, const char *transa,
@@ -410,7 +406,6 @@ dnnl_status_t sgemm_compute(const char *transa, const char *transb,
 #endif
 }
 
-#if DNNL_ENABLE_BFLOAT16
 dnnl_status_t gemm_bf16bf16f32_compute(const char *transa, const char *transb,
         const int *M, const int *N, const int *K, const bfloat16_t *A,
         const int *lda, const bfloat16_t *B, const int *ldb, const float *beta,
@@ -423,7 +418,6 @@ dnnl_status_t gemm_bf16bf16f32_compute(const char *transa, const char *transb,
     return gemm_bf16bf16f32(
             transa, transb, M, N, K, &one, A, lda, B, ldb, beta, C, ldc);
 }
-#endif // DNNL_ENABLE_BFLOAT16
 
 template <typename a_dt, typename b_dt>
 dnnl_status_t gemm_x8x8s32_compute(const char *transa, const char *transb,

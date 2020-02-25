@@ -37,36 +37,26 @@ using namespace dnnl::impl::data_type;
 #define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
 static const pd_create_f impl_list[] = {
         /* fp */
-#if DNNL_ENABLE_BFLOAT16
         INSTANCE_avx512(jit_uni_pooling_fwd_t<avx512_core, bf16>)
         INSTANCE_avx512(jit_uni_pooling_bwd_t<avx512_core, bf16>)
-#endif // DNNL_ENABLE_BFLOAT16
         INSTANCE_avx512(jit_uni_pooling_fwd_t<avx512_common, f32>)
         INSTANCE_avx512(jit_uni_pooling_bwd_t<avx512_common, f32>)
         INSTANCE_avx(jit_uni_pooling_fwd_t<avx, f32>)
         INSTANCE_avx(jit_uni_pooling_bwd_t<avx, f32>)
         INSTANCE_sse41(jit_uni_pooling_fwd_t<sse41, f32>)
         INSTANCE_sse41(jit_uni_pooling_bwd_t<sse41, f32>)
-#if DNNL_ENABLE_BFLOAT16
         INSTANCE(nchw_pooling_fwd_t<bf16>)
         INSTANCE(nchw_pooling_bwd_t<bf16>)
-#endif // DNNL_ENABLE_BFLOAT16
         INSTANCE(nchw_pooling_fwd_t<f32>)
         INSTANCE(nchw_pooling_bwd_t<f32>)
-#if DNNL_ENABLE_BFLOAT16
         INSTANCE(nhwc_pooling_fwd_t<bf16>)
         INSTANCE(nhwc_pooling_bwd_t<bf16>)
-#endif // DNNL_ENABLE_BFLOAT16
         INSTANCE(nhwc_pooling_fwd_t<f32>)
         INSTANCE(nhwc_pooling_bwd_t<f32>)
         INSTANCE(ref_pooling_fwd_t<f32>)
-#if DNNL_ENABLE_BFLOAT16
         INSTANCE(ref_pooling_fwd_t<bf16, f32>)
-#endif // DNNL_ENABLE_BFLOAT16
         INSTANCE(ref_pooling_bwd_t<f32>)
-#if DNNL_ENABLE_BFLOAT16
         INSTANCE(ref_pooling_bwd_t<bf16>)
-#endif // DNNL_ENABLE_BFLOAT16
         /* int */
         INSTANCE_avx512(jit_uni_i8i8_pooling_fwd_t<avx512_core>)
         INSTANCE_avx2(jit_uni_i8i8_pooling_fwd_t<avx2>)

@@ -198,9 +198,7 @@ protected:
 };
 
 using lrn_f32 = lrn_forward_test<float>;
-#if DNNL_ENABLE_BFLOAT16
 using lrn_bf16 = lrn_forward_test<bfloat16_t>;
-#endif // DNNL_ENABLE_BFLOAT16
 using lrn_fp16 = lrn_forward_test<float16_t>;
 
 using fmt = memory::format_tag;
@@ -471,7 +469,6 @@ INSTANTIATE_TEST_SUITE_P(
 INSTANTIATE_TEST_SUITE_P(
         TestLRNForwardNCHWTail, lrn_f32, ForwardNCHWTail_cases());
 
-#if DNNL_ENABLE_BFLOAT16
 // ------------- bf16 ----------------------
 TEST_P(lrn_bf16, TestsLRN) {}
 INSTANTIATE_TEST_SUITE_P(
@@ -499,7 +496,6 @@ INSTANTIATE_TEST_SUITE_P(TestLRNGoogleNetV1Forward_nChw16c, lrn_bf16,
         GoogleNetV1Forward_nChw16c_cases());
 INSTANTIATE_TEST_SUITE_P(
         TestLRNRCNNForwardBlocked, lrn_bf16, RCNNForwardBlocked_cases());
-#endif // DNNL_ENABLE_BFLOAT16
 
 // ------------- fp16 ----------------------
 TEST_P(lrn_fp16, TestsLRN) {}

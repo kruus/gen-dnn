@@ -39,12 +39,10 @@ dnnl_status_t gemm_s8x8s32(const char *transa, const char *transb,
         const b_dt *B, const int *ldb, const b_dt *bo, const float *beta,
         int32_t *c, const int *ldc, const int32_t *co);
 
-#if DNNL_ENABLE_BFLOAT16
 dnnl_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
         const int *M, const int *N, const int *K, const float *alpha,
         const bfloat16_t *A, const int *lda, const bfloat16_t *B,
         const int *ldb, const float *beta, float *C, const int *ldc);
-#endif // DNNL_ENABLE_BFLOAT16
 
 #if defined(USE_MKL)
 #define GEMM_IMPL_STR "gemm:mkl"

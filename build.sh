@@ -800,10 +800,17 @@ if [ "$BUILDOK" == "y" ]; then
             (cd "${BUILDDIR}" && ARGS='-VV -N' ${TESTRUNNER} make test \
             && ARGS='-VV -R .*test_.*' DNNL_VERBOSE=2 ${TESTRUNNER}  make test) 2>&1 | tee "${BUILDDIR}/test2.log" || true
         fi
-        if [ $DOTEST -ge 3 ]; then
+        if [ $DOTEST -ge 3 ]; then # some convolution timings
             if [ -x ./bench.sh ]; then
                 DNNL_VERBOSE=2 BUILDDIR=${BUILDDIR} ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
             fi
+        fi
+        if [ $DOTEST -ge 4 ]; then # full battery of tests/benchdnn/CMakeLists.txt targets
+            (cd ${BUILDDIR} && make help | grep test_benchdnn | sed s/....//p | sort)
+            (cd ${BUILDDIR} && make help | grep test_benchdnn | sed s/....//p | sort) > ${BUILDDIR}/bench.targets
+            { while read -r benchdnn_target; do
+                make -C ${BUILDDIR} ${benchdnn_target}; # note default is --mode=C (correctness check)
+            done < ${BUILDDIR}/bench.targets; }
         fi
         echo "Tests done"
     fi

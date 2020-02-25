@@ -126,10 +126,8 @@ void im2col_3d(const jit_gemm_conv_conf_t &jcp, const data_type_t *im,
 template void im2col_3d(
         const jit_gemm_conv_conf_t &jcp, const float *im, float *col, int od);
 
-#if DNNL_ENABLE_BFLOAT16
 template void im2col_3d(const jit_gemm_conv_conf_t &jcp, const bfloat16_t *im,
         bfloat16_t *col, int od);
-#endif // DNNL_ENABLE_BFLOAT16
 
 /* imtr[ic][od][oh][ow] <-- im[id][ih][iw][ic]*/
 template <typename T>
@@ -441,11 +439,9 @@ template void im2col(const jit_gemm_conv_conf_t &jcp,
         const float *__restrict im, float *__restrict col, int hs, int hb,
         int ws, int wb);
 
-#if DNNL_ENABLE_BFLOAT16
 template void im2col(const jit_gemm_conv_conf_t &jcp,
         const bfloat16_t *__restrict im, bfloat16_t *__restrict col, int hs,
         int hb, int ws, int wb);
-#endif // DNNL_ENABLE_BFLOAT16
 
 /* col[kh][kw][ic][oh][ow] <-- im2col_u8(im[ih][iw][ic]) */
 template <typename T>
@@ -1256,13 +1252,9 @@ status_t init_conf(jit_gemm_conv_conf_t &jcp,
                        && (jcp.mb != 1 || jcp.ngroups > 2);
 
         jcp.nthr = jcp.outer_threading ? max_threads : 1;
-#if DNNL_ENABLE_BFLOAT16
         const size_t gemm_col_datatype_size = is_bf16_conv && !is_bwd_d
                 ? sizeof(bfloat16_t)
                 : sizeof(float);
-#else
-        const size_t gemm_col_datatype_size = sizeof(float);
-#endif // DNNL_ENABLE_BFLOAT16
         scratchpad.book(key_conv_gemm_col,
                 gemm_col_datatype_size * jcp.nthr * jcp.im2col_sz);
 

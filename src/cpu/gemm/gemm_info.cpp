@@ -222,7 +222,6 @@ void gemm_info_t<a_t, b_t, c_t>::jit_init(void) {
             }
             break;
 
-//#if DNNL_ENABLE_BFLOAT16
         case data_type::bf16:
             if (mayiuse(avx512_core)) {
                 this->um = 48;
@@ -237,7 +236,6 @@ void gemm_info_t<a_t, b_t, c_t>::jit_init(void) {
                 this->bn_small_k = 24;
             }
             break;
-//#endif // DNNL_ENABLE_BFLOAT16
 
         case data_type::f32:
             if (mayiuse(avx512_core)) {
@@ -337,7 +335,6 @@ void gemm_info_t<a_t, b_t, c_t>::jit_init(void) {
                 }
                 break;
 
-//#if DNNL_ENABLE_BFLOAT16
             case data_type::bf16:
                 if (mayiuse(avx512_core)) {
                     copy_a[no_trans][no_sum]
@@ -351,7 +348,6 @@ void gemm_info_t<a_t, b_t, c_t>::jit_init(void) {
                             = new jit_avx512_core_s16_copy_bt_kern();
                 }
                 break;
-//#endif // DNNL_ENABLE_BFLOAT16
 
             case data_type::f32:
                 if (mayiuse(avx512_core)) {
@@ -408,7 +404,6 @@ void gemm_info_t<a_t, b_t, c_t>::jit_init(void) {
                 }
                 break;
 
-//#if DNNL_ENABLE_BFLOAT16
             case data_type::bf16:
                 if (mayiuse(avx512_core)) {
                     for (int isBeta0 : {no_beta0, do_beta0})
@@ -419,7 +414,6 @@ void gemm_info_t<a_t, b_t, c_t>::jit_init(void) {
                         }
                 }
                 break;
-//#endif // DNNL_ENABLE_BFLOAT16
 
             case data_type::f32:
                 if (mayiuse(avx2)) {
@@ -639,10 +633,8 @@ template // For gemm_s8u8s32
 template // For gemm_s8s8s32
         struct gemm_info_t<int8_t, int8_t, int32_t>;
 
-#if DNNL_ENABLE_BFLOAT16
 template // For gemm_bf16bf16f32
         struct gemm_info_t<bfloat16_t, bfloat16_t, float>;
-#endif // MKLDNN_CPU_GEMM_JIT
 
 template // For sgemm.
         struct gemm_info_t<float, float, float>;

@@ -1837,12 +1837,10 @@ dnnl_status_t gemm_driver(const char *transA, const char *transB,
             data_traits<a_type>::data_type, data_type::s8, data_type::u8);
     MAYBE_UNUSED(is_int8);
 
-#if DNNL_ENABLE_BFLOAT16
     // gemm_driver supports bfloat16 gemm for Intel AVX512 and
     // Intel AVX512 BF16.
     assert(IMPLICATION(data_traits<a_type>::data_type == data_type::bf16,
             mayiuse(avx512_core) && !force_nocopy));
-#endif // DNNL_ENABLE_BFLOAT16
 
     // gemm_driver supports 8-bit integer Intel AVX512, Intel AVX2 and
     // Intel DL Boost.
@@ -1871,7 +1869,6 @@ dnnl_status_t gemm_driver(const char *transA, const char *transB,
     return gemm_threading_driver(&args);
 }
 
-#if DNNL_ENABLE_BFLOAT16
 template // Instantiate gemm_bf16bf16f32
         dnnl_status_t
         gemm_driver<bfloat16_t, bfloat16_t, float>(const char *transA,
@@ -1882,7 +1879,6 @@ template // Instantiate gemm_bf16bf16f32
                 const float *beta, float *c, const int *ldc, const float *oc,
                 const bool force_nocopy, pack_type packing,
                 gemm_pack_storage_t *pack_dst, bool measure_only);
-#endif // DNNL_ENABLE_BFLOAT16
 
 template // Instantiate gemm_s8s8s32
         dnnl_status_t

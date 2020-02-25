@@ -32,7 +32,6 @@
 #include <stdexcept>
 
 #include "dnnl.hpp"
-#if DNNL_ENABLE_BFLOAT16
 
 #include "example_utils.hpp"
 
@@ -469,13 +468,7 @@ void simple_net() {
 
     s.wait();
 }
-#endif // DNNL_ENABLE_BFLOAT16
 
 int main(int argc, char **argv) {
-#if DNNL_ENABLE_BFLOAT16
     return handle_example_errors({engine::kind::cpu}, simple_net);
-#else
-    printf("this build removed bfloat16 support");
-    return 0;
-#endif // DNNL_ENABLE_BFLOAT16
 }

@@ -123,9 +123,7 @@ struct dnn_mem_t {
             case dnnl_s32: elem = static_cast<int32_t *>(data)[idx]; break;
             case dnnl_f32: elem = static_cast<float *>(data)[idx]; break;
             case dnnl_f16: elem = static_cast<float16_t *>(data)[idx]; break;
-#if DNNL_ENABLE_BFLOAT16
             case dnnl_bf16: elem = static_cast<bfloat16_t *>(data)[idx]; break;
-#endif // DNNL_ENABLE_BFLOAT16
             default: assert(!"bad data type");
         }
         return elem;
@@ -139,9 +137,7 @@ struct dnn_mem_t {
             case dnnl_s32: ((int32_t *)data)[idx] = value; break;
             case dnnl_f32: ((float *)data)[idx] = value; break;
             case dnnl_f16: ((float16_t *)data)[idx] = value; break;
-#if DNNL_ENABLE_BFLOAT16
             case dnnl_bf16: ((bfloat16_t *)data)[idx] = value; break;
-#endif // DNNL_ENABLE_BFLOAT16
             default: assert(!"bad data type");
         }
     }

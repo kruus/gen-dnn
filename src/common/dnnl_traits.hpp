@@ -46,12 +46,10 @@ struct prec_traits<data_type::f16> {
     typedef float16_t type;
 };
 
-#if DNNL_ENABLE_BFLOAT16
 template <>
 struct prec_traits<data_type::bf16> {
     typedef bfloat16_t type;
 };
-#endif // DNNL_ENABLE_BFLOAT18
 
 template <>
 struct prec_traits<data_type::f32> {
@@ -75,12 +73,10 @@ struct data_traits<float16_t> {
     static constexpr data_type_t data_type = data_type::f16;
 };
 
-#if DNNL_ENABLE_BFLOAT16
 template <>
 struct data_traits<bfloat16_t> {
     static constexpr data_type_t data_type = data_type::bf16;
 };
-#endif // DNNL_ENABLE_BFLOAT16
 
 template <>
 struct data_traits<float> {

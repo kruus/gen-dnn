@@ -48,9 +48,7 @@
 
 #define for_ for
 
-#if DNNL_ENABLE_BFLOAT16
 using dnnl::impl::bfloat16_t;
-#endif // DNNL_ENABLE_BFLOAT16
 using dnnl::impl::f16_support::float16_t;
 
 #define DNNL_CHECK(f) \
@@ -79,14 +77,12 @@ struct data_traits<float16_t> {
 
     using uint_type = uint16_t;
 };
-#if DNNL_ENABLE_BFLOAT16
 template <>
 struct data_traits<bfloat16_t> {
     static const auto data_type = memory::data_type::bf16;
 
     using uint_type = uint16_t;
 };
-#endif // DNNL_ENABLE_BFLOAT16
 template <>
 struct data_traits<float> {
     static const auto data_type = memory::data_type::f32;

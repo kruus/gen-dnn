@@ -14,7 +14,6 @@
 * limitations under the License.
 *******************************************************************************/
 #include "cpu_isa_traits.hpp"
-#if DNNL_ENABLE_BFLOAT16
 
 #include <assert.h>
 #include <float.h>
@@ -225,4 +224,3 @@ template struct gemm_bf16_matmul_t<data_type::bf16>;
 } // namespace dnnl
 
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // DNNL_ENABLE_BFLOAT16

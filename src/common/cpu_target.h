@@ -310,11 +310,6 @@
 #else
 #warning "DNNL_ENABLE_RNN is FALSE"
 #endif
-#if DNNL_ENABLE_BFLOAT16
-#warning "DNNL_ENABLE_BLOAT16 is TRUE"
-#else
-#warning "DNNL_ENABLE_BLOAT16 is FALSE"
-#endif
 #endif // verbose compiler warnings
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif // CPU_TARGET_H

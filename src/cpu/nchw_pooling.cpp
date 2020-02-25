@@ -153,7 +153,6 @@ void nchw_pooling_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
     }
 }
 
-#if DNNL_ENABLE_BFLOAT16
 template <>
 void nchw_pooling_fwd_t<data_type::bf16>::execute_forward(
         const exec_ctx_t &ctx) const {
@@ -297,7 +296,6 @@ void nchw_pooling_fwd_t<data_type::bf16>::execute_forward(
                 });
     }
 }
-#endif // DNNL_ENABLE_BFLOAT16
 
 template <data_type_t d_type>
 void nchw_pooling_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
@@ -443,7 +441,6 @@ void nchw_pooling_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
     }
 }
 
-#if DNNL_ENABLE_BFLOAT16
 template <>
 void nchw_pooling_bwd_t<data_type::bf16>::execute_backward(
         const exec_ctx_t &ctx) const {
@@ -632,14 +629,11 @@ void nchw_pooling_bwd_t<data_type::bf16>::execute_backward(
         });
     }
 }
-#endif // DNNL_ENABLE_BFLOAT16
 
 template struct nchw_pooling_fwd_t<data_type::f32>;
 template struct nchw_pooling_bwd_t<data_type::f32>;
-#if DNNL_ENABLE_BFLOAT16
 template struct nchw_pooling_fwd_t<data_type::bf16>;
 template struct nchw_pooling_bwd_t<data_type::bf16>;
-#endif // DNNL_ENABLE_BFLOAT16
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl

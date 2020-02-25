@@ -278,9 +278,7 @@ status_t memory_t::zero_pad() const {
 
     switch (mdw.data_type()) {
         case f16: return typed_zero_pad<f16>();
-#if DNNL_ENABLE_BFLOAT16
         case bf16: return typed_zero_pad<bf16>();
-#endif // DNNL_ENABLE_BFLOAT16
         case f32: return typed_zero_pad<f32>();
         case s32: return typed_zero_pad<s32>();
         case s8: return typed_zero_pad<s8>();

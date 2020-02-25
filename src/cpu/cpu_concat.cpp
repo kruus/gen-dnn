@@ -32,9 +32,7 @@ static const cpd_create_f cpu_concat_impl_list[] = {
         INSTANCE(simple_concat_t<data_type::u8>),
         INSTANCE(simple_concat_t<data_type::s8>),
         INSTANCE(simple_concat_t<data_type::s32>),
-#if DNNL_ENABLE_BFLOAT16
         INSTANCE(simple_concat_t<data_type::bf16>),
-#endif // DNNL_ENABLE_BFLOAT16
         INSTANCE(ref_concat_t),
         nullptr,
 };

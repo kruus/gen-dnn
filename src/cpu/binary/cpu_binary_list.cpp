@@ -37,13 +37,9 @@ using namespace dnnl::impl::data_type;
 static const pd_create_f impl_list[] = {
         /* fp */
         INSTANCE_uni(jit_uni_binary_t<f32>)
-#if DNNL_ENABLE_BFLOAT16
         INSTANCE_uni(jit_uni_binary_t<bf16>)
-#endif // DNNL_ENABLE_BFLOAT16
         INSTANCE(ref_binary_t<f32>)
-#if DNNL_ENABLE_BFLOAT16
         INSTANCE(ref_binary_t<bf16>)
-#endif // DNNL_ENABLE_BFLOAT16
         /* int */
         INSTANCE_uni(jit_uni_i8i8_binary_t<u8, u8>)
         INSTANCE_uni(jit_uni_i8i8_binary_t<u8, s8>)

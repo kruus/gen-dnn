@@ -15,7 +15,6 @@
 *******************************************************************************/
 
 #include "cpu_isa_traits.hpp"
-#if DNNL_ENABLE_BFLOAT16
 #include <array>
 #include <memory>
 #include "bfloat16.hpp"
@@ -132,5 +131,4 @@ void add_floats_and_cvt_to_bfloat16(
 } // namespace impl
 } // namespace dnnl
 
-#endif // DNNL_ENABLE_BFLOAT16
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

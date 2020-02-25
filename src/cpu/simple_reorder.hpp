@@ -508,7 +508,6 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 };
 #endif // REORDER_ENABLE_CONV_S8S8
 
-#if DNNL_ENABLE_BFLOAT16
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         typename utils::enable_if<(
@@ -697,7 +696,6 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         return status::success;
     }
 };
-#endif // DNNL_ENABLE_BFLOAT16
 
 /* reorders with tail support */
 

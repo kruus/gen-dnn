@@ -17,7 +17,6 @@
 #ifndef CPU_GEMM_BF16_CONVOLUTION_HPP
 #define CPU_GEMM_BF16_CONVOLUTION_HPP
 #include "cpu_target.h"
-#if DNNL_ENABLE_BFLOAT16
 
 #include "c_types_map.hpp"
 #include "memory_tracking.hpp"
@@ -409,6 +408,5 @@ private:
 } // namespace impl
 } // namespace dnnl
 
-#endif // DNNL_ENABLE_BFLOAT16
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

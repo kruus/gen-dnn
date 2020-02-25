@@ -281,17 +281,13 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
 
 template struct ref_pooling_fwd_t<data_type::f32>;
 template struct ref_pooling_fwd_t<data_type::s32>;
-#if DNNL_ENABLE_BFLOAT16
 template struct ref_pooling_fwd_t<data_type::bf16, data_type::f32>;
-#endif // DNNL_ENABLE_BFLOAT16
 template struct ref_pooling_fwd_t<data_type::s8, data_type::s32>;
 template struct ref_pooling_fwd_t<data_type::u8, data_type::s32>;
 
 template struct ref_pooling_bwd_t<data_type::f32>;
 template struct ref_pooling_bwd_t<data_type::s32>;
-#if DNNL_ENABLE_BFLOAT16
 template struct ref_pooling_bwd_t<data_type::bf16>;
-#endif // DNNL_ENABLE_BFLOAT16
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl

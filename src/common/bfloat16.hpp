@@ -18,7 +18,6 @@
 #define BFLOAT16_HPP
 
 #include "cpu_target.h"        // DNNL_ENABLE_BFLOAT16(0/1)
-#if DNNL_ENABLE_BFLOAT16
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -58,7 +57,6 @@ void add_floats_and_cvt_to_bfloat16(
 
 } // namespace impl
 } // namespace dnnl
-#endif // DNNL_ENABLE_BFLOAT16
 
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

@@ -96,7 +96,6 @@ struct qz<in_t, float> {
     }
 };
 
-#if DNNL_ENABLE_BFLOAT16
 template <>
 struct qz<bfloat16_t, bfloat16_t> {
     float operator()(bfloat16_t in, bfloat16_t out, float alpha, float beta) {
@@ -110,7 +109,6 @@ struct qz<float, bfloat16_t> {
         return (bfloat16_t)(alpha * in + (beta ? beta * out : 0));
     }
 };
-#endif // DNNL_ENABLE_BFLOAT16
 
 template <>
 struct qz<float16_t, float16_t> {

@@ -14,7 +14,6 @@
 * limitations under the License.
 *******************************************************************************/
 #include "cpu_isa_traits.hpp"
-#if DNNL_ENABLE_BFLOAT16
 
 #include "c_types_map.hpp"
 #include "dnnl_thread.hpp"
@@ -214,4 +213,3 @@ template struct gemm_bf16_inner_product_bwd_weights_t<data_type::bf16>;
 } // namespace dnnl
 
 // vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
-#endif // DNNL_ENABLE_BFLOAT16

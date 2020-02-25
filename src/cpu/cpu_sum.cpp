@@ -18,7 +18,7 @@
 
 #include "cpu/ref_sum.hpp"
 #include "cpu/simple_sum.hpp"
-#if TARGET_X86_JIT && DNNL_ENABLE_BFLOAT16
+#if TARGET_X86_JIT // && DNNL_ENABLE_BFLOAT16
 #include "jit_avx512_core_bf16_sum.hpp"
 #endif // TARGET_X86_JIT
 
@@ -31,14 +31,12 @@ using spd_create_f = dnnl::impl::engine_t::sum_primitive_desc_create_f;
 namespace {
 #define INSTANCE_CREATOR(...) __VA_ARGS__::pd_t::create
 static const spd_create_f cpu_sum_impl_list[] = {
-#if DNNL_ENABLE_BFLOAT16
 #if TARGET_X86_JIT
         INSTANCE(jit_bf16_sum_t<data_type::bf16, data_type::bf16>),
         INSTANCE(jit_bf16_sum_t<data_type::bf16, data_type::f32>),
 #endif // TARGET_X87_JIT
         INSTANCE(simple_sum_t<data_type::bf16>),
         INSTANCE(simple_sum_t<data_type::bf16, data_type::f32>),
-#endif // DNNL_ENABLE_BFLOAT16
         INSTANCE(simple_sum_t<data_type::f32>),
         INSTANCE(ref_sum_t),
         nullptr,

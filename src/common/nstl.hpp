@@ -111,7 +111,6 @@ struct numeric_limits<int8_t> : public std::numeric_limits<int8_t> {};
 template <>
 struct numeric_limits<uint8_t> : public std::numeric_limits<uint8_t> {};
 
-#if DNNL_ENABLE_BFLOAT16
 template <>
 struct numeric_limits<bfloat16_t> {
     static constexpr bfloat16_t lowest() { return bfloat16_t(0xff7f, true); }
@@ -124,7 +123,6 @@ struct numeric_limits<bfloat16_t> {
         return bfloat16_t(((0x7f - (digits - 1)) << (digits - 1)), true);
     }
 };
-#endif // DNNL_ENABLE_BFLOAT16
 
 template <>
 struct numeric_limits<float16_t> {

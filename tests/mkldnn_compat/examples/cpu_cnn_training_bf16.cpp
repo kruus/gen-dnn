@@ -33,7 +33,6 @@
 #include <string>
 #include "mkldnn.hpp"
 
-#if DNNL_ENABLE_BFLOAT16
 using namespace mkldnn;
 
 memory::dim product(const memory::dims &dims) {
@@ -430,10 +429,8 @@ void simple_net() {
 
     s.wait();
 }
-#endif // DNNL_ENABLE_BFLOAT16
 
 int main(int argc, char **argv) {
-#if DNNL_ENABLE_BFLOAT16
     try {
         simple_net();
         std::cout << "passed" << std::endl;
@@ -441,8 +438,5 @@ int main(int argc, char **argv) {
         std::cerr << "status: " << e.status << std::endl;
         std::cerr << "message: " << e.message << std::endl;
     }
-#else
-    std::cerr << "message: " << "development build -- no bfloat16 support" << std::endl;
-#endif // DNNL_ENABLE_BFLOAT16
     return 0;
 }

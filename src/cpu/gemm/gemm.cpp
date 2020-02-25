@@ -243,7 +243,6 @@ dnnl_status_t gemm_s8x8s32(const char *transa, const char *transb,
     return status;
 }
 
-#if DNNL_ENABLE_BFLOAT16
 dnnl_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
         const int *M, const int *N, const int *K, const float *alpha,
         const bfloat16_t *A, const int *lda, const bfloat16_t *B,
@@ -265,7 +264,6 @@ dnnl_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
         return dnnl_unimplemented;
     }
 }
-#endif // DNNL_ENABLE_BFLOAT16
 
 } // namespace cpu
 } // namespace impl
@@ -329,7 +327,6 @@ dnnl_status_t dnnl_gemm_s8s8s32(char transa, char transb, char offsetc,
             C, &ldc_s32, co);
 }
 
-#if DNNL_ENABLE_BFLOAT16
 extern "C" {
 dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32(char transa, char transb,
         dnnl_dim_t M, dnnl_dim_t N, dnnl_dim_t K, float alpha,
@@ -346,4 +343,3 @@ dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32(char transa, char transb,
             &ldb_s32, A, &lda_s32, &beta, C, &ldc_s32);
 }
 }//"C"
-#endif // DNNL_ENABLE_BFLOAT16

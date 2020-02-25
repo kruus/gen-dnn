@@ -41,14 +41,12 @@ static const pd_create_f impl_list[] = {
         INSTANCE(ref_inner_product_bwd_data_t<f32, f32, f32, f32>)
         INSTANCE(ref_inner_product_bwd_weights_t<f32>)
         /* bfloat16 */
-#if DNNL_ENABLE_BFLOAT16
         INSTANCE(gemm_bf16_inner_product_fwd_t<f32>)
         INSTANCE(gemm_bf16_inner_product_fwd_t<bf16>)
         INSTANCE(gemm_bf16_inner_product_bwd_data_t<f32>)
         INSTANCE(gemm_bf16_inner_product_bwd_data_t<bf16>)
         INSTANCE(gemm_bf16_inner_product_bwd_weights_t<f32>)
         INSTANCE(gemm_bf16_inner_product_bwd_weights_t<bf16>)
-#endif // DNNL_ENABLE_BFLOAT16
         /* int */
         INSTANCE(gemm_x8s8s32x_inner_product_fwd_t<u8, u8>)
         INSTANCE(gemm_x8s8s32x_inner_product_fwd_t<u8, s8>)

@@ -50,9 +50,7 @@ rnn_cell_execution_sig((_ref_rnn_common_t<aprop, src_type, weights_type,
 #endif // TARGET_X86_JIT
 }
 template rnn_cell_execution_sig(ref_rnn_fwd_f32_t::cell_execution);
-#if DNNL_ENABLE_BFLOAT16
 template rnn_cell_execution_sig(ref_rnn_fwd_bf16_t::cell_execution);
-#endif // DNNL_ENABLE_BFLOAT16
 template rnn_cell_execution_sig(ref_rnn_fwd_u8s8_t::cell_execution);
 
 template <typename T1, typename T2, typename T3, typename T4, typename T5,

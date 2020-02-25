@@ -76,9 +76,7 @@ void ref_binary_t<data_type>::execute_ref(const exec_ctx_t &ctx) const {
 }
 
 template struct ref_binary_t<data_type::f32>;
-#if DNNL_ENABLE_BFLOAT16
 template struct ref_binary_t<data_type::bf16>;
-#endif // DNNL_ENABLE_BFLOAT16
 
 } // namespace cpu
 } // namespace impl

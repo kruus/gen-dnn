@@ -56,14 +56,12 @@ static const pd_create_f impl_list[] = {
         INSTANCE(nspc_batch_normalization_bwd_t<f32>)
         INSTANCE(ref_batch_normalization_fwd_t<f32>)
         INSTANCE(ref_batch_normalization_bwd_t<f32>)
-#if DNNL_ENABLE_BFLOAT16
         INSTANCE(ncsp_batch_normalization_fwd_t<bf16>)
         INSTANCE(ncsp_batch_normalization_bwd_t<bf16>)
         INSTANCE(nspc_batch_normalization_fwd_t<bf16>)
         INSTANCE(nspc_batch_normalization_bwd_t<bf16>)
         INSTANCE(ref_batch_normalization_fwd_t<bf16>)
         INSTANCE(ref_batch_normalization_bwd_t<bf16>)
-#endif // DNNL_ENABLE_BFLOAT16
         /* int */
         INSTANCE_avx512(jit_uni_batch_normalization_s8_fwd_t<avx512_core>)
         INSTANCE_avx2(jit_uni_batch_normalization_s8_fwd_t<avx2>)

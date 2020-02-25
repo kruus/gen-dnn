@@ -690,9 +690,7 @@ template class pp_kernel_t<s32, f32>;
 template class pp_kernel_t<s32, s32>;
 template class pp_kernel_t<s32, s8>;
 template class pp_kernel_t<s32, u8>;
-#if DNNL_ENABLE_BFLOAT16
 template class pp_kernel_t<f32, bf16>;
-#endif // DNNL_ENABLE_BFLOAT16
 } // namespace inner_product_utils
 
 } // namespace cpu

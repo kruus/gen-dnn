@@ -36,10 +36,8 @@ using namespace dnnl::impl::data_type;
 // Can run vanilla tests with extra verbosity and see which ones get skipped? XXX
 static const pd_create_f impl_list[] = {
         INSTANCE(matmul::gemm_f32_matmul_t)
-#if DNNL_ENABLE_BFLOAT16
         INSTANCE(matmul::gemm_bf16_matmul_t<f32>)
         INSTANCE(matmul::gemm_bf16_matmul_t<bf16>)
-#endif // DNNL_ENABLE_BFLOAT16
         INSTANCE(matmul::gemm_x8s8s32x_matmul_t<s8, s8, f32>)
         INSTANCE(matmul::gemm_x8s8s32x_matmul_t<s8, s8, s32>)
         INSTANCE(matmul::gemm_x8s8s32x_matmul_t<s8, s8, s8>)
@@ -49,11 +47,9 @@ static const pd_create_f impl_list[] = {
         INSTANCE(matmul::gemm_x8s8s32x_matmul_t<u8, s8, s8>)
         INSTANCE(matmul::gemm_x8s8s32x_matmul_t<u8, s8, u8>)
         INSTANCE(matmul::ref_matmul_t<f32>)
-#if DNNL_ENABLE_BFLOAT16
         // I think following 2 may require sse41 XXX
         INSTANCE(matmul::ref_matmul_t<bf16, bf16, f32, f32>)
         INSTANCE(matmul::ref_matmul_t<bf16, bf16, bf16, f32>)
-#endif // DNNL_ENABLE_BFLOAT16
         INSTANCE(matmul::ref_matmul_t<s8, s8, f32, s32>)
         INSTANCE(matmul::ref_matmul_t<s8, s8, s32, s32>)
         INSTANCE(matmul::ref_matmul_t<s8, s8, s8, s32>)

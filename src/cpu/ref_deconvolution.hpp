@@ -170,9 +170,6 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
                                   ->support_bias();
                 bool ref_deconv_supports_bias = true
                         && desc()->accum_data_type == data_type::f32
-//#if !DNNL_ENABLE_BFLOAT16
-//                        && desc()->dst_desc.data_type == data_type::f32;
-//#else
                         && utils::one_of(desc()->dst_desc.data_type, f32, bf16)
                         && IMPLICATION(desc()->src_desc.data_type == bf16,
                                 memory_desc_matches_one_of_tag(
@@ -181,7 +178,6 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
                                                 ndims() - 3, ncw, nchw, ncdhw),
                                         utils::pick(ndims() - 3, nCw16c,
                                                 nChw16c, nCdhw16c)));
-//#endif
                 bool ok = true
                         && conv_pd_->weights_md()->extra.flags == 0
                         /* deconv reference code can process only f32 bias */
@@ -297,14 +293,12 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
             auto bia_type = pd()->weights_md(1)->data_type;
             if (utils::everyone_is(f32, dst_type, bia_type))
                 compute_bias<f32, f32>(ctx);
-#if DNNL_ENABLE_BFLOAT16
             else if (utils::everyone_is(bf16, dst_type, bia_type))
                 compute_bias<bf16, bf16>(ctx);
             else if (dst_type == f32 && bia_type == bf16)
                 compute_bias<f32, bf16>(ctx);
             else if (dst_type == bf16 && bia_type == f32)
                 compute_bias<bf16, f32>(ctx);
-#endif // DNNL_ENABLE_BFLOAT16
         }
         return status::success;
     }
@@ -641,12 +635,10 @@ struct ref_deconvolution_bwd_weights_t : public primitive_impl_t {
             auto ddst_type = pd()->diff_dst_md()->data_type;
             if (utils::everyone_is(f32, dbia_type, ddst_type))
                 compute_bias<f32, f32>(ctx);
-#if DNNL_ENABLE_BFLOAT16
             else if (utils::everyone_is(bf16, dbia_type, ddst_type))
                 compute_bias<bf16, bf16>(ctx);
             else if (dbia_type == f32 && ddst_type == bf16)
                 compute_bias<f32, bf16>(ctx);
-#endif // DNNL_ENABLE_BFLOAT16
         }
         return status::success;
     }

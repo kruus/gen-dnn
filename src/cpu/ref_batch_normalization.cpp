@@ -55,12 +55,10 @@ inline float maybe_up_convert(T x) {
     return x;
 }
 
-#if DNNL_ENABLE_BFLOAT16
 template <>
 inline float maybe_up_convert<bfloat16_t>(bfloat16_t x) {
     return (float)x;
 }
-#endif // DNNL_ENABLE_BFLOAT16
 
 } // namespace
 
@@ -188,9 +186,7 @@ void ref_batch_normalization_fwd_t<d_type>::execute_forward(
 
 template struct ref_batch_normalization_fwd_t<s8>;
 template struct ref_batch_normalization_fwd_t<f32>;
-#if DNNL_ENABLE_BFLOAT16
 template struct ref_batch_normalization_fwd_t<bf16>;
-#endif // DNNL_ENABLE_BFLOAT16
 
 template <impl::data_type_t d_type>
 void ref_batch_normalization_bwd_t<d_type>::execute_backward(
@@ -299,9 +295,7 @@ void ref_batch_normalization_bwd_t<d_type>::execute_backward(
 }
 
 template struct ref_batch_normalization_bwd_t<f32>;
-#if DNNL_ENABLE_BFLOAT16
 template struct ref_batch_normalization_bwd_t<bf16>;
-#endif // DNNL_ENABLE_BFLOAT16
 
 } // namespace cpu
 } // namespace impl

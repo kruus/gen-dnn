@@ -119,9 +119,7 @@ void ref_resampling_fwd_t<data_type>::execute_forward(
 }
 
 template struct ref_resampling_fwd_t<data_type::f32>;
-#if DNNL_ENABLE_BFLOAT16
 template struct ref_resampling_fwd_t<data_type::bf16>;
-#endif // DNNL_ENABLE_BFLOAT16
 
 template <impl::data_type_t data_type>
 void ref_resampling_bwd_t<data_type>::execute_backward(
@@ -196,9 +194,7 @@ void ref_resampling_bwd_t<data_type>::execute_backward(
 }
 
 template struct ref_resampling_bwd_t<data_type::f32>;
-#if DNNL_ENABLE_BFLOAT16
 template struct ref_resampling_bwd_t<data_type::bf16>;
-#endif // DNNL_ENABLE_BFLOAT16
 
 } // namespace cpu
 } // namespace impl

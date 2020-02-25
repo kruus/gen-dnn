@@ -15,7 +15,6 @@
 *******************************************************************************/
 
 #include "cpu_target.h"
-#if DNNL_ENABLE_BFLOAT16
 #include "dnnl_test_common.hpp"
 #include "gtest/gtest.h"
 
@@ -32,5 +31,4 @@ TEST_P(gemm_test, TestGEMM) {}
 #define BF16BF16F32
 #include "gemm_in.h"
 } // namespace dnnl
-#endif // DNNL_ENABLE_BFLOAT16
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

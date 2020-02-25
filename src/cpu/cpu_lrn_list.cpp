@@ -36,19 +36,15 @@ using namespace dnnl::impl::data_type;
 static const pd_create_f impl_list[] = {
         INSTANCE_avx512(jit_avx512_common_lrn_fwd_t<f32>)
         INSTANCE_avx512(jit_avx512_common_lrn_bwd_t<f32>)
-#if DNNL_ENABLE_BFLOAT16
         INSTANCE_avx512(jit_avx512_common_lrn_fwd_t<bf16>)
         INSTANCE_avx512(jit_avx512_common_lrn_bwd_t<bf16>)
-#endif // DNNL_ENABLE_BFLOAT16
         INSTANCE_avx2(jit_uni_lrn_fwd_t<avx2>)
         INSTANCE_avx2(jit_uni_lrn_bwd_t<avx2>)
         INSTANCE_sse41(jit_uni_lrn_fwd_t<sse41>)
         INSTANCE(ref_lrn_fwd_t<f32>)
         INSTANCE(ref_lrn_bwd_t<f32>)
-#if DNNL_ENABLE_BFLOAT16
         INSTANCE(ref_lrn_fwd_t<bf16>)
         INSTANCE(ref_lrn_bwd_t<bf16>)
-#endif // DNNL_ENABLE_BFLOAT16
         /* eol */
         nullptr,
 };

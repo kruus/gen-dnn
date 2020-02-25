@@ -118,14 +118,10 @@
  */
 #cmakedefine DNNL_ISA ${DNNL_ISA_VALUE}
 
-/// [debug] enable bfloat16 (for debug -- x86 jit releases will always
-/// have this enabled). \deprecated
-/** \internal
- * Sometimes useful for pruning gtests, but future code should
- * prefer to do the weeding at runtime, in Setup().  Many times,
- * it is OK to define the bfloat16 functions, but they will just
- * return \e unimplemented or such. */
-#define DNNL_ENABLE_BFLOAT16 ${DNNL_ENABLE_BFLOAT16_01}
+// DNNL_ISA==DNNL_ISA_VANILLA build is missing many bf16 impls, but
+// removing bf16 support from src,examples,tests touched 79 files.
+// Option can be reintroduced as separate PR [kruus]
+// #define DNNL_ENABLE_BFLOAT16 ${DNNL_ENABLE_BFLOAT16_01}
 
 /// [debug] some targets cannot compile a correct ref impl yet.
 #define DNNL_ENABLE_RNN ${DNNL_ENABLE_RNN_01}

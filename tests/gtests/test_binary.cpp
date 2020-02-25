@@ -209,9 +209,7 @@ static auto simple_cases = []() {
     INSTANTIATE_TEST_SUITE_P(TestbinarySimple, test, simple_cases());
 
 using binary_test_f32 = binary_test<float>;
-#if DNNL_ENABLE_BFLOAT16
 using binary_test_bf16 = binary_test<bfloat16_t>;
-#endif
 using binary_test_f16 = binary_test<float16_t>;
 using binary_test_s8 = binary_test<int8_t>;
 using binary_test_u8 = binary_test<uint8_t>;
@@ -219,9 +217,7 @@ using binary_test_s8u8s8 = binary_test<int8_t, uint8_t, int8_t>;
 using binary_test_u8s8u8 = binary_test<uint8_t, int8_t, uint8_t>;
 
 INST_TEST_CASE(binary_test_f32)
-#if DNNL_ENABLE_BFLOAT16
 INST_TEST_CASE(binary_test_bf16)
-#endif
 INST_TEST_CASE(binary_test_f16)
 INST_TEST_CASE(binary_test_s8)
 INST_TEST_CASE(binary_test_u8)

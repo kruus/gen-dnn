@@ -152,9 +152,7 @@ void ref_binary_t<src0_type, src1_type, dst_type>::execute_ref(
 using namespace data_type;
 
 template struct ref_binary_t<f32>;
-#if DNNL_ENABLE_BFLOAT16
 template struct ref_binary_t<bf16>;
-#endif // DNNL_ENABLE_BFLOAT16
 template struct ref_binary_t<s8, u8, s8>;
 template struct ref_binary_t<s8, s8, s8>;
 template struct ref_binary_t<u8, s8, u8>;

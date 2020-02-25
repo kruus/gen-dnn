@@ -47,7 +47,6 @@ status_t simple_sum_t<src_data_type, dst_data_type>::execute(
 
     const auto scales = pd()->scales();
 
-#if DNNL_ENABLE_BFLOAT16
     auto sum_block_bf16 = [&](dim_t start, dim_t end, int ithr) {
         const bool is_dst_bf16 = dst_data_type == data_type::bf16;
 
@@ -78,7 +77,6 @@ status_t simple_sum_t<src_data_type, dst_data_type>::execute(
                         (bfloat16_t *)&output[b], my_acc, current_block);
         }
     };
-#endif // DNNL_ENABLE_BFLOAT16
 
     auto sum_block = [&](dim_t start, dim_t end, int ithr) {
         PRAGMA_OMP_SIMD()
@@ -100,22 +98,18 @@ status_t simple_sum_t<src_data_type, dst_data_type>::execute(
         for (dim_t nb = start; nb < end; ++nb) {
             dim_t start_e = nb * block_size;
             dim_t end_e = start_e + block_size;
-#if DNNL_ENABLE_BFLOAT16
             if (src_data_type == data_type::bf16)
                 sum_block_bf16(start_e, end_e, ithr);
             else
-#endif // DNNL_ENABLE_BFLOAT16
                 sum_block(start_e, end_e, ithr);
         }
 
         if (tail != 0 && ithr == nthr - 1) {
             dim_t start_e = nelems - tail;
             dim_t end_e = nelems;
-#if DNNL_ENABLE_BFLOAT16
             if (src_data_type == data_type::bf16)
                 sum_block_bf16(start_e, end_e, ithr);
             else
-#endif // DNNL_ENABLE_BFLOAT16
                 sum_block(start_e, end_e, ithr);
         }
     });
@@ -124,10 +118,8 @@ status_t simple_sum_t<src_data_type, dst_data_type>::execute(
 }
 
 template struct simple_sum_t<data_type::f32>;
-#if DNNL_ENABLE_BFLOAT16
 template struct simple_sum_t<data_type::bf16>;
 template struct simple_sum_t<data_type::bf16, data_type::f32>;
-#endif // DNNL_ENABLE_BFLOAT16
 
 } // namespace cpu
 } // namespace impl

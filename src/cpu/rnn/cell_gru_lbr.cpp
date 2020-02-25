@@ -58,9 +58,7 @@ rnn_cell_execution_sig((_ref_rnn_common_t<aprop, src_type, weights_type,
 }
 
 template rnn_cell_execution_sig(ref_rnn_fwd_f32_t::cell_execution_gru_lbr);
-#if DNNL_ENABLE_BFLOAT16
 template rnn_cell_execution_sig(ref_rnn_fwd_bf16_t::cell_execution_gru_lbr);
-#endif // DNNL_ENABLE_BFLOAT16
 template <>
 rnn_cell_execution_sig(ref_rnn_fwd_u8s8_t::cell_execution_gru_lbr) {
     assert(!"GRU LBR int8 is not supported");
