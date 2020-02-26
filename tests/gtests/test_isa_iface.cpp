@@ -55,7 +55,7 @@ namespace dnnl {
 /** internal flags value, src/cpu/cpu_isa_traits.hpp .
  * Note that these are also determinable by searching for */
 #define ISA_MASK    dnnl::impl::cpu::sse41
-#warning "isa_set_once_test using dnnl_cpu_isa_sse41"
+//#warning "isa_set_once_test using dnnl_cpu_isa_sse41"
 
 #elif TARGET_X86_JIT
 #define PUBLIC_ISA  any /*jit, but not even sse41 - no jit impls for this yet*/

@@ -88,12 +88,11 @@ endmacro()
 ######################## target processor + "ISA" option
 set(DNNL_BUILD_STRING "CPU ${CMAKE_SYSTEM_PROCESSOR}")
 
-# ISA : "ALL" is default
+# ISA : "ALL" is default, no need to report
 if(NOT CPU_ISA EQUAL "ALL") # ALL is the default, whatever DNNL_CPU is targeted
-    if(0)
-        # if you prefer a few shortened strings
+    if(0) # shortened strings?
         string(APPEND DNNL_BUILD_STRING " ISA ")
-        append_map(DNNL_BUILD_STRING ${DNNL_ISA} "VANILLA.vanilla;ANY.any;SSE41.sse41;AVX.avx;AVX.avx2;AVX512_MIC.mic;AVX512_MIC_4OPS.4ops;AVX512_CORE;avx512_core;AVX_512_CORE_VNNI;vnni;AVX512_CORE_BF16.bf16;VEDNN.vednn;VEJIT.vejit")
+        append_map(DNNL_BUILD_STRING ${DNNL_ISA} "VANILLA.vanilla;ALL.all;SSE41.sse41;AVX.avx;AVX.avx2;AVX512_MIC.mic;AVX512_MIC_4OPS.4ops;AVX512_CORE;avx512_core;AVX_512_CORE_VNNI;vnni;AVX512_CORE_BF16.bf16;VEDNN.vednn;VEJIT.vejit")
     else()
         string(TOLOWER ${DNNL_ISA} DNNL_ISA_LOWERCASE)
         set(DNNL_BUILD_STRING "${DNNL_BUILD_STRING} ISA ${DNNL_ISA_LOWERCASE}")
@@ -153,11 +152,20 @@ endif()
 if(NOT "${DNNL_USE_CLANG_SANITIZER}" STREQUAL "")
     string(APPEND DNNL_BUILD_STRING " sanitizer=${DNNL_USE_CLANG_SANITIZER}")
 endif()
-append_map(DNNL_BUILD_STRING "${DNNL_CPU_EXTERNAL_GEMM}" "NONE.;MKL.MKL;CBLAS.CBLAS")
+append_map(DNNL_BUILD_STRING "${DNNL_CPU_EXTERNAL_GEMM}" "NONE.;MKL. MKL;CBLAS. CBLAS")
 append_choice(DNNL_BUILD_STRING BENCHDNN_USE_RDPMC " benchdnn-rdpmc" "")
-set_01(_DNNL_USE_MKL "${DNNL_CPU_EXTERNAL_GEMM}" STREQUAL "MKL")
-set_01(_DNNL_USE_CBLAS _DNNL_USE_MKL OR "${DNNL_CPU_EXTERNAL_GEMM}" STREQUAL "CBLAS")
-set_01(DNNL_ENABLE_BFLOAT16_01 ${DNNL_ENABLE_BFLOAT16})
+# pass CBLAS or MKL options via dnnl_config.h.in
+set_01(DNNL_USE_MKL_01 "${DNNL_CPU_EXTERNAL_GEMM}" STREQUAL "MKL")
+set_01(DNNL_USE_CBLAS_01 _DNNL_USE_MKL OR "${DNNL_CPU_EXTERNAL_GEMM}" STREQUAL "CBLAS")
+set(DNNL_USE_MKL   ${DNNL_USE_MKL_01})
+set(DNNL_USE_CBLAS ${DNNL_USE_CBLAS_01})
+#
+# default x86 build has all features ENABLEd.
+# VANILLA builds may remove whole API features from libdnnl
+#    DNNL_ENABLE_BFLOAT16 : not used (can reintroduce)
+#    DNNL_ENABLE_RNN      : remove when VANILLA has ref rnn postops
+#
+#set_01(DNNL_ENABLE_BFLOAT16_01 ${DNNL_ENABLE_BFLOAT16})
 set_01(DNNL_ENABLE_RNN_01      ${DNNL_ENABLE_RNN})
 if(NOT DNNL_ENABLE_BFLOAT16)
     set(DNNL_BUILD_STRING "${DNNL_BUILD_STRING} no-bf16")

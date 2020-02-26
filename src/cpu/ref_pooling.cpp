@@ -76,9 +76,9 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
         if (ws) {
             const auto off = get_offset(ws_d, mb, oc, od, oh, ow);
             if (ws_dt == data_type::u8) {
-                typedef typename prec_traits<data_type::u8>::type u8_type;
                 assert(0 <= value
-                        && value <= numeric_limits<u8_type>::max());
+                        && value <= numeric_limits<typename prec_traits<
+                                        data_type::u8>::type>::max());
                 ws[off] = value;
             } else {
                 typedef typename prec_traits<data_type::s32>::type s32_type;

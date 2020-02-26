@@ -138,8 +138,8 @@ struct vednnx_convolution_fwd_t: public cpu_primitive_t {
 
     vednnx_convolution_fwd_t(const pd_t *pd, const input_vector &inputs,
             const output_vector &outputs)
-#if TARGET_VEDNN // ??
-        ; /* moved to .cpp file for more control & debug */
+#if ! TARGET_X86_JIT // extra debug -- moved to .cpp file
+        ;
 #else
         : cpu_primitive_t(&conf_, inputs, outputs), conf_(*pd)
         {}

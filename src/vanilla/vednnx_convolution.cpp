@@ -120,7 +120,7 @@ static inline char const* after_last_colon(const char* msg) {
 
 #endif // MKLDNN_REF_CONV_DBG
 
-#if TARGET_VANILLA // uglify constructor with optional debug code
+#if ! TARGET_X86_JIT // uglify constructor with optional debug code
 vednnx_convolution_fwd_t
 ::vednnx_convolution_fwd_t (const pd_t *pd, const input_vector &inputs,
                           const output_vector &outputs)
@@ -160,7 +160,7 @@ vednnx_convolution_fwd_t
     }
 #endif /* MKLDNN_REF_CONV_DBG */
 }
-#endif // TARGET_VANILLA (constructor)
+#endif // !TARGET_X86_JIT (constructor with extra debug if MKLDNN_REF_CONV_DBG is set))
 
 void vednnx_convolution_fwd_t
 ::execute_forward() {

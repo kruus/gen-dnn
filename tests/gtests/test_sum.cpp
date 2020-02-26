@@ -351,7 +351,7 @@ using sum_test_float_omit_output = sum_test<float, float>;
 using sum_test_u8_omit_output = sum_test<uint8_t, int32_t>;
 using sum_test_s8_omit_output = sum_test<int8_t, int32_t>;
 using sum_test_s32_omit_output = sum_test<int32_t, float>;
-using sum_test_f16_omit_output = sum_test<float16_t, float>; // ok for TARGET_VANILLA ?
+using sum_test_f16_omit_output = sum_test<float16_t, float>;
 using sum_test_bf16bf16_omit_output = sum_test<bfloat16_t, float>;
 using sum_test_bf16f32_omit_output = sum_test<bfloat16_t, float, float>;
 

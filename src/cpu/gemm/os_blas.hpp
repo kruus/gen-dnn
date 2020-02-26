@@ -18,7 +18,7 @@
 #define OS_BLAS_HPP
 
 /** \file
-/* DNNL provides gemm functionality on its own using jit generated
+ * DNNL provides gemm functionality on its own using jit generated
  * kernels. This is the only official supported option for the
  * default build target.
  *
@@ -35,16 +35,8 @@
  *    `cmake -DDNNL_CPU_EXTERNAL_GEMM=NONE|MKL|CBLAS`.
  *  Results are propagated via dnnl_config.h
  */
-#include "dnnl_config.h"
-
-#if defined(DNNL_USE_MKL)
-#define(USE_MKL)
-#endif
-
-#if defined(DNNL_USE_CBLAS)
-#define USE_CBLAS
-#endif
-// OK : dnnl_config.h --> same internal settings that used to come from command line
+//#include "dnnl_config.h"      // provides DNNL_USE_MKL and DNNL_USE_CBLAS
+#include "cpu_target.h"         // we want USE_MKL and USE_CBLAS shortcuts
 
 #if defined(USE_MKL)
 
@@ -56,6 +48,8 @@
 
 #include "mkl_cblas.h"
 #if !defined(USE_CBLAS)
+// XXX deprecated configuration? no longer available via cmake
+#error "Is it safe to deprecate this case?"
 #define cblas_sgemm(...) assert(!"CBLAS is unavailable")
 #endif
 
@@ -94,8 +88,7 @@ typedef MKL_INT cblas_int;
 #elif defined(USE_CBLAS)
 typedef int cblas_int;
 
-#if defined(_SX)
-/* this cblas.h is peculiar... */
+#if defined(_SX) /* this cblas.h is peculiar... */
 typedef CBLAS_ORDER CBLAS_LAYOUT;
 #endif
 #endif

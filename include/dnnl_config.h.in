@@ -66,9 +66,10 @@
 //@{
 
 /// [info] DNNL cmake Build Target String.
-/// This also records non-standard 'unsupported' options
-/** \note some options may be exposed only in the build string.
- * Some build options will appear only via the build string. */
+/// To manage experimental builds, this string should also report any
+/// non-standard <em>expert use only</em> options.
+/// \e gtests and \e benchdnn will print this string to avoid confusion in log files.
+// also check that benchdnn startup prints it?
 #cmakedefine DNNL_BUILD_STRING "${DNNL_BUILD_STRING}"
 
 /// DNNL CPU threading runtime
@@ -140,13 +141,18 @@
 /// [at own risk] gemm via MKL library.
 /// May provide support for packed and integer gemm variations not yet
 /// available via jit.
-#cmakedefine DNNL_USE_MKL ${_DNNL_USE_MKL}
+/// Defined via `cmake -DDNNL_EXTERNAL_GEMM=MKL`
+//          #define DNNL_USE_MKL ${DNNL_USE_MKL_01}
+#cmakedefine DNNL_USE_MKL
 
 /// [at own risk] gemm via OS CBLAS (also implied by DNNL_USE_MKL)
 /// New: dnnl now comes with a reasonable reference gemm impl now,
 ///      capable of running the tests in reasonable time frame,
 ///      even without having cmake look for a cblas library.
-#cmakedefine DNNL_USE_CBLAS ${_DNNL_USE_CBLAS}
+/// Defined via `cmake -DDNNL_EXTERNAL_GEMM=CBLAS`.
+///          or `cmake -DDNNL_EXTERNAL_GEMM=MKL`
+//          #define DNNL_USE_CBLAS ${DNNL_USE_CBLAS_01}
+#cmakedefine DNNL_USE_CBLAS
 
 //@}
 //@}
@@ -172,9 +178,8 @@
 /// Means "C/C++ code only, please".
 #cmakedefine DNNL_ISA_VANILLA ${DNNL_ISA_VANILLA}
 
-/** Also provides a builtin gemm reference implementation, so many common
- * convolutions can run at decent speed during tests. */
-#cmakedefine DNNL_ISA_ANY     ${DNNL_ISA_ANY}
+// removed: too easy to confuse ANY with ALL
+// cmakedefine DNNL_ISA_ANY     ${DNNL_ISA_ANY}
 
 /// pull out all the stops, all options & external support allowed.
 #cmakedefine DNNL_ISA_ALL     ${DNNL_ISA_ALL}
@@ -186,7 +191,7 @@
  * DNNL_ISA_ALL, on x86 cpu will be equivalent to DNNL_ISA_X86_ALL
  */
 ///@{
-#cmakedefine DNNL_ISA_X86              ${DNNL_ISA_X86}
+#cmakedefine DNNL_ISA_X86              ${DNNL_ISA_X86} // for completeness (lowest x86 jit impl is really SSE41)
 #cmakedefine DNNL_ISA_SSE41            ${DNNL_ISA_SSE41}
 #cmakedefine DNNL_ISA_AVX              ${DNNL_ISA_AVX}
 #cmakedefine DNNL_ISA_AVX2             ${DNNL_ISA_AVX2}
@@ -215,31 +220,11 @@
  * values (easier to read) XXX verify function CHECKME. */
 #define DNNL_EXPAND_01(...) !!(__VA_ARGS__)
 
-/** No x86 jit -- only uses <em>reference implementation</em> code.  This is a
- * good build target to begin supporting non-x86 chipsets. Typical customization
- * issues for cross-compilers will be:
- *
- * - providing a cmake TOOLCHAIN file
- * - dealing with atomic support and timer routines.  Maybe you need some minimal
- *   amount of inline assembler for this.
- * - Although DNNL reference gemm is now pretty fast, you should set cache sizes
- *   for your target correctly.
- * - You may also want to use some system blas
- *   - (DNNL_EXTERNAL_GEMM XXX what did I call it?)
- *
- * - note: DNNL_a.k.a. TARGET_XXX
- * \todo not all features are available with vanilla implementation
- * (DNNL_ISA==DNL_ISA_VANILLA)
- */
-#define DNNL_TARGET_VANILLA (DNNL_ISA == DNNL_ISA_VANILLA || DNNL_CPU == DNNL_CPU_VE/*to start debug*/)
-// not yet sure if we DNNL_ISA_ANY should be supported XXX all vs any is always confusing XXX
-//#define DNNL_TARGET_VANILLA (DNNL_ISA == DNNL_ISA_VANILLA || (DNNL_CPU == DNNL_CPU_VE && DNNL_ISA <= DNNL_ISA_ANY))
+// deprecated. use other 0/1 DNNL_TARGET to express what you really mean.
+//#define DNNL_TARGET_VANILLA (DNNL_ISA == DNNL_ISA_VANILLA || DNNL_CPU == DNNL_CPU_VE/*temporarily*/)
 
-/** Can use DNNL_TARGET_VANILLA == (DNNL_TARGET_X86 && !DNNL_TARGET_X86_JIT).
- * \detail dnnl impls often include \ref src/common/cpu_target.h and will write
- *         `TARGET_X86` for readability. */
 #define DNNL_TARGET_X86     (DNNL_CPU == DNNL_CPU_X86)
-#define DNNL_TARGET_X86_JIT (DNNL_TARGET_X86 && DNNL_ISA >= DNNL_ISA_ANY && DNNL_ISA <= DNNL_ISA_ALL)
+#define DNNL_TARGET_X86_JIT (DNNL_TARGET_X86 && DNNL_ISA >= DNNL_ISA_X86 && DNNL_ISA <= DNNL_ISA_ALL)
 
 #define DNNL_TARGET_VE      (DNNL_CPU == DNNL_CPU_VE)
 #define DNNL_TARGET_VEDNN   (DNNL_TARGET_VE && DNNL_ISA >= DNNL_ISA_VEDNN && DNNL_ISA <= DNNL_ISA_ALL)

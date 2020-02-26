@@ -2,11 +2,10 @@ if(cblas_cmake_included)
     return()
 endif()
 set(cblas_cmake_included true)
-include("cmake/SDL.cmake")
 include("cmake/options.cmake")
+include("cmake/SDL.cmake")
 
-#if (NOT MKLDNN_USE_CBLAS)
-if ( (DNNL_CPU_EXTERNAL_GEMM STREQUAL "NONE") OR NOT _DNNL_USE_CBLAS)
+if (NOT DNNL_CPU_EXTERNAL_GEMM STREQUAL "CBLAS")
     return()
 endif()
 
@@ -27,10 +26,15 @@ if(CBLAS_FOUND)
     message(STATUS "CBLAS_LIBRARY_DIRS_DEP  ${CBLAS_LIBRARY_DIRS_DEP}")
     message(STATUS "CBLAS_LIBRARIES_DEP  	${CBLAS_LIBRARIES_DEP}")
     include_directories(${CBLAS_INCLUDE_DIRS_DEP})
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${CBLAS_LINKER_FLAGS} ${CBLAS_LIBRARY_DIRS_DEP}")
-    list(APPEND EXTRA_SHARED_LIBS ${CBLAS_LINKER_FLAGS} ${CBLAS_LIBRARY_DIRS_DEP} ${CBLAS_LIBRARIES_DEP})
+    # adjust as things get more complicated...
+    if(${CBLAS_LIBRARY_DIRS_DEP})
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${CMAKE_LIBRARY_PATH_FLAG}${CBLAS_LIBRARY_DIRS_DEP}")
+    endif()
+    list(APPEND EXTRA_SHARED_LIBS ${CBLAS_LINKER_FLAGS} ${CBLAS_LIBRARIES_DEP})
     message(STATUS "cblas.cmake CMAKE_EXE_LINKER_FLAGS = ${CMAKE_EXE_LINKER_FLAGS}")
     message(STATUS "cblas.cmake EXTRA_SHARED_LIBS      = ${EXTRA_SHARED_LIBS}")
-    add_definitions(-DUSE_CBLAS)
+    #add_definitions(-DUSE_CBLAS)
+    # New: DNNL_USE_CBLAS is provided by dnnl_config.h.in,
+    #      and mapped to USE_CBLAS in cpu_target.h
 endif()
 # vim: sw=4 ts=4 et	    

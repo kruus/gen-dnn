@@ -10,7 +10,7 @@ BUILDOK="y"
 SIZE_T=64 # or 64, for -s or -S SX compile
 JOBS="-j8"
 CMAKETRACE=""
-USE_MKL="n" # _MKLDNN_USE_MKL is deprecated in v1.0, -M to try it anyway
+USE_MKL=0
 USE_CBLAS=0
 QUICK=0
 DOGCC_VER=0
@@ -145,15 +145,18 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMrCm:bBrR" arg; do
             ISA="${OPTARG}"
             # check for valid ISA string values XXX
             ;;
-        M) # try _MKLDNN_USE_MKL [deprecated] option
-            USE_MKL="y"
+        M) # try MKL [at own risk] option
+            USE_MKL=1; USE_CBLAS=0
             ;;
         r) # reference impls only: no -DUSE_CBLAS compile flag (->no im2col gemm)
-            USE_CBLAS=0
+            USE_CBLAS=0; USE_MKL=0
             ;;
         C) # force -DUSE_CBLAS compile flag
-            # x86: expect errors if not very careful about omp libs (or set OMP_NUM_THREADS=1)
-            USE_CBLAS=1
+            # x86: expect errors if not very careful about omp libs
+            #      (or set OMP_NUM_THREADS=1)
+            # non-x86: this *may* provide a speed boost if your platform has an
+            #          optimized cblas library
+            USE_CBLAS=1; USE_MKL=0
             ;;
     h | *) # help
             usage
@@ -527,10 +530,10 @@ echo "PATH $PATH"
     #CMAKEOPT="${CMAKEOPT} -DDNNL_JIT_SUPPORT=${CPU}"    # default max jit for target cpu
 
     if [ $USE_CBLAS -ne 0 ]; then
-        CMAKEOPT="${CMAKEOPT} -DMKLDNN_USE_CBLAS=ON" # default OFF
+        CMAKEOPT="${CMAKEOPT} -DDNNL_CPU_EXTERNAL_GEMM=CBLAS" # default NONE
     fi
-    if [ $USE_MKL == "y" ]; then # deprecated in v1.0
-        CMAKEOPT="${CMAKEOPT} -D_MKLDNN_USE_MKL=ON"
+    if [ $USE_MKL -ne 0 ]; then
+        CMAKEOPT="${CMAKEOPT} -DDNNL_CPU_EXTERNAL_GEMM=MKL" # default NONE
     fi
     if [ "$DOTARGET" == "a" ]; then
         TOOLCHAIN=../cmake/ve.cmake

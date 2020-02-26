@@ -63,7 +63,9 @@ detect_mkl("mkl_rt")
 
 if(HAVE_MKL)
     list(APPEND EXTRA_SHARED_LIBS ${MKLLIB})
-    add_definitions(-DUSE_MKL)
+    #add_definitions(-DUSE_MKL)
+    # New: DNNL_USE_MKL is provided by dnnl_config.h.in,
+    #      and mapped to USE_MKL by cpu_target.h
     include_directories(AFTER ${MKLINC})
 
     set(MSG "Intel(R) MKL:")
