@@ -29,8 +29,6 @@ if (NOT (_DNNL_USE_MKL OR (DNNL_CPU_EXTERNAL_GEMM STREQUAL "MKL")))
     return()
 endif()
 
-
-
 function(detect_mkl LIBNAME)
     find_path(MKLINC mkl_cblas.h
         HINTS ${MKLROOT}/include $ENV{MKLROOT}/include)

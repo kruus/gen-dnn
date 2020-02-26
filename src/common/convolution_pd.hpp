@@ -25,13 +25,6 @@
 
 #ifdef DNNL_VERBOSE_EXTRA
 #include "consistency.hpp"
-
-#include <iostream>
-#include <cstring>
-#define DNNL_SHORTFILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
-#define DNNL_CONV_PD_DBG(MSG) do{ using std::cout; using std::endl; \
-    cout<<DNNL_SHORTFILENAME<<":"<<__LINE__<<": "<<MSG; \
-}while(0)
 #endif // NDEBUG
 
 namespace dnnl {
@@ -233,12 +226,6 @@ protected:
 #if DNNL_VERBOSE_EXTRA
 #define AND_(...) SCHKVV(ok,__VA_ARGS__)
         Consistency ok("conv_pd_fwd");
-        // with following, no bug
-        //DNNL_CONV_PD_DBG(" src_dt="<<dnnl_dt2str(src_dt)
-        //        <<" invariant_src_md()->data_type = "
-        //        <<dnnl_dt2str(invariant_src_md()->data_type)
-        //        <<(with_bias()? " +bias":" -bias")
-        //        <<endl);
         AND_((src_dt == data_type::undef
                     || invariant_src_md()->data_type == src_dt));
         AND_((wei_dt == data_type::undef
@@ -248,8 +235,6 @@ protected:
         AND_((acc_dt == data_type::undef
                     || desc_.accum_data_type == acc_dt));
         if (with_bias() && bia_dt != data_type::undef){
-            //DNNL_CONV_PD_DBG(" with_bias() && bia_dt="<<dnnl_dt2str(bia_dt)<<" != data_type::undef (CHECKME!)"<<endl);
-            //DNNL_CONV_PD_DBG(" invariant_bia_md()->data_type = dnnl_dt2str(invariant_bia_md()->data_type)"<<endl);
             AND_(invariant_bia_md()->data_type == bia_dt);
         }
 #undef AND_
@@ -266,7 +251,6 @@ protected:
         if (with_bias() && bia_dt != data_type::undef)
             ok = ok && invariant_bia_md()->data_type == bia_dt;
 #endif
-        //DNNL_CONV_PD_DBG(" expect_data_types="<<(bool)ok<<endl);
         return ok;
     }
 };
