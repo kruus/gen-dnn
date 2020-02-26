@@ -36,6 +36,23 @@
 #   define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__(al)))
 #endif
 
+// Any restrictions on alignas(expression)?
+#ifdef __ve
+#   define alignas(x) alignas((x) > 16 ? 16 : (x))
+#endif
+
+// How is the restrict keyword handled? (disallow it as you encounter errors, please)
+// Actually dnnl sources seem to use __restrict throughout, avoiding C++ restrict keyword
+
+#if defined(__ve) // cross-compilers may or may not be happy with restrict or __restrict
+#elif defined(WIN32)
+#elif defined(__INTEL_COMPILER)
+//#   define restrict __restrict__ /* historical? */
+#elif defined(__GNUC__) /* may catch many compilers */
+//#   define restrict __restrict__
+#else
+#endif // restrict keyword handling
+
 #if TARGET_X86_JIT
 #define XBYAK64
 #define XBYAK_NO_OP_NAMES

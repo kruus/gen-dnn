@@ -15,9 +15,11 @@
 *******************************************************************************/
 
 // You could always test, and the test will SKIP
-#define TEST_PACKED_GEMM 1
-// or you can target expected packed-gemm support cases (XXX please verify)
-//#define TEST_PACKED_GEMM (defined(TARGET_X86_JIT) || defined(DNNL_USE_MKL))
+//#define TEST_PACKED_GEMM 1
+// or you can target expected packed-gemm support cases
+#define TEST_PACKED_GEMM (defined(TARGET_X86_JIT) || defined(DNNL_USE_MKL))
+// or even expose the pack_sgemm_supported() function and SKIP_IF
+// in test_gemm_common.hpp
 
 #if defined(FP16) || defined(FP32) || defined(F16F16F32) || defined(BF16BF16F32)
 INST_TEST_CASE(TestGEMM,

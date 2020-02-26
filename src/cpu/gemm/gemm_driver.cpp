@@ -32,7 +32,7 @@
 #include "jit_generator.hpp"
 #include "s8x8s32/jit_avx512_core_gemv_s8x8s32.hpp"
 #endif // MKLDNN_CPU_GEMM_JIT
-#include "dnnl_os.h" // alignas macro (if required)
+#include "cpu_isa_traits.hpp"   // just for alignas?
 #include "gemm_info.hpp"
 #include "gemm_partition.hpp"
 #include "gemm_threading.hpp"

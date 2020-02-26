@@ -30,10 +30,19 @@
 
 #include "consistency.hpp"
 #include "mkldnn_debug.h"
-#define AND_(...) SCHKVV(ok,__VA_ARGS__)
-#define AND_STR(CSTR,...) do{bool a=ok; bool b=AND_(__VA_ARGS__); if(a && !b) printf("%s",CSTR);}while(0)
-#define DBG(CSTR) do{ }while(0)
-#define DBG2(CSTR1,CSTR2) do{ }while(0)
+#define AND_(...) SCHKVV(ok, __VA_ARGS__)
+#define AND_STR(CSTR, ...) \
+    do { \
+        bool a = ok; \
+        bool b = AND_(__VA_ARGS__); \
+        if (a && !b) printf("%s", CSTR); \
+    } while (0)
+#define DBG(CSTR) \
+    do { \
+    } while (0)
+#define DBG2(CSTR1, CSTR2) \
+    do { \
+    } while (0)
 //#define DBG(CSTR) do{ printf(" warning: %s:%lu %s\n",__FILE__,(long unsigned)__LINE__,(CSTR)); fflush(stdout); }while(0);
 //#define DBG2(CSTR1,CSTR2) do{ printf(" warning: %s:%lu %s %s\n",__FILE__,(long unsigned)__LINE__,(CSTR1),(CSTR2)); fflush(stdout); }while(0);
 
@@ -41,37 +50,6 @@ namespace dnnl {
 namespace impl {
 namespace cpu {
 
-#if 0 // removed ?
-static status_t compute_blocked_format(
-        bool with_groups, const memory_desc_t *oi_md, memory_desc_t *io_md) {
-    /* Computes blocking for *i*o* format from *o*i* format */
-
-    Consistency ok("\ndeconv compute_blocked_format bad:");
-    AND_(oi_md->ndims == io_md->ndims
-            && oi_md->format_kind == format_kind::blocked);
-    //sanity_check_ok = true && oi_md->ndims == io_md->ndims
-    //        && oi_md->format_kind == format_kind::blocked;
-    if (!ok) return status::invalid_arguments;
-
-    const blocking_desc_t &oi_blk = oi_md->format_desc.blocking;
-    blocking_desc_t io_blk = io_md->format_desc.blocking;
-
-    io_md->format_kind = format_kind::blocked;
-    io_blk = oi_blk;
-
-    const int ID_OC = 0 + with_groups;
-    const int ID_IC = 1 + with_groups;
-
-    nstl::swap(io_blk.strides[ID_OC], io_blk.strides[ID_IC]);
-    for (int i_blk = 0; i_blk < io_blk.inner_nblks; ++i_blk) {
-        if (utils::one_of(io_blk.inner_idxs[i_blk], ID_OC, ID_IC)) {
-            io_blk.inner_idxs[i_blk]
-                    = (io_blk.inner_idxs[i_blk] == ID_OC ? ID_IC : ID_OC);
-        }
-    }
-
-    return memory_desc_init_by_blocking_desc(*io_md, io_blk);
-#endif
 static status_t weights_axes_permutation(
         memory_desc_t *o_md, const memory_desc_t *i_md, bool with_groups) {
     int perm[DNNL_MAX_NDIMS] {}; // deconv to conv weight permutation
@@ -231,7 +209,7 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
 
             return status::unimplemented;
 #else // debug
-            if(ok){
+            if (ok) {
                 OK_CHECK(init_convolution());
                 if (weights_md_.format_kind == format_kind::any) {
                     OK_CHECK(weights_axes_permutation(&weights_md_,
@@ -250,8 +228,7 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
                         utils::pick(ndims() - 3, nCw8c, nChw8c, nCdhw8c),
                         utils::pick(ndims() - 3, nCw16c, nChw16c, nCdhw16c));
             }
-            if(ok)
-                return status::success;
+            if (ok) return status::success;
 
             DBG(" warning: missing ref deconvolution");
             return status::unimplemented;
@@ -303,18 +280,18 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
         return status::success;
     }
 
-    private:
+private:
     void compute_fwd_bias(float *dst, const float *bias) const;
     template <data_type_t dst_type, data_type_t bia_type>
-        void compute_fwd_bias_ncdhw(typename prec_traits<dst_type>::type *dst,
-                const typename prec_traits<bia_type>::type *bias) const;
+    void compute_fwd_bias_ncdhw(typename prec_traits<dst_type>::type *dst,
+            const typename prec_traits<bia_type>::type *bias) const;
 
     template <data_type_t dst_type, data_type_t bia_type, int blksize>
-        void compute_fwd_bias_nCdhwXc(typename prec_traits<dst_type>::type *dst,
-                const typename prec_traits<bia_type>::type *bias) const;
+    void compute_fwd_bias_nCdhwXc(typename prec_traits<dst_type>::type *dst,
+            const typename prec_traits<bia_type>::type *bias) const;
 
     template <data_type_t dst_type, data_type_t bia_type>
-        void compute_bias(const exec_ctx_t &ctx) const;
+    void compute_bias(const exec_ctx_t &ctx) const;
 
     const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
     primitive_t *conv_p_;
@@ -330,7 +307,7 @@ struct ref_deconvolution_bwd_data_t : public primitive_impl_t {
 
         pd_t(const pd_t &other)
             : cpu_deconvolution_bwd_data_pd_t(other)
-              , conv_pd_(other.conv_pd_->clone()) {}
+            , conv_pd_(other.conv_pd_->clone()) {}
 
         pd_t &operator=(const pd_t &other) {
             DNNL_SHORT_CIRCUIT_SELF_ASSIGN(other);
@@ -385,11 +362,9 @@ struct ref_deconvolution_bwd_data_t : public primitive_impl_t {
             AND_(desc()->prop_kind == prop_kind::backward_data);
             AND_(utils::everyone_is(f32, dsrc_type, wei_type, ddst_type)
                     || (utils::one_of(dsrc_type, f32, bf16)
-                        && utils::everyone_is(
-                            bf16, wei_type, ddst_type)));
-            AND_(utils::one_of(desc()->alg_kind,
-                        alg_kind::deconvolution_direct,
-                        alg_kind::deconvolution_winograd));
+                            && utils::everyone_is(bf16, wei_type, ddst_type)));
+            AND_(utils::one_of(desc()->alg_kind, alg_kind::deconvolution_direct,
+                    alg_kind::deconvolution_winograd));
             AND_(attr()->has_default_values());
 #endif
 
@@ -419,8 +394,7 @@ struct ref_deconvolution_bwd_data_t : public primitive_impl_t {
                 if (diff_dst_md_.format_kind == format_kind::any)
                     diff_dst_md_ = *conv_pd_->src_md();
             }
-            if(ok)
-                return status::success;
+            if (ok) return status::success;
             DBG(" warning: missing ref deconvolution");
 #endif
             return status::unimplemented;
@@ -533,13 +507,13 @@ struct ref_deconvolution_bwd_weights_t : public primitive_impl_t {
 #else // debug  XXX pare down once all tests pass on all cpus CHECKME
             Consistency ok("\ndeconvolution_bwd_weights bad init:");
             AND_(desc()->prop_kind == prop_kind::backward_weights);
-            DBG2("src_type",mkldnn_dt2str(src_type));
-            DBG2("dwei_type",mkldnn_dt2str(dwei_type));
-            DBG2("ddst_type",mkldnn_dt2str(ddst_type));
+            DBG2("src_type", mkldnn_dt2str(src_type));
+            DBG2("dwei_type", mkldnn_dt2str(dwei_type));
+            DBG2("ddst_type", mkldnn_dt2str(ddst_type));
             {
                 // but also perhaps issues with undef data types in gtests
-                bool all_f32 = utils::everyone_is(f32,
-                        src_type, dwei_type, ddst_type);
+                bool all_f32 = utils::everyone_is(
+                        f32, src_type, dwei_type, ddst_type);
                 if (ok && !all_f32)
                     printf(" deconv data types src,dwei,ddst={%s, %s, %s}\n",
                             mkldnn_dt2str(src_type), mkldnn_dt2str(dwei_type),
@@ -547,10 +521,9 @@ struct ref_deconvolution_bwd_weights_t : public primitive_impl_t {
             }
             AND_(utils::everyone_is(f32, src_type, dwei_type, ddst_type)
                     || (utils::one_of(dwei_type, f32, bf16)
-                        && utils::everyone_is(bf16, src_type, ddst_type)));
-            AND_(utils::one_of(desc()->alg_kind,
-                        alg_kind::deconvolution_direct,
-                        alg_kind::deconvolution_winograd));
+                            && utils::everyone_is(bf16, src_type, ddst_type)));
+            AND_(utils::one_of(desc()->alg_kind, alg_kind::deconvolution_direct,
+                    alg_kind::deconvolution_winograd));
             AND_(attr()->has_default_values());
 #endif
 
@@ -594,8 +567,7 @@ struct ref_deconvolution_bwd_weights_t : public primitive_impl_t {
                         utils::pick(ndims() - 3, nCw8c, nChw8c, nCdhw8c),
                         utils::pick(ndims() - 3, nCw16c, nChw16c, nCdhw16c));
             }
-            if(ok)
-                return status::success;
+            if (ok) return status::success;
 #endif
 
             DBG(" warning: missing ref deconvolution_bwd_weights impl?");
@@ -648,17 +620,17 @@ private:
     void compute_bwd_bias(float *diff_bias, const float *diff_dst) const;
 
     template <data_type_t dbia_type, data_type_t ddst_type>
-        void compute_bwd_bias_ncdhw(
-                typename prec_traits<dbia_type>::type *diff_bias,
-                const typename prec_traits<ddst_type>::type *diff_dst) const;
+    void compute_bwd_bias_ncdhw(
+            typename prec_traits<dbia_type>::type *diff_bias,
+            const typename prec_traits<ddst_type>::type *diff_dst) const;
 
     template <data_type_t dbia_type, data_type_t ddst_type, int blksize>
-        void compute_bwd_bias_nCdhwXc(
-                typename prec_traits<dbia_type>::type *diff_bias,
-                const typename prec_traits<ddst_type>::type *diff_dst) const;
+    void compute_bwd_bias_nCdhwXc(
+            typename prec_traits<dbia_type>::type *diff_bias,
+            const typename prec_traits<ddst_type>::type *diff_dst) const;
 
     template <data_type_t dbia_type, data_type_t ddst_type>
-        void compute_bias(const exec_ctx_t &ctx) const;
+    void compute_bias(const exec_ctx_t &ctx) const;
     primitive_t *conv_p_;
 };
 

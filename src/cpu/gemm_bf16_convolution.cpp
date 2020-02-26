@@ -383,14 +383,14 @@ void gemm_bf16_convolution_fwd_t<dst_data_type>::execute_forward(
                     &this->beta_, _acc, &LDC);
 
             if (this->pd()->is_postprocess_required()) {
+#if TARGET_X86_JIT
                 size_t acc_str = LDC;
                 size_t dst_str = M;
-#if TARGET_X86_JIT
                 (*pp_ker_)(dst_local, _acc, bias + g * jcp.oc, sum_scale,
                         dst_str, acc_str, m, jcp.nthr == 1);
 #else
-#warning "missing reference impl for gemm_bf16_convolution.cpp"
-                assert(!"missing reference impl");
+#warning "missing reference postprocess impl for gemm_bf16_convolution.cpp"
+                assert(!"missing ref postprocessing for gemm_bf16_convolution.cpp");
 #endif // TARGET_X86_JIT
             }
 

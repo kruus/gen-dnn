@@ -106,8 +106,6 @@
 #   define SIMD(...) PragmaQuote(vector)
 
 #elif ENABLE_OPT_PRAGMAS && defined(__INTEL_COMPILER)
-// restrict keyword requires the "-restrict" CFLAG; __restrict__ works anyway
-#   define restrict __restrict__ /* historical? */
 #   define IVDEP() _Pragma("ivdep")
 #   define UNROLL(x) PragmaQuote(unroll(x))
 //  TODO:
