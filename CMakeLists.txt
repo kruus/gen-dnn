@@ -82,15 +82,14 @@ set(CMAKE_SRC_CCXX_FLAGS)       # SRC specifics
 set(CMAKE_EXAMPLE_CCXX_FLAGS)   # EXAMPLE specifics
 set(CMAKE_TEST_CCXX_FLAGS)      # TESTS specifics
 
-if(UNIX OR MINGW)
+if(NECVE) # toolchain file may need extra help
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
-    if(NECVE)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")
-        string(APPEND CMAKE_C_FLAGS   " -minit-stack=0xDeadBeef")
-        string(APPEND CMAKE_CXX_FLAGS " -minit-stack=0xDefaced1")
-    else()
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-    endif()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")
+    string(APPEND CMAKE_C_FLAGS   " -minit-stack=0xDeadBeef")
+    string(APPEND CMAKE_CXX_FLAGS " -minit-stack=0xDefaced1")
+elseif(UNIX OR MINGW)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
 
 include("cmake/mkldnn_compat.cmake")
@@ -107,10 +106,8 @@ include("cmake/cblas.cmake")
 include("cmake/Doxygen.cmake")
 include("cmake/version.cmake")
 include("cmake/coverage.cmake")
-if(NECVE)
+if(NECVE) # toolchains may want additional help with cmake
     #include("cmake/asm.cmake") # annotated assembler?
-    #include("cmake/NLC.cmake") # VE cblas settings now in toolchain file
-    #include("Platform/SX-util.cmake") # cmake toolchain debug
 endif()
 
 # Handle cases when OpenMP runtime is requested but not found: override CPU

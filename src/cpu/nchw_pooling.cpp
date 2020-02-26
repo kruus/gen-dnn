@@ -89,16 +89,16 @@ void nchw_pooling_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
             const int ih = oh * SH - padT + kh;
             const int iw = ow * SW - padL + kw;
 
-                    if (id < 0 || id >= ID) continue;
-                    if (ih < 0 || ih >= IH) continue;
-                    if (iw < 0 || iw >= IW) continue;
+            if (id < 0 || id >= ID) continue;
+            if (ih < 0 || ih >= IH) continue;
+            if (iw < 0 || iw >= IW) continue;
 
             auto src_offset = (size_t)IW * IH * ID * C * mb
                     + (size_t)IW * IH * ID * c + (size_t)IW * IH * id
                     + (size_t)IW * ih + (size_t)iw;
-                    auto s = src[src_offset];
-                    if (s > d[0]) {
-                        d[0] = s;
+            auto s = src[src_offset];
+            if (s > d[0]) {
+                d[0] = s;
                 set_ws(mb, c, od, oh, ow, kd * KH * KW + kh * KW + kw);
             }
         }
@@ -123,8 +123,8 @@ void nchw_pooling_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
             auto src_offset = (size_t)IW * IH * ID * C * mb
                     + (size_t)IW * IH * ID * c + (size_t)IW * IH * id
                     + (size_t)IW * ih + (size_t)iw;
-                    d[0] += src[src_offset];
-                }
+            d[0] += src[src_offset];
+        }
 
         d[0] = math::out_round<data_t>((float)d[0] / num_summands);
     };
@@ -395,8 +395,8 @@ void nchw_pooling_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
             size_t diff_src_offset = (size_t)mb * C * ID * IH * IW
                     + (size_t)c * ID * IH * IW + (size_t)id * IH * IW
                     + (size_t)ih * IW + (size_t)iw;
-                    diff_src[diff_src_offset] += d[0] / num_summands;
-                }
+            diff_src[diff_src_offset] += d[0] / num_summands;
+        }
     };
 
     int ow_start = max(0, utils::div_up(padL - KW + 1, SW));
@@ -419,9 +419,9 @@ void nchw_pooling_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
                         + (size_t)od * OH * OW + (size_t)oh * OW;
                 for (int ow = ow_start; ow < ow_end; ++ow) {
                     const data_t *d = &diff_dst[diff_dst_offset + ow];
-                        ker_max(d, mb, c, od, oh, ow);
-                    }
+                    ker_max(d, mb, c, od, oh, ow);
                 }
+            }
         });
     } else {
         parallel_nd(MB, C, [&](int mb, int c) {
@@ -434,9 +434,9 @@ void nchw_pooling_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
                         + (size_t)od * OH * OW + (size_t)oh * OW;
                 for (int ow = ow_start; ow < ow_end; ++ow) {
                     const data_t *d = &diff_dst[diff_dst_offset + ow];
-                        ker_avg(d, mb, c, od, oh, ow);
-                    }
+                    ker_avg(d, mb, c, od, oh, ow);
                 }
+            }
         });
     }
 }
@@ -629,7 +629,6 @@ void nchw_pooling_bwd_t<data_type::bf16>::execute_backward(
         });
     }
 }
-
 template struct nchw_pooling_fwd_t<data_type::f32>;
 template struct nchw_pooling_bwd_t<data_type::f32>;
 template struct nchw_pooling_fwd_t<data_type::bf16>;
@@ -638,4 +637,4 @@ template struct nchw_pooling_bwd_t<data_type::bf16>;
 } // namespace impl
 } // namespace dnnl
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

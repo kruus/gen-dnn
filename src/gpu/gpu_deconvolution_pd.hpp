@@ -18,7 +18,6 @@
 #define GPU_GPU_DECONVOLUTION_PD_HPP
 
 #include "common/deconvolution_pd.hpp"
-#include "ocl/ocl_engine.hpp"
 
 namespace dnnl {
 namespace impl {

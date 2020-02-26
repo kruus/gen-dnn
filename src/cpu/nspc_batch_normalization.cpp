@@ -108,8 +108,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
                         cvt_bfloat16_to_float(
                                 tmp_src, (bfloat16_t *)src + s_off, C);
                         _src = tmp_src;
-                    } else
-                    {
+                    } else {
                         _src = reinterpret_cast<const acc_data_t *>(
                                 src + s_off);
                     }
@@ -147,8 +146,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
                         cvt_bfloat16_to_float(
                                 tmp_src, (bfloat16_t *)src + s_off, C);
                         _src = tmp_src;
-                    } else
-                    {
+                    } else {
                         _src = reinterpret_cast<const acc_data_t *>(
                                 src + s_off);
                     }
@@ -199,8 +197,7 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
                     cvt_bfloat16_to_float(
                             tmp_src, (bfloat16_t *)src + s_off, C);
                     _src = tmp_src;
-                } else
-                {
+                } else {
                     _dst = reinterpret_cast<acc_data_t *>(dst + s_off);
                     _src = reinterpret_cast<const acc_data_t *>(src + s_off);
                 }
@@ -307,8 +304,7 @@ void nspc_batch_normalization_bwd_t<d_type>::execute_backward(
                     cvt_bfloat16_to_float(
                             tmp_src, (bfloat16_t *)src + s_off, C);
                     _src = tmp_src;
-                } else
-                {
+                } else {
                     _diff_dst = reinterpret_cast<const acc_data_t *>(
                             diff_dst + s_off);
                     _src = reinterpret_cast<const acc_data_t *>(src + s_off);
@@ -377,8 +373,7 @@ void nspc_batch_normalization_bwd_t<d_type>::execute_backward(
                         _src = tmp_src;
                     } else
                         _src = nullptr; // to avoid compiler warning w/ gcc483
-                } else
-                {
+                } else {
                     _diff_src
                             = reinterpret_cast<acc_data_t *>(diff_src + s_off);
                     _diff_dst = reinterpret_cast<const acc_data_t *>(

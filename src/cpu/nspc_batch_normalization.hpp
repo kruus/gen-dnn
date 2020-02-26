@@ -24,7 +24,6 @@
 #include "memory_tracking.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
-#include "consistency.hpp"
 
 #include "cpu_batch_normalization_pd.hpp"
 #include "cpu_isa_traits.hpp"

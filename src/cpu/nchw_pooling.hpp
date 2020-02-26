@@ -23,7 +23,6 @@
 #include "dnnl_thread.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
-#include "consistency.hpp"
 
 #include "cpu_isa_traits.hpp"
 #include "cpu_pooling_pd.hpp"

@@ -65,8 +65,8 @@ void compute_ref_inner_product_fwd(test_inner_product_descr_t ipd, memory &src,
                 dst_data[dst_mdw.off_l(oidx, true)]
                         += src_data[src_mdw.off_l(iidx, true)]
                         * weights_data[weights_mdw.off_l(widx, true)];
+            }
         }
-    }
     });
 }
 

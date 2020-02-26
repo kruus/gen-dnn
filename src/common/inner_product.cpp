@@ -20,7 +20,6 @@
 #include "c_types_map.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
-#include "consistency.hpp"
 
 using namespace dnnl::impl;
 using namespace dnnl::impl::utils;
@@ -111,4 +110,4 @@ status_t dnnl_inner_product_backward_weights_desc_init(
             diff_bias_desc, diff_dst_desc);
 }
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

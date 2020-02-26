@@ -119,12 +119,6 @@ struct memory_desc_wrapper : public c_compatible {
                 & (memory_extra_flags::compensation_conv_s8s8
                         | memory_extra_flags::gpu_rnn_u8s8_compensation)) {
             int cmask = extra().compensation_mask;
-#ifndef NDEBUG // had a struct zeroing bug here...
-            if(!(cmask==1||cmask==3||cmask==27)){
-                printf("\nerror: unexpected compensation mask %d\n",
-                        (int)cmask);
-            }
-#endif
             assert(cmask == 1 || cmask == 3 || cmask == 27);
             dim_t prod = 1;
             for (int d = 0; d < ndims(); ++d)
@@ -340,8 +334,8 @@ struct memory_desc_wrapper : public c_compatible {
                 l_offset = (int32_t)l_offset / (int32_t)cur_dim;
             } else {
                 pos[d] = l_offset % cur_dim;
-            l_offset /= cur_dim;
-        }
+                l_offset /= cur_dim;
+            }
         }
         return off_v(pos, is_pos_padded);
     }

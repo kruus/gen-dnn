@@ -67,7 +67,7 @@ void bwd_weights_balance(int ithr, int nthr, int ngroups, int mb, int &ithr_g,
         int &nthr_g, int &ithr_mb, int &nthr_mb);
 void bwd_weights_reduction_par(int ithr, int nthr,
         const jit_gemm_conv_conf_t &jcp, const float *weights_reduce_ws,
-            float *weights);
+        float *weights);
 
 } // namespace jit_gemm_convolution_utils
 

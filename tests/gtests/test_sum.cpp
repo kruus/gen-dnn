@@ -133,7 +133,6 @@ private:
 
 protected:
     virtual void SetUp() {
-        show_dnnl_build();
         src_data_type = data_traits<src_data_t>::data_type;
         dst_data_type = data_traits<dst_data_t>::data_type;
         sum_test_params p
@@ -226,7 +225,7 @@ protected:
         strm.wait();
 
         check_data(srcs, p.scale, dst);
-        }
+    }
 };
 
 static auto simple_test_cases = [](bool omit_output) {

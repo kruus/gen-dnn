@@ -18,7 +18,6 @@
 #define GPU_GPU_CONCAT_PD_HPP
 
 #include "common/concat_pd.hpp"
-#include "ocl/ocl_engine.hpp"
 
 namespace dnnl {
 namespace impl {

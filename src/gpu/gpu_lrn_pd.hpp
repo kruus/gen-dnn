@@ -19,7 +19,6 @@
 
 #include "common/c_types_map.hpp"
 #include "common/lrn_pd.hpp"
-#include "ocl/ocl_engine.hpp"
 
 namespace dnnl {
 namespace impl {

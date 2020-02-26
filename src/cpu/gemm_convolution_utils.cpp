@@ -479,8 +479,8 @@ void im2col_u8(const jit_gemm_conv_conf_t &jcp, const T *__restrict im,
                 const ptrdiff_t imtr_idx_ih = imtr_idx_ic + ih * iwb;
                 for (int iw = iw_start; iw < iw_end; iw++)
                     imtr[imtr_idx_ih + iw] = im[im_idx_ih + iw * im_iw_stride];
-                    }
-                }
+            }
+        }
 
         const int col_ic_str = hb * wb;
         const int col_kw_stride = jcp.ic * col_ic_str;
@@ -524,9 +524,9 @@ void im2col_u8(const jit_gemm_conv_conf_t &jcp, const T *__restrict im,
                         for (int ow = 0; ow < wb; ++ow)
                             col[col_idx_oh + ow] = shift;
                     }
-                    }
                 }
             }
+        }
     } else {
         parallel_nd(jcp.kh, jcp.kw, jcp.ic, hb,
                 [&](int kh, int kw, int ic, int oh) {
@@ -651,13 +651,13 @@ void col2im_3d(
 
         int id = od * jcp.stride_d - jcp.f_pad;
         for (int kd = 0; kd < jcp.kd; ++kd) {
-        if (id < 0 || id >= jcp.id) {
-            col_ += jcp.kh * jcp.kw * jcp.os;
-            id += (1 + jcp.dilate_d);
-            continue;
-        }
+            if (id < 0 || id >= jcp.id) {
+                col_ += jcp.kh * jcp.kw * jcp.os;
+                id += (1 + jcp.dilate_d);
+                continue;
+            }
 
-        float *__restrict im_ = im_ic + id * jcp.ih * jcp.iw;
+            float *__restrict im_ = im_ic + id * jcp.ih * jcp.iw;
 
             for_(int oh = 0; oh < jcp.oh; ++oh)
             for (int kh = 0; kh < jcp.kh; ++kh) {
@@ -678,8 +678,8 @@ void col2im_3d(
                 }
             }
 
-        col_ += jcp.kh * jcp.kw * jcp.os;
-        id += (1 + jcp.dilate_d);
+            col_ += jcp.kh * jcp.kw * jcp.os;
+            id += (1 + jcp.dilate_d);
         }
     });
 }
@@ -720,7 +720,7 @@ void col2im(const jit_gemm_conv_conf_t &jcp, const float *col, float *im) {
 status_t init_conf(jit_gemm_conv_conf_t &jcp,
         memory_tracking::registrar_t &scratchpad, const convolution_desc_t &cd,
     const memory_desc_wrapper &src_d, const memory_desc_wrapper &weights_d,
-        const memory_desc_wrapper &dst_d, int max_threads) {
+    const memory_desc_wrapper &dst_d, int max_threads) {
     const bool with_groups = weights_d.ndims() == src_d.ndims() + 1;
     const int ndims = src_d.ndims();
     const int is_1d = ndims == 3;
@@ -851,7 +851,7 @@ status_t init_conf(jit_gemm_conv_conf_t &jcp,
                 h_block = nstl::max(1, nstl::min(oh, div_up(L2, row_size)));
                 if (h_block == 1) {
                     int col_size = ic * jcp.ks + 2 * (ic + oc);
-    if (is_int8_conv) {
+                    if (is_int8_conv) {
                         col_size *= 5;
                         col_size += oc * sizeof(uint32_t);
                         col_size += ic;
@@ -1217,7 +1217,7 @@ status_t init_conf(jit_gemm_conv_conf_t &jcp,
                 // if im2col then gemm_loop_rlb and gemm_loop_lrb looks
                 // preferable otherwise other loop orders are possible
                 jcp.loop_order = gemm_loop_rlb;
-    } else {
+            } else {
                 const size_t outer_work_amount = jcp.ngroups * jcp.mb * jcp.od;
                 const float outer_thr_eff = (float)outer_work_amount
                         / rnd_up(outer_work_amount, max_threads);
@@ -1249,7 +1249,7 @@ status_t init_conf(jit_gemm_conv_conf_t &jcp,
                                     < gemm_thrld);
         } else if (is_bwd_w)
             jcp.outer_threading = jcp.os / max_threads < 256
-                       && (jcp.mb != 1 || jcp.ngroups > 2);
+                    && (jcp.mb != 1 || jcp.ngroups > 2);
 
         jcp.nthr = jcp.outer_threading ? max_threads : 1;
         const size_t gemm_col_datatype_size = is_bf16_conv && !is_bwd_d

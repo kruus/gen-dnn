@@ -50,7 +50,7 @@ status_t simple_concat_t<data_type>::execute(const exec_ctx_t &ctx) const {
                 is[a][i] = size_t(i_d.blocking_desc().strides[iperm[i]]);
             else
                 is[a][i] = 0;
-    }
+        }
     }
 
     const memory_desc_wrapper o_d(pd()->dst_md(0));

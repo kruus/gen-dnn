@@ -419,7 +419,7 @@ static ::std::vector<std::string> g_argvs;
   // ::string. This code converts it to the appropriate type.
   const auto& custom = GTEST_CUSTOM_GET_ARGVS_();
   return ::std::vector<std::string>(custom.begin(), custom.end());
-#else  // defined(GTEST_CUSTOM_GET_ARGVS_)
+#else   // defined(GTEST_CUSTOM_GET_ARGVS_)
   return g_argvs;
 #endif  // defined(GTEST_CUSTOM_GET_ARGVS_)
 }
@@ -656,10 +656,10 @@ extern const TypeId kTestTypeIdInGoogleTest = GetTestTypeId();
 // failure of the given type and that the failure message contains the
 // given substring.
 static AssertionResult HasOneFailure(const char* /* results_expr */,
-                              const char* /* type_expr */,
-                              const char* /* substr_expr */,
-                              const TestPartResultArray& results,
-                              TestPartResult::Type type,
+                                     const char* /* type_expr */,
+                                     const char* /* substr_expr */,
+                                     const TestPartResultArray& results,
+                                     TestPartResult::Type type,
                                      const std::string& substr) {
   const std::string expected(type == TestPartResult::kFatalFailure ?
                         "1 fatal failure" :
@@ -695,7 +695,7 @@ static AssertionResult HasOneFailure(const char* /* results_expr */,
 // test part results, what type of failure we expect, and what
 // substring the failure message should contain.
 SingleFailureChecker::SingleFailureChecker(const TestPartResultArray* results,
-    TestPartResult::Type type,
+                                           TestPartResult::Type type,
                                            const std::string& substr)
     : results_(results), type_(type), substr_(substr) {}
 
@@ -1339,11 +1339,11 @@ AssertionResult EqFailure(const char* lhs_expression,
   msg << "Expected equality of these values:";
   msg << "\n  " << lhs_expression;
   if (lhs_value != lhs_expression) {
-    msg << "\n      Which is: " << lhs_value;
+    msg << "\n    Which is: " << lhs_value;
   }
   msg << "\n  " << rhs_expression;
   if (rhs_value != rhs_expression) {
-    msg << "\n      Which is: " << rhs_value;
+    msg << "\n    Which is: " << rhs_value;
   }
 
   if (ignoring_case) {
@@ -1697,11 +1697,11 @@ AssertionResult HRESULTFailureHelper(const char* expr,
   // Gets the system's human readable message string for this HRESULT.
   char error_text[kBufSize] = { '\0' };
   DWORD message_length = ::FormatMessageA(kFlags,
-                                          0,  // no source, we're asking system
+                                          0,   // no source, we're asking system
                                           hr,  // the error
-                                          0,  // no line width restrictions
+                                          0,   // no line width restrictions
                                           error_text,  // output buffer
-                                          kBufSize,  // buf size
+                                          kBufSize,    // buf size
                                           nullptr);  // no arguments for inserts
   // Trims tailing white space (FormatMessage leaves a trailing CR-LF)
   for (; message_length && IsSpace(error_text[message_length - 1]);
@@ -1946,7 +1946,7 @@ bool String::CaseInsensitiveWideCStringEquals(const wchar_t* lhs,
 
 #if GTEST_OS_WINDOWS
   return _wcsicmp(lhs, rhs) == 0;
-#elif GTEST_OS_LINUX && !GTEST_OS_LINUX_ANDROID && !SXAURORA
+#elif GTEST_OS_LINUX && !GTEST_OS_LINUX_ANDROID
   return wcscasecmp(lhs, rhs) == 0;
 #else
   // Android, Mac OS X and Cygwin don't define wcscasecmp.
@@ -2151,7 +2151,7 @@ static std::string FormatWordList(const std::vector<std::string>& words) {
 
 static bool ValidateTestPropertyName(
     const std::string& property_name,
-                              const std::vector<std::string>& reserved_names) {
+    const std::vector<std::string>& reserved_names) {
   if (std::find(reserved_names.begin(), reserved_names.end(), property_name) !=
           reserved_names.end()) {
     ADD_FAILURE() << "Reserved key used in RecordProperty(): " << property_name
@@ -2276,9 +2276,9 @@ void ReportFailureInUnknownLocation(TestPartResult::Type result_type,
   UnitTest::GetInstance()->AddTestPartResult(
       result_type,
       nullptr,  // No info about the source file where the exception occurred.
-      -1,    // We have no info on which line caused the exception.
+      -1,       // We have no info on which line caused the exception.
       message,
-      "");   // No stack trace, either.
+      "");  // No stack trace, either.
 }
 
 }  // namespace internal
@@ -2582,7 +2582,7 @@ TestInfo* MakeAndRegisterTestInfo(
 }
 
 void ReportInvalidTestSuiteType(const char* test_suite_name,
-                               CodeLocation code_location) {
+                                CodeLocation code_location) {
   Message errors;
   errors
       << "Attempted redefinition of test suite " << test_suite_name << ".\n"
@@ -2676,10 +2676,10 @@ void TestInfo::Run() {
   }
 
   if (test != nullptr) {
-  // Deletes the test object.
-  impl->os_stack_trace_getter()->UponLeavingGTest();
-  internal::HandleExceptionsInMethodIfSupported(
-      test, &Test::DeleteSelf_, "the test fixture's destructor");
+    // Deletes the test object.
+    impl->os_stack_trace_getter()->UponLeavingGTest();
+    internal::HandleExceptionsInMethodIfSupported(
+        test, &Test::DeleteSelf_, "the test fixture's destructor");
   }
 
   result_.set_elapsed_time(internal::GetTimeInMillis() - start);
@@ -3186,12 +3186,12 @@ void PrettyUnitTestResultPrinter::OnTestPartResult(
     // we don't need to do anything.
     case TestPartResult::kSkip:
     case TestPartResult::kSuccess:
-    return;
+      return;
     default:
       // Print failure message from the assertion
       // (e.g. expected this and got that).
-  PrintTestPartResult(result);
-  fflush(stdout);
+      PrintTestPartResult(result);
+      fflush(stdout);
   }
 }
 
@@ -3804,13 +3804,13 @@ void XmlUnitTestResultPrinter::PrintXmlTestSuite(std::ostream* stream,
   OutputXmlAttribute(stream, kTestsuite, "tests",
                      StreamableToString(test_suite.reportable_test_count()));
   if (!GTEST_FLAG(list_tests)) {
-  OutputXmlAttribute(stream, kTestsuite, "failures",
+    OutputXmlAttribute(stream, kTestsuite, "failures",
                        StreamableToString(test_suite.failed_test_count()));
-  OutputXmlAttribute(
-      stream, kTestsuite, "disabled",
+    OutputXmlAttribute(
+        stream, kTestsuite, "disabled",
         StreamableToString(test_suite.reportable_disabled_test_count()));
-  OutputXmlAttribute(stream, kTestsuite, "errors", "0");
-  OutputXmlAttribute(stream, kTestsuite, "time",
+    OutputXmlAttribute(stream, kTestsuite, "errors", "0");
+    OutputXmlAttribute(stream, kTestsuite, "time",
                        FormatTimeInMillisAsSeconds(test_suite.elapsed_time()));
     *stream << TestPropertiesAsXmlAttributes(test_suite.ad_hoc_test_result());
   }
@@ -4919,7 +4919,7 @@ namespace internal {
 UnitTestImpl::UnitTestImpl(UnitTest* parent)
     : parent_(parent),
       GTEST_DISABLE_MSC_WARNINGS_PUSH_(4355 /* using this in initializer */)
-      default_global_test_part_result_reporter_(this),
+          default_global_test_part_result_reporter_(this),
       default_per_thread_test_part_result_reporter_(this),
       GTEST_DISABLE_MSC_WARNINGS_POP_() global_test_part_result_repoter_(
           &default_global_test_part_result_reporter_),
@@ -4934,7 +4934,7 @@ UnitTestImpl::UnitTestImpl(UnitTest* parent)
       os_stack_trace_getter_(nullptr),
       post_flag_parse_init_performed_(false),
       random_seed_(0),  // Will be overridden by the flag before first use.
-      random_(0),  // Will be reseeded before first use.
+      random_(0),       // Will be reseeded before first use.
       start_timestamp_(0),
       elapsed_time_(0),
 #if GTEST_HAS_DEATH_TEST
@@ -5638,7 +5638,7 @@ bool SkipPrefix(const char* prefix, const char** pstr) {
 //
 // Returns the value of the flag, or NULL if the parsing failed.
 static const char* ParseFlagValue(const char* str, const char* flag,
-                           bool def_optional) {
+                                  bool def_optional) {
   // str and flag must not be NULL.
   if (str == nullptr || flag == nullptr) return nullptr;
 

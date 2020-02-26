@@ -187,21 +187,21 @@ public:
 
 // different avx512 types not distinguished
 #if DNNL_ISA >= DNNL_ISA_AVX512_MIC && DNNL_ISA <= DNNL_ISA_X86_ALL
-#warning "cpu_engine WITH _avx512"
+//#warning "cpu_engine WITH _avx512"
 #define INSTANCE_avx512(...) INSTANCE_CREATOR(__VA_ARGS__)
 #else
 #define INSTANCE_avx512(...)
 #endif
 
 #if DNNL_ISA >= DNNL_ISA_AVX2 && DNNL_ISA <= DNNL_ISA_X86_ALL
-#warning "cpu_engine WITH _avx2"
+//#warning "cpu_engine WITH _avx2"
 #define INSTANCE_avx2(...) INSTANCE_CREATOR(__VA_ARGS__)
 #else
 #define INSTANCE_avx2(...)
 #endif
 
 #if DNNL_ISA >= DNNL_ISA_AVX && DNNL_ISA <= DNNL_ISA_X86_ALL
-#warning "cpu_engine WITH _avx"
+//#warning "cpu_engine WITH _avx"
 #define INSTANCE_avx(...) INSTANCE_CREATOR(__VA_ARGS__)
 #else
 #define INSTANCE_avx(...)
@@ -210,7 +210,7 @@ public:
 // no x86 jit specific to sse42
 
 #if DNNL_ISA >= DNNL_ISA_SSE41 && DNNL_ISA <= DNNL_ISA_X86_ALL
-#warning "cpu_engine WITH _sse41"
+//#warning "cpu_engine WITH _sse41"
 #define INSTANCE_sse41(...) INSTANCE_CREATOR(__VA_ARGS__)
 #else
 #define INSTANCE_sse41(...)
@@ -224,17 +224,16 @@ public:
  * XXX CHECKME this is not equiv to sse41 (does not strictly mandate) ??
  */
 #if DNNL_ISA >= DNNL_ISA_X86 && DNNL_ISA <= DNNL_ISA_X86_ALL
-#warning "cpu_engine WITH _uni"
+//#warning "cpu_engine WITH _uni"
 #define INSTANCE_uni(...) INSTANCE_CREATOR(__VA_ARGS__)
 #else
 #define INSTANCE_uni(...)
 #endif
 
-// Add other cpu implementation options here...
-#if 0
+// Add implementations for non-x86 CPU here...
+#if 0 /*placeholder*/
 /** an implementation ONLY working for VE (Aurora) vector processor. */
 #if DNNL_ISA >= DNNL_ISA_VE && DNNL_ISA <= DNNL_ISA_VE_ALL
-#warning "cpu_engine WITH _ve"
 #define INSTANCE_ve(...) INSTANCE_CREATOR(__VA_ARGS__)
 #else
 #define INSTANCE_ve(...)

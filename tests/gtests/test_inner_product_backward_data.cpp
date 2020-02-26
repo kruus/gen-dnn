@@ -64,12 +64,12 @@ void compute_ref_inner_product_bwd_data(int ndims,
                             + kd * ipd.kh * ipd.kw + kh * ipd.kw + kw;
                     *ds += diff_dst_data[diff_dst_mdw.off_l(ddidx, true)]
                             * weights_data[weights_mdw.off_l(widx, true)];
-                    }
                 }
-            } else {
+            }
+        } else {
             memory::dim dsidx = n * ipd.ic + ic;
             data_t *ds = &diff_src_data[diff_src_mdw.off_l(dsidx, true)];
-                *ds = data_t(0);
+            *ds = data_t(0);
             for (memory::dim oc = 0; oc < ipd.oc; ++oc) {
                 memory::dim ddidx = n * ipd.oc + oc;
                 memory::dim widx = oc * ipd.ic + ic;

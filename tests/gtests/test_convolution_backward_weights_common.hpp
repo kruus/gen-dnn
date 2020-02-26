@@ -245,8 +245,8 @@ protected:
             compute_ref_conv_bwd_bias<data_t_src, data_t_diff_dst,
                     data_t_diff_bias>(cd, c_diff_dst.get(), ref_diff_bias);
 
-        compare_data<data_t_diff_bias>(ref_diff_bias, c_diff_bias.get());
-    }
+            compare_data<data_t_diff_bias>(ref_diff_bias, c_diff_bias.get());
+        }
     }
 };
 

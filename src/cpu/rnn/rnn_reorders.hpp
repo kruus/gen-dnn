@@ -574,8 +574,7 @@ private:
                                                 ? off_igo(l, d, 0, g, 0)
                                                 : off_goi(l, d, 0, g, 0)],
                                 (bfloat16_t *)output);
-                    } else
-                    {
+                    } else {
                         st = sgemm_pack("A", "N", "N", &m_p, &n, &k_p, &lda,
                                 &ldb,
                                 (float *)&input_tr[to_igo

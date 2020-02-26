@@ -180,16 +180,16 @@ void check_pool_bwd(const pool_bwd_test_params &p, const memory &diff_src,
                     memory::dim iw = ow * pd.strw - pd.padl + kw;
                     memory::dim ih = oh * pd.strh - pd.padt + kh;
                     memory::dim id = od * pd.strd - pd.padf + kd;
-                        if (iw < 0 || iw >= pd.iw) continue;
-                        if (ih < 0 || ih >= pd.ih) continue;
-                        if (id < 0 || id >= pd.id) continue;
+                    if (iw < 0 || iw >= pd.iw) continue;
+                    if (ih < 0 || ih >= pd.ih) continue;
+                    if (id < 0 || id >= pd.id) continue;
                     memory::dim iidx = n * pd.c * pd.id * pd.ih * pd.iw
                             + c * pd.id * pd.ih * pd.iw + id * pd.ih * pd.iw
                             + ih * pd.iw + iw;
 
-                        if (kh == kh_max && kw == kw_max && kd == kd_max)
-                            ref_diff_src[iidx] += diff_dst;
-                    }
+                    if (kh == kh_max && kw == kw_max && kd == kd_max)
+                        ref_diff_src[iidx] += diff_dst;
+                }
             } else if (p.aalgorithm == algorithm::pooling_avg_include_padding
                     || p.aalgorithm == algorithm::pooling_avg_exclude_padding) {
                 auto id_start = apply_offset(od * pd.strd, pd.padf);
@@ -212,10 +212,10 @@ void check_pool_bwd(const pool_bwd_test_params &p, const memory &diff_src,
                     memory::dim iidx = n * pd.c * pd.id * pd.ih * pd.iw
                             + c * pd.id * pd.ih * pd.iw + id * pd.ih * pd.iw
                             + ih * pd.iw + iw;
-                                ref_diff_src[iidx] += diff_dst / num_summands;
-                            }
-                        }
-                    }
+                    ref_diff_src[iidx] += diff_dst / num_summands;
+                }
+            }
+        }
     });
 
     dnnl::impl::parallel_nd(

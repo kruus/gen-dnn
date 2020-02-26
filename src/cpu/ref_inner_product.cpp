@@ -97,7 +97,6 @@ void ref_inner_product_fwd_t<src_type, wei_type, dst_type,
         return d;
     };
 
-    //printf(bias? "B":"b");
     parallel_nd(MB, OC, [&](int mb, int oc) {
         float a = bias ? get_bias(bias, bias_d.off(oc),
                           pd()->desc()->bias_desc.data_type)

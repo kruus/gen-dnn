@@ -79,5 +79,3 @@ status_t dnnl_primitive_desc_get_attr(
     *attr = primitive_desc->attr();
     return success;
 }
-
-// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

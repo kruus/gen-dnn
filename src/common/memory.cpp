@@ -25,7 +25,6 @@
 #include "memory_desc_wrapper.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
-#include "consistency.hpp"
 
 using namespace dnnl::impl;
 using namespace dnnl::impl::utils;
@@ -532,4 +531,4 @@ status_t dnnl_memory_destroy(memory_t *memory) {
     return success;
 }
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

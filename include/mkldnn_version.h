@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2019 Intel Corporation
+* Copyright 2019-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -14,26 +14,13 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef CPU_BINARY_PD_HPP
-#define CPU_BINARY_PD_HPP
+// Header file ensures the backwards compatibility with previous namings.
 
-#include "binary_pd.hpp"
-#include "c_types_map.hpp"
-#include "cpu_engine.hpp"
-#include "type_helpers.hpp"
-#include "utils.hpp"
+#ifndef MKLDNN_VERSION_H
+#define MKLDNN_VERSION_H
 
-namespace dnnl {
-namespace impl {
-namespace cpu {
+#include "mkldnn_dnnl_mangling.h"
 
-struct cpu_binary_pd_t : public binary_pd_t {
-    using binary_pd_t::binary_pd_t;
-};
-} // namespace cpu
-} // namespace impl
-} // namespace dnnl
+#include "dnnl_version.h"
 
-#endif
-
-// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s
+#endif /* MKLDNN_VERSION_H */

@@ -18,18 +18,20 @@
 #define OS_BLAS_HPP
 
 /** \file
- * DNNL provides gemm functionality on its own using jit generated
- * kernels. This is the only official supported option.
+/* DNNL provides gemm functionality on its own using jit generated
+ * kernels. This is the only official supported option for the
+ * default build target.
  *
- *  USE_MKL  USE_CBLAS effect
- *  -------  --------- ------
- *  yes      yes       normal compile: jit *may* be preferred over Intel(R) MKL CBLAS
- *  yes      no        jit calls OK; assert if cblas is ever called
- *  no       yes       system-dependent CBLAS
- *  no       no        gemm convolution (or other blas) N/A; create stubs
+ * However, for non-jit builds and debugging (ex. CPU dispatch to non-jit code)
+ * we keep the ability to use cblas functions from the other libraries. The
+ * following macros affect the behavior:
  *
- *  NEW:  The USE_MKL and USE_CBLAS flags are no longer propagated on the compiler
- *  command line.  Instead, you compile with
+ * - DNNL_USE_CBLAS allow using sgemm and other regular BLAS functionality
+ * - DNNL_USE_MKL (implies DNNL_USE_CBLAS) same as above + allow using igemm
+ *   and packed gemm from Intel MKL library.
+ *
+ *  New:  USE_MKL and USE_CBLAS flags were replaced by above flags that are
+ *  set on the cmake command line, like
  *    `cmake -DDNNL_CPU_EXTERNAL_GEMM=NONE|MKL|CBLAS`.
  *  Results are propagated via dnnl_config.h
  */
