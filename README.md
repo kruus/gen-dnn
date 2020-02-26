@@ -2,11 +2,30 @@
 
 ### Beware:  The master branch is now historical (at v0.16 mkl-dnn API)
 
-Soon the existing master and genv1.1 branch will be switched.
+DNNL v1.0+ ports disable rnn support for vanilla compiles,
+mainly awaiting ref impls for some jit-only post-ops cases.
 
-* v1 branch has some "won't fix" issues fixed in branch genv1.1
-* genv1.1 passes tests/examples/benchdnn on x86 with a `./build.sh -gTtttt`
-  build
+bfloat16 support makes little sense for non-jit, so some branches
+remove bfloat16 features from the library and tests entirely.
+
+DNNL (v1.0+) branches:
+
+* v1 branch was ok for x86 but has "won't fix" issues for VE Aurora chip
+
+* genv1.1 passes tests/examples/benchdnn on x86 and VE (iirc)
+  * Use this branch for VE Aurora.
+  * Workarounds for nc++ value-init compiler bug fixed up by using gdb.
+
+* v1.2-ve is a test build, that hits a new batch of nc++ bugs.
+  * won't fix.  Will wait for nc++ to get better.
+
+* v1.2-x86 pares down the diffs in preparation for a PR to Intel mkl-dnn master.
+  * This can build a VANILLA version that should run most stuff on any CPU
+    * except rnn and many bfloat16 layers
+  * Almost ready! todo:
+    * Look again at cpu\_isa\_traits magic values
+    * Add a non-default cmake option to support runtime CPU dispatch
+      all the way down to 'vanilla'
 
 ### This fork of MKL-DNN provides the same API for non-Intel chips, targeting:
 
