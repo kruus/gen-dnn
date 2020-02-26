@@ -1,1 +1,0 @@
-../../../cpu/gemm/s8x8s32/common_u8.hpp

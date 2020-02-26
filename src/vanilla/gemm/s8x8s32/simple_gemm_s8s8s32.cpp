@@ -1,1 +1,0 @@
-../../../cpu/gemm/s8x8s32/simple_gemm_s8s8s32.cpp

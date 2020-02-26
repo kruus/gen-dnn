@@ -13,9 +13,11 @@
 * License for the specific language governing permissions and limitations under
 * the License.
 *******************************************************************************/
-/** \file handle various compiler/os retrictions.
+/** \file handle various compiler/os peculiarities.
  *
- * handle minor compiler/os peculiarities.
+ * - how to say restrict?
+ * - strnlen available under different name?
+ * - alignas has restrictions?
  *
  */
 #ifndef DNNL_OS_H

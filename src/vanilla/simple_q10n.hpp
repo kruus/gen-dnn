@@ -1,1 +1,0 @@
-../cpu/simple_q10n.hpp

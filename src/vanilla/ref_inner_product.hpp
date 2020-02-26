@@ -1,1 +1,0 @@
-../cpu/ref_inner_product.hpp

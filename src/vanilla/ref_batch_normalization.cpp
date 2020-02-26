@@ -1,1 +1,0 @@
-../cpu/ref_batch_normalization.cpp

@@ -83,7 +83,8 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMrCm:bBrR" arg; do
             # 0   : build    ~ ?? min  (jit), 1     min  (vanilla)
             # >=1 : examples ~  1 min  (jit), 13-16 mins (vanilla)
             # >=2 : test_*   ~ 10 mins (jit), 108   mins (vanilla)
-            # >=3 : benchdnn (bench.sh) performance/correctness tests (long)
+            # >=3 : benchdnn quick performance/correctness tests
+            # >=4 : benchdnn default build targets (very long)
             DOTEST=$(( DOTEST + 1 ))
             ;;
         v) # [yes] (vanilla C/C++ only: no src/cpu/ JIT assembler)
@@ -804,7 +805,18 @@ if [ "$BUILDOK" == "y" ]; then
         fi
         if [ $DOTEST -ge 3 ]; then # some convolution timings
             if [ -x ./bench.sh ]; then
-                DNNL_VERBOSE=2 BUILDDIR=${BUILDDIR} ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
+                #DNNL_VERBOSE=2 BUILDDIR=${BUILDDIR} ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
+                # bench.sh quick convolution tests...
+                BENCHDIR=${BUILDDIR}/tests/benchdnn
+                { (cd ${BENCHDIR} && ./benchdnn --conv --mode=AC -v0 --cfg=f32 --dir=FWD_D --skip-impl="$SKIP" \
+                    mb32_ic3ih44iw44_oc7oh10_kh11kw11_sh4sw4ph0pw0_nsmall1 \
+                    mb32_ic3ih44kh3_oc7oh42_nsmall2 \
+                    ) || { echo "Ohoh"; } ; \
+                   (cd ${BENCHDIR} && ./benchdnn --conv --mode=AP -v0 --cfg=f32 --dir=FWD_D --skip-impl="$SKIP" \
+                    mb32_ic3ih44iw44_oc7oh10_kh11kw11_sh4sw4ph0pw0_nsmall1 \
+                    mb32_ic3ih44kh3_oc7oh42_nsmall2 \
+                    ) || { echo "Ohoh"; } ; \
+                } 2>&1 | tee ${BUILDDIR}/test3.log || true
             fi
         fi
         if [ $DOTEST -ge 4 ]; then # full battery of tests/benchdnn/CMakeLists.txt targets

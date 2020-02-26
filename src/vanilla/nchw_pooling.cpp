@@ -1,1 +1,0 @@
-../cpu/nchw_pooling.cpp
