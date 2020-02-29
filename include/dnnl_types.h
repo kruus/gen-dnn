@@ -2082,53 +2082,59 @@ typedef struct {
 ///
 /// Values \b happen to reflect \e logical partial ordering for x86,
 /// but implementations may map them in \b arbitrary fashion to
-/// \c cpu_isa_t bitmasks within \ref cpu_isa_traits.hpp.
+/// \c cpu_isa_t bit masks within \ref cpu_isa_traits.hpp.
 /// \sa dnnl::set_max_cpu_isa(cpu_isa) for the x86 partial ordering
 ///
-/// \note \c dnnl_cpu_isa_vanilla, \c dnnl_cpu_isa_any and \c dnnl_cpu_isa_all
-///       ("VANILLA", "ANY", "ALL") are supported by all CPUs, but might
-///       have different interpretations as bit masks for \c cpu_isa_t.
-/**
- * \todo XXX dnnl_cpu_isa_t are arbitrary values, and could be set to match
- *       the build options.   They no longer have any relation to bit
- *       flags.
- *
- * - I think the behavior is:
- *   - "default from environment" (only an internal \e string useful)
- *   - "you can override it via dnnl_set_max_cpu_isa(..) at most once"
- *     - here an enum value is needed, but it has no relation to
- *       any internal bit flags
- * - So values are arbitrary (could as well be 1,2,3,4,...)
- * - Would they be better replaced with dnnl_conf values directly from cmake?
- *   - (might allow easier "hard" isa limit tests against DNNL_ISA build value)
- */
+/// \note We introduce \c dnnl_cpu_isa_vanilla, \c dnnl_cpu_isa_full
+///       `cmake -DDNNL_CPU_ISA=VANILLA|FULL` builds that \b must be
+///       supported by all CPUs, but internally map to different bit
+///       masks for purposes of \c mayiuse(cpu_isa_t).
+// These values are actually arbitrary (could match cmake sequential values)
+// I have kept same values for pre-existing ones, in case anyone cares.
+// 
+// XXX exception is the zero value, (maybe zero should be "unkndown"?)
+// but I don't recall and zero-initialization assumptions.
 typedef enum {
-    /// "vanilla" Should run on any DNNL_CPU target
-    /// Run just plain C/C++ code, with very rare need for inline assembler,
-    /// and never any x86 JIT.
-    dnnl_cpu_isa_vanilla = 0x1, // new, can use for any build cpu
+    /** [new] "vanilla" \b must run on any DNNL_CPU build target.
+     * This is a subset of \c dnnl_cpu_isa_all, that further restricts
+     * implementations to C/C++ (i.e. "reference" implementations).  Note that
+     * dnnl provides a reference gemm, which "vanilla" layers can use.
+     *
+     * No jit.  No cpu-specific ref impls.
+     * Allowed: DNNL_CPU_EXTERNAL_GEMM calls to MKL/CBLAS, for some builds.
+     */
+    dnnl_cpu_isa_vanilla = -1, // new, can use for any build cpu
 
-    // XXX remove cpu_isa_any, make it equivalent to vanilla ??
-    /// "any" For x86, Intel(R) x86 jit, no vector extensions (none so far
-    /// For non-x86 maps to "standard basic options" for the DNNL_CPU target
-    dnnl_cpu_isa_any = 0x3, // x86 jit, but no vector op extensions [new, maybe not so useful?]
+    /// [new] "full" For \em any target CPU, means "full set of options".
+    /** For Intel(R) means "provide all available jit implementations".
+     * For non-x86, this may place added requirements on the run-time
+     * environment. */
+    dnnl_cpu_isa_full = -2,
 
+    // Following keeps original x86 values unchanged, which is a bit awkward.
+    // perhaps 0~unknown 1~vanilla, 2~all, 3+~x86-various ?
+    /// "all" allows a slight expansion of "vanilla"
+    /// - x86:     Any Intel(R) x86 ISA (no restrictions, in principle could be jit).
+    /// - non-x86: DNNL_CPU-specific ref impls allowed (but usually same as vanilla)
+    dnnl_cpu_isa_all = 0x0,
+
+    // DNNL_CPU==DNNL_CPU_X86 -------------------------------------------------
     /// "sse4.1" Intel(R) SSE4.1 jit.
-    dnnl_cpu_isa_sse41 = 0x7, //0x1, historical basic x86 jit requirement
+    dnnl_cpu_isa_sse41 = 0x1,
 
     /// "avx" Intel(R) Advanced Vector Extensions.
-    dnnl_cpu_isa_avx = 0xf, //0x3,
+    dnnl_cpu_isa_avx = 0x3,
 
     /// "avx2" Intel(R) Advanced Vector Extensions 2.
-    dnnl_cpu_isa_avx2 = 0x1f, //0x7,
+    dnnl_cpu_isa_avx2 = 0x7,
 
     /// "avx512_mic" Intel(R) Advanced Vector Extensions 512 subset for
     /// Intel(R) Xeon / Phi(TM) Processors x200 Series.
-    dnnl_cpu_isa_avx512_mic = 0x3f, //0xf,
+    dnnl_cpu_isa_avx512_mic = 0xf,
 
     /// "avx512_mic_4ops" Intel(R) Advanced Vector Extensions 512 subset for
     ///Intel(R) Xeon / Phi(TM) Processors 7235, 7285, 7295 Series.
-    dnnl_cpu_isa_avx512_mic_4ops = 0x7f, //0x1f,
+    dnnl_cpu_isa_avx512_mic_4ops = 0x1f,
 
     /// "avx512_core" Intel(R) Advanced Vector Extensions 512 for Intel(R)
     /// Xeon(R) Processor / Scalable Family and Intel(R) Core(TM) processor
@@ -2145,58 +2151,15 @@ typedef enum {
     /// Scalable Family and / Intel(R) Core(TM) processor family.
     dnnl_cpu_isa_avx512_core_bf16 = 0x380 | dnnl_cpu_isa_avx2,
 
-    /// For any build CPU, means "full set of options".
-    /// For Intel(R) means "provide all available jit implementations".
-    /// For non-x86, this may place added requirements on the run-time
-    /// environment.
-    dnnl_cpu_isa_all = 0xffff,
 
-    // cpu_isa "ve_common" is handled by "ANY"
+    // DNNL_CPU==DNNL_CPU_VE --------------------------------------------------
     /// "vednn" VE build with libvednn public API calls
-    dnnl_cpu_isa_vednn = 0x10001,
+    dnnl_cpu_isa_vednn = 0x10000,
 
     /// "vejit" VE build with libvednn calls allowing JIT features.
     /// Also requires a VE development tools (ncc, clang)
-    dnnl_cpu_isa_vejit = 0x30001,
+    dnnl_cpu_isa_vejit = 0x30000,
 
-#if 0 // dnnl version, for reference
-/// CPU instruction set flags
-typedef enum {
-    /// Any ISA (no restrictions)
-    dnnl_cpu_isa_all = 0x0,
-
-    /// Intel(R) SSE4.1.
-    dnnl_cpu_isa_sse41 = 0x1,
-
-    /// Intel(R) Advanced Vector Extensions.
-    dnnl_cpu_isa_avx = 0x3,
-
-    /// Intel(R) Advanced Vector Extensions 2.
-    dnnl_cpu_isa_avx2 = 0x7,
-
-    /// Intel(R) Advanced Vector Extensions 512 subset for Intel(R) Xeon
-    /// Phi(TM) Processors x200 Series.
-    dnnl_cpu_isa_avx512_mic = 0xf,
-
-    /// Intel(R) Advanced Vector Extensions 512 subset for Intel(R) Xeon
-    /// Phi(TM) Processors 7235, 7285, 7295 Series.
-    dnnl_cpu_isa_avx512_mic_4ops = 0x1f,
-
-    /// Intel(R) Advanced Vector Extensions 512 for Intel(R) Xeon(R) Processor
-    /// Scalable Family and Intel(R) Core(TM) processor family.
-    dnnl_cpu_isa_avx512_core = 0x27,
-
-    /// Intel(R) Advanced Vector Extensions 512 with Intel(R) DL Boost Support
-    /// for Intel(R) Xeon(R) Processor Scalable Family and Intel(R) Core(TM)
-    /// processor family.
-    dnnl_cpu_isa_avx512_core_vnni = 0x67,
-
-    /// Intel(R) Advanced Vector Extensions 512 with Intel(R) DL Boost and
-    /// Bfloat16 Support for Intel(R) Xeon(R) Processor Scalable Family and
-    /// Intel(R) Core(TM) processor family.
-    dnnl_cpu_isa_avx512_core_bf16 = 0xe7,
-}
-#endif
 } dnnl_cpu_isa_t;
 
 /// @} dnnl_api_service

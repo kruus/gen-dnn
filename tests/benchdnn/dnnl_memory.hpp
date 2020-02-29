@@ -37,12 +37,6 @@ struct dnn_mem_t {
     }
 
     dnn_mem_t(int ndims, const dnnl_dims_t dims, dnnl_data_type_t dt,
-            dnnl_format_tag_t tag, const dnnl_memory_extra_desc_t &extra,
-            dnnl_engine_t engine) {
-        active_ = (initialize(ndims, dims, dt, tag, extra, engine) == OK);
-    }
-
-    dnn_mem_t(int ndims, const dnnl_dims_t dims, dnnl_data_type_t dt,
             const dnnl_dims_t strides, dnnl_engine_t engine) {
         active_ = (initialize(ndims, dims, dt, strides, engine) == OK);
     }
@@ -187,8 +181,9 @@ struct dnn_mem_t {
         mapped_ptr_ = NULL;
     }
 
-    /* fields */
+    static int check_mem_size(const_dnnl_primitive_desc_t const_pd);
 
+    /* fields */
     dnnl_memory_desc_t md_ {};
     dnnl_memory_t m_ {};
 
@@ -263,17 +258,6 @@ private:
         dnnl_memory_desc_t xmd;
         DNN_SAFE(
                 dnnl_memory_desc_init_by_tag(&xmd, ndims, dims, dt, tag), CRIT);
-        SAFE(initialize(xmd, engine), CRIT);
-        return OK;
-    }
-
-    int initialize(int ndims, const dnnl_dims_t dims, dnnl_data_type_t dt,
-            dnnl_format_tag_t tag, const dnnl_memory_extra_desc_t &extra,
-            dnnl_engine_t engine) {
-        dnnl_memory_desc_t xmd;
-        DNN_SAFE(
-                dnnl_memory_desc_init_by_tag(&xmd, ndims, dims, dt, tag), CRIT);
-        xmd.extra = extra;
         SAFE(initialize(xmd, engine), CRIT);
         return OK;
     }

@@ -108,7 +108,7 @@
  */
 #cmakedefine DNNL_CPU ${DNNL_CPU}
 
-/// cpu target expand capability from VANILLA-->ANY-->(cpu-specific)-->ALL.
+/// cpu target expand capability from VANILLA-->ALL-->(cpu-specific)-->FULL.
 /// The cmake default is -DDNNL_ISA=ALL, which means "provide full support".
 /// During compilation `\#if DNNL_ISA == DNNL_ISA_ALL` will be true.
 /** \internal
@@ -173,22 +173,30 @@
 /// or external library features to the basic VANILLA builds.
 ///@{
 /// @group
-/// all cpus support a few common settings.
+/// All cpus support a few common settings.
 ///@{
 /// Means "C/C++ code only, please".
+/// These layers in principle should run on any CPU.
 #cmakedefine DNNL_ISA_VANILLA ${DNNL_ISA_VANILLA}
 
-// removed: too easy to confuse ANY with ALL
-// cmakedefine DNNL_ISA_ANY     ${DNNL_ISA_ANY}
+/// Almost like vanilla, except allows layers that may be a little less portable:
+/// - x86 layer that might use x86 jit (but not sse4.1)
+/// - non-x86 engine layer available only on a fork
+///   - even if pure C/C++, it might have very different loop treatment
+///     or optimizations and have large code difference from the official
+///     VANILLA implementations.
+/// This value is CPU-specific, and provided mostly for completeness
+#cmakedefine DNNL_ISA_ALL ${DNNL_ISA_ALL}
 
 /// pull out all the stops, all options & external support allowed.
-#cmakedefine DNNL_ISA_ALL     ${DNNL_ISA_ALL}
+/// This value is CPU-specific.
+#cmakedefine DNNL_ISA_FULL     ${DNNL_ISA_FULL}
 ///@}
 
 /** @group
  * max x86 jit instruction set support.
- * This might not be respected by jit uni [unified] drivers CHECKME.
- * DNNL_ISA_ALL, on x86 cpu will be equivalent to DNNL_ISA_X86_ALL
+ * This might not be respected by jit all uni [unified] drivers.
+ * DNNL_ISA_FULL, on x86 cpu will be equivalent to DNNL_ISA_X86_FULL
  */
 ///@{
 #cmakedefine DNNL_ISA_X86              ${DNNL_ISA_X86} // for completeness (lowest x86 jit impl is really SSE41)
@@ -200,15 +208,15 @@
 #cmakedefine DNNL_ISA_AVX512_CORE      ${DNNL_ISA_AVX512_CORE}
 #cmakedefine DNNL_ISA_AVX512_CORE_VNNI ${DNNL_ISA_AVX512_CORE_VNNI}
 #cmakedefine DNNL_ISA_AVX512_CORE_BF16 ${DNNL_ISA_AVX512_CORE_BF16}
-#cmakedefine DNNL_ISA_X86_ALL          ${DNNL_ISA_X86_ALL}
+#cmakedefine DNNL_ISA_X86_FULL         ${DNNL_ISA_X86_FULL}
 ///@}
 /// @group
 /// ve isa settings govern jit instruction set support
 ///@{
-#cmakedefine DNNL_ISA_VE     ${DNNL_ISA_VE}    // equiv to vanilla
-#cmakedefine DNNL_ISA_VEDNN  ${DNNL_ISA_VEDNN}
-#cmakedefine DNNL_ISA_VEJIT  ${DNNL_ISA_VEJIT}
-#cmakedefine DNNL_ISA_VE_ALL ${DNNL_ISA_VE_ALL}
+#cmakedefine DNNL_ISA_VE      ${DNNL_ISA_VE}    // equiv to vanilla
+#cmakedefine DNNL_ISA_VEDNN   ${DNNL_ISA_VEDNN}
+#cmakedefine DNNL_ISA_VEJIT   ${DNNL_ISA_VEJIT}
+#cmakedefine DNNL_ISA_VE_FULL ${DNNL_ISA_VE_FULL}
 ///@}
 ///@}
 
@@ -224,11 +232,11 @@
 //#define DNNL_TARGET_VANILLA (DNNL_ISA == DNNL_ISA_VANILLA || DNNL_CPU == DNNL_CPU_VE/*temporarily*/)
 
 #define DNNL_TARGET_X86     (DNNL_CPU == DNNL_CPU_X86)
-#define DNNL_TARGET_X86_JIT (DNNL_TARGET_X86 && DNNL_ISA >= DNNL_ISA_X86 && DNNL_ISA <= DNNL_ISA_ALL)
+#define DNNL_TARGET_X86_JIT (DNNL_TARGET_X86 && DNNL_ISA >= DNNL_ISA_X86 && DNNL_ISA <= DNNL_ISA_FULL)
 
 #define DNNL_TARGET_VE      (DNNL_CPU == DNNL_CPU_VE)
-#define DNNL_TARGET_VEDNN   (DNNL_TARGET_VE && DNNL_ISA >= DNNL_ISA_VEDNN && DNNL_ISA <= DNNL_ISA_ALL)
-#define DNNL_TARGET_VEJIT   (DNNL_TARGET_VE && DNNL_ISA >= DNNL_ISA_VEJIT && DNNL_ISA <= DNNL_ISA_ALL)
+#define DNNL_TARGET_VEDNN   (DNNL_TARGET_VE && DNNL_ISA >= DNNL_ISA_VEDNN && DNNL_ISA <= DNNL_ISA_FULL)
+#define DNNL_TARGET_VEJIT   (DNNL_TARGET_VE && DNNL_ISA >= DNNL_ISA_VEJIT && DNNL_ISA <= DNNL_ISA_FULL)
 
 //#define DNNL_TARGET_SX // \deprecated
 #if DNNL_TARGET_X86_JIT

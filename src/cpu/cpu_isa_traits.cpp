@@ -86,6 +86,7 @@ set_before_first_get_setting_t<cpu_isa_t> &max_cpu_isa() {
     return max_cpu_isa_setting;
 }
 
+// Attempt a "set before 1st get" of the max_cpu_isa() flag
 bool init_max_cpu_isa() {
     static int const verbose = 0;
     if (verbose) printf("  init_max_cpu_isa!");
@@ -95,23 +96,24 @@ bool init_max_cpu_isa() {
     }
     if (verbose) printf("  (not yet initialized!)");
 
-    cpu_isa_t max_cpu_isa_val = (DNNL_CPU == DNNL_CPU_VE ? ve_all : isa_all);
+    cpu_isa_t max_cpu_isa_val = isa_full; // x86:x86_full, VE:ve_full, ...
 
     char buf[64];
     if (getenv("DNNL_MAX_CPU_ISA", buf, sizeof(buf)) > 0) {
-#define IF_HANDLE_CASE(cpu_isa) \
-    if (std::strcmp(buf, cpu_isa_traits<cpu_isa>::user_option_env) == 0) \
-    max_cpu_isa_val = cpu_isa
-#define ELSEIF_HANDLE_CASE(cpu_isa) else IF_HANDLE_CASE(cpu_isa)
+        // string value --> cpu_isa_t max_cpu_isa_val;
+#define IF_HANDLE_CASE(CPU_ISA_T) \
+    if (std::strcmp(buf, cpu_isa_traits<CPU_ISA_T>::user_option_env) == 0) \
+    max_cpu_isa_val = CPU_ISA_T
+#define ELSEIF_HANDLE_CASE(CPU_ISA_T) else IF_HANDLE_CASE(CPU_ISA_T)
         static const int verbose = 1;
         // allow case-insensitive compare
         for (size_t i = 0u; i < sizeof(buf) && buf[i]; ++i)
             buf[i] = toupper(i);
 
-        IF_HANDLE_CASE(isa_all); // "ALL" CPU-specific
-        ELSEIF_HANDLE_CASE(vanilla); // "VANILLA"
-        ELSEIF_HANDLE_CASE(
-                isa_any); // "ANY" (x86 jit ok, no vec ops; ve same as vanilla)
+        IF_HANDLE_CASE(
+                vanilla); // "VANILLA" --> vanilla (CPU-agnostic ref impls)
+        ELSEIF_HANDLE_CASE(isa_all); // "ANY" --> x86_common or ve_common or ...
+        ELSEIF_HANDLE_CASE(isa_full); // "FULL" --> x86_full or ve_full or ...
 #if TARGET_X86
         ELSEIF_HANDLE_CASE(sse41);
         ELSEIF_HANDLE_CASE(avx);
@@ -147,20 +149,10 @@ cpu_isa_t get_max_cpu_isa(bool soft) {
     return max_cpu_isa().get(soft);
 }
 
-#else // could be constexpr
+#else
 cpu_isa_t get_max_cpu_isa(bool soft) {
     MAYBE_UNUSED(soft);
-    cpu_isa_t ret = unknown
-#if TARGET_X86
-            ret
-            = isa_all;
-#elif TARGET_VE // "isa_all" is not set up be cmake, it is only for x86
-            ret
-            = isa_ve_all;
-#endif
-    static_assert(ret != unknown, "unhandled get_max_cpu_isa case");
-    return ret;
-    ;
+    return isa_full;
 }
 #endif // defined(DNNL_ENABLE_MAX_CPU_ISA)
 

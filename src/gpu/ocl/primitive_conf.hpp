@@ -348,21 +348,28 @@ struct lnorm_conf_t {
 // Binary
 struct binary_conf_t {
     int ndims;
-    data_type_t data_type;
+    data_type_t src0_data_type;
+    data_type_t src1_data_type;
+    data_type_t dst_data_type;
     bool is_mul;
     bool is_add;
     bool is_max;
     bool is_min;
     bool is_tensor_op;
+    bool use_unroll_16b, src0_unroll_16b;
     compute::dispatch_t dispatch;
     int dim0[MAX_NDIMS];
     int bcast_dims[MAX_NDIMS];
     bool is_dense;
     bool is_same_md;
+    bool same_src_dt;
     bool with_eltwise;
+    bool with_src0_scale;
+    bool with_src1_scale;
     post_ops_t::entry_t::eltwise_t eltwise;
     bool with_sum;
     float sum_scale;
+    float eltwise_scale;
     memory_desc_info_t src0_md_info;
     memory_desc_info_t src1_md_info;
     memory_desc_info_t dst_md_info;

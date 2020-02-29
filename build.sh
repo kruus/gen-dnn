@@ -26,7 +26,7 @@ CPU_VE=2
 CPU_SX=3
 #
 CPU=-1
-ISA="ALL"
+ISA="FULL"
 usage() {
     echo "$0 usage:"
     #head -n 30 "$0" | grep "^[^#]*.)\ #"
@@ -142,7 +142,7 @@ while getopts ":hjgaSstvPdDqQTwWbF1567iMrCm:bBrR" arg; do
         i) # try using icc
             DOGCC_VER=icc
             ;;
-        m) # -mISA "machine", ISA=[ALL]|VANILLA|ANY, SSE41|AVX|AVX2|AVX512..., VE...
+        m) # -mISA "machine", ISA=[FULL]|VANILLA|ANY, SSE41|AVX|AVX2|AVX512..., VE...
             ISA="${OPTARG}"
             # check for valid ISA string values XXX
             ;;

@@ -60,7 +60,7 @@ namespace dnnl {
 #elif TARGET_X86_JIT
 #define PUBLIC_ISA  any /*jit, but not even sse41 - no jit impls for this yet*/
 #define ISA_MASK    dnnl::impl::cpu::x86_any
-#warning "isa_set_once_test using dnnl_cpu_isa_any"
+#warning "isa_set_once_test using dnnl_cpu_isa_all"
 
 #elif TARGET_X86 /*x86, without jit*/
 #define PUBLIC_ISA  vanilla
@@ -70,7 +70,7 @@ namespace dnnl {
 #elif TARGET_VE
 #define PUBLIC_ISA  vanilla
 #define ISA_MASK    dnnl::impl::cpu::ve_common
-#warning "isa_set_once_test using dnnl_cpu_isa_any"
+#warning "isa_set_once_test using dnnl_cpu_isa_all"
 #else
 #error "Please choose an appropriate dnnl_cpu_isa_FOO for this build target"
 #endif
@@ -105,8 +105,8 @@ TEST(isa_set_once_test, TestISASetOnce) {
 
     printf(" interesting values:\n");
     printf(" dnnl_cpu_isa_vanilla = %d\n", dnnl_cpu_isa_vanilla);
-    printf(" dnnl_cpu_isa_any     = %d\n", dnnl_cpu_isa_any);
     printf(" dnnl_cpu_isa_all     = %d\n", dnnl_cpu_isa_all);
+    printf(" dnnl_cpu_isa_full    = %d\n", dnnl_cpu_isa_full);
     printf(" DNNL_ISA (cmake)     = %d\n", DNNL_ISA);
     cout<<" Test using dnnl_cpu_isa_t "<<STR(DNNL_CPU_ISA_T)
             " = 0x"<<hex<<DNNL_CPU_ISA_T<<dec<<endl;

@@ -38,48 +38,60 @@ include("cmake/mkldnn_compat.cmake")
 set(DNNL_CPU_X86 1)
 set(DNNL_CPU_VE  2)
 #
-# JIT (or external libs) may be specified as cmake -DDNNL_ISA=<string>.
-# All cpus support DNNL_ISA = VANILLA, ALL    (removed: and ANY)
-# Note: ALL vs ANY is confusing.  Removing 'ANY'
+# JIT (or external libs) may be specified as `cmake -DDNNL_ISA=<string>`.
+# All cpus support VANILLA and FULL builds.
 #
 set(DNNL_ISA_VANILLA 1)
-#set(DNNL_ISA_ANY     2)  # value changes below, once cpu is known
-#set(DNNL_ISA_ALL     3)  # value changes below, once cpu is known
-# x86-specific JIT -- Unless you know what you are doing, the useful
-#                     settings are DNNL_ISA_VANILLA and DNNL_ISA_X86_ALL
-# Capping DNNL_ISA remove impls from libdnnl.
-# However to really run lower-level codes you should use runtime CPU dispatch,
-# because jit uni drivers are expected to make runtime choices.
-set(DNNL_ISA_X86                10) # here only for completeness
+#set(DNNL_ISA_FULL    2)  # value changes below, once cpu is known
+
+# In principle, you could cap DNNL_ISA to remove jit impls from libdnnl.
+# However to really run lower-level codes you should (perhaps also?) use
+# runtime CPU dispatch.  Unified jit drivers might try to be clever.
+set(DNNL_ISA_X86                10) # VANILLA + no restriction to be C/C++ ref impl
 set(DNNL_ISA_SSE41              11)
 set(DNNL_ISA_AVX                12)
 set(DNNL_ISA_AVX2               13)
-set(DNNL_ISA_AVX512_MIC         14) # AVX_512_COMMON ?
+set(DNNL_ISA_AVX512_MIC         14)
 set(DNNL_ISA_AVX512_MIC_4OPS    15)
 set(DNNL_ISA_AVX512_CORE        16)
 set(DNNL_ISA_AVX512_CORE_VNNI   17)
 set(DNNL_ISA_AVX512_CORE_BF16   18)
-set(DNNL_ISA_X86_ALL            18)
+set(DNNL_ISA_X86_FULL           18)
 # ve-specific
 set(DNNL_ISA_VE                 30)
 set(DNNL_ISA_VEDNN              31)
 set(DNNL_ISA_VEJIT              32)
-set(DNNL_ISA_VE_ALL             32)
+set(DNNL_ISA_VE_FULL            32)
+#
+# Semantics:
+#
+# ALL expands its connotation a tiny bit to mean "any variety of this DNNL_CPU"
+#     so, semantically, it is still OK for to use within jit impls.
+# VANILLA adds the restriction of being "cross-platform"
+#     Occasionally very light inline assembly might occur,
+#     but code diffs should try to not impact code readability.
+#     dnnl_optimize.h, dnnl_omp.h etc have some ideas for cpu-specific macros
+# FULL implies "all available bells and whistles" for this DNNL_CPU.
+#     (using "any" for this led to recurring confusion with "all")
 
 #
 # Determine target CPU (governed by available compiler / environment CC),
-# and then determine what the default -DDNNL_ISA=ALL build should mean
+# and then determine what the default -DDNNL_ISA=FULL build should mean
 #
-if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
+if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86_64|aarch64.*|AARCH64.*|arm64.*|ARM64.*")
+    # for xbyak jit support all treated as "same" cross-compilation target.
+    # TARGET_ARCH in https://github.com/intel/mkl-dnn/pull/658 disambiguates
     set(DNNL_CPU ${DNNL_CPU_X86})
-    #set(DNNL_ISA_ANY ${DNNL_ISA_X86})
-    set(DNNL_ISA_ALL ${DNNL_ISA_X86_ALL})
+    set(DNNL_ISA_ALL ${DNNL_ISA_X86_FULL})
+    set(DNNL_ISA_FULL ${DNNL_ISA_X86_FULL})
 elseif(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aurora")
     set(DNNL_CPU ${DNNL_CPU_VE})
-    #set(DNNL_ISA_ANY ${DNNL_ISA_VE})
-    set(DNNL_ISA_ALL ${DNNL_ISA_VE_ALL})
+    set(DNNL_ISA_ALL ${DNNL_ISA_VE})
+    set(DNNL_ISA_FULL ${DNNL_ISA_VE_FULL})
 else()
     message(FATAL_ERROR "Unrecognized target CPU : ${CMAKE_SYSTEM_PROCESSOR}")
+    # To add a new DNNL_CPU, start with ALL and FULL impls exactly the VANILLA
+    # ones, until CPU-specific work begins on your branch/fork.
 endif()
 
 # ===========
@@ -90,34 +102,43 @@ endif()
 # This is used for dnnl_config.h.in
 #
 if(DNNL_CPU EQUAL DNNL_CPU_X86)
-    set(DNNL_ISA "ALL" CACHE STRING
-        "All cpus support the VANILLA and ALL setting.
-        ALL means supply all available features.  x86 supports all jit targets.
+    set(DNNL_ISA "FULL" CACHE STRING
+        "All cpus must support FULL and VANILLA settings for DNNL_ISA
 
-        VANILLA removes all x86 jit support (libdnnl is mostly pure C/C++)
-        Non-x86 ALL builds may add external libs or jit features.
+        VANILLA removes all x86 jit support and should mostly be pure C/C++.
+                These impls should run on any CPU, so can be used with a
+                cmake toolchain file to cross-compile libdnnl for non-x86 CPUs.
+        FULL means supply all available features. x86 supports all jit targets.
+             Non-x86 FULL builds on forked repos can add specialized layers to
+             the basic VANILLA build to provide a cpu-specific cpu_engine.
         
+        For FULL build debug, runtime CPU dispatch to VANILLA ref impls should
+        enable DNNL_ENABLE_MAX_CPU_ISA and DNNL_ENABLE_MAX_CPU_ISA_VANILLA.
+
         For expert use, the layer implementations included in libdnnl can be
-        capped at intermediate ISA settings too (see cpu_engine.hpp for how
-        these relate to which impls get removed from the build)
-        
-        max ISA possble values: ALL (default), VANILLA, and for completeness
-        SSE41 AVX AVX2 AVX512_MIC AVX512_MIC_4OPS
-        AVX512_CORE AVX512_CORE_VNNI AVX512_CORE_BF16.
-
-        Note: generic ANY option was removed (too easily confused with ALL)"
-        ) # default to ALL bells and whistles
-    if(NOT ${DNNL_ISA} MATCHES "^(VANILLA|SSE41|AVX|AVX2|AVX512_MIC|AVX512_MIC_4OPS|AVX512_CORE|AVX512_CORE_VNNI|AVX512_CORE_BF16|ALL)$")
+        capped at intermediate ISA settings too (see cpu_engine.hpp macros)
+        max ISA possble values: FULL (default), VANILLA, and
+        x86:
+           ALL SSE41 AVX AVX2 AVX512_MIC AVX512_MIC_4OPS
+           AVX512_CORE AVX512_CORE_VNNI AVX512_CORE_BF16.
+        VE:
+           ALL VEDNN VEJIT
+        In practice, ALL is pretty much the same as VANILLA.  Semantically ALL
+        is CPU-specific 'for some reason': not cross-platform, too big code
+        diffs from VANILLA, or using engine layers only available on a fork of
+        Intel dnnl sources."
+        ) # default to full support
+    if(NOT ${DNNL_ISA} MATCHES "^(VANILLA|ALL|SSE41|AVX|AVX2|AVX512_MIC|AVX512_MIC_4OPS|AVX512_CORE|AVX512_CORE_VNNI|AVX512_CORE_BF16|FULL)$")
         message(FATAL_ERROR "Unsupported ${CMAKE_SYSTEM_PROCESSOR} variant: DNNL_ISA=${DNNL_ISA}")
     endif()
 elseif(NECVE) # example toolchain build
     set(DNNL_ISA "ALL" CACHE STRING
-        "VE cpu build styles include VANILLA, ALL(libvednn, jit,...)
-        as well intermediate compile-time support for max isa VEDNN and VEJIT==ALL.
+        "VE cpu build styles include VANILLA, FULL(libvednn, jit,...)
+        as well intermediate compile-time support for max isa VEDNN and VEJIT.
         non-x86 jit should be supported via an external library.
-        cpu_target.h defines macros to provide alternate ref impls."
+        cpu_target.h defines macros to lightly customize libdnnl ref impls."
         ) # default to ALL bells and whistles
-    if(NOT ${DNNL_ISA} MATCHES "^(VANILLA|VEDNN|VEJIT|ALL)$")
+    if(NOT ${DNNL_ISA} MATCHES "^(VANILLA|VEDNN|VEJIT|FULL)$")
         message(FATAL_ERROR "Unsupported ${CMAKE_SYSTEM_PROCESSOR} variant: DNNL_ISA=${DNNL_ISA}")
     endif()
 endif()
@@ -171,6 +192,14 @@ option(DNNL_ENABLE_MAX_CPU_ISA
     "enables control of CPU ISA detected by DNNL via DNNL_MAX_CPU_ISA
     environment variable and dnnl_set_max_cpu_isa() function" ON)
 
+option(DNNL_ENABLE_MAX_CPU_ISA_VANILLA
+    "Forces libdnnl being a superset of the VANILLA build.
+
+    An x86 jit build intentionally removes some 'SIMPLE_IMPL' reference
+    implementations that are intended to always have a JIT implementation.
+    But consider runtime CPU dispatch to VANILLA, to preclude all JIT impls.
+    In this case might want to provide a full set of VANILLA impls." OFF)
+
 # =============================
 # Building properties and scope
 # =============================
@@ -178,7 +207,7 @@ option(DNNL_ENABLE_MAX_CPU_ISA
 set(DNNL_LIBRARY_TYPE "SHARED" CACHE STRING
     "specifies whether DNNL library should be SHARED or STATIC")
 if(NOT ${DNNL_LIBRARY_TYPE} MATCHES "^(SHARED|STATIC)$")
-    message(FATAL_ERROR "Unsupported ${DNNL_LIBRARY_TYPE} variant: DNNL_ISA=${DNNL_ISA}")
+    message(FATAL_ERROR "Unsupported ${DNNL_LIBRARY_TYPE} variant: DNNL_LIBRARY_TYPE=${DNNL_LIBRARY_TYPE}")
 endif()
 option(DNNL_BUILD_EXAMPLES "builds examples"  ON)
 option(DNNL_BUILD_TESTS "builds tests" ON)
@@ -191,13 +220,12 @@ set(DNNL_INSTALL_MODE "DEFAULT" CACHE STRING
     When BUNDLE option is set DNNL will be installed as a bundle
     which contains examples and benchdnn.")
 if(NOT ${DNNL_INSTALL_MODE} MATCHES "^(DEFAULT|BUNDLE)$")
-    message(FATAL_ERROR "Unsupported ${DNNL_INSTALL_MODE} variant: DNNL_ISA=${DNNL_ISA}")
+    message(FATAL_ERROR "Unsupported ${DNNL_INSTALL_MODE} variant: DNNL_INSTALL_MODE=${DNNL_INSTALL_MODE}")
 endif()
 
 set(DNNL_CODE_COVERAGE "OFF" CACHE STRING
     "specifies which supported tool for code coverage will be used
-    Currently only gcov supported"
-    )
+    Currently only gcov supported")
 if(NOT ${DNNL_CODE_COVERAGE} MATCHES "^(OFF|GCOV)$")
     message(FATAL_ERROR "Unsupported code coverage tool: ${DNNL_CODE_COVERAGE}")
 endif()
@@ -277,23 +305,6 @@ set(OPENCLROOT "" CACHE STRING
     "path to Intel(R) SDK for OpenCL(TM).
     Use this option to specify custom location for OpenCL.")
 
-set(DNNL_CPU_EXTERNAL_GEMM "NONE" CACHE STRING
-    "NONE uses an x86 jit gemm.  For vanilla or non-x86 build a builtin
-    portable gemm will be used.  Other values are: MKL, CBLAS.
-
-    MKL can be used for performance comparisons and may support gemm
-    operations with different data types/formats.
-
-    A native CBLAS might provide a performance boost when cross-compiling.
-    (For x86 vanilla build or cross-compilation, you may also investigate
-    changing DNNL_ARCH_OPT_FLAGS or playing with gemm:ref tuning)")
-if(NOT ${DNNL_CPU_EXTERNAL_GEMM} MATCHES "^(NONE|MKL|CBLAS)$")
-    message(FATAL_ERROR "Unsupported DNNL_CPU_EXTERNAL_GEMM=${DNNL_CPU_EXTERNAL_GEMM}, expected NONE|MKL|CBLAS")
-endif()
-if(_DNNL_USE_MKL) # older _DNNL_USE_MKL or _MKLDNN_USE_MKL bools still accepted
-    set(DNNL_CPU_EXTERNAL_GEMM MKL) # mkldnn_compat
-endif()
-
 # =============
 # Miscellaneous
 # =============
@@ -313,47 +324,52 @@ set(DNNL_USE_CLANG_SANITIZER "" CACHE STRING
     Memory: enables MemorySanitizer
     MemoryWithOrigin: enables MemorySanitizer with origin tracking
     Undefined: enables UndefinedBehaviourSanitizer
-    This feature is experimental and is only available on Linux."
-    )
+    This feature is experimental and is only available on Linux.")
 
-# now handled via DNNL_CPU_EXTERNAL_GEMM option, above
 #option(_DNNL_USE_MKL "use BLAS functions from Intel MKL" OFF)
+set(DNNL_CPU_EXTERNAL_GEMM "NONE" CACHE STRING
+    "NONE uses an x86 jit gemm.  For vanilla or non-x86 build a builtin
+    portable gemm will be used.  Other values are: MKL, CBLAS.
+
+    MKL can be used for performance comparisons and may support gemm
+    operations with different data types/formats.
+
+    A native CBLAS might provide a performance boost when cross-compiling.
+    (For x86 vanilla build or cross-compilation, you may also investigate
+    changing DNNL_ARCH_OPT_FLAGS or playing with gemm:ref tuning)")
+if(NOT ${DNNL_CPU_EXTERNAL_GEMM} MATCHES "^(NONE|MKL|CBLAS)$")
+    message(FATAL_ERROR "Unsupported DNNL_CPU_EXTERNAL_GEMM=${DNNL_CPU_EXTERNAL_GEMM}, expected NONE|MKL|CBLAS")
+endif()
+if(_DNNL_USE_MKL) # older _DNNL_USE_MKL or _MKLDNN_USE_MKL bools still accepted
+    set(DNNL_CPU_EXTERNAL_GEMM MKL) # mkldnn_compat
+endif()
+
 
 # ==========================================
 # Development work helpers (expert use only)
 # ==========================================
 
-# FIXME test jit with and without bfloat16 (or just remove this option)
-# FIXME RNN ref impl !!!
-# FIXME should allow this as option
-#   but jit codes have neither #if..BFLOAT16 not #if..RNN secions !
-set(DNNL_DEFAULT_ENABLE_BFLOAT16 1)
 set(DNNL_DEFAULT_ENABLE_RNN 1)
-# for development work, we may disable big chunks of code
+#set(DNNL_DEFAULT_ENABLE_BFLOAT16 1)  # removed, to reduce code differences
 if(DNNL_CPU EQUAL DNNL_CPU_X86)
     set(TARGET_X86 TRUE)
     if(DNNL_ISA STREQUAL "VANILLA") # note: DNNL_ISA is a "string"
         message(STATUS "x86 VANILLA compile removes rnn support (for now)")
-        set(DNNL_DEFAULT_ENABLE_RNN 0) # FIXME - there is some jit entanglement
+        set(DNNL_DEFAULT_ENABLE_RNN 0) # FIXME - add ref postops and try again
     else()
         set(TARGET_X86_JIT TRUE)
     endif()
 elseif(DNNL_CPU EQUAL DNNL_CPU_VE)
     message(STATUS "non-x86 compile wil disable RNN support (for now)")
-    set(DNNL_DEFAULT_ENABLE_BFLOAT16 0) # initially 0 for porting
+    #set(DNNL_DEFAULT_ENABLE_BFLOAT16 0) # initially 0 for porting
     set(DNNL_DEFAULT_ENABLE_RNN 0)      # initially 0 for porting
-else() # unknown? try enabling everything
-    set(DNNL_DEFAULT_ENABLE_BFLOAT16 1) # initially 0 for porting
-    set(DNNL_DEFAULT_ENABLE_RNN 1)      # initially 0 for porting
 endif()
 
 # Some depending on CPU & jit options, some parts of dnnl may not be ready
-option(DNNL_ENABLE_BFLOAT16
-    "Enable bfloat16 support (default ${DNNL_DEFAULT_ENABLE_BFLOAT16})"
-    ${DNNL_DEFAULT_ENABLE_BFLOAT16})
 option(DNNL_ENABLE_RNN
     "Enable rnn support (default ${DNNL_DEFAULT_ENABLE_RNN}, for now requires x86 jit)"
     ${DNNL_DEFAULT_ENABLE_RNN})
-
-# XXX now DNNL_CPU_EXTERNAL_GEMM MATCHES "^(NONE|MKL|CBLAS)$"
-#option(_DNNL_USE_MKL "use BLAS functions from Intel MKL" OFF)
+#option(DNNL_ENABLE_BFLOAT16
+#    "Enable bfloat16 support (default ${DNNL_DEFAULT_ENABLE_BFLOAT16})"
+#    ${DNNL_DEFAULT_ENABLE_BFLOAT16})
+# vim: ts=4 sw=4 et

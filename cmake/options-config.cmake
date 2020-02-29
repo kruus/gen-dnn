@@ -88,11 +88,11 @@ endmacro()
 ######################## target processor + "ISA" option
 set(DNNL_BUILD_STRING "CPU ${CMAKE_SYSTEM_PROCESSOR}")
 
-# ISA : "ALL" is default, no need to report
-if(NOT CPU_ISA EQUAL "ALL") # ALL is the default, whatever DNNL_CPU is targeted
+# ISA : "FULL" is default, no need to report
+if(NOT CPU_ISA EQUAL "FULL") # FULL is the default, whatever DNNL_CPU is targeted
     if(0) # shortened strings?
         string(APPEND DNNL_BUILD_STRING " ISA ")
-        append_map(DNNL_BUILD_STRING ${DNNL_ISA} "VANILLA.vanilla;ALL.all;SSE41.sse41;AVX.avx;AVX.avx2;AVX512_MIC.mic;AVX512_MIC_4OPS.4ops;AVX512_CORE;avx512_core;AVX_512_CORE_VNNI;vnni;AVX512_CORE_BF16.bf16;VEDNN.vednn;VEJIT.vejit")
+        append_map(DNNL_BUILD_STRING ${DNNL_ISA} "VANILLA.vanilla;FULL.full;ALL.all;SSE41.sse41;AVX.avx;AVX.avx2;AVX512_MIC.mic;AVX512_MIC_4OPS.4ops;AVX512_CORE;avx512_core;AVX_512_CORE_VNNI;vnni;AVX512_CORE_BF16.bf16;VEDNN.vednn;VEJIT.vejit")
     else()
         string(TOLOWER ${DNNL_ISA} DNNL_ISA_LOWERCASE)
         set(DNNL_BUILD_STRING "${DNNL_BUILD_STRING} ISA ${DNNL_ISA_LOWERCASE}")

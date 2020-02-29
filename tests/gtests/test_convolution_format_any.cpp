@@ -75,9 +75,15 @@ protected:
                                  data_fmt_t expected) {
             bool ok = false;
             if (expected == data_fmt_t::flat) {
+                printf(" check_fmt:expect_flat blocked=%d inner_nblks=%d\n",
+                        (int)(md.format_kind == dnnl_blocked),
+                        (int)(md.format_desc.blocking.inner_nblks));
                 ok = true && md.format_kind == dnnl_blocked
                         && md.format_desc.blocking.inner_nblks == 0;
             } else if (expected == data_fmt_t::blocked_cX) {
+                printf(" check_fmt:expect_blocked_cX blocked=%d inner_nblks=%d\n",
+                        (int)(md.format_kind == dnnl_blocked),
+                        (int)(md.format_desc.blocking.inner_nblks));
                 ok = true && md.format_kind == dnnl_blocked
                         && md.format_desc.blocking.inner_nblks == 1
                         && md.format_desc.blocking.inner_idxs[0] == 1
