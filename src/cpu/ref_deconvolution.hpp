@@ -28,23 +28,11 @@
 #include "cpu_convolution_pd.hpp"
 #include "cpu_deconvolution_pd.hpp"
 
+#if DNNL_VERBOSE_EXTRA
 #include "consistency.hpp"
-#include "mkldnn_debug.h"
-#define AND_(...) SCHKVV(ok, __VA_ARGS__)
-#define AND_STR(CSTR, ...) \
-    do { \
-        bool a = ok; \
-        bool b = AND_(__VA_ARGS__); \
-        if (a && !b) printf("%s", CSTR); \
-    } while (0)
-#define DBG(CSTR) \
-    do { \
-    } while (0)
-#define DBG2(CSTR1, CSTR2) \
-    do { \
-    } while (0)
-//#define DBG(CSTR) do{ printf(" warning: %s:%lu %s\n",__FILE__,(long unsigned)__LINE__,(CSTR)); fflush(stdout); }while(0);
-//#define DBG2(CSTR1,CSTR2) do{ printf(" warning: %s:%lu %s %s\n",__FILE__,(long unsigned)__LINE__,(CSTR1),(CSTR2)); fflush(stdout); }while(0);
+#include "dnnl_debug.h"
+#define AND_(...) SCHKV(ok, __VA_ARGS__)
+#endif
 
 namespace dnnl {
 namespace impl {
@@ -103,7 +91,6 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
                 const deconvolution_fwd_pd_t *hint_fwd_pd)
             : cpu_deconvolution_fwd_pd_t(engine, adesc, attr, hint_fwd_pd)
             , conv_pd_(nullptr) {
-            DBG("+ref_deconvolution_fwd_t");
         }
 
         pd_t(const pd_t &other)
@@ -111,11 +98,9 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
             , conv_pd_(other.conv_pd_->clone())
             , conv_supports_bias_(other.conv_supports_bias_)
             , dst_tag_(other.dst_tag_) {
-            DBG("+[copy]ref_deconvolution_fwd_t");
         }
 
         pd_t &operator=(const pd_t &other) {
-            DBG("+[assign]ref_deconvolution_fwd_t");
             DNNL_SHORT_CIRCUIT_SELF_ASSIGN(other);
             cpu_deconvolution_fwd_pd_t::operator=(other);
             delete conv_pd_;
@@ -126,7 +111,6 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
         }
 
         ~pd_t() {
-            DBG("-ref_deconvolution_fwd_t");
             delete conv_pd_;
         }
 
@@ -172,13 +156,13 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
 
         status_t init() {
             using namespace format_tag;
-#if 1 || defined(NDEBUG) // orig
+#if !DNNL_VERBOSE_EXTRA
             bool ok = true && is_fwd()
                     && utils::one_of(desc()->alg_kind,
                             alg_kind::deconvolution_direct,
                             alg_kind::deconvolution_winograd)
                     && attr()->has_default_values();
-#else // debug
+#else // track reason we could not use
             Consistency ok("\ndeconvolution_fwd bad init:");
             AND_(is_fwd());
             AND_(utils::one_of(desc()->alg_kind, alg_kind::deconvolution_direct,
@@ -186,7 +170,7 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
             AND_(attr()->has_default_values());
 #endif
 
-#if 1 || defined(NDEBUG) // orig
+#if !DNNL_VERBOSE_EXTRA
             if (ok) {
                 CHECK(init_convolution());
                 if (weights_md_.format_kind == format_kind::any)
@@ -230,7 +214,6 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
             }
             if (ok) return status::success;
 
-            DBG(" warning: missing ref deconvolution");
             return status::unimplemented;
 #endif
         }
@@ -336,7 +319,6 @@ struct ref_deconvolution_bwd_data_t : public primitive_impl_t {
                     return status::success;
                 delete conv_pd_;
             }
-            DBG(" warning: missing ref deconvolution");
             return status::unimplemented;
         }
 
@@ -345,7 +327,7 @@ struct ref_deconvolution_bwd_data_t : public primitive_impl_t {
             auto dsrc_type = desc()->diff_src_desc.data_type;
             auto wei_type = desc()->weights_desc.data_type;
             auto ddst_type = desc()->diff_dst_desc.data_type;
-#if 1 || defined(NDEBUG)
+#if !DNNL_VERBOSE_EXTRA
             bool ok = true && desc()->prop_kind == prop_kind::backward_data
                     && (utils::everyone_is(f32, dsrc_type, wei_type, ddst_type)
                             || (utils::one_of(dsrc_type, f32, bf16)
@@ -357,8 +339,6 @@ struct ref_deconvolution_bwd_data_t : public primitive_impl_t {
                     && attr()->has_default_values();
 #else // debug
             Consistency ok("\ndeconvolution_bwd_data bad init:");
-            //AND_STR(mkldnn_prop_kind2str(desc()->prop_kind),
-            //        desc()->prop_kind == prop_kind::backward_data);
             AND_(desc()->prop_kind == prop_kind::backward_data);
             AND_(utils::everyone_is(f32, dsrc_type, wei_type, ddst_type)
                     || (utils::one_of(dsrc_type, f32, bf16)
@@ -368,7 +348,7 @@ struct ref_deconvolution_bwd_data_t : public primitive_impl_t {
             AND_(attr()->has_default_values());
 #endif
 
-#if 1 || defined(NDEBUG)
+#if !DNNL_VERBOSE_EXTRA
             if (ok) {
                 CHECK(init_convolution());
                 if (weights_md_.format_kind == format_kind::any)
@@ -395,7 +375,6 @@ struct ref_deconvolution_bwd_data_t : public primitive_impl_t {
                     diff_dst_md_ = *conv_pd_->src_md();
             }
             if (ok) return status::success;
-            DBG(" warning: missing ref deconvolution");
 #endif
             return status::unimplemented;
         }
@@ -483,18 +462,16 @@ struct ref_deconvolution_bwd_weights_t : public primitive_impl_t {
                     return status::success;
                 delete conv_pd_;
             }
-            DBG(" warning: missing ref deconvolution_bwd_weights impl?");
             return status::unimplemented;
         }
 
         status_t init() {
-            DBG(" deconv bwd weights init...");
             using namespace format_tag;
             using namespace data_type;
             auto src_type = desc()->src_desc.data_type;
             auto dwei_type = desc()->diff_weights_desc.data_type;
             auto ddst_type = desc()->diff_dst_desc.data_type;
-#if 1 || defined(NDEBUG)
+#if !DNNL_VERBOSE_EXTRA
             bool ok = true && desc()->prop_kind == prop_kind::backward_weights
                     && (utils::everyone_is(f32, src_type, dwei_type, ddst_type)
                             || (utils::one_of(dwei_type, f32, bf16)
@@ -507,18 +484,6 @@ struct ref_deconvolution_bwd_weights_t : public primitive_impl_t {
 #else // debug  XXX pare down once all tests pass on all cpus CHECKME
             Consistency ok("\ndeconvolution_bwd_weights bad init:");
             AND_(desc()->prop_kind == prop_kind::backward_weights);
-            DBG2("src_type", mkldnn_dt2str(src_type));
-            DBG2("dwei_type", mkldnn_dt2str(dwei_type));
-            DBG2("ddst_type", mkldnn_dt2str(ddst_type));
-            {
-                // but also perhaps issues with undef data types in gtests
-                bool all_f32 = utils::everyone_is(
-                        f32, src_type, dwei_type, ddst_type);
-                if (ok && !all_f32)
-                    printf(" deconv data types src,dwei,ddst={%s, %s, %s}\n",
-                            mkldnn_dt2str(src_type), mkldnn_dt2str(dwei_type),
-                            mkldnn_dt2str(ddst_type));
-            }
             AND_(utils::everyone_is(f32, src_type, dwei_type, ddst_type)
                     || (utils::one_of(dwei_type, f32, bf16)
                             && utils::everyone_is(bf16, src_type, ddst_type)));
@@ -527,7 +492,7 @@ struct ref_deconvolution_bwd_weights_t : public primitive_impl_t {
             AND_(attr()->has_default_values());
 #endif
 
-#if 1 || defined(NDEBUG)
+#if !DNNL_VERBOSE_EXTRA
             if (ok) {
                 CHECK(init_convolution());
                 if (diff_weights_md_.format_kind == format_kind::any)
@@ -553,7 +518,6 @@ struct ref_deconvolution_bwd_weights_t : public primitive_impl_t {
                 if (diff_weights_md_.format_kind == format_kind::any) {
                     CHECK(weights_axes_permutation(&diff_weights_md_,
                             conv_pd_->diff_weights_md(), with_groups()));
-                    // XXX removed? diff_weights_md_ = desc_.diff_weights_desc;
                 }
                 if (src_md_.format_kind == format_kind::any)
                     src_md_ = *conv_pd_->diff_dst_md();
@@ -570,7 +534,6 @@ struct ref_deconvolution_bwd_weights_t : public primitive_impl_t {
             if (ok) return status::success;
 #endif
 
-            DBG(" warning: missing ref deconvolution_bwd_weights impl?");
             return status::unimplemented;
         }
 

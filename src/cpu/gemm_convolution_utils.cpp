@@ -719,8 +719,8 @@ void col2im(const jit_gemm_conv_conf_t &jcp, const float *col, float *im) {
 
 status_t init_conf(jit_gemm_conv_conf_t &jcp,
         memory_tracking::registrar_t &scratchpad, const convolution_desc_t &cd,
-    const memory_desc_wrapper &src_d, const memory_desc_wrapper &weights_d,
-    const memory_desc_wrapper &dst_d, int max_threads) {
+        const memory_desc_wrapper &src_d, const memory_desc_wrapper &weights_d,
+        const memory_desc_wrapper &dst_d, int max_threads) {
     const bool with_groups = weights_d.ndims() == src_d.ndims() + 1;
     const int ndims = src_d.ndims();
     const int is_1d = ndims == 3;

@@ -83,9 +83,11 @@
 
 /// DNNL CPU enable runtime cpu dispatch.
 ///   respect env DNNL_MAX_CPU_ISA, enable dnnl_set_max_cpu_isa(dnnl_cpu_isa_t)
-#ifndef DNNL_ENABLE_MAX_CPU_ISA /* XXX remove from cmake files XXX */
 #cmakedefine DNNL_ENABLE_MAX_CPU_ISA
-#endif
+
+/// Force libdnnl to have more reference impls (esp for x86 default build).
+/// default is TRUE for non-x86 and x86 non-FULL builds
+#cmakedefine DNNL_ENABLE_MAX_CPU_ISA_VANILLA
 
 /// DNNL verbosity, from `cmake -DDNNL_VERBOSE={NONE|DEFAULT|EXTRA}`.
 /// This is '1' at levels above NONE, which allows verbosity

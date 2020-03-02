@@ -29,7 +29,6 @@ namespace dnnl {
 namespace impl {
 
 const primitive_attr_t &default_attr() {
-    // 'static' forces zero-initialization: cf. impls::zero<primitive_attr_t>()
     static const primitive_attr_t default_attr_instance;
     return default_attr_instance;
 }

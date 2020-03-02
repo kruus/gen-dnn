@@ -23,13 +23,10 @@ file(GLOB_RECURSE SOURCES
 
 # vanilla-x86 and non-x86 targets should ignore all x86 jit files
 if(NOT TARGET_X86_JIT)
-    # XXX rnn directory has to be there for API-completeness, but no
-    #     ref impls will be available
-    # XXX reference bfloat support may also not be available
     message(STATUS "no x86 JIT: removing all '.*jit.*' source code")
     message(STATUS "\nbegin:\n${SOURCES}\n")
     #list(FILTER SOURCES EXCLUDE REGEX ".*(jit|xbyak).*") # not in older cmake
-    list_filter_exclude(SOURCES ".*(jit|xbyak).*") # not in older cmake
+    list_filter_exclude(SOURCES ".*(jit|xbyak).*") # equiv. as macro
     message(STATUS "\nend:\n${SOURCES}\n")
 endif()
 
@@ -68,16 +65,6 @@ if(MSVC)
     set_source_files_properties(${FILES_REQUIRED_BIGOBJ}
         PROPERTIES COMPILE_FLAGS "/bigobj")
 endif()
-
-# Check that all headers will compile "standalone"
-# Hmmm. not quite working. how did I do this before?
-#set(CMAKE_REQUIRED_FLAGS ${CMAKE_CXX_FLAGS})
-#set(CMAKE_REQUIRED_INCLUDES ${CMAKE_CXX_FLAGS})
-#include(CheckIncludeFileCXX)
-#foreach(project_header ${HPP_HEADERS})
-#    get_filename_component(header_name ${project_header} NAME_WE)
-#    check_include_file_cxx("${project_header}" ${header_name}_IS_STANDALONE)
-#endforeach()
 
 set(OBJ_LIB ${LIB_NAME}_cpu)
 add_library(${OBJ_LIB} OBJECT ${SOURCES})

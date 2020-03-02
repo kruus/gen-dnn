@@ -212,15 +212,8 @@ protected:
 #define DECLARE_COMMON_PD_T(impl_name, impl_type, ...) \
     DECLARE_COMMON_PD_T_##__VA_ARGS__(impl_name, impl_type)
 
-#else // compiler workaround : spurious cpp "missing args for '...'"
-// (the expansion was actually done correctly, despite being an error)
-// Difference: the 3rd argument is completely ignored
-// (use USE_GLOBAL_SCRATCHPAD for 3rd arg for compatibility and readability)
-//
-// (i.e. you could use 'false' as the third arg, if you wanted)
-// 3-arg macro is DECLARE_COMMON_PD_t(impl_name, impl_type, use_global_scratchpad)
-// 2-arg macro is DECLARE_COMMON_PD_T_(impl_name, impl_type)
-//             or DECLARE_COMMON_PD_T_USE_GLOBAL_SCRATCHPAD
+#else // workaround: preprocessor error about missing '...' \
+        // even though it did the right thing
 #define PD_MACRO_NAME(_1,_2,_3,NAME,...) DECLARE_COMMON_PD##NAME
 // supply the 2-or-3-args macro name with exactly 2 args
 #define PD_MACRO_INVOKE(_1,_2,_3,NAME,...) \

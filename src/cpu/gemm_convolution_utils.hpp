@@ -23,7 +23,7 @@
 
 #include "cpu_convolution_pd.hpp"
 #include "cpu_engine.hpp"
-// This jit_*.hpp file is also used for vanilla, with heavily pruned conf_t structures
+// jit_primitive_conf.hpp file for VANILLA build heavily prunes conf_t structs
 #include "jit_primitive_conf.hpp"
 
 namespace dnnl {

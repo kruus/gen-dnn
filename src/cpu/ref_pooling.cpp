@@ -89,11 +89,11 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
 
     auto ker_max = [=](data_t *d, int mb, int oc, int od, int oh, int ow) {
         for (int kd = 0; kd < KD; ++kd) {
-                    const int id = od * SD - padF + kd;
-                    if (id < 0 || id >= ID) continue;
+            const int id = od * SD - padF + kd;
+            if (id < 0 || id >= ID) continue;
             for (int kh = 0; kh < KH; ++kh) {
                 const int ih = oh * SH - padT + kh;
-                    if (ih < 0 || ih >= IH) continue;
+                if (ih < 0 || ih >= IH) continue;
                 for (int kw = 0; kw < KW; ++kw) {
                     const int iw = ow * SW - padL + kw;
                     if (iw < 0 || iw >= IW) continue;

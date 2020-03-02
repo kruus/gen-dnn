@@ -16,7 +16,6 @@
 
 #ifndef DNNL_TRAITS_HPP
 #define DNNL_TRAITS_HPP
-#include "cpu_target.h"
 
 #include <assert.h>
 #include <stdint.h>
@@ -45,12 +44,10 @@ template <>
 struct prec_traits<data_type::f16> {
     typedef float16_t type;
 };
-
 template <>
 struct prec_traits<data_type::bf16> {
     typedef bfloat16_t type;
 };
-
 template <>
 struct prec_traits<data_type::f32> {
     typedef float type;
@@ -72,12 +69,10 @@ template <>
 struct data_traits<float16_t> {
     static constexpr data_type_t data_type = data_type::f16;
 };
-
 template <>
 struct data_traits<bfloat16_t> {
     static constexpr data_type_t data_type = data_type::bf16;
 };
-
 template <>
 struct data_traits<float> {
     static constexpr data_type_t data_type = data_type::f32;

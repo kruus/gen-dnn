@@ -125,7 +125,9 @@ enum cpu_isa_bit_t : unsigned {
 // false if a cpu_isa_t doesn't make sense.
 enum cpu_isa_t : unsigned {
     /** unknown replaces old "isa_any" value of zero and
-     * satisfies `mayiuse(unkown)==false`. */
+     * satisfies `mayiuse(unkown)==false`.  For multiple cpus, now
+     * isa_all always represents the "most basic" ISA, and has
+     * mayiuse(isa_all)==true.  \c unknown might not be necessary. */
     unknown             = 0,
 
     /** \enum vanilla
@@ -318,7 +320,8 @@ struct cpu_isa_traits<vejit> : public cpu_isa_traits<ve_common> {
 
 cpu_isa_t DNNL_API get_max_cpu_isa(bool soft = false);
 
-dnnl::impl::status_t DNNL_API set_max_cpu_isa(dnnl_cpu_isa_t isa, bool force); // here? not in include? XXX
+// Note: also in include/dnnl.h and include/dnnl.hpp ?
+dnnl::impl::status_t DNNL_API set_max_cpu_isa(dnnl_cpu_isa_t isa, bool force);
 
 namespace {
 
@@ -521,8 +524,7 @@ inline unsigned int get_cache_size(int level, bool per_core = true){
 }
 
 inline bool isa_has_bf16(cpu_isa_t isa) {
-    return TARGET_X86 \
-            && isa == avx512_core_bf16;
+    return TARGET_X86 && isa == avx512_core_bf16;
 }
 
 } // namespace
@@ -530,9 +532,6 @@ inline bool isa_has_bf16(cpu_isa_t isa) {
 /* whatever is required to generate string literals... */
 #include "z_magic.hpp"
 /* clang-format off */
-// NOTE: isa_any used to be zero. now we use isa_all, matching dnnl_types.h
-// for what "all" means.
-// so isa_any --> "isa_all" (confusing, should change impl naming)
 #if TARGET_X86_JIT
 #define JIT_IMPL_NAME_HELPER(prefix, isa, suffix_if_any) \
     ( (isa) == isa_all            ? (prefix STRINGIFY(any)) \
@@ -558,5 +557,5 @@ inline bool isa_has_bf16(cpu_isa_t isa) {
 } // namespace impl
 } // namespace dnnl
 
-// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

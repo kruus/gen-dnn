@@ -88,10 +88,6 @@ status_t dnnl_primitive_execute(const primitive_t *primitive, stream_t *stream,
 status_t dnnl_primitive_get_primitive_desc(
         const primitive_t *primitive, const primitive_desc_t **primitive_desc) {
     if (utils::any_null(primitive, primitive_desc)) return invalid_arguments;
-#if 0 // can we get the info string by creating primitive with null descriptor CHECKME XXX
-    // NEW: allow primitive_desc to be NULL, for convenience
-    if (!primitive) return invalid_arguments;
-#endif
     return safe_ptr_assign<const primitive_desc_t>(
             *primitive_desc, primitive->pd());
 }

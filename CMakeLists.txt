@@ -15,9 +15,7 @@
 #===============================================================================
 
 if (CMAKE_TOOLCHAIN_FILE)
-    cmake_minimum_required(VERSION 3.6)
-elseif (NECSX)
-    cmake_minimum_required(VERSION 3.8) # allow nicer Platform/SX-* files
+    cmake_minimum_required(VERSION 3.8) # nice Platform/ support
 else()
     cmake_minimum_required(VERSION 2.8.11)
 endif()
@@ -82,11 +80,10 @@ set(CMAKE_SRC_CCXX_FLAGS)       # SRC specifics
 set(CMAKE_EXAMPLE_CCXX_FLAGS)   # EXAMPLE specifics
 set(CMAKE_TEST_CCXX_FLAGS)      # TESTS specifics
 
-if(NECVE) # toolchain file may need extra help
+if(NECVE) # toolchains may want minor mods
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")
-    string(APPEND CMAKE_C_FLAGS   " -minit-stack=0xDeadBeef")
-    string(APPEND CMAKE_CXX_FLAGS " -minit-stack=0xDefaced1")
+    #string(APPEND CMAKE_CXX_FLAGS " -minit-stack=0xBad4Face")
 elseif(UNIX OR MINGW)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
@@ -159,8 +156,7 @@ else()
     install(FILES ${PROJECT_BINARY_DIR}/README DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${LIB_NAME})
 endif()
 
-if(NECVE) # toolchain debug
+if(NECVE) # toolchain debug -- check that cmake found reasonable settings
+    message(STATUS, "Supported cmake feature checks:\n${CMAKE_CXX_COMPILE_FEATURES}")
     show_cmake_stuff("At end of CMakeLists.txt")
 endif()
-# enable just to see what cmake compiler feature checks you have:
-message(STATUS, "Supported cmake feature checks:\n${CMAKE_CXX_COMPILE_FEATURES}")

@@ -192,6 +192,8 @@ extern dnnl_engine_t engine_tgt;
 extern dnnl_stream_t stream_tgt;
 
 inline int init() {
+    // Occasionally print DNNL_BUILD_STRING during tests.  Serious
+    // bug reports are only for x86 FULL and VANILLA build targets.
     printf("DNNL build : %s", DNNL_BUILD_STRING);
     int const v = dnnl_get_verbose();
     if(v>0) printf(" dnnl_get_verbose=%d", v);

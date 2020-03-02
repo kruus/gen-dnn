@@ -283,6 +283,10 @@ struct reducer_2d_driver_f_s_32_t : public reducer_2d_driver_t<data_type>,
 template <impl::data_type_t data_type>
 inline reducer_2d_driver_t<data_type> *create_reduce_2d_drv(int n_src,
         size_t src_ld, size_t src_step, size_t dst_step, bool nullify_dst) {
+    // v1.2 default:  only include ref impl for a SIMPLE_IMPL
+    // new: vanilla, or non-x86 or SIMPLE_IMPL all should allow ref impl,
+    //      and x86 full build might want to allow cpu dispatch to
+    //      less than avx2  (cmake DNNL_ENABLE_MAX_CPU_ISA_VANILLA option)
 #if TARGET_X86_JIT && !defined(SIMPLE_IMPL)
     if (mayiuse(avx512_common))
         return new reducer_2d_driver_f_s_32_t<data_type, avx512_common>(
@@ -290,8 +294,12 @@ inline reducer_2d_driver_t<data_type> *create_reduce_2d_drv(int n_src,
     else if (mayiuse(avx2))
         return new reducer_2d_driver_f_s_32_t<data_type, avx2>(
                 n_src, src_ld, src_step, dst_step, nullify_dst);
-    assert(!"unimplemented"); // dnnl v2.1 believes this is OK for sse41.
-#endif // TARGET_X86_JIT
+#if not defined(DNNL_ENABLE_MAX_CPU_ISA_VANILLA)
+    assert(!"unimplemented"); // dnnl v1.2 asserted this in all cases
+#else
+    // provide a reference impl, without error
+#endif // v1.2 wants to elide ref impls from libdnnl
+#endif // X86-jit and not SIMPLE_IMPL
     return nullptr;
 }
 
@@ -349,40 +357,56 @@ void cpu_reducer_t<data_type>::reduce_nolock(int ithr, data_t *dst,
             = balancer().nthr_per_group_ == 1 || balancer().idle(ithr);
     if (redundant_reduction) return;
 
+#if defined(DNNL_ENABLE_MAX_CPU_ISA_VANILLA)
+    if (drv_) // altered behavior: just allow jit driver to be absent
+#else
+    if (1) // v1.2 default behavior: ALWAYS assume jit driver exists
+#endif
+    {
 #if TARGET_X86_JIT && !defined(SIMPLE_IMPL)
-    using namespace utils;
+        using namespace utils;
 
-    const int id_in_grp = balancer().id_in_group(ithr);
-    const int njobs_in_grp = balancer().ithr_njobs(ithr);
-    const size_t cl = 64 / sizeof(data_t);
+        const int id_in_grp = balancer().id_in_group(ithr);
+        const int njobs_in_grp = balancer().ithr_njobs(ithr);
+        const size_t cl = 64 / sizeof(data_t);
 
-    const size_t reduction_size = njobs_in_grp * balancer().job_size_;
-    size_t start {0}, end {0};
-    balance211(div_up(reduction_size, cl), balancer().nthr_per_group_,
-            id_in_grp, start, end);
+        const size_t reduction_size = njobs_in_grp * balancer().job_size_;
+        size_t start {0}, end {0};
+        balance211(div_up(reduction_size, cl), balancer().nthr_per_group_,
+                id_in_grp, start, end);
 
-    if (start == end) return;
+        if (start == end) return;
 
-    data_t *d = get_local_ptr(ithr - id_in_grp, dst, scratchpad) + start * cl;
-    const data_t *space
-            = get_local_ptr(ithr - id_in_grp + 1, dst, scratchpad) + start * cl;
-    const size_t len = nstl::min(end * cl, reduction_size) - start * cl;
+        data_t *d
+                = get_local_ptr(ithr - id_in_grp, dst, scratchpad) + start * cl;
+        const data_t *space
+                = get_local_ptr(ithr - id_in_grp + 1, dst, scratchpad)
+                + start * cl;
+        const size_t len = nstl::min(end * cl, reduction_size) - start * cl;
 
-    (*drv_)(d, space, 1, len);
+        (*drv_)(d, space, 1, len);
+#else
+        ;
+#endif
+    }
+#if !TARGET_X86_JIT \
+    || defined(SIMPLE_IMPL) \
+    || defined(DNNL_ENABLE_MAX_CPU_ISA_VANILLA)
+    else { // cmake option, non-x86-jit, or SIMPLE_IMPL has ref impl fallback
+        assert(drv_ == nullptr);
+        if (balancer().id_in_group(ithr) != 0)
+            return; /* only threads 0 do the reduction */
 
-#else // v2.1 default: ref impl never available in jit build (except via SIMPLE_IMPL)
-    // (VANILLA or non-x86 builds should always provide ref impl)
-    assert(drv_ == nullptr);
-    if (balancer().id_in_group(ithr) != 0)
-        return; /* only threads 0 do the reduction */
-
-    const int njobs_in_grp = balancer().ithr_njobs(ithr);
-    data_t *d = get_local_ptr(ithr, dst, scratchpad);
-    for (int id_in_grp = 1; id_in_grp < balancer().nthr_per_group_;
-            ++id_in_grp) {
-        const data_t *space = get_local_ptr(ithr + id_in_grp, dst, scratchpad);
-        for (size_t i = 0; i < (size_t)njobs_in_grp * balancer().job_size_; ++i)
-            d[i] += space[i];
+        const int njobs_in_grp = balancer().ithr_njobs(ithr);
+        data_t *d = get_local_ptr(ithr, dst, scratchpad);
+        for (int id_in_grp = 1; id_in_grp < balancer().nthr_per_group_;
+                ++id_in_grp) {
+            const data_t *space
+                    = get_local_ptr(ithr + id_in_grp, dst, scratchpad);
+            for (size_t i = 0; i < (size_t)njobs_in_grp * balancer().job_size_;
+                    ++i)
+                d[i] += space[i];
+        }
     }
 #endif
 }
@@ -459,18 +483,33 @@ void cpu_reducer_2d_t<data_type>::reduce_block(const data_t *space_base,
     data_t *d = dst + (start_y + ny_start) * conf_.dst_x_ + start_x + nx_start;
     const data_t *space = space_base + job * balancer().job_size_
             + ny_start * conf_.job_size_x_ + nx_start;
+#if defined(DNNL_ENABLE_MAX_CPU_ISA_VANILLA)
+    if (drv_) // altered behavior: just allow jit driver to be absent
+#else
+    if (1) // v1.2 default behavior: ALWAYS assume jit driver exists
+#endif
+    {
 #if TARGET_X86_JIT && !defined(SIMPLE_IMPL)
-    (*drv_)(d, space, ny_step, nx_step);
-#else // special SIMPLE_IMPL compile, or VANILLA build, or non-x86 cpu...
-    assert(drv_ == nullptr);
-    for (int idg = 0; idg < balancer().nthr_per_group_; ++idg) {
-        const data_t *w = &space[idg * space_per_thread(balancer())];
-        for (int y = 0; y < ny_step; ++y)
-            for (int x = 0; x < nx_step; ++x) {
-                d[y * conf_.dst_x_ + x]
-                        = (idg == 0 ? 0 : d[y * conf_.dst_x_ + x])
-                        + w[y * conf_.job_size_x_ + x];
-            }
+        (*drv_)(d, space, ny_step, nx_step); // v1.2: this is the ONLY code path
+#else
+        ;
+#endif
+    }
+    // but sometimes we include a fallback ref impl
+#if !TARGET_X86_JIT \
+    || defined(SIMPLE_IMPL) \
+    || defined(DNNL_ENABLE_MAX_CPU_ISA_VANILLA)
+    else { // cmake option, non-x86-jit, or SIMPLE_IMPL has ref impl fallback
+        assert(drv_ == nullptr);
+        for (int idg = 0; idg < balancer().nthr_per_group_; ++idg) {
+            const data_t *w = &space[idg * space_per_thread(balancer())];
+            for (int y = 0; y < ny_step; ++y)
+                for (int x = 0; x < nx_step; ++x) {
+                    d[y * conf_.dst_x_ + x]
+                            = (idg == 0 ? 0 : d[y * conf_.dst_x_ + x])
+                            + w[y * conf_.job_size_x_ + x];
+                }
+        }
     }
 #endif
 }

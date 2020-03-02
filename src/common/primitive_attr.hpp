@@ -167,7 +167,6 @@ struct scales_t : public c_compatible {
 
 private:
     enum { scales_buf_size = 16 };
-
     float scales_buf_[scales_buf_size];
 
     void cleanup() {
@@ -296,8 +295,7 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
             dnnl::impl::alg_kind_t alg;
             float scale, alpha, beta;
         };
-        // sometimes "warning: types cannot be declared in anonymous unions"
-        struct sum_t { float scale; };
+        struct sum_t { float scale; }; // avoid "type declared in anon union" warning
 
         dnnl::impl::primitive_kind_t kind;
         union {
@@ -385,12 +383,8 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
 
 struct dnnl_primitive_attr : public dnnl::impl::c_compatible {
     dnnl_primitive_attr()
-            : scratchpad_mode_(dnnl::impl::scratchpad_mode::library)
-#if 0 // paranoia
-            , output_scales_() , zero_points_() , post_ops_() , rnn_data_qparams_()
-            , rnn_weights_qparams_() , rnn_tparams_()
-#endif
-    {}
+            : scratchpad_mode_(dnnl::impl::scratchpad_mode::library) {}
+    // note: some data intentionally uninitialized
 
     dnnl_primitive_attr *clone() const {
         return new dnnl_primitive_attr(*this);

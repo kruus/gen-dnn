@@ -38,22 +38,6 @@
 #endif
 /// @endcond
 
-// XXX debug stuff --- should remove
-#if DNNL_TARGET_VE
-#define DNNL_MD_DEBUG 1
-#define DNNL_MD_VERBOSE 0
-#elif (DNNL_TARGET_X86 && !DNNL_TARGET_X86_JIT)
-#define DNNL_MD_DEBUG 0
-#define DNNL_MD_VERBOSE 0
-#else
-//#warning " normal dnnl::memory::desc"
-#define DNNL_MD_DEBUG 0
-#define DNNL_MD_VERBOSE 0
-#endif
-#if DNNL_MD_VERBOSE
-#include <cstring> // VE debug
-#endif
-
 // __cpp_exceptions is referred from
 // https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_exceptions.html
 // gcc < 5 does not define __cpp_exceptions but __EXCEPTIONS,
@@ -2066,24 +2050,6 @@ struct memory : public handle<dnnl_memory_t> {
     /// A memory descriptor.
     struct desc {
       private:
-#if DNNL_MD_DEBUG
-            void zero_data() { // buggy C++ compilers...
-                std::memset(&data, 0, sizeof(dnnl_memory_desc_t));
-            }
-#else
-            void zero_data() {}
-#endif
-#if DNNL_MD_VERBOSE // debug
-        void msg(char const* m) const {
-            typedef unsigned long long ull;
-            printf("%s,@0x%llx,md@%llx",m,
-                    (ull)(void*)this, (ull)(void*)(&this->data));
-            //if(data.ndims){ dnnl_debug print of data; } if necessary.
-            fflush(stdout);
-        }
-#else
-	void msg(char const*m) const {}
-#endif
       public:
         friend struct memory;
         /// The underlying C API data structure.
@@ -2092,10 +2058,7 @@ struct memory : public handle<dnnl_memory_t> {
         /// Constructs a zero (empty) memory descriptor. Such a memory
         /// descriptor can be used to indicate absence of an argument.
         //desc() : data(dnnl_memory_desc_t DNNL_ZERO_MEMORY_DESC_T) {} // VE debug
-        desc() : data() {
-            if(DNNL_MD_DEBUG) zero_data();
-            if(DNNL_MD_VERBOSE) msg(" +desc()");
-        } // VE debug
+        desc() : data() {}
 
         /// Constructs a memory descriptor.
         ///
@@ -2114,9 +2077,7 @@ struct memory : public handle<dnnl_memory_t> {
         desc(const memory::dims &dims, data_type data_type,
                 format_tag format_tag, bool allow_empty = false)
             : data() {
-            if(DNNL_MD_DEBUG) zero_data();
             validate_dims(dims);
-            if(DNNL_MD_VERBOSE) msg(" +desc(dims,data_type,format_tag)");
             dnnl_status_t status = dnnl_memory_desc_init_by_tag(&data,
                     (int)dims.size(), dims.data(), convert_to_c(data_type),
                     convert_to_c(format_tag));
@@ -2143,9 +2104,7 @@ struct memory : public handle<dnnl_memory_t> {
         desc(const memory::dims &dims, data_type data_type,
                 const memory::dims &strides, bool allow_empty = false)
             : data() {
-            if(DNNL_MD_DEBUG) zero_data();
             validate_dims(dims);
-            if(DNNL_MD_VERBOSE) msg(" +desc(dims,data_type,strides)");
             if (!strides.empty()) validate_dims(strides, (int)dims.size());
             dnnl_status_t status = dnnl_memory_desc_init_by_strides(&data,
                     (int)dims.size(), dims.data(), convert_to_c(data_type),
@@ -2159,16 +2118,7 @@ struct memory : public handle<dnnl_memory_t> {
         /// Constructs a memory descriptor from a C API data structure.
         ///
         /// @param data A C API ::dnnl_memory_desc_t structure.
-        desc(const dnnl_memory_desc_t &data) : data(data) {
-            if(DNNL_MD_VERBOSE){
-                msg(" +desc(dnnl_memory_desc_t)COPY");
-                printf("-FROM-md@0x%llx", (unsigned long long)(void*)&data);
-                printf(" tag %lx-->%lx\n",
-                        (long)      data.extra.flags,
-                        (long)this->data.extra.flags);
-                fflush(stdout);
-            }
-        }
+        desc(const dnnl_memory_desc_t &data) : data(data) {}
 
         /// Constructs a memory descriptor for a region inside an area
         /// described by this memory descriptor.
@@ -2186,10 +2136,6 @@ struct memory : public handle<dnnl_memory_t> {
             validate_dims(dims, data.ndims);
             validate_dims(offsets, data.ndims);
             dnnl_memory_desc_t sub_md = dnnl_memory_desc_t();
-#if DNNL_MD_DEBUG
-            std::memset(&sub_md, 0, sizeof(dnnl_memory_desc_t)); // VE debug
-#endif
-            if(DNNL_MD_VERBOSE) msg(" submemory-from");
             dnnl_status_t status = dnnl_memory_desc_init_submemory(
                     &sub_md, &data, dims.data(), offsets.data());
             if (!allow_empty)
@@ -2244,10 +2190,6 @@ struct memory : public handle<dnnl_memory_t> {
         desc reshape(const memory::dims &dims, bool allow_empty = false) const {
             if (data.ndims) validate_dims(dims, 1);
             dnnl_memory_desc_t out_md = dnnl_memory_desc_t();
-#if DNNL_MD_DEBUG
-            std::memset(&out_md, 0, sizeof(dnnl_memory_desc_t)); // VE debug
-#endif
-            if(DNNL_MD_VERBOSE) msg(" reshape-from");
             dnnl_status_t status = dnnl_memory_desc_reshape(
                     &out_md, &data, (int)dims.size(), dims.data());
             if (!allow_empty)
@@ -2326,7 +2268,7 @@ struct memory : public handle<dnnl_memory_t> {
 
         /// Checks whether the memory descriptor is zero (empty).
         /// @returns @c true if the memory descriptor describes an empty
-        ///     memory and @c false otherwise.
+        ///     memory and @c false otherwise. \sa is_zero_md (different test)
         bool is_zero() const { return data.ndims == 0; }
 
         /// An equality operator.

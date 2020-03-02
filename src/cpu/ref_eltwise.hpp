@@ -22,7 +22,9 @@
 #include "cpu_isa_traits.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+#if DNNL_VERBOSE_EXTRA
 #include "consistency.hpp"
+#endif
 
 #include "cpu_eltwise_pd.hpp"
 
@@ -70,7 +72,7 @@ struct ref_eltwise_fwd_t : public primitive_impl_t {
 
             const bool use_generic = !use_dense_ && !use_nCspBc_padded_;
 
-#if 1 || defined(NDEBUG)
+#if !DNNL_VERBOSE_EXTRA
             bool ok = true && is_fwd()
                     && everyone_is(data_type, desc()->data_desc.data_type)
                     /*bf16<->f32 cvt operators don't work on non-avx512_core*/

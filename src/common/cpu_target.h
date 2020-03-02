@@ -17,12 +17,6 @@
 #define CPU_TARGET_H
 /** \file
  * extra build-time cpu/isa macros, based dnnl_config.h ONLY.
- *
- * <em>gen-dnn</em> compile introduces "vanilla" target for a library that
- * can run on any CPU.
- * It removes all xbyak code, and runs... slowly, but faster now that a
- * reference gemm implementation is available.
- *
  * \sa dnnl_config.h
  */
 
@@ -34,7 +28,7 @@
 
 /// @defgroup cpu_target DNNL cpu and JIT macros
 /**
- * <em>gen-dnn</em> compile introduces "vanilla" target for a library that
+ * 
  * can run on any CPU.
  * It removes all xbyak code, and runs... slowly, but faster now that a
  * reference gemm implementation is available.
@@ -45,11 +39,10 @@
 //@{
 //@}
 
-// XXX equiv. to TARGET_X86 ?  (64-bit is only build supported)
+// XXX reason for DNNL_X86_64 existing?
+//     How is it different from TARGET_X86?  Is this for AARCH64 or such?
 #if defined(__x86_64__) || defined(_M_X64)
 #define DNNL_X86_64
-//#elif defined(__ve)
-//#define DNNL_VE // not yet used
 #endif
 
 // easier to read versions of some dnnl_config.h 0/1 values
@@ -77,28 +70,5 @@
 #error "exactly one of TARGET_VE and TARGET_X86 should be set"
 #endif
 
-#if 0 // verbose compiler warnings, for debug
-#if TARGET_X86
-#warning "cpu target TARGET_X86 !"
-#endif
-#if TARGET_X86_JIT
-#warning "cpu target TARGET_X86_JIT !"
-#endif
-#if TARGET_VE
-#warning "cpu target TARGET_VE !"
-#endif
-#if TARGET_VEDNN
-#warning "cpu target TARGET_VEDNN !"
-#endif
-#if TARGET_VEJIT
-#warning "cpu target TARGET_VEJIT !"
-#endif
-//              DNNL_ENABLE_BFLOAT16 was removed
-#if DNNL_ENABLE_RNN
-#warning "DNNL_ENABLE_RNN is TRUE"
-#else
-#warning "DNNL_ENABLE_RNN is FALSE"
-#endif
-#endif // verbose compiler warnings
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif // CPU_TARGET_H

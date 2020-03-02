@@ -319,7 +319,7 @@ inline typename remove_reference<T>::type rnd_dn(const T a, const U b) {
 
 /** For \c b>0, return largest exact divisor \f$div \in [1,b] \ni a\%div=0\f$.
  * Intended for both \c a and \c b > 0 (although \c a could be negative)
- * \pre \c b > 0 (unchecked, returns \c b if \c b < 0). */
+ * \pre \c b > 0 (unchecked, returns 0 if \c b==0 and \c b if \c b < 0). */
 template <typename T, typename U>
 inline typename remove_reference<T>::type max_div(const T a, const U b) {
     U div = b;
@@ -357,7 +357,7 @@ inline T nd_iterator_init(T start, U &x, const W &X, Args &&... tuple) {
     start = nd_iterator_init(start, utils::forward<Args>(tuple)...);
     x = static_cast<U>(start % static_cast<T>(X)); // ignore "loss of precision" warnings
     return start / static_cast<T>(X);
-    // ... maybe do in "larger-of" type ?
+    // XXX maybe do in "larger-of" type ?
     //typedef decltype(start + x) TU_t;
     //x = static_cast<U>( (TU_t)(start) % (TU_t)(X));
     //return static_cast<T>(start / X);
@@ -374,18 +374,13 @@ inline bool nd_iterator_step(U &x, const W &X, Args &&... tuple) {
         return x == 0;
     }
     return false;
-#else
-    // nc++: err(1813) Cannot branch into or out of OpenMP construct.
+#else // nc++: err(1813) Cannot branch into or out of OpenMP construct.
     bool ret = false;
     if (nd_iterator_step(utils::forward<Args>(tuple)...)) {
         x = (x + 1) % X;
         ret = (x == 0);
     }
     return ret;
-    // can nc++ do better with a one-liner? (no)
-    //return nd_iterator_step(utils::forward<Args>(tuple)...)
-    //        ? (x = (x + 1) % X) == 0
-    //        : false;
 #endif
 }
 

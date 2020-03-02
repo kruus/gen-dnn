@@ -67,9 +67,6 @@ struct dnnl_primitive_desc_iterator : public dnnl::impl::c_compatible {
                     &pd_, op_desc_, &attr_, engine_, hint_fwd_pd_);
             if (s == dnnl::impl::status::success) { break; }
         }
-//#ifndef NDEBUG
-//        if( idx_ >= last_idx_ ) printf(" ++:%d>=%dend ",idx_, last_idx_ );
-//#endif
         return *this;
     }
 

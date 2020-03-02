@@ -291,9 +291,9 @@ struct registry_t {
     grantor_t grantor(const memory_storage_t *mem_storage) const;
 
 protected:
-#if TARGET_X86
+#if TARGET_VE // other cpu may have lower alignment possible
     enum { minimal_alignment = 128 };
-#else // other cpu may have lower alignment possible
+#else // x86 default
     enum { minimal_alignment = 16 };
 #endif
     struct entry_t {

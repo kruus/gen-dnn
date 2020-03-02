@@ -46,26 +46,6 @@ const char *get_isa_info();
 #define DNNL_VERBOSE_BUF_LEN 1
 #endif
 
-#if 0 // not here any more? XXX
-void init_info(batch_normalization_pd_t *s, char *buffer);
-void init_info(binary_pd_t *s, char *buffer);
-void init_info(concat_pd_t *s, char *buffer);
-void init_info(convolution_pd_t *s, char *buffer);
-void init_info(deconvolution_pd_t *s, char *buffer);
-void init_info(eltwise_pd_t *s, char *buffer);
-void init_info(gemm_pd_t *s, char *buffer);
-void init_info(inner_product_pd_t *s, char *buffer);
-void init_info(layer_normalization_pd_t *s, char *buffer);
-void init_info(lrn_pd_t *s, char *buffer);
-void init_info(matmul_pd_t *s, char *buffer);
-void init_info(pooling_pd_t *s, char *buffer);
-void init_info(reorder_pd_t *s, char *buffer);
-void init_info(resampling_pd_t *s, char *buffer);
-void init_info(rnn_pd_t *s, char *buffer);
-void init_info(shuffle_pd_t *s, char *buffer);
-void init_info(softmax_pd_t *s, char *buffer);
-void init_info(sum_pd_t *s, char *buffer);
-#endif
 /// A container for primitive desc verbose string.
 struct pd_info_t {
     pd_info_t() = default;

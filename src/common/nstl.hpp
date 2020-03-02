@@ -57,20 +57,14 @@ inline const T abs(const T &a) {
     return a >= 0 ? a : -a;
 }
 
-/** Computes the modulus and returns the result as the least positive
- * residue when the divisor > 0.
- * a.k.a "Euclidean" or "Arithmetic" division, rounding to \f$-\infty\f$.
- * This version is portable.  For 2's complement, one has versions that
- * will use sar and avoid the cmov
- * XXX that I *think* the following would use.
- * \sa \ref idiv-dev.hpp for a \c rem_floor equiv
- */
+// Computes the modulus and returns the result as the least positive residue when
+// the divisor > 0.
 template <typename T>
 inline const T modulo(const T &dividend, const T &divisor) {
     static_assert(std::is_integral<T>::value, "T must be an integer type.");
     assert(divisor > 0);
-    T result = dividend % divisor;
-    return result < 0 ? result + divisor : result;
+    return (dividend % divisor /* nudge gcc toward branchless 'sar; and' */
+            + (divisor & (dividend % divisor < T(0) ? ~T(0) : T(0))));
 }
 
 template <typename T>

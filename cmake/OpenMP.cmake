@@ -85,4 +85,3 @@ else()
     forbid_link_compiler_omp_rt()
     return()
 endif()
-# vim: et ts=4 sw=4 ai :

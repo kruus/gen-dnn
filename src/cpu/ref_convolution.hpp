@@ -24,14 +24,6 @@
 #include "utils.hpp"
 #include "consistency.hpp"
 
-#if !defined(MKLDNN_REF_CONV_DBG)
-#if !defined(NDEBUG)
-#define MKLDNN_REF_CONV_DBG 1
-#else
-#define MKLDNN_REF_CONV_DBG 1
-#endif
-#endif
-
 #include "cpu_convolution_pd.hpp"
 #include "ref_eltwise.hpp"
 
@@ -51,7 +43,7 @@ struct ref_convolution_fwd_t : public primitive_impl_t {
         status_t init() {
             using namespace data_type;
 
-#if MKLDNN_REF_CONV_DBG
+#if DNNL_VERBOSE_EXTRA
             Consistency ok("cpu_ref_conv_fwd");
             // SHCKV=usual, SHCKVV=long debug
 #define AND_(...) SCHKVV(ok, __VA_ARGS__)

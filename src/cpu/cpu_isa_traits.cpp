@@ -39,14 +39,12 @@ private:
     bool initialized_;
     std::atomic<unsigned> state_;
     enum : unsigned { idle = 0, busy_setting = 1, locked_after_a_get = 2 };
-    static int const verbose = 0;
 
 public:
     set_before_first_get_setting_t(T init = T(0))
         : value_ {init}, initialized_ {false}, state_ {0} {}
 
     bool set(T new_value) {
-        if (verbose) printf(" cpu_isa set(%lx)? ", (long)new_value);
         if (state_.load() == locked_after_a_get) return false;
 
         while (true) {
@@ -55,7 +53,6 @@ public:
             if (expected == locked_after_a_get) return false;
         }
 
-        if (verbose) printf(" YES!\n");
         value_ = new_value;
         initialized_ = true;
         state_.store(idle);
@@ -73,28 +70,18 @@ public:
                 if (expected == locked_after_a_get) break;
             }
         }
-        if (verbose)
-            printf(" cpu_isa GET set-once value 0x%lx, then state-->%d\n",
-                    (long)value_, (int)state_.load());
         return value_;
     }
 };
 
 set_before_first_get_setting_t<cpu_isa_t> &max_cpu_isa() {
     static set_before_first_get_setting_t<cpu_isa_t> max_cpu_isa_setting;
-    //printf(" max_cpu_isa_setting @ 0x%08llx ",(long long)&max_cpu_isa_setting);
     return max_cpu_isa_setting;
 }
 
 // Attempt a "set before 1st get" of the max_cpu_isa() flag
 bool init_max_cpu_isa() {
-    static int const verbose = 0;
-    if (verbose) printf("  init_max_cpu_isa!");
-    if (max_cpu_isa().initialized()) {
-        if (verbose) printf("  (already initialized!)");
-        return false;
-    }
-    if (verbose) printf("  (not yet initialized!)");
+    if (max_cpu_isa().initialized()) { return false; }
 
     cpu_isa_t max_cpu_isa_val = isa_full; // x86:x86_full, VE:ve_full, ...
 
@@ -105,7 +92,6 @@ bool init_max_cpu_isa() {
     if (std::strcmp(buf, cpu_isa_traits<CPU_ISA_T>::user_option_env) == 0) \
     max_cpu_isa_val = CPU_ISA_T
 #define ELSEIF_HANDLE_CASE(CPU_ISA_T) else IF_HANDLE_CASE(CPU_ISA_T)
-        static const int verbose = 1;
         // allow case-insensitive compare
         for (size_t i = 0u; i < sizeof(buf) && buf[i]; ++i)
             buf[i] = toupper(i);
@@ -123,21 +109,17 @@ bool init_max_cpu_isa() {
         ELSEIF_HANDLE_CASE(avx512_core);
         ELSEIF_HANDLE_CASE(avx512_core_vnni);
         ELSEIF_HANDLE_CASE(avx512_core_bf16);
-        else if (verbose)
-                printf("Bad DNNL_MAX_CPU_ISA=%s environment for x86", buf);
+        else; //printf("Bad DNNL_MAX_CPU_ISA=%s environment for x86", buf);
 #elif TARGET_VE
         ELSEIF_HANDLE_CASE(vednn);
         ELSEIF_HANDLE_CASE(vejit);
-        else if (verbose)
-                printf("Bad DNNL_MAX_CPU_ISA=%s environment value for VE", buf);
+        else; //printf("Bad DNNL_MAX_CPU_ISA=%s environment value for VE", buf);
 #endif
 
 #undef IF_HANDLE_CASE
 #undef ELSEIF_HANDLE_CASE
     }
 
-    if (verbose)
-        printf(" init_max_cpu_isa-->cpu_isa(%lx)\n", (long)max_cpu_isa_val);
     return max_cpu_isa().set(max_cpu_isa_val);
 }
 #endif // DNNL_ENABLE_MAX_CPU_ISA
@@ -160,7 +142,6 @@ cpu_isa_t get_max_cpu_isa(bool soft) {
 } // namespace impl
 } // namespace dnnl
 
-extern "C" {
 /** set max_cpu_isa() to the \c cpu_isa_t mask corresponding to a
  * \c dnnl_cpu_isa_t.
  * When a \c cpu_isa trait field matches the dnnl \c isa value,
@@ -177,13 +158,9 @@ dnnl_status_t dnnl_set_max_cpu_isa(dnnl_cpu_isa_t isa) {
     using namespace dnnl::impl;
     using namespace dnnl::impl::cpu;
 
-    static int const verbose = 0;
     // XXX see if we can get rid of from_dnnl, at least in the header (see also tests/gtests/test_isa_*)
     cpu_isa_t isa_to_set = ::dnnl::impl::cpu::from_dnnl(isa);
     if (isa_to_set == unknown) return invalid_arguments;
-    if (verbose)
-        printf(" dnnl_set_max_cpu_isa(0x%lx) --> cpu_isa_t(0x%lx)\n", (long)isa,
-                (long)isa_to_set);
 
     if (::dnnl::impl::cpu::max_cpu_isa().set(isa_to_set))
         return success;
@@ -193,6 +170,4 @@ dnnl_status_t dnnl_set_max_cpu_isa(dnnl_cpu_isa_t isa) {
     return unimplemented;
 #endif // DNNL_ENABLE_MAX_CPU_ISA
 }
-} // extern "C"
-
-// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

@@ -192,13 +192,19 @@ option(DNNL_ENABLE_MAX_CPU_ISA
     "enables control of CPU ISA detected by DNNL via DNNL_MAX_CPU_ISA
     environment variable and dnnl_set_max_cpu_isa() function" ON)
 
+set(_ADD_MORE_REF_IMPLS ON)
+if(DNNL_CPU EQUAL DNNL_CPU_X86 AND CPU_ISA EQUAL CPU_ISA_FULL)
+    # OFF for default x86 FULL build, to match existing behavior
+    set(_ADD_MORE_REF_IMPLS OFF)
+endif()
 option(DNNL_ENABLE_MAX_CPU_ISA_VANILLA
-    "Forces libdnnl being a superset of the VANILLA build.
+    "Force libdnnl to contain a superset of the VANILLA build.
 
-    An x86 jit build intentionally removes some 'SIMPLE_IMPL' reference
+    A FULL x86 build intentionally removes some 'SIMPLE_IMPL' reference
     implementations that are intended to always have a JIT implementation.
-    But consider runtime CPU dispatch to VANILLA, to preclude all JIT impls.
-    In this case might want to provide a full set of VANILLA impls." OFF)
+    This forces libdnnl to provide a few extra reference impls, providing
+    better support for runtime CPU dispatch to VANILLA, for example."
+    _ADD_MORE_REF_IMPLS)
 
 # =============================
 # Building properties and scope

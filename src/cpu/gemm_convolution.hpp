@@ -25,14 +25,6 @@
 #include "ref_eltwise.hpp"
 #include "consistency.hpp"
 
-#if !defined(MKLDNN_REF_CONV_DBG)
-#if !defined(NDEBUG)
-#define MKLDNN_REF_CONV_DBG 1
-#else
-#define MKLDNN_REF_CONV_DBG 1
-#endif
-#endif
-
 #include "cpu_convolution_pd.hpp"
 
 namespace dnnl {
@@ -51,7 +43,7 @@ struct gemm_convolution_fwd_t : public primitive_impl_t {
                 GEMM_IMPL_STR, gemm_convolution_fwd_t, USE_GLOBAL_SCRATCHPAD);
 
         status_t init() {
-#if MKLDNN_REF_CONV_DBG
+#if DNNL_VERBOSE_EXTRA
 #define AND_(...) SCHKVV(ok,__VA_ARGS__)
             Consistency ok("cpu_gemm_conv_fwd");
             AND_(is_fwd());

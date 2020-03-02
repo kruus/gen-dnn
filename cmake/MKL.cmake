@@ -74,4 +74,3 @@ if(HAVE_MKL)
         message(STATUS "${MSG} dll ${MKLDLL}")
     endif()
 endif()
-# vim: et ts=4 sw=4 ai
