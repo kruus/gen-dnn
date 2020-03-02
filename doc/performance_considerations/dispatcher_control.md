@@ -21,3 +21,10 @@ observe consistent CPU features both during generation and execution.
 
 This feature can be enabled or disabled at build time. See @ref
 dev_guide_build_options for more information.
+
+### CPU dispatch to `DNNL_MAX_CPU_ISA=VANILLA`
+DNNL by default includes most reference implementations.  For CPU dispatch all
+the way down to VANILLA you can include some extra reference implementations
+by building with expert flag `cmake -DDNNL_ENABLE_MAX_CPU_ISA_VANILLA.  Some
+layers are incomplete or unavailable as C/C++-only reference implementations,
+like bfloat16 support and RNNs.

@@ -32,6 +32,7 @@ using namespace dnnl::impl::data_type;
 /// @copydoc INSTANCE_CREATOR
 #define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
 static const pd_create_f impl_list[] = {
+        // clang-format off
         /* fp */
         INSTANCE_uni(jit_uni_binary_t<f32>)
         INSTANCE_uni(jit_uni_binary_t<bf16>)
@@ -46,6 +47,7 @@ static const pd_create_f impl_list[] = {
         INSTANCE(ref_binary_t<s8, s8, s8>)
         INSTANCE(ref_binary_t<u8, s8, u8>)
         INSTANCE(ref_binary_t<u8, u8, u8>)
+        // clang-format off
         /* eol */
         nullptr,
 };

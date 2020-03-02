@@ -17,8 +17,8 @@
 #ifndef GEMM_X8S8S32X_INNER_PRODUCT_HPP
 #define GEMM_X8S8S32X_INNER_PRODUCT_HPP
 
-#include "cpu_isa_traits.hpp"
 #include <assert.h>
+#include "cpu_isa_traits.hpp"
 
 #include "c_types_map.hpp"
 #include "memory_tracking.hpp"
@@ -110,9 +110,7 @@ struct gemm_x8s8s32x_inner_product_fwd_t : public primitive_impl_t {
         pp_kernel_ = new inner_product_utils::pp_kernel_t<data_type::s32,
                 dst_type>(apd, false);
     }
-    ~gemm_x8s8s32x_inner_product_fwd_t() {
-        delete pp_kernel_;
-    }
+    ~gemm_x8s8s32x_inner_product_fwd_t() { delete pp_kernel_; }
 
     typedef typename prec_traits<dst_type>::type data_t;
 

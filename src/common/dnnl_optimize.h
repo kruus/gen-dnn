@@ -80,80 +80,82 @@
 // SX preprocessor generates _Pragma(XXX) and sxc++ might be ignoring
 //    *some*, based on failure to produce some warning messages.
 //#warning "SX optimization pragmas IN EFFECT"
-#   define VREG(...) PragmaQuote(cdir vreg(__VA_ARGS__))
-#   define ALLOC_ON_VREG(...) PragmaQuote(cdir alloc_on_vreg(__VA_ARGS__))
-#   define ALLOC_ON_ADB(...) PragmaQuote(cdir alloc_on_adb(__VA_ARGS__))
+#define VREG(...) PragmaQuote(cdir vreg(__VA_ARGS__))
+#define ALLOC_ON_VREG(...) PragmaQuote(cdir alloc_on_vreg(__VA_ARGS__))
+#define ALLOC_ON_ADB(...) PragmaQuote(cdir alloc_on_adb(__VA_ARGS__))
 // Is there a pre-for-loop RETAIN for SX? For now, kludge as on_adb.
-#   define RETAIN(...) PragmaQuote(cdir on_adb(__VA_ARGS__))
-#   define RETAIN1st(var,...) PragmaQuote(cdir on_adb(var))
-#   define ShortLoop() _Pragma("cdir shortloop")
-#   define ShortLoopTest() /*?*/
-#   define IVDEP() _Pragma("cdir nodep")
-#   define UNROLL(x)
-#   define SIMD(...)
+#define RETAIN(...) PragmaQuote(cdir on_adb(__VA_ARGS__))
+#define RETAIN1st(var, ...) PragmaQuote(cdir on_adb(var))
+#define ShortLoop() _Pragma("cdir shortloop")
+#define ShortLoopTest() /*?*/
+#define IVDEP() _Pragma("cdir nodep")
+#define UNROLL(x)
+#define SIMD(...)
 
 #elif ENABLE_OPT_PRAGMAS && defined(__ve)
 //#   warning "__ve optimization pragmas IN EFFECT"
-#   define VREG(...) PragmaQuote(_NEC vreg(__VA_ARGS__))
-#   define ALLOC_ON_VREG(...)
-#   define ALLOC_ON_ADB(...)
-#   define RETAIN(...) PragmaQuote(_NEC retain(__VA_ARGS__))
-#   define RETAIN1st(var,...) PragmaQuote(_NEC retain(var))
-#   define ShortLoop() _Pragma("_NEC shortloop")
-#   define ShortLoopTest() _Pragma("_NEC shortloop_reduction")/*produce both with runtime test*/
-#   define IVDEP() _Pragma("_NEC ivdep")
-#   define UNROLL(x) PragmaQuote(_NEC unroll(x))
-#   define SIMD(...) PragmaQuote(vector)
+#define VREG(...) PragmaQuote(_NEC vreg(__VA_ARGS__))
+#define ALLOC_ON_VREG(...)
+#define ALLOC_ON_ADB(...)
+#define RETAIN(...) PragmaQuote(_NEC retain(__VA_ARGS__))
+#define RETAIN1st(var, ...) PragmaQuote(_NEC retain(var))
+#define ShortLoop() _Pragma("_NEC shortloop")
+#define ShortLoopTest() \
+    _Pragma("_NEC shortloop_reduction") /*produce both with runtime test*/
+#define IVDEP() _Pragma("_NEC ivdep")
+#define UNROLL(x) PragmaQuote(_NEC unroll(x))
+#define SIMD(...) PragmaQuote(vector)
 
 #elif ENABLE_OPT_PRAGMAS && defined(__INTEL_COMPILER)
-#   define IVDEP() _Pragma("ivdep")
-#   define UNROLL(x) PragmaQuote(unroll(x))
+#define IVDEP() _Pragma("ivdep")
+#define UNROLL(x) PragmaQuote(unroll(x))
 //  TODO:
-#   define VREG(...)
-#   define ALLOC_ON_VREG(...)
-#   define ALLOC_ON_ADB(...)
-#   define RETAIN(...)
-#   define ShortLoop()
-#   define ShortLoopTest()
-#   define SIMD(...) PragmaQuote(simd __VA_ARGS__)
+#define VREG(...)
+#define ALLOC_ON_VREG(...)
+#define ALLOC_ON_ADB(...)
+#define RETAIN(...)
+#define ShortLoop()
+#define ShortLoopTest()
+#define SIMD(...) PragmaQuote(simd __VA_ARGS__)
 
-#elif ENABLE_OPT_PRAGMAS && defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
-#   warning "Please check if __pragma macros can be defined for this platorm"
-#   define IVDEP()
-#   define UNROLL(x)
-#   define VREG(...)
-#   define ALLOC_ON_VREG(...)
-#   define ALLOC_ON_ADB(...)
-#   define RETAIN(...)
-#   define ShortLoop()
-#   define ShortLoopTest()
-#   define SIMD(...)
+#elif ENABLE_OPT_PRAGMAS && defined(_MSC_VER) && !defined(__clang__) \
+        && !defined(__INTEL_COMPILER)
+#warning "Please check if __pragma macros can be defined for this platorm"
+#define IVDEP()
+#define UNROLL(x)
+#define VREG(...)
+#define ALLOC_ON_VREG(...)
+#define ALLOC_ON_ADB(...)
+#define RETAIN(...)
+#define ShortLoop()
+#define ShortLoopTest()
+#define SIMD(...)
 
 #elif ENABLE_OPT_PRAGMAS && defined(__GNUC__)
 //#warning "__GNUC optimization pragmas IN EFFECT"
-#   define IVDEP() _Pragma("GCC ivdep")
-#   define UNROLL(x) PragmaQuote(GCC unroll x)
-#   define VREG(...)
-#   define ALLOC_ON_VREG(...)
-#   define ALLOC_ON_ADB(...)
-#   define RETAIN(...)
-#   define ShortLoop()
-#   define ShortLoopTest()
-#   define SIMD(...)
+#define IVDEP() _Pragma("GCC ivdep")
+#define UNROLL(x) PragmaQuote(GCC unroll x)
+#define VREG(...)
+#define ALLOC_ON_VREG(...)
+#define ALLOC_ON_ADB(...)
+#define RETAIN(...)
+#define ShortLoop()
+#define ShortLoopTest()
+#define SIMD(...)
 
 #else /* A new system might begin by ignoring the optimization pragmas */
-#   if ENABLE_OPT_PRAGMS
-#      warning "Please check if _Pragma macros can be defined for this platorm"
-#   endif
-#   define IVDEP()
-#   define UNROLL(x)
-#   define VREG(...)
-#   define ALLOC_ON_VREG(...)
-#   define ALLOC_ON_ADB(...)
-#   define RETAIN(...)
-#   define ShortLoop()
-#   define ShortLoopTest()
-#   define SIMD(...)
+#if ENABLE_OPT_PRAGMS
+#warning "Please check if _Pragma macros can be defined for this platorm"
+#endif
+#define IVDEP()
+#define UNROLL(x)
+#define VREG(...)
+#define ALLOC_ON_VREG(...)
+#define ALLOC_ON_ADB(...)
+#define RETAIN(...)
+#define ShortLoop()
+#define ShortLoopTest()
+#define SIMD(...)
 
 #endif
 

@@ -143,17 +143,15 @@ int init_pd(const prb_t *p, dnnl_primitive_desc_t &rpd, res_t *r) {
             ? dst_3d_dims
             : p->ndims == 4 ? dst_2d_dims : dst_1d_dims;
 
-    dnnl_format_tag_t tag_src
-            = (p->dir & FLAG_FWD) ? p->tag : dnnl_format_tag_any;
-    dnnl_format_tag_t tag_dst
-            = (p->dir & FLAG_BWD) ? p->tag : dnnl_format_tag_any;
+    std::string src_tag = (p->dir & FLAG_FWD) ? p->tag : tag::any;
+    std::string dst_tag = (p->dir & FLAG_BWD) ? p->tag : tag::any;
 
-    DNN_SAFE(dnnl_memory_desc_init_by_tag(
-                     &src_d, p->ndims, src_dims, p->dt, tag_src),
+    DNN_SAFE(dnnl_memory_desc_init_by_tag(&src_d, p->ndims, src_dims, p->dt,
+                     convert_tag(src_tag, p->ndims)),
             WARN);
 
-    DNN_SAFE(dnnl_memory_desc_init_by_tag(
-                     &dst_d, p->ndims, dst_dims, p->dt, tag_dst),
+    DNN_SAFE(dnnl_memory_desc_init_by_tag(&dst_d, p->ndims, dst_dims, p->dt,
+                     convert_tag(dst_tag, p->ndims)),
             WARN);
 
     dnnl_alg_kind_t alg = alg2alg_kind(p->alg);
@@ -233,7 +231,7 @@ int doit(const prb_t *p, res_t *r) {
             = p->dir == BWD_D ? q(DNNL_ARG_DIFF_DST) : q(DNNL_ARG_DST);
 
     const auto fp = dnnl_f32;
-    const auto tag = get_default_tag(p->ndims);
+    const auto tag = get_abx_tag(p->ndims);
 
     dnn_mem_t src_fp(src_md, fp, tag, engine_tgt);
     dnn_mem_t src_dt(src_md, engine_tgt);

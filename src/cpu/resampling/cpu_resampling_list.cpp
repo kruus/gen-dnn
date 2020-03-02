@@ -32,11 +32,11 @@ using namespace dnnl::impl::data_type;
 #define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
 static const pd_create_f impl_list[] = {
         INSTANCE(simple_resampling_fwd_t<f32>)
-        INSTANCE(simple_resampling_bwd_t<f32>)
-        INSTANCE(ref_resampling_fwd_t<f32>)
-        INSTANCE(ref_resampling_bwd_t<f32>)
-        INSTANCE(ref_resampling_fwd_t<bf16>)
-        INSTANCE(ref_resampling_bwd_t<bf16>)
+                INSTANCE(simple_resampling_bwd_t<f32>)
+                        INSTANCE(ref_resampling_fwd_t<f32>)
+                                INSTANCE(ref_resampling_bwd_t<f32>) INSTANCE(
+                                        ref_resampling_fwd_t<bf16>)
+                                        INSTANCE(ref_resampling_bwd_t<bf16>)
         /* eol */
         nullptr,
 };

@@ -37,9 +37,9 @@ static int init_pd(const prb_t *p, dnnl_primitive_desc_t &bpd, res_t *r) {
 
     for (int i_input = 0; i_input < p->n_inputs(); ++i_input) {
         const dims_t &i_sdims = p->sdims[i_input];
-        DNN_SAFE(
-                dnnl_memory_desc_init_by_tag(&src_d[i_input], p->ndims[i_input],
-                        i_sdims.data(), p->sdt[i_input], p->stag[i_input]),
+        DNN_SAFE(dnnl_memory_desc_init_by_tag(&src_d[i_input],
+                         p->ndims[i_input], i_sdims.data(), p->sdt[i_input],
+                         convert_tag(p->stag[i_input], p->ndims[i_input])),
                 WARN);
     }
 
@@ -175,7 +175,7 @@ int doit(const prb_t *p, res_t *r) {
     const auto &src1_md = q(DNNL_ARG_SRC_1);
 
     const auto fp = dnnl_f32;
-    const auto tag = get_default_tag(p->ndims[0]);
+    const auto tag = get_abx_tag(p->ndims[0]);
 
     dnn_mem_t src0_fp(src0_md, fp, tag, engine_tgt);
     dnn_mem_t src0_dt(src0_md, engine_tgt);

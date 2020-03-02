@@ -30,7 +30,6 @@ using namespace dnnl::impl;
 using namespace dnnl::impl::utils;
 using namespace dnnl::impl::status;
 
-
 status_t dnnl_primitive_desc_query(const primitive_desc_t *primitive_desc,
         query_t what, int index, void *result) {
     if (any_null(primitive_desc, result)) return invalid_arguments;
@@ -47,7 +46,7 @@ const memory_desc_t *dnnl_primitive_desc_query_md(
     AND_((what & query::some_md) == query::some_md);
     AND_(what != query::some_md);
     AND_(dnnl_primitive_desc_query(primitive_desc, what, index, &res_md)
-         == success);
+            == success);
 #else
     bool args_ok = true && primitive_desc != nullptr
             && (what & query::some_md) == query::some_md

@@ -225,9 +225,10 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
                     }
                     _dst[c] = maybe_post_op(bn_res);
                 }
-                if (d_type == bf16)
+                if (d_type == bf16) {
                     // convert dst from f32 to b16
                     cvt_float_to_bfloat16((bfloat16_t *)dst + s_off, _dst, C);
+                }
             }
         }
     });

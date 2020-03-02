@@ -283,7 +283,7 @@ int fill_src(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp, res_t *r) {
     const bool need_extra_mem = mem_dt.dt() != mem_fp.dt();
     dnn_mem_t extra_mem;
     if (need_extra_mem) {
-        const auto tag = get_default_tag(mem_dt.md_.ndims);
+        const auto tag = get_abx_tag(mem_dt.md_.ndims);
         extra_mem = dnn_mem_t(mem_dt.md_, dnnl_f32, tag, engine_tgt);
     }
     dnn_mem_t &mem_00 = need_extra_mem ? extra_mem : mem_fp;
@@ -319,7 +319,7 @@ int fill_wei(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp, res_t *r) {
 
     dnn_mem_t extra_mem;
     if (check_reorder) {
-        const auto tag = get_default_tag(mem_dt.md_.ndims);
+        const auto tag = get_abx_tag(mem_dt.md_.ndims);
         extra_mem = dnn_mem_t(mem_dt.md_, dnnl_f32, tag, engine_tgt);
     }
     dnn_mem_t &mem_00 = check_reorder ? extra_mem : mem_fp;
@@ -381,7 +381,7 @@ int fill_dst(const prb_t *p, dnn_mem_t &mem_dt, dnn_mem_t &mem_fp, res_t *r) {
     const bool need_extra_mem = mem_dt.dt() != mem_fp.dt();
     dnn_mem_t extra_mem;
     if (need_extra_mem) {
-        const auto tag = get_default_tag(mem_dt.md_.ndims);
+        const auto tag = get_abx_tag(mem_dt.md_.ndims);
         extra_mem = dnn_mem_t(mem_dt.md_, dnnl_f32, tag, engine_tgt);
     }
     dnn_mem_t &mem_00 = need_extra_mem ? extra_mem : mem_fp;
@@ -443,10 +443,13 @@ inline int init_pd(dnnl_engine_t eng, const prb_t *p,
     if (bia_dt == dnnl_data_type_undef) bia_dt = p->cfg[BIA].dt;
     if (dst_dt == dnnl_data_type_undef) dst_dt = p->cfg[DST].dt;
     if (acc_dt == dnnl_data_type_undef) acc_dt = p->cfg[ACC].dt;
-    if (src_tag == dnnl_format_tag_undef) src_tag = p->stag;
-    if (wei_tag == dnnl_format_tag_undef) wei_tag = p->wtag;
+    if (src_tag == dnnl_format_tag_undef)
+        src_tag = convert_tag(p->stag, p->ndims);
+    if (wei_tag == dnnl_format_tag_undef)
+        wei_tag = convert_tag(p->wtag, p->ndims);
     if (bia_tag == dnnl_format_tag_undef) bia_tag = dnnl_format_tag_any;
-    if (dst_tag == dnnl_format_tag_undef) dst_tag = p->dtag;
+    if (dst_tag == dnnl_format_tag_undef)
+        dst_tag = convert_tag(p->dtag, p->ndims);
 
     DNN_SAFE(dnnl_memory_desc_init_by_tag(&src_d, p->ndims,
                      p->ndims == 5 ? src_3d_dims
@@ -598,8 +601,8 @@ int doit(const prb_t *p, res_t *r) {
             = p->dir & FLAG_BWD ? q(DNNL_ARG_DIFF_DST) : q(DNNL_ARG_DST);
 
     const auto fp = dnnl_f32;
-    const auto src_tag = get_default_tag(p->ndims);
-    const auto wei_tag = get_default_tag(p->ndims + p->has_groups);
+    const auto src_tag = get_abx_tag(p->ndims);
+    const auto wei_tag = get_abx_tag(p->ndims + p->has_groups);
 
     // Try to use CPU primitive as the reference in GPU testing to reduce
     // testing time

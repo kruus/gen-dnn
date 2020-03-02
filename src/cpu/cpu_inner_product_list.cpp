@@ -33,6 +33,7 @@ using namespace dnnl::impl::data_type;
 /// @copydoc INSTANCE_CREATOR
 #define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
 static const pd_create_f impl_list[] = {
+        // clang-format off
         /* f32 */
         INSTANCE(gemm_inner_product_fwd_t<f32>)
         INSTANCE(gemm_inner_product_bwd_data_t<f32>)
@@ -60,6 +61,7 @@ static const pd_create_f impl_list[] = {
         INSTANCE(ref_inner_product_fwd_t<u8, s8, s8, s32>)
         INSTANCE(ref_inner_product_fwd_t<u8, s8, s32, s32>)
         INSTANCE(ref_inner_product_fwd_t<u8, s8, f32, s32>)
+        // clang-format on
         /* eol */
         nullptr,
 };

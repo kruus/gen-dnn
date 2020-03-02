@@ -36,7 +36,7 @@
 #define ENABLE_OMP_MACROS 1
 #endif
 
-#if ! ENABLE_OMP_MACROS
+#if !ENABLE_OMP_MACROS
 #define PRAGMA_OMP(...)
 #define PRAGMA_OMP_SIMD(...)
 
@@ -50,11 +50,11 @@
 #ifndef PRAGMA_OMP_SIMD
 // MSVC still supports omp 2.0 only
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
-#   define PRAGMA_OMP_SIMD(...)
+#define PRAGMA_OMP_SIMD(...)
 #elif defined(__ve)
-#   define PRAGMA_OMP_SIMD(...)
+#define PRAGMA_OMP_SIMD(...)
 #else
-#   define PRAGMA_OMP_SIMD(...) PRAGMA_MACRO(CHAIN2(omp, simd __VA_ARGS__))
+#define PRAGMA_OMP_SIMD(...) PRAGMA_MACRO(CHAIN2(omp, simd __VA_ARGS__))
 #endif // defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
 #endif // ndef PRAGMA_OMP_SIMD
 

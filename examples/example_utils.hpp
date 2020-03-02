@@ -24,30 +24,31 @@
 #include <stdexcept>
 #include <stdlib.h>
 #include <string>
-#include <initializer_list>
 #include "dnnl_debug.h"
-#include <iostream>
+#include <initializer_list>
 
 #include "dnnl.hpp"
 #include "dnnl_debug.h"
 
 // ostream output of memory objects (debug initialization/lifetime issues)
-inline std::ostream& operator<<(std::ostream& os, dnnl_memory_desc_t const* const md){
-	char str[121] = {'\0'};
-	int nchar = dnnl_md2fmt_str(&str[0], 120, md);
-    if(nchar){
-        str[nchar]='\0';
-        os<<str;
-    }else{
-        os<<"???";
+inline std::ostream &operator<<(
+        std::ostream &os, dnnl_memory_desc_t const *const md) {
+    char str[121] = {'\0'};
+    int nchar = dnnl_md2fmt_str(&str[0], 120, md);
+    if (nchar) {
+        str[nchar] = '\0';
+        os << str;
+    } else {
+        os << "???";
     }
-	return os;
+    return os;
 }
-inline std::ostream& operator<<(std::ostream& os, dnnl::memory::desc const& mem){
-    return os<<&mem.data;
+inline std::ostream &operator<<(
+        std::ostream &os, dnnl::memory::desc const &mem) {
+    return os << &mem.data;
 }
-inline std::ostream& operator<<(std::ostream& os, dnnl::memory const& mem){
-    return os<<mem.get_desc();  // get the dnnl::memory::desc and print
+inline std::ostream &operator<<(std::ostream &os, dnnl::memory const &mem) {
+    return os << mem.get_desc(); // get the dnnl::memory::desc and print
 }
 
 // Exception class to indicate that the example uses a feature that is not

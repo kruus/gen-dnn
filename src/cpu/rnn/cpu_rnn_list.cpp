@@ -31,11 +31,9 @@ using namespace dnnl::impl::data_type;
 #define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
 static const pd_create_f impl_list[] = {
 #if DNNL_ENABLE_RNN // todo: remove flag when VANILLA build supports rnn.
-        INSTANCE(ref_rnn_fwd_f32_t)
-        INSTANCE(ref_rnn_fwd_bf16_t)
-        INSTANCE(ref_rnn_fwd_u8s8_t)
-        INSTANCE(ref_rnn_bwd_f32_t)
-        INSTANCE(ref_rnn_bwd_bf16_t)
+        INSTANCE(ref_rnn_fwd_f32_t) INSTANCE(ref_rnn_fwd_bf16_t)
+                INSTANCE(ref_rnn_fwd_u8s8_t) INSTANCE(ref_rnn_bwd_f32_t)
+                        INSTANCE(ref_rnn_bwd_bf16_t)
 #endif
         /* eol */
         nullptr,

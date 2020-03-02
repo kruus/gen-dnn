@@ -404,4 +404,3 @@ INSTANTIATE_TEST_SUITE_P(TestInnerProductForward, inner_product_test_float,
                         memory::format_tag::x, memory::format_tag::nc,
                         EXPAND_SIZES_2D(2, 8, 16, 1, 1)}));
 } // namespace dnnl
-// vim: et ts=4 sw=4 cindent cino=^=l0,\:0,N-s

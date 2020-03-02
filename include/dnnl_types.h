@@ -996,8 +996,6 @@ typedef struct {
     char reserved[64];
 } dnnl_memory_extra_desc_t;
 
-// XXX CHECKME used?
-#define DNNL_ZERO_MEMORY_EXTRA_DESC_T {0,0,0.f,'\0'}
 
 /// Memory descriptor. The description is based on a number of dimensions,
 /// dimensions themselves, plus information about elements type and memory
@@ -2050,8 +2048,8 @@ typedef struct {
     const char *hash; ///< Git hash of the sources (may be absent)
     unsigned cpu_runtime; ///< CPU runtime
     unsigned gpu_runtime; ///< GPU runtime
-    unsigned cpu; ///< XXX CPU DNNL_CPU_{X86|VE}
-    unsigned jit; ///< XXX change to cpu_isa NONE|ANY|ALL|... ??
+    unsigned cpu; ///< New: cmake target, DNNL_CPU_{X86|VE} (def X86)
+    unsigned jit; ///< cmake target DNNL_ISA_{VANILLA|ALL|...|FULL} (def FULL)
 } dnnl_version_t;
 
 /// Disable profiling completely
@@ -2074,26 +2072,8 @@ typedef struct {
 #define DNNL_JIT_PROFILE_LINUX_PERF \
     (DNNL_JIT_PROFILE_LINUX_JITDUMP | DNNL_JIT_PROFILE_LINUX_PERFMAP)
 
-/// CPU instruction set flags.
-/// They are used for \ref dev_guide_cpu_dispatcher_control only.
-///
-/// Environment variable \c DNNL_MAX_CPU_ISA strings map directly to
-/// one of the following values.  Inappropriate values get ignored,
-///
-/// Values \b happen to reflect \e logical partial ordering for x86,
-/// but implementations may map them in \b arbitrary fashion to
-/// \c cpu_isa_t bit masks within \ref cpu_isa_traits.hpp.
-/// \sa dnnl::set_max_cpu_isa(cpu_isa) for the x86 partial ordering
-///
-/// \note We introduce \c dnnl_cpu_isa_vanilla, \c dnnl_cpu_isa_full
-///       `cmake -DDNNL_CPU_ISA=VANILLA|FULL` builds that \b must be
-///       supported by all CPUs, but internally map to different bit
-///       masks for purposes of \c mayiuse(cpu_isa_t).
-// These values are actually arbitrary (could match cmake sequential values)
-// I have kept same values for pre-existing ones, in case anyone cares.
-// 
-// XXX exception is the zero value, (maybe zero should be "unkndown"?)
-// but I don't recall and zero-initialization assumptions.
+/// CPU instruction set flags.  The enum values do not need to carry
+/// any special significance.
 typedef enum {
     /** [new] "vanilla" \b must run on any DNNL_CPU build target.
      * This is a subset of \c dnnl_cpu_isa_all, that further restricts
@@ -2108,49 +2088,46 @@ typedef enum {
     /// [new] "full" For \em any target CPU, means "full set of options".
     /** For Intel(R) means "provide all available jit implementations".
      * For non-x86, this may place added requirements on the run-time
-     * environment. */
+     * environment.  Runtime CPU dispatch string "ALL" maps to this. */
     dnnl_cpu_isa_full = -2,
 
-    // Following keeps original x86 values unchanged, which is a bit awkward.
-    // perhaps 0~unknown 1~vanilla, 2~all, 3+~x86-various ?
-    /// "all" allows a slight expansion of "vanilla"
+    // Following keeps v1.2 x86 values unchanged (perhaps awkward?)
+    /// "all" allows a slight expansion of "vanilla", but still applies to all CPUs
     /// - x86:     Any Intel(R) x86 ISA (no restrictions, in principle could be jit).
     /// - non-x86: DNNL_CPU-specific ref impls allowed (but usually same as vanilla)
     dnnl_cpu_isa_all = 0x0,
 
     // DNNL_CPU==DNNL_CPU_X86 -------------------------------------------------
-    /// "sse4.1" Intel(R) SSE4.1 jit.
+    /// Intel(R) SSE4.1.
     dnnl_cpu_isa_sse41 = 0x1,
 
-    /// "avx" Intel(R) Advanced Vector Extensions.
+    /// Intel(R) Advanced Vector Extensions.
     dnnl_cpu_isa_avx = 0x3,
 
-    /// "avx2" Intel(R) Advanced Vector Extensions 2.
+    /// Intel(R) Advanced Vector Extensions 2.
     dnnl_cpu_isa_avx2 = 0x7,
 
-    /// "avx512_mic" Intel(R) Advanced Vector Extensions 512 subset for
-    /// Intel(R) Xeon / Phi(TM) Processors x200 Series.
+    /// Intel(R) Advanced Vector Extensions 512 subset for Intel(R) Xeon
+    /// Phi(TM) Processors x200 Series.
     dnnl_cpu_isa_avx512_mic = 0xf,
 
-    /// "avx512_mic_4ops" Intel(R) Advanced Vector Extensions 512 subset for
-    ///Intel(R) Xeon / Phi(TM) Processors 7235, 7285, 7295 Series.
+    /// Intel(R) Advanced Vector Extensions 512 subset for /Intel(R) Xeon
+    /// Phi(TM) Processors 7235, 7285, 7295 Series.
     dnnl_cpu_isa_avx512_mic_4ops = 0x1f,
 
-    /// "avx512_core" Intel(R) Advanced Vector Extensions 512 for Intel(R)
-    /// Xeon(R) Processor / Scalable Family and Intel(R) Core(TM) processor
-    /// family.
-    dnnl_cpu_isa_avx512_core = 0x80 | dnnl_cpu_isa_avx2, //0x27,
+    /// Intel(R) Advanced Vector Extensions 512 for Intel(R) Xeon(R) Processor
+    /// Scalable Family and Intel(R) Core(TM) processor family.
+    dnnl_cpu_isa_avx512_core = 0x20 | dnnl_cpu_isa_avx2,
 
-    /// "avx512_core_vnni" Intel(R) Advanced Vector Extensions 512 with
-    /// Intel(R) DL Boost Support / for Intel(R) Xeon(R) Processor Scalable
-    /// Family and Intel(R) Core(TM) / processor family.
-    dnnl_cpu_isa_avx512_core_vnni = 0x180 | dnnl_cpu_isa_avx2, //0x67,
+    /// Intel(R) Advanced Vector Extensions 512 with Intel(R) DL Boost Support
+    /// for Intel(R) Xeon(R) Processor Scalable Family and Intel(R) Core(TM)
+    /// processor family.
+    dnnl_cpu_isa_avx512_core_vnni = 0x60 | dnnl_cpu_isa_avx2,
 
-    /// "avx512_core_bf16" Intel(R) Advanced Vector Extensions 512 with
-    /// Intel(R) DL Boost and / Bfloat16 Support for Intel(R) Xeon(R) Processor
-    /// Scalable Family and / Intel(R) Core(TM) processor family.
-    dnnl_cpu_isa_avx512_core_bf16 = 0x380 | dnnl_cpu_isa_avx2,
-
+    /// Intel(R) Advanced Vector Extensions 512 with Intel(R) DL Boost and
+    /// Bfloat16 Support for Intel(R) Xeon(R) Processor Scalable Family and
+    /// Intel(R) Core(TM) processor family.
+    dnnl_cpu_isa_avx512_core_bf16 = 0xe0 | dnnl_cpu_isa_avx2,
 
     // DNNL_CPU==DNNL_CPU_VE --------------------------------------------------
     /// "vednn" VE build with libvednn public API calls
@@ -2159,6 +2136,8 @@ typedef enum {
     /// "vejit" VE build with libvednn calls allowing JIT features.
     /// Also requires a VE development tools (ncc, clang)
     dnnl_cpu_isa_vejit = 0x30000,
+
+    // other chipsets here...
 
 } dnnl_cpu_isa_t;
 
@@ -2170,5 +2149,4 @@ typedef enum {
 }
 #endif
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s syntax=cpp.doxygen
 #endif

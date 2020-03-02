@@ -42,7 +42,7 @@
 #endif
 
 #include "common/bfloat16.hpp" // XXX needed?
-#include "os_blas.hpp"         // XXX needed?
+#include "os_blas.hpp" // XXX needed?
 
 namespace dnnl {
 namespace impl {
@@ -109,8 +109,8 @@ dnnl_status_t extended_sgemm(const char *transa, const char *transb,
 #if MKLDNN_TRACE_EXTENDED_SGEMM
         printf("cblas_sgemm(%d,%c,%c;MNK=%d,%d,%d;alpha=%f"
                ",A@ld=%d,B@ld=%d,beta=%f,C@ld=%d)\n",
-               CblasColMajor,*transa,*transb, *M,*N,*K, *alpha,
-               *lda,*ldb, *beta, *ldc);
+                CblasColMajor, *transa, *transb, *M, *N, *K, *alpha, *lda, *ldb,
+                *beta, *ldc);
 #endif
         cblas_sgemm(CblasColMajor, Cblas_trA, Cblas_trB, *M, *N, *K, *alpha, A,
                 *lda, B, *ldb, *beta, C, *ldc);
@@ -342,4 +342,4 @@ dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32(char transa, char transb,
     return gemm_bf16bf16f32(&transb, &transa, &N_s32, &M_s32, &K_s32, &alpha, B,
             &ldb_s32, A, &lda_s32, &beta, C, &ldc_s32);
 }
-}//"C"
+} //"C"

@@ -148,4 +148,4 @@ status_t dnnl_primitive::execute(exec_ctx_t &ctx) const {
     return status;
 }
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

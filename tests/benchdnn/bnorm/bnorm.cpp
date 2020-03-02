@@ -497,8 +497,8 @@ static int init_pd(const prb_t *p, dnnl_primitive_desc_t &bpd, res_t *r) {
             : p->ndims == 4 ? data_dims_2d
                             : p->ndims == 3 ? data_dims_1d : data_dims_0d;
 
-    DNN_SAFE(dnnl_memory_desc_init_by_tag(
-                     &data_d, p->ndims, data_dims, p->dt, p->tag),
+    DNN_SAFE(dnnl_memory_desc_init_by_tag(&data_d, p->ndims, data_dims, p->dt,
+                     convert_tag(p->tag, p->ndims)),
             WARN);
 
     auto flags = (dnnl_normalization_flags_t)p->flags;
@@ -579,7 +579,8 @@ static int cvt_mask_to_ws(
             : p->ndims == 4 ? data_dims_2d
                             : p->ndims == 3 ? data_dims_1d : data_dims_0d;
 
-    dnn_mem_t data(p->ndims, data_dims, dnnl_f32, p->tag, engine_tgt);
+    dnn_mem_t data(p->ndims, data_dims, dnnl_f32, convert_tag(p->tag, p->ndims),
+            engine_tgt);
     SAFE(data.reorder(mask_fp), WARN);
 
     dnn_mem_t mean(1, &p->ic, dnnl_f32, dnnl_x, engine_tgt);
@@ -648,7 +649,7 @@ int doit(const prb_t *p, res_t *r) {
     const auto &ws_md = q(DNNL_ARG_WORKSPACE);
 
     const auto fp = dnnl_f32;
-    const auto tag = get_default_tag(p->ndims);
+    const auto tag = get_abx_tag(p->ndims);
 
     dnn_mem_t src_fp(data_md, fp, tag, engine_tgt);
     dnn_mem_t src_dt(data_md, engine_tgt);
@@ -661,14 +662,14 @@ int doit(const prb_t *p, res_t *r) {
     // On inference w/o global stats the batch norm doesn't require stat
     // memories. Hence, we need to prepare the mean_fp and var_fp ourselves.
     const dnnl_dims_t dims1d = {p->ic};
-    dnn_mem_t mean_fp(1, dims1d, fp, get_default_tag(1), engine_tgt);
+    dnn_mem_t mean_fp(1, dims1d, fp, get_abx_tag(1), engine_tgt);
     dnn_mem_t mean_dt(mean_md, engine_tgt);
-    dnn_mem_t var_fp(1, dims1d, fp, get_default_tag(1), engine_tgt);
+    dnn_mem_t var_fp(1, dims1d, fp, get_abx_tag(1), engine_tgt);
     dnn_mem_t var_dt(var_md, engine_tgt);
 
-    dnn_mem_t ss_fp(ss_md, fp, get_default_tag(ss_md.ndims), engine_tgt);
+    dnn_mem_t ss_fp(ss_md, fp, get_abx_tag(ss_md.ndims), engine_tgt);
     dnn_mem_t ss_dt(ss_md, engine_tgt);
-    dnn_mem_t d_ss_fp(ss_md, fp, get_default_tag(ss_md.ndims), engine_tgt);
+    dnn_mem_t d_ss_fp(ss_md, fp, get_abx_tag(ss_md.ndims), engine_tgt);
     dnn_mem_t d_ss_dt(ss_md, engine_tgt);
 
     if ((p->flags & FUSE_NORM_RELU) && !(p->dir & FLAG_INF))

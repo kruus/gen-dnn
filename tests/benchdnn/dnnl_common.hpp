@@ -196,7 +196,7 @@ inline int init() {
     // bug reports are only for x86 FULL and VANILLA build targets.
     printf("DNNL build : %s", DNNL_BUILD_STRING);
     int const v = dnnl_get_verbose();
-    if(v>0) printf(" dnnl_get_verbose=%d", v);
+    if (v > 0) printf(" dnnl_get_verbose=%d", v);
     printf("\n");
     if (!engine_tgt) {
         DNN_SAFE(dnnl_engine_create(&engine_tgt, engine_tgt_kind, 0), CRIT);
@@ -250,7 +250,7 @@ void maybe_prepare_runtime_zero_points(dnn_mem_t &zero_points_m,
         const attr_t &attr, int arg, dnnl_engine_t engine);
 
 bool check_md_consistency_with_tag(
-        const dnnl_memory_desc_t &md, dnnl_format_tag_t tag);
+        const dnnl_memory_desc_t &md, const std::string &tag);
 
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

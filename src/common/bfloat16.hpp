@@ -17,12 +17,12 @@
 #ifndef BFLOAT16_HPP
 #define BFLOAT16_HPP
 
-#include "cpu_target.h"        // DNNL_ENABLE_BFLOAT16(0/1)
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
+#include "cpu_target.h" // DNNL_ENABLE_BFLOAT16(0/1)
 
 #include "dnnl.h"
 

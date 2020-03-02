@@ -30,6 +30,12 @@
 #include "dnnl_debug.hpp"
 #include "src/common/math_utils.hpp"
 
+namespace tag {
+const char *abx {"abx"};
+const char *any {"any"};
+const char *undef {"undef"};
+} // namespace tag
+
 // returns dims with current @p off values using actual values from @p dims
 dims_t off2dims_idx(const dims_t &dims, int64_t off) {
     dims_t dims_idx;
@@ -66,10 +72,10 @@ std::ostream &operator<<(
 }
 
 std::ostream &operator<<(
-        std::ostream &s, const std::vector<dnnl_format_tag_t> &v_tag) {
-    s << fmt_tag2str(v_tag[0]);
+        std::ostream &s, const std::vector<std::string> &v_tag) {
+    s << v_tag[0];
     for (size_t d = 1; d < v_tag.size(); ++d)
-        s << ":" << fmt_tag2str(v_tag[d]);
+        s << ":" << v_tag[d];
     return s;
 }
 
@@ -679,7 +685,7 @@ dnnl_primitive_attr_t create_dnnl_attr(const attr_t &attr, int64_t scale_cnt,
     return dnnl_attr;
 }
 
-dnnl_format_tag_t get_default_tag(int ndims) {
+dnnl_format_tag_t get_abx_tag(int ndims) {
     switch (ndims) {
         case 1: return dnnl_a;
         case 2: return dnnl_ab;
@@ -690,6 +696,90 @@ dnnl_format_tag_t get_default_tag(int ndims) {
         default: assert(!"unsupported ndims");
     }
     return dnnl_format_tag_undef;
+}
+
+dnnl_format_tag_t get_axb_tag(int ndims) {
+    switch (ndims) {
+        case 1: return dnnl_a;
+        case 2: return dnnl_ab;
+        case 3: return dnnl_acb;
+        case 4: return dnnl_acdb;
+        case 5: return dnnl_acdeb;
+        default: assert(!"unsupported ndims");
+    }
+    return dnnl_format_tag_undef;
+}
+
+dnnl_format_tag_t get_xba_tag(int ndims) {
+    switch (ndims) {
+        case 1: return dnnl_a;
+        case 2: return dnnl_ba;
+        case 3: return dnnl_cba;
+        case 4: return dnnl_cdba;
+        case 5: return dnnl_cdeba;
+        default: assert(!"unsupported ndims");
+    }
+    return dnnl_format_tag_undef;
+}
+
+dnnl_format_tag_t get_aBx4b_tag(int ndims) {
+    switch (ndims) {
+        case 3: return dnnl_aBc4b;
+        case 4: return dnnl_aBcd4b;
+        case 5: return dnnl_aBcde4b;
+        default: assert(!"unsupported ndims");
+    }
+    return dnnl_format_tag_undef;
+}
+
+dnnl_format_tag_t get_aBx8b_tag(int ndims) {
+    switch (ndims) {
+        case 3: return dnnl_aBc8b;
+        case 4: return dnnl_aBcd8b;
+        case 5: return dnnl_aBcde8b;
+        default: assert(!"unsupported ndims");
+    }
+    return dnnl_format_tag_undef;
+}
+
+dnnl_format_tag_t get_aBx16b_tag(int ndims) {
+    switch (ndims) {
+        case 3: return dnnl_aBc16b;
+        case 4: return dnnl_aBcd16b;
+        case 5: return dnnl_aBcde16b;
+        default: assert(!"unsupported ndims");
+    }
+    return dnnl_format_tag_undef;
+}
+
+dnnl_format_tag_t get_ABx16a16b_tag(int ndims) {
+    switch (ndims) {
+        case 3: return dnnl_ABc16a16b;
+        case 4: return dnnl_ABcd16a16b;
+        case 5: return dnnl_ABcde16a16b;
+        default: assert(!"unsupported ndims");
+    }
+    return dnnl_format_tag_undef;
+}
+
+dnnl_format_tag_t convert_tag(const std::string &tag_str, int ndims) {
+    // List of supported meta-tags
+    if (tag_str.compare("abx") == 0)
+        return get_abx_tag(ndims);
+    else if (tag_str.compare("axb") == 0)
+        return get_axb_tag(ndims);
+    else if (tag_str.compare("xba") == 0)
+        return get_xba_tag(ndims);
+    else if (tag_str.compare("aBx4b") == 0)
+        return get_aBx4b_tag(ndims);
+    else if (tag_str.compare("aBx8b") == 0)
+        return get_aBx8b_tag(ndims);
+    else if (tag_str.compare("aBx16b") == 0)
+        return get_aBx16b_tag(ndims);
+    else if (tag_str.compare("ABx16a16b") == 0)
+        return get_ABx16a16b_tag(ndims);
+    // fall-back to regular tag parse function
+    return str2fmt_tag(tag_str.c_str());
 }
 
 void maybe_scale(float &d, float *scales, int64_t oc, const attr_t &attr) {

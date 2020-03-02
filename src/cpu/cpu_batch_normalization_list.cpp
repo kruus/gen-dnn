@@ -37,6 +37,7 @@ using namespace dnnl::impl::data_type;
 /// @copydoc INSTANCE_CREATOR
 #define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
 static const pd_create_f impl_list[] = {
+        // clang-format off
         /* fp */
         INSTANCE_avx512(jit_uni_batch_normalization_fwd_t<avx512_common>)
         INSTANCE_avx512(jit_uni_batch_normalization_bwd_t<avx512_common>)
@@ -66,6 +67,7 @@ static const pd_create_f impl_list[] = {
         INSTANCE_avx512(jit_uni_batch_normalization_s8_fwd_t<avx512_core>)
         INSTANCE_avx2(jit_uni_batch_normalization_s8_fwd_t<avx2>)
         INSTANCE(ref_batch_normalization_fwd_t<s8>)
+        // clang-format on
         /* eol */
         nullptr,
 };
@@ -80,3 +82,4 @@ const pd_create_f *get_batch_normalization_impl_list(
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

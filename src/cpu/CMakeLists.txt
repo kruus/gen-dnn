@@ -35,6 +35,12 @@ if(TARGET_X86_JIT)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/xbyak)
 endif()
 
+# Don't build sources from linux_perf direcotry if JIT Profiling isn't enabled.
+# NOTE: On AArch64 builds. DNNL_ENABLE_JIT_PROFILING=OFF by default.
+if(NOT DNNL_ENABLE_JIT_PROFILING)
+    list(FILTER SOURCES EXCLUDE REGEX "linux_perf")
+endif()
+
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
     # to make computations more stable and to align the jitted code
     # with the reference one use precise division and square root

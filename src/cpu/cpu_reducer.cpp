@@ -297,7 +297,7 @@ inline reducer_2d_driver_t<data_type> *create_reduce_2d_drv(int n_src,
 #if not defined(DNNL_ENABLE_MAX_CPU_ISA_VANILLA)
     assert(!"unimplemented"); // dnnl v1.2 asserted this in all cases
 #else
-    // provide a reference impl, without error
+        // provide a reference impl, without error
 #endif // v1.2 wants to elide ref impls from libdnnl
 #endif // X86-jit and not SIMPLE_IMPL
     return nullptr;
@@ -389,9 +389,8 @@ void cpu_reducer_t<data_type>::reduce_nolock(int ithr, data_t *dst,
         ;
 #endif
     }
-#if !TARGET_X86_JIT \
-    || defined(SIMPLE_IMPL) \
-    || defined(DNNL_ENABLE_MAX_CPU_ISA_VANILLA)
+#if !TARGET_X86_JIT || defined(SIMPLE_IMPL) \
+        || defined(DNNL_ENABLE_MAX_CPU_ISA_VANILLA)
     else { // cmake option, non-x86-jit, or SIMPLE_IMPL has ref impl fallback
         assert(drv_ == nullptr);
         if (balancer().id_in_group(ithr) != 0)
@@ -496,9 +495,8 @@ void cpu_reducer_2d_t<data_type>::reduce_block(const data_t *space_base,
 #endif
     }
     // but sometimes we include a fallback ref impl
-#if !TARGET_X86_JIT \
-    || defined(SIMPLE_IMPL) \
-    || defined(DNNL_ENABLE_MAX_CPU_ISA_VANILLA)
+#if !TARGET_X86_JIT || defined(SIMPLE_IMPL) \
+        || defined(DNNL_ENABLE_MAX_CPU_ISA_VANILLA)
     else { // cmake option, non-x86-jit, or SIMPLE_IMPL has ref impl fallback
         assert(drv_ == nullptr);
         for (int idg = 0; idg < balancer().nthr_per_group_; ++idg) {

@@ -356,6 +356,5 @@ using ref_rnn_fwd_u8s8_t = _ref_rnn_common_t<prop_kind::forward, data_type::u8,
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-#endif // CPU_REF_RNN_HPP
-
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+#endif // CPU_REF_RNN_HPP

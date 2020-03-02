@@ -90,15 +90,13 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
                 const primitive_attr_t *attr,
                 const deconvolution_fwd_pd_t *hint_fwd_pd)
             : cpu_deconvolution_fwd_pd_t(engine, adesc, attr, hint_fwd_pd)
-            , conv_pd_(nullptr) {
-        }
+            , conv_pd_(nullptr) {}
 
         pd_t(const pd_t &other)
             : cpu_deconvolution_fwd_pd_t(other)
             , conv_pd_(other.conv_pd_->clone())
             , conv_supports_bias_(other.conv_supports_bias_)
-            , dst_tag_(other.dst_tag_) {
-        }
+            , dst_tag_(other.dst_tag_) {}
 
         pd_t &operator=(const pd_t &other) {
             DNNL_SHORT_CIRCUIT_SELF_ASSIGN(other);
@@ -110,9 +108,7 @@ struct ref_deconvolution_fwd_t : public primitive_impl_t {
             return *this;
         }
 
-        ~pd_t() {
-            delete conv_pd_;
-        }
+        ~pd_t() { delete conv_pd_; }
 
         DECLARE_COMMON_PD_T(conv_pd_->name(), ref_deconvolution_fwd_t);
 

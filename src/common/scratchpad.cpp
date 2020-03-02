@@ -103,7 +103,7 @@ private:
 #if DNNL_USE_STATIC_THREAD_LOCAL_OBJECTS
     thread_local static std::unique_ptr<memory_storage_t> mem_storage_;
 #else // workaround lack of support for thread_local C++ objects
-    thread_local static memory_storage_t * mem_storage_;
+    thread_local static memory_storage_t *mem_storage_;
 #endif
     thread_local static size_t size_;
     thread_local static unsigned int reference_count_;
@@ -113,7 +113,7 @@ private:
 thread_local std::unique_ptr<memory_storage_t>
         global_scratchpad_t::mem_storage_(nullptr);
 #else
-thread_local memory_storage_t * global_scratchpad_t::mem_storage_ = nullptr;
+thread_local memory_storage_t *global_scratchpad_t::mem_storage_ = nullptr;
 #endif
 thread_local size_t global_scratchpad_t::size_ = 0;
 thread_local unsigned int global_scratchpad_t::reference_count_ = 0;

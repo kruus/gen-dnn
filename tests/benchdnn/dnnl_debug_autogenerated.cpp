@@ -400,6 +400,3 @@ const char *dt2str(dnnl_data_type_t dt) {
     return dnnl_dt2str(dt);
 }
 
-const char *fmt_tag2str(dnnl_format_tag_t tag) {
-    return dnnl_fmt_tag2str(tag);
-}

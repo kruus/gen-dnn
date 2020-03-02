@@ -18,8 +18,8 @@
 
 #include "ref_gemm_s8x8s32.hpp"
 
-#include "cpu_isa_traits.hpp"
 #include "../f32/ref_gemm_f32.hpp"
+#include "cpu_isa_traits.hpp"
 #include "dnnl_thread.hpp"
 #include "dnnl_types.h"
 #if TARGET_X86_JIT

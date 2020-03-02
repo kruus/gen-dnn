@@ -884,7 +884,8 @@ int main(int argc, char **argv) {
 #if DNNL_ENABLE_RNN
     return handle_example_errors({engine::kind::cpu}, simple_net);
 #else
-    std::cerr << "message: " << "development build -- no rnn support" << std::endl;
+    std::cerr << "message: "
+              << "development build -- no rnn support" << std::endl;
     return 0;
 #endif // DNNL_ENABLE_RNN
 }

@@ -49,7 +49,8 @@ class jit_avx512_core_gemv_s8x8s32_kern : jit_generator {
             Xbyak::Zmm, Xbyak::Zmm, Xbyak::Zmm, Xbyak::Zmm, Xbyak::Zmm);
     void update_c(int, Xbyak::Reg64, int, Xbyak::Opmask);
 
-    cpu_isa_t isa = isa_full; // was isa_any==0, mayiuse(isa_any)==false
+    // Set up in generate.  v1.2 used isa_any==0, with mayiuse(isa_any)==false
+    cpu_isa_t isa = unknown;
     enum class ver_t { undef, s8s8, s8u8, u8s8 } ver = ver_t::undef;
 
     // Assumes unroll_{m,n} are a power of 2.

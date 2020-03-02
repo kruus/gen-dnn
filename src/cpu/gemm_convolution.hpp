@@ -20,10 +20,10 @@
 #include "c_types_map.hpp"
 #include "memory_tracking.hpp"
 
+#include "consistency.hpp"
 #include "gemm/gemm.hpp"
 #include "gemm_convolution_utils.hpp"
 #include "ref_eltwise.hpp"
-#include "consistency.hpp"
 
 #include "cpu_convolution_pd.hpp"
 
@@ -44,7 +44,7 @@ struct gemm_convolution_fwd_t : public primitive_impl_t {
 
         status_t init() {
 #if DNNL_VERBOSE_EXTRA
-#define AND_(...) SCHKVV(ok,__VA_ARGS__)
+#define AND_(...) SCHKVV(ok, __VA_ARGS__)
             Consistency ok("cpu_gemm_conv_fwd");
             AND_(is_fwd());
             AND_(set_default_alg_kind(alg_kind::convolution_direct));

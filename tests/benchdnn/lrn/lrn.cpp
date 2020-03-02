@@ -114,8 +114,8 @@ int init_pd(const prb_t *p, dir_t dir, dnnl_primitive_desc_t &lpd,
             : p->ndims == 4 ? data_dims_2d
                             : p->ndims == 3 ? data_dims_1d : data_dims_0d;
 
-    DNN_SAFE(dnnl_memory_desc_init_by_tag(
-                     &data_d, p->ndims, data_dims, p->dt, p->tag),
+    DNN_SAFE(dnnl_memory_desc_init_by_tag(&data_d, p->ndims, data_dims, p->dt,
+                     convert_tag(p->tag, p->ndims)),
             WARN);
 
     dnnl_alg_kind_t alg = alg2alg_kind(p->alg);
@@ -192,7 +192,7 @@ int doit(const prb_t *p, res_t *r) {
     const auto &ws_md = q(const_fpd, DNNL_ARG_WORKSPACE);
 
     const auto fp = dnnl_f32;
-    const auto tag = get_default_tag(p->ndims);
+    const auto tag = get_abx_tag(p->ndims);
 
     dnn_mem_t src_fp(data_md, fp, tag, engine_tgt);
     dnn_mem_t src_dt(data_md, engine_tgt);

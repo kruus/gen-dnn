@@ -355,4 +355,3 @@ int main(int argc, char **argv) {
 ///   dnnl::memory::format_tag::ABcd8b8a optimized memory format (output (A)
 ///   and input (B) channel dimensions blocked by 8) which we also had to
 ///   reorder the initial weights to since they are in the OIHW memory format.
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

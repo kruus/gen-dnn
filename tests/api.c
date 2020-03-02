@@ -25,7 +25,7 @@
 
 #define VERBOSE 0
 
-#if VERBOSE==0
+#if VERBOSE == 0
 #define CHECK(f) \
     do { \
         dnnl_status_t s = f; \

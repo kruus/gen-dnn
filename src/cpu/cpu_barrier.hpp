@@ -22,9 +22,10 @@
 //     but DNNL_RUNTIME_SEQ probably should avoid calling barrier()...
 //
 // so BARRIER_SHOULD_THROW for debug build with DNNL_RUNTIME_SEQ
-//     to catch attempts to invoke barrier()
+//     might want to catch illegal attempts to invoke barrier()
 #ifdef NDEBUG
-#define BARRIER_SHOULD_THROW 0/*dnnl release behavior, always provide barrier()*/
+#define BARRIER_SHOULD_THROW \
+    0 /*dnnl release behavior, always provide barrier()*/
 #else
 #define BARRIER_SHOULD_THROW (DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ)
 #endif
@@ -38,7 +39,6 @@
 #include "jit_generator.hpp"
 #endif // TARGET_X86_JIT
 #include "utils.hpp"
-
 
 namespace dnnl {
 namespace impl {
@@ -83,10 +83,11 @@ STRUCT_ALIGN(
 struct ctx_t {};
 
 // In C++14 can be constexpr, not C++11
-inline void ctx_init( ctx_t *ctx_t ) {}
-inline void barrier(ctx_t *ctx, int nthr){
+inline void ctx_init(ctx_t *ctx_t) {}
+inline void barrier(ctx_t *ctx, int nthr) {
     if (nthr > 1)
-        throw std::runtime_error("nthr must be <= 1 (compiled without _MULTI_THREAD)");
+        throw std::runtime_error(
+                "nthr must be <= 1 (compiled without _MULTI_THREAD)");
 }
 
 #else // assume multiple thread support

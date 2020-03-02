@@ -35,6 +35,7 @@ using namespace dnnl::impl::data_type;
 // don't really know yet about which ones require jit.
 // Can run vanilla tests with extra verbosity and see which ones get skipped? XXX
 static const pd_create_f impl_list[] = {
+        // clang-format off
         INSTANCE(matmul::gemm_f32_matmul_t)
         INSTANCE(matmul::gemm_bf16_matmul_t<f32>)
         INSTANCE(matmul::gemm_bf16_matmul_t<bf16>)
@@ -58,6 +59,7 @@ static const pd_create_f impl_list[] = {
         INSTANCE(matmul::ref_matmul_t<u8, s8, s32, s32>)
         INSTANCE(matmul::ref_matmul_t<u8, s8, s8, s32>)
         INSTANCE(matmul::ref_matmul_t<u8, s8, u8, s32>)
+        // clang-format off
         /* eol */
         nullptr,
 };

@@ -14,11 +14,11 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "cpu_isa_traits.hpp"
 #include <array>
 #include <memory>
 #include "bfloat16.hpp"
 #include "bit_cast.hpp"
+#include "cpu_isa_traits.hpp"
 #if TARGET_X86_JIT
 #include "jit_avx512_core_bf16cvt.hpp"
 #endif // TARGET_X86_JIT

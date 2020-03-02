@@ -46,11 +46,11 @@
 #endif
 
 // easier to read versions of some dnnl_config.h 0/1 values
-#define TARGET_X86      DNNL_TARGET_X86
-#define TARGET_X86_JIT  DNNL_TARGET_X86_JIT
-#define TARGET_VE       DNNL_TARGET_VE
-#define TARGET_VEDNN    DNNL_TARGET_VEDNN
-#define TARGET_VEJIT    DNNL_TARGET_VEJIT
+#define TARGET_X86 DNNL_TARGET_X86
+#define TARGET_X86_JIT DNNL_TARGET_X86_JIT
+#define TARGET_VE DNNL_TARGET_VE
+#define TARGET_VEDNN DNNL_TARGET_VEDNN
+#define TARGET_VEJIT DNNL_TARGET_VEJIT
 
 // src code uses shorter versions of these dnnl_config.h build options
 #if defined(DNNL_USE_MKL) && !defined(USE_MKL)

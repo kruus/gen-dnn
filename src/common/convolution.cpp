@@ -18,9 +18,9 @@
 #include "dnnl.h"
 
 #include "c_types_map.hpp"
+#include "consistency.hpp" // debug: print reason for consistency failures
 #include "type_helpers.hpp"
 #include "utils.hpp"
-#include "consistency.hpp" // debug: print reason for consistency failures
 
 using namespace dnnl::impl;
 using namespace dnnl::impl::utils;
@@ -93,14 +93,14 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
     const int g = with_groups ? weights_desc->dims[0] : 1;
     const int bias_dim = prop_kind == backward_data ? src_desc->dims[1]
                                                     : dst_desc->dims[1];
-#define AND_(...) SCHKV(consistency,__VA_ARGS__) /* also avail: SCHK, SCHKVV */
+#define AND_(...) SCHKV(consistency, __VA_ARGS__) /* also avail: SCHK, SCHKVV */
 #if DNNL_VERBOSE_EXTRA // build allows some additional trace levels
     Consistency consistency("conv_desc_init consistency:");
     AND_(memory_desc_wrapper(weights_desc).nelems());
     AND_(src_desc->ndims == dst_desc->ndims);
     AND_(utils::one_of(src_desc->ndims, 3, 4, 5));
     AND_(utils::one_of(
-                weights_desc->ndims, src_desc->ndims, src_desc->ndims + 1));
+            weights_desc->ndims, src_desc->ndims, src_desc->ndims + 1));
     AND_((with_bias ? bias_desc->ndims == 1 : true));
     AND_((with_bias ? bias_desc->dims[0] == bias_dim : true));
     AND_(src_desc->dims[0] == dst_desc->dims[0]);

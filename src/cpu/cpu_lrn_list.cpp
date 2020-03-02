@@ -34,6 +34,7 @@ using namespace dnnl::impl::data_type;
 /// @copydoc INSTANCE_CREATOR
 #define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
 static const pd_create_f impl_list[] = {
+        // clang-format off
         INSTANCE_avx512(jit_avx512_common_lrn_fwd_t<f32>)
         INSTANCE_avx512(jit_avx512_common_lrn_bwd_t<f32>)
         INSTANCE_avx512(jit_avx512_common_lrn_fwd_t<bf16>)
@@ -45,6 +46,7 @@ static const pd_create_f impl_list[] = {
         INSTANCE(ref_lrn_bwd_t<f32>)
         INSTANCE(ref_lrn_fwd_t<bf16>)
         INSTANCE(ref_lrn_bwd_t<bf16>)
+        // clang-format on
         /* eol */
         nullptr,
 };

@@ -16,7 +16,7 @@
 
 #include "gemm_inner_product_utils.hpp"
 #include "dnnl_thread.hpp"
-#if TARGET_X86_JIT 
+#if TARGET_X86_JIT
 #include "jit_uni_eltwise_injector.hpp"
 #else
 #include "ref_eltwise.hpp"
@@ -41,7 +41,7 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
 #else
 #define __J__(...)
 #endif
-// clang-format off
+    // clang-format off
     : ker_(nullptr)
     , ref_eltwise_(nullptr)
     __J__(eltwise_injector_(nullptr))
@@ -91,38 +91,28 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
 
     const int sum_ind = p.find(primitive_kind::sum);
     do_sum_ = sum_ind != -1 && !skip_sum;
-    if (do_sum_) {
-        sum_scale_ = p.entry_[sum_ind].sum.scale;
-    }
+    if (do_sum_) { sum_scale_ = p.entry_[sum_ind].sum.scale; }
 
-    if (do_bias()) {
-        bias_data_type_size_ = data_type_size(bias_data_type_);
-    }
+    if (do_bias()) { bias_data_type_size_ = data_type_size(bias_data_type_); }
 
-    do_dst_zero_points_ = ! attr->zero_points_
-            .has_default_values(DNNL_ARG_DST);
+    do_dst_zero_points_ = !attr->zero_points_.has_default_values(DNNL_ARG_DST);
 
 #if !TARGET_X86_JIT
     if (do_eltwise_)
-        ref_eltwise_ = new ref_eltwise_scalar_fwd_t(eltwise_.alg,
-                eltwise_.alpha, eltwise_.beta, eltwise_.scale);
+        ref_eltwise_ = new ref_eltwise_scalar_fwd_t(
+                eltwise_.alg, eltwise_.alpha, eltwise_.beta, eltwise_.scale);
 #else
     using namespace Xbyak;
-    if (do_scale_) {
-        vreg_scale = Zmm(idx_compute_vreg_start_++);
-    }
+    if (do_scale_) { vreg_scale = Zmm(idx_compute_vreg_start_++); }
 
-    if (dst_type == data_type::u8)
-       vreg_zero = Zmm(idx_compute_vreg_start_++);
+    if (dst_type == data_type::u8) vreg_zero = Zmm(idx_compute_vreg_start_++);
 
     if (do_sum_) {
         vreg_sum_scale = Zmm(idx_compute_vreg_start_++);
         compute_vreg_prev_dst_shift_ = compute_vregs_per_iter_++;
     }
 
-    if (do_bias()) {
-        compute_vreg_bias_shift_ = compute_vregs_per_iter_++;
-    }
+    if (do_bias()) { compute_vreg_bias_shift_ = compute_vregs_per_iter_++; }
 
     if (do_dst_zero_points_)
         vreg_dst_zero_points = Zmm(idx_compute_vreg_start_++);

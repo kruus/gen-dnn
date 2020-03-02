@@ -181,7 +181,7 @@ private:
             size_t oc_work;
         };
 
-        enum { default_unroll_2_pow_ = 2 };
+        enum {default_unroll_2_pow_ = 2};
 
         Xbyak::Reg64 reg_param = abi_param1;
         Xbyak::Reg64 reg_dst_base = rdx;
@@ -221,7 +221,8 @@ private:
         int data_reg_base_idx_;
         size_t vlen_;
         cpu_isa_t isa_;
-        bf16_emulation_t *bf16_emu_; /* note: defined in  jit_avx512_core_bf16cvt.hpp */
+        bf16_emulation_t
+                *bf16_emu_; /* note: defined in  jit_avx512_core_bf16cvt.hpp */
         jit_uni_eltwise_injector_f32<avx512_core> *eltwise_injector_;
 
         void generate();
@@ -253,13 +254,11 @@ private:
         };
     };
 #else
-    void* pp_ker_;
+    typedef void *pp_ker_t;
 #endif // TARGET_X86_JIT
 
     acc_data_t beta_;
-#if TARGET_X86_JIT
     pp_ker_t *pp_ker_;
-#endif // TARGET_X86_JIT
 };
 
 template <data_type_t diff_src_data_type>

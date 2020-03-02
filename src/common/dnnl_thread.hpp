@@ -20,7 +20,7 @@
 #include "utils.hpp"
 
 #define ENABLE_OMP_MACROS (DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP)
-#include "dnnl_omp.h"       // omp compiler-portable macro definitions, if needed
+#include "dnnl_omp.h" // omp compiler-portable macro definitions, if needed
 
 #if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
 #define DNNL_THR_SYNC 1

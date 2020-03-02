@@ -67,8 +67,7 @@
     "Intel AVX-512 with Intel DL Boost and bfloat16 support"
 #define VEJIT "NEC Aurora (VE) with libvednn jit"
 #define VEDNN "NEC Aurora (VE) with libvednn C api calls"
-#define VE_COMMON \
-        "NEC Aurora (VE) (C/C++-only vanilla build)"
+#define VE_COMMON "NEC Aurora (VE) (C/C++-only vanilla build)"
 #define VANILLA "Intel 64 (no jit, C/C++-only vanilla build)"
 //@}
 
@@ -133,7 +132,7 @@ const char *get_isa_info() {
     if (mayiuse(vednn)) return VEDNN;
     if (mayiuse(ve_common)) return VE_COMMON;
     if (mayiuse(vanilla)) return VANILLA;
-    //return ISA_ANY;
+        //return ISA_ANY;
 #if TARGET_X86
     return "unrecovnized x86 isa : " __FILE__;
 #elif TARGET_VE
@@ -1031,10 +1030,8 @@ int dnnl_get_verbose() {
 }
 
 const dnnl_version_t *dnnl_version() {
-    static const dnnl_version_t ver
-            = {DNNL_VERSION_MAJOR, DNNL_VERSION_MINOR, DNNL_VERSION_PATCH,
-                    DNNL_VERSION_HASH, DNNL_CPU_RUNTIME, DNNL_GPU_RUNTIME,
-                    DNNL_CPU, DNNL_ISA
-            };
+    static const dnnl_version_t ver = {DNNL_VERSION_MAJOR, DNNL_VERSION_MINOR,
+            DNNL_VERSION_PATCH, DNNL_VERSION_HASH, DNNL_CPU_RUNTIME,
+            DNNL_GPU_RUNTIME, DNNL_CPU, DNNL_ISA};
     return &ver;
 }

@@ -17,8 +17,8 @@
 #ifndef GEMM_X8S8S32X_CONVOLUTION_HPP
 #define GEMM_X8S8S32X_CONVOLUTION_HPP
 
-#include "cpu_isa_traits.hpp"
 #include "c_types_map.hpp"
+#include "cpu_isa_traits.hpp"
 #include "memory_tracking.hpp"
 
 #include "cpu_convolution_pd.hpp"

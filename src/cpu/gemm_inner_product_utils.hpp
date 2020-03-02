@@ -17,10 +17,10 @@
 #ifndef CPU_GEMM_INNER_PRODUCT_UTILS_HPP
 #define CPU_GEMM_INNER_PRODUCT_UTILS_HPP
 
-#include "cpu_isa_traits.hpp"
 #include "c_types_map.hpp"
 #include "cpu_engine.hpp"
 #include "cpu_inner_product_pd.hpp"
+#include "cpu_isa_traits.hpp"
 #if TARGET_X86_JIT
 #include "jit_avx512_core_bf16cvt.hpp"
 #include "jit_generator.hpp"
@@ -39,7 +39,7 @@ namespace inner_product_utils {
 template <impl::data_type_t acc_type, impl::data_type_t dst_type>
 class pp_kernel_t
 #if TARGET_X86_JIT
-: jit_generator
+    : jit_generator
 #endif // TARGET_X86_JIT
 {
 public:

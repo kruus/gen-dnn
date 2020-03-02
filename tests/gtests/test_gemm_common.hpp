@@ -1251,7 +1251,7 @@ protected:
         // XXX could remove diffs in in/gemm_in.h by beefing up packed gemm support.
         //     Should we expose pack_sgemm_supported as DNNL_API ?
         //     else use gemm.in.h as (defined(TARGET_X86_JIT) || defined(DNNL_USE_MKL))
-        //SKIP_IF(pack && !pack_sgemm_supported(),  
+        //SKIP_IF(pack && !pack_sgemm_supported(),
         //        "CPU does not support packed sgemm");
         SKIP_IF(data_traits<b_dt>::data_type == memory::data_type::u8
                         && get_test_engine_kind() == engine::kind::cpu,

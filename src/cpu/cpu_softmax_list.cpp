@@ -32,11 +32,13 @@ using namespace dnnl::impl::data_type;
 
 #define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
 static const pd_create_f impl_list[] = {
+        // clang-format off
         INSTANCE_avx512(jit_uni_softmax_fwd_t<avx512_common>)
         INSTANCE_avx2(jit_uni_softmax_fwd_t<avx2>)
         INSTANCE_sse41(jit_uni_softmax_fwd_t<sse41>)
         INSTANCE(ref_softmax_fwd_t<f32>)
         INSTANCE(ref_softmax_bwd_t<f32>)
+        // clang-format on
         /* eol */
         nullptr,
 };

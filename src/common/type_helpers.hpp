@@ -168,9 +168,9 @@ inline memory_desc_t zero_md() {
     return zero;
 }
 
-// Following compares ALL elements of the struct (not just 'ndims==0')
-// so we had better be absolutely certain the default-constructed POD
-// type is fully initialized, in 'zero_md()' above.
+// Following compares ALL elements of the struct (not just 'ndims==0' as in
+// dnnl.hpp memory::desc::is_zero)), so we had better be absolutely certain the
+// default-constructed POD type is fully initialized, in 'zero_md()' above.
 inline bool is_zero_md(const memory_desc_t *md) {
     return md == nullptr || *md == zero_md();
 }

@@ -24,7 +24,9 @@ set(platform_cmake_included true)
 
 include("cmake/utils.cmake")
 
-add_definitions(-DDNNL_DLL)
+if (DNNL_LIBRARY_TYPE STREQUAL "SHARED")
+    add_definitions(-DDNNL_DLL)
+endif()
 
 # UNIT8_MAX-like macros are a part of the C99 standard and not a part of the
 # C++ standard (see C99 standard 7.18.2 and 7.18.4)
@@ -141,7 +143,13 @@ elseif(UNIX OR MINGW)
             append(CMAKE_CCXX_SANITIZER_FLAGS "-g -fno-omit-frame-pointer")
         endif()
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-        set(DEF_ARCH_OPT_FLAGS "-msse4.1")
+        if(TARGET_ARCH STREQUAL "AARCH64")
+             set(DEF_ARCH_OPT_FLAGS "-O3 -mcpu=native")
+             set(DNNL_ENABLE_JIT_PROFILING CACHE BOOL "OFF" FORCE)
+             message(WARNING "AArch64 build, DNNL_ENABLE_JIT_PROFILING is OFF")
+        else()
+             set(DEF_ARCH_OPT_FLAGS "-msse4.1")
+        endif()
         # suppress warning on assumptions made regarding overflow (#146)
         append(CMAKE_CCXX_NOWARN_FLAGS "-Wno-strict-overflow")
     elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
@@ -187,7 +195,7 @@ if(APPLE)
     endforeach()
 endif()
 
-# Some build environments have compiler or library issues
+# toolchain builds may add checks for compiler/environment/library issues...
 include(CheckCXXSourceCompiles)
 check_cxx_source_compiles(
     "#include <iostream>
@@ -200,7 +208,6 @@ check_cxx_source_compiles(
     DNNL_OK_STATIC_THREAD_LOCAL_OBJECTS # as in scratchpad std::unique_ptr
     )
 message(STATUS "DNNL_OK_STATIC_THREAD_LOCAL_OBJECTS ${DNNL_OK_STATIC_THREAD_LOCAL_OBJECTS}")
-
 if(NECVE) # most standard compilers comply with c++11, but...
     # Note: This bug is pretty severe.  Try not to pollute mkl-dnn/master with 
     #       workarounds for this bug.

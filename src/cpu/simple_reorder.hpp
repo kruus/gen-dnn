@@ -31,38 +31,13 @@
 #include "tag_traits.hpp"
 
 #include "cpu_isa_traits.hpp"
-#include "simple_q10n.hpp"
 #include "cpu_target.h"
+#include "simple_q10n.hpp"
 
-// XXX v2.1 already addresses splitting the impl lists, but we need to split the .cpp file CHECKME
-// VE compiler bogs down horribly with huge number of reorders
-//#define REORDER_ENABLE_CONV_S8S8 (! TARGET_VE) /* remove, eventually XXX */
-//#if defined(REORDER_JUST_CONV_S8S8)
-//#define REORDER_ENABLE_CONV_S8S8 1
-//#define REORDER_ENABLE_ANY_TO_BLOCKED 0
-//#define REORDER_ENABLE_SIMPLE_BLOCKED_CONVERIONS 0
-//#define REORDER_ENABLE_DIRECT_COPY 0
-//#define REORDER_ENABLE_REFERENCE 0
-//#elif defined(REORDER_JUST_BLOCKED)
-//#define REORDER_ENABLE_CONV_S8S8 0
-//#define REORDER_ENABLE_ANY_TO_BLOCKED 1
-//#define REORDER_ENABLE_SIMPLE_BLOCKED_CONVERIONS 1
-//#define REORDER_ENABLE_DIRECT_COPY 0
-//#define REORDER_ENABLE_REFERENCE 0
-//#elif TARGET_VE
-//#define REORDER_ENABLE_CONV_S8S8 1
-//#define REORDER_ENABLE_ANY_TO_BLOCKED 1
-//#define REORDER_ENABLE_SIMPLE_BLOCKED_CONVERIONS 1
-//#define REORDER_ENABLE_DIRECT_COPY 1
-//#define REORDER_ENABLE_REFERENCE 1
-//#else
-#define REORDER_ENABLE_CONV_S8S8 1
-#define REORDER_ENABLE_ANY_TO_BLOCKED 1
-#define REORDER_ENABLE_SIMPLE_BLOCKED_CONVERIONS 1
-#define REORDER_ENABLE_DIRECT_COPY 1
-#define REORDER_ENABLE_REFERENCE 1
-//#endif
-
+// Note: can fairly easily split these impl lists even further.
+// MSVC and other compilers have troubles trying to optimize the
+// large number of inline functions (this can cause very long
+// compile times).
 namespace dnnl {
 namespace impl {
 namespace cpu {
@@ -86,16 +61,10 @@ const bool any = keep;
 } // namespace fmt_order
 
 namespace spec {
-#if REORDER_ENABLE_DIRECT_COPY
 struct direct_copy {};
 struct direct_copy_except_dim_0 {};
-#endif
-#if REORDER_ENABLE_REFERENCE
 struct reference {};
-#endif
-#if REORDER_ENABLE_CONV_S8S8
 struct conv_s8s8 {};
-#endif // REORDER_ENABLE_CONV_S8S8
 } // namespace spec
 
 #define SIMPLE_REORDER_TEMPL_DECL \
@@ -151,7 +120,6 @@ bool simple_attr_check(const primitive_attr_t *attr, bool many_scales_support,
 }
 } // namespace
 
-#if REORDER_ENABLE_CONV_S8S8
 /* specific reorders: implementation */
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
@@ -506,7 +474,6 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         return status::success;
     }
 };
-#endif // REORDER_ENABLE_CONV_S8S8
 
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
@@ -567,7 +534,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             if (utils::one_of(tag_o, gOIhw16i16o, OIhw16i16o))
                 return (ic * blksize + oc);
             else if (utils::one_of(tag_o, gOIhw8i16o2i, OIhw8i16o2i))
-            return ((ic / sblk) * blksize * sblk + sblk * oc + ic % sblk);
+                return ((ic / sblk) * blksize * sblk + sblk * oc + ic % sblk);
             else if (utils::one_of(tag_o, gOIhw8o16i2o, gIOhw8o16i2o,
                              OIhw8o16i2o, IOhw8o16i2o))
                 return ((oc / sblk) * blksize * sblk + sblk * ic + oc % sblk);
@@ -589,11 +556,11 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                                     * plain_d.blocking_desc()
                                               .strides[w_groups + 1];
                     out[index(ic, oc)] = inp[plain_off];
-                    }
+                }
                 for (/* continue */; oc < oc_block; ++oc) {
                     out[index(ic, oc)] = (data_t<type_i>)0;
                 }
-                    }
+            }
             for (/* continue */; ic < ic_block; ++ic) {
                 for (int oc = 0; oc < oc_block; ++oc) {
                     out[index(ic, oc)] = (data_t<type_i>)0;
@@ -699,7 +666,6 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
 /* reorders with tail support */
 
-#if REORDER_ENABLE_SIMPLE_BLOCKED_CONVERIONS
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         typename utils::enable_if<false
@@ -795,7 +761,6 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         return status::success;
     }
 };
-#endif // REORDER_ENABLE_SIMPLE_BLOCKED_CONVERIONS
 
 #define PLAIN_TO_BLOCKED_IS_APPLICABLE() \
     static bool is_applicable(const memory_desc_wrapper &input_d, \
@@ -809,7 +774,6 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                                         && output_d.is_plain()); \
     }
 
-#if REORDER_ENABLE_ANY_TO_BLOCKED
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         typename utils::enable_if<tag_i == format_tag::any
@@ -1093,11 +1057,9 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         return status::success;
     }
 };
-#endif //REORDER_ENABLE_ANY_TO_BLOCKED
 
 /* generic and direct-copy reorders */
 
-#if REORDER_ENABLE_DIRECT_COPY
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         typename utils::enable_if<tag_i == format_tag::any
@@ -1296,9 +1258,7 @@ private:
         return max_size;
     }
 };
-#endif //REORDER_ENABLE_DIRECT_COPY
 
-#if REORDER_ENABLE_REFERENCE
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         typename utils::enable_if<tag_i == format_tag::any
@@ -1375,7 +1335,6 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         return status::success;
     }
 };
-#endif //REORDER_ENABLE_REFERENCE
 
 /* high level class declaration */
 

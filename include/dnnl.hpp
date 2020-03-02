@@ -2049,15 +2049,12 @@ struct memory : public handle<dnnl_memory_t> {
 
     /// A memory descriptor.
     struct desc {
-      private:
-      public:
         friend struct memory;
         /// The underlying C API data structure.
         dnnl_memory_desc_t data;
 
         /// Constructs a zero (empty) memory descriptor. Such a memory
         /// descriptor can be used to indicate absence of an argument.
-        //desc() : data(dnnl_memory_desc_t DNNL_ZERO_MEMORY_DESC_T) {} // VE debug
         desc() : data() {}
 
         /// Constructs a memory descriptor.
@@ -2268,7 +2265,7 @@ struct memory : public handle<dnnl_memory_t> {
 
         /// Checks whether the memory descriptor is zero (empty).
         /// @returns @c true if the memory descriptor describes an empty
-        ///     memory and @c false otherwise. \sa is_zero_md (different test)
+        ///     memory and @c false otherwise.
         bool is_zero() const { return data.ndims == 0; }
 
         /// An equality operator.
@@ -9853,7 +9850,8 @@ inline status set_jit_profiling_jitdumpdir(const std::string &dir) {
 }
 
 /// @copydoc dnnl_cpu_isa_t
-/// \note logically, vanilla <= any < [cpu-specific] <= all
+/// \note logically, vanilla <= all < [cpu-specific] <= full support, however
+/// for runtime dispatch "ALL" means "no restrictions" (dnnl_cpu_isa_full) 
 enum class cpu_isa {
     // ----------- any DNNL_CPU target -----------------
     /// @copydoc dnnl_cpu_isa_vanilla

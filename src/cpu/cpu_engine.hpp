@@ -19,10 +19,10 @@
 
 #include <assert.h>
 
-#include "dnnl.h"
-#include "cpu_isa_traits.hpp"   // also give common/cpu_target.h
 #include "../common/engine.hpp"
 #include "c_types_map.hpp"
+#include "cpu_isa_traits.hpp" // also give common/cpu_target.h
+#include "dnnl.h"
 
 /** NEW: this now gets activated solely by `cmake -DDNNL_VERBOSE=EXTRA`, as
  * conveyed by \c DNNL_VERBOSE_EXTRA = 0/1 in \ref dnnl_config.h.
@@ -144,7 +144,8 @@ public:
  * (XXX include an example verbose func later)
  */
 #if 1
-#define DEFAULT_INSTANCE_CREATOR(...) &primitive_desc_t::create<__VA_ARGS__::pd_t>,
+#define DEFAULT_INSTANCE_CREATOR(...) \
+    &primitive_desc_t::create<__VA_ARGS__::pd_t>,
 #else /* show a verbose mode one, for debugging, here */
 #endif
 

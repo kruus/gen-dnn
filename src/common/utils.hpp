@@ -164,7 +164,9 @@ inline T &&forward(typename utils::remove_reference<T>::type &&t) {
  * constructors) to zero with `memset` is a good enough workaround. */
 template <typename T>
 inline typename remove_reference<T>::type zero() {
-    static_assert(std::is_standard_layout<typename remove_reference<T>::type>::value, "zero<T> should have standard layout");
+    static_assert(
+            std::is_standard_layout<typename remove_reference<T>::type>::value,
+            "zero<T> should have standard layout");
     auto zero = typename remove_reference<T>::type();
 #if DNNL_BUG_VALUE_INITIALIZATION
     // Adjust bug handling as required for bad compilers.
@@ -221,9 +223,12 @@ inline void array_copy(T *dst, const T *src, size_t size) {
 template <typename T>
 inline bool array_cmp(const T *a1, const T *a2, size_t size) {
 #if defined(__ve)
-    bool ret=true;
+    bool ret = true;
     for (size_t i = 0; i < size; ++i)
-        if (a1[i] != a2[i]) {ret=false; break; }
+        if (a1[i] != a2[i]) {
+            ret = false;
+            break;
+        }
     return ret;
 #else
     for (size_t i = 0; i < size; ++i)
@@ -355,7 +360,8 @@ inline T nd_iterator_init(T start) {
 template <typename T, typename U, typename W, typename... Args>
 inline T nd_iterator_init(T start, U &x, const W &X, Args &&... tuple) {
     start = nd_iterator_init(start, utils::forward<Args>(tuple)...);
-    x = static_cast<U>(start % static_cast<T>(X)); // ignore "loss of precision" warnings
+    x = static_cast<U>(
+            start % static_cast<T>(X)); // ignore "loss of precision" warnings
     return start / static_cast<T>(X);
     // XXX maybe do in "larger-of" type ?
     //typedef decltype(start + x) TU_t;

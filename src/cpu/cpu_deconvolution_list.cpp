@@ -34,6 +34,7 @@ using namespace dnnl::impl::data_type;
 /// @copydoc INSTANCE_CREATOR
 #define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
 static const pd_create_f impl_list[] = {
+        // clang-format off
         INSTANCE_avx512(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<u8, f32>)
         INSTANCE_avx512(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<u8, s32>)
         INSTANCE_avx512(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<u8, u8>)
@@ -54,6 +55,7 @@ static const pd_create_f impl_list[] = {
         INSTANCE(ref_deconvolution_bwd_weights_t)
         INSTANCE(ref_deconvolution_bwd_data_t)
         INSTANCE(ref_deconvolution_fwd_t)
+        // clang-format on
         /* eol */
         nullptr,
 };

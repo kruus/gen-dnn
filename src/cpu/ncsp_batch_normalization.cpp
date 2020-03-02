@@ -164,8 +164,7 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
                             cvt_bfloat16_to_float(tmp_src + S_s,
                                     (bfloat16_t *)src + soff + S_s, S_chunk);
                             scr_fp32 = tmp_src;
-                        } else
-                        {
+                        } else {
                             scr_fp32 = reinterpret_cast<const acc_data_t *>(
                                     src + soff);
                         }
@@ -173,7 +172,7 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
                         for (dim_t sp = S_s; sp < S_e; ++sp) {
                             sum += scr_fp32[sp];
                         }
-                }
+                    }
                     ws_reduce[ws_iter_off + SP_N_ithr * C_blks_per_iter + c]
                             = sum;
                 }
@@ -207,8 +206,7 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
                             cvt_bfloat16_to_float(tmp_src + S_s,
                                     (bfloat16_t *)src + soff + S_s, S_chunk);
                             _src = tmp_src;
-                        } else
-                        {
+                        } else {
                             _src = reinterpret_cast<const acc_data_t *>(
                                     src + soff);
                         }
@@ -217,7 +215,7 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
                             acc_data_t m = _src[sp] - mean[off];
                             sum += m * m;
                         }
-                }
+                    }
                     ws_reduce[ws_iter_off + SP_N_ithr * C_blks_per_iter + c]
                             = sum;
                 }
@@ -261,8 +259,7 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
                         cvt_bfloat16_to_float(tmp_src + S_s,
                                 (bfloat16_t *)src + s_off + S_s, S_chunk);
                         _src = tmp_src;
-                    } else
-                    {
+                    } else {
                         _dst = reinterpret_cast<acc_data_t *>(dst + s_off);
                         _src = reinterpret_cast<const acc_data_t *>(
                                 src + s_off);
@@ -288,9 +285,9 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
                         cvt_float_to_bfloat16((bfloat16_t *)dst + s_off + S_s,
                                 _dst + S_s, S_chunk);
                     }
+                }
             }
         }
-    }
     });
 }
 
@@ -409,8 +406,7 @@ void ncsp_batch_normalization_bwd_t<d_type>::execute_backward(
                         cvt_bfloat16_to_float(tmp_src + S_s,
                                 (bfloat16_t *)src + s_off + S_s, S_chunk);
                         _src = tmp_src;
-                    } else
-                    {
+                    } else {
                         _diff_dst = reinterpret_cast<const acc_data_t *>(
                                 diff_dst + s_off);
                         _src = reinterpret_cast<const acc_data_t *>(
@@ -427,7 +423,7 @@ void ncsp_batch_normalization_bwd_t<d_type>::execute_backward(
                         diff_gamma += (_src[sp] - v_mean) * dd;
                         diff_beta += dd;
                     }
-            }
+                }
                 ws_reduce[ws_iter_off + SP_N_ithr * C_blks_per_iter + c]
                         = diff_gamma;
                 ws_reduce[ws_iter_off + SP_N_nthr * C_blks_per_iter
@@ -484,8 +480,7 @@ void ncsp_batch_normalization_bwd_t<d_type>::execute_backward(
                         } else
                             _src = nullptr; // to avoid compiler warning w/
                                     // gcc483
-                    } else
-                    {
+                    } else {
                         assert(d_type != bf16);
                         _diff_src = reinterpret_cast<acc_data_t *>(
                                 diff_src + s_off);

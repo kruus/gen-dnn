@@ -33,6 +33,7 @@ using namespace dnnl::impl::data_type;
 /// @copydoc INSTANCE_CREATOR
 #define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
 static const pd_create_f impl_list[] = {
+        // clang-format off
         INSTANCE_avx512(jit_uni_eltwise_fwd_t<avx512_common, f32>)
         INSTANCE_avx512(jit_uni_eltwise_fwd_t<avx512_common, s32>)
         INSTANCE_avx512(jit_uni_eltwise_fwd_t<avx512_common, s8>)
@@ -55,6 +56,7 @@ static const pd_create_f impl_list[] = {
         INSTANCE(ref_eltwise_fwd_t<s8>)
         INSTANCE(ref_eltwise_fwd_t<u8>)
         INSTANCE(ref_eltwise_bwd_t<s32>)
+        // clang-format on
         /* eol */
         nullptr,
 };

@@ -901,7 +901,8 @@ int main(int argc, char **argv) {
         std::cerr << "message: " << e.message << std::endl;
     }
 #else
-    std::cerr << "message: " << "development build -- no rnn support" << std::endl;
+    std::cerr << "message: "
+              << "development build -- no rnn support" << std::endl;
 #endif // DNNL_ENABLE_RNN
     return 0;
 }

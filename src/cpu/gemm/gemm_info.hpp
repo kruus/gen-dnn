@@ -17,10 +17,10 @@
 #ifndef GEMM_INFO_HPP
 #define GEMM_INFO_HPP
 
-#include "cpu_isa_traits.hpp"
 #include <cstdint>
 #include <memory>
 #include "c_types_map.hpp"
+#include "cpu_isa_traits.hpp"
 #include "gemm_pack_storage.hpp"
 #include "gemm_threading.hpp"
 
@@ -35,8 +35,8 @@
 #define MKLDNN_CPU_GEMM_JIT 0
 #endif
 
-#define ASSERT_MKLDNN_CPU_GEMM_JIT static_assert \
-    ( MKLDNN_CPU_GEMM_JIT, "MKLDNN_CPU_GEMM_JIT required here" )
+#define ASSERT_MKLDNN_CPU_GEMM_JIT \
+    static_assert(MKLDNN_CPU_GEMM_JIT, "MKLDNN_CPU_GEMM_JIT required here")
 
 namespace dnnl {
 namespace impl {

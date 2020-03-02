@@ -65,7 +65,7 @@ dnnl::engine::kind get_test_engine_kind();
 inline void show_dnnl_build() {
     printf("DNNL build : %s", DNNL_BUILD_STRING);
     int const v = dnnl_get_verbose();
-    if(v>0) printf(" DNNL_VERBOSE=%d", v);
+    if (v > 0) printf(" DNNL_VERBOSE=%d", v);
     printf("\n");
 }
 
@@ -798,5 +798,4 @@ void test_bwd_pd_constructors(const op_desc_t &op_desc, const pd_t &pd,
     test_bwd_pd_allow_empty<op_desc_t, pd_t>(test_pd, hint_pd);
 }
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

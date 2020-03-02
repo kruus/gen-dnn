@@ -78,7 +78,10 @@ set(DNNL_ISA_VE_FULL            32)
 # Determine target CPU (governed by available compiler / environment CC),
 # and then determine what the default -DDNNL_ISA=FULL build should mean
 #
-if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86_64|aarch64.*|AARCH64.*|arm64.*|ARM64.*")
+if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "^(x86_64|aarch64.*|AARCH64.*|arm64.*|ARM64.*)")
+    # XXX As far as I could tell, aarch64 and arm64 still try to compile jit impls
+    #     How are these architectures compatible with xbyak jit?
+
     # for xbyak jit support all treated as "same" cross-compilation target.
     # TARGET_ARCH in https://github.com/intel/mkl-dnn/pull/658 disambiguates
     set(DNNL_CPU ${DNNL_CPU_X86})

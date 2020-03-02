@@ -22,29 +22,31 @@
  */
 
 #include "dnnl.h"
-#include "dnnl_types.h"
 #include "dnnl_config.h"
+#include "dnnl_types.h"
 
 #include "dnnl_thread.hpp"
 #include "utils.hpp"
 
 #if defined(_WIN32) && !defined(__GNUC__)
-#   define STRUCT_ALIGN(al, ...) __declspec(align(al)) __VA_ARGS__
+#define STRUCT_ALIGN(al, ...) __declspec(align(al)) __VA_ARGS__
 #elif defined(__ve)
-#   define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__((al)>16? 16: (al))))
+#define STRUCT_ALIGN(al, ...) \
+    __VA_ARGS__ __attribute__((__aligned__((al) > 16 ? 16 : (al))))
 #else
-#   define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__(al)))
+#define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__(al)))
 #endif
 
 // Any restrictions on alignas(expression)?
 #ifdef __ve
-#   define alignas(x) alignas((x) > 16 ? 16 : (x))
+#define alignas(x) alignas((x) > 16 ? 16 : (x))
 #endif
 
 // How is the restrict keyword handled? (disallow it as you encounter errors, please)
 // Actually dnnl sources seem to use __restrict throughout, avoiding C++ restrict keyword
 
-#if defined(__ve) // cross-compilers may or may not be happy with restrict or __restrict
+#if defined( \
+        __ve) // cross-compilers may or may not be happy with restrict or __restrict
 #elif defined(WIN32)
 #elif defined(__INTEL_COMPILER)
 //#   define restrict __restrict__ /* historical? */
@@ -90,34 +92,34 @@ enum cpu_isa_bit_t : unsigned {
     /** impls using only C/C++ code. Typicall ref impls, but may be built
      * to use external gemm routines (cblas/MKL). inline assembler only when
      * absolutely necessary (by checking compile flags). */
-    vanilla_bit         = 1U << 0,
+    vanilla_bit = 1U << 0,
     /// @defgroup x86_jit_flags x86 JIT levels
     //@{
-    x86_common_bit      = 1U << 1, ///< [for completeness] x86 [+ jit allowed]
-    sse41_bit           = 1u << 2,
-    avx_bit             = 1u << 3,
-    avx2_bit            = 1u << 4,
-    avx512_common_bit   = 1u << 5,
-    avx512_mic_bit      = 1u << 6,
+    x86_common_bit = 1U << 1, ///< [for completeness] x86 [+ jit allowed]
+    sse41_bit = 1u << 2,
+    avx_bit = 1u << 3,
+    avx2_bit = 1u << 4,
+    avx512_common_bit = 1u << 5,
+    avx512_mic_bit = 1u << 6,
     avx512_mic_4ops_bit = 1u << 7,
-    avx512_core_bit     = 1u << 8,
-    avx512_core_vnni_bit =1u << 9,
-    avx512_core_bf16_bit =1u << 10,
-    x86_11_bit          = 1u << 11, ///< future use
-    x86_12_bit          = 1u << 12, ///< future use
-    x86_13_bit          = 1u << 13, ///< future use
-    x86_14_bit          = 1u << 14, ///< future use
-    x86_15_bit          = 1u << 15, ///< future use
-    x86_bits            = 0xffffu,  ///< set of x86 flags
+    avx512_core_bit = 1u << 8,
+    avx512_core_vnni_bit = 1u << 9,
+    avx512_core_bf16_bit = 1u << 10,
+    x86_11_bit = 1u << 11, ///< future use
+    x86_12_bit = 1u << 12, ///< future use
+    x86_13_bit = 1u << 13, ///< future use
+    x86_14_bit = 1u << 14, ///< future use
+    x86_15_bit = 1u << 15, ///< future use
+    x86_bits = 0xffffu, ///< set of x86 flags
     //x86_jit_bits        = x86_bits ^ vanilla_bit,
     ///@}
     /// @defgroup VE_extensions VE extended capabilities
     ///@{
     /// perhaps remove ve_common* (force it identical to vanilla)?
-    ve_common_bit       = 1u << 16, ///< without libvednn support
-    ve_vednn_bit        = 1u << 17, ///< DNNL_CPU_VE with libvednn support
-    ve_vejit_bit        = 1u << 18, ///< VE with jit support, also via libvednn
-    ve_bits             = vanilla_bit | 0x80000u, ///< set of VE flags
+    ve_common_bit = 1u << 16, ///< without libvednn support
+    ve_vednn_bit = 1u << 17, ///< DNNL_CPU_VE with libvednn support
+    ve_vejit_bit = 1u << 18, ///< VE with jit support, also via libvednn
+    ve_bits = vanilla_bit | 0x80000u, ///< set of VE flags
     ///@}
 };
 
@@ -128,7 +130,7 @@ enum cpu_isa_t : unsigned {
      * satisfies `mayiuse(unkown)==false`.  For multiple cpus, now
      * isa_all always represents the "most basic" ISA, and has
      * mayiuse(isa_all)==true.  \c unknown might not be necessary. */
-    unknown             = 0,
+    unknown = 0,
 
     /** \enum vanilla
      * cpu-agnostic ref code only (possibly cblas/mkl calls).
@@ -136,46 +138,47 @@ enum cpu_isa_t : unsigned {
      * lowest common denominator.
      * \todo could \c vanilla be 0x00 (avoiding vanilla_bit)?
      */
-    vanilla             = vanilla_bit,
+    vanilla = vanilla_bit,
     // isa_any=0u was removed,
     //   replaced with isa_all (non-zero)
     //   catch attempts to use old isa_all with 'unknown' ?
     // isa_all=~0u should use the isa_full mask
     /// @defgroup x86_jit_masks x86-specific jit masks
     //@{
-    x86_common          = x86_common_bit | vanilla, // like old "all"
-    sse41               = sse41_bit | x86_common,
-    avx                 = avx_bit | sse41,
-    avx2                = avx2_bit | avx,
+    x86_common = x86_common_bit | vanilla, // like old "all"
+    sse41 = sse41_bit | x86_common,
+    avx = avx_bit | sse41,
+    avx2 = avx2_bit | avx,
     //
-    avx512_common       = avx512_common_bit | vanilla,
-    avx512_mic          = avx512_mic_bit | avx512_common,
-    avx512_mic_4ops     = avx512_mic_4ops_bit | avx512_mic,
+    avx512_common = avx512_common_bit | vanilla,
+    avx512_mic = avx512_mic_bit | avx512_common,
+    avx512_mic_4ops = avx512_mic_4ops_bit | avx512_mic,
     //
-    avx512_core         = avx512_core_bit | avx512_common,
-    avx512_core_vnni    = avx512_core_vnni_bit | avx512_core,
-    avx512_core_bf16    = avx512_core_bf16_bit | avx512_core_vnni,
-    x86_full            = x86_bits,
+    avx512_core = avx512_core_bit | avx512_common,
+    avx512_core_vnni = avx512_core_vnni_bit | avx512_core,
+    avx512_core_bf16 = avx512_core_bf16_bit | avx512_core_vnni,
+    x86_full = x86_bits,
     //@}
     /// @defgroup ve_jit_masks VE-specific implementation masks
     //@{
-    ve_common = ve_common_bit | vanilla, // ref impls allowed to expand on vanilla
-    vednn     = ve_vednn_bit | ve_common,
-    vejit     = ve_vejit_bit | vednn,
-    ve_full   = ve_bits,
-    //@}
-    /// @defgroup cpu_agnostic_masks VANILLA and FULL DNNL_ISA settings
-    //@{
-    // Now (mainly) just have VANILLA and FULL that get remapped somehow
-    // Well, let's keep VANILLA as is (could remap to x86_common or ve_common?)
+    ve_common
+    = ve_common_bit | vanilla, // ref impls allowed to expand on vanilla
+    vednn = ve_vednn_bit | ve_common,
+    vejit = ve_vejit_bit | vednn,
+    ve_full = ve_bits,
+//@}
+/// @defgroup cpu_agnostic_masks VANILLA and FULL DNNL_ISA settings
+//@{
+// Now (mainly) just have VANILLA and FULL that get remapped somehow
+// Well, let's keep VANILLA as is (could remap to x86_common or ve_common?)
 #if DNNL_CPU == DNNL_CPU_X86
     // Note: isa_any used to be zero, and behaved as false==mayiuse(isa_any)
     //       now we use zero for 'unknown', and still have mayiuse(unknown)==false
     isa_all = x86_common,
-    isa_full = x86_full,        // all varieties of x86 jit
+    isa_full = x86_full, // all varieties of x86 jit
 #elif DNNL_CPU == DNNL_CPU_VE
     isa_all = ve_common,
-    isa_full = ve_full,         // all types of VE optimizations
+    isa_full = ve_full, // all types of VE optimizations
 #else
 #error "isa_all and isa_full for this cpu MUST be defined"
 #endif
@@ -195,6 +198,10 @@ struct cpu_isa_traits<vanilla> { // MUST work for any cpu (X86, VE, ...)
 };
 
 /// ALL is (at least semantically) a step up from VANILLA (now depends on cpu).
+/// For compatibility with docs, which adopt a somewhat confusing choice,
+///     "The `DNNL_MAX_CPU_ISA=ALL` setting implies no restrictions",
+/// we map the string "COMMON" to dnnl_cpu_isa_all, the "most basic" isa.
+/// And we map the string "ALL" to dnnl_cpu_isa_full (below)
 template <>
 struct cpu_isa_traits<x86_common> {
     static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_all;
@@ -208,10 +215,9 @@ struct cpu_isa_traits<ve_common> {
     static constexpr const char *user_option_env = "ALL";
     // 2 kBit vector regs (256 double or 512 packed float)
     static constexpr int vlen_shift = 8; // CHECK! also try nc++ -mpacked-float
-    static constexpr int vlen = (1<<(vlen_shift-1))*8;
+    static constexpr int vlen = (1 << (vlen_shift - 1)) * 8;
     static constexpr int n_vregs = 64;
 };
-
 
 /// x86-specific
 //@{
@@ -289,19 +295,23 @@ struct cpu_isa_traits<avx512_core_bf16> : public cpu_isa_traits<avx512_core> {
 };
 //@}
 
-/// FULL, naturally, depends on cmake auto-determined DNNL_CPU build target.
+/// FULL (oops "ALL") now depends on cmake auto-determined DNNL_CPU build target.
+///  Note: there are several flip-flops about how "all" is interpreted.
+///  For compatibility with \ref doc/performance_considerations/dispatcher_control.md
+///  We retain the mapping of "ALL" to "all bells and whistles", which
+///  corresponds to the CPU-agnostic `dnnl_cpu_isa_full` enum value.
 template <>
 struct cpu_isa_traits<x86_full> : public cpu_isa_traits<avx512_core> {
     static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_full;
-    static constexpr const char *user_option_env = "FULL";
+    static constexpr const char *user_option_env = "ALL";
 };
 template <>
 struct cpu_isa_traits<ve_full> : public cpu_isa_traits<ve_common> {
     static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_full;
-    static constexpr const char *user_option_env = "FULL";
+    static constexpr const char *user_option_env = "ALL";
 };
 
-/// only for cross-compilation builds (
+/// only for cross-compilation builds
 //@{
 template <>
 struct cpu_isa_traits<vednn> : public cpu_isa_traits<ve_common> {
@@ -333,27 +343,30 @@ namespace {
  *         or \c unknown.
  * \todo \c from_dnnl sig could use C++ enum as "cpu_isa_t from_dnnl(cpu_isa isa)"
  * \todo perhaps remove this function \sa tests/gtests/test_isa_iface.cpp */
-static inline cpu_isa_t from_dnnl(dnnl_cpu_isa_t isa){
-    static int const verbose=0;
+static inline cpu_isa_t from_dnnl(dnnl_cpu_isa_t isa) {
+    static int const verbose = 0;
     using namespace dnnl::impl;
     using namespace dnnl::impl::cpu;
 
     // return \c unknown if unrecognized
     cpu_isa_t isa_to_set = unknown;
 #define HANDLE_CASE(CPU_ISA_T) \
-    case cpu_isa_traits<CPU_ISA_T>::user_option_val: isa_to_set = CPU_ISA_T; break;
+    case cpu_isa_traits<CPU_ISA_T>::user_option_val: \
+        isa_to_set = CPU_ISA_T; \
+        break;
 
     // convert a dnnl.h \c isa value to internal \c cpu_isa_t
     switch (isa) {
         // Note cases here should match init_max_cpu_isa()
         // All target cpus support "VANILLA", "FULL", and "ALL"
         HANDLE_CASE(vanilla);
-        HANDLE_CASE(isa_all);  // covers x86_common and ve_common (almost same as vanilla)
+        HANDLE_CASE(
+                isa_all); // covers x86_common and ve_common (almost same as vanilla)
         HANDLE_CASE(isa_full); // covers x86_full and ve_full
 #if TARGET_X86
         //HANDLE_CASE(x86_common);// "ALL" (mostly vanilla, but jit technically allowed)
         //HANDLE_CASE(x86_full);  // "FULL"
-        HANDLE_CASE(sse41);     // x86 jit with vec ops
+        HANDLE_CASE(sse41); // x86 jit with vec ops
         HANDLE_CASE(avx);
         HANDLE_CASE(avx2);
         HANDLE_CASE(avx512_mic);
@@ -364,18 +377,17 @@ static inline cpu_isa_t from_dnnl(dnnl_cpu_isa_t isa){
 #elif TARGET_VE
         //HANDLE_CASE(ve_common); // "ALL" (identical to vanilla, for now)
         //HANDLE_CASE(ve_full);   // "FULL" vednn + libvednn jit
-        HANDLE_CASE(vednn);     // vanilla + libvednn "C" api
-        HANDLE_CASE(vejit);     // vednn + libvednn jit
+        HANDLE_CASE(vednn); // vanilla + libvednn "C" api
+        HANDLE_CASE(vejit); // vednn + libvednn jit
 #endif
-        default: /*unknown*/ ;
+        default: /*unknown*/;
     }
 #undef HANDLE_CASE
-    if(verbose)
-        printf(" from_dnnl(0x%lx) --> cpu_isa_t(0x%lx)\n",
-                (long)isa, (long)isa_to_set);
+    if (verbose)
+        printf(" from_dnnl(0x%lx) --> cpu_isa_t(0x%lx)\n", (long)isa,
+                (long)isa_to_set);
     return isa_to_set;
 }
-
 
 #if TARGET_X86_JIT
 static Xbyak::util::Cpu cpu;
@@ -388,15 +400,17 @@ static Xbyak::util::Cpu cpu;
  */
 static inline bool mayiuse(const cpu_isa_t cpuIsaT, const bool soft = false) {
     // reminder:
-    static_assert(isa_all == (int)x86_common, "changed VE alias for cpuIsaT 'all'?");
-    static_assert(isa_full == (int)x86_full, "changed VE alias for cpuIsaT 'full'?");
+    static_assert(
+            isa_all == (int)x86_common, "changed VE alias for cpuIsaT 'all'?");
+    static_assert(
+            isa_full == (int)x86_full, "changed VE alias for cpuIsaT 'full'?");
     using namespace Xbyak::util;
 
     // Say no quickly if cpuIsaT fails runtime CPU dispatch check
     //                or cpuIsaT is for a different cpu .
     unsigned cpu_isa_mask = get_max_cpu_isa(soft);
     if ((cpu_isa_mask & cpuIsaT) != cpuIsaT) return false;
-    assert(cpuIsaT != unknown /*0*/ ); // old 'isa_all' enum
+    assert(cpuIsaT != unknown /*0*/); // old 'isa_all' enum
 
     switch (cpuIsaT) {
         case vanilla: return true;
@@ -421,15 +435,12 @@ static inline bool mayiuse(const cpu_isa_t cpuIsaT, const bool soft = false) {
         case avx512_core_bf16:
             return mayiuse(avx512_core_vnni, soft)
                     && cpu.has(Cpu::tAVX512_BF16);
-        default:
-                      assert(!"unhandled x86 mayiuse");
-                      return false;
+        default: assert(!"unhandled x86 mayiuse"); return false;
     }
     return false;
 }
 
-#elif TARGET_X86 \
-    || (TARGET_VE && DNNL_ISA <= DNNL_ISA_VE)
+#elif TARGET_X86 || (TARGET_VE && DNNL_ISA <= DNNL_ISA_VE)
 // cmake -DDNNL_ISA=VANILLA build for x86 has only the VANILLA impls
 // cmake -DDNNL_ISA=ALL build for VE also only has the VANILLA impls (so far)
 static inline constexpr bool mayiuse(
@@ -457,24 +468,29 @@ static inline bool mayiuse(cpu_isa_t const cpuIsaT, bool const soft = false) {
     //            forks begin with only VANILLA, so runtime dispatch irrelevant
     unsigned cpu_isa_mask = ve_full; // enough to reject mayiuse(wrong-cpu)
     if ((cpu_isa_mask & cpuIsaT) != cpuIsaT) return false;
-    assert(cpuIsaT != unknown /*0*/ ); // old 'isa_all' enum
+    assert(cpuIsaT != unknown /*0*/); // old 'isa_all' enum
 
     // Do check any compile-time DNNL_ISA cap.
-    static_assert(isa_full == (int)ve_full, "changed VE alias for cpuIsaT 'full'?");
-    static_assert(isa_all == (int)ve_bits, "changed VE alias for cpuIsaT 'all'?");
+    static_assert(
+            isa_full == (int)ve_full, "changed VE alias for cpuIsaT 'full'?");
+    static_assert(
+            isa_all == (int)ve_bits, "changed VE alias for cpuIsaT 'all'?");
     // we check for cpuIsaT at or under the compile-time DNNL_ISA cap,
     // but have not checked for runtime get_max_cpu_isa(soft) CPU dispatch limit
-    return (cpuIsaT==vanilla || cpuIsaT==ve_common)? true
+    return (cpuIsaT == vanilla || cpuIsaT == ve_common)
+            ? true
             //: cpuIsaT==isa_all? true /*aliased to ve_common*/
-            : cpuIsaT==vednn? (DNNL_ISA >= DNNL_ISA_VEDNN)
-            : cpuIsaT==vejit? (DNNL_ISA >= DNNL_ISA_VEJIT)
-            // did I alias isa_full to isa VEJIT? maybe not...
-            : cpuIsaT==isa_full? (DNNL_ISA >= DNNL_ISA_VE_FULL)
-            : false;
+            : cpuIsaT == vednn ? (DNNL_ISA >= DNNL_ISA_VEDNN)
+                               : cpuIsaT == vejit
+                            ? (DNNL_ISA >= DNNL_ISA_VEJIT)
+                            // did I alias isa_full to isa VEJIT? maybe not...
+                            : cpuIsaT == isa_full
+                                    ? (DNNL_ISA >= DNNL_ISA_VE_FULL)
+                                    : false;
 #else
     // -DDNNL_ISA=VEDNN or VEJIT or FULL are not available in Intel master
-    return ((void)soft,(void)cpuIsaT,
-        cpuIsaT==vanilla || cpuIsaT==isa_all);
+    return ((void)soft, (void)cpuIsaT,
+            cpuIsaT == vanilla || cpuIsaT == isa_all);
 #endif // DNNL_ENABLE_MAX_CPU_ISA
 }
 
@@ -484,7 +500,7 @@ static inline bool mayiuse(cpu_isa_t const cpuIsaT, bool const soft = false) {
 } // namespace
 
 namespace {
-inline unsigned int get_cache_size(int level, bool per_core = true){
+inline unsigned int get_cache_size(int level, bool per_core = true) {
     unsigned int l = level - 1;
 #if TARGET_X86_JIT
     unsigned const cpuDataCacheLevels = cpu.getDataCacheLevels();
@@ -493,25 +509,26 @@ inline unsigned int get_cache_size(int level, bool per_core = true){
 #endif
     // Currently, if XByak is not able to fetch the cache topology
     // we default to 32KB of L1, 512KB of L2 and 1MB of L3 per core.
-    if (cpuDataCacheLevels == 0){
+    if (cpuDataCacheLevels == 0) {
 #if TARGET_VE
         const int L1_cache_per_core = 32000; // each, for data and instruction
         const int L2_cache_per_core = 256000;
-        const int L3_cache_per_core = 16*1024*1024 / 8; // 16G per chip of 8 processors (today)
+        const int L3_cache_per_core
+                = 16 * 1024 * 1024 / 8; // 16G per chip of 8 processors (today)
 #else
         const int L1_cache_per_core = 32000;
         const int L2_cache_per_core = 512000;
         const int L3_cache_per_core = 1024000;
-#if ! TARGET_X86
+#if !TARGET_X86
 #warning "Guessed cache sizes for this CPU!"
 #endif
 #endif
         int num_cores = per_core ? 1 : dnnl_get_max_threads();
-        switch(l){
-        case(0): return L1_cache_per_core * num_cores;
-        case(1): return L2_cache_per_core * num_cores;
-        case(2): return L3_cache_per_core * num_cores;
-        default: return 0;
+        switch (l) {
+            case (0): return L1_cache_per_core * num_cores;
+            case (1): return L2_cache_per_core * num_cores;
+            case (2): return L3_cache_per_core * num_cores;
+            default: return 0;
         }
     }
 #if TARGET_X86_JIT

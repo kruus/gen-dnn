@@ -20,9 +20,9 @@
 #include <assert.h>
 
 #include "c_types_map.hpp"
+#include "consistency.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
-#include "consistency.hpp"
 
 #include "cpu_convolution_pd.hpp"
 #include "ref_eltwise.hpp"
@@ -60,8 +60,8 @@ struct ref_convolution_fwd_t : public primitive_impl_t {
                                     bias_md_.data_type == f32)));
             AND_(set_default_formats());
             AND_(attr()->has_default_values(
-                        primitive_attr_t::skip_mask_t::oscale
-                        | primitive_attr_t::skip_mask_t::post_ops));
+                    primitive_attr_t::skip_mask_t::oscale
+                    | primitive_attr_t::skip_mask_t::post_ops));
             AND_(output_scales_mask_ok() && post_ops_ok());
 #undef AND_
 #else

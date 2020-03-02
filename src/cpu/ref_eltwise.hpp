@@ -82,13 +82,12 @@ struct ref_eltwise_fwd_t : public primitive_impl_t {
                     && IMPLICATION(use_generic, one_of(src_d.ndims(), 4, 5))
                     && attr()->has_default_values();
 #else // debug
-#define AND_(...) SCHKV(ok,__VA_ARGS__)
+#define AND_(...) SCHKV(ok, __VA_ARGS__)
             Consistency ok("\nref_eltwise_fwd_init !ok :");
             AND_(is_fwd());
             AND_(everyone_is(data_type, desc()->data_desc.data_type));
             /*bf16<->f32 cvt operators don't work on non-avx512_core*/
-            AND_(IMPLICATION(
-                    desc()->data_desc.data_type == data_type::bf16,
+            AND_(IMPLICATION(desc()->data_desc.data_type == data_type::bf16,
                     mayiuse(avx512_core)));
             AND_(IMPLICATION(use_generic, one_of(src_d.ndims(), 4, 5)));
             AND_(attr()->has_default_values());

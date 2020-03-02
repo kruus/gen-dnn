@@ -30,13 +30,13 @@
  * - DNNL_USE_MKL (implies DNNL_USE_CBLAS) same as above + allow using igemm
  *   and packed gemm from Intel MKL library.
  *
- *  New:  USE_MKL and USE_CBLAS flags were replaced by above flags that are
- *  set on the cmake command line, like
+ *  New:  USE_MKL and USE_CBLAS compile flags were replaced by above cmake flags
+ *  that are set like
  *    `cmake -DDNNL_CPU_EXTERNAL_GEMM=NONE|MKL|CBLAS`.
- *  Results are propagated via dnnl_config.h
+ *  USE_MKL and USE_CBLAS are now propagated via dnnl_config.h & cpu_target.h
  */
-//#include "dnnl_config.h"      // provides DNNL_USE_MKL and DNNL_USE_CBLAS
-#include "cpu_target.h"         // we want USE_MKL and USE_CBLAS shortcuts
+#include "cpu_target.h" // we want USE_MKL and USE_CBLAS shortcuts
+#include "dnnl_config.h" // provides DNNL_USE_MKL and DNNL_USE_CBLAS
 
 #if defined(USE_MKL)
 
@@ -93,9 +93,9 @@ typedef CBLAS_ORDER CBLAS_LAYOUT;
 #endif
 #endif
 
-}
-}
-}
+} // namespace cpu
+} // namespace impl
+} // namespace mkldnn
 
 #endif /* OS_BLAS_HPP */
 

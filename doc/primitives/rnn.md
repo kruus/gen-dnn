@@ -6,7 +6,8 @@ RNN {#dev_guide_rnn}
 >
 
 The RNN primitive computes a stack of unrolled recurrent cells, as depicted in
-Figure 1. \bias, \srciter and \dstiter are optional parameters. If not
+Figure 1. \bias, \srciter and \dstiter are optional parameters (the
+variable names follow the standard @ref dev_guide_conventions). If not
 provided, \bias and \srciter will default to 0.
 
 @img{unrolled_stack_rnn.jpg,Figure 1: Example of stacked recurrent cells unrolled over the time dimension and executed with the `left2right` direction. Dashed lines represent optional parameters.,}
@@ -295,10 +296,10 @@ primitive for each input and output memory object.
 
 ## Data Representation
 
-In the DNNL programming model, the RNN primitive is one of a few that
-support the placeholder memory format memory::format::any (shortened
-to `any` from now on) and can define data and weight memory objects format based
-on the primitive parameters.
+In the DNNL programming model, the RNN primitive is one of a few that support
+the placeholder memory format #dnnl::memory::format::any (shortened to `any`
+from now on) and can define data and weight memory objects format based on the
+primitive parameters.
 
 The following table summarizes the data layouts supported by the RNN
 primitive.

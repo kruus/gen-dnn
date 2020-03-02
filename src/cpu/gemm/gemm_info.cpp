@@ -17,11 +17,11 @@
 #include <cstdint>
 #include <mutex>
 
-#include "gemm_info.hpp"
+#include "common/bfloat16.hpp"
+#include "cpu_isa_traits.hpp"
 #include "dnnl_traits.hpp"
 #include "dnnl_types.h"
-#include "cpu_isa_traits.hpp"
-#include "common/bfloat16.hpp"
+#include "gemm_info.hpp"
 #if MKLDNN_CPU_GEMM_JIT
 #include "bf16/common_s16.hpp"
 #include "bf16/jit_avx512_core_gemm_bf16bf16f32_kern.hpp"
@@ -517,7 +517,6 @@ void gemm_info_t<a_t, b_t, c_t>::jit_init(void) {
         }
         // NO non-jit kernels.  copyA, copyB remain NULL
 #endif // MKLDNN_CPU_GEMM_JIT
-
     });
 
     int doSumA = this->bo != 0 ? do_sum : no_sum;

@@ -48,7 +48,7 @@ static void test_init(int argc, char *argv[]);
 
 class DnnlBuildPrinter : public EmptyTestEventListener {
 protected:
-    void OnTestProgramStart(const UnitTest& /*unit_test*/) override {
+    void OnTestProgramStart(const UnitTest & /*unit_test*/) override {
         ::show_dnnl_build();
     }
 };

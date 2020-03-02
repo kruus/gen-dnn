@@ -295,7 +295,9 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
             dnnl::impl::alg_kind_t alg;
             float scale, alpha, beta;
         };
-        struct sum_t { float scale; }; // avoid "type declared in anon union" warning
+        struct sum_t {
+            float scale;
+        }; // avoid "type declared in anon union" warning
 
         dnnl::impl::primitive_kind_t kind;
         union {
@@ -383,7 +385,7 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
 
 struct dnnl_primitive_attr : public dnnl::impl::c_compatible {
     dnnl_primitive_attr()
-            : scratchpad_mode_(dnnl::impl::scratchpad_mode::library) {}
+        : scratchpad_mode_(dnnl::impl::scratchpad_mode::library) {}
     // note: some data intentionally uninitialized
 
     dnnl_primitive_attr *clone() const {
