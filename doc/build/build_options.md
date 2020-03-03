@@ -15,6 +15,7 @@ DNNL supports the following build-time options.
 | DNNL_ENABLE_JIT_PROFILING   | **ON**, OFF                         | Enables integration with Intel(R) VTune(TM) Amplifier
 | DNNL_ENABLE_PRIMITIVE_CACHE | ON, **OFF**                         | Enables primitive cache
 | DNNL_ENABLE_MAX_CPU_ISA     | **ON**, OFF                         | Enables controlling CPU dispatcher at run-time
+| DNNL_ENABLE_MAX_CPU_ISA_VANILLA | **OFF**, ON                     | Enables extra support for CPU dispatch to VANILLA
 
 All other building options that can be found in CMake files are dedicated for
 the development/debug purposes and are subject to change without any notice.
@@ -55,11 +56,14 @@ should be set to an empty string (`""`) if the resulting library needs to be
 portable.
 
 ### Runtime CPU dispatcher control
-DNNL JIT relies on ISA features obtained from the processor it is being run
-on.  There are situations when it is necessary to control this behavior at
-run-time to, for example, test SSE4.1 code on an AVX2-capable processor. The
+DNNL JIT relies on ISA features obtained from the processor it is being run on.
+There are situations when it is necessary to control this behavior at run-time
+to, for example, test SSE4.1 code on an AVX2-capable processor. The
 `DNNL_ENABLE_MAX_CPU_ISA` build option controls the availability of this
-feature. See @ref dev_guide_cpu_dispatcher_control for more information.
+feature.  To include extra reference implementations to CPU dispatch to VANILLA
+C/C++ reference implementations (including dnnl's reference gemm), please
+configure with `DNNL_ENABLE_MAX_CPU_ISA_VANILLA`.  See @ref
+dev_guide_cpu_dispatcher_control for more information.
 
 ### Runtimes
 CPU engine can use OpenMP, TBB or sequential threading runtimes. OpenMP
@@ -114,3 +118,37 @@ explicitly specify the path to the SDK using `-DOPENCLROOT` CMake option.
 ~~~sh
 cmake -DDNNL_GPU_RUNTIME=OCL -DOPENCLROOT=/path/to/opencl/sdk ..
 ~~~
+
+## Chipset support (advanced developer topic)
+
+Intel DNNL provides a well designed API appropriate for consideration even on
+non-x86 systems.  `cmake` can be configured to build using a cross-compiler
+Forks/branches of Intel DNNL may add a toolchain file and light modifications
+of other cmake files (compiler options need to be adjusted) to build for any
+CPU.
+
+`cmake/options.cmake` should be adjusted to define two cross-platform build
+ISA's of VANILLA and FULL for your DNNL_CPU.  FULL is the default for x86
+builds.  non-x86 builds might begin just with a cross-platform VANILLA build
+that should be close to "just working":
+
+~~~
+cmake -DTOOLCHAIN_FILE=cmake/mycpu.cmake -DCPU_ISA=VANILLA ..
+~~~
+
+On your branch, besides compiler options, you should expect to adjust some
+variables like cache and page sizes, alignment restrictions,
+optimization-related macros (OpenMP support has wide variations), etc.
+
+The VANILLA build strips out xbyak and x86-jit support, supplying only C/C++
+reference implementations in the cross-compiled libdnnl.  In practice, libdnnl
+turns out to be an excellent test of your cross-compiler.  Cases of `make test`
+failures for a CPU_ISA=VANILLA configuration have almost always been traced to
+cross-compiler bugs.
+
+The DNNL API configuration and version files have been extended to better show
+the build configuration.  gtests now frequently print the DNNL_BUILD_STRING,
+which should mirror any 'nonstandard' build options used for libdnnl.
+
+A -DCPU_ISA=VANILLA build has limited support for bfloat16, and (WIP) RNN
+support is disabled (some components lack a reference impl).

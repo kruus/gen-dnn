@@ -55,6 +55,15 @@
 
 /// @endcond
 
+/// @addtogroup dnnl_api
+//@{
+/// [info] DNNL cmake Build Target String.
+/// To manage experimental builds, this string reports any non-standard
+/// <em>expert use only</em> options.  \e tests and \e benchdnn will
+/// print this string to avoid confusion in log files.
+#cmakedefine DNNL_BUILD_STRING "${DNNL_BUILD_STRING}"
+//@}
+
 // clang-format off
 
 /// @addtogroup cmake_build cmake build options
@@ -64,13 +73,6 @@
 /// Not all options are exposed as config variables, however all
 /// nonstandard supported build options should appear in DNNL_BUILD_STRING
 //@{
-
-/// [info] DNNL cmake Build Target String.
-/// To manage experimental builds, this string should also report any
-/// non-standard <em>expert use only</em> options.
-/// \e gtests and \e benchdnn will print this string to avoid confusion in log files.
-// also check that benchdnn startup prints it?
-#cmakedefine DNNL_BUILD_STRING "${DNNL_BUILD_STRING}"
 
 /// DNNL CPU threading runtime
 #cmakedefine DNNL_CPU_THREADING_RUNTIME DNNL_RUNTIME_${DNNL_CPU_THREADING_RUNTIME}
