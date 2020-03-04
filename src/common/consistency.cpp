@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2019-2020 Intel Corporation
+* Copyright 2020 NEC Labs America
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -13,24 +13,25 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+#include "consistency.hpp"
 
-#ifndef DNNL_VERSION_H
-#define DNNL_VERSION_H
+namespace dnnl {
+namespace impl {
 
-// clang-format off
+void Consistency::show(CondLocV const &cl) const {
+    if (dnnl_get_verbose() >= 3) {
+        printf(" %s [%s:%d] %s\n", pfx, cl.file, cl.line, cl.cond_msg);
+        fflush(stdout);
+    }
+}
 
-/// Major version
-#define DNNL_VERSION_MAJOR @DNNL_VERSION_MAJOR@
+void Consistency::show(CondLocVV const &cl) const {
+    if (dnnl_get_verbose() >= 3) {
+        printf(" %s [%s:%d] %s\n", pfx, cl.file, cl.line, cl.cond_msg);
+        fflush(stdout);
+    }
+}
 
-/// Minor version
-#define DNNL_VERSION_MINOR @DNNL_VERSION_MINOR@
-
-/// Patch version
-#define DNNL_VERSION_PATCH @DNNL_VERSION_PATCH@
-
-/// Git commit hash
-#define DNNL_VERSION_HASH  "@DNNL_VERSION_HASH@"
-
-// clang-format on
-
-#endif
+} // namespace impl
+} // namespace dnnl
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

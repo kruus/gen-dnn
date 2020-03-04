@@ -60,7 +60,7 @@ namespace dnnl {
 #elif TARGET_X86_JIT
 #define PUBLIC_ISA any /*jit, but not even sse41 - no jit impls for this yet*/
 #define ISA_MASK dnnl::impl::cpu::x86_any
-#warning "isa_set_once_test using dnnl_cpu_isa_all"
+#warning "isa_set_once_test using dnnl_cpu_isa_any"
 
 #elif TARGET_X86 /*x86, without jit*/
 #define PUBLIC_ISA vanilla
@@ -70,7 +70,7 @@ namespace dnnl {
 #elif TARGET_VE
 #define PUBLIC_ISA vanilla
 #define ISA_MASK dnnl::impl::cpu::ve_common
-#warning "isa_set_once_test using dnnl_cpu_isa_all"
+#warning "isa_set_once_test using dnnl_cpu_isa_any"
 #else
 #error "Please choose an appropriate dnnl_cpu_isa_FOO for this build target"
 #endif
@@ -106,7 +106,7 @@ TEST(isa_set_once_test, TestISASetOnce) {
 
     printf(" interesting values:\n");
     printf(" dnnl_cpu_isa_vanilla = %d\n", dnnl_cpu_isa_vanilla);
-    printf(" dnnl_cpu_isa_all     = %d\n", dnnl_cpu_isa_all);
+    printf(" dnnl_cpu_isa_any     = %d\n", dnnl_cpu_isa_any);
     printf(" dnnl_cpu_isa_full    = %d\n", dnnl_cpu_isa_full);
     printf(" DNNL_ISA (cmake)     = %d\n", DNNL_ISA);
     cout << " Test using dnnl_cpu_isa_t " << STR(DNNL_CPU_ISA_T) " = 0x" << hex
@@ -116,7 +116,7 @@ TEST(isa_set_once_test, TestISASetOnce) {
     printf("%s 0x%lx --> cpu_isa_t cpuisa_flags = 0x%lx\n",
             STRINGIFY(DNNL_CPU_ISA_T), (long)DNNL_CPU_ISA_T,
             (long)cpuisa_flags);
-    ASSERT_TRUE(cpuisa_flags != impl::cpu::unknown);
+    ASSERT_TRUE(cpuisa_flags != impl::cpu::isa_unknown);
 
     static const bool c_api = 1; // Both must compile
     if (c_api) {
@@ -130,7 +130,7 @@ TEST(isa_set_once_test, TestISASetOnce) {
         // safer: also call get_max_cpu_isa directly (ensure "set once" event)
         int max_cpu_isa = (int)impl::cpu::get_max_cpu_isa();
         printf(" get_max_cpu_isa() returns %d\n", max_cpu_isa);
-        ASSERT_TRUE(max_cpu_isa != impl::cpu::unknown);
+        ASSERT_TRUE(max_cpu_isa != impl::cpu::isa_unknown);
         // this now becomes a secondary test,
         // desirable, but not really absolutely necessary
         printf(" mayiuse(cpuisa_flags=%d)?\n", (int)cpuisa_flags);
@@ -155,7 +155,7 @@ TEST(isa_set_once_test, TestISASetOnce) {
         ASSERT_TRUE(st == status::success || st == status::unimplemented);
 
         // safer: also call get_max_cpu_isa directly
-        ASSERT_TRUE(impl::cpu::get_max_cpu_isa() != impl::cpu::unknown);
+        ASSERT_TRUE(impl::cpu::get_max_cpu_isa() != impl::cpu::isa_unknown);
         // this now becomes a secondary test,
         // desirable, but not really absolutely necessary
         ASSERT_TRUE(mayiuse(cpuisa_flags));

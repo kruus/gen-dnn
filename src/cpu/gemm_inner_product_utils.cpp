@@ -60,8 +60,7 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
     , do_sum_(false)
     , do_dst_zero_points_(false)
     , sum_scale_(0) // XXX also only for jit?
-    //__J__(isa_(static_cast<cpu_isa_t>(0))) // old isa_any=0 -> isa_all or "unknown"
-    __J__(isa_(isa_full)) // old isa_any=0 -> isa_all or "unknown"
+    __J__(isa_(isa_unknown)) // init so mayiuse --> false
     __J__(max_OC_loop_unroll_(13))
     __J__(idx_compute_vreg_start_(0))
     __J__(idx_compute_vreg_max_(31))
@@ -98,6 +97,8 @@ pp_kernel_t<acc_type, dst_type>::pp_kernel_t(size_t OC, size_t MB,
     do_dst_zero_points_ = !attr->zero_points_.has_default_values(DNNL_ARG_DST);
 
 #if !TARGET_X86_JIT
+    // logic currently adjusted for clarity of jit vs nonjit path,
+    // but may wish to rearrange to remove duplicate x86 jit if clauses.
     if (do_eltwise_)
         ref_eltwise_ = new ref_eltwise_scalar_fwd_t(
                 eltwise_.alg, eltwise_.alpha, eltwise_.beta, eltwise_.scale);

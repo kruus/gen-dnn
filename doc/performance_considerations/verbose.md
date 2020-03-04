@@ -67,13 +67,14 @@ rate is high.
 Extended verbosity engine debug [advanced]
 ------------------------------------------
 
-Additional [even slower] code can be enabled by building with `cmake
--DDNNL_VERBOSE_EXTRA`.  This adds addtional verbosity levels to
-debug which implementations got skipped by the engine.  <em>Some</em>
-implementations have been instrumented to also report the reason why
-the implementation was skipped.
+Additional debug code is enabled for a `cmake -DDNNL_VERBOSE=EXTRA` build.
+This adds addtional verbosity levels to debug which implementations got skipped
+and some layers can be instrumented with code saying why they were skipped.
+Extra verbosity is enabled by default for debug builds, and the DNNL_VERBOSE
+environment variable now understands these values:
 
 | Value | Behavior
 | :- | :----
-| 3  | print `unimimplemented` info, and maybe a reason for skipping
-| 4  | print even more implementations that were skipped ? (CHECKME)
+| 3  | print unimimplemented`info, and maybe a reason for skipping
+| 4  | print even more implementations that were skipped
+Note: some features of DNNL_VERBOSE=EXTRA are not mainline yet.

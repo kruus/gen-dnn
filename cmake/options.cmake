@@ -38,15 +38,17 @@ include("cmake/mkldnn_compat.cmake")
 set(DNNL_CPU_X86 1)
 set(DNNL_CPU_VE  2)
 #
-# JIT (or external libs) may be specified as `cmake -DDNNL_ISA=<string>`.
-# All cpus support VANILLA and FULL builds.
 #
-set(DNNL_ISA_VANILLA 1)
-#set(DNNL_ISA_FULL    2)  # value changes below, once cpu is known
 
+# JIT and non-x86 feature set "cap" can be set with `cmake -DDNNL_ISA=<string>`
+# All cpus support VANILLA, ANY and FULL [default] builds.
 # In principle, you could cap DNNL_ISA to remove jit impls from libdnnl.
-# However to really run lower-level codes you should (perhaps also?) use
-# runtime CPU dispatch.  Unified jit drivers might try to be clever.
+# In practice, the only important ones are VANILLA and the _FULL ones.
+# Generally you should prefer using runtime CPU dispatch to run lower-level
+# implementations.  Dispatch to DNNL_MAX_CPU_ISA=VANILLA is now supported.
+# (Unified jit drivers might try to be clever, but probably check 'mayiuse')
+set(DNNL_ISA_VANILLA 1) # ANY and FULL depend on CPU, VANILLA does not
+
 set(DNNL_ISA_X86                10) # VANILLA + no restriction to be C/C++ ref impl
 set(DNNL_ISA_SSE41              11)
 set(DNNL_ISA_AVX                12)
@@ -57,44 +59,41 @@ set(DNNL_ISA_AVX512_CORE        16)
 set(DNNL_ISA_AVX512_CORE_VNNI   17)
 set(DNNL_ISA_AVX512_CORE_BF16   18)
 set(DNNL_ISA_X86_FULL           18)
-# ve-specific
-set(DNNL_ISA_VE                 30)
-set(DNNL_ISA_VEDNN              31)
-set(DNNL_ISA_VEJIT              32)
+# ve-specific cross-compilation example: add when VANILLA is not enough
+set(DNNL_ISA_VE                 30) # VANILLA + VE-specific asm, intrinsics
+set(DNNL_ISA_VEDNN              31) # add external optimization library
+set(DNNL_ISA_VEJIT              32) # add external JIT
 set(DNNL_ISA_VE_FULL            32)
 #
 # Semantics:
 #
-# ALL expands its connotation a tiny bit to mean "any variety of this DNNL_CPU"
-#     so, semantically, it is still OK for to use within jit impls.
 # VANILLA adds the restriction of being "cross-platform"
 #     Occasionally very light inline assembly might occur,
 #     but code diffs should try to not impact code readability.
 #     dnnl_optimize.h, dnnl_omp.h etc have some ideas for cpu-specific macros
-# FULL implies "all available bells and whistles" for this DNNL_CPU.
-#     (using "any" for this led to recurring confusion with "all")
+# ANY expands on VANILLA to mean "any variety of this DNNL_CPU".
+#     ANY loses the cross-platform connotation.
+# FULL implies "full bells and whistles" for this DNNL_CPU.
+#     (was 'all', but too easily confused with ANY)
 
 #
 # Determine target CPU (governed by available compiler / environment CC),
 # and then determine what the default -DDNNL_ISA=FULL build should mean
 #
+# TARGET_ARCH in https://github.com/intel/mkl-dnn/pull/658 disambiguates
+#     AARCH64 and ARM64 -- adjust here if xbyak and jit don't apply.
 if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "^(x86_64|aarch64.*|AARCH64.*|arm64.*|ARM64.*)")
-    # XXX As far as I could tell, aarch64 and arm64 still try to compile jit impls
-    #     How are these architectures compatible with xbyak jit?
-
-    # for xbyak jit support all treated as "same" cross-compilation target.
-    # TARGET_ARCH in https://github.com/intel/mkl-dnn/pull/658 disambiguates
     set(DNNL_CPU ${DNNL_CPU_X86})
-    set(DNNL_ISA_ALL ${DNNL_ISA_X86_FULL})
+    set(DNNL_ISA_ANY ${DNNL_ISA_X86})
     set(DNNL_ISA_FULL ${DNNL_ISA_X86_FULL})
 elseif(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aurora")
     set(DNNL_CPU ${DNNL_CPU_VE})
-    set(DNNL_ISA_ALL ${DNNL_ISA_VE})
+    set(DNNL_ISA_ANY ${DNNL_ISA_VE})
     set(DNNL_ISA_FULL ${DNNL_ISA_VE_FULL})
 else()
     message(FATAL_ERROR "Unrecognized target CPU : ${CMAKE_SYSTEM_PROCESSOR}")
-    # To add a new DNNL_CPU, start with ALL and FULL impls exactly the VANILLA
-    # ones, until CPU-specific work begins on your branch/fork.
+    # To add a new DNNL_CPU, start with ANY and FULL impls exactly the VANILLA
+    # ones, until CPU-specific optimizations begin on your branch/fork.
 endif()
 
 # ===========
@@ -106,7 +105,7 @@ endif()
 #
 if(DNNL_CPU EQUAL DNNL_CPU_X86)
     set(DNNL_ISA "FULL" CACHE STRING
-        "All cpus must support FULL and VANILLA settings for DNNL_ISA
+        "All cpus must support DNNL_ISA = FULL [default] and VANILLA.
 
         VANILLA removes all x86 jit support and should mostly be pure C/C++.
                 These impls should run on any CPU, so can be used with a
@@ -115,33 +114,29 @@ if(DNNL_CPU EQUAL DNNL_CPU_X86)
              Non-x86 FULL builds on forked repos can add specialized layers to
              the basic VANILLA build to provide a cpu-specific cpu_engine.
         
-        For FULL build debug, runtime CPU dispatch to VANILLA ref impls should
-        enable DNNL_ENABLE_MAX_CPU_ISA and DNNL_ENABLE_MAX_CPU_ISA_VANILLA.
-
-        For expert use, the layer implementations included in libdnnl can be
+        For debugging, the layer implementations included in libdnnl can be
         capped at intermediate ISA settings too (see cpu_engine.hpp macros)
         max ISA possble values: FULL (default), VANILLA, and
         x86:
-           ALL SSE41 AVX AVX2 AVX512_MIC AVX512_MIC_4OPS
+           ANY SSE41 AVX AVX2 AVX512_MIC AVX512_MIC_4OPS
            AVX512_CORE AVX512_CORE_VNNI AVX512_CORE_BF16.
         VE:
-           ALL VEDNN VEJIT
-        In practice, ALL is pretty much the same as VANILLA.  Semantically ALL
-        is CPU-specific 'for some reason': not cross-platform, too big code
-        diffs from VANILLA, or using engine layers only available on a fork of
-        Intel dnnl sources."
+        ANY VEDNN VEJIT
+        In practice, ANY is pretty much the same as VANILLA.  Semantically ANY
+        is CPU-specific -- it may have inline asm, cpu-specific optimizations,
+        or using engine layers only available on a fork of Intel dnnl sources."
         ) # default to full support
-    if(NOT ${DNNL_ISA} MATCHES "^(VANILLA|ALL|SSE41|AVX|AVX2|AVX512_MIC|AVX512_MIC_4OPS|AVX512_CORE|AVX512_CORE_VNNI|AVX512_CORE_BF16|FULL)$")
+    if(NOT ${DNNL_ISA} MATCHES "^(VANILLA|ANY|SSE41|AVX|AVX2|AVX512_MIC|AVX512_MIC_4OPS|AVX512_CORE|AVX512_CORE_VNNI|AVX512_CORE_BF16|FULL)$")
         message(FATAL_ERROR "Unsupported ${CMAKE_SYSTEM_PROCESSOR} variant: DNNL_ISA=${DNNL_ISA}")
     endif()
 elseif(NECVE) # example toolchain build
-    set(DNNL_ISA "ALL" CACHE STRING
+    set(DNNL_ISA "FULL" CACHE STRING
         "VE cpu build styles include VANILLA, FULL(libvednn, jit,...)
         as well intermediate compile-time support for max isa VEDNN and VEJIT.
-        non-x86 jit should be supported via an external library.
-        cpu_target.h defines macros to lightly customize libdnnl ref impls."
-        ) # default to ALL bells and whistles
-    if(NOT ${DNNL_ISA} MATCHES "^(VANILLA|VEDNN|VEJIT|FULL)$")
+        non-x86 jit is supported via an external library.
+        cpu_target.h defines TARGET_cond macros to maintain readable ref impls."
+        ) # default to FULL set of bells and whistles
+    if(NOT ${DNNL_ISA} MATCHES "^(VANILLA|ANY|VEDNN|VEJIT|FULL)$")
         message(FATAL_ERROR "Unsupported ${CMAKE_SYSTEM_PROCESSOR} variant: DNNL_ISA=${DNNL_ISA}")
     endif()
 endif()
@@ -194,20 +189,6 @@ option(DNNL_ENABLE_PRIMITIVE_CACHE "enables primitive cache.
 option(DNNL_ENABLE_MAX_CPU_ISA
     "enables control of CPU ISA detected by DNNL via DNNL_MAX_CPU_ISA
     environment variable and dnnl_set_max_cpu_isa() function" ON)
-
-set(_ADD_MORE_REF_IMPLS ON)
-if(DNNL_CPU EQUAL DNNL_CPU_X86 AND CPU_ISA EQUAL CPU_ISA_FULL)
-    # OFF for default x86 FULL build, to match existing behavior
-    set(_ADD_MORE_REF_IMPLS OFF)
-endif()
-option(DNNL_ENABLE_MAX_CPU_ISA_VANILLA
-    "Force libdnnl to contain a superset of the VANILLA build.
-
-    A FULL x86 build intentionally removes some 'SIMPLE_IMPL' reference
-    implementations that are intended to always have a JIT implementation.
-    This forces libdnnl to provide a few extra reference impls, providing
-    better support for runtime CPU dispatch to VANILLA, for example."
-    _ADD_MORE_REF_IMPLS)
 
 # =============================
 # Building properties and scope

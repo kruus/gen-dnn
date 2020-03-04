@@ -121,34 +121,36 @@ cmake -DDNNL_GPU_RUNTIME=OCL -DOPENCLROOT=/path/to/opencl/sdk ..
 
 ## Chipset support (advanced developer topic)
 
-Intel DNNL provides a well designed API appropriate for consideration even on
-non-x86 systems.  `cmake` can be configured to build using a cross-compiler
-Forks/branches of Intel DNNL may add a toolchain file and light modifications
-of other cmake files (compiler options need to be adjusted) to build for any
-CPU.
-
-`cmake/options.cmake` should be adjusted to define two cross-platform build
-ISA's of VANILLA and FULL for your DNNL_CPU.  FULL is the default for x86
-builds.  non-x86 builds might begin just with a cross-platform VANILLA build
-that should be close to "just working":
+The default x86 build uses `cmake -DCPU_ISA=ALL`, which provides Intel DNNL
+provides a well designed API appropriate for consideration on non-x86 systems.
+Firstly, you can build a reference-only version of libdnnl with no xbyak JIT
+support using `cmake -DCPU_ISA=VANILLA`.  Secondly, you create a fork/branch,
+add a cmake toolchain file, adjust compiler flags and tweak a few files source
+files adding support for your new CMAKE_SYSTEM_PROCESSOR and cross-compile with
+a configuration something like:
 
 ~~~
 cmake -DTOOLCHAIN_FILE=cmake/mycpu.cmake -DCPU_ISA=VANILLA ..
 ~~~
 
-On your branch, besides compiler options, you should expect to adjust some
-variables like cache and page sizes, alignment restrictions,
-optimization-related macros (OpenMP support has wide variations), etc.
+You will need add support for your CPU to a few files (dnnl_config.h.in,
+cpu_isa_traits).  Begin optimizing the VANILLA build by adjusting variables
+like cache and page sizes, alignment restrictions, optimization-related macros
+(OpenMP support has wide variations), etc.
+
+CPU_ISA config values have 3 cross-platform values, VANILLA, ANY and ALL.  You
+may begin with all equivalent.  ANY must run on the lowest variation of your chip,
+but is not restricted to cross-platform code.  ALL supports the broadest set
+of features for your chipset.
 
 The VANILLA build strips out xbyak and x86-jit support, supplying only C/C++
 reference implementations in the cross-compiled libdnnl.  In practice, libdnnl
-turns out to be an excellent test of your cross-compiler.  Cases of `make test`
-failures for a CPU_ISA=VANILLA configuration have almost always been traced to
-cross-compiler bugs.
+turns out to be an excellent test of your cross-compiler, so compiler
+workarounds mey be needed.  Run `make test` frequently.
 
 The DNNL API configuration and version files have been extended to better show
 the build configuration.  gtests now frequently print the DNNL_BUILD_STRING,
 which should mirror any 'nonstandard' build options used for libdnnl.
 
-A -DCPU_ISA=VANILLA build has limited support for bfloat16, and (WIP) RNN
-support is disabled (some components lack a reference impl).
+A -DCPU_ISA=VANILLA build has limited support for bfloat16, and RNN support is
+disabled (some components lack a reference impl).

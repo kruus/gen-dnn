@@ -87,10 +87,6 @@
 ///   respect env DNNL_MAX_CPU_ISA, enable dnnl_set_max_cpu_isa(dnnl_cpu_isa_t)
 #cmakedefine DNNL_ENABLE_MAX_CPU_ISA
 
-/// Force libdnnl to have more reference impls (esp for x86 default build).
-/// default is TRUE for non-x86 and x86 non-FULL builds
-#cmakedefine DNNL_ENABLE_MAX_CPU_ISA_VANILLA
-
 /// DNNL verbosity, from `cmake -DDNNL_VERBOSE={NONE|DEFAULT|EXTRA}`.
 /// This is '1' at levels above NONE, which allows verbosity
 /// \ref dev-guide-verbose "levels 0[default, quiet], 1 and 2".
@@ -112,20 +108,18 @@
  */
 #cmakedefine DNNL_CPU ${DNNL_CPU}
 
-/// cpu target expand capability from VANILLA-->ALL-->(cpu-specific)-->FULL.
-/// The cmake default is -DDNNL_ISA=ALL, which means "provide full support".
-/// During compilation `\#if DNNL_ISA == DNNL_ISA_ALL` will be true.
+/// cpu target expand capability from VANILLA-->ANY-->(cpu-specific)-->FULL.
+/// The cmake default is -DDNNL_ISA=FULL, which means "provide full support".
 /** \internal
- * This may prune \b some implementations from \c cpu_engine, but is non-normative.
- * For example, jit\_uni\_ drivers may circumvent this, and even
- * \ref dispatcher_control.md may not always suffice to force particular
- * code variants to run.
+ * DNNL_ISA_ may prune \b some implementations from \c cpu_engine, but is
+ * non-normative.  For example, jit\_uni\_ drivers may circumvent this, so
+ * \ref dispatcher_control.md is a more general approach.
  */
 #cmakedefine DNNL_ISA ${DNNL_ISA_VALUE}
 
 // DNNL_ISA==DNNL_ISA_VANILLA build is missing many bf16 impls, but
 // removing bf16 support from src,examples,tests touched 79 files.
-// Option can be reintroduced as separate PR [kruus]
+// Option can be reintroduced as separate PR [@kruus]
 // #define DNNL_ENABLE_BFLOAT16 ${DNNL_ENABLE_BFLOAT16_01}
 
 /// [debug] some targets cannot compile a correct ref impl yet.
@@ -136,10 +130,11 @@
  * which allows extra output at additional verbosity levels
  * \ref dev-guide-verbose "levels 3 and 4".
  *
- * This allows tracing how cpu_engine skips various impls as it tries
+ * This allows tracing why cpu_engine skips various impls as it tries
  * to create a primitive. Primitive creation will slow down even more.
  * \ref consistency.hpp can help pinpoint the precise reason a
  * particular init() failed. */
+// Code to trace reasons why init() declined --> separate PR [@kruus]
 #define DNNL_VERBOSE_EXTRA ${_DNNL_VERBOSE_EXTRA}
 
 /// [at own risk] gemm via MKL library.
@@ -190,7 +185,7 @@
 ///     or optimizations and have large code difference from the official
 ///     VANILLA implementations.
 /// This value is CPU-specific, and provided mostly for completeness
-#cmakedefine DNNL_ISA_ALL ${DNNL_ISA_ALL}
+#cmakedefine DNNL_ISA_ANY ${DNNL_ISA_ANY}
 
 /// pull out all the stops, all options & external support allowed.
 /// This value is CPU-specific.

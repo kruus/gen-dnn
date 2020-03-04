@@ -17,6 +17,7 @@
 # This file has two purposes:
 # 1. Construct a Build Target string describing non-default target options
 # 2. Further option processing for creating dnnl_config.h
+#    (make some build variables boolean 0/1 for readability and logic)
 #===============================================================================
 
 if(options_config_included)
@@ -83,7 +84,6 @@ endmacro()
 #message(STATUS "dog VERB = ${VERB}")
 #append_map(VERB "cow" "man.eats hamburger;cow.eats hay")
 #message(STATUS "cow ${VERB}")
-
 
 ######################## target processor + "ISA" option
 set(DNNL_BUILD_STRING "CPU ${CMAKE_SYSTEM_PROCESSOR}")
@@ -167,12 +167,8 @@ set(DNNL_USE_CBLAS ${DNNL_USE_CBLAS_01})
 #
 #set_01(DNNL_ENABLE_BFLOAT16_01 ${DNNL_ENABLE_BFLOAT16})
 set_01(DNNL_ENABLE_RNN_01      ${DNNL_ENABLE_RNN})
-if(NOT DNNL_ENABLE_BFLOAT16)
-    set(DNNL_BUILD_STRING "${DNNL_BUILD_STRING} no-bf16")
-endif()
-if(NOT DNNL_ENABLE_RNN)
-    set(DNNL_BUILD_STRING "${DNNL_BUILD_STRING} no-rnn")
-endif()
+#append_choice(DNNL_BUILD_STRING DNNL_ENABLE_BFLOAT16 "" "no-bf16")
+append_choice(DNNL_BUILD_STRING DNNL_ENABLE_RNN "" "no-rnn")
 
 ########################## compiler restrictions
 set_01(DNNL_USE_STATIC_THREAD_LOCAL_OBJECTS ${DNNL_OK_STATIC_THREAD_LOCAL_OBJECTS})

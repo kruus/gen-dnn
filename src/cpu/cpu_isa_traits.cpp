@@ -94,11 +94,11 @@ bool init_max_cpu_isa() {
 #define ELSEIF_HANDLE_CASE(CPU_ISA_T) else IF_HANDLE_CASE(CPU_ISA_T)
         // allow case-insensitive compare
         for (size_t i = 0u; i < sizeof(buf) && buf[i]; ++i)
-            buf[i] = toupper(i);
+            buf[i] = toupper(buf[i]);
+        //printf(" getenv DNNL_MAX_CPU_ISA --> %s\n", &buf[0]);
 
-        IF_HANDLE_CASE(
-                vanilla); // "VANILLA" --> vanilla (CPU-agnostic ref impls)
-        ELSEIF_HANDLE_CASE(isa_all); // "ANY" --> x86_common or ve_common or ...
+        IF_HANDLE_CASE(vanilla); // "VANILLA" --> (CPU-agnostic ref impls)
+        ELSEIF_HANDLE_CASE(isa_any); // "ANY" --> x86_common or ve_common or ...
         ELSEIF_HANDLE_CASE(isa_full); // "ALL" --> x86_full or ve_full or ...
 #if TARGET_X86
         ELSEIF_HANDLE_CASE(sse41);
@@ -109,17 +109,18 @@ bool init_max_cpu_isa() {
         ELSEIF_HANDLE_CASE(avx512_core);
         ELSEIF_HANDLE_CASE(avx512_core_vnni);
         ELSEIF_HANDLE_CASE(avx512_core_bf16);
-        else; //printf("Bad DNNL_MAX_CPU_ISA=%s environment for x86", buf);
+        //else printf("Bad DNNL_MAX_CPU_ISA=%s environment for x86", buf);
 #elif TARGET_VE
         ELSEIF_HANDLE_CASE(vednn);
         ELSEIF_HANDLE_CASE(vejit);
-        else; //printf("Bad DNNL_MAX_CPU_ISA=%s environment value for VE", buf);
+        //else printf("Bad DNNL_MAX_CPU_ISA=%s environment value for VE", buf);
 #endif
 
 #undef IF_HANDLE_CASE
 #undef ELSEIF_HANDLE_CASE
     }
 
+    //printf("init_max_cpu_isa->0x%x\n", max_cpu_isa_val);
     return max_cpu_isa().set(max_cpu_isa_val);
 }
 #endif // DNNL_ENABLE_MAX_CPU_ISA
@@ -160,7 +161,7 @@ dnnl_status_t dnnl_set_max_cpu_isa(dnnl_cpu_isa_t isa) {
 
     // XXX see if we can get rid of from_dnnl, at least in the header (see also tests/gtests/test_isa_*)
     cpu_isa_t isa_to_set = ::dnnl::impl::cpu::from_dnnl(isa);
-    if (isa_to_set == unknown) return invalid_arguments;
+    if (isa_to_set == isa_unknown) return invalid_arguments;
 
     if (::dnnl::impl::cpu::max_cpu_isa().set(isa_to_set))
         return success;

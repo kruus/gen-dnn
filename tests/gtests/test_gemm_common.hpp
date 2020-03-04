@@ -1248,7 +1248,8 @@ protected:
                         || p.igemm_params.ob() != 0)
                         && pack,
                 "Packed GEMM doesn't support alpha or non-zero offset{A,B}.");
-        // XXX could remove diffs in in/gemm_in.h by beefing up packed gemm support.
+        // XXX If we new had this function we could also remove some more
+        //     'skipped' tests.
         //     Should we expose pack_sgemm_supported as DNNL_API ?
         //     else use gemm.in.h as (defined(TARGET_X86_JIT) || defined(DNNL_USE_MKL))
         //SKIP_IF(pack && !pack_sgemm_supported(),

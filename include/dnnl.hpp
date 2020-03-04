@@ -9850,17 +9850,17 @@ inline status set_jit_profiling_jitdumpdir(const std::string &dir) {
 }
 
 /// @copydoc dnnl_cpu_isa_t
-/// \note logically, vanilla <= all < [cpu-specific] <= full support, however
-/// for runtime dispatch "ALL" means "no restrictions" (dnnl_cpu_isa_full) 
+/// \note vanilla <= any < [cpu-specific] <= full support, however for
+/// runtime dispatch "ALL" means "no restrictions" (dnnl_cpu_isa_full).
 enum class cpu_isa {
     // ----------- any DNNL_CPU target -----------------
     /// @copydoc dnnl_cpu_isa_vanilla
     vanilla = dnnl_cpu_isa_vanilla,
+    /// @copydoc dnnl_cpu_isa_any
+    any = dnnl_cpu_isa_any,
     /// @copydoc dnnl_cpu_isa_full
     full = dnnl_cpu_isa_full,
     // -------------- x86-specific ---------------------
-    /// @copydoc dnnl_cpu_isa_all
-    all = dnnl_cpu_isa_all,
     /// @copydoc dnnl_cpu_isa_sse41
     sse41 = dnnl_cpu_isa_sse41,
     /// @copydoc dnnl_cpu_isa_avx

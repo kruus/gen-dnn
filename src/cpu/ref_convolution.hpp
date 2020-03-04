@@ -46,7 +46,7 @@ struct ref_convolution_fwd_t : public primitive_impl_t {
 #if DNNL_VERBOSE_EXTRA
             Consistency ok("cpu_ref_conv_fwd");
             // SHCKV=usual, SHCKVV=long debug
-#define AND_(...) SCHKVV(ok, __VA_ARGS__)
+#define AND_(...) SCHKV(ok, __VA_ARGS__)
             AND_(is_fwd());
             AND_(set_default_alg_kind(alg_kind::convolution_direct));
             AND_(expect_data_types(

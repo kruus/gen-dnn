@@ -24,11 +24,13 @@
 #include "cpu_isa_traits.hpp" // also give common/cpu_target.h
 #include "dnnl.h"
 
-/** NEW: this now gets activated solely by `cmake -DDNNL_VERBOSE=EXTRA`, as
- * conveyed by \c DNNL_VERBOSE_EXTRA = 0/1 in \ref dnnl_config.h.
- * This adds extra code to respect \c dnnl_set_verbose(int) or environment
- * DNNL_VERBOSE values 3 or 4.   ?? enable by default in debug compile ?? */
+#if 0 // oops, I removed the verbose create wrapper.(can be separate PR).
+/** This adds extra code to respect \c dnnl_set_verbose(int) or environment
+ * DNNL_VERBOSE values 3 and 4. It's activated by `cmake -DDNNL_VERBOSE=EXTRA`,
+ * and defaults to '1' for debug builds.
+ */
 #define VERBOSE_PRIMITIVE_SKIP DNNL_VERBOSE_EXTRA
+#endif
 
 namespace dnnl {
 namespace impl {

@@ -1,3 +1,18 @@
+/*******************************************************************************
+* Copyright 2020 NEC Labs America
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*******************************************************************************/
 #ifndef CONSISTENCY_HPP
 #define CONSISTENCY_HPP
 /** \file
@@ -17,6 +32,10 @@
  *
  * For optimized compile (-DNEBUG) default must be to never print stuff,
  * but for temporary file scope debug you can choose a more verbose macro
+ *
+ * TODO: check asm and judge impact on code.  Does the non-verbose build truly
+ *       remove all debug cruft?  Does release build short-circuit almost as
+ *       effectively?
  */
 
 #include <cstdio>
@@ -98,12 +117,12 @@ struct Consistency {
     }
     /** Using '&& COND_LOCV(cond)' will print failure only if dnnl_get_verbose() >= 3. */
     Consistency &operator&&(CondLocV const &cl) {
+#if !DNNL_VERBOSE_EXTRA
         var = var && cl.cond;
-#if DNNL_VERBOSE_EXTRA
-        if (!cl.cond && dnnl_get_verbose() >= 3) {
-            fprintf(stdout, " %s [%s:%d] %s\n", pfx, cl.file, cl.line,
-                    cl.cond_msg);
-            fflush(stdout);
+#else
+        if (!cl.cond) {
+            var = false;
+            show(cl);
         }
 #endif
         return *this;
@@ -112,13 +131,14 @@ struct Consistency {
     Consistency &operator&&(CondLocVV const &cl) {
         if (!cl.cond) {
             var = false;
-            fprintf(stdout, " %s [%s:%d] %s\n", pfx, /*nclause,*/ cl.file,
-                    cl.line, cl.cond_msg);
-            fflush(stdout);
+            show(cl);
         }
         return *this;
     }
     operator bool() { return var; }
+
+    void show(CondLocV const &cl) const;
+    void show(CondLocVV const &cl) const;
 
 private:
     char const *pfx;

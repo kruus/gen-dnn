@@ -2041,6 +2041,7 @@ typedef const struct dnnl_stream *const_dnnl_stream_t;
 
 /// Structure containing version information as per [Semantic
 /// Versioning](https://semver.org)
+/// Some fields also available via dnnl_version.h or dnnl_config.h
 typedef struct {
     int major; ///< Major version
     int minor; ///< Minor version
@@ -2048,8 +2049,8 @@ typedef struct {
     const char *hash; ///< Git hash of the sources (may be absent)
     unsigned cpu_runtime; ///< CPU runtime
     unsigned gpu_runtime; ///< GPU runtime
-    unsigned cpu; ///< New: cmake target, DNNL_CPU_{X86|VE} (def X86)
-    unsigned jit; ///< cmake target DNNL_ISA_{VANILLA|ALL|...|FULL} (def FULL)
+    unsigned cpu; ///< DNNL_CPU build target DNNL_CPU_{X86|VE|...} (def X86)
+    unsigned isa; ///< DNNL_ISA build target DNNL_ISA_{FULL|VANILLA|...} (def FULL)
 } dnnl_version_t;
 
 /// Disable profiling completely
@@ -2072,30 +2073,28 @@ typedef struct {
 #define DNNL_JIT_PROFILE_LINUX_PERF \
     (DNNL_JIT_PROFILE_LINUX_JITDUMP | DNNL_JIT_PROFILE_LINUX_PERFMAP)
 
-/// CPU instruction set flags.  The enum values do not need to carry
-/// any special significance.
+/// CPU instruction set flags.
+/// Flag values are \em not constrained to have any interpretation as bitmasks.
+/// Features expand in order vanilla &le; any &le; cpu-specific ... &le; full
 typedef enum {
     /** [new] "vanilla" \b must run on any DNNL_CPU build target.
-     * This is a subset of \c dnnl_cpu_isa_all, that further restricts
-     * implementations to C/C++ (i.e. "reference" implementations).  Note that
-     * dnnl provides a reference gemm, which "vanilla" layers can use.
-     *
-     * No jit.  No cpu-specific ref impls.
-     * Allowed: DNNL_CPU_EXTERNAL_GEMM calls to MKL/CBLAS, for some builds.
+     * Generic C/C++ "reference" implementations only, please.
+     * \note dnnl provides a reference gemm, which "vanilla" layers can use.
+     * Special DNNL_CPU_EXTERNAL_GEMM builds may also allow calls to MKL/CBLAS.
      */
-    dnnl_cpu_isa_vanilla = -1, // new, can use for any build cpu
+    dnnl_cpu_isa_vanilla = -2, // new, can use for any build cpu
 
-    /// [new] "full" For \em any target CPU, means "full set of options".
-    /** For Intel(R) means "provide all available jit implementations".
-     * For non-x86, this may place added requirements on the run-time
-     * environment.  Runtime CPU dispatch string "ALL" maps to this. */
-    dnnl_cpu_isa_full = -2,
-
-    // Following keeps v1.2 x86 values unchanged (perhaps awkward?)
-    /// "all" allows a slight expansion of "vanilla", but still applies to all CPUs
+    /// "any" allows a slight expansion of "vanilla", but still applies to all CPUs
     /// - x86:     Any Intel(R) x86 ISA (no restrictions, in principle could be jit).
     /// - non-x86: DNNL_CPU-specific ref impls allowed (but usually same as vanilla)
-    dnnl_cpu_isa_all = 0x0,
+    dnnl_cpu_isa_any = -1,
+
+    /// Means "full set of options", whatever your DNNL_CPU.
+    /// [new] all-->full (too often confused with any).
+    /** For Intel(R) means "provide full set of jit implementations".
+     * For non-x86 builds, this may place added requirements on run-time
+     * environment, external libs, etc. */
+    dnnl_cpu_isa_full = 0x0,
 
     // DNNL_CPU==DNNL_CPU_X86 -------------------------------------------------
     /// Intel(R) SSE4.1.
@@ -2111,9 +2110,9 @@ typedef enum {
     /// Phi(TM) Processors x200 Series.
     dnnl_cpu_isa_avx512_mic = 0xf,
 
-    /// Intel(R) Advanced Vector Extensions 512 subset for /Intel(R) Xeon
+    /// Intel(R) Advanced Vector Extensions 512 subset for Intel(R) Xeon
     /// Phi(TM) Processors 7235, 7285, 7295 Series.
-    dnnl_cpu_isa_avx512_mic_4ops = 0x1f,
+    dnnl_cpu_isa_avx512_mic_4ops = 0x10 + dnnl_cpu_isa_avx512_mic,
 
     /// Intel(R) Advanced Vector Extensions 512 for Intel(R) Xeon(R) Processor
     /// Scalable Family and Intel(R) Core(TM) processor family.
@@ -2130,11 +2129,10 @@ typedef enum {
     dnnl_cpu_isa_avx512_core_bf16 = 0xe0 | dnnl_cpu_isa_avx2,
 
     // DNNL_CPU==DNNL_CPU_VE --------------------------------------------------
-    /// "vednn" VE build with libvednn public API calls
+    /// "vednn" NEC VE build with libvednn intrinsics
     dnnl_cpu_isa_vednn = 0x10000,
 
-    /// "vejit" VE build with libvednn calls allowing JIT features.
-    /// Also requires a VE development tools (ncc, clang)
+    /// "vejit" NEC VE build with libvednn JIT features.
     dnnl_cpu_isa_vejit = 0x30000,
 
     // other chipsets here...

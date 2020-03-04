@@ -518,8 +518,8 @@ const char *dnnl_scratchpad_mode2str(dnnl_scratchpad_mode_t v) {
 
 const char *dnnl_cpu_isa2str(dnnl_cpu_isa_t v) {
     if (v == dnnl_cpu_isa_vanilla) return "cpu_isa_vanilla";
+    if (v == dnnl_cpu_isa_any) return "any";
     if (v == dnnl_cpu_isa_full) return "cpu_isa_full";
-    if (v == dnnl_cpu_isa_all) return "cpu_isa_all";
     if (v == dnnl_cpu_isa_sse41) return "cpu_isa_sse41";
     if (v == dnnl_cpu_isa_avx) return "cpu_isa_avx";
     if (v == dnnl_cpu_isa_avx2) return "cpu_isa_avx2";
