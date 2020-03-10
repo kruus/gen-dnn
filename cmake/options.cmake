@@ -50,9 +50,11 @@ set(DNNL_ISA_VE_ALL             30) # ALL==ANY (simplest case)
 if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "^(x86_64|AMD64.*|aarch64.*|AARCH64.*|arm64.*|ARM64.*)")
     # Begin assuming xbyak and jit files are in libdnnl
     set(DNNL_CPU ${DNNL_CPU_X86})
+    set(TARGET_X86 1) # shorthand
     set(DNNL_ISA_ANY ${DNNL_ISA_X86})
     set(DNNL_ISA_ALL ${DNNL_ISA_X86_ALL})
 elseif(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aurora") # some cpus won't handle x86 jit
+    set(TARGET_X86 0)
     set(DNNL_CPU ${DNNL_CPU_VE})
     set(DNNL_ISA_ANY ${DNNL_ISA_VE})
     set(DNNL_ISA_ALL ${DNNL_ISA_VE_ALL})
@@ -81,6 +83,11 @@ set(DNNL_ISA "ALL" CACHE STRING
     endif()
 set(DNNL_ISA_VALUE ${DNNL_ISA_${DNNL_ISA}})
 message(STATUS "Target CPU ${CMAKE_SYSTEM_PROCESSOR} has DNNL_CPU=${DNNL_CPU}, and maps DNNL_ISA=${DNNL_ISA} to DNNL_ISA_VALUE=${DNNL_ISA_VALUE}=DNNL_ISA_${DNNL_ISA}")
+
+set(TARGET_X86_JIT 1)
+if(NOT TARGET_X86 OR DNNL_ISA STREQUAL "VANILLA")
+    set(TARGET_X86_JIT 0)
+endif()
 
 # ========
 # Features
