@@ -23,9 +23,9 @@
 #include "common/c_types_map.hpp"
 #include "common/gemm_utils.hpp"
 #include "gpu/compute/compute.hpp"
+#include "gpu/gemm/gpu_gemm.hpp"
 #include "gpu/gpu_gemm_pd.hpp"
 #include "gpu/ocl/gemm/gen9_gemm_kernel.hpp"
-#include "gpu/ocl/gemm/ocl_gemm.hpp"
 #include "gpu/ocl/ocl_stream.hpp"
 #include "gpu/ocl/ocl_utils.hpp"
 
@@ -34,7 +34,7 @@ namespace impl {
 namespace gpu {
 namespace ocl {
 
-struct gen9_gemm_t : public ocl_gemm_t {
+struct gen9_gemm_t : public gpu_gemm_t {
 
     enum class type {
         copy_based,
@@ -110,7 +110,7 @@ struct gen9_gemm_t : public ocl_gemm_t {
         float eltwise_alpha() const {
             const int eltwise_idx
                     = attr()->post_ops_.find(primitive_kind::eltwise);
-            return with_eltwise()
+            return eltwise_idx != -1
                     ? attr()->post_ops_.entry_[eltwise_idx].eltwise.alpha
                     : 1.0f;
         }
@@ -118,9 +118,17 @@ struct gen9_gemm_t : public ocl_gemm_t {
         float eltwise_beta() const {
             const int eltwise_idx
                     = attr()->post_ops_.find(primitive_kind::eltwise);
-            return with_eltwise()
+            return eltwise_idx != -1
                     ? attr()->post_ops_.entry_[eltwise_idx].eltwise.beta
                     : 0.0f;
+        }
+
+        float eltwise_scale() const {
+            const int eltwise_idx
+                    = attr()->post_ops_.find(primitive_kind::eltwise);
+            return eltwise_idx != -1
+                    ? attr()->post_ops_.entry_[eltwise_idx].eltwise.scale
+                    : 1.0f;
         }
 
         float alpha() const { return attr()->output_scales_.scales_[0]; }
@@ -134,7 +142,7 @@ struct gen9_gemm_t : public ocl_gemm_t {
         alg_kind_t eltwise_alg_kind() const {
             const int eltwise_idx
                     = attr()->post_ops_.find(primitive_kind::eltwise);
-            return with_eltwise()
+            return eltwise_idx != -1
                     ? attr()->post_ops_.entry_[eltwise_idx].eltwise.alg
                     : dnnl_alg_kind_undef;
         }
@@ -288,7 +296,7 @@ struct gen9_gemm_t : public ocl_gemm_t {
         return init_superkernel_plan();
     }
 
-    gen9_gemm_t(const pd_t *apd) : ocl_gemm_t(apd) {}
+    gen9_gemm_t(const pd_t *apd) : gpu_gemm_t(apd) {}
 
     virtual status_t execute(const gemm_exec_ctx_t &ctx) const override;
 
@@ -313,14 +321,14 @@ private:
             int64_t k, const memory_storage_t &base, int32_t offset_a,
             int32_t offset_b, const memory_storage_t &c, int64_t offset_c,
             int64_t ldc, int last_k_block, float eltwise_alpha,
-            float eltwise_beta, bool beta0) const;
+            float eltwise_beta, float eltwise_scale, bool beta0) const;
 
     status_t launch_nocopy(compute::compute_stream_t *s,
             const memory_storage_t &a, const memory_storage_t &b,
             const memory_storage_t &c, int64_t offset_a, int64_t offset_b,
             int64_t offset_c, int32_t lda, int32_t ldb, int32_t ldc, int32_t m,
             int32_t n, int32_t k, float alpha, float beta, int last_k_block,
-            float eltwise_alpha, float eltwise_beta,
+            float eltwise_alpha, float eltwise_beta, float eltwise_scale,
             memory_storage_t &flag) const;
 
     status_t launch_nocopy_superkernel(compute::compute_stream_t *s,
@@ -329,7 +337,7 @@ private:
             const memory_storage_t &c, int64_t offset_a, int64_t offset_b,
             int64_t offset_c, int32_t lda, int32_t ldb, int32_t ldc, int32_t m,
             int32_t n, int32_t k, float alpha, float beta, int last_k_block,
-            float eltwise_alpha, float eltwise_beta) const;
+            float eltwise_alpha, float eltwise_beta, float eltwise_scale) const;
 
     size_t max_plan_size() const;
     status_t init_superkernel_plan();

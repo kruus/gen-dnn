@@ -14,8 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef GPU_OCL_PRIMITIVE_CONF_HPP
-#define GPU_OCL_PRIMITIVE_CONF_HPP
+#ifndef GPU_PRIMITIVE_CONF_HPP
+#define GPU_PRIMITIVE_CONF_HPP
 
 #include <stdint.h>
 
@@ -24,12 +24,10 @@
 #include "common/primitive_attr.hpp"
 #include "common/utils.hpp"
 #include "gpu/compute/compute.hpp"
-#include "gpu/ocl/ocl_utils.hpp"
 
 namespace dnnl {
 namespace impl {
 namespace gpu {
-namespace ocl {
 
 #define MAX_NDIMS 6
 
@@ -128,6 +126,7 @@ enum conv_version_t {
     ver_1stconv,
     ver_16mb16c,
     ver_8ow16c,
+    ver_nhwc,
 };
 
 struct conv_conf_t {
@@ -309,10 +308,10 @@ struct bnorm_conf_t {
     data_type_t data_type;
 
     int ndims;
-    int mb, ic, mb_block;
+    int mb, ic, mb_block, ic_block;
     int reduce_stat_nblocks;
     int id, ih, iw;
-    bool with_relu, use_16mb_unroll;
+    bool with_relu, use_16mb_unroll, use_nhwc;
     bool is_forward, is_backward;
     bool use_scaleshift, save_stats, is_training;
     bool fuse_norm_relu, calculate_stats, calculate_diff_stats;
@@ -643,7 +642,6 @@ inline void def_dispatch(compute::kernel_ctx_t &kernel_ctx,
     dispatch.def_kernel_macros(kernel_ctx);
 }
 
-} // namespace ocl
 } // namespace gpu
 } // namespace impl
 } // namespace dnnl

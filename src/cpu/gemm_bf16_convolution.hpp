@@ -113,7 +113,7 @@ struct gemm_bf16_convolution_fwd_t : public primitive_impl_t {
                 default: return false;
             }
 #else
-            if (po.len_ == 0) return true; // XXX need ref postops here!
+            if (po.len_ == 0) return true; // if !TARGET_X86_JIT, do you even care about bf16?
 #endif // TARGET_X86_JIT
             return false;
         }

@@ -124,21 +124,20 @@ The weights update computes \diffweights and \diffbias based on
 different on forward propagation, backward propagation, and weights
 update.
 
-
 ## Execution Arguments
 When executed, the inputs and outputs should be mapped to an execution
 argument index as specified by the following table.
-| Primitive intput/output | Execution argument index |
-| ---                     | ---                      |
-| \src                    | DNNL_ARG_SRC             |
-| \weights                | DNNL_ARG_WEIGHTS         |
-| \bias                   | DNNL_ARG_BIAS            |
-| \dst                    | DNNL_ARG_DST             |
-| \diffsrc                | DNNL_ARG_DIFF_SRC        |
-| \diffweights            | DNNL_ARG_DIFF_WEIGHTS    |
-| \diffbias               | DNNL_ARG_DIFF_BIAS       |
-| \diffdst                | DNNL_ARG_DIFF_DST        |
-
+| Primitive input/output | Execution argument index |
+| ---                    | ---                      |
+| \src                   | DNNL_ARG_SRC             |
+| \weights               | DNNL_ARG_WEIGHTS         |
+| \bias                  | DNNL_ARG_BIAS            |
+| \dst                   | DNNL_ARG_DST             |
+| \diffsrc               | DNNL_ARG_DIFF_SRC        |
+| \diffweights           | DNNL_ARG_DIFF_WEIGHTS    |
+| \diffbias              | DNNL_ARG_DIFF_BIAS       |
+| \diffdst               | DNNL_ARG_DIFF_DST        |
+| \f$depthwise\f$        | DNNL_ARG_ATTR_POST_OP_DW |
 
 ## Implementation Details
 
@@ -207,11 +206,11 @@ primitive by applying the output scale to the result of the primitive and by
 chaining certain operations after the primitive. The following attributes and
 post-ops are supported:
 
-| Propagation | Type      | Operation     | Description        | Restrictions
-| :--         | :--       | :--           | :--                | :--
-| forward     | attribute | [Output scale](@ref dnnl::primitive_attr::set_output_scales) | Scales the result of convolution by given scale factor(s)                     | int8 convolutions only
-| forward     | post-op   | [eltwise](@ref dnnl::post_ops::append_eltwise)               | Applies an @ref dnnl_api_eltwise operation to the result                      |
-| forward     | post-op   | [sum](@ref dnnl::post_ops::append_sum)                       | Adds the operation result to the destination tensor instead of overwriting it |
+| Propagation | Type      | Operation                                                    | Description                                                                   | Restrictions           |
+| :--         | :--       | :--                                                          | :--                                                                           | :--                    |
+| forward     | attribute | [Output scale](@ref dnnl::primitive_attr::set_output_scales) | Scales the result of convolution by given scale factor(s)                     | int8 convolutions only |
+| forward     | post-op   | [eltwise](@ref dnnl::post_ops::append_eltwise)               | Applies an @ref dnnl_api_eltwise operation to the result                      |                        |
+| forward     | post-op   | [sum](@ref dnnl::post_ops::append_sum)                       | Adds the operation result to the destination tensor instead of overwriting it |                        |
 
 @note The library doesn't prevent using post-ops in training, but note that
 not all post-ops are feasible for training usage. For instance, using ReLU
@@ -390,7 +389,6 @@ processors available.  (For automatic selection to work as intended, use the
 same thread affinity settings when creating the convolution as when executing
 the convolution.)
 
-
 @anchor dg_conv_impl_limits
 ## Implementation Limitations
 
@@ -403,7 +401,6 @@ the convolution.)
 
 3. **GPU**
     - No support for Winograd algorithm
-
 
 ## Performance Tips
 

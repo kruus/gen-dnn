@@ -82,11 +82,13 @@ if(NOT CPU_ISA EQUAL "ALL") # ALL is the default (whatever your DNNL_CPU)
 endif()
 
 ########################## supported options, constants
-# normalize DNNL_VERBOSE values to a config file integer
-set_01(DNNL_VERBOSE_01 DNNL_VERBOSE)
 if(NOT "${CMAKE_BUILD_TYPE}" MATCHES "[Rr]elease")
     set(${DNNL_BUILD_STRING} "${DNNL_BUILD_STRING} build type=${CMAKE_BUILD_TYPE},")
 endif()
+# normalize DNNL_VERBOSE values to a config file integer
+set_01(DNNL_VERBOSE_01 DNNL_VERBOSE)
+message(STATUS "DNNL_VERBOSE   =${DNNL_VERBOSE}")
+message(STATUS "DNNL_VERBOSE_01=${DNNL_VERBOSE_01}")
 append_choice(DNNL_BUILD_STRING DNNL_VERBOSE_01 " quiet" "")
 
 append_choice(DNNL_BUILD_STRING DNNL_ENABLE_CONCURRENT_CACHE " concurrent_exec" "")

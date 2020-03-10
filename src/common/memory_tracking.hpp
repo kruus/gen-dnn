@@ -165,6 +165,7 @@ enum {
     key_conv_int_dat_in_acc_dt,
     key_conv_padded_bias,
     key_conv_rtus_space,
+    key_conv_store_wsp,
     key_conv_tails,
     key_conv_tr_diff_dst,
     key_conv_tr_diff_dst_bctx,
@@ -173,6 +174,8 @@ enum {
     key_conv_wei_reduction,
     key_conv_wei_bia_reduction,
     key_conv_wei_bia_reduction_bctx,
+    key_fusion_forward_scratchpad,
+    key_fusion_inout_buffer,
     key_iprod_bias_bf16_convert_wsp,
     key_iprod_dst_bf16_convert_wsp,
     key_iprod_int_dat_in_acc_dt,
@@ -182,7 +185,10 @@ enum {
     key_lnorm_reduction,
     key_matmul_dst_in_acc_dt,
     key_pool_dst_bf16cvt,
+    key_pool_dst_plain2blocked_cvt,
+    key_pool_ind_plain2blocked_cvt,
     key_pool_src_bf16cvt,
+    key_pool_src_plain2blocked_cvt,
     key_reducer_space,
     key_reducer_space_bctx,
     key_reorder_cross_space,
@@ -210,6 +216,7 @@ enum {
 
 enum {
     prefix_none = 0,
+    prefix_fusion,
     prefix_reducer_bia,
     prefix_reducer_wei,
 };

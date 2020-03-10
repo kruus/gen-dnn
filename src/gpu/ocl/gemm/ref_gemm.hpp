@@ -17,17 +17,17 @@
 #ifndef GPU_OCL_GEMM_REF_GEMM_HPP
 #define GPU_OCL_GEMM_REF_GEMM_HPP
 
+#include "gpu/gemm/gpu_gemm.hpp"
+#include "gpu/gemm/gpu_gemm_utils.hpp"
 #include "gpu/gpu_gemm_pd.hpp"
-#include "gpu/ocl/gemm/ocl_gemm.hpp"
-#include "gpu/ocl/gemm/ocl_gemm_utils.hpp"
-#include "gpu/ocl/primitive_conf.hpp"
+#include "gpu/primitive_conf.hpp"
 
 namespace dnnl {
 namespace impl {
 namespace gpu {
 namespace ocl {
 
-struct ref_gemm_t : public ocl_gemm_t {
+struct ref_gemm_t : public gpu_gemm_t {
     struct pd_t : public gpu_gemm_pd_t {
         using gpu_gemm_pd_t::gpu_gemm_pd_t;
 
@@ -99,7 +99,7 @@ struct ref_gemm_t : public ocl_gemm_t {
         float eltwise_alpha() const {
             const int eltwise_idx
                     = attr()->post_ops_.find(primitive_kind::eltwise);
-            return with_eltwise(0) || with_eltwise(1)
+            return eltwise_idx != -1
                     ? attr()->post_ops_.entry_[eltwise_idx].eltwise.alpha
                     : 1.0f;
         }
@@ -107,15 +107,23 @@ struct ref_gemm_t : public ocl_gemm_t {
         float eltwise_beta() const {
             const int eltwise_idx
                     = attr()->post_ops_.find(primitive_kind::eltwise);
-            return with_eltwise(0) || with_eltwise(1)
+            return eltwise_idx != -1
                     ? attr()->post_ops_.entry_[eltwise_idx].eltwise.beta
                     : 0.0f;
+        }
+
+        float eltwise_scale() const {
+            const int eltwise_idx
+                    = attr()->post_ops_.find(primitive_kind::eltwise);
+            return eltwise_idx != -1
+                    ? attr()->post_ops_.entry_[eltwise_idx].eltwise.scale
+                    : 1.0f;
         }
 
         alg_kind_t eltwise_alg_kind() const {
             const int eltwise_idx
                     = attr()->post_ops_.find(primitive_kind::eltwise);
-            return with_eltwise(0) || with_eltwise(1)
+            return eltwise_idx != -1
                     ? attr()->post_ops_.entry_[eltwise_idx].eltwise.alg
                     : alg_kind::undef;
         }
@@ -179,7 +187,7 @@ struct ref_gemm_t : public ocl_gemm_t {
         return status::success;
     }
 
-    ref_gemm_t(const pd_t *apd) : ocl_gemm_t(apd) {}
+    ref_gemm_t(const pd_t *apd) : gpu_gemm_t(apd) {}
 
     virtual status_t execute(const gemm_exec_ctx_t &ctx) const override;
 

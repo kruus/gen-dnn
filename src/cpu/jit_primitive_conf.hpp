@@ -103,6 +103,8 @@ struct jit_conv_conf_t {
     bool with_bias;
     bool with_sum;
     bool with_eltwise;
+    bool is_fused_conv;
+    int dw_conv_buffer_oc;
 
     post_ops_t::entry_t::eltwise_t eltwise;
 
@@ -131,6 +133,12 @@ struct jit_conv_conf_t {
     int tr_iw, tr_ih;
     int tr_kw, tr_kh;
     int tr_src_num_guard_elems;
+
+    // Transpose buffer management
+    size_t tr_src_buf_size, tr_src_buf_count;
+    size_t tr_diff_dst_buf_size, tr_diff_dst_buf_count;
+    int nthr_mb_work;
+
     /* 1st conv: 4fma */
     int tr_ld;
     int kh_step;
@@ -429,6 +437,7 @@ struct jit_1x1_conv_conf_t {
     bool with_bias;
     bool with_sum;
     bool with_eltwise;
+    bool with_dw_conv;
 
     post_ops_t::entry_t::eltwise_t eltwise;
 
@@ -508,6 +517,7 @@ struct jit_1x1_conv_call_s {
     const void *acc_s32;
     const void *scales;
     const void *compensation;
+    const void *store_buffer;
 
     size_t load_dim;
     size_t bcast_dim;
@@ -520,7 +530,7 @@ struct jit_1x1_conv_call_s {
 
 struct jit_pool_conf_t {
     int ndims;
-    int mb, c;
+    int mb, c, c_without_padding;
     int id, ih, iw, od, oh, ow;
     int stride_d, stride_h, stride_w;
     int kd, kh, kw;

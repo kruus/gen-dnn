@@ -16,7 +16,7 @@
 
 #include "gpu/ocl/gemm_x8s8s32x_inner_product.hpp"
 
-#include "gpu/ocl/gemm/ocl_gemm.hpp"
+#include "gpu/gemm/gpu_gemm.hpp"
 #include "gpu/ocl/ocl_utils.hpp"
 
 namespace dnnl {
@@ -49,11 +49,12 @@ status_t gemm_x8s8s32x_inner_product_fwd_t::execute_forward(
         arg_list.set(2, CTX_OUT_STORAGE(DNNL_ARG_DST));
         arg_list.set(3, pd()->eltwise_alpha());
         arg_list.set(4, pd()->eltwise_beta());
-        arg_list.set(5, pd()->sum_scale());
-        arg_list.set(6,
+        arg_list.set(5, pd()->eltwise_scale());
+        arg_list.set(6, pd()->sum_scale());
+        arg_list.set(7,
                 pd()->use_scratchpad() ? *scratchpad_
                                        : memory_storage_t::empty_storage());
-        arg_list.set(7,
+        arg_list.set(8,
                 pd()->with_scales() ? *scales_mem_->memory_storage()
                                     : memory_storage_t::empty_storage());
 

@@ -1891,6 +1891,10 @@ typedef const struct dnnl_primitive *const_dnnl_primitive_t;
 /// Zero points provided at execution time.
 #define DNNL_ARG_ATTR_ZERO_POINTS 4096
 
+/// Arguments for fused depthwise convolution.
+/// See @ref dev_guide_attributes_post_ops_depthwise_fusion
+#define DNNL_ARG_ATTR_POST_OP_DW 8192
+
 /// A structure that contains an index and a memory object, and is used to pass
 /// arguments to dnnl_primitive_execute().
 typedef struct {
