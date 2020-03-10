@@ -22,12 +22,9 @@
 #else // provide a nontrivial barrier impl
 
 #if TARGET_VE
-//#include "C++/xatomic.h" // things like std::_Atomic_fetch_add_8, and _Atomic_counter_t
 #include <memory> // shared pointer support defines memory_order_seq_cst
-
 #elif !TARGET_X86_JIT
 #include <atomic> // the usual place we expect memory_order_seq_cst
-
 #endif
 
 namespace dnnl {
@@ -153,7 +150,7 @@ void barrier(ctx_t *ctx, int nthr) {
     }
 }
 
-#elif defined(__ve) //TARGET_VE
+#elif TARGET_VE
 //#warning "Aurora: if xatomic0.h usable, consider _Atomic_counter_t"
 // XXX check __NEC_VERSION__ (ex. nc++ -dM -E empty.cpp --> #define __NEC_VERSION__ 30025)
 //     because level atomic support has been improving in recent compiler versions

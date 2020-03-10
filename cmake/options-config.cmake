@@ -72,58 +72,22 @@ macro(append_map var key dotmapping)
     MAP_VERB(_am_mapval ${key} "${dotmapping}")
     string(APPEND ${var} ${_am_mapval})
 endmacro()
-# debug examples ...
-#set(VERB "nothing")
-#set(MAPPING "ON.Yahoo" "OFF.Oh-no")
-#message(STATUS "MAPPING = ${MAPPING}")
-#map_verb(VERB "OFF" "${MAPPING}")
-#message(STATUS "OFF VERB = ${VERB}")
-#map_verb(VERB "bar" "foo.FOO;bar.BAR;baz.BAZ")
-#message(STATUS "bar VERB = ${VERB}")
-#map_verb(VERB "dog" "man.is master;dog.is pet")
-#message(STATUS "dog VERB = ${VERB}")
-#append_map(VERB "cow" "man.eats hamburger;cow.eats hay")
-#message(STATUS "cow ${VERB}")
 
 ######################## target processor + "ISA" option
 set(DNNL_BUILD_STRING "CPU ${CMAKE_SYSTEM_PROCESSOR}")
 
-# ISA : "FULL" is default, no need to report
-if(NOT CPU_ISA EQUAL "FULL") # FULL is the default, whatever DNNL_CPU is targeted
-    if(0) # shortened strings?
-        string(APPEND DNNL_BUILD_STRING " ISA ")
-        append_map(DNNL_BUILD_STRING ${DNNL_ISA} "VANILLA.vanilla;FULL.full;ALL.all;SSE41.sse41;AVX.avx;AVX.avx2;AVX512_MIC.mic;AVX512_MIC_4OPS.4ops;AVX512_CORE;avx512_core;AVX_512_CORE_VNNI;vnni;AVX512_CORE_BF16.bf16;VEDNN.vednn;VEJIT.vejit")
-    else()
-        string(TOLOWER ${DNNL_ISA} DNNL_ISA_LOWERCASE)
-        set(DNNL_BUILD_STRING "${DNNL_BUILD_STRING} ISA ${DNNL_ISA_LOWERCASE}")
-    endif()
+if(NOT CPU_ISA EQUAL "ALL") # ALL is the default (whatever your DNNL_CPU)
+    string(TOLOWER ${DNNL_ISA} DNNL_ISA_LOWERCASE)
+    set(DNNL_BUILD_STRING "${DNNL_BUILD_STRING} ISA ${DNNL_ISA_LOWERCASE}")
 endif()
 
 ########################## supported options, constants
 # normalize DNNL_VERBOSE values to a config file integer
-if(NOT DNNL_VERBOSE)
-    #message(STATUS "NOT DNNL_VERBOSE")
-    set(DNNL_VERBOSE "NONE")
-    set(_DNNL_VERBOSE "0")
-    set(_DNNL_VERBOSE_EXTRA "0")
-elseif("${DNNL_VERBOSE}" STREQUAL "DEFAULT" OR "${DNNL_VERBOSE}" STREQUAL "")
-    #message(STATUS "DNNL_VERBOSE=DEFAULT")
-    set(_DNNL_VERBOSE "1")
-    set(_DNNL_VERBOSE_EXTRA "0")
-elseif("${DNNL_VERBOSE}" STREQUAL "EXTRA")
-    #message(STATUS "DNNL_VERBOSE=EXTRA")
-    set(_DNNL_VERBOSE "1")
-    set(_DNNL_VERBOSE_EXTRA "1")
-else()
-    message(FATAL_ERROR "Unhandled DNNL_VERBOSE=${DNNL_VERBOSE}")
-endif()
-message(STATUS "DNNL_VERBOSE = ${DNNL_VERBOSE}")
-message(STATUS "_DNNL_VERBOSE = ${_DNNL_VERBOSE}")
-message(STATUS "_DNNL_VERBOSE_EXTRA = ${_DNNL_VERBOSE_EXTRA}")
+set_01(DNNL_VERBOSE_01 DNNL_VERBOSE)
 if(NOT "${CMAKE_BUILD_TYPE}" MATCHES "[Rr]elease")
     set(${DNNL_BUILD_STRING} "${DNNL_BUILD_STRING} build type=${CMAKE_BUILD_TYPE},")
 endif()
-append_map(DNNL_BUILD_STRING DNNL_VERBOSE "NONE.quiet;DEFAULT.;EXTRA.extra-verbose")
+append_choice(DNNL_BUILD_STRING DNNL_VERBOSE_01 " quiet" "")
 
 append_choice(DNNL_BUILD_STRING DNNL_ENABLE_CONCURRENT_CACHE " concurrent_exec" "")
 append_choice(DNNL_BUILD_STRING DNNL_ENABLE_PRIMITIVE_CACHE " primitive_cache" "")
@@ -152,28 +116,7 @@ endif()
 if(NOT "${DNNL_USE_CLANG_SANITIZER}" STREQUAL "")
     string(APPEND DNNL_BUILD_STRING " sanitizer=${DNNL_USE_CLANG_SANITIZER}")
 endif()
-append_map(DNNL_BUILD_STRING "${DNNL_CPU_EXTERNAL_GEMM}" "NONE.;MKL. MKL;CBLAS. CBLAS")
+append_choice(DNNL_BUILD_STRING HAVE_MKL " MKL" "")
 append_choice(DNNL_BUILD_STRING BENCHDNN_USE_RDPMC " benchdnn-rdpmc" "")
-# pass CBLAS or MKL options via dnnl_config.h.in
-set_01(DNNL_USE_MKL_01 "${DNNL_CPU_EXTERNAL_GEMM}" STREQUAL "MKL")
-set_01(DNNL_USE_CBLAS_01 _DNNL_USE_MKL OR "${DNNL_CPU_EXTERNAL_GEMM}" STREQUAL "CBLAS")
-set(DNNL_USE_MKL   ${DNNL_USE_MKL_01})
-set(DNNL_USE_CBLAS ${DNNL_USE_CBLAS_01})
-#
-# default x86 build has all features ENABLEd.
-# VANILLA builds may remove whole API features from libdnnl
-#    DNNL_ENABLE_BFLOAT16 : not used (can reintroduce)
-#    DNNL_ENABLE_RNN      : remove when VANILLA has ref rnn postops
-#
-#set_01(DNNL_ENABLE_BFLOAT16_01 ${DNNL_ENABLE_BFLOAT16})
-set_01(DNNL_ENABLE_RNN_01      ${DNNL_ENABLE_RNN})
-#append_choice(DNNL_BUILD_STRING DNNL_ENABLE_BFLOAT16 "" "no-bf16")
-append_choice(DNNL_BUILD_STRING DNNL_ENABLE_RNN "" "no-rnn")
-
-########################## compiler restrictions
-set_01(DNNL_USE_STATIC_THREAD_LOCAL_OBJECTS ${DNNL_OK_STATIC_THREAD_LOCAL_OBJECTS})
-set_01(DNNL_BUG_VALUE_INITIALIZATION NOT ${DNNL_OK_VALUE_INITIALIZATION})
-
-append_map(DNNL_BUILD_STRING DNNL_CPU_EXTERNAL_GEMM "NONE.;MKL. gemm:MKL;CBLAS gemm:CBLAS")
-
+set(DNNL_USE_MKL HAVE_MKL)
 # vim: et ts=4 sw=4 ai

@@ -26,14 +26,16 @@ namespace cpu {
 using cpd_create_f = dnnl::impl::engine_t::concat_primitive_desc_create_f;
 
 namespace {
-#define INSTANCE_CREATOR(...) __VA_ARGS__::pd_t::create
+#define INSTANCE_CREATOR(...) __VA_ARGS__::pd_t::create,
 static const cpd_create_f cpu_concat_impl_list[] = {
-        INSTANCE(simple_concat_t<data_type::f32>),
-        INSTANCE(simple_concat_t<data_type::u8>),
-        INSTANCE(simple_concat_t<data_type::s8>),
-        INSTANCE(simple_concat_t<data_type::s32>),
-        INSTANCE(simple_concat_t<data_type::bf16>),
-        INSTANCE(ref_concat_t),
+        // clang-format on
+        INSTANCE_ref(simple_concat_t<data_type::f32>)
+        INSTANCE_ref(simple_concat_t<data_type::u8>)
+        INSTANCE_ref(simple_concat_t<data_type::s8>)
+        INSTANCE_ref(simple_concat_t<data_type::s32>)
+        INSTANCE_ref(simple_concat_t<data_type::bf16>)
+        INSTANCE_ref(ref_concat_t)
+        // clang-format off
         nullptr,
 };
 #undef INSTANCE

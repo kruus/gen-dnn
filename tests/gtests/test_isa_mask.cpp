@@ -29,8 +29,8 @@ namespace dnnl {
 using namespace impl::cpu;
 
 const std::set<cpu_isa_t> cpu_isa_set
-        = {vanilla, sse41, avx, avx2, avx512_mic, avx512_mic_4ops, avx512_core,
-                avx512_core_vnni, avx512_core_bf16, vednn, vejit};
+        = {vanilla, isa_any, sse41, avx, avx2, avx512_mic, avx512_mic_4ops,
+                avx512_core, avx512_core_vnni, avx512_core_bf16, isa_all};
 
 struct isa_compat_info {
     cpu_isa_t this_isa;
@@ -40,28 +40,31 @@ struct isa_compat_info {
 // This mostly duplicates isa_traits, but the idea is to *not* rely on that
 // information...
 static std::map<cpu_isa, isa_compat_info> isa_compatibility_table = {
+        // generic...
         {cpu_isa::vanilla, {vanilla, {vanilla}}},
-        {cpu_isa::sse41, {sse41, {vanilla, sse41}}},
-        {cpu_isa::avx, {avx, {vanilla, sse41, avx}}},
-        {cpu_isa::avx2, {avx2, {vanilla, sse41, avx, avx2}}},
+        {cpu_isa::any, {vanilla, {vanilla, isa_any}}},
+        {cpu_isa::all, {isa_all, {vanilla, isa_any, isa_all}}},
+        // x86-specific...
+        {cpu_isa::sse41, {sse41, {vanilla, isa_any, sse41}}},
+        {cpu_isa::avx, {avx, {vanilla, isa_any, sse41, avx}}},
+        {cpu_isa::avx2, {avx2, {vanilla, isa_any, sse41, avx, avx2}}},
         {cpu_isa::avx512_mic,
-                {avx512_mic, {vanilla, sse41, avx, avx2, avx512_mic}}},
+                {avx512_mic, {vanilla, isa_any, sse41, avx, avx2, avx512_mic}}},
         {cpu_isa::avx512_mic_4ops,
                 {avx512_mic_4ops,
-                        {vanilla, sse41, avx, avx2, avx512_mic,
+                        {vanilla, isa_any, sse41, avx, avx2, avx512_mic,
                                 avx512_mic_4ops}}},
         {cpu_isa::avx512_core,
-                {avx512_core, {vanilla, sse41, avx, avx2, avx512_core}}},
+                {avx512_core,
+                        {vanilla, isa_any, sse41, avx, avx2, avx512_core}}},
         {cpu_isa::avx512_core_vnni,
                 {avx512_core_vnni,
-                        {vanilla, sse41, avx, avx2, avx512_core,
+                        {vanilla, isa_any, sse41, avx, avx2, avx512_core,
                                 avx512_core_vnni}}},
         {cpu_isa::avx512_core_bf16,
                 {avx512_core_bf16,
-                        {vanilla, sse41, avx, avx2, avx512_core,
-                                avx512_core_vnni, avx512_core_bf16}}},
-        {cpu_isa::vednn, {vednn, {vanilla, vednn}}},
-        {cpu_isa::vejit, {vejit, {vanilla, vednn, vejit}}}};
+                        {vanilla, isa_any, sse41, avx, avx2, avx512_core,
+                                avx512_core_vnni, avx512_core_bf16}}}};
 
 class isa_test : public ::testing::TestWithParam<cpu_isa> {
 protected:
@@ -84,14 +87,14 @@ protected:
         auto info = isa_compatibility_table[isa];
         for (auto cur_isa : cpu_isa_set) {
             if (info.cpu_isa_compatible.find(cur_isa)
-                    != info.cpu_isa_compatible.end())
+                    != info.cpu_isa_compatible.end()) {
                 ASSERT_TRUE(
                         !test_mayiuse(info.this_isa) || test_mayiuse(cur_isa))
                         << (test_mayiuse(info.this_isa) ? "can" : "cannot")
                         << " use this_isa=" << (void *)isa << ", and "
                         << (test_mayiuse(cur_isa) ? "can" : "cannot")
                         << " use [compatible] cur_isa=" << (void *)cur_isa;
-            else
+            } else {
                 ASSERT_TRUE(!test_mayiuse(cur_isa))
                         << " cur_isa=" << (void *)cur_isa
                         << " not in compat table"
@@ -99,8 +102,9 @@ protected:
                         << (test_mayiuse(cur_isa) ? "can" : "cannot")
                         << " use cur_isa=" << (void *)cur_isa << " (fix "
                         << __FILE__ << ")";
+            }
         }
-    }
+    } // namespace dnnl
 };
 
 TEST_P(isa_test, TestISA) {}
@@ -110,13 +114,12 @@ INSTANTIATE_TEST_SUITE_P(TestISACompatibility, isa_test,
                 cpu_isa::avx2, cpu_isa::avx512_mic, cpu_isa::avx512_mic_4ops,
                 cpu_isa::avx512_core, cpu_isa::avx512_core_vnni,
                 cpu_isa::avx512_core_bf16));
-#elif TARGET_VE
+#else // non-x86 : just use the generic values
 INSTANTIATE_TEST_SUITE_P(TestISACompatibility, isa_test,
         ::testing::Values(cpu_isa::vanilla,
-                //cpu_isa::any, // probably aliased
-                //cpu_isa::all, // probably aliased
-                //cpu_isa::ve_common, // not there
-                cpu_isa::vednn, cpu_isa::vejit));
+                cpu_isa::any, // probably aliased
+                cpu_isa::all, // probably aliased
+                ));
 #endif
 
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

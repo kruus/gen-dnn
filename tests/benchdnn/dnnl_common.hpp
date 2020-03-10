@@ -192,12 +192,7 @@ extern dnnl_engine_t engine_tgt;
 extern dnnl_stream_t stream_tgt;
 
 inline int init() {
-    // Occasionally print DNNL_BUILD_STRING during tests.  Serious
-    // bug reports are only for x86 FULL and VANILLA build targets.
-    printf("DNNL build : %s", DNNL_BUILD_STRING);
-    int const v = dnnl_get_verbose();
-    if (v > 0) printf(" dnnl_get_verbose=%d", v);
-    printf("\n");
+    printf("DNNL build : %s\n", DNNL_BUILD_STRING);
     if (!engine_tgt) {
         DNN_SAFE(dnnl_engine_create(&engine_tgt, engine_tgt_kind, 0), CRIT);
         DNN_SAFE(dnnl_stream_create(
@@ -252,5 +247,4 @@ void maybe_prepare_runtime_zero_points(dnn_mem_t &zero_points_m,
 bool check_md_consistency_with_tag(
         const dnnl_memory_desc_t &md, const std::string &tag);
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

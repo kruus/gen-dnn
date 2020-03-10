@@ -126,7 +126,7 @@ dnnl_status_t extended_sgemm(const char *transa, const char *transb,
         return status;
     }
 #endif
-    if (TARGET_X86_JIT && DNNL_ISA >= DNNL_ISA_SSE41 && mayiuse(sse41)) {
+    if (TARGET_X86_JIT && DNNL_ISA >= DNNL_ISA_ANY && mayiuse(sse41)) {
         float *dummy_ao = NULL;
         float *dummy_bo = NULL;
 

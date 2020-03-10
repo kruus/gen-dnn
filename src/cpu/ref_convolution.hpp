@@ -20,7 +20,6 @@
 #include <assert.h>
 
 #include "c_types_map.hpp"
-#include "consistency.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
@@ -43,28 +42,6 @@ struct ref_convolution_fwd_t : public primitive_impl_t {
         status_t init() {
             using namespace data_type;
 
-#if DNNL_VERBOSE_EXTRA
-            Consistency ok("cpu_ref_conv_fwd");
-            // SHCKV=usual, SHCKVV=long debug
-#define AND_(...) SCHKV(ok, __VA_ARGS__)
-            AND_(is_fwd());
-            AND_(set_default_alg_kind(alg_kind::convolution_direct));
-            AND_(expect_data_types(
-                    src_type, wei_type, data_type::undef, dst_type, acc_type));
-            AND_(IMPLICATION(with_bias(),
-                    true
-                            && IMPLICATION(src_type == u8,
-                                    utils::one_of(bias_md_.data_type, f32, s32,
-                                            s8, u8))
-                            && IMPLICATION(src_type == f32,
-                                    bias_md_.data_type == f32)));
-            AND_(set_default_formats());
-            AND_(attr()->has_default_values(
-                    primitive_attr_t::skip_mask_t::oscale
-                    | primitive_attr_t::skip_mask_t::post_ops));
-            AND_(output_scales_mask_ok() && post_ops_ok());
-#undef AND_
-#else
             bool ok = true && is_fwd()
                     && set_default_alg_kind(alg_kind::convolution_direct)
                     && expect_data_types(src_type, wei_type, data_type::undef,
@@ -81,7 +58,6 @@ struct ref_convolution_fwd_t : public primitive_impl_t {
                             primitive_attr_t::skip_mask_t::oscale
                             | primitive_attr_t::skip_mask_t::post_ops)
                     && output_scales_mask_ok() && post_ops_ok();
-#endif
             return ok ? status::success : status::unimplemented;
         }
 

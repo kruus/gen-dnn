@@ -9850,16 +9850,15 @@ inline status set_jit_profiling_jitdumpdir(const std::string &dir) {
 }
 
 /// @copydoc dnnl_cpu_isa_t
-/// \note vanilla <= any < [cpu-specific] <= full support, however for
-/// runtime dispatch "ALL" means "no restrictions" (dnnl_cpu_isa_full).
 enum class cpu_isa {
     // ----------- any DNNL_CPU target -----------------
+    /// \note vanilla <= any < [cpu-specific] <= all
     /// @copydoc dnnl_cpu_isa_vanilla
     vanilla = dnnl_cpu_isa_vanilla,
     /// @copydoc dnnl_cpu_isa_any
     any = dnnl_cpu_isa_any,
-    /// @copydoc dnnl_cpu_isa_full
-    full = dnnl_cpu_isa_full,
+    /// @copydoc dnnl_cpu_isa_all
+    all = dnnl_cpu_isa_all,
     // -------------- x86-specific ---------------------
     /// @copydoc dnnl_cpu_isa_sse41
     sse41 = dnnl_cpu_isa_sse41,
@@ -9877,11 +9876,7 @@ enum class cpu_isa {
     avx512_core_vnni = dnnl_cpu_isa_avx512_core_vnni,
     /// @copydoc dnnl_cpu_isa_avx512_core_bf16
     avx512_core_bf16 = dnnl_cpu_isa_avx512_core_bf16,
-    // ------------- VE-specific -----------------------
-    /// @copydoc dnnl_cpu_isa_vednn
-    vednn = dnnl_cpu_isa_vednn,
-    /// @copydoc dnnl_cpu_isa_vejit
-    vejit = dnnl_cpu_isa_vejit
+    // other chipsets here...
 };
 
 /// @copydoc dnnl_set_max_cpu_isa()

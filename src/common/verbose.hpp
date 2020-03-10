@@ -65,7 +65,7 @@ struct pd_info_t {
 private:
     std::string str_;
 
-#if defined(DISABLE_VERBOSE)
+#if !DNNL_VERBOSE
     bool is_initialized_ = true; // no verbose -> info is always ready
 #else
     bool is_initialized_ = false;

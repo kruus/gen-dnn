@@ -72,15 +72,12 @@
 #define AVX512_CORE_BF16 \
     "Intel AVX-512 with Intel DL Boost and bfloat16 support"
 
-#define VEDNN "NEC Aurora (VE) with libvednn intrinsics"
-#define VEJIT "NEC Aurora (VE) with libvednn jit"
-
 namespace dnnl {
 namespace impl {
 
 static setting_t<int> verbose {0};
 int get_verbose() {
-#if !defined(DISABLE_VERBOSE)
+#if DNNL_VERBOSE
     if (!verbose.initialized()) {
         const int len = 2;
         char val[len] = {0};
@@ -90,6 +87,7 @@ int get_verbose() {
     static bool version_printed = false;
     if (!version_printed && verbose.get() > 0) {
         printf("dnnl_verbose,info,verbose:%d\n", verbose.get());
+        printf("dnnl_verbose,info,build:%s\n",DNNL_BUILD_STRING);
         printf("dnnl_verbose,info,DNNL v%d.%d.%d (commit %s)\n",
                 dnnl_version()->major, dnnl_version()->minor,
                 dnnl_version()->patch, dnnl_version()->hash);
@@ -135,21 +133,17 @@ const char *get_isa_info() {
     if (mayiuse(sse41)) return SSE41;
     if (mayiuse(x86_common)) return ISA_ANY;
     if (mayiuse(vanilla)) return VANILLA;
-    //return ISA_ANY;
     return "unrecognized x86 isa : " __FILE__;
 #elif TARGET_VE
-    if (mayiuse(vejit)) return VEJIT;
-    if (mayiuse(vednn)) return VEDNN;
     if (mayiuse(ve_common)) return ISA_ANY;
     if (mayiuse(vanilla)) return VANILLA;
-    //return ISA_ANY;
     return "unrecognized ve isa : " __FILE__;
 #else
 #error "unhandled get_isa_info() cpu target" __FILE__
 #endif
 }
 
-#if defined(DISABLE_VERBOSE)
+#if !DNNL_VERBOSE
 void pd_info_t::init(const primitive_desc_t *) {}
 
 #else

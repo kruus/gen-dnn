@@ -83,7 +83,7 @@ set_before_first_get_setting_t<cpu_isa_t> &max_cpu_isa() {
 bool init_max_cpu_isa() {
     if (max_cpu_isa().initialized()) { return false; }
 
-    cpu_isa_t max_cpu_isa_val = isa_full; // x86:x86_full, VE:ve_full, ...
+    cpu_isa_t max_cpu_isa_val = isa_all; // x86:x86_all, VE:ve_all, ...
 
     char buf[64];
     if (getenv("DNNL_MAX_CPU_ISA", buf, sizeof(buf)) > 0) {
@@ -92,14 +92,12 @@ bool init_max_cpu_isa() {
     if (std::strcmp(buf, cpu_isa_traits<CPU_ISA_T>::user_option_env) == 0) \
     max_cpu_isa_val = CPU_ISA_T
 #define ELSEIF_HANDLE_CASE(CPU_ISA_T) else IF_HANDLE_CASE(CPU_ISA_T)
-        // allow case-insensitive compare
         for (size_t i = 0u; i < sizeof(buf) && buf[i]; ++i)
             buf[i] = toupper(buf[i]);
-        //printf(" getenv DNNL_MAX_CPU_ISA --> %s\n", &buf[0]);
 
         IF_HANDLE_CASE(vanilla); // "VANILLA" --> (CPU-agnostic ref impls)
         ELSEIF_HANDLE_CASE(isa_any); // "ANY" --> x86_common or ve_common or ...
-        ELSEIF_HANDLE_CASE(isa_full); // "ALL" --> x86_full or ve_full or ...
+        ELSEIF_HANDLE_CASE(isa_all); // "ALL" --> x86_all or ve_all or ...
 #if TARGET_X86
         ELSEIF_HANDLE_CASE(sse41);
         ELSEIF_HANDLE_CASE(avx);
@@ -109,35 +107,25 @@ bool init_max_cpu_isa() {
         ELSEIF_HANDLE_CASE(avx512_core);
         ELSEIF_HANDLE_CASE(avx512_core_vnni);
         ELSEIF_HANDLE_CASE(avx512_core_bf16);
-        //else printf("Bad DNNL_MAX_CPU_ISA=%s environment for x86", buf);
-#elif TARGET_VE
-        ELSEIF_HANDLE_CASE(vednn);
-        ELSEIF_HANDLE_CASE(vejit);
-        //else printf("Bad DNNL_MAX_CPU_ISA=%s environment value for VE", buf);
+#else // non-x86 : no special isas
 #endif
-
 #undef IF_HANDLE_CASE
 #undef ELSEIF_HANDLE_CASE
     }
 
-    //printf("init_max_cpu_isa->0x%x\n", max_cpu_isa_val);
     return max_cpu_isa().set(max_cpu_isa_val);
 }
 #endif // DNNL_ENABLE_MAX_CPU_ISA
 
-#if defined(DNNL_ENABLE_MAX_CPU_ISA)
 cpu_isa_t get_max_cpu_isa(bool soft) {
     MAYBE_UNUSED(soft);
+#if defined(DNNL_ENABLE_MAX_CPU_ISA)
     init_max_cpu_isa();
     return max_cpu_isa().get(soft);
-}
-
 #else
-cpu_isa_t get_max_cpu_isa(bool soft) {
-    MAYBE_UNUSED(soft);
-    return isa_full;
-}
+    return isa_all;
 #endif // defined(DNNL_ENABLE_MAX_CPU_ISA)
+}
 
 } // namespace cpu
 } // namespace impl

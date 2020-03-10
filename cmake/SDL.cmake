@@ -25,8 +25,6 @@ include("cmake/utils.cmake")
 
 set(CMAKE_CCXX_FLAGS)
 if(NECVE) # handle cross-compiler toolchains separately
-    set(CMAKE_CCXX_FLAGS "-fPIC")
-    # no stack protector
 elseif(UNIX)
     # what about DNNL_LIBRARY_TYPE not needing -fPIC?
     set(CMAKE_CCXX_FLAGS "-fPIC -Wformat -Wformat-security")

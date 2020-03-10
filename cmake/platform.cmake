@@ -87,10 +87,7 @@ if(MSVC)
         # unconditionally.
         append(CMAKE_CCXX_FLAGS "-Wno-pass-failed")
     endif()
-elseif(NECVE) # masquerades as GNU 6.0.0, but does not quite support all the flags
-    append_if(DNNL_WERROR CMAKE_CCXX_FLAGS "-Werror")
-    append(CMAKE_CCXX_FLAGS "-Wall -Wunknown-pragma")
-    set(CMAKE_CCXX_FLAGS "${CMAKE_CCXX_FLAGS} -fdiag-parallel=2 -ffast-math")
+elseif(NECVE) # cross-compilers may have special flags
 elseif(UNIX OR MINGW)
     append(CMAKE_CCXX_FLAGS "-Wall -Wno-unknown-pragmas")
     append_if(DNNL_WERROR CMAKE_CCXX_FLAGS "-Werror")

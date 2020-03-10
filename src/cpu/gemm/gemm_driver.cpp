@@ -349,15 +349,15 @@ void gemm_kernel(const dim_t m, const dim_t n, const dim_t k, const float alpha,
 
     // Since m and n are limited by blocking, stack overflow may not happen;
     // it's up to 32kB
-#if TARGET_VE
+#if !TARGET_X86
     c_type *col_offset = (c_type *)alloca(sizeof(*col_offset) * m);
     c_type *row_offset = (c_type *)alloca(sizeof(*row_offset) * n);
-#elif !defined(_MSC_VER)
-    c_type col_offset[m];
-    c_type row_offset[n];
-#else
+#elif defined(_MSC_VER)
     c_type *col_offset = (c_type *)_alloca(sizeof(*col_offset) * m);
     c_type *row_offset = (c_type *)_alloca(sizeof(*row_offset) * n);
+#else
+    c_type col_offset[m];
+    c_type row_offset[n];
 #endif
 
     bool col_req = false;

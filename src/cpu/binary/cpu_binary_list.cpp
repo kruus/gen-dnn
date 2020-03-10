@@ -34,19 +34,19 @@ using namespace dnnl::impl::data_type;
 static const pd_create_f impl_list[] = {
         // clang-format off
         /* fp */
-        INSTANCE_uni(jit_uni_binary_t<f32>)
-        INSTANCE_uni(jit_uni_binary_t<bf16>)
-        INSTANCE(ref_binary_t<f32>)
-        INSTANCE(ref_binary_t<bf16>)
+        INSTANCE(jit_uni_binary_t<f32>)
+        INSTANCE(jit_uni_binary_t<bf16>)
+        INSTANCE_ref(ref_binary_t<f32>)
+        INSTANCE_ref(ref_binary_t<bf16>)
         /* int */
-        INSTANCE_uni(jit_uni_i8i8_binary_t<u8, u8>)
-        INSTANCE_uni(jit_uni_i8i8_binary_t<u8, s8>)
-        INSTANCE_uni(jit_uni_i8i8_binary_t<s8, s8>)
-        INSTANCE_uni(jit_uni_i8i8_binary_t<s8, u8>)
-        INSTANCE(ref_binary_t<s8, u8, s8>)
-        INSTANCE(ref_binary_t<s8, s8, s8>)
-        INSTANCE(ref_binary_t<u8, s8, u8>)
-        INSTANCE(ref_binary_t<u8, u8, u8>)
+        INSTANCE(jit_uni_i8i8_binary_t<u8, u8>)
+        INSTANCE(jit_uni_i8i8_binary_t<u8, s8>)
+        INSTANCE(jit_uni_i8i8_binary_t<s8, s8>)
+        INSTANCE(jit_uni_i8i8_binary_t<s8, u8>)
+        INSTANCE_ref(ref_binary_t<s8, u8, s8>)
+        INSTANCE_ref(ref_binary_t<s8, s8, s8>)
+        INSTANCE_ref(ref_binary_t<u8, s8, u8>)
+        INSTANCE_ref(ref_binary_t<u8, u8, u8>)
         // clang-format off
         /* eol */
         nullptr,

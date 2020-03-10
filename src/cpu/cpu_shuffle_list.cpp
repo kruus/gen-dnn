@@ -31,9 +31,9 @@ using namespace dnnl::impl::data_type;
 #define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
 static const pd_create_f impl_list[] = {
         // clang-format off
-        INSTANCE(ref_shuffle_t<4>) /* f32 or s32 */
-        INSTANCE(ref_shuffle_t<2>) /* bf16 */
-        INSTANCE(ref_shuffle_t<1>) /* s8 or u8 */
+        INSTANCE_ref(ref_shuffle_t<4>) /* f32 or s32 */
+        INSTANCE_ref(ref_shuffle_t<2>) /* bf16 */
+        INSTANCE_ref(ref_shuffle_t<1>) /* s8 or u8 */
         // clang-format on
         /* eol */
         nullptr,

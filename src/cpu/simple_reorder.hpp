@@ -31,13 +31,9 @@
 #include "tag_traits.hpp"
 
 #include "cpu_isa_traits.hpp"
-#include "cpu_target.h"
+// ejk #include "cpu_target.h"
 #include "simple_q10n.hpp"
 
-// Note: can fairly easily split these impl lists even further.
-// MSVC and other compilers have troubles trying to optimize the
-// large number of inline functions (this can cause very long
-// compile times).
 namespace dnnl {
 namespace impl {
 namespace cpu {
@@ -475,6 +471,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     }
 };
 
+/* bf16 reorders */
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         typename utils::enable_if<(

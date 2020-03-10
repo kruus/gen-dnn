@@ -29,11 +29,6 @@
 
 #include "cpu_target.h" // dnnl_config, with some extra build macro settings
 
-// XXX CHECKME where is DNNL_X86_64 used? is it equivalent to TARGET_X86?
-#if defined(__x86_64__) || defined(_M_X64)
-#define DNNL_X86_64
-#endif
-
 #define MSAN_ENABLED 0
 #define ATTR_NO_MSAN
 #if defined(__has_feature)
@@ -374,7 +369,7 @@ inline bool nd_iterator_step() {
 }
 template <typename U, typename W, typename... Args>
 inline bool nd_iterator_step(U &x, const W &X, Args &&... tuple) {
-#if !TARGET_VE // dnnl original
+#if TARGET_X86 // dnnl original
     if (nd_iterator_step(utils::forward<Args>(tuple)...)) {
         x = (x + 1) % X;
         return x == 0;

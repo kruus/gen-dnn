@@ -29,10 +29,7 @@
 #include "../gemm/os_blas.hpp"
 
 #include "cpu_rnn_pd.hpp"
-// XXX #include "../cpu_primitive.hpp"
-#if TARGET_X86_JIT
 #include "jit_uni_rnn_common_postgemm_dispatcher.hpp"
-#endif // TARGET_X86_JIT
 #include "rnn_utils.hpp"
 
 namespace dnnl {
@@ -102,7 +99,6 @@ struct _ref_rnn_common_t : public primitive_impl_t {
             using namespace rnn_utils;
             const alg_kind_t cell_kind = this->desc()->cell_kind;
 
-            // TODO no postops dispatcher?
             data_type_t src_layer_dt = this->desc()->src_layer_desc.data_type;
             data_type_t weights_iter_dt
                     = this->desc()->weights_iter_desc.data_type;
@@ -178,9 +174,6 @@ struct _ref_rnn_common_t : public primitive_impl_t {
                         data_type::u8, format_tag::x);
             }
 
-#if !TARGET_X86_JIT
-#warning "TODO: RNN support for VANILLA build"
-#endif // TARGET_X86_JIT
             init_scratchpad(scratchpad_sz);
 
             return status::success;
@@ -209,11 +202,7 @@ struct _ref_rnn_common_t : public primitive_impl_t {
     };
 
     _ref_rnn_common_t(const pd_t *apd)
-        : primitive_impl_t(apd)
-#if TARGET_X86_JIT // FIXME ref impl for this !!!
-        , rnn_postgemm_(nullptr)
-#endif // TARGET_X86_JIT
-    {
+        : primitive_impl_t(apd), rnn_postgemm_(nullptr) {
         /// @todo set max_feature_size assuming that we limit the number of
         /// iterations and layer to one if slc != dic and sic != dic
         /// respectively
@@ -237,12 +226,10 @@ struct _ref_rnn_common_t : public primitive_impl_t {
         set_gemm_funcs(pd()->rnn_.use_layer_packed_gemm, gemm_layer_func,
                 weights_layer_assign_func);
 
-#if TARGET_X86_JIT
         rnn_postgemm_
                 = new rnn_postgemm_dispatcher<aprop, src_type, scratch_type>(
                         pd()->rnn_, pd());
         assert(rnn_postgemm_ != nullptr);
-#endif // TARGET_X86_JIT
         switch (pd()->cell_kind()) {
             case alg_kind::vanilla_rnn:
             case alg_kind::vanilla_lstm:
@@ -266,11 +253,9 @@ struct _ref_rnn_common_t : public primitive_impl_t {
                 scratch_cell_offset_, scratchpad_size, workspace_size);
     }
 
-    ~_ref_rnn_common_t() {
-#if TARGET_X86_JIT
-        delete rnn_postgemm_;
-#endif // TARGET_X86_JIT
-    }
+    ~_ref_rnn_common_t() { delete rnn_postgemm_; }
+
+    // typedef typename prec_traits::type data_t;
 
     virtual status_t execute(const exec_ctx_t &ctx) const override {
         execute_(ctx);
@@ -326,9 +311,7 @@ private:
     size_t ws_grid_comp_offset_;
     size_t scratch_gates_offset_;
     size_t scratch_cell_offset_;
-#if TARGET_X86_JIT
     rnn_postgemm_dispatcher<aprop, src_type, scratch_type> *rnn_postgemm_;
-#endif // TARGET_X86_JIT
 
     grid_execution_f grid_computation;
     cell_execution_f cell_func;
@@ -356,5 +339,6 @@ using ref_rnn_fwd_u8s8_t = _ref_rnn_common_t<prop_kind::forward, data_type::u8,
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif // CPU_REF_RNN_HPP
+#endif
+
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

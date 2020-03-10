@@ -2049,8 +2049,7 @@ typedef struct {
     unsigned cpu_runtime; ///< CPU runtime
     unsigned gpu_runtime; ///< GPU runtime
     unsigned cpu; ///< DNNL_CPU build target DNNL_CPU_{X86|VE|...} (def X86)
-    unsigned
-            isa; ///< DNNL_ISA build target DNNL_ISA_{FULL|VANILLA|...} (def FULL)
+    unsigned isa; ///< DNNL_ISA target: DNNL_ISA_{VANILLA|ALL|...} (def ALL)
 } dnnl_version_t;
 
 /// Disable profiling completely
@@ -2094,7 +2093,7 @@ typedef enum {
     /** For Intel(R) means "provide full set of jit implementations".
      * For non-x86 builds, this may place added requirements on run-time
      * environment, external libs, etc. */
-    dnnl_cpu_isa_full = 0x0,
+    dnnl_cpu_isa_all = 0x0,
 
     // DNNL_CPU==DNNL_CPU_X86 -------------------------------------------------
     /// Intel(R) SSE4.1.
@@ -2127,14 +2126,6 @@ typedef enum {
     /// Bfloat16 Support for Intel(R) Xeon(R) Processor Scalable Family and
     /// Intel(R) Core(TM) processor family.
     dnnl_cpu_isa_avx512_core_bf16 = 0xe0 | dnnl_cpu_isa_avx2,
-
-    // DNNL_CPU==DNNL_CPU_VE --------------------------------------------------
-    /// "vednn" NEC VE build with libvednn intrinsics
-    dnnl_cpu_isa_vednn = 0x10000,
-
-    /// "vejit" NEC VE build with libvednn JIT features.
-    dnnl_cpu_isa_vejit = 0x30000,
-
     // other chipsets here...
 
 } dnnl_cpu_isa_t;

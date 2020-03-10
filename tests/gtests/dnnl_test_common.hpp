@@ -63,10 +63,7 @@ bool is_current_test_failed();
 dnnl::engine::kind get_test_engine_kind();
 
 inline void show_dnnl_build() {
-    printf("DNNL build : %s", DNNL_BUILD_STRING);
-    int const v = dnnl_get_verbose();
-    if (v > 0) printf(" DNNL_VERBOSE=%d", v);
-    printf("\n");
+    printf("DNNL build : %s\n", DNNL_BUILD_STRING);
 }
 
 template <typename data_t>
