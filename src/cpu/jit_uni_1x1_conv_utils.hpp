@@ -25,7 +25,10 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
+#include "cpu_target.h"
+#if TARGET_X86_JIT
 #include "jit_generator.hpp"
+#endif // DNNL_TARGET_X86_JIT
 
 namespace dnnl {
 namespace impl {
@@ -37,6 +40,7 @@ struct reduce_to_unit_stride_t {
     size_t space_per_thread_;
 };
 
+#if DNNL_TARGET_X86_JIT
 /* 1x1-kernel does not support non-unit strides so far, so the idea is:
  *  - for fwd or bwd_weights: to copy src to a scratch memory (with strides
  *    equal to 1) and then call the kernel
@@ -369,6 +373,7 @@ inline int best_divider(int value, int min_divider, int max_divider,
     }
     return x_divider;
 }
+#endif // DNNL_TARGET_X86_JIT
 
 inline status_t get_depthwise_primitive_desc(primitive_desc_t **pd,
         const memory_desc_t &src_dw_md, const primitive_attr_t &attr_1x1,

@@ -44,7 +44,6 @@ struct ncsp_batch_normalization_fwd_t : public primitive_impl_t {
             using namespace data_type;
             using namespace prop_kind;
             using namespace format_tag;
-            using namespace ::dnnl::impl::cpu;
 
             bool ok = true && is_fwd() && !has_zero_dim_memory()
                     && src_md()->data_type == d_type

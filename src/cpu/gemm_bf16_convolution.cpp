@@ -310,8 +310,8 @@ void gemm_bf16_convolution_fwd_t<dst_data_type>::execute_forward(
         }
     }
 
+#if TARGET_X86_JIT // no ref impl for vanilla bfloat16 post-ops (probably ok)
     const auto &post_ops = pd()->attr()->post_ops_;
-#if TARGET_X86_JIT // FIXME need a ref impl for post_ops
     const bool do_sum = post_ops.contain(primitive_kind::sum, 0);
     const float sum_scale = do_sum ? post_ops.entry_[0].sum.scale : 0;
 #endif // TARGET_X86_JIT

@@ -30,8 +30,8 @@
 #include "cpu_reorder_pd.hpp"
 #include "tag_traits.hpp"
 
-#include "cpu_isa_traits.hpp"
-// ejk #include "cpu_target.h"
+//#include "cpu_isa_traits.hpp"
+#include "cpu_target.h"
 #include "simple_q10n.hpp"
 
 namespace dnnl {

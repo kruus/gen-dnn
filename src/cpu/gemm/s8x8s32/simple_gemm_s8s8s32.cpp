@@ -21,9 +21,6 @@
 #include "../gemm.hpp"
 #include "dnnl_thread.hpp"
 #include "dnnl_types.h"
-#if TARGET_X86_JIT
-#include "jit_generator.hpp" // why? XXX
-#endif // TARGET_X86_JIT
 #include "math_utils.hpp"
 #include "nstl.hpp"
 #include "utils.hpp"

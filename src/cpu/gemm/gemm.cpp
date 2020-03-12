@@ -36,11 +36,6 @@
 #include "s8x8s32/ref_gemm_s8x8s32.hpp"
 #include "s8x8s32/simple_gemm_s8s8s32.hpp"
 
-#define MKLDNN_TRACE_EXTENDED_SGEMM 0
-#if MKLDNN_TRACE_EXTENDED_SGEMM
-#include <stdio.h>
-#endif
-
 #include "common/bfloat16.hpp" // XXX needed?
 #include "os_blas.hpp" // XXX needed?
 
@@ -106,12 +101,6 @@ dnnl_status_t extended_sgemm(const char *transa, const char *transb,
         bool trB = *transb == 't' || *transb == 'T';
         CBLAS_TRANSPOSE Cblas_trA = trA ? CblasTrans : CblasNoTrans;
         CBLAS_TRANSPOSE Cblas_trB = trB ? CblasTrans : CblasNoTrans;
-#if MKLDNN_TRACE_EXTENDED_SGEMM
-        printf("cblas_sgemm(%d,%c,%c;MNK=%d,%d,%d;alpha=%f"
-               ",A@ld=%d,B@ld=%d,beta=%f,C@ld=%d)\n",
-                CblasColMajor, *transa, *transb, *M, *N, *K, *alpha, *lda, *ldb,
-                *beta, *ldc);
-#endif
         cblas_sgemm(CblasColMajor, Cblas_trA, Cblas_trB, *M, *N, *K, *alpha, A,
                 *lda, B, *ldb, *beta, C, *ldc);
         if (bias) {
@@ -130,21 +119,10 @@ dnnl_status_t extended_sgemm(const char *transa, const char *transb,
         float *dummy_ao = NULL;
         float *dummy_bo = NULL;
 
-#if MKLDNN_TRACE_EXTENDED_SGEMM
-        printf("gemm_driver(%c,%c,%s;MNK=%d,%d,%d;alpha=%f"
-               ",A@ld=%dx,B@ld=%dx,beta=%f,C@ld=%d,bias%s)\n",
-                *transa, *transb, (bias ? "C" : "x"), *M, *N, *K, *alpha, *lda,
-                *ldb, *beta, *ldc, (force_jit_nocopy_gemm ? "(nocopy)" : ""));
-#endif
         status = gemm_driver(transa, transb, bias ? "C" : NULL, M, N, K, alpha,
                 A, lda, dummy_ao, B, ldb, dummy_bo, beta, C, ldc, bias,
                 force_jit_nocopy_gemm);
     } else {
-#if MKLDNN_TRACE_EXTENDED_SGEMM
-        printf("ref_gemm<float>(%c,%c;MNK=%d,%d,%d;alpha=%f"
-               ",A@ld=%d,B@ld=%d,beta=%f,C@ld=%d,bias)\n",
-                *transa, *transb, *M, *N, *K, *alpha, *lda, *ldb, *beta, *ldc);
-#endif
         status = ref_gemm<float>(transa, transb, M, N, K, alpha, A, lda, B, ldb,
                 beta, C, ldc, bias);
     }

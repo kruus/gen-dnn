@@ -49,17 +49,22 @@ dnnl_status_t gemm_bf16bf16f32(const char *transa, const char *transb,
 #elif defined(USE_CBLAS)
 #define GEMM_IMPL_STR "gemm:blas"
 #elif TARGET_X86_JIT
+// misleading during cpu dispatch to VANILLA :
 #define GEMM_IMPL_STR "gemm:jit"
 #else
 #define GEMM_IMPL_STR "gemm:ref"
 #endif
 
 #if USE_MKL_IGEMM
-#define IGEMM_S8U8S32_IMPL_STR "igemm_s8u8s32:blas"
-#define IGEMM_S8S8S32_IMPL_STR "igemm_s8s8s32:blas"
-#else
+#define IGEMM_S8U8S32_IMPL_STR "igemm_s8u8s32:mkl"
+#define IGEMM_S8S8S32_IMPL_STR "igemm_s8s8s32:mkl"
+// cblas has no igemm available
+#elif TARGET_X86_JIT
 #define IGEMM_S8U8S32_IMPL_STR "igemm_s8u8s32:jit"
 #define IGEMM_S8S8S32_IMPL_STR "igemm_s8s8s32:jit"
+#else
+#define IGEMM_S8U8S32_IMPL_STR "igemm_s8u8s32:ref"
+#define IGEMM_S8S8S32_IMPL_STR "igemm_s8s8s32:ref"
 #endif
 
 #ifndef USE_MKL_IGEMM

@@ -55,9 +55,9 @@ should be set to an empty string (`""`) if the resulting library needs to be
 portable.
 
 ### Runtime CPU dispatcher control
-DNNL JIT relies on ISA features obtained from the processor it is being run on.
-There are situations when it is necessary to control this behavior at run-time
-to, for example, test SSE4.1 code on an AVX2-capable processor. The
+DNNL JIT relies on ISA features obtained from the processor it is being run
+on.  There are situations when it is necessary to control this behavior at
+run-time to, for example, test SSE4.1 code on an AVX2-capable processor. The
 `DNNL_ENABLE_MAX_CPU_ISA` build option controls the availability of this
 feature. See @ref dev_guide_cpu_dispatcher_control for more information.
 
@@ -132,7 +132,9 @@ cmake -DTOOLCHAIN_FILE=cmake/mycpu.cmake -DCPU_ISA=VANILLA ..
 You will need add support for your CPU to a few files (dnnl_config.h.in, and
 eventually cpu_isa_traits).  Begin optimizing the VANILLA build by adjusting
 variables like cache and page sizes, alignment restrictions,
-optimization-related macros (OpenMP support has wide variations), etc.
+optimization-related macros (OpenMP support has wide variations), etc.  All
+non-x86 cpu-specific code in mkl-dnn sources is not officially supported and
+should be viewed solely as example code
 
 CPU_ISA config values have 3 cross-platform values, VANILLA, ANY and ALL.  You
 may begin with all equivalent.  ANY must run on the lowest variation of your chip,
@@ -148,5 +150,8 @@ The DNNL API configuration and version files have been extended to better show
 the build configuration.  gtests now frequently print the DNNL_BUILD_STRING,
 which should mirror any 'nonstandard' build options used for libdnnl.
 
-A -DCPU_ISA=VANILLA build has limited support for bfloat16, and RNN support is
-disabled (some components lack a reference impl).
+The purpose of the cross-platform VANILLA build is to provide a reasonably
+complete **reference baseline** upon which you can build more specialized
+chip-specific optimizations.  A -DCPU_ISA=VANILLA build has limited support for
+bfloat16, and several features may be absent or run appreciably slower (int8
+operations and rnn).

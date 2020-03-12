@@ -554,6 +554,7 @@ void pp_kernel_t<acc_type, dst_type>::compute_mb_blk() {
         sub(reg_len, mb_oc_blk);
         jmp(mb_main_loop, T_NEAR);
     }
+    L(end_main_loop);
 
     if (mb_tail > 0) {
         Label mb_tail_loop, end_tail_loop;

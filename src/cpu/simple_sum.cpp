@@ -16,7 +16,6 @@
 
 #include "simple_sum.hpp"
 #include "bfloat16.hpp"
-// ejk #include "cpu_isa_traits.hpp"
 #include "dnnl_thread.hpp"
 
 namespace dnnl {

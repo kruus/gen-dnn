@@ -113,7 +113,7 @@ struct gemm_bf16_convolution_fwd_t : public primitive_impl_t {
                 default: return false;
             }
 #else
-            if (po.len_ == 0) return true; // if !TARGET_X86_JIT, do you even care about bf16?
+            if (po.len_ == 0) return true; // heavy-handed for VANILLA
 #endif // TARGET_X86_JIT
             return false;
         }
@@ -221,8 +221,7 @@ private:
         int data_reg_base_idx_;
         size_t vlen_;
         cpu_isa_t isa_;
-        bf16_emulation_t
-                *bf16_emu_; /* note: defined in  jit_avx512_core_bf16cvt.hpp */
+        bf16_emulation_t *bf16_emu_; /* note: in  jit_avx512_core_bf16cvt.hpp */
         jit_uni_eltwise_injector_f32<avx512_core> *eltwise_injector_;
 
         void generate();

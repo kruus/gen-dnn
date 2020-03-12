@@ -43,9 +43,9 @@
 #include "cpu/jit_sse41_1x1_convolution.hpp"
 #include "cpu/jit_sse41_convolution.hpp"
 #include "cpu/jit_uni_dw_convolution.hpp"
-#include "cpu/ref_fused_convolution.hpp" // Note: heavily jit-dependent ??
 #endif // DNNL_TARGET_X86_JIT
 #include "cpu/ref_convolution.hpp"
+#include "cpu/ref_fused_convolution.hpp" // Note: heavily jit-dependent ??
 
 namespace dnnl {
 namespace impl {
@@ -95,7 +95,7 @@ static const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
         INSTANCE(jit_sse41_convolution_fwd_t)
         INSTANCE(gemm_convolution_fwd_t)
         INSTANCE_ref(ref_convolution_fwd_t<f32>)
-        INSTANCE(ref_fused_convolution_fwd_t)
+        INSTANCE_ref(ref_fused_convolution_fwd_t)
         nullptr
     }},
     {{forward, bf16, bf16, f32}, {
@@ -110,7 +110,7 @@ static const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
         INSTANCE(jit_avx512_core_bf16_1x1_convolution_fwd_t<bf16>)
         INSTANCE(jit_avx512_core_bf16_convolution_fwd_t)
         INSTANCE_ref(gemm_bf16_convolution_fwd_t<bf16>) // omit from ref?
-        INSTANCE(ref_fused_convolution_fwd_t)
+        INSTANCE_ref(ref_fused_convolution_fwd_t)
         nullptr
     }},
     // BWD_D fp
@@ -194,7 +194,7 @@ static const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
         INSTANCE(jit_avx2_x8s8s32x_1x1_convolution_fwd_t<s8, s8>)
         INSTANCE(jit_avx2_x8s8s32x_convolution_fwd_t<s8, s8>)
         INSTANCE_ref(_gemm_x8s8s32x_convolution_fwd_t<s8, s8>)
-        INSTANCE(ref_fused_convolution_fwd_t)
+        INSTANCE_ref(ref_fused_convolution_fwd_t)
         nullptr
     }},
     {{forward, s8, s8, u8}, {
@@ -203,7 +203,7 @@ static const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
         INSTANCE(jit_avx2_x8s8s32x_1x1_convolution_fwd_t<s8, u8>)
         INSTANCE(jit_avx2_x8s8s32x_convolution_fwd_t<s8, u8>)
         INSTANCE_ref(_gemm_x8s8s32x_convolution_fwd_t<s8, u8>)
-        INSTANCE(ref_fused_convolution_fwd_t)
+        INSTANCE_ref(ref_fused_convolution_fwd_t)
         nullptr
     }},
     // FWD int8 (src:u8)
@@ -235,7 +235,7 @@ static const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
         INSTANCE(jit_avx2_x8s8s32x_convolution_fwd_t<u8, s8>)
         INSTANCE_ref(_gemm_x8s8s32x_convolution_fwd_t<u8, s8>)
         INSTANCE_ref(ref_convolution_fwd_t<u8, s8, s8, s32>)
-        INSTANCE(ref_fused_convolution_fwd_t)
+        INSTANCE_ref(ref_fused_convolution_fwd_t)
         nullptr
     }},
     {{forward, u8, s8, u8}, {
@@ -246,7 +246,7 @@ static const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
         INSTANCE(jit_avx2_x8s8s32x_convolution_fwd_t<u8, u8>)
         INSTANCE_ref(_gemm_x8s8s32x_convolution_fwd_t<u8, u8>)
         INSTANCE_ref(ref_convolution_fwd_t<u8, s8, u8, s32>)
-        INSTANCE(ref_fused_convolution_fwd_t)
+        INSTANCE_ref(ref_fused_convolution_fwd_t)
         nullptr
     }},
     // BWD int8 (diff_dst:u8)

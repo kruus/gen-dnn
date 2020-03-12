@@ -276,6 +276,7 @@ struct ref_deconvolution_bwd_data_t : public primitive_impl_t {
                     return status::success;
                 delete conv_pd_;
             }
+
             return status::unimplemented;
         }
 
@@ -306,6 +307,7 @@ struct ref_deconvolution_bwd_data_t : public primitive_impl_t {
 
                 return status::success;
             }
+
             return status::unimplemented;
         }
 
@@ -469,8 +471,9 @@ struct ref_deconvolution_bwd_weights_t : public primitive_impl_t {
                 compute_bias<f32, f32>(ctx);
             else if (utils::everyone_is(bf16, dbia_type, ddst_type))
                 compute_bias<bf16, bf16>(ctx);
-            else if (dbia_type == f32 && ddst_type == bf16)
+            else if (dbia_type == f32 && ddst_type == bf16) {
                 compute_bias<f32, bf16>(ctx);
+            }
         }
         return status::success;
     }
@@ -498,5 +501,6 @@ private:
 } // namespace impl
 } // namespace dnnl
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif
+
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

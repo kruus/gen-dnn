@@ -121,6 +121,7 @@ struct jit_uni_dw_convolution_bwd_data_t : public primitive_impl_t {
                             data_type::undef, diff_dst_type, data_type::f32)
                     && attr()->has_default_values() && !has_zero_dim_memory()
                     && set_default_formats();
+
             if (!ok) return status::unimplemented;
 
             status_t status = jit_uni_dw_conv_bwd_data_kernel<isa,
