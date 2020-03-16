@@ -194,20 +194,9 @@ endif()
 
 # toolchain builds may add checks for compiler/environment/library issues...
 include(CheckCXXSourceCompiles)
-check_cxx_source_compiles(
-    "#include <iostream>
-    struct Foo { Foo() : i(42) {} int i; };
-    // Some systems fail link : missing atexit c++ destructor function
-    thread_local static Foo foo;
-    int main(int argc,char**){ std::cout<<foo.i; }
-    "
-    #nc++ - 3.0.25 workaround; remove check, and tidy scratchpad.cpp when fixed
-    DNNL_OK_STATIC_THREAD_LOCAL_OBJECTS # as in scratchpad std::unique_ptr
-    )
-message(STATUS "DNNL_OK_STATIC_THREAD_LOCAL_OBJECTS ${DNNL_OK_STATIC_THREAD_LOCAL_OBJECTS}")
+# DNNL_OK_STATIC_THREAD_LOCAL_OBJECTS test removed - scratchpad.cpp reverted
 if(NECVE) # most standard compilers comply with c++11, but...
-    # Note: This bug is pretty severe.  Try not to pollute mkl-dnn/master with 
-    #       workarounds for this bug.
+    # This bug can often use zero<T> to localize a crude 'memset' workaround
     include(CheckCXXSourceRuns)
     file(READ cmake/test_value_initialized_bug.cpp _source)
     check_cxx_source_runs("${_source}"
