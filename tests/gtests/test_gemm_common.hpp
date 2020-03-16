@@ -113,9 +113,22 @@ dnnl_status_t dnnl_gemm_bf16bf16f32(char transa, char transb, dnnl_dim_t M,
 }
 
 // Declare packed GEMM interfaces for testing
+// TODO actually provide a GEMM interface to avoid copy-paste and sync issues
 namespace dnnl {
 namespace impl {
 namespace cpu {
+
+/** packed capability function (copied) \sa src/cpu/gemm/gemm_pack.hpp */
+// allow SKIP so sgemm_pack_get_size avoids 'unimplemented' --> exception
+#if defined(USE_MKL)
+static inline bool constexpr pack_sgemm_supported() {
+    return true;
+}
+#else
+static inline bool pack_sgemm_supported() {
+    return mayiuse(sse41);
+}
+#endif
 
 // Get pack-size functions.
 extern dnnl_status_t sgemm_pack_get_size(const char *identifier,
@@ -608,7 +621,7 @@ struct dnnl_gemm<float16_t, float16_t, float16_t> {
             const test_memory &) {
 #if DNNL_GPU_RUNTIME == DNNL_RUNTIME_OCL
         if (get_test_engine_kind() == engine::kind::gpu) {
-            engine eng(get_test_engine_kind(), 0);
+            engine eng = get_test_engine();
             stream s(eng);
             cl_command_queue q = s.get_ocl_command_queue();
             auto status = dnnl_ocl_hgemm(q, p.transA, p.transB, p.M, p.N, p.K,
@@ -812,7 +825,7 @@ struct dnnl_gemm<int8_t, int8_t, int32_t> {
 
 #if DNNL_GPU_RUNTIME == DNNL_RUNTIME_OCL
         if (get_test_engine_kind() == engine::kind::gpu) {
-            engine eng(get_test_engine_kind(), 0);
+            engine eng = get_test_engine();
             stream s(eng);
             cl_command_queue q = s.get_ocl_command_queue();
             auto status = dnnl_ocl_gemm_s8s8s32(q, p.transA, p.transB,
@@ -848,7 +861,7 @@ struct dnnl_gemm<int8_t, uint8_t, int32_t> {
             const test_memory &oc_mem) {
 #if DNNL_GPU_RUNTIME == DNNL_RUNTIME_OCL
         if (get_test_engine_kind() == engine::kind::gpu) {
-            engine eng(get_test_engine_kind(), 0);
+            engine eng = get_test_engine();
             stream s(eng);
             cl_command_queue q2 = s.get_ocl_command_queue();
             auto status = dnnl_ocl_gemm_s8u8s32(q2, p.transA, p.transB,
@@ -874,7 +887,7 @@ struct dnnl_gemm<uint8_t, uint8_t, int32_t> {
 
 #if DNNL_GPU_RUNTIME == DNNL_RUNTIME_OCL
         if (get_test_engine_kind() == engine::kind::gpu) {
-            engine eng(get_test_engine_kind(), 0);
+            engine eng = get_test_engine();
             stream s(eng);
             cl_command_queue q = s.get_ocl_command_queue();
             auto status = dnnl_ocl_gemm_u8u8s32(q, p.transA, p.transB,
@@ -985,7 +998,7 @@ struct dnnl_gemm<uint8_t, int8_t, int32_t> {
 
 #if DNNL_GPU_RUNTIME == DNNL_RUNTIME_OCL
         if (get_test_engine_kind() == engine::kind::gpu) {
-            engine eng(get_test_engine_kind(), 0);
+            engine eng = get_test_engine();
             stream s(eng);
             cl_command_queue q = s.get_ocl_command_queue();
             auto status = dnnl_ocl_gemm_u8s8s32(q, p.transA, p.transB,
@@ -1164,7 +1177,7 @@ template <typename a_dt, typename b_dt, typename c_dt>
 struct run_test_gemm {
     static void call(const test_params &p) {
         if (p.expect_to_fail) {
-            engine eng(get_test_engine_kind(), 0);
+            engine eng = get_test_engine();
             test_memory zero_mem({}, eng);
             auto status = dnnl_gemm<a_dt, b_dt, c_dt>::call(
                     p, zero_mem, zero_mem, zero_mem, zero_mem);
@@ -1176,7 +1189,7 @@ struct run_test_gemm {
         size_t sizeA, sizeB, sizeC;
         get_matrix_size(p, sizeA, sizeB, sizeC);
 
-        engine eng(get_test_engine_kind(), 0);
+        engine eng = get_test_engine();
         test_memory a_mem = get_matrix_memory<a_dt>(sizeA, p.off.a, eng);
         test_memory b_mem = get_matrix_memory<b_dt>(sizeB, p.off.b, eng);
         test_memory c_mem = get_matrix_memory<c_dt>(sizeC, p.off.c, eng);
@@ -1233,6 +1246,9 @@ protected:
         bool pack = (p.pack_params.pack_a || p.pack_params.pack_b);
         SKIP_IF(get_test_engine_kind() == engine::kind::gpu && pack,
                 "GPU does not support packed GEMM.");
+        using dnnl::impl::cpu::pack_sgemm_supported;
+        SKIP_IF(pack && !pack_sgemm_supported(),
+                "Packed GEMM requires MKL or >= sse4.1");
         SKIP_IF((p.alpha != 1.f || p.igemm_params.oa() != 0
                         || p.igemm_params.ob() != 0)
                         && pack,

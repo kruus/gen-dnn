@@ -833,16 +833,17 @@ static inline bool nocopy_checker_avx512(int nthr, const int transa,
 
     bool is_lda_verybad = lda % VERYBAD_LD_MULT == 0;
 
-    // Crude threshold to nocopy kernels if copy overhead is significant
-    // and nthr greater than 1.
-    if (nthr > 1 && 1.0 / m + 1.0 / n >= FORCE_NOCOPY_THRESH
+    // Copy-based performs better for TN case with small N in sequential case.
+    if (nthr == 1 && is_TN_case && m > 100
+            && ((m < 1200 && n < 200 && k < 1200)
+                    || (is_lda_bad && is_ldb_bad)))
+        return false;
+
+    // Crude threshold for nocopy kernels if copy overhead is significant.
+    if (1.0 / m + 1.0 / n >= FORCE_NOCOPY_THRESH
             && !(is_lda_verybad && is_NT_case)) {
         return true;
     }
-
-    // Copy-based performs better for TN case with small N in sequential case.
-    if (nthr == 1 && is_TN_case && m > 100 && m < 1200 && n < 200 && k < 1200)
-        return false;
 
     // Copy strategy usually performs better than nocopy on "bad" leading
     // dimensions.
@@ -1758,9 +1759,9 @@ dnnl_status_t gemm_driver(const char *transA, const char *transB,
     assert(IMPLICATION(data_traits<a_type>::data_type == data_type::bf16,
             mayiuse(avx512_core) && !force_nocopy));
 
-    // gemm_driver supports 8-bit integer Intel AVX512, Intel AVX2 and
-    // Intel DL Boost.
-    assert(IMPLICATION(is_int8, mayiuse(avx2) && !mayiuse(avx512_mic)));
+    // gemm_driver supports 8-bit integer Intel AVX512, Intel AVX2, Intel AVX,
+    // Intel SSE4.1 and Intel DL Boost.
+    assert(IMPLICATION(is_int8, mayiuse(sse41) && !mayiuse(avx512_mic)));
 
     // gemm_driver supports sgemm for Intel AVX512, Intel AVX2, Intel AVX,
     // and Intel SSE4.1

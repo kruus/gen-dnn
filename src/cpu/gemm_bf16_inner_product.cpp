@@ -202,10 +202,10 @@ void gemm_bf16_inner_product_bwd_weights_t<diff_wei_data_type>::
 }
 
 template struct gemm_bf16_inner_product_fwd_t<data_type::f32>;
-template struct gemm_bf16_inner_product_bwd_data_t<data_type::f32>;
-template struct gemm_bf16_inner_product_bwd_weights_t<data_type::f32>;
 template struct gemm_bf16_inner_product_fwd_t<data_type::bf16>;
+template struct gemm_bf16_inner_product_bwd_data_t<data_type::f32>;
 template struct gemm_bf16_inner_product_bwd_data_t<data_type::bf16>;
+template struct gemm_bf16_inner_product_bwd_weights_t<data_type::f32>;
 template struct gemm_bf16_inner_product_bwd_weights_t<data_type::bf16>;
 
 } // namespace cpu

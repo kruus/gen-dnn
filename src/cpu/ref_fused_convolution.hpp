@@ -92,7 +92,6 @@ struct ref_fused_convolution_fwd_t : public primitive_impl_t {
 
         status_t init() {
             bool ok = true && is_fwd()
-                    //&& !TARGET_X86_JIT // todo: provide ref impl (benchdnn fails fused conv)
                     && (attr()->post_ops_.find(primitive_kind::sum) == -1);
 
             if (!ok) return status::unimplemented;

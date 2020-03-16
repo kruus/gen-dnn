@@ -19,6 +19,7 @@
 #include "dnnl_traits.hpp"
 #include "nstl.hpp"
 #include "utils.hpp"
+#include "cpu_target.h"
 
 #if MKLDNN_CPU_GEMM_JIT
 #include "jit_generator.hpp"
@@ -36,8 +37,8 @@
 #include "s8x8s32/ref_gemm_s8x8s32.hpp"
 #include "s8x8s32/simple_gemm_s8s8s32.hpp"
 
-#include "common/bfloat16.hpp" // XXX needed?
-#include "os_blas.hpp" // XXX needed?
+#include "common/bfloat16.hpp"
+#include "os_blas.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -112,10 +113,10 @@ dnnl_status_t extended_sgemm(const char *transa, const char *transb,
             });
         }
         msan_unpoison_matrix(C, *M, *N, *ldc, sizeof(*C));
-        return status;
+        return dnnl_success;
     }
 #endif
-    if (TARGET_X86_JIT && DNNL_ISA >= DNNL_ISA_ANY && mayiuse(sse41)) {
+    if (TARGET_X86_JIT && mayiuse(sse41)) {
         float *dummy_ao = NULL;
         float *dummy_bo = NULL;
 
@@ -181,7 +182,7 @@ dnnl_status_t gemm_s8x8s32(const char *transa, const char *transb,
             LDA, ao, B, LDB, bo, beta, C, LDC, co);
     if (status == dnnl_success) return status;
 
-    if (mayiuse(avx2) && !mayiuse(avx512_mic))
+    if (mayiuse(sse41) && !mayiuse(avx512_mic))
         status = gemm_driver(transa, transb, offsetc, M, N, K, alpha, A, LDA,
                 ao, B, LDB, bo, beta, C, LDC, co, false);
     else
@@ -206,7 +207,7 @@ dnnl_status_t gemm_s8x8s32(const char *transa, const char *transb,
     bool use_jit = mayiuse(avx512_core);
     bool use_s8u8 = true
             && utils::everyone_is(0, *ao, *bo) // so far a requirement
-            && IMPLICATION(USE_MKL_IGEMM == 0, mayiuse(avx2));
+            && IMPLICATION(USE_MKL_IGEMM == 0, mayiuse(sse41));
 
     if (use_jit)
         status = gemm_driver(transa, transb, offsetc, M, N, K, alpha, A, LDA,

@@ -70,11 +70,11 @@ static int init_pd(const prb_t *p, dnnl_primitive_desc_t &epd, res_t *r) {
 
     const char *impl_str = query_impl_info(epd);
     if (maybe_skip(skip_impl, impl_str)) {
-        print(2, "SKIPPED: dnnl implementation: %s\n", impl_str);
+        BENCHDNN_PRINT(2, "SKIPPED: dnnl implementation: %s\n", impl_str);
         DNN_SAFE(dnnl_primitive_desc_destroy(epd), WARN);
         return r->state = SKIPPED, OK;
     } else {
-        print(5, "dnnl implementation: %s\n", impl_str);
+        BENCHDNN_PRINT(5, "dnnl implementation: %s\n", impl_str);
     }
 
     return OK;
@@ -147,13 +147,17 @@ static bool check_abs_err(const prb_t *p, const float &s, const float &trh) {
 
 static int compare(const prb_t *p, const dnn_mem_t &mem_arg_fp,
         const dnn_mem_t &mem_fp, const dnn_mem_t &mem_dt, res_t *r) {
+    const bool is_fwd = p->dir & FLAG_FWD;
+
     // Tolerate only rounding error (1 ulp) for other than fp32 precisions.
     float trh = epsilon_dt(p->dt);
     if (p->dt == dnnl_f32) {
         // Tolerate bigger compute errors for complex algorithms.
         if (p->alg == alg_t::GELU_TANH || p->alg == alg_t::ELU
                 || p->alg == alg_t::SWISH || p->alg == alg_t::TANH
-                || p->alg == alg_t::SRELU || p->alg == alg_t::LOG)
+                || p->alg == alg_t::SRELU || p->alg == alg_t::LOG
+                || (is_fwd && p->alg == alg_t::ELU_DST)
+                || (is_fwd && p->alg == alg_t::TANH_DST))
             trh *= 300; // 3e-5
         else
             trh *= 20; // 2e-6
@@ -188,7 +192,7 @@ static int compare(const prb_t *p, const dnn_mem_t &mem_arg_fp,
             ss << dims_idx;
             std::string ind_str = ss.str();
 
-            print(0,
+            BENCHDNN_PRINT(0,
                     "[%4ld][%s] src:% 9.6g fp0:% 9.6g fp:% 9.6g dt:% 9.6g "
                     "diff:%8.3g rdiff:%8.3g\n",
                     (long)i, ind_str.c_str(), src, fp0, fp, dt, diff, rel_diff);
@@ -255,7 +259,8 @@ static int compare_padded_area_for_zeros(
                         || (!ok && (r->errors < 10 || verbose >= 10))
                         || (verbose >= 50 && i < 30) || (verbose >= 99);
                 if (dump) {
-                    print(0, "[%4ld] fp:  0.f dt:% 9.6g \n", (long)i, dt);
+                    BENCHDNN_PRINT(
+                            0, "[%4ld] fp:  0.f dt:% 9.6g \n", (long)i, dt);
                 }
             }
         }

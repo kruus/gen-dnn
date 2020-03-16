@@ -242,7 +242,6 @@ struct rnn_postgemm_dispatcher {
                         rnn_postgemm_
                                 = new jit_uni_gru_lbr_cell_postgemm_fwd<sse41,
                                         src_type, scratch_type>(rnn, pd);
-                    assert(rnn_postgemm_ != nullptr);
                 }
                 if (jit_bwd) {
                     if (mayiuse(avx512_core))

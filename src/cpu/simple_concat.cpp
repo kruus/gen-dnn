@@ -14,6 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include <cstring>
+
 #include "dnnl_thread.hpp"
 
 #include "simple_concat.hpp"

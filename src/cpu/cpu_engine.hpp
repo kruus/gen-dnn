@@ -21,8 +21,6 @@
 
 #include "../common/engine.hpp"
 #include "c_types_map.hpp"
-//#include "cpu_isa_traits.hpp" // also give common/cpu_target.h
-//#include "dnnl.h"
 
 namespace dnnl {
 namespace impl {
@@ -121,8 +119,8 @@ public:
  * a ref impl if init() handles cases that actually require jit. */
 #define INSTANCE_ref(...) INSTANCE_CREATOR(__VA_ARGS__)
 
-/** VANILLA builds, however, remove impls that require x86 jit. */
-#if DNNL_ISA >= DNNL_ISA_ANY && DNNL_ISA <= DNNL_ISA_ALL
+/** Default allows x86 jit; N/A for vanilla or non-x86 builds.*/
+#if TARGET_X86_JIT
 #define INSTANCE(...) INSTANCE_CREATOR(__VA_ARGS__)
 #else
 #define INSTANCE(...)
