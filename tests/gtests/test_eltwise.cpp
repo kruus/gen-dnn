@@ -344,12 +344,11 @@ protected:
                         && !impl::cpu::mayiuse(impl::cpu::avx512_core),
                 "ISA does not support bf16 data type.");
         p = ::testing::TestWithParam<decltype(p)>::GetParam();
-        SKIP_IF((p.alg_kind != algorithm::eltwise_relu
-                        || (p.alg_kind == algorithm::eltwise_relu
-                                && p.alpha != 0.0))
-                        && (data_type == memory::data_type::s32
-                                || data_type == memory::data_type::s8),
-                "DNNL only supports relu w/ slope=0 for integers");
+        SKIP_IF((data_type == memory::data_type::s32
+                        || data_type == memory::data_type::s8)
+                        && !(p.alg_kind == algorithm::eltwise_relu
+                                && p.alpha == 0),
+                "DNNL integer eltwise only supports relu with slope 0");
         catch_expected_failures(
                 [=]() { Test(); }, p.expect_to_fail, p.expected_status);
     }
