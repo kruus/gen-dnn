@@ -14,6 +14,12 @@
 # limitations under the License.
 #===============================================================================
 
+if(CMAKE_TOOLCHAIN_FILE)
+    cmake_minimum_required(VERSION 3.8) # nice Platform/ support
+else()
+    cmake_minimum_required(VERSION 2.8.11)
+endif()
+
 if(POLICY CMP0022)
     cmake_policy(SET CMP0022 NEW)
 endif()
@@ -25,6 +31,11 @@ endif()
 # Enable RPATH on MacOS/OSX
 if(POLICY CMP0042)
     cmake_policy(SET CMP0042 NEW)
+endif()
+
+# use full path for link libraries
+if(POLICY CMP0060)
+    cmake_policy(SET CMP0060 NEW)
 endif()
 
 # Do not export symbols from executables

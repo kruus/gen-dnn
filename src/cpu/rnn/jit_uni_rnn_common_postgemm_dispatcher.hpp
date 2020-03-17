@@ -256,8 +256,8 @@ struct rnn_postgemm_dispatcher {
                                 = new jit_uni_gru_lbr_cell_postgemm_bwd<sse41,
                                         src_type, scratch_type>(rnn, pd);
                 }
-                break;
 #endif // TARGET_X86_JIT
+                break;
             default: assert(!"Unsupported algorithm kind"); break;
         }
 #if TARGET_X86_JIT

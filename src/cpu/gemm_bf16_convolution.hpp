@@ -61,6 +61,10 @@ struct gemm_bf16_convolution_fwd_t : public primitive_impl_t {
                     && attr()->has_default_values(
                             primitive_attr_t::skip_mask_t::post_ops)
                     && post_ops_ok()
+#if 0 //TARGET_X86_JIT // TESTING XXX CHECKME for CPU dispatch
+                    && IMPLICATION(is_postprocess_required(),
+                            mayiuse(bf16_emulation_t::get_isa()))
+#endif
                     && memory_desc_matches_tag(*src_md(), dat_tag())
                     && memory_desc_matches_tag(*dst_md(), dat_tag())
                     && memory_desc_matches_tag(*weights_md(), wei_tag());
@@ -98,7 +102,6 @@ struct gemm_bf16_convolution_fwd_t : public primitive_impl_t {
                                  : utils::pick(ndims() - 3, oiw, oihw, oidhw);
         }
 
-        /** \todo gemm_bf16_convolution needs a ref postops impl. */
         bool post_ops_ok() const {
             auto const &po = attr()->post_ops_;
 #if TARGET_X86_JIT

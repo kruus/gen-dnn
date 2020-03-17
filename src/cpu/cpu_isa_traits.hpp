@@ -27,17 +27,17 @@
 
 #include "dnnl_thread.hpp"
 #include "utils.hpp"
+#include <cstdalign>
 
 #if defined(_WIN32) && !defined(__GNUC__)
-#define STRUCT_ALIGN(al, ...) __declspec(align(al)) __VA_ARGS__
-#elif defined(__ve)
-#define STRUCT_ALIGN(al, ...) \
-    __VA_ARGS__ __attribute__((__aligned__((al) > 16 ? 16 : (al))))
+#define STRUCT_ALIGN(al, ...) __declspec(align(al)) struct __VA_ARGS__
+#elif defined(__ve) // perhaps ok for __GNUC__ too?
+#define STRUCT_ALIGN(al, ...) struct __attribute__((__aligned__(al))) __VA_ARGS__
 #else
-#define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__(al)))
+#define STRUCT_ALIGN(al, ...) struct __VA_ARGS__ __attribute__((__aligned__(al)))
 #endif
 
-// Any restrictions on alignas(expression)?
+// Any restrictions on alignas(expression)? Can alignas align upward?
 #ifdef __ve
 #define alignas(x) alignas((x) > 16 ? 16 : (x))
 #endif
@@ -83,7 +83,7 @@ typedef enum {
 } cpu_page_size_t;
 
 #if defined(__ve)
-enum { CACHE_LINE_SIZE = 128 }; // is ADB cache line size the relevant quantity?
+enum { CACHE_LINE_SIZE = 128 }; // LLC cache line size
 #else
 enum { CACHE_LINE_SIZE = 64 };
 #endif

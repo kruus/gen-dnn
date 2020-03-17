@@ -25,12 +25,6 @@
 #include "cpu_isa_traits.hpp"
 #include "jit_utils/jit_utils.hpp"
 
-#if defined(_WIN32) && !defined(__GNUC__)
-#define STRUCT_ALIGN(al, ...) __declspec(align(al)) __VA_ARGS__
-#else
-#define STRUCT_ALIGN(al, ...) __VA_ARGS__ __attribute__((__aligned__(al)))
-#endif
-
 #if defined(_WIN32)
 #define OFFSET_SHADOWSPACE 0x28
 #endif

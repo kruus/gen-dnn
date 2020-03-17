@@ -46,17 +46,14 @@ namespace cpu {
 
 namespace simple_barrier {
 
-#ifdef _WIN32
-#define CTX_ALIGNMENT 64
-#elif TARGET_VE
-#define CTX_ALIGNMENT 128 /*VE LLC cache line bytes*/
+#if defined(_WIN32) || defined(__ve)
+#define CTX_ALIGNMENT CACHE_LINE_SIZE
 #else
-#define CTX_ALIGNMENT 4096
+#define CTX_ALIGNMENT PAGE_4K
 #endif
 
 STRUCT_ALIGN(
-        CTX_ALIGNMENT, struct ctx_t {
-            enum { CACHE_LINE_SIZE = 64 };
+        CTX_ALIGNMENT, ctx_t {
             volatile size_t ctr;
             char pad1[CACHE_LINE_SIZE - 1 * sizeof(size_t)];
             volatile size_t sense;
@@ -71,8 +68,7 @@ STRUCT_ALIGN(
  * Batch normalization (that creates C / simd_w barriers) degrades with page
  * alignment due to significant overhead of ctx_init in case of mb=1. */
 STRUCT_ALIGN(
-        64, struct ctx_64_t {
-            enum { CACHE_LINE_SIZE = 64 };
+        64, ctx_64_t {
             volatile size_t ctr;
             char pad1[CACHE_LINE_SIZE - 1 * sizeof(size_t)];
             volatile size_t sense;
