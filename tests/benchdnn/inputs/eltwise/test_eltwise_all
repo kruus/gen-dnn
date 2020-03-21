@@ -2,7 +2,7 @@
 --reset
 
 --inplace=true,false
---skip-impl="ref:any"
+# --skip-impl="ref:any" # allow for VANILLA build or dispatch
 
 --dir=FWD_D,BWD_D
 --dt=f32
@@ -17,7 +17,7 @@
 # s32, s8
 --reset
 --inplace=true,false
---skip-impl="ref:any"
+#--skip-impl="ref:any" # allow for VANILLA build/dispatch
 
 --dir=FWD_I
 --dt=s32,s8

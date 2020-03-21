@@ -37,8 +37,8 @@
 #define STRUCT_ALIGN(al, ...) struct __VA_ARGS__ __attribute__((__aligned__(al)))
 #endif
 
-// Any restrictions on alignas(expression)? Can alignas align upward?
-#ifdef __ve
+// Any restrictions on alignas(expression)?
+#ifdef __ve // TODO nc++ v2.3.22 can now align upward up to 16384
 #define alignas(x) alignas((x) > 16 ? 16 : (x))
 #endif
 

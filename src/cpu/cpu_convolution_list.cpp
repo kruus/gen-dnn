@@ -257,28 +257,28 @@ static const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
     }},
     // BWD int8 (diff_dst:u8)
     {{backward_data, f32, s8, u8}, {
-        INSTANCE(_gemm_u8s8s32x_convolution_bwd_data_t<f32>)
+        INSTANCE_ref(_gemm_u8s8s32x_convolution_bwd_data_t<f32>)
         INSTANCE_ref(ref_convolution_bwd_data_t<f32, s8, u8, s32>)
         nullptr
     }},
     {{backward_data, s32, s8, u8}, {
-        INSTANCE(_gemm_u8s8s32x_convolution_bwd_data_t<s32>)
+        INSTANCE_ref(_gemm_u8s8s32x_convolution_bwd_data_t<s32>)
         INSTANCE_ref(ref_convolution_bwd_data_t<s32, s8, u8, s32>)
         nullptr
     }},
     {{backward_data, s8, s8, u8}, {
-        INSTANCE(_gemm_u8s8s32x_convolution_bwd_data_t<s8>)
+        INSTANCE_ref(_gemm_u8s8s32x_convolution_bwd_data_t<s8>)
         INSTANCE_ref(ref_convolution_bwd_data_t<s8, s8, u8, s32>)
         nullptr
     }},
     {{backward_data, u8, s8, u8}, {
-        INSTANCE(_gemm_u8s8s32x_convolution_bwd_data_t<u8>)
+        INSTANCE_ref(_gemm_u8s8s32x_convolution_bwd_data_t<u8>)
         INSTANCE_ref(ref_convolution_bwd_data_t<u8, s8, u8, s32>)
         nullptr
     }},
     // BWD int8 (diff_dst:s8)
     {{backward_data, f32, s8, s8}, {
-        INSTANCE(_gemm_u8s8s32x_convolution_bwd_data_t<f32>)
+        INSTANCE_ref(_gemm_u8s8s32x_convolution_bwd_data_t<f32>)
         INSTANCE_ref(ref_convolution_bwd_data_t<f32, s8, s8, s32>)
         nullptr,
     }},

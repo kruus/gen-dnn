@@ -12,7 +12,7 @@
 
 --reset --cfg=f32_full
 --mb=2
---skip-impl="ref:gemm"
+#--skip-impl="ref:gemm" # do not skip to test VANILLA build/dispatch
 --dir=FWD_B,BWD_D,BWD_WB
 --batch=set_conv_dw
 --batch=shapes_dw_minibatch_2d-spatial
