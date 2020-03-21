@@ -115,8 +115,14 @@
 /// May provide packed and integer gemm variations.
 #cmakedefine USE_MKL
 
-// ejk REMOVE gemm via OS CBLAS (also implied by DNNL_USE_MKL)
+// ejk REMOVED gemm via OS CBLAS (also implied by DNNL_USE_MKL)
 //#cmakedefine DNNL_USE_CBLAS
+// ejk REMOVED cmake test for compiler bug (for simplicity)
+#if !defined(DNNL_VALUE_INITIALIZATION_BUG) && defined(__ve)
+#define DNNL_VALUE_INITIALIZATION_BUG 1
+#elif !defined(DNNL_VALUE_INITIALIZATION_BUG)
+#define DNNL_VALUE_INITIALIZATION_BUG 0
+#endif
 
 //@}
 //@}

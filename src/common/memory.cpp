@@ -84,9 +84,22 @@ dnnl_memory::dnnl_memory(dnnl::impl::engine_t *engine,
 
 status_t dnnl_memory_desc_init_by_tag(memory_desc_t *memory_desc, int ndims,
         const dims_t dims, data_type_t data_type, format_tag_t tag) {
+#ifndef NDEBUG
+#define INVARIANTS(md) do{ \
+    assert((md).offset0 == 0); \
+    assert((md).extra.flags == 0); \
+    assert((md).extra.compensation_mask == 0); \
+    for(size_t i=0; i<ndims; ++i) { \
+        assert((md).padded_offsets[i] == 0); \
+    } \
+}while(0)
+#else
+#define INVARIANTS(md) do{}while(0)
+#endif
     if (any_null(memory_desc)) return invalid_arguments;
     if (ndims == 0 || tag == format_tag::undef) {
         *memory_desc = types::zero_md();
+        INVARIANTS(*memory_desc);
         return success;
     }
 
@@ -103,6 +116,7 @@ status_t dnnl_memory_desc_init_by_tag(memory_desc_t *memory_desc, int ndims,
     md.data_type = data_type;
     array_copy(md.padded_dims, dims, ndims);
     md.format_kind = format_kind;
+    INVARIANTS(md);
 
     status_t status = success;
     if (tag == format_tag::undef) {
@@ -111,21 +125,40 @@ status_t dnnl_memory_desc_init_by_tag(memory_desc_t *memory_desc, int ndims,
         // nop
     } else if (format_kind == format_kind::blocked) {
         status = memory_desc_wrapper::compute_blocking(md, tag);
+        INVARIANTS(md);
     } else {
         assert(!"unreachable");
         status = invalid_arguments;
     }
 
-    if (status == success) *memory_desc = md;
+    if (status == success){
+        *memory_desc = md;
+        INVARIANTS(*memory_desc);
+    }
 
     return status;
+#undef INVARIANTS
 }
 
 status_t dnnl_memory_desc_init_by_strides(memory_desc_t *memory_desc, int ndims,
         const dims_t dims, data_type_t data_type, const dims_t strides) {
+#ifndef NDEBUG
+#define INVARIANTS(md) do{ \
+    assert((md).offset0 == 0); \
+    assert((md).format_desc.blocking.inner_nblks==0); \
+    assert((md).extra.flags == 0); \
+    assert((md).extra.compensation_mask == 0); \
+    for(size_t i=0; i<ndims; ++i) { \
+        assert((md).padded_offsets[i] == 0); \
+    } \
+}while(0)
+#else
+#define INVARIANTS(md) do{}while(0)
+#endif
     if (any_null(memory_desc)) return invalid_arguments;
     if (ndims == 0) {
         *memory_desc = types::zero_md();
+        INVARIANTS(*memory_desc);
         return success;
     }
 
@@ -136,11 +169,14 @@ status_t dnnl_memory_desc_init_by_strides(memory_desc_t *memory_desc, int ndims,
     if (!args_ok) return invalid_arguments;
 
     auto md = types::zero_md();
+    INVARIANTS(md);
     md.ndims = ndims;
     array_copy(md.dims, dims, ndims);
     md.data_type = data_type;
     array_copy(md.padded_dims, dims, ndims);
     md.format_kind = format_kind::blocked;
+    INVARIANTS(md);
+    assert(md.format_desc.blocking.strides[0]==0);
 
     dims_t default_strides = {0};
     if (strides == nullptr) {
@@ -161,8 +197,10 @@ status_t dnnl_memory_desc_init_by_strides(memory_desc_t *memory_desc, int ndims,
     array_copy(md.format_desc.blocking.strides, strides, md.ndims);
 
     *memory_desc = md;
+    INVARIANTS(*memory_desc);
 
     return success;
+#undef INVARIANTS
 }
 
 status_t dnnl_memory_desc_init_submemory(memory_desc_t *md,

@@ -1,0 +1,177 @@
+# vim: set sw=4 ts=4 et ft=cmake
+if(SX_TRACE)
+    message(STATUS " *** Platform/SX-Initialize ***")
+endif()
+# set up CMAKE_SX_ROOT by looking at path of sxcc command [or "/SX"]
+execute_process(COMMAND /usr/bin/which sxcc
+	OUTPUT_VARIABLE _stdout
+	OUTPUT_STRIP_TRAILING_WHITESPACE
+	ERROR_VARIABLE _stderr
+	RESULT_VARIABLE _failed)
+#message(STATUS "_stdout ${_stdout}")
+#message(STATUS "_stderr ${_stderr}")
+#message(STATUS "_failed ${_failed}")
+if(NOT _failed AND EXISTS "${_stdout}")
+    string(REGEX REPLACE "\(.*\)[/]?usr.*bin.*" "\\1" SX_ROOT ${_stdout})
+elseif(IS_DIRECTORY "/SX")
+    set(SX_ROOT "/SX")
+else()
+    set(SX_ROOT "")
+endif()
+message(STATUS "from sxcc path, using SX_ROOT ${SX_ROOT}")
+
+#SET(CMAKE_SYSTEM_PREFIX_PATH "${SX_ROOT}")
+#
+SET(CMAKE_FIND_ROOT_PATH "${SX_ROOT}")
+SET(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY)
+SET(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+SET(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+SET(NECSX TRUE)
+
+# help CMakeFindBinUtils locate things  (this might be in DetermineCCompiler ?)
+#     short-circuit default settings in CMakeDetermineCCompiler.cmake (for CmakeFindBinUtils)
+set(_CMAKE_TOOLCHAIN_PREFIX "sx")
+# give cmake a HINT location for toolchain location [in case it is not in current path?]
+set(CMAKE_C_COMPILER_EXTERNAL_TOOLCHAIN "${SX_ROOT}/usr")
+
+set(CMAKE_RULE_MESSAGES ON)
+set(CMAKE_TARGET_MESSAGES ON)
+
+# did not work... use cmake -Wno-dev to get rid of warnings
+#cmake_policy(SET CMP0056 OLD)
+#cmake_policy(SET CMP0066 OLD)
+
+
+# These do NOT short-circuit the incorrect identification as a GNU compiler
+set(CMAKE_C_COMPILER_NAMES sxcc)
+set(CMAKE_CXX_COMPILER_NAMES sxc++)
+#set(CMAKE_C_COMPILER_INIT sxcc)
+#set(CMAKE_CXX_COMPILER_INIT sxc++)
+#set(CMAKE_C_COMPILER_ID SXCC)
+#set(CMAKE_CXX_COMPILER_ID SXCXX)
+##
+# So it looks like after project(FOO C CXX), we chould include a FIXUPS cmake file
+# to undo the bad GNU assumptions
+##
+
+# ------ Suggestions -------------
+set(SX_CFLAGS_INLINING    "-pi auto" CACHE STRING "")
+set(SX_CFLAGS_NOINLINING  "-pi noauto" CACHE STRING "")
+set(SX_CCXXFLAGS_PAR_AUTO   "-Pauto")
+set(SX_CCXXFLAGS_PAR_OPENMP "-Popenmp")
+set(SX_CCXXFLAGS_PTHREADS   "-Pmulti" CACHE STRING "")
+set(SX_CCXXFLAGS_QUIET    "-pi nomsg -pvctl nomsg -O nomsg" CACHE STRING "")
+set(SX_CCXXFLAGS_VERBOSE  "-ftrace -R,diaglist,fmtlist -pvctl,fullmsg,noneighbors" CACHE STRING "")
+set(SX_CCXXFLAGS_WARNALL  "-w all" CACHE STRING "")
+# ? -f90lib
+set(SX_CFLAGS_C99     "${SX_CFLAGS} -Kc99,gcc" CACHE STRING "")
+
+#set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -f90lib -Kexceptions,rtti,cpp11,gcc" CACHE STRING "")
+# perhaps leave out -Krtti
+set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -f90lib -Kexceptions,cpp11,gcc" CACHE STRING "")
+set(SX_LINK_LIBRARIES "${SX_LINK_LIBRARIES} -llapack -lcblas -lblas -lm" CACHE STRING "decent set of default math libs for SX")
+#     -f90lib,dw,eW   : allows 4-byte integer and 4-byte reals
+# OR, without -f90lib ... seeem to need -lf2003  (to define symbol f_rtdt)
+#   but what is diff between libf2003 and libf2003_m and libi90sx and libi90sxe and libi90sxt
+#set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -K exceptions rtti cpp11 gcc" CACHE STRING "")
+#set(SX_CXXFLAGS_C11   "${SX_CXXFLAGS} -K,exceptions,cpp11,gcc" CACHE STRING "")
+#set(SX_LINK_LIBRARIES "${SX_LINK_LIBRARIES} -llapack -lcblas -lblas -lf2003 -lm" CACHE STRING "decent set of default math libs for SX")
+#set(SX_LINK_LIBRARIES "-f90lib ${SX_LINK_LIBRARIES} -llapack -lcblas -lblas -lm" CACHE STRING "decent set of default math libs for SX")
+
+string(STRIP "${SX_LINK_LIBRARIES}" SX_LINK_LIBRARIES)
+string(STRIP "${SX_CFLAGS_C99}" SX_CFLAGS_C99)
+string(STRIP "${SX_CXXFLAGS_C11}" SX_CXXFLAGS_C11)
+# --------------------------------
+
+# SX-Initialize runs early -- before SX-C and SX-CXX and flags settings
+# This would ideally run in an SX-finalize setting.
+#     (while developing, cmake was overriding these things)
+
+# Ahaa --- setting the foo_INIT versions here works nicely
+#      *** TODO Fortran settings? (need a Fortran hello world!) ***
+function(set_cmake_ccxx SUFFIX OPT)
+    set(CMAKE_C_${SUFFIX} "${OPT}" CACHE STRING "")
+    set(CMAKE_CXX_${SUFFIX} "${OPT}" CACHE STRING "")
+    if(SX_TRACE)
+        message(STATUS "CMAKE_C_${SUFFIX} --> ${CMAKE_C_${SUFFIX}}")
+	endif()
+endfunction()
+# vsafe < vopt < aopt < hopt
+# In roughly decrease optimization level ...
+##set(SX_OPTFLAGS_INIT "-Caopt") # sX FAIL: traced to base class conversion wrong pointer values (compiler BUG)
+##set(SX_OPTFLAGS_INIT "-Chopt") # SX FAIL: uses -ipa
+##set(SX_OPTFLAGS_INIT "-Chopt") # SX FAIL: also uses -ipa
+##set(SX_OPTFLAGS_INIT "-Cvopt")
+#set(SX_OPTFLAGS_INIT "-Cvsafe")	# SX OK
+## -Cvsafe + ADD allowed vectorizations ----> OK
+#set(SX_OPTFLAGS_INIT "-Cvsafe -pvctl,assume,nocompress,divloop,expand=4,lstval,outerunroll,n,osplit,novchg,verrchk,vlchk")
+## -Cvopt + REMOVE -O flags		---> FAIL
+#set(SX_OPTFLAGS_INIT "-Cvopt -O,nochg,nodiv,nomove,overlap,restrict=this,nounroll")
+## restrict optimizations even more	---> FAIL
+#set(SX_OPTFLAGS_INIT "-Cvopt -O,nochg,nodiv,nomove,overlap,restrict=keyword,nounroll -pvctl,noaltcode,noassoc,noassume,nocollapse,nocompress,divloop,noexpand,noloopchg,lstval,noouterunroll,nosplit,novchg,verrchk,vlchk -struct,no_loop -P,multi")
+## -Cvsafe + ADD many -Chopt options (or aggressive) (some will be ignored)	--->  FAIL (yay)
+#set(SX_OPTFLAGS_INIT "-Cvsafe -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,verrchk,vlchk -O,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline -P,auto -Kexceptions")
+## note: sxc++: Warning: "-Ounroll" cannot be specified with "-Cvsafe" and ignored
+##					---> FAIL
+#set(SX_OPTFLAGS_INIT "-Cvsafe -O,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline -P,auto -Kexceptions")
+##					---> OK
+#set(SX_OPTFLAGS_INIT "-Cvsafe -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,verrchk,vlchk -O,chg,div,move,nooverlap,restrict=arg,unroll")
+##					---> OK
+#set(SX_OPTFLAGS_INIT "-Cvsafe -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,verrchk,vlchk -O,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline")
+## -P,auto ----> fail
+#set(SX_OPTFLAGS_INIT "-Cvsafe -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,verrchk,vlchk -O,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline -P,auto")
+## -P,multi ---				--> OK ???
+#set(sx_optflags_init "-Cvsafe -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,verrchk,vlchk -o,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline -p,multi")
+## 					---> FAIL
+#set(SX_OPTFLAGS_INIT "-Chopt -P,multi")
+## disable more optimizations...		----> FAIL
+#set(SX_OPTFLAGS_INIT "-Cvopt -P,multi -pvctl,noaltcode,noassoc,noassume,nocollapse,nocompress,divloop,noexpand,noloopchg,lstval,noouterunroll,nosplit,novchg,verrchk,vlchk -O,nochg,nodiv,nomove,overlap,restrict=keyword,nounroll -pi,inline")
+## all options "by hand			----> FAIL -- #pragma omp **simd** not supported
+#set(SX_OPTFLAGS_INIT "-math,vector -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,noverrchk,vlchk -O,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline -P,multi -Popenmp")
+##					----> FAIL
+#set(SX_OPTFLAGS_INIT "-math,vector -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,noverrchk,vlchk -O,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline -P,multi")
+#
+# -P,multi ---				--> FAIL
+#set(sx_optflags_init "-Cvsafe -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,verrchk,vlchk -o,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline -P,multi")
+#					---> 
+set(SX_OPTFLAGS_INIT "-Cvsafe -pvctl,altcode,assoc,assume,collapse,nocompress,divloop,expand=4,loopchg,lstval,outerunroll,nosplit,vchg,verrchk,vlchk -O,chg,div,move,nooverlap,restrict=arg,unroll -pi,inline")
+#set(SX_OPTFLAGS_INIT "-Csopt")	 # normal optimization, no vectorization
+#set(SX_OPTFLAGS_INIT "-Cssafe") # safe optimization (minimal side effects), no vectorization
+####### The following I think correspond to -Cvsafe
+#
+#set(SX_OPTFLAGS_INIT "")
+#set(SX_OPTFLAGS_INIT "${SX_OPTFLAGS_INIT} -xint")
+#set(SX_OPTFLAGS_INIT "${SX_OPTFLAGS_INIT} -Nipa")
+#set(SX_OPTFLAGS_INIT "${SX_OPTFLAGS_INIT} -pi,copy_arg,inline")
+#set(SX_OPTFLAGS_INIT "${SX_OPTFLAGS_INIT} -pvctl,noaltcode,noassoc,noassume,nocollapse,noexpand,noloopchg,noloop_eq,nomatmul,noon_adb,noouterstrip,noouterunroll,noreplace_induction,verrchk,vlchk")
+#set(SX_OPTFLAGS_INIT "${SX_OPTFLAGS_INIT} -Onochg,nodiv,noignore_volatile,nomove,overlap,restrict=no,safe_longjmp,nounroll")
+#set(SX_OPTFLAGS_INIT "${SX_OPTFLAGS_INIT} -math,inline,vector,strict_prototype") # defaults
+set_cmake_ccxx("FLAGS_DEBUG_INIT"          "-g -ftrace -Cvopt")
+#set_cmake_ccxx("FLAGS_RELEASE_INIT"        "${SX_OPTFLAGS_INIT} -math,inline,vector,nostrict_prototype -DNDEBUG")
+set_cmake_ccxx("FLAGS_RELEASE_INIT"        "${SX_OPTFLAGS_INIT} -DNDEBUG")
+set_cmake_ccxx("FLAGS_MINSIZEREL_INIT"     "${SX_OPTFLAGS_INIT} -DNDEBUG")
+set_cmake_ccxx("FLAGS_RELWITHDEBINFO_INIT" "-g ${SX_OPTFLAGS_INIT} -math vector nostrict_prototype -DNDEBUG")
+set(CMAKE_EXE_LINKER_FLAGS_DEBUG_INIT "-g -ftrace")
+set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO_INIT "-g")
+
+# Now this fixup can be removed ....
+#function(fix_bad_gnu_things)
+#    function(set_cmake_ccxx SUFFIX OPT)
+#        set(CMAKE_C_${SUFFIX} "${OPT}" CACHE STRING "")
+#        set(CMAKE_CXX_${SUFFIX} "${OPT}" CACHE STRING "")
+#        if(SX_TRACE)
+#            message(STATUS "CMAKE_C_${SUFFIX} --> ${CMAKE_C_${SUFFIX}}")
+#        endif()
+#    endfunction()
+#    # ------ Defaults ----------------
+#    #set_cmake_ccxx("FLAGS_DEBUG" "-g -ftrace -Cnoopt")
+#    #set_cmake_ccxx("FLAGS_RELEASE" "-Caopt")
+#    #set_cmake_ccxx("FLAGS_MINSIZEREL" "-Cvopt -Os")
+#    #set_cmake_ccxx("FLAGS_RELWITHDEBINFO" "-g -Cvopt")
+#    #set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-g -ftrace")
+#    #set(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "-g")
+#    # ------ Suggestions -------------
+#endfunction()
+#
+
+include(Platform/SX-util.cmake)
