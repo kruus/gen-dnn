@@ -30,8 +30,6 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include <assert.h> // [ejk]
-#include <string.h> // [ejk] memcmp
 
 #include "dnnl.h"
 
@@ -1623,29 +1621,10 @@ struct memory : public handle<dnnl_memory_t> {
         friend struct memory;
         /// The underlying C API data structure.
         dnnl_memory_desc_t data;
+
         /// Constructs a zero (empty) memory descriptor. Such a memory
         /// descriptor can be used to indicate absence of an argument.
-        desc() : data() {
-#ifndef NDEBUG
-            char zeros[sizeof(data)];
-            memset(zeros,0,sizeof(data));
-            assert(!memcmp(zeros,&data,sizeof(data)));
-#endif
-        }
-
-#ifndef NDEBUG
-#define CHK_ZEROS \
-    do { \
-        assert(data.extra.flags == 0); \
-        assert(data.offset0 == 0); \
-        for (size_t i = 0; i < dims.size(); ++i) \
-            assert(data.padded_offsets[i] == 0); \
-    } while (0)
-#else
-#define CHK_ZEROS \
-    do { \
-    } while (0)
-#endif
+        desc() : data() {}
 
         /// Constructs a memory descriptor.
         ///
@@ -1669,7 +1648,6 @@ struct memory : public handle<dnnl_memory_t> {
             dnnl_status_t status = dnnl_memory_desc_init_by_tag(&data,
                     (int)dims.size(), dims.data(), convert_to_c(data_type),
                     convert_to_c(format_tag));
-            CHK_ZEROS;
             if (!allow_empty)
                 error::wrap_c_api(status,
                         "could not construct a memory descriptor using a "
@@ -1699,13 +1677,11 @@ struct memory : public handle<dnnl_memory_t> {
             dnnl_status_t status = dnnl_memory_desc_init_by_strides(&data,
                     (int)dims.size(), dims.data(), convert_to_c(data_type),
                     strides.empty() ? nullptr : &strides[0]);
-            CHK_ZEROS;
             if (!allow_empty)
                 error::wrap_c_api(status,
                         "could not construct a memory descriptor using "
                         "strides");
         }
-#undef CHK_ZEROS
 
         /// Constructs a memory descriptor from a C API data structure.
         ///
@@ -2048,7 +2024,7 @@ struct memory : public handle<dnnl_memory_t> {
     static dnnl_format_tag_t convert_to_c(format_tag format) {
         return static_cast<dnnl_format_tag_t>(format);
     }
-}; // namespace dnnl
+};
 
 inline bool operator==(dnnl_data_type_t a, memory::data_type b) {
     return a == memory::convert_to_c(b);

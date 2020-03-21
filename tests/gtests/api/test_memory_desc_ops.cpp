@@ -23,7 +23,7 @@
 
 #include "dnnl.hpp"
 
-#define DEBUG_TEST_MEMORY_DESC_OPS_CPP 1
+#define DEBUG_TEST_MEMORY_DESC_OPS_CPP 0
 
 namespace dnnl {
 namespace memory_desc_ops {
@@ -98,11 +98,11 @@ struct params_t {
 class reshape_test : public ::testing::TestWithParam<params_t> {
 protected:
     void Test(const memory::desc &in_md, const memory::desc &out_md) {
-        debug::print_md("in_md", in_md);
-        debug::print_md("expect_out_md", out_md);
-
         memory::desc get_out_md = in_md.reshape(out_md.dims());
+
+        debug::print_md("in_md", in_md);
         debug::print_md("out_md", get_out_md);
+        debug::print_md("expect_out_md", out_md);
 
         ASSERT_EQ(get_out_md, out_md);
     }
@@ -204,12 +204,12 @@ class permute_axes_test : public ::testing::TestWithParam<params_t> {
 protected:
     void Test(const memory::desc &in_md, const memory::desc &out_md,
             const std::vector<int> &perm) {
+        memory::desc get_out_md = in_md.permute_axes(perm);
+
         debug::print_md("in_md", in_md);
         debug::print_vec("perm : ", perm.data(), (int)perm.size());
-        debug::print_md("expect_out_md", out_md);
-
-        memory::desc get_out_md = in_md.permute_axes(perm);
         debug::print_md("out_md", get_out_md);
+        debug::print_md("expect_out_md", out_md);
 
         ASSERT_EQ(get_out_md, out_md);
     }
