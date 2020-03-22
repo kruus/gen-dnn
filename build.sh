@@ -357,8 +357,8 @@ if [ -d "$INSTALLDIR}" -a $QUICK -lt 2 ]; then
     rm -rf "$INSTALLDIR}".bak && mv -v "$INSTALLDIR}" "$INSTALLDIR}".bak
 fi
 
-# Obtain initial guesses for TESTRUNNER and VE_EXEC
-if [ "" ]; then
+# Obtain INITIAL guesses for TESTRUNNER and VE_EXEC
+if [ "" ]; then # old way (now we do not need ve_exec anymore)
     VE_EXEC=''
     TESTRUNNER=''
     if [ "$DOTARGET" = "a" ]; then
@@ -382,15 +382,19 @@ fi
 #if [ "$NEC_FTRACE" -gt 0 ]; then
 if [ "$DOTARGET" = "a" -o "$DOTARGET" = "s" ]; then
     #TESTRUNNER="VE_PROGINF=YES ${TESTRUNNER}" #works if used as bash -c ${TESTRUNNER}
-    export VE_PROGINF=YES;
+    #export VE_PROGINF=YES;
+    export VE_PROGINF=DETAIL;
     export C_PROGINF=YES;
 else
     unset VE_PROGINF
     unset C_PROGINF
 fi
 
-if [ "$DOTARGET" = "a" ]; then
+if [ "$DOTARGET" = "aXXX" ]; then
+    echo "Warning: setting OMP_NUM_THREADS=1 for now"
     export OMP_NUM_THREADS=1; # for now XXX
+else
+    : #unset OMP_NUM_THREADS; # typically 1 thread per cpu
 fi
 
 export PATH
@@ -438,7 +442,10 @@ echo "PATH $PATH"
     fi
         OPT_FLAGS="${OPT_FLAGS} -O0"
     if [ ! x"${OPT_FLAGS}" = x"" ]; then ccxx_flags ${OPT_FLAGS}; fi
-    if [ "${DOTARGET}" = "a" ]; then ccxx_flags -include stdint.h; fi
+    if [ "${DOTARGET}" = "a" ]; then
+        ccxx_flags -include stdint.h
+        ccxx_flags -minit-stack=zero
+    fi
     # Show build commands
     CMAKETRACE="${CMAKETRACE} -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON"
     CMAKEOPT="${CMAKEOPT} -DDNNL_VERBOSE=1"
@@ -654,13 +661,15 @@ echo "PATH $PATH"
         fi
         # Put one test here (maybe one you are currently debugging)
         { echo "api-c                   ...";
-            DNNL_VERBOSE=2 ${TESTRUNNER} ${VE_EXEC} tests/api-c \
+            DNNL_VERBOSE=2 VE_INIT_HEAP=ZERO \
+            ${TESTRUNNER} ${VE_EXEC} tests/api-c \
                 || xBUILDOK="n";
         } 
-        if [ $DOTEST -eq 0 ]; then # another short test, this one must pass
+        if [ $DOTEST -eq 0 ]; then # another short test, this one can fail too
             { echo "cpu-cnn-training-f32-c"
+                DNNL_VERBOSE=2 VE_INIT_HEAP=ZERO \
                 ${TESTRUNNER}  ${VE_EXEC} examples/cpu-cnn-training-f32-c \
-                || BUILDOK="n";
+                || xBUILDOK="n";
             }
         fi
     fi
@@ -727,13 +736,17 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
     if [ ! $DOTEST -eq 0 -a ! "$DOTARGET" == "s" ]; then # non-SX: -t might run some tests
         rm -f test1.log test2.log test3.log
         echo "Testing in ${BUILDDIR} ... test1"
-        if [ $DOTEST -ge 1 ]; then
-            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' DNNL_VERBOSE=2 ${TESTRUNNER} make VERBOSE=1 test) 2>&1 | tee "${BUILDDIR}/test1.log" || true
+        if [ $DOTEST -eq 1 ]; then
+            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' DNNL_VERBOSE=2 VE_INIT_HEAP=ZERO \
+             ${TESTRUNNER} make VERBOSE=1 test \
+            ) 2>&1 | tee "${BUILDDIR}/test1.log" || true
         fi
         if [ $DOTEST -ge 2 ]; then
             echo "Testing ... test2"
-            (cd "${BUILDDIR}" && ARGS='-VV -N' ${TESTRUNNER} make test \
-             && ARGS='-VV -R .*test_.*' DNNL_VERBOSE=2 ${TESTRUNNER}  make test \
+            (cd "${BUILDDIR}" && ARGS='-VV -N' DNNL_VERBOSE=2 VE_INIT_HEAP=ZERO \
+             ${TESTRUNNER} make test \
+             && ARGS='-VV -R .*test_.*' DNNL_VERBOSE=2 VE_INIT_HEAP=ZERO \
+             ${TESTRUNNER}  make test \
             ) 2>&1 | tee "${BUILDDIR}/test2.log" || true
         fi
         if [ $DOTEST -ge 3 ]; then # some [few] convolution timings
@@ -774,7 +787,8 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
             { while read -r bench_target; do
                 # note default is --mode=C (correctness check)
                 # can set BENCHDNN_ARGS="--mode=P' for other modes (e.g. performance, even slower)
-                DNNL_VERBOSE=2 make -C ${BUILDDIR} VERBOSE=1 ${bench_target} \
+                DNNL_VERBOSE=2 VE_INIT_HEAP=ZERO \
+                    make -C ${BUILDDIR} VERBOSE=1 ${bench_target} \
                     | tee >(awk '/^tests:/{printf("%-20s %s\n","'${bench_target##test_benchdnn_}'",$0)}' \
                     >>${BUILDDIR}/bench.summary) \
                     | sed "s/^tests:/test:${bench_target}\\ntests:/"

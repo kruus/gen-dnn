@@ -188,21 +188,24 @@ struct attr_t {
 
         struct entry_t {
             entry_t() {}
-
             kind_t kind;
-            union {
-                struct {
-                    float scale;
-                } sum;
-                struct {
-                    dnnl_alg_kind_t alg;
-                    float scale, alpha, beta;
-                } eltwise;
-                struct {
-                    int stride;
-                    dnnl_data_type_t dst_dt;
-                    scale_t oscale;
-                } convolution;
+
+            struct sum_t { // avoid struct-inside-anon-union warning
+                float scale;
+            };
+            struct eltwise_t {
+                dnnl_alg_kind_t alg;
+                float scale, alpha, beta;
+            };
+            struct convolution_t {
+                int stride;
+                dnnl_data_type_t dst_dt;
+                scale_t oscale;
+            };
+            union { // anon union
+                sum_t sum;
+                eltwise_t eltwise; // largest first? [ejk]
+                convolution_t convolution;
             };
 
             bool is_eltwise_kind() const;

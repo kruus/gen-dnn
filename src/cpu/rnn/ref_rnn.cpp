@@ -36,6 +36,7 @@
 #include "../simple_q10n.hpp"
 #include "gemm/gemm_pack.hpp"
 #include "ref_rnn.hpp"
+#include <algorithm> // also in dnnl.hpp ?
 
 namespace dnnl {
 namespace impl {

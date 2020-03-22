@@ -38,7 +38,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
     append_if(UNIX  CMAKE_CXX_FLAGS "-prec-div -prec-sqrt -fp-model precise")
 endif()
 
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE AND NOT NECVE)
     find_library(LIBRT rt)
 endif()
 register_exe(benchdnn "${SOURCES}" "" "${LIBRT}")

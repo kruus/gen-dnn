@@ -116,8 +116,9 @@ enum cpu_isa_bit_t : unsigned {
     /// @defgroup VE_extensions VE extended capabilities
     ///@{
     /// perhaps remove ve_common* (force it identical to vanilla)?
-    ve_common_bit = 1u << 16, ///< vanilla + some VE-specific code
-    ve_bits = vanilla_bit | 0x80000u, ///< set of VE flags
+    ve_any_bit = 1u << 16, // simplest VE-specific impls
+    ve_all_bit = 1U << 17, // full set VE-specific impls
+    ve_bits = vanilla_bit | 0x30000u, ///< set of VE flags
     ///@}
 };
 
@@ -164,7 +165,7 @@ enum cpu_isa_t : unsigned {
     //@}
     /// @defgroup ve_jit_masks VE-specific implementation masks
     //@{
-    ve_common = ve_common_bit | vanilla,
+    ve_common = ve_any_bit | vanilla,
     ve_all = ve_bits,
 //@}
 /// @defgroup cpu_agnostic_masks VANILLA and ALL DNNL_ISA settings
@@ -348,7 +349,7 @@ static inline cpu_isa_t from_dnnl(dnnl_cpu_isa_t isa) {
 }
 
 #if DNNL_ISA == DNNL_ISA_VANILLA // VANILLA build can only support vanilla
-static inline const bool mayiuse(
+static inline bool mayiuse(
         cpu_isa_t const cpuIsaT, bool const soft = false) {
     get_max_cpu_isa(soft); // retain full backward compatibility
     return cpuIsaT == vanilla;

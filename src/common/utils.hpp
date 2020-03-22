@@ -163,7 +163,7 @@ inline typename remove_reference<T>::type zero() {
             std::is_standard_layout<typename remove_reference<T>::type>::value,
             "zero<T> should have standard layout");
     auto zero = typename remove_reference<T>::type();
-#if DNNL_BUG_VALUE_INITIALIZATION
+#if defined(__ve) || DNNL_BUG_VALUE_INITIALIZATION
     // Adjust bug handling as required for bad compilers.
     // So far bug is for pod types.
     // Note some desc_t are non-POD, like dnnl_concat_desc_t with a std::vector

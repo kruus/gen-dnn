@@ -68,13 +68,13 @@ struct memory_desc_proxy_t {
     memory_desc_proxy_t(const memory::desc &md) : md(md) {}
 
     memory_desc_proxy_t(const memory::dims &dims, memory::format_tag tag)
-        : md(dims, memory::data_type::f32, tag) {}
+        : md(dims, memory::data_type::f32, tag) {} // garbage offs at >= -O2 or so
     memory_desc_proxy_t(const memory::dims &dims, const memory::dims &strides)
         : md(dims, memory::data_type::f32, strides) {}
 
     memory_desc_proxy_t(const memory::dims &dims, const memory::dims &strides,
             const memory::dims &padded_dims)
-        : md(dims, memory::data_type::f32, strides) {
+        : md(dims, memory::data_type::f32, strides) { // garbage offs, nblks idxs errors
         for (int d = 0; d < md.data.ndims; ++d)
             md.data.padded_dims[d] = padded_dims[d];
     }
@@ -98,9 +98,9 @@ struct params_t {
 class reshape_test : public ::testing::TestWithParam<params_t> {
 protected:
     void Test(const memory::desc &in_md, const memory::desc &out_md) {
+        // adding print_md here made bug disappear
         debug::print_md("in_md", in_md);
         debug::print_md("expect_out_md", out_md);
-
         memory::desc get_out_md = in_md.reshape(out_md.dims());
         debug::print_md("out_md", get_out_md);
 
@@ -109,6 +109,8 @@ protected:
 };
 TEST_P(reshape_test, TestsReshape) {
     params_t p = ::testing::TestWithParam<decltype(p)>::GetParam();
+    //memory_desc_proxy_t(const memory::dims &dims, memory::format_tag tag)
+    // this constructor yields an MD with GARBAGE offsets. only fixable by dnnl.hpp kludge?
     catch_expected_failures([=]() { Test(p.in.md, p.out.md); },
             p.expected_status != dnnl_success, p.expected_status);
     if (p.test_direction == UNI_DIRECTION) return;
@@ -133,6 +135,7 @@ auto cases_expect_to_fail = ::testing::Values(
         // joining axes are not contiguous in memory (strides {2, 1} would be oK)
         params_t {{{6, 2}, {3, 1}}, {{12}, fmt::a}, UNI_DIRECTION, dnnl_invalid_arguments},
         // removing an axis of size `1` that has padding is not allowed
+        // TestReshapeEF/reshape_test.TestsReshape/6 segfault
         params_t {{{6, 1, 2}, {4, 2, 1}, {6, 2, 2}}, {{6, 2}, fmt::any}, UNI_DIRECTION, dnnl_invalid_arguments},
         // joining axes where one has padding is not allowed
         params_t {{{6, 2, 2}, {6, 2, 1}, {6, 3, 2}}, {{6, 4}, fmt::any}, UNI_DIRECTION, dnnl_invalid_arguments},
@@ -207,7 +210,6 @@ protected:
         debug::print_md("in_md", in_md);
         debug::print_vec("perm : ", perm.data(), (int)perm.size());
         debug::print_md("expect_out_md", out_md);
-
         memory::desc get_out_md = in_md.permute_axes(perm);
         debug::print_md("out_md", get_out_md);
 

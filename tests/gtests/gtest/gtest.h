@@ -2016,13 +2016,13 @@ class TestWithParam : public Test, public WithParamInterface<T> {
 // Note:
 //
 //   1. It is possible to make a user-defined type work with
-//   {ASSERT|EXPECT}_??(), but that requires overloading the
+//   {ASSERT|EXPECT}_*(), but that requires overloading the
 //   comparison operators and is thus discouraged by the Google C++
 //   Usage Guide.  Therefore, you are advised to use the
 //   {ASSERT|EXPECT}_TRUE() macro to assert that two objects are
 //   equal.
 //
-//   2. The {ASSERT|EXPECT}_??() macros do pointer comparisons on
+//   2. The {ASSERT|EXPECT}_*() macros do pointer comparisons on
 //   pointers (in particular, C strings).  Therefore, if you use it
 //   with two C strings, you are testing how their locations in memory
 //   are related, not how their content is related.  To compare two C
@@ -2033,7 +2033,7 @@ class TestWithParam : public Test, public WithParamInterface<T> {
 //   what the actual value is when it fails, and similarly for the
 //   other comparisons.
 //
-//   4. Do not depend on the order in which {ASSERT|EXPECT}_??()
+//   4. Do not depend on the order in which {ASSERT|EXPECT}_*()
 //   evaluate their arguments, which is undefined.
 //
 //   5. These macros evaluate their arguments exactly once.
@@ -2111,7 +2111,7 @@ class TestWithParam : public Test, public WithParamInterface<T> {
 //    * {ASSERT|EXPECT}_STRCASENE(s1, s2): Tests that s1 != s2, ignoring case
 //
 // For wide or narrow string objects, you can use the
-// {ASSERT|EXPECT}_??() macros.
+// {ASSERT|EXPECT}_*() macros.
 //
 // Don't depend on the order in which the arguments are evaluated,
 // which is undefined.

@@ -420,7 +420,7 @@ INSTANTIATE_TEST_SUITE_P(TestPoolingForwardAvgS8, pooling_test_s8,
                         EXPAND_SIZES_2D(
                                 16, 64, 32, 32, 16, 16, 3, 3, 0, 0, 2, 2)}));
 
-GPU_INST_TEST_CASE(pooling_test_s8);
+GPU_INST_TEST_CASE(pooling_test_s8,);
 
 TEST_P(pooling_test_u8, TestsPooling) {}
 
@@ -493,7 +493,7 @@ INSTANTIATE_TEST_SUITE_P(TestPoolingForwardAvgU8, pooling_test_u8,
                         EXPAND_SIZES_2D(
                                 16, 64, 32, 32, 16, 16, 3, 3, 0, 0, 2, 2)}));
 
-GPU_INST_TEST_CASE(pooling_test_u8);
+GPU_INST_TEST_CASE(pooling_test_u8,);
 
 TEST_P(pooling_test_s32, TestsPooling) {}
 
@@ -1858,6 +1858,6 @@ CPU_INSTANTIATE_TEST_SUITE_P(TestPoolingAsymmPadding, pooling_test_float,
 
                 ));
 
-GPU_INST_TEST_CASE(pooling_test_float);
+GPU_INST_TEST_CASE(pooling_test_float,);
 
 } // namespace dnnl

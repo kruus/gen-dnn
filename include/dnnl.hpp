@@ -31,6 +31,7 @@
 #include <vector>
 #include <unordered_map>
 #include <assert.h> // [ejk]
+#include <stdio.h> // [ejk]
 #include <string.h> // [ejk] memcmp
 
 #include "dnnl.h"
@@ -1623,16 +1624,6 @@ struct memory : public handle<dnnl_memory_t> {
         friend struct memory;
         /// The underlying C API data structure.
         dnnl_memory_desc_t data;
-        /// Constructs a zero (empty) memory descriptor. Such a memory
-        /// descriptor can be used to indicate absence of an argument.
-        desc() : data() {
-#ifndef NDEBUG
-            char zeros[sizeof(data)];
-            memset(zeros,0,sizeof(data));
-            assert(!memcmp(zeros,&data,sizeof(data)));
-#endif
-        }
-
 #ifndef NDEBUG
 #define CHK_ZEROS \
     do { \
@@ -1646,6 +1637,15 @@ struct memory : public handle<dnnl_memory_t> {
     do { \
     } while (0)
 #endif
+        /// Constructs a zero (empty) memory descriptor. Such a memory
+        /// descriptor can be used to indicate absence of an argument.
+        desc() : data() {
+#ifndef NDEBUG
+            char zeros[sizeof(data)];
+            memset(zeros,0,sizeof(data));
+            assert(!memcmp(zeros,&data,sizeof(data)));
+#endif
+        }
 
         /// Constructs a memory descriptor.
         ///
@@ -1664,7 +1664,10 @@ struct memory : public handle<dnnl_memory_t> {
         ///     optional and defaults to false.
         desc(const memory::dims &dims, data_type data_type,
                 format_tag format_tag, bool allow_empty = false)
-            : data() {
+            : data()
+        {
+            CHK_ZEROS;
+            //memset((void*)&data, 0, sizeof(dnnl_memory_desc_t));
             validate_dims(dims);
             dnnl_status_t status = dnnl_memory_desc_init_by_tag(&data,
                     (int)dims.size(), dims.data(), convert_to_c(data_type),
@@ -1695,6 +1698,8 @@ struct memory : public handle<dnnl_memory_t> {
                 const memory::dims &strides, bool allow_empty = false)
             : data() {
             validate_dims(dims);
+            CHK_ZEROS;
+            //memset((void*)&data, 0, sizeof(dnnl_memory_desc_t));
             if (!strides.empty()) validate_dims(strides, (int)dims.size());
             dnnl_status_t status = dnnl_memory_desc_init_by_strides(&data,
                     (int)dims.size(), dims.data(), convert_to_c(data_type),

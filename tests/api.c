@@ -298,6 +298,7 @@ void test3() {
     CHECK_TRUE(dnnl_primitive_desc_query_s32(
                        l2_pd, dnnl_query_num_of_inputs_s32, 0)
             == 1);
+    // [ejk] fails w/ nc++ ...
     CHECK_TRUE(dnnl_primitive_desc_query_s32(
                        l2_pd, dnnl_query_num_of_outputs_s32, 0)
             == 1);

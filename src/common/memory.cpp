@@ -102,7 +102,6 @@ status_t dnnl_memory_desc_init_by_tag(memory_desc_t *memory_desc, int ndims,
         INVARIANTS(*memory_desc);
         return success;
     }
-
     format_kind_t format_kind = types::format_tag_to_kind(tag);
 
     /* memory_desc != 0 */
@@ -111,6 +110,10 @@ status_t dnnl_memory_desc_init_by_tag(memory_desc_t *memory_desc, int ndims,
     if (!args_ok) return invalid_arguments;
 
     auto md = types::zero_md();
+    INVARIANTS(md);
+#if defined(__ve)
+    //memset(&md, 0, sizeof(md));
+#endif
     md.ndims = ndims;
     array_copy(md.dims, dims, ndims);
     md.data_type = data_type;
@@ -131,7 +134,7 @@ status_t dnnl_memory_desc_init_by_tag(memory_desc_t *memory_desc, int ndims,
         status = invalid_arguments;
     }
 
-    if (status == success){
+    if (status == success) {
         *memory_desc = md;
         INVARIANTS(*memory_desc);
     }
