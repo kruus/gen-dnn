@@ -25,8 +25,15 @@ include("cmake/utils.cmake")
 
 set(CMAKE_CCXX_FLAGS)
 if(NECVE) # handle cross-compiler toolchains separately
+    if(DNNL_LIBRARY_TYPE STREQUAL "SHARED")
+        set(CMAKE_CCXX_FLAGS "-fPIC")
+    endif()
+    append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now")
+    append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,stacksize=0x8000000") # 128M stack
+    append(CMAKE_CCXX_FLAGS "-D_FORTIFY_SOURCE=2")
+    #append(CMAKE_CCXX_FLAGS "-D_VE_ITERATOR_DEBUG")
 elseif(UNIX)
-    # what about DNNL_LIBRARY_TYPE not needing -fPIC?
+    # DNNL_LIBRARY_TYPE STATIC might not need -fPIC
     set(CMAKE_CCXX_FLAGS "-fPIC -Wformat -Wformat-security")
     append(CMAKE_CXX_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2")
     append(CMAKE_C_FLAGS_RELEASE "-D_FORTIFY_SOURCE=2")

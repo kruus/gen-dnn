@@ -142,6 +142,7 @@ protected:
                 = p.fmts.weights_peephole_fmt != memory::format_tag::undef;
         auto eng = get_test_engine();
         auto strm = stream(eng);
+        printf(" init strm @ %p\n", (void*)&strm);
         //@todo check algorithm is one of the supported by RNN
         //ASSERT_EQ(p.aalgorithm, algorithm::vanilla_lstm);
 
@@ -273,51 +274,67 @@ protected:
         auto dst_layer_tgt = memory(dst_layer_md_tgt, eng);
         auto dst_iter_tgt = memory(dst_iter_md_tgt, eng);
         auto dst_iter_c_tgt = memory(dst_iter_c_md_tgt, eng);
+        asm("### pt0");
 
-        // Assumption: b is a plain layout
-        auto init_tensor = [&](memory a, memory b, int scale = 1) {
-            auto desc = a.get_desc();
-            auto b_dims = desc.data.dims;
-            auto b_ndims = desc.data.ndims;
-            auto n_elems = std::accumulate(b_dims, b_dims + b_ndims, size_t(1),
-                    std::multiplies<dnnl_dim_t>());
-            const dnnl::impl::memory_desc_wrapper mdw(desc.data);
-            {
-                auto b_ptr = map_memory<float>(b);
-                for (size_t i = 0; i < n_elems; i++)
-                    b_ptr[i] = scale * i;
+        if(1){
+            // Assumption: b is a plain layout
+            auto init_tensor = [&strm](memory& a, memory& b, int scale = 1) {
+                //const dnnl::impl::memory_desc_wrapper mdw(desc.data);
+                {
+                    auto desc = a.get_desc();
+                    auto b_dims = desc.data.dims;
+                    auto b_ndims = desc.data.ndims;
+                    auto n_elems = std::accumulate(b_dims, b_dims + b_ndims, size_t(1),
+                            std::multiplies<dnnl_dim_t>());
+                    auto b_ptr = map_memory<data_t>(b); // was float
+                    for (size_t i = 0; i < n_elems; i++)
+                        b_ptr[i] = scale * i;
+                }
+                {
+                    auto reorder_prim = new reorder(b, a);
+                    printf(" reorder_execute, strm@%p...",(void*)&strm); fflush(0);
+                    reorder_prim->execute(strm, b, a);
+                    printf(" strm.wait...\n"); fflush(0);
+                    strm.wait(); // nc++ segfault here // double destruction of stream during exec_ctx_t destruction MAYBE ?
+                    printf(" delete reorder..."); fflush(0);
+                    delete reorder_prim;
+                }
+                printf(" DONE(init_tensor)...\n"); fflush(0);
+            };
+            auto init_zero_tensor = [&](memory& a, memory::format_tag fmt) {
+                auto desc = a.get_desc();
+                memory::desc tmp_md(desc.dims(), desc.data_type(), fmt);
+                memory tmp(tmp_md, eng);
+                // Zero fill the tmp tensor
+                init_tensor(a, tmp, 0);
+            };
+
+            init_tensor(weights_layer_ref, weights_layer_tgt);
+            init_tensor(weights_iter_ref, weights_iter_tgt);
+            if (is_lstm_peephole)
+                init_tensor(weights_peephole_ref, weights_peephole_tgt);
+            else if (std::is_same<T, lstm_forward>::value)
+                init_zero_tensor(weights_peephole_ref, memory::format_tag::ldgo);
+            init_tensor(bias_ref, bias_tgt);
+            init_tensor(src_layer_ref, src_layer_tgt);
+            if (p.fmts.src_iter_fmt != memory::format_tag::undef) {
+                printf(" init_tensor(src_iter...)..."); fflush(0);
+                init_tensor(src_iter_ref, src_iter_tgt); // nc++ segfault
+                printf(" init_tensor(src_iter...)DONE...\n"); fflush(0);
+                if (std::is_same<T, lstm_forward>::value)
+                    init_tensor(src_iter_c_ref, src_iter_c_tgt);
+            } else {
+                init_zero_tensor(src_iter_ref, memory::format_tag::ldnc);
+                if (std::is_same<T, lstm_forward>::value)
+                    init_zero_tensor(src_iter_c_ref, memory::format_tag::ldnc);
             }
-            reorder(b, a).execute(strm, b, a);
-            strm.wait();
-        };
-        auto init_zero_tensor = [&](memory a, memory::format_tag fmt) {
-            auto desc = a.get_desc();
-            memory::desc tmp_md(desc.dims(), desc.data_type(), fmt);
-            memory tmp(tmp_md, eng);
-            // Zero fill the tmp tensor
-            init_tensor(a, tmp, 0);
-        };
-
-        init_tensor(weights_layer_ref, weights_layer_tgt);
-        init_tensor(weights_iter_ref, weights_iter_tgt);
-        if (is_lstm_peephole)
-            init_tensor(weights_peephole_ref, weights_peephole_tgt);
-        else if (std::is_same<T, lstm_forward>::value)
-            init_zero_tensor(weights_peephole_ref, memory::format_tag::ldgo);
-        init_tensor(bias_ref, bias_tgt);
-        init_tensor(src_layer_ref, src_layer_tgt);
-        if (p.fmts.src_iter_fmt != memory::format_tag::undef) {
-            init_tensor(src_iter_ref, src_iter_tgt);
-            if (std::is_same<T, lstm_forward>::value)
-                init_tensor(src_iter_c_ref, src_iter_c_tgt);
-        } else {
-            init_zero_tensor(src_iter_ref, memory::format_tag::ldnc);
-            if (std::is_same<T, lstm_forward>::value)
-                init_zero_tensor(src_iter_c_ref, memory::format_tag::ldnc);
         }
 
+        asm("### pt1");
         // run the non packed version
-        T(ref_pd).execute(strm,
+        // nc++ get here
+        auto ref_rnn = T(ref_pd);
+        ref_rnn.execute(strm,
                 {{DNNL_ARG_SRC_LAYER, src_layer_ref},
                         {DNNL_ARG_SRC_ITER, src_iter_ref},
                         {DNNL_ARG_SRC_ITER_C, src_iter_c_ref},

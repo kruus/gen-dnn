@@ -19,6 +19,8 @@
 #include "dnnl_test_common.hpp"
 #include "gtest/gtest.h"
 
+#define DEBUG 1
+
 namespace dnnl {
 
 TEST(test_parallel, Test) {
@@ -36,6 +38,27 @@ struct nd_params_t {
 };
 using np_t = nd_params_t;
 
+namespace debug {
+#if DEBUG
+template <typename T>
+void print_vec(const char *str, const T *vec, int size) {
+    printf("%s", str);
+    char fmt[] = "{%d";
+    for (int d = 0; d < size; ++d){
+        printf(fmt, (int)vec[d]);
+        fmt[0] = ',';
+    }
+    printf("}\n");
+}
+void print_np(np_t const& np){
+    print_vec(" np_t::dims",np.dims.data(), np.dims.size());
+}
+#else
+void print_vec(const char*, const T*, int) {}
+void print_np(np_t const& np){}
+#endif
+} // debug::
+
 class test_nd : public ::testing::TestWithParam<nd_params_t> {
 protected:
     virtual void SetUp() {
@@ -44,6 +67,11 @@ protected:
         for (auto &d : p.dims)
             size *= d;
         data.resize((size_t)size);
+#if DEBUG
+        printf(" size %lu ", (long)size);
+        debug::print_np(p);
+        debug::print_vec(" data",data.data(),data.size());
+#endif
     }
 
     void CheckID() {

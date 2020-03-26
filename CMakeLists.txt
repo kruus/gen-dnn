@@ -157,3 +157,11 @@ else()
     install(FILES THIRD-PARTY-PROGRAMS DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${LIB_NAME})
     install(FILES ${PROJECT_BINARY_DIR}/README DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/${LIB_NAME})
 endif()
+
+if(NECVE)
+    # -pthread required for <atomic> <condition_variable> <mutex> <thread> <stdatomic.h> <threads.h>
+    # -traceback enables VE_TRACEBACK=VERBOSE fatal error traceback
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -pthread -traceback=verbose")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -pthread -traceback=verbose")
+    show_cmake_stuff("End cmake configuration")
+endif()

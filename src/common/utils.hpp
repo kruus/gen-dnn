@@ -556,7 +556,7 @@ private:
     bool initialized_;
 
 public:
-    setting_t() : initialized_ {false} {}
+    setting_t() : value_()/*ejk*/, initialized_ {false} {}
     setting_t(const T init) : value_ {init}, initialized_ {false} {}
     bool initialized() { return initialized_; }
     T get() { return value_; }

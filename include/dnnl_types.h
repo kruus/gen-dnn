@@ -1725,7 +1725,7 @@ typedef struct dnnl_primitive *dnnl_primitive_t;
 typedef const struct dnnl_primitive *const_dnnl_primitive_t;
 
 /// Source argument #0.
-#define DNNL_ARG_SRC_0 1
+#define DNNL_ARG_SRC_0 ((int)1)
 /// A special mnemonic for source argument for primitives that have a
 /// single source. An alias for #DNNL_ARG_SRC_0.
 #define DNNL_ARG_SRC DNNL_ARG_SRC_0
@@ -1737,19 +1737,19 @@ typedef const struct dnnl_primitive *const_dnnl_primitive_t;
 #define DNNL_ARG_FROM DNNL_ARG_SRC_0
 
 /// Source argument #1.
-#define DNNL_ARG_SRC_1 2
+#define DNNL_ARG_SRC_1 ((int)2)
 /// A special mnemonic for RNN input recurrent hidden state vector. An alias
 /// for #DNNL_ARG_SRC_1.
 #define DNNL_ARG_SRC_ITER DNNL_ARG_SRC_1
 
 /// Source argument #2.
-#define DNNL_ARG_SRC_2 3
+#define DNNL_ARG_SRC_2 ((int)3)
 /// A special mnemonic for RNN input recurrent cell state vector. An alias for
 /// #DNNL_ARG_SRC_2.
 #define DNNL_ARG_SRC_ITER_C DNNL_ARG_SRC_2
 
 /// Destination argument #0.
-#define DNNL_ARG_DST_0 17
+#define DNNL_ARG_DST_0 ((int)17)
 /// A special mnemonic for destination argument for primitives that have a
 /// single destination. An alias for #DNNL_ARG_DST_0.
 #define DNNL_ARG_DST DNNL_ARG_DST_0
@@ -1760,19 +1760,19 @@ typedef const struct dnnl_primitive *const_dnnl_primitive_t;
 #define DNNL_ARG_DST_LAYER DNNL_ARG_DST_0
 
 /// Destination argument #1.
-#define DNNL_ARG_DST_1 18
+#define DNNL_ARG_DST_1 ((int)18)
 /// A special mnemonic for RNN input recurrent hidden state vector. An
 /// alias for #DNNL_ARG_DST_1.
 #define DNNL_ARG_DST_ITER DNNL_ARG_DST_1
 
 /// Destination argument #2.
-#define DNNL_ARG_DST_2 19
+#define DNNL_ARG_DST_2 ((int)19)
 /// A special mnemonic for LSTM output recurrent cell state vector. An
 /// alias for #DNNL_ARG_DST_2.
 #define DNNL_ARG_DST_ITER_C DNNL_ARG_DST_2
 
 /// Weights argument #0.
-#define DNNL_ARG_WEIGHTS_0 33
+#define DNNL_ARG_WEIGHTS_0 ((int)33)
 /// A special mnemonic for primitives that have a single weights
 /// argument. Alias for #DNNL_ARG_WEIGHTS_0.
 #define DNNL_ARG_WEIGHTS DNNL_ARG_WEIGHTS_0
@@ -1784,33 +1784,33 @@ typedef const struct dnnl_primitive *const_dnnl_primitive_t;
 #define DNNL_ARG_WEIGHTS_LAYER DNNL_ARG_WEIGHTS_0
 
 /// Weights argument #1.
-#define DNNL_ARG_WEIGHTS_1 34
+#define DNNL_ARG_WEIGHTS_1 ((int)34)
 /// A special mnemonic for RNN weights applied to the recurrent input.
 /// An alias for #DNNL_ARG_WEIGHTS_1.
 #define DNNL_ARG_WEIGHTS_ITER DNNL_ARG_WEIGHTS_1
 
 /// Weights argument #2.
-#define DNNL_ARG_WEIGHTS_2 35
+#define DNNL_ARG_WEIGHTS_2 ((int)35)
 /// A special mnemonic for RNN weights applied to the peephole weights.
 /// An alias for #DNNL_ARG_WEIGHTS_2.
 #define DNNL_ARG_WEIGHTS_PEEPHOLE DNNL_ARG_WEIGHTS_2
 
 /// Bias tensor argument.
-#define DNNL_ARG_BIAS 41
+#define DNNL_ARG_BIAS ((int)41)
 
 /// Mean values tensor argument.
-#define DNNL_ARG_MEAN 49
+#define DNNL_ARG_MEAN ((int)49)
 /// Variance values tensor argument.
-#define DNNL_ARG_VARIANCE 50
+#define DNNL_ARG_VARIANCE ((int)50)
 
 /// Workspace tensor argument. Workspace is used to pass information
 /// from forward propagation to backward propagation computations.
-#define DNNL_ARG_WORKSPACE 64
+#define DNNL_ARG_WORKSPACE ((int)64)
 /// Scratchpad (temporary storage) tensor argument.
-#define DNNL_ARG_SCRATCHPAD 80
+#define DNNL_ARG_SCRATCHPAD ((int)80)
 
 /// Gradient (diff) of the source argument #0.
-#define DNNL_ARG_DIFF_SRC_0 129
+#define DNNL_ARG_DIFF_SRC_0 ((int)129)
 /// A special mnemonic for primitives that have a single diff source argument.
 /// An alias for #DNNL_ARG_DIFF_SRC_0.
 #define DNNL_ARG_DIFF_SRC DNNL_ARG_DIFF_SRC_0
@@ -1819,19 +1819,19 @@ typedef const struct dnnl_primitive *const_dnnl_primitive_t;
 #define DNNL_ARG_DIFF_SRC_LAYER DNNL_ARG_DIFF_SRC_0
 
 /// Gradient (diff) of the source argument #1.
-#define DNNL_ARG_DIFF_SRC_1 130
+#define DNNL_ARG_DIFF_SRC_1 ((int)130)
 /// A special mnemonic for gradient (diff) of RNN input recurrent hidden state
 /// vector. An alias for #DNNL_ARG_DIFF_SRC_1.
 #define DNNL_ARG_DIFF_SRC_ITER DNNL_ARG_DIFF_SRC_1
 
 /// Gradient (diff) of the source argument #2.
-#define DNNL_ARG_DIFF_SRC_2 131
+#define DNNL_ARG_DIFF_SRC_2 ((int)131)
 /// A special mnemonic for gradient (diff) of RNN input recurrent cell state
 /// vector. An alias for #DNNL_ARG_DIFF_SRC_1.
 #define DNNL_ARG_DIFF_SRC_ITER_C DNNL_ARG_DIFF_SRC_2
 
 /// Gradient (diff) of the destination argument #0.
-#define DNNL_ARG_DIFF_DST_0 145
+#define DNNL_ARG_DIFF_DST_0 ((int)145)
 /// A special mnemonic for primitives that have a single diff destination
 /// argument. An alias for #DNNL_ARG_DIFF_DST_0.
 #define DNNL_ARG_DIFF_DST DNNL_ARG_DIFF_DST_0
@@ -1840,19 +1840,19 @@ typedef const struct dnnl_primitive *const_dnnl_primitive_t;
 #define DNNL_ARG_DIFF_DST_LAYER DNNL_ARG_DIFF_DST_0
 
 /// Gradient (diff) of the destination argument #1.
-#define DNNL_ARG_DIFF_DST_1 146
+#define DNNL_ARG_DIFF_DST_1 ((int)146)
 /// A special mnemonic for gradient (diff) of RNN input recurrent hidden state
 /// vector. An alias for #DNNL_ARG_DIFF_DST_1.
 #define DNNL_ARG_DIFF_DST_ITER DNNL_ARG_DIFF_DST_1
 
 /// Gradient (diff) of the destination argument #2.
-#define DNNL_ARG_DIFF_DST_2 147
+#define DNNL_ARG_DIFF_DST_2 ((int)147)
 /// A special mnemonic for gradient (diff) of RNN input recurrent cell state
 /// vector. An alias for #DNNL_ARG_DIFF_DST_2.
 #define DNNL_ARG_DIFF_DST_ITER_C DNNL_ARG_DIFF_DST_2
 
 /// Gradient (diff) of the weights argument #0.
-#define DNNL_ARG_DIFF_WEIGHTS_0 161
+#define DNNL_ARG_DIFF_WEIGHTS_0 ((int)161)
 /// A special mnemonic for primitives that have a single diff weights
 /// argument. Alias for #DNNL_ARG_DIFF_WEIGHTS_0.
 #define DNNL_ARG_DIFF_WEIGHTS DNNL_ARG_DIFF_WEIGHTS_0
@@ -1864,36 +1864,36 @@ typedef const struct dnnl_primitive *const_dnnl_primitive_t;
 #define DNNL_ARG_DIFF_WEIGHTS_LAYER DNNL_ARG_DIFF_WEIGHTS_0
 
 /// Gradient (diff) of the weights argument #1.
-#define DNNL_ARG_DIFF_WEIGHTS_1 162
+#define DNNL_ARG_DIFF_WEIGHTS_1 ((int)162)
 /// A special mnemonic for diff of RNN weights applied to the recurrent input.
 /// An alias for #DNNL_ARG_DIFF_WEIGHTS_1.
 #define DNNL_ARG_DIFF_WEIGHTS_ITER DNNL_ARG_DIFF_WEIGHTS_1
 
 /// Gradient (diff) of the weights argument #2.
-#define DNNL_ARG_DIFF_WEIGHTS_2 163
+#define DNNL_ARG_DIFF_WEIGHTS_2 ((int)163)
 /// A special mnemonic for diff of RNN weights applied to the peephole weights.
 /// An alias for #DNNL_ARG_DIFF_WEIGHTS_2.
 #define DNNL_ARG_DIFF_WEIGHTS_PEEPHOLE DNNL_ARG_DIFF_WEIGHTS_2
 
 /// Gradient (diff) of the bias tensor argument.
-#define DNNL_ARG_DIFF_BIAS 169
+#define DNNL_ARG_DIFF_BIAS ((int)169)
 
 /// Output scaling factors provided at execution time.
-#define DNNL_ARG_ATTR_OUTPUT_SCALES 513
+#define DNNL_ARG_ATTR_OUTPUT_SCALES ((int)513)
 
 /// Starting index for source arguments for primitives that take a variable
 /// number of source arguments.
-#define DNNL_ARG_MULTIPLE_SRC 1024
+#define DNNL_ARG_MULTIPLE_SRC ((int)1024)
 /// Starting index for destination arguments for primitives that produce a
 /// variable number of destination arguments.
-#define DNNL_ARG_MULTIPLE_DST 2048
+#define DNNL_ARG_MULTIPLE_DST ((int)2048)
 
 /// Zero points provided at execution time.
-#define DNNL_ARG_ATTR_ZERO_POINTS 4096
+#define DNNL_ARG_ATTR_ZERO_POINTS ((int)4096)
 
 /// Arguments for fused depthwise convolution.
 /// See @ref dev_guide_attributes_post_ops_depthwise_fusion
-#define DNNL_ARG_ATTR_POST_OP_DW 8192
+#define DNNL_ARG_ATTR_POST_OP_DW ((int)8192)
 
 /// A structure that contains an index and a memory object, and is used to pass
 /// arguments to dnnl_primitive_execute().

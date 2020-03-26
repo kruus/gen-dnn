@@ -19,6 +19,7 @@ DOTARGET="x"
 BFLOAT16="x"
 RNN="x"
 OMP="y"
+ULIMIT=65536
 
 # see dnnl_config.h ...
 CPU_X86=1
@@ -385,6 +386,8 @@ if [ "$DOTARGET" = "a" -o "$DOTARGET" = "s" ]; then
     #export VE_PROGINF=YES;
     export VE_PROGINF=DETAIL;
     export C_PROGINF=YES;
+    ulimit -s $ULIMIT
+    echo 'ulimit : '`ulimit -s`
 else
     unset VE_PROGINF
     unset C_PROGINF
@@ -413,6 +416,8 @@ echo "PATH $PATH"
     echo "BUILDDIR   ${BUILDDIR}"
     echo "INSTALLDIR ${INSTALLDIR}"
     echo "JOBS       ${JOBS}"
+    ulimit -s $ULIMIT # 10.1.18 "When compiling a program which code size is large, the compiler aborts by SIGSEGV."
+    echo 'ulimit : '`ulimit -s`
     if [ $QUICK -lt 2 ]; then
         mkdir "${BUILDDIR}"
     fi
@@ -504,20 +509,24 @@ echo "PATH $PATH"
 
         # adjust here for VE shared library and Openmp use
         #CMAKEOPT="${CMAKEOPT} -DUSE_SHAREDLIB=OFF" # deprecated
-        CMAKEOPT="${CMAKEOPT} -DDNNL_LIBRARY_TYPE=STATIC"
+        #CMAKEOPT="${CMAKEOPT} -DDNNL_LIBRARY_TYPE=STATIC"
+        #CMAKEOPT="${CMAKEOPT} -DDNNL_LIBRARY_TYPE=SHARED" # default
 
         # USE_OPENMP defaults to off, so force it on (VE openmp has improved)
         if [ "${OMP}" = "n" ]; then
-            CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=OFF"
+            # CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=OFF"
+            CMAKEOPT="${CMAKEOPT} -DDNNL_CPU_RUNTIME=SEQ"
         else
-            CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=ON"
+            # CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=ON"
+            CMAKEOPT="${CMAKEOPT} -DDNNL_CPU_RUNTIME=OMP"
             #ccxx_flags -fopenmp # ?? -mparallel and -fopenmp both => -pthread
         fi
         # TODO proginf is not working automatically any more?
         # -proginf  : Run with 'export VE_PROGINF=YES' to get some stats output
-        # ccxx_flags -DCBLAS_LAYOUT=CBLAS_ORDER -proginf
+        # ccxx_flags -proginf
         ccxx_flags -DCBLAS_LAYOUT=CBLAS_ORDER
         ccxx_flags -DDNNL_VALUE_INITIALIZATION_BUG # VE branch should test and set in dnnl_config.h
+        ccxx_flags -pthread # for <atomic>, <mutex> headers
         if [ "$NEC_FTRACE" -eq 1 ]; then
             #ccxx_flags -ftrace
             # at some point above was sufficent (ve.cmake) set things
@@ -649,7 +658,6 @@ echo "PATH $PATH"
         echo "DOTEST    $DOTEST"
         echo "DODEBUG   $DODEBUG"
         echo "DODOC     $DODOC"
-        export DNNL_VERBOSE=7
         if [ -f ./bash_help.inc ]; then # note: file was removed from Intel master
             source "./bash_help.inc" # we are already in ${BUILDDIR}
         fi
@@ -660,16 +668,27 @@ echo "PATH $PATH"
             # because 'make' tragets already supply VE_EXEC if needed.
         fi
         # Put one test here (maybe one you are currently debugging)
+        TEST_ENV=(DNNL_VERBOSE=2)
+        TEST_ENV+=(VE_INIT_HEAP=ZERO)
+        TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
+        TEST_ENV+=(OMP_STACKSIZE=1G)
+        TEST_ENV+=(VE_TRACEBACK=VERBOSE)
+        TEST_ENV+=(VE_INIT_HEAP=ZERO)
+        TEST_ENV+=(VE_PROGINF=DETAIL)
+        #export DNNL_VERBOSE=2
+        #export VE_INIT_HEAP=ZERO
+        #export VE_ERRCTL_DEALLOCATE=MSG
+        #export VE_TRACEBACK=VERBOSE
+        #export VE_PROGINF=DETAIL
+        #TEST_ENV+=(VE_ADVANCEOFF=YES)
         { echo "api-c                   ...";
-            DNNL_VERBOSE=2 VE_INIT_HEAP=ZERO \
-            ${TESTRUNNER} ${VE_EXEC} tests/api-c \
-                || xBUILDOK="n";
+            /bin/env ${TEST_ENV[@]} ${TESTRUNNER} ${VE_EXEC} tests/api-c \
+                || xBUILDOK="n"; # do not stop tests on failure
         } 
-        if [ $DOTEST -eq 0 ]; then # another short test, this one can fail too
+        if [ $DOTEST -eq 13 ]; then # another short test, this one can fail too
             { echo "cpu-cnn-training-f32-c"
-                DNNL_VERBOSE=2 VE_INIT_HEAP=ZERO \
-                ${TESTRUNNER}  ${VE_EXEC} examples/cpu-cnn-training-f32-c \
-                || xBUILDOK="n";
+                /bin/env ${TEST_ENV[@]} ${TESTRUNNER}  ${VE_EXEC} examples/cpu-cnn-training-f32-c \
+                || xBUILDOK="n"; # do not stop tests on failure
             }
         fi
     fi
@@ -694,6 +713,7 @@ echo "PATH $PATH"
 ls -l "${BUILDDIR}"
 BUILDOK="n"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="y"; fi
 
+echo 'ulimit : '`ulimit -s`
 set +x
 # after cmake we might have a better idea about ve_exec (esp. if PATH is not set properly)
 if [ -f "${BUILDDIR}/bash_help.inc" ]; then # file was removed from mkl-dnnl ~ v1.x
@@ -734,20 +754,30 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
     fi
     echo "Testing ?"
     if [ ! $DOTEST -eq 0 -a ! "$DOTARGET" == "s" ]; then # non-SX: -t might run some tests
+        TEST_ENV=(DNNL_VERBOSE=2)
+        TEST_ENV+=(VE_INIT_HEAP=ZERO)
+        TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
+        TEST_ENV+=(OMP_STACKSIZE=1G)
+        TEST_ENV+=(VE_TRACEBACK=VERBOSE)
+        TEST_ENV+=(VE_INIT_HEAP=ZERO)
+        TEST_ENV+=(VE_PROGINF=DETAIL)
+        #TEST_ENV+=(VE_ADVANCEOFF=YES)
         rm -f test1.log test2.log test3.log
         echo "Testing in ${BUILDDIR} ... test1"
         if [ $DOTEST -eq 1 ]; then
-            (cd "${BUILDDIR}" && ARGS='-VV -E .*test_.*' DNNL_VERBOSE=2 VE_INIT_HEAP=ZERO \
-             ${TESTRUNNER} make VERBOSE=1 test \
+            ( echo "/bin/env ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' ${TESTRUNNER} make VERBOSE=1 test"; \
+                cd "${BUILDDIR}" && /bin/env ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' \
+                ${TESTRUNNER} make VERBOSE=1 test \
             ) 2>&1 | tee "${BUILDDIR}/test1.log" || true
         fi
         if [ $DOTEST -ge 2 ]; then
             echo "Testing ... test2"
-            (cd "${BUILDDIR}" && ARGS='-VV -N' DNNL_VERBOSE=2 VE_INIT_HEAP=ZERO \
-             ${TESTRUNNER} make test \
-             && ARGS='-VV -R .*test_.*' DNNL_VERBOSE=2 VE_INIT_HEAP=ZERO \
-             ${TESTRUNNER}  make test \
-            ) 2>&1 | tee "${BUILDDIR}/test2.log" || true
+            (
+                 echo "/bin/env ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' ${TESTRUNNER} <commnad>";
+                 cd "${BUILDDIR}" && /bin/env ${TEST_ENV[@]} ARGS='-VV -N' \
+                     ${TESTRUNNER} make test \
+                     && /bin/env ARGS='-VV -R .*test_.*' ${TEST_ENV[@]} ${TESTRUNNER}  make test \
+                     ) 2>&1 | tee "${BUILDDIR}/test2.log" || true
         fi
         if [ $DOTEST -ge 3 ]; then # some [few] convolution timings
             if [ -x ./bench.sh ]; then
@@ -787,8 +817,8 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
             { while read -r bench_target; do
                 # note default is --mode=C (correctness check)
                 # can set BENCHDNN_ARGS="--mode=P' for other modes (e.g. performance, even slower)
-                DNNL_VERBOSE=2 VE_INIT_HEAP=ZERO \
-                    make -C ${BUILDDIR} VERBOSE=1 ${bench_target} \
+                echo "/bin/env ${TEST_ENV[@]} make -C ${BUILDDIR} VERBOSE=1 ${bench_target} ..."
+                /bin/env ${TEST_ENV[@]} make -C ${BUILDDIR} VERBOSE=1 ${bench_target} \
                     | tee >(awk '/^tests:/{printf("%-20s %s\n","'${bench_target##test_benchdnn_}'",$0)}' \
                     >>${BUILDDIR}/bench.summary) \
                     | sed "s/^tests:/test:${bench_target}\\ntests:/"
