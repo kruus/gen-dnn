@@ -10,7 +10,7 @@ Figure 1. \bias, \srciter and \dstiter are optional parameters (the
 variable names follow the standard @ref dev_guide_conventions). If not
 provided, \bias and \srciter will default to 0.
 
-@img{unrolled_stack_rnn.jpg,Figure 1: Example of stacked recurrent cells unrolled over the time dimension and executed with the `left2right` direction. Dashed lines represent optional parameters.,}
+@img{unrolled_stack_rnn.jpg,Figure 1: Example of stacked recurrent cells unrolled over the time dimension and executed with the `left2right` direction. Dashed lines represent optional parameters.,80%,}
 
 The RNN primitive supports four modes for evaluation direction:
 -   `left2right` will process the input data timestamps by increasing order
@@ -327,3 +327,9 @@ details on how to use and set these quantization parameters.
 2. **GPU**
     - No support for GRU
     - No support for Peephole LSTM
+
+## Examples
+
+| Engine  | Name                  | Comments
+| :--     | :--                   | :--
+| CPU/GPU | @ref lstm_example_cpp | @copydetails lstm_example_cpp_short
