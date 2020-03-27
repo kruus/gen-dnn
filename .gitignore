@@ -39,3 +39,4 @@ compile_commands.json
 **.diff
 gmon.out
 oprofile*
+typescript

@@ -15,6 +15,7 @@
 *******************************************************************************/
 
 #include <vector>
+#include <mutex>
 
 #include "dnnl_test_common.hpp"
 #include "gtest/gtest.h"
@@ -43,21 +44,26 @@ namespace debug {
 template <typename T>
 void print_vec(const char *str, const T *vec, int size) {
     printf("%s", str);
-    char fmt[] = "{%d";
-    for (int d = 0; d < size; ++d){
-        printf(fmt, (int)vec[d]);
-        fmt[0] = ',';
+    if (size <= 0)
+        printf("EMPTY");
+    else {
+        char fmt[] = "{%d";
+        for (int d = 0; d < size; ++d) {
+            printf(fmt, (int)vec[d]);
+            fmt[0] = ',';
+        }
     }
     printf("}\n");
 }
-void print_np(np_t const& np){
-    print_vec(" np_t::dims",np.dims.data(), np.dims.size());
+void print_np(np_t const &np) {
+    print_vec(" np_t::dims", np.dims.data(), np.dims.size());
 }
 #else
-void print_vec(const char*, const T*, int) {}
-void print_np(np_t const& np){}
+template <typename T>
+void print_vec(const char *, const T *, int) {}
+void print_np(np_t const &np) {}
 #endif
-} // debug::
+} // namespace debug
 
 class test_nd : public ::testing::TestWithParam<nd_params_t> {
 protected:
@@ -70,7 +76,8 @@ protected:
 #if DEBUG
         printf(" size %lu ", (long)size);
         debug::print_np(p);
-        debug::print_vec(" data",data.data(),data.size());
+        debug::print_vec(" p.dims", p.dims.data(), p.dims.size());
+        debug::print_vec(" data", data.data(), data.size());
 #endif
     }
 
@@ -86,17 +93,54 @@ protected:
 
 class test_for_nd : public test_nd {
 protected:
+#if DEBUG
+    std::mutex ioMutex;
+#endif
     void emit_for_nd(int ithr, int nthr) {
-#define SHOW(idx,...) do { \
-    SHOW1(ithr,nthr,idx); \
-    SHOW(__VA_ARGS__); \
-} while(0)
+#if DEBUG
+#define CAT0(a, ...) a##__VA_ARGS__
+#define CAT(a, ...) CAT0(a, __VA_ARGS__)
+#define PRT1(x) << ' ' << x
+#define PRT2(x, ...) << ' ' << x PRT1(__VA_ARGS__)
+#define PRT3(x, ...) << ' ' << x PRT2(__VA_ARGS__)
+#define PRT4(x, ...) << ' ' << x PRT3(__VA_ARGS__)
+#define PRT5(x, ...) << ' ' << x PRT4(__VA_ARGS__)
+#define PRT6(x, ...) << ' ' << x PRT5(__VA_ARGS__)
+#define DECL(os) \
+    std::ostringstream os
+#define SHOW(os, ...) \
+    do { \
+        std::lock_guard<std::mutex> const lock(ioMutex); \
+        os __VA_ARGS__; \
+    } while (0)
+#define COUT(os) \
+    do { \
+        std::lock_guard<std::mutex> const lock(ioMutex); \
+        std::cout << os.str() << std::endl; \
+        std::cout.flush(); \
+    } while (0)
+#else
+#define DECL(os) \
+    do { \
+    } while (0)
+#define SHOW(os, stuff) \
+    do { \
+    } while (0)
+#define COUT(os) \
+    do { \
+    } while (0)
+#endif
+        DECL(os);
+        SHOW(os, << " emit_for_nd(" << ithr << "/" << nthr << ")\n");
+        COUT(os);
+
         switch ((int)p.dims.size()) {
             case 1:
                 impl::for_nd(ithr, nthr, p.dims[0], [&](ptrdiff_t d0) {
                     ASSERT_TRUE(0 <= d0 && d0 < p.dims[0]);
                     data[d0] = d0;
-                    SHOW(d0,d0)
+                    SHOW(os, << " " << ithr << "/" << nthr << " d[]: " PRT1(d0)
+                             << "\n");
                 });
                 break;
             case 2:
@@ -105,6 +149,9 @@ protected:
                             ASSERT_TRUE(0 <= d0 && d0 < p.dims[0]);
                             ASSERT_TRUE(0 <= d1 && d1 < p.dims[1]);
                             const ptrdiff_t idx = d0 * p.dims[1] + d1;
+                            SHOW(os, << " " << ithr << "/" << nthr
+                                     << " d{" PRT2(d0, d1) << "}-->idx " << idx
+                                     << "\n");
                             data[idx] = idx;
                         });
                 break;
@@ -116,6 +163,9 @@ protected:
                             ASSERT_TRUE(0 <= d2 && d2 < p.dims[2]);
                             const ptrdiff_t idx
                                     = (d0 * p.dims[1] + d1) * p.dims[2] + d2;
+                            SHOW(os, << " " << ithr << "/" << nthr
+                                     << " d{" PRT3(d0, d1, d2) << "}-->idx "
+                                     << idx << "\n");
                             data[idx] = idx;
                         });
                 break;
@@ -132,6 +182,9 @@ protected:
                                     = ((d0 * p.dims[1] + d1) * p.dims[2] + d2)
                                             * p.dims[3]
                                     + d3;
+                            SHOW(os, << " " << ithr << "/" << nthr
+                                     << " d{" PRT4(d0, d1, d2, d3) << "}-->idx "
+                                     << idx << "\n");
                             data[idx] = idx;
                         });
                 break;
@@ -151,6 +204,9 @@ protected:
                                               + d3)
                                             * p.dims[4]
                                     + d4;
+                            SHOW(os, << " " << ithr << "/" << nthr
+                                     << " d{" PRT5(d0, d1, d2, d3, d4)
+                                     << "}-->idx " << idx << "\n");
                             data[idx] = idx;
                         });
                 break;
@@ -172,13 +228,17 @@ protected:
                                               + d4)
                                             * p.dims[5]
                                     + d5;
+                            SHOW(os, << " " << ithr << "/" << nthr
+                                     << " d{" PRT6(d0, d1, d2, d3, d4, d5)
+                                     << "}-->idx " << idx << "\n");
                             data[idx] = idx;
                         });
                 break;
             default: ASSERT_TRUE(false);
         }
+        COUT(os);
     }
-};
+}; // namespace dnnl
 
 TEST_P(test_for_nd, Sequential) {
     emit_for_nd(0, 1);

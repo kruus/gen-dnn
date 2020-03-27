@@ -1,5 +1,6 @@
 #!/bin/bash
 # vim: et sw=2 ts=2 foldlevel=6
+ENV=`which env`
 TEST_ENV=(DNNL_VERBOSE=2)
 TEST_ENV+=(VE_INIT_HEAP=ZERO)
 TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
@@ -13,7 +14,7 @@ TEST_ENV+=(VE_PROGINF=DETAIL)
 ULIMIT=262144
 ulimit -s $ULIMIT
 echo 'ulimit : '`ulimit -s`
-echo "/bin/env ${TEST_ENV[@]} <command>"
+echo "${ENV} ${TEST_ENV[@]} <command>"
 LOG="f.log"
 BLD="build-ved4"
 BUILD=0
@@ -121,8 +122,8 @@ function test # test COMMAND [ARGS...] -- run in TEST_ENV & send console output 
   # what's seen on terminal goes to typescript
   #  so abort message that write to /dev/tty also end up in t${LOG}
   echo 'ulimit : '`ulimit -s`
-  echo "/bin/env ${TEST_ENV[@]} $*"
-  /bin/env ${TEST_ENV[@]} GTEST_FILTER="${GTEST_FILTER}" script -e -a -c $*
+  echo "${ENV} ${TEST_ENV[@]} $*"
+  ${ENV} ${TEST_ENV[@]} GTEST_FILTER="${GTEST_FILTER}" script -e -a -c $*
 }
 function comment
 {

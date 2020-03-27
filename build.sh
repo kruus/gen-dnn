@@ -20,6 +20,7 @@ BFLOAT16="x"
 RNN="x"
 OMP="y"
 ULIMIT=65536
+ENV=`which env`
 
 # see dnnl_config.h ...
 CPU_X86=1
@@ -682,12 +683,12 @@ echo "PATH $PATH"
         #export VE_PROGINF=DETAIL
         #TEST_ENV+=(VE_ADVANCEOFF=YES)
         { echo "api-c                   ...";
-            /bin/env ${TEST_ENV[@]} ${TESTRUNNER} ${VE_EXEC} tests/api-c \
+            ${ENV} ${TEST_ENV[@]} ${TESTRUNNER} ${VE_EXEC} tests/api-c \
                 || xBUILDOK="n"; # do not stop tests on failure
         } 
         if [ $DOTEST -eq 13 ]; then # another short test, this one can fail too
             { echo "cpu-cnn-training-f32-c"
-                /bin/env ${TEST_ENV[@]} ${TESTRUNNER}  ${VE_EXEC} examples/cpu-cnn-training-f32-c \
+                ${ENV} ${TEST_ENV[@]} ${TESTRUNNER}  ${VE_EXEC} examples/cpu-cnn-training-f32-c \
                 || xBUILDOK="n"; # do not stop tests on failure
             }
         fi
@@ -765,18 +766,18 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
         rm -f test1.log test2.log test3.log
         echo "Testing in ${BUILDDIR} ... test1"
         if [ $DOTEST -eq 1 ]; then
-            ( echo "/bin/env ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' ${TESTRUNNER} make VERBOSE=1 test"; \
-                cd "${BUILDDIR}" && /bin/env ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' \
+            ( echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' ${TESTRUNNER} make VERBOSE=1 test"; \
+                cd "${BUILDDIR}" && ${ENV} ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' \
                 ${TESTRUNNER} make VERBOSE=1 test \
             ) 2>&1 | tee "${BUILDDIR}/test1.log" || true
         fi
         if [ $DOTEST -ge 2 ]; then
             echo "Testing ... test2"
             (
-                 echo "/bin/env ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' ${TESTRUNNER} <commnad>";
-                 cd "${BUILDDIR}" && /bin/env ${TEST_ENV[@]} ARGS='-VV -N' \
+                 echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' ${TESTRUNNER} <commnad>";
+                 cd "${BUILDDIR}" && ${ENV} ${TEST_ENV[@]} ARGS='-VV -N' \
                      ${TESTRUNNER} make test \
-                     && /bin/env ARGS='-VV -R .*test_.*' ${TEST_ENV[@]} ${TESTRUNNER}  make test \
+                     && ${ENV} ARGS='-VV -R .*test_.*' ${TEST_ENV[@]} ${TESTRUNNER}  make test \
                      ) 2>&1 | tee "${BUILDDIR}/test2.log" || true
         fi
         if [ $DOTEST -ge 3 ]; then # some [few] convolution timings
@@ -817,8 +818,8 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
             { while read -r bench_target; do
                 # note default is --mode=C (correctness check)
                 # can set BENCHDNN_ARGS="--mode=P' for other modes (e.g. performance, even slower)
-                echo "/bin/env ${TEST_ENV[@]} make -C ${BUILDDIR} VERBOSE=1 ${bench_target} ..."
-                /bin/env ${TEST_ENV[@]} make -C ${BUILDDIR} VERBOSE=1 ${bench_target} \
+                echo "${ENV} ${TEST_ENV[@]} make -C ${BUILDDIR} VERBOSE=1 ${bench_target} ..."
+                ${ENV} ${TEST_ENV[@]} make -C ${BUILDDIR} VERBOSE=1 ${bench_target} \
                     | tee >(awk '/^tests:/{printf("%-20s %s\n","'${bench_target##test_benchdnn_}'",$0)}' \
                     >>${BUILDDIR}/bench.summary) \
                     | sed "s/^tests:/test:${bench_target}\\ntests:/"
