@@ -1,5 +1,5 @@
 #!/bin/bash
-# vim: et sw=2 ts=2 ft=sh
+# vim: et sw=2 ts=2 foldlevel=6
 TEST_ENV=(DNNL_VERBOSE=2)
 TEST_ENV+=(VE_INIT_HEAP=ZERO)
 TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
@@ -9,16 +9,108 @@ TEST_ENV+=(VE_INIT_HEAP=ZERO)
 TEST_ENV+=(VE_PROGINF=DETAIL)
 #TEST_ENV+=(VE_ADVANCEOFF=YES)
 #
-ULIMIT=65536
+#ULIMIT=65536 # in 1024-byte increments
+ULIMIT=262144
 ulimit -s $ULIMIT
 echo 'ulimit : '`ulimit -s`
 echo "/bin/env ${TEST_ENV[@]} <command>"
-BLD="build-ved4"
 LOG="f.log"
-GTESTS='test_dnnl_threading test_inner_product_forward test_rnn_forward test_matmul test_convolution_backward_data_f32 test_convolution_backward_weights_f32 test_deconvolution'
-#----------------------- setup
-rm -f "${LOG}"
+BLD="build-ved4"
+BUILD=0
+# test failure in test_dnnl_threading; others look like random heap corruption
+DEF_GTESTS='test_dnnl_threading test_inner_product_forward test_rnn_forward test_matmul test_convolution_backward_data_f32 test_convolution_backward_weights_f32 test_deconvolution'
+# TODO GTESTS should really be an array of multiple tests (tests with options?)
+GTESTS=''
+GTEST_FILTER='*'
+GDB=0
+# Transform long options into short ones
+for arg in "$@"; do
+  shift
+  case "$arg" in
+    --gdb) set -- "$@" "-G"
+      ;;
+    --filter) set -- "$@" "-f"
+      ;;
+    --help) set -- "$@" "-h"
+      ;;
+    *) set -- "$@" "$arg"
+      ;;
+  esac
+done
+function usage
+{
+  echo "$0: Usage"
+    awk '/getopts/{flag=1;next} /^done/{flag=0} flag&&/^[^#]+) #/; flag&&/^ *# /' $0
+    echo "Example: quick rebuild + single gtest case "
+    echo "   ./vetest.sh -B build-ved4 -q -g test_dnnl_threading -f '*for_nd.Para*/2'"
+    exit 0
+}
+# Parse short options with bash getopts
+while getopts "L:B:g:f:qGh" arg; do
+    #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
+    case $arg in
+      L) # $LOG file.  "less -r r$LOG" to view colorized version
+        if [ "${OPTARG}" ]; then LOG="${OPTARG}"; fi
+        ;;
+      B) # $BLD build directory
+        if [ "${OPTARG}" ]; then BLD="${OPTARG}"; fi
+        ;;
+      g) # single gtest to run [default=preset set of tests]
+        GTESTS="${GTESTS} ${OPTARG}"
+        ;;
+      f) # (--filter) gtest filter ex. -g test_matmul -f 'Generic_s8*'
+        GTEST_FILTER=${OPTARG}
+        ;;
+      q) # quick rebuild of $BLD--> q.log
+        BUILD=1
+        ;;
+      G) # (--gdb) run in gdb : requires -g single gtest name)
+        GDB=1
+        ;;
+      h) # (--help)
+        usage
+        ;;
+      *) echo "Unrecognized option '$arg'"
+        usage
+        ;;
+    esac
+done
+if [ "$GDB" = 1 -a -z "$GTESTS" ]; then
+  echo "-G (--gdb) option requires a -g <test_foo> gtest test name"
+  usage
+fi
+#----------------------- setup for tests
+rm -f "r${LOG}"
 rm -f typescript # we append /dev/tty raw output here.
+function options
+{
+  echo "Build dir      : ${BLD}"
+  echo "quick rebuild? : ${BUILD}"
+  if [ -z "${GTESTS}" ]; then
+    echo "Using default set of gtests"
+    GTESTS="$DEF_GTESTS";
+  else
+    echo "gtests         : ${GTESTS}"
+  fi
+  echo "Raw log        : r${LOG}"
+  echo "Final log      : ${LOG}"
+}
+function quickbuild
+{
+  # default BUILD=0 does nothing
+  if [ "$BUILD" = "old" ]; then
+    echo -n "Rebuilding : ./build.sh -avddddqq ..."
+    { ./build.sh -avddddqq; echo "build.sh exit code $?"; } \
+      >& q.log \
+      && echo "YAY (see q.log)" || { echo "OHOH (see q.log)"; exit 1; }
+  elif [ "$BUILD" = 1 ]; then
+    echo -n "Rebuilding ${BLD} ... "
+    { make -C "${BLD}"; echo "quick build exit code $?"; } \
+      >& q.log \
+      && echo "YAY (see q.log)" || { echo "OHOH (see q.log)"; exit 1; }
+  fi
+}
+
 function decolorize # decolorize FILE [to stdout]
 {
   sed -r 's/\x1B\[(([0-9]{1,3})?(;)?([0-9]{1,2})?)?[m,K,H,f,J]//g' "${1}" | tr -d '\r'
@@ -26,35 +118,25 @@ function decolorize # decolorize FILE [to stdout]
 function test # test COMMAND [ARGS...] -- run in TEST_ENV & send console output to stdout
 {
   # run COMMAND in TEST_ENV, returning exit status of COMMAND
-  # stdout get the decolorized output of what's seen on terminal,
-  #  so abort message that write to /dev/tty also end up on stdout )
+  # what's seen on terminal goes to typescript
+  #  so abort message that write to /dev/tty also end up in t${LOG}
   echo 'ulimit : '`ulimit -s`
   echo "/bin/env ${TEST_ENV[@]} $*"
-  /bin/env ${TEST_ENV[@]} script -e -a -c $*
-  err="$?"
-  #decolorize typescript
-  #rm -f typescript
-  return $err
+  /bin/env ${TEST_ENV[@]} GTEST_FILTER="${GTEST_FILTER}" script -e -a -c $*
 }
 function comment
 {
-  echo "$*" | tee -a ${LOG}
+  echo "$*" | tee -a "r${LOG}"
 }
-
-#------------------ rebuild? ---------------------------------
-if [ "" ]; then
-  echo -n "Rebuilding : ./build.sh -avddddqq ..."
-  { ./build.sh -avddddqq; echo "build.sh exit code $?"; } \
-    >& q.log \
-    && echo "YAY (see q.log)" || { echo "OHOH (see q.log)"; exit 1; }
-fi
 #------------------ run some tests ---------------------------
 tests=0;
 fail=0;
 ok=0;
 # gtests accept --gtest_list_tests and --gtest_filter to run just specific tests
-if [ "y" ]; then # "" evaluates to false
+if [ $GDB = 0 ]; then # "" evaluates to false
   {
+    >&2 options
+    >&2 quickbuild
     for t in $GTESTS; do
       tests=$(($tests+1))
       { >&2 echo; >&2 echo "test ${t}";
@@ -65,16 +147,39 @@ if [ "y" ]; then # "" evaluates to false
         || { >&2 echo "ERROR gtest ${t} exit code $?"; fail=$(($fail+1)); }
       }
     done
-    decolorize typescript
-    rm -f typescript
   } \
-    2>&1 1>>"${LOG}" 2> >(tee >(cat 1>&2)) # stdin+stderr-->LOG; stderr-->console
+    2>&1 1>>"r${LOG}" 2> >(tee >(cat 1>&2)) # stdout+stderr-->LOG; stderr-->console
     #2>&1 1>>"${LOG}"
   # console shows just stderr summary, while
   # LOG also captures all decolorized console output of the test (incl abort msg)
+elif [ $GDB = 1 ]; then # "" evaluates to false
+  {
+    options
+    quickbuild
+    # here we run gdb on "everything" (1 test) capturing /dev/tty session
+    # with full abort / traceback info to r$LOG (later decolorized into $LOG)
+    for t in $GTESTS; do
+      tests=$(($tests+1))
+      { >&2 echo; >&2 echo "test ${t}";
+          #test0 "${BLD}/tests/gtests/${t}"
+          # sample
+          #     script typescript -c '{ echo hi; echo bye; gdb --args ls; }'
+          cmd="script r${LOG} --flush -c '{ export; gdb --args ${BLD}/tests/gtests/${t}; echo bye; }'"
+          echo $cmd
+          eval $cmd
+      }
+    done
+  }
 fi
+if [ ${fail} -gt 0 ]; then
+  comment "Common VE exit codes:"
+  comment "    1 --> failed assertion"
+  comment "  137 --> free(): invalid pointer: 0x..., and backtrace"
+  comment "  139 --> Segmentation fault: Address not mapped to object at 0x..."
+fi
+options
 comment "Summary: ${tests} tests; ${ok} OK and ${fail} FAILED" 
-decolorize f.log > ff.log
+decolorize "r${LOG}" > "${LOG}"
 
 #
 # failed

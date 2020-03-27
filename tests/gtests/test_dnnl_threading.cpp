@@ -87,11 +87,16 @@ protected:
 class test_for_nd : public test_nd {
 protected:
     void emit_for_nd(int ithr, int nthr) {
+#define SHOW(idx,...) do { \
+    SHOW1(ithr,nthr,idx); \
+    SHOW(__VA_ARGS__); \
+} while(0)
         switch ((int)p.dims.size()) {
             case 1:
                 impl::for_nd(ithr, nthr, p.dims[0], [&](ptrdiff_t d0) {
                     ASSERT_TRUE(0 <= d0 && d0 < p.dims[0]);
                     data[d0] = d0;
+                    SHOW(d0,d0)
                 });
                 break;
             case 2:
