@@ -92,7 +92,10 @@ set(CMAKE_SRC_CCXX_FLAGS)       # SRC specifics
 set(CMAKE_EXAMPLE_CCXX_FLAGS)   # EXAMPLE specifics
 set(CMAKE_TEST_CCXX_FLAGS)      # TESTS specifics
 
-if(UNIX OR MINGW)
+if(NECVE)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+elseif(UNIX OR MINGW)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
@@ -161,7 +164,7 @@ endif()
 if(NECVE)
     # -pthread required for <atomic> <condition_variable> <mutex> <thread> <stdatomic.h> <threads.h>
     # -traceback enables VE_TRACEBACK=VERBOSE fatal error traceback
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -pthread -traceback=verbose")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -pthread -traceback=verbose")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread -traceback=verbose")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -traceback=verbose")
     show_cmake_stuff("End cmake configuration")
 endif()

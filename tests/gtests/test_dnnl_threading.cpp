@@ -20,7 +20,7 @@
 #include "dnnl_test_common.hpp"
 #include "gtest/gtest.h"
 
-#define DEBUG 1
+#define DEBUG 0
 
 namespace dnnl {
 
@@ -96,7 +96,9 @@ protected:
 #if DEBUG
     std::mutex ioMutex;
 #endif
-    void emit_for_nd(int ithr, int nthr) {
+    void emit_for_nd(int ithr, int nthr)
+    // no diff void emit_for_nd(int const& ithr, int const& nthr)
+    {
 #if DEBUG
 #define CAT0(a, ...) a##__VA_ARGS__
 #define CAT(a, ...) CAT0(a, __VA_ARGS__)
@@ -246,7 +248,35 @@ TEST_P(test_for_nd, Sequential) {
 }
 
 TEST_P(test_for_nd, Parallel) {
-    impl::parallel(0, [&](int ithr, int nthr) { emit_for_nd(ithr, nthr); });
+#if 1
+	impl::parallel(0, [&](int ithr, int nthr) {
+            emit_for_nd(ithr, nthr);
+            });
+
+#else
+#define PDEBUG 0 // 1 with print statements "fixes" the error
+#if PDEBUG
+    std::mutex parallelMutex;
+    std::ostringstream oss;
+    oss<<" TEST_P(test_for_nd, Parallel): ";
+#endif
+	impl::parallel(0, [&this](int pithr, int pnthr) {
+#if PDEBUG
+            do {
+                std::lock_guard<std::mutex> const lock(parallelMutex);
+                oss<<" "<<pithr<<"||"<<pnthr;
+            }while(0);
+#endif
+            auto const pi=pithr;
+            auto const pn=pnthr;
+            this->emit_for_nd(pi, pn);
+            });
+#if PDEBUG
+    std::cout << oss.str() << std::endl;
+    debug::print_vec(" p.dims", p.dims.data(), p.dims.size());
+    debug::print_vec(" data", data.data(), data.size());
+#endif
+#endif
     CheckID();
 }
 
@@ -385,3 +415,4 @@ CPU_INSTANTIATE_TEST_SUITE_P(Case, test_parallel_nd,
                 np_t {{2, 1, 3, 1, 2, 1}}, np_t {{4, 1, 4, 3, 2, 2}}));
 
 } // namespace dnnl
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

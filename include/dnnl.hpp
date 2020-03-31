@@ -10143,6 +10143,7 @@ inline primitive::primitive(const_dnnl_primitive_desc_t c_pd) {
 
 inline primitive::primitive(const primitive_desc &pd) : primitive(pd.get()) {}
 
+#if 0 // [ejk]
 inline void primitive::execute(
         stream &stream, const std::unordered_map<int, memory> &args) const {
     std::vector<dnnl_exec_arg_t> c_args;
@@ -10154,6 +10155,7 @@ inline void primitive::execute(
                               (int)c_args.size(), c_args.data()),
             "could not execute a primitive");
 }
+#endif
 /// @endcond
 
 #undef DNNL_DEFINE_BITMASK_OPS

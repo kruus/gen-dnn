@@ -29,6 +29,18 @@
 #define ENABLE_OPT_PRAGMAS 1
 #endif
 
+#ifdef _MSC_VER // __pragma takes an unquoted arg UNTESTED (see z_magic.hpp)
+// untested !!!
+#define CXX_PRAGMA(...) __pragma(__VA_ARGS__)
+#define EVAL_ARGS(...) __VA_ARGS__
+#define PragmaQuote(...) CXX_PRAGMA(EVAL_ARGS(__VA_ARGS__))
+
+#else // most compilers allow _Pragma("something") macros
+#define CXX_PRAGMA(str) _Pragma(str)
+#define STRINGIFY_ARGS(...) #__VA_ARGS__
+#define PragmaQuote(...) CXX_PRAGMA(STRINGIFY_ARGS(__VA_ARGS__))
+#endif
+
 // -------- compiler-specific pragmas --------
 // __ve compile does something with pragma omp, but it is not officially supported,
 // so we use C++11 _Pragma to emit pragmas from macros and customize pragmas to

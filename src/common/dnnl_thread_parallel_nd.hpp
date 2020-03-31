@@ -19,6 +19,9 @@
 
 /* This header must be included by dnnl_thread.hpp only */
 
+/* nc++ might be having trouble with the arg packs (can do it old way) */
+#define OLDSTYLE (defined(__ve))
+
 /* Functions:
  *  - parallel(nthr, f)              - executes f in parallel using at most
  *                                     nthr threads. If nthr equals 0
@@ -42,13 +45,20 @@ void parallel(int nthr, F f) {
 #if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
     assert(nthr == 1);
     f(0, 1);
+
 #elif DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP
     if (nthr == 1) {
         f(0, 1);
         return;
     }
+#if TARGET_X86
 #pragma omp parallel num_threads(nthr)
     f(dnnl_get_thread_num(), dnnl_get_num_threads());
+#else // add braces (nc++ issue)
+#pragma omp parallel num_threads(nthr)
+    { f(dnnl_get_thread_num(), dnnl_get_num_threads()); }
+#endif
+
 #elif DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_TBB
     if (nthr == 1) {
         f(0, 1);
@@ -178,7 +188,8 @@ constexpr size_t get_work_amount(const T &v, Args &&... args) {
 
 /* parallel_nd and parallel_nd_in_omp section */
 
-#if DNNL_CPU_THREADING_RUNTIME != DNNL_RUNTIME_TBB
+#if !OLDSTYLE && DNNL_CPU_THREADING_RUNTIME != DNNL_RUNTIME_TBB
+// concise arg pack version
 template <typename... Args>
 void parallel_nd(Args &&... args) {
 #if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
@@ -193,7 +204,167 @@ void parallel_nd(Args &&... args) {
     }
 #endif
 }
-#else // DNNL_CPU_THREADING_RUNTIME != DNNL_RUNTIME_TBB
+
+#elif OLDSTYLE && DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
+template <typename T0, typename F>
+void parallel_nd(const T0 D0, F f) {
+    for_nd(0, 1, D0, f);
+}
+template <typename T0, typename T1, typename F>
+void parallel_nd(const T0 D0, const T1 D1, F f) {
+    for_nd(0, 1, D0, D1, f);
+}
+template <typename T0, typename T1, typename T2, typename F>
+void parallel_nd(const T0 D0, const T1 D1, const T2 D2, F f) {
+    for_nd(0, 1, D0, D1, D2, f);
+}
+template <typename T0, typename T1, typename T2, typename T3, typename F>
+void parallel_nd(const T0 D0, const T1 D1, const T2 D2, const T3 D3, F f) {
+    for_nd(0, 1, D0, D1, D2, D3, f);
+}
+template <typename T0, typename T1, typename T2, typename T3, typename T4,
+    typename F>
+void parallel_nd(const T0 D0, const T1 D1, const T2 D2, const T3 D3,
+        const T4 D4, F f) {
+    for_nd(0, 1, D0, D1, D2, D3, D4, f);
+}
+template <typename T0, typename T1, typename T2, typename T3, typename T4,
+    typename T5, typename F>
+void parallel_nd(const T0 D0, const T1 D1, const T2 D2, const T3 D3,
+        const T4 D4, const T5 D5, F f) {
+    for_nd(0, 1, D0, D1, D2, D3, D4, D5, f);
+}
+
+#elif OLDSTYLE && DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP
+
+template <typename T0, typename F>
+void parallel_nd(const T0 D0, F f) {
+    const size_t work_amount = (size_t)D0;
+    if (work_amount == 0) return;
+    const bool do_parallel = work_amount > 1;
+
+    PRAGMA_OMP(parallel if(do_parallel))
+    {
+        const int nthr = !do_parallel ? 1 : dnnl_get_num_threads();
+        const int ithr = !do_parallel ? 0 : dnnl_get_thread_num();
+        for_nd(ithr, nthr, D0, f);
+    }
+}
+
+template <typename T0, typename T1, typename F>
+void parallel_nd(const T0 D0, const T1 D1, F f) {
+    const size_t work_amount = (size_t)D0 * D1;
+    if (work_amount == 0) return;
+    const bool do_parallel = work_amount > 1;
+
+    PRAGMA_OMP(parallel if(do_parallel))
+    {
+        const int nthr = !do_parallel ? 1 : dnnl_get_num_threads();
+        const int ithr = !do_parallel ? 0 : dnnl_get_thread_num();
+        //for_nd(ithr, nthr, D0, D1, f);
+        size_t start{0}, end{0};
+        balance211(work_amount, nthr, ithr, start, end);
+        T0 d0{0}; T1 d1{0};
+        utils::nd_iterator_init(start, d0, D0, d1, D1);
+        for (size_t iwork = start; iwork < end; ++iwork) {
+            f(d0, d1);
+            utils::nd_iterator_step(d0, D0, d1, D1);
+        }
+    }
+}
+
+template <typename T0, typename T1, typename T2, typename F>
+void parallel_nd(const T0 D0, const T1 D1, const T2 D2, F f) {
+    const size_t work_amount = (size_t)D0 * D1 * D2;
+    if (work_amount == 0) return;
+    const bool do_parallel = work_amount > 1;
+
+    PRAGMA_OMP(parallel if(do_parallel))
+    {
+        const int nthr = !do_parallel ? 1 : dnnl_get_num_threads();
+        const int ithr = !do_parallel ? 0 : dnnl_get_thread_num();
+        //for_nd(ithr, nthr, D0, D1, D2, f);
+        size_t start{0}, end{0};
+        balance211(work_amount, nthr, ithr, start, end);
+        T0 d0{0}; T1 d1{0}; T2 d2{0};
+        utils::nd_iterator_init(start, d0, D0, d1, D1, d2, D2);
+        for (size_t iwork = start; iwork < end; ++iwork) {
+            f(d0, d1, d2);
+            utils::nd_iterator_step(d0, D0, d1, D1, d2, D2);
+        }
+    }
+}
+
+template <typename T0, typename T1, typename T2, typename T3, typename F>
+void parallel_nd(const T0 D0, const T1 D1, const T2 D2, const T3 D3, F f) {
+    const size_t work_amount = (size_t)D0 * D1 * D2 * D3;
+    if (work_amount == 0) return;
+    const bool do_parallel = work_amount > 1;
+
+    PRAGMA_OMP(parallel if(do_parallel))
+    {
+        const int nthr = !do_parallel ? 1 : dnnl_get_num_threads();
+        const int ithr = !do_parallel ? 0 : dnnl_get_thread_num();
+        size_t start{0}, end{0};
+        balance211(work_amount, nthr, ithr, start, end);
+        T0 d0{0}; T1 d1{0}; T2 d2{0}; T3 d3{0};
+        utils::nd_iterator_init(start, d0, D0, d1, D1, d2, D2, d3, D3);
+        for (size_t iwork = start; iwork < end; ++iwork) {
+            f(d0, d1, d2, d3);
+            utils::nd_iterator_step(d0, D0, d1, D1, d2, D2, d3, D3);
+        }
+    }
+}
+
+template <typename T0, typename T1, typename T2, typename T3, typename T4,
+    typename F>
+void parallel_nd(const T0 D0, const T1 D1, const T2 D2, const T3 D3,
+        const T4 D4, F f) {
+    const size_t work_amount = (size_t)D0 * D1 * D2 * D3 * D4;
+    if (work_amount == 0) return;
+    const bool do_parallel = work_amount > 1;
+
+    PRAGMA_OMP(parallel if(do_parallel))
+    {
+        const int nthr = !do_parallel ? 1 : dnnl_get_num_threads();
+        const int ithr = !do_parallel ? 0 : dnnl_get_thread_num();
+        size_t start{0}, end{0};
+        balance211(work_amount, nthr, ithr, start, end);
+        T0 d0{0}; T1 d1{0}; T2 d2{0}; T3 d3{0}; T4 d4{0};
+        utils::nd_iterator_init(start, d0, D0, d1, D1, d2, D2, d3, D3, d4, D4);
+        for (size_t iwork = start; iwork < end; ++iwork) {
+            f(d0, d1, d2, d3, d4);
+            utils::nd_iterator_step(d0, D0, d1, D1, d2, D2, d3, D3, d4, D4);
+        }
+    }
+}
+
+template <typename T0, typename T1, typename T2, typename T3, typename T4,
+    typename T5, typename F>
+void parallel_nd(const T0 D0, const T1 D1, const T2 D2, const T3 D3,
+        const T4 D4, const T5 D5, F f) {
+    const size_t work_amount = (size_t)D0 * D1 * D2 * D3 * D4 * D5;
+    if (work_amount == 0) return;
+    const bool do_parallel = work_amount > 1;
+
+    PRAGMA_OMP(parallel if(do_parallel))
+    {
+        const int nthr = !do_parallel ? 1 : dnnl_get_num_threads();
+        const int ithr = !do_parallel ? 0 : dnnl_get_thread_num();
+        size_t start{0}, end{0};
+        balance211(work_amount, nthr, ithr, start, end);
+        T0 d0{0}; T1 d1{0}; T2 d2{0}; T3 d3{0}; T4 d4{0}; T5 d5{0};
+        utils::nd_iterator_init(start, d0, D0, d1, D1, d2, D2, d3, D3, d4, D4,
+            d5, D5);
+        for (size_t iwork = start; iwork < end; ++iwork) {
+            f(d0, d1, d2, d3, d4, d5);
+            utils::nd_iterator_step(d0, D0, d1, D1, d2, D2, d3, D3, d4, D4,
+                d5, D5);
+        }
+    }
+}
+
+#else // DNNL_CPU_THREADING_RUNTIME is DNNL_RUNTIME_TBB
 
 // gcc 4.8 has a bug with passing parameter pack to lambdas.
 // So have to explicitly instantiate all the cases.
@@ -253,6 +424,8 @@ void parallel_nd(const T0 &D0, const T1 &D1, const T2 &D2, const T3 &D3,
 }
 #endif
 
+#if !OLDSTYLE
+// modern (dnnl v1.x) version
 template <typename... Args>
 void parallel_nd_in_omp(Args &&... args) {
 #if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
@@ -262,10 +435,74 @@ void parallel_nd_in_omp(Args &&... args) {
             utils::forward<Args>(args)...);
 #elif DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_TBB
     assert(!"unsupported parallel_nd_in_omp()");
+    static_assert(false, "unsupported parallel_nd_in_omp()");
 #endif
 }
+
+#elif OLDSTYLE && DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
+template <typename T0, typename F>
+void parallel_nd_in_omp(const T0 D0, F f) {
+    for_nd(0, 1, D0, f);
+}
+template <typename T0, typename T1, typename F>
+void parallel_nd_in_omp(const T0 D0, const T1 D1, F f) {
+    for_nd(0, 1, D0, D1, f);
+}
+template <typename T0, typename T1, typename T2, typename F>
+void parallel_nd_in_omp(const T0 D0, const T1 D1, const T2 D2, F f) {
+    for_nd(0, 1, D0, D1, D2, f);
+}
+template <typename T0, typename T1, typename T2, typename T3, typename F>
+void parallel_nd_in_omp(const T0 D0, const T1 D1, const T2 D2, const T3 D3, F f) {
+    for_nd(0, 1, D0, D1, D2, D3, f);
+}
+template <typename T0, typename T1, typename T2, typename T3, typename T4,
+    typename F>
+void parallel_nd_in_omp(const T0 D0, const T1 D1, const T2 D2, const T3 D3,
+        const T4 D4, F f) {
+    for_nd(0, 1, D0, D1, D2, D3, D4, f);
+}
+template <typename T0, typename T1, typename T2, typename T3, typename T4,
+    typename T5, typename F>
+void parallel_nd_in_omp(const T0 D0, const T1 D1, const T2 D2, const T3 D3,
+        const T4 D4, const T5 D5, F f) {
+    for_nd(0, 1, D0, D1, D2, D3, D4, D5, f);
+}
+
+#elif OLDSTYLE && DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP
+template <typename T0, typename F>
+void parallel_nd_in_omp(const T0 D0, F f) {
+    for_nd(dnnl_get_thread_num(), dnnl_get_num_threads(), D0, f);
+}
+template <typename T0, typename T1, typename F>
+void parallel_nd_in_omp(const T0 D0, const T1 D1, F f) {
+    for_nd(dnnl_get_thread_num(), dnnl_get_num_threads(), D0, D1, f);
+}
+template <typename T0, typename T1, typename T2, typename F>
+void parallel_nd_in_omp(const T0 D0, const T1 D1, const T2 D2, F f) {
+    for_nd(dnnl_get_thread_num(), dnnl_get_num_threads(), D0, D1, D2, f);
+}
+template <typename T0, typename T1, typename T2, typename T3, typename F>
+void parallel_nd_in_omp(const T0 D0, const T1 D1, const T2 D2, const T3 D3, F f) {
+    for_nd(dnnl_get_thread_num(), dnnl_get_num_threads(), D0, D1, D2, D3, f);
+}
+template <typename T0, typename T1, typename T2, typename T3, typename T4,
+    typename F>
+void parallel_nd_in_omp(const T0 D0, const T1 D1, const T2 D2, const T3 D3,
+        const T4 D4, F f) {
+    for_nd(dnnl_get_thread_num(), dnnl_get_num_threads(), D0, D1, D2, D3, D4, f);
+}
+template <typename T0, typename T1, typename T2, typename T3, typename T4,
+    typename T5, typename F>
+void parallel_nd_in_omp(const T0 D0, const T1 D1, const T2 D2, const T3 D3,
+        const T4 D4, const T5 D5, F f) {
+    for_nd(dnnl_get_thread_num(), dnnl_get_num_threads(), D0, D1, D2, D3, D4, D5, f);
+}
+
+#endif
 
 } // namespace impl
 } // namespace dnnl
 
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

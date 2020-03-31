@@ -33,7 +33,7 @@
 #include "z_magic.hpp"
 
 #if !defined(ENABLE_OMP_MACROS)
-#define ENABLE_OMP_MACROS 1
+#define ENABLE_OMP_MACROS (DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP)
 #endif
 
 #if !ENABLE_OMP_MACROS
@@ -43,7 +43,7 @@
 #else
 #define PRAGMA_OMP(...) PRAGMA_MACRO(CHAIN2(omp, __VA_ARGS__))
 
-#if defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+#if defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER) && !defined(__ve)
 #define collapse(x)
 #endif
 

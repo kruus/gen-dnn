@@ -457,6 +457,9 @@ function(NLC_PRELIM_SETTINGS)
     #   VE_NLC_LIBRARY_PATH --> VE_NLC_LIBS
 
     set(VE_NCC_INCLUDES "")   # a ;-separated list, analogous to nlcvar additions to $NCC_INCLUDE_PATH
+    if(IS_DIRECTORY ${VE_OPT}/include)
+        list(APPEND VE_NCC_INCLUDES ${VE_OPT}/include)
+    endif()
     foreach(NLC__dir_inc in ${NLC_HOME}/include ${NLC_HOME}/include/inc${NLC__suffix})
         if(IS_DIRECTORY ${NLC__dir_inc})
             list(APPEND VE_NCC_INCLUDES ${NLC__dir_inc})

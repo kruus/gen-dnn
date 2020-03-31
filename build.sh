@@ -19,7 +19,7 @@ DOTARGET="x"
 BFLOAT16="x"
 RNN="x"
 OMP="y"
-ULIMIT=65536
+ULIMIT=65536 # ulimit is in 1024-byte blocks
 ENV=`which env`
 
 # see dnnl_config.h ...
@@ -257,6 +257,7 @@ if [ "$BFLOAT16" = "y" ]; then BUILDDIR="${BUILDDIR}-bf16"; fi
 if [ "$BFLOAT16" = "n" ]; then BUILDDIR="${BUILDDIR}-nobf16"; fi
 if [ "$RNN" = "y" ]; then BUILDDIR="${BUILDDIR}-rnn"; fi
 if [ "$RNN" = "n" ]; then BUILDDIR="${BUILDDIR}-nornn"; fi
+if [ "${OMP}" = "n" ]; then BUILDDIR="${BUILDDIR}-seq"; INSTALLDIR="${INSTALLDIR}-seq"; fi
 
 if [ $DOJUSTDOC -gt 0 ]; then
     echo " JUST building doxygen docs"
@@ -428,7 +429,7 @@ echo "PATH $PATH"
         export CXXFLAGS="${CXXFLAGS} $*"
         echo "ccxx_flags CFLAGS --> ${CFLAGS}"
     }
-    if [ "${DOWARN}" = 'y' ]; then
+    if [ "${DOWARN}" = "1" ]; then
         DOWARNFLAGS=""
         if [ "$DOTARGET" = "s" ]; then DOWARNFLAGS="-wall"
         else DOWARNFLAGS="-Wall"; fi
@@ -451,6 +452,9 @@ echo "PATH $PATH"
     if [ "${DOTARGET}" = "a" ]; then
         ccxx_flags -include stdint.h
         ccxx_flags -minit-stack=zero
+        ccxx_flags -Wunknown-pragma
+        ccxx_flags -report-all
+        ccxx_flags -D_FORTIFY_SOURCE=1
     fi
     # Show build commands
     CMAKETRACE="${CMAKETRACE} -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON"
@@ -676,12 +680,10 @@ echo "PATH $PATH"
         TEST_ENV+=(VE_TRACEBACK=VERBOSE)
         TEST_ENV+=(VE_INIT_HEAP=ZERO)
         TEST_ENV+=(VE_PROGINF=DETAIL)
-        #export DNNL_VERBOSE=2
-        #export VE_INIT_HEAP=ZERO
-        #export VE_ERRCTL_DEALLOCATE=MSG
-        #export VE_TRACEBACK=VERBOSE
-        #export VE_PROGINF=DETAIL
         #TEST_ENV+=(VE_ADVANCEOFF=YES)
+        TEST_ENV+=(OMP_DYNAMIC=false)
+        TEST_ENV+=(OMP_PROC_BIND=true)
+        #TEST_ENV+=(OMP_WAIT_POLICY=active)
         { echo "api-c                   ...";
             ${ENV} ${TEST_ENV[@]} ${TESTRUNNER} ${VE_EXEC} tests/api-c \
                 || xBUILDOK="n"; # do not stop tests on failure
@@ -763,9 +765,12 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
         TEST_ENV+=(VE_INIT_HEAP=ZERO)
         TEST_ENV+=(VE_PROGINF=DETAIL)
         #TEST_ENV+=(VE_ADVANCEOFF=YES)
+        TEST_ENV+=(OMP_DYNAMIC=false)
+        TEST_ENV+=(OMP_PROC_BIND=true)
+        #TEST_ENV+=(OMP_WAIT_POLICY=active)
         rm -f test1.log test2.log test3.log
         echo "Testing in ${BUILDDIR} ... test1"
-        if [ $DOTEST -eq 1 ]; then
+        if [ $DOTEST -ge 1 ]; then
             ( echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' ${TESTRUNNER} make VERBOSE=1 test"; \
                 cd "${BUILDDIR}" && ${ENV} ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' \
                 ${TESTRUNNER} make VERBOSE=1 test \

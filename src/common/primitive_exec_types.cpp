@@ -21,6 +21,13 @@
 namespace dnnl {
 namespace impl {
 
+#if 1 // [ejk]
+exec_ctx_t::exec_ctx_t(stream_t *stream, exec_args_t &&args)
+        : stream_(stream)
+          , args_(args)
+{ }
+#endif
+
 status_t cvt_primtive_args(const primitive_desc_t *pd, int nargs,
         const dnnl_exec_arg_t *c_args, exec_args_t &args) {
     using namespace status;

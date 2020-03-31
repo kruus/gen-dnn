@@ -20,6 +20,8 @@
 #include <assert.h>
 
 #include "c_types_map.hpp"
+#include "dnnl_optimize.h"
+#include "dnnl_thread.hpp" // dnnl_omp.h
 #include "memory_tracking.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
@@ -50,7 +52,12 @@ void gates_reduction(const rnn_utils::rnn_conf_t &rnn,
     // @todo block k on simd-width to enable vectorization in
     // parallel_nd path
 #if DNNL_CPU_RUNTIME == DNNL_RUNTIME_OMP && _OPENMP >= 201307
+#if TARGET_X86
 #pragma omp parallel for simd collapse(2)
+#elif TARGET_VE
+    // [ejk] FIXME SIMD() -- _Pragma("vector") is now unrecognized ?
+    PRAGMA_OMP(parallel for collapse(2))
+#endif
     for (int i = 0; i < rnn.n_gates; i++)
         for (int k = 0; k < rnn.dhc; k++)
             body_loop(i, k);

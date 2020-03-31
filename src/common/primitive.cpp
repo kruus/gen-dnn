@@ -23,6 +23,8 @@
 #include "stream.hpp"
 #include "utils.hpp"
 
+#include "dnnl.hpp"
+
 using namespace dnnl::impl;
 using namespace dnnl::impl::status;
 using namespace dnnl::impl::primitive_kind;
@@ -68,6 +70,8 @@ status_t dnnl_primitive_execute(const primitive_t *primitive, stream_t *stream,
     if (status != status::success) return status;
 
     exec_ctx_t ctx(stream, std::move(args));
+    args.clear(); // [ejk] ok, no preconditions on clear
+    args.~exec_args_t(); // [ejk]
 
     if (get_verbose()) {
         double ms = get_msec();
@@ -130,7 +134,7 @@ dnnl_primitive::get_primitive_impl() const {
     return primitive_impl_;
 }
 
-status_t dnnl_primitive::execute(exec_ctx_t &ctx) const {
+inline status_t dnnl_primitive::execute(exec_ctx_t &ctx) const {
     const memory_storage_t *mem_storage = nullptr;
     if (primitive_impl_->pd()->attr()->scratchpad_mode_
             == scratchpad_mode::user) {
@@ -147,5 +151,21 @@ status_t dnnl_primitive::execute(exec_ctx_t &ctx) const {
     auto status = primitive_impl_->execute(ctx);
     return status;
 }
+
+#if 1 // [ejk] from dnnl.hpp, for debugging
+namespace dnnl {
+void primitive::execute(
+        stream &stream, const std::unordered_map<int, memory> &args) const {
+    std::vector<dnnl_exec_arg_t> c_args;
+    c_args.reserve(args.size());
+    for (const auto &a : args)
+        c_args.push_back({a.first, a.second.get(true)});
+
+    error::wrap_c_api(dnnl_primitive_execute(get(), stream.get(),
+                              (int)c_args.size(), c_args.data()),
+            "could not execute a primitive");
+}
+} //dnnl::
+#endif
 
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

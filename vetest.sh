@@ -4,11 +4,14 @@ ENV=`which env`
 TEST_ENV=(DNNL_VERBOSE=2)
 TEST_ENV+=(VE_INIT_HEAP=ZERO)
 TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
-TEST_ENV+=(OMP_STACKSIZE=1G)
 TEST_ENV+=(VE_TRACEBACK=VERBOSE)
 TEST_ENV+=(VE_INIT_HEAP=ZERO)
 TEST_ENV+=(VE_PROGINF=DETAIL)
+TEST_ENV+=(OMP_STACKSIZE=1G)
 #TEST_ENV+=(VE_ADVANCEOFF=YES)
+TEST_ENV+=(OMP_DYNAMIC=false)
+TEST_ENV+=(OMP_PROC_BIND=true)
+#TEST_ENV+=(OMP_WAIT_POLICY=active)
 #
 #ULIMIT=65536 # in 1024-byte increments
 ULIMIT=262144
@@ -47,7 +50,7 @@ function usage
     exit 0
 }
 # Parse short options with bash getopts
-while getopts "L:B:g:f:qGh" arg; do
+while getopts "L:B:g:f:t:qGh" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
       L) # $LOG file.  "less -r r$LOG" to view colorized version
@@ -61,6 +64,9 @@ while getopts "L:B:g:f:qGh" arg; do
         ;;
       f) # (--filter) gtest filter ex. -g test_matmul -f 'Generic_s8*'
         GTEST_FILTER=${OPTARG}
+        ;;
+      t) # N OMP_NUM_THREADS
+        THREADS="${OPTARG}"
         ;;
       q) # quick rebuild of $BLD--> q.log
         BUILD=1
@@ -81,6 +87,9 @@ if [ "$GDB" = 1 -a -z "$GTESTS" ]; then
   usage
 fi
 #----------------------- setup for tests
+if [ "$THREADS" ]; then
+  TEST_ENV+=("OMP_NUM_THREADS=${THREADS}")
+fi
 rm -f "r${LOG}"
 rm -f typescript # we append /dev/tty raw output here.
 function options
@@ -106,8 +115,9 @@ function quickbuild
       && echo "YAY (see q.log)" || { echo "OHOH (see q.log)"; exit 1; }
   elif [ "$BUILD" = 1 ]; then
     echo -n "Rebuilding ${BLD} ... "
-    { make -C "${BLD}"; echo "quick build exit code $?"; } \
-      >& q.log \
+    { make -C "${BLD}" depend && make -C "${BLD}";
+      echo "quick build exit code $?";
+    } >& q.log \
       && echo "YAY (see q.log)" || { echo "OHOH (see q.log)"; exit 1; }
   fi
 }
