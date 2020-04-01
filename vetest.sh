@@ -26,6 +26,7 @@ DEF_GTESTS='test_dnnl_threading test_inner_product_forward test_rnn_forward test
 # TODO GTESTS should really be an array of multiple tests (tests with options?)
 GTESTS=''
 GTEST_FILTER='*'
+EXAMPLES=""
 GDB=0
 # Transform long options into short ones
 for arg in "$@"; do
@@ -50,7 +51,7 @@ function usage
     exit 0
 }
 # Parse short options with bash getopts
-while getopts "L:B:g:f:t:qGh" arg; do
+while getopts "L:B:g:x:f:t:qGh" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
       L) # $LOG file.  "less -r r$LOG" to view colorized version
@@ -61,6 +62,9 @@ while getopts "L:B:g:f:t:qGh" arg; do
         ;;
       g) # single gtest to run [default=preset set of tests]
         GTESTS="${GTESTS} ${OPTARG}"
+        ;;
+      x) # add an 'example/' to run ex. -x primitive-softmax
+        EXAMPLES="${EXAMPLES} ${OPTARG}"
         ;;
       f) # (--filter) gtest filter ex. -g test_matmul -f 'Generic_s8*'
         GTEST_FILTER=${OPTARG}
@@ -82,7 +86,7 @@ while getopts "L:B:g:f:t:qGh" arg; do
         ;;
     esac
 done
-if [ "$GDB" = 1 -a -z "$GTESTS" ]; then
+if [ "$GDB" = 1 -a -z "$GTESTS" -a -z "$EXAMPLES" ]; then
   echo "-G (--gdb) option requires a -g <test_foo> gtest test name"
   usage
 fi
@@ -96,7 +100,7 @@ function options
 {
   echo "Build dir      : ${BLD}"
   echo "quick rebuild? : ${BUILD}"
-  if [ -z "${GTESTS}" ]; then
+  if [ -z "${GTESTS}" -a -z "${EXAMPLES}" ]; then
     echo "Using default set of gtests"
     GTESTS="$DEF_GTESTS";
   else
@@ -158,6 +162,16 @@ if [ $GDB = 0 ]; then # "" evaluates to false
         || { >&2 echo "ERROR gtest ${t} exit code $?"; fail=$(($fail+1)); }
       }
     done
+    for t in $EXAMPLES; do
+      tests=$(($tests+1))
+      { >&2 echo; >&2 echo "run ${BLD}/examples/${t}";
+        {
+          test "${BLD}/examples/${t}"
+        } \
+        && { >&2 echo "OK gtest ${t}"; ok=$(($ok+1)); } \
+        || { >&2 echo "ERROR gtest ${t} exit code $?"; fail=$(($fail+1)); }
+      }
+    done
   } \
     2>&1 1>>"r${LOG}" 2> >(tee >(cat 1>&2)) # stdout+stderr-->LOG; stderr-->console
     #2>&1 1>>"${LOG}"
@@ -175,7 +189,15 @@ elif [ $GDB = 1 ]; then # "" evaluates to false
           #test0 "${BLD}/tests/gtests/${t}"
           # sample
           #     script typescript -c '{ echo hi; echo bye; gdb --args ls; }'
-          cmd="script r${LOG} --flush -c '{ export; gdb --args ${BLD}/tests/gtests/${t}; echo bye; }'"
+          cmd="script r${LOG} --flush -c '{ gdb --args ${BLD}/tests/gtests/${t}; echo bye; }'"
+          echo $cmd
+          eval $cmd
+      }
+    done
+    for t in $EXAMPLES; do
+      tests=$(($tests+1))
+      { >&2 echo; >&2 echo "test ${t}";
+          cmd="script r${LOG} --flush -c '{ gdb --args ${BLD}/examples/${t}; echo bye; }'"
           echo $cmd
           eval $cmd
       }

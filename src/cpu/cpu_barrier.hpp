@@ -46,6 +46,19 @@ namespace cpu {
 
 namespace simple_barrier {
 
+#if BARRIER_SHOULD_THROW
+struct ctx_t {};
+
+// In C++14 can be constexpr, not C++11
+inline void ctx_init(ctx_t *ctx_t) {}
+inline void barrier(ctx_t *ctx, int nthr) {
+    if (nthr > 1)
+        throw std::runtime_error(
+                "nthr must be <= 1 (compiled without _MULTI_THREAD)");
+}
+
+#else // assume multiple thread support
+
 #if defined(_WIN32) || defined(__ve)
 #define CTX_ALIGNMENT CACHE_LINE_SIZE
 #else
@@ -74,19 +87,6 @@ STRUCT_ALIGN(
             volatile size_t sense;
             char pad2[CACHE_LINE_SIZE - 1 * sizeof(size_t)];
         });
-
-#if BARRIER_SHOULD_THROW
-struct ctx_t {};
-
-// In C++14 can be constexpr, not C++11
-inline void ctx_init(ctx_t *ctx_t) {}
-inline void barrier(ctx_t *ctx, int nthr) {
-    if (nthr > 1)
-        throw std::runtime_error(
-                "nthr must be <= 1 (compiled without _MULTI_THREAD)");
-}
-
-#else // assume multiple thread support
 
 template <typename ctx_t>
 inline void ctx_init(ctx_t *ctx) {

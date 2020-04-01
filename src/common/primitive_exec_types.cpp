@@ -25,7 +25,29 @@ namespace impl {
 exec_ctx_t::exec_ctx_t(stream_t *stream, exec_args_t &&args)
         : stream_(stream)
           , args_(args)
-{ }
+          , scratchpad_grantor_()
+{
+    printf(" +exec_ctx_t(stream*,exec_args_t&&) @%p\n", (void*)this); fflush(stdout);
+}
+exec_ctx_t::exec_ctx_t(stream_t *stream, exec_args_t &args)
+        : stream_(stream)
+          //, args_(std::move(args))
+          , args_(args)
+          , scratchpad_grantor_()
+{
+    printf(" +exec_ctx_t(stream*,exec_args_t&) @%p\n", (void*)this); fflush(stdout);
+}
+exec_ctx_t::exec_ctx_t(stream_t *stream)
+    : stream_(stream)
+      , args_()
+      , scratchpad_grantor_()
+{
+    printf(" +exec_ctx_t(stream*) @%p\n", (void*)this); fflush(stdout);
+}
+exec_ctx_t::~exec_ctx_t()
+{
+    printf(" -exec_ctx_t @%p\n", (void*)this); fflush(stdout);
+}
 #endif
 
 status_t cvt_primtive_args(const primitive_desc_t *pd, int nargs,

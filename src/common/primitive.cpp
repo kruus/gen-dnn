@@ -65,26 +65,29 @@ status_t dnnl_primitive_execute(const primitive_t *primitive, stream_t *stream,
             && IMPLICATION(nargs > 0, c_args != nullptr);
     if (!ok) return invalid_arguments;
 
-    exec_args_t args;
-    status_t status = cvt_primtive_args(primitive->pd(), nargs, c_args, args);
-    if (status != status::success) return status;
+    status_t status;
+    {
+        exec_args_t args;
+        status = cvt_primtive_args(primitive->pd(), nargs, c_args, args);
+        if (status == status::success) {
+            //exec_ctx_t ctx(stream, std::move(args));
+            exec_ctx_t ctx(stream, args);
 
-    exec_ctx_t ctx(stream, std::move(args));
-    args.clear(); // [ejk] ok, no preconditions on clear
-    args.~exec_args_t(); // [ejk]
-
-    if (get_verbose()) {
-        double ms = get_msec();
-        status = primitive->execute(ctx);
-        stream->wait();
-        ms = get_msec() - ms;
-        printf("dnnl_verbose,exec,%s,%g\n", primitive->pd()->info(), ms);
-        fflush(0);
-    } else {
-        status = primitive->execute(ctx);
+            if (get_verbose()) {
+                double ms = get_msec();
+                status = primitive->execute(ctx);
+                stream->wait();
+                ms = get_msec() - ms;
+                printf("dnnl_verbose,exec,%s,%g\n", primitive->pd()->info(), ms);
+                fflush(0);
+            } else {
+                status = primitive->execute(ctx);
+            }
+            if (msan_enabled) unpoison_outputs(ctx.args());
+            ctx.~exec_ctx_t();
+        }
+        args.~exec_args_t();
     }
-
-    if (msan_enabled) unpoison_outputs(ctx.args());
 
     return status;
 }
@@ -161,9 +164,15 @@ void primitive::execute(
     for (const auto &a : args)
         c_args.push_back({a.first, a.second.get(true)});
 
-    error::wrap_c_api(dnnl_primitive_execute(get(), stream.get(),
-                              (int)c_args.size(), c_args.data()),
-            "could not execute a primitive");
+    {
+        auto s = stream.get();
+        int n = c_args.size();
+        auto ea = c_args.data();
+        error::wrap_c_api(dnnl_primitive_execute(get(), s, n, ea),
+                          "could not execute a primitive");
+    }
+
+    c_args.~vector<dnnl_exec_arg_t>();
 }
 } //dnnl::
 #endif
