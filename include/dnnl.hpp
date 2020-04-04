@@ -10143,7 +10143,7 @@ inline primitive::primitive(const_dnnl_primitive_desc_t c_pd) {
 
 inline primitive::primitive(const primitive_desc &pd) : primitive(pd.get()) {}
 
-#if 0 // [ejk]
+#if 1 // [ejk] move to src/common/primitive?
 inline void primitive::execute(
         stream &stream, const std::unordered_map<int, memory> &args) const {
     std::vector<dnnl_exec_arg_t> c_args;

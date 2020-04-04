@@ -23,8 +23,10 @@
 
 #include "c_types_map.hpp"
 #include "primitive.hpp"
-#include "primitive_cache.hpp"
 #include "utils.hpp"
+#ifdef DNNL_ENABLE_PRIMITIVE_CACHE
+#include "primitive_cache.hpp"
+#endif // DNNL_ENABLE_PRIMITIVE_CACHE
 
 /** \brief An abstraction of an execution unit with shared resources
  *
@@ -37,6 +39,7 @@ struct dnnl_engine : public dnnl::impl::c_compatible {
     dnnl_engine(dnnl::impl::engine_kind_t kind,
             dnnl::impl::runtime_kind_t runtime_kind)
         : kind_(kind), runtime_kind_(runtime_kind) {
+#ifdef DNNL_ENABLE_PRIMITIVE_CACHE
         primitive_cache_ = dnnl::impl::utils::make_unique<
                 dnnl::impl::lru_primitive_cache_t>(
                 get_primitive_cache_capacity());
@@ -44,6 +47,7 @@ struct dnnl_engine : public dnnl::impl::c_compatible {
         static_assert(std::has_virtual_destructor<
                               dnnl::impl::primitive_cache_t>::value,
                 "primitive_cache_t should have a virtual destructor");
+#endif // DNNL_ENABLE_PRIMITIVE_CACHE
     }
 
     virtual ~dnnl_engine() {}
@@ -143,34 +147,40 @@ struct dnnl_engine : public dnnl::impl::c_compatible {
 
         double ms = dnnl::impl::get_msec();
 
+#ifdef DNNL_ENABLE_PRIMITIVE_CACHE
         // create a key for the requested primitive
         dnnl::impl::primitive_hashing::key_t key(
                 pd, this->dnnl_get_max_threads());
+#endif // DNNL_ENABLE_PRIMITIVE_CACHE
 
         // lock cache
         recursive_mutex_.lock();
         dnnl::impl::primitive_t *p = nullptr;
-        auto primitive_impl = primitive_cache_->get(key);
-        if (primitive_impl) {
-            // cache hit
-            // unlock cache because it's safe to create a wrapper in parallel
-            recursive_mutex_.unlock();
-            // create a wrapper for primitive_impl
-            auto status
-                    = dnnl::impl::safe_ptr_assign<dnnl::impl::primitive_t>(p,
-                            new dnnl::impl::primitive_t(
-                                    primitive_impl, use_global_scratchpad));
-            if (status != dnnl::impl::status::success) return status;
+#ifdef DNNL_ENABLE_PRIMITIVE_CACHE
+        {
+            auto primitive_impl = primitive_cache_->get(key);
+            if (primitive_impl) {
+                // cache hit
+                // unlock cache because it's safe to create a wrapper in parallel
+                recursive_mutex_.unlock();
+                // create a wrapper for primitive_impl
+                auto status
+                        = dnnl::impl::safe_ptr_assign<dnnl::impl::primitive_t>(p,
+                                new dnnl::impl::primitive_t(
+                                        primitive_impl, use_global_scratchpad));
+                if (status != dnnl::impl::status::success) return status;
 
-            ms = dnnl::impl::get_msec() - ms;
-            print_verbose(dnnl::impl::get_verbose(), true, p, ms);
-            (*primitive) = p;
-            return status;
+                ms = dnnl::impl::get_msec() - ms;
+                print_verbose(dnnl::impl::get_verbose(), true, p, ms);
+                (*primitive) = p;
+                return status;
+            }
         }
+#endif // DNNL_ENABLE_PRIMITIVE_CACHE
 
         // cache miss
         // create a requested primitive_impl
-        primitive_impl = create_primitive_impl();
+        auto primitive_impl = create_primitive_impl();
         // create a wrapper over created primitive_impl
         auto status = dnnl::impl::safe_ptr_assign<dnnl::impl::primitive_t>(p,
                 new dnnl::impl::primitive_t(
@@ -188,11 +198,13 @@ struct dnnl_engine : public dnnl::impl::c_compatible {
             return status;
         }
 
+#if PRIMITIVE_CACHE
         // update op_desc and attr pointers in the key
         key.op_desc_ = p->pd()->op_desc();
         key.attr_ = p->pd()->attr();
 
         primitive_cache_->add(key, p->get_primitive_impl());
+#endif
         recursive_mutex_.unlock();
 
         ms = dnnl::impl::get_msec() - ms;
@@ -221,7 +233,9 @@ struct dnnl_engine : public dnnl::impl::c_compatible {
 protected:
     dnnl::impl::engine_kind_t kind_;
     dnnl::impl::runtime_kind_t runtime_kind_;
+#ifdef DNNL_ENABLE_PRIMITIVE_CACHE
     std::unique_ptr<dnnl::impl::primitive_cache_t> primitive_cache_;
+#endif // DNNL_ENABLE_PRIMITIVE_CACHE
     // As a primitive can be created inside another one a recursive_mutex is
     // required
     std::recursive_mutex recursive_mutex_;

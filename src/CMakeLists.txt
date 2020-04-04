@@ -40,20 +40,20 @@ append(CMAKE_CXX_FLAGS "${CMAKE_CCXX_NOWARN_FLAGS}")
 append(CMAKE_C_FLAGS "${CMAKE_CCXX_SANITIZER_FLAGS}")
 append(CMAKE_CXX_FLAGS "${CMAKE_CCXX_SANITIZER_FLAGS}")
 
-if(DNNL_ENABLE_CONCURRENT_EXEC)
-    add_definitions(-DDNNL_ENABLE_CONCURRENT_EXEC)
-endif()
-
-if(DNNL_ENABLE_PRIMITIVE_CACHE)
-    message(STATUS "Primitive cache is enabled")
-    add_definitions(-DDNNL_ENABLE_PRIMITIVE_CACHE)
-endif()
+#if(DNNL_ENABLE_CONCURRENT_EXEC)
+#    add_definitions(-DDNNL_ENABLE_CONCURRENT_EXEC)
+#endif()
+#
+#if(DNNL_ENABLE_PRIMITIVE_CACHE)
+#    message(STATUS "Primitive cache is enabled")
+#    #add_definitions(-DDNNL_ENABLE_PRIMITIVE_CACHE) #via dnnl_config.h.in
+#endif()
 
 if(NOT DNNL_ENABLE_JIT_PROFILING)
     # XXX: the profiling interface will still be built and present in the
     # library
     message(STATUS "Intel(R) VTune(TM) Amplifier JIT profiling disabled")
-    add_definitions(-DDNNL_ENABLE_JIT_PROFILING=0)
+    #add_definitions(-DDNNL_ENABLE_JIT_PROFILING=0)
 elseif(UNIX AND NOT APPLE)
     # Not every compiler adds -ldl automatically
     list(APPEND EXTRA_SHARED_LIBS "${CMAKE_DL_LIBS}")

@@ -19,11 +19,11 @@
 
 #include <assert.h>
 
-#include "c_types_map.hpp"
 #include "cpu_engine.hpp"
 #include "softmax_pd.hpp"
-#include "type_helpers.hpp"
-#include "utils.hpp"
+#include "common/c_types_map.hpp"
+#include "common/type_helpers.hpp"
+#include "common/utils.hpp"
 
 namespace dnnl {
 namespace impl {

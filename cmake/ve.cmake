@@ -21,9 +21,12 @@ set(NECVE  1 CACHE BOOL "Set thing up for NEC Aurora vector processor" FORCE)
 set(CMAKE_BUILD_TYPE_INIT "RelWithDebInfo")
 
 # for now, want verbose linking...
+# sometimes linke fail without verbose and passes with. Have not checked lately
 if(NOT CMAKE_EXE_LINKER_FLAGS_INIT)
-    set(CMAKE_EXE_LINKER_FLAGS_INIT "-v -Wl,--verbose")
-    set(CMAKE_SHARED_LINKER_FLAGS_INIT "-v -Wl,--verbose")
+    set(CMAKE_EXE_LINKER_FLAGS_INIT "-v")
+    set(CMAKE_SHARED_LINKER_FLAGS_INIT "-v")
+    #set(CMAKE_EXE_LINKER_FLAGS_INIT "$(CMAKE_EXE_LINKER_FLAGS_INIT) -Wl,--verbose")
+    #set(CMAKE_SHARED_LINKER_FLAGS_INIT "$(CMAKE_EXE_LINKER_FLAGS_INIT) -Wl,--verbose")
 endif()
 
 # "/opt/nec/ve/bin/nld: warning: -z -origin ignored."
@@ -245,6 +248,8 @@ if(NOT VE_OPT)
     set(VE_OPT $ENV{VE_OPT})
 endif()
 # TODO if already know full compiler path from [2], then VE_ROOT must be in some parent dir
+#      actually, DETERMINE_NCC_SYSTEM_INCLUDES_DIRS can find the '-isysroot;/opt/nec/ve'
+#      and also output a _sysRoot value.
 # TODO ncc gives us MUSL_DIR (and we probably do not need it)
 find_program(VE_NCC NAMES ${CMAKE_C_COMPILER} NO_DEFAULT_PATH
     PATHS ${VE_OPT} /opt/nec/ve
@@ -370,6 +375,7 @@ function(NLC_PRELIM_SETTINGS)
                 set(VE_CBLAS_INCLUDE_DIR "${NLC_HOME}/include")
             endif()
         else()
+            # why fatal?
             message(FATAL_ERROR "environment variable NLC_HOME not set")
             foreach(_ve_nlc_root "$ENV{NLC_BASE}" "${VE_OPT}/nlc")
                 if(IS_DIRECTORY "${_ve_nlc_root}")

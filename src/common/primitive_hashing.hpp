@@ -17,11 +17,16 @@
 #ifndef PRIMITIVE_HASHING_HPP
 #define PRIMITIVE_HASHING_HPP
 
+#include "dnnl_config.h"
+#ifdef DNNL_ENABLE_PRIMITIVE_CACHE
+
 #include <typeindex>
 
-#include "c_types_map.hpp"
 #include "dnnl.h"
+
+#include "c_types_map.hpp"
 #include "type_helpers.hpp"
+#include "primitive_attr.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -700,4 +705,5 @@ struct hash<dnnl::impl::primitive_hashing::key_t> {
 
 } // namespace std
 
+#endif // DNNL_ENABLE_PRIMITIVE_CACHE
 #endif

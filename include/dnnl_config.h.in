@@ -96,6 +96,12 @@
 /// @addtogroup cmake_extra Other building options (subject to change)
 //@{
 
+#cmakedefine DNNL_ENABLE_CONCURRENT_EXEC
+#cmakedefine DNNL_ENABLE_PRIMITIVE_CACHE
+#cmakedefine DNNL_ENABLE_JIT_PROFILING
+#cmakedefine DNNLPRIM_ALL
+#cmakedefine DNNLPRIM_SOFTMAX
+
 /** DNNL CPU build target 1,2,etc = x86, ve, etc.
  * Cmake sets this automatically based on CMAKE_SYSTEM_PROCESSOR.
  * So almost always it will have the value \c DNN_CPU_X86.

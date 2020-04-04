@@ -17,6 +17,9 @@
 #ifndef PRIMITIVE_CACHE_HPP
 #define PRIMITIVE_CACHE_HPP
 
+#include "dnnl_config.h"
+#ifdef DNNL_ENABLE_PRIMITIVE_CACHE
+
 #include <list>
 #include <memory>
 #include <unordered_map>
@@ -78,6 +81,7 @@ private:
 
 } // namespace impl
 } // namespace dnnl
-#endif
+#endif // DNNL_ENABLE_PRIMITIVE_CACHE
+#endif // PRIMITIVE_CACHE_HPP
 
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

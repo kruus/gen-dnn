@@ -21,32 +21,19 @@
 namespace dnnl {
 namespace impl {
 
-#if 1 // [ejk]
+#if 0 // [ejk]
 exec_ctx_t::exec_ctx_t(stream_t *stream, exec_args_t &&args)
         : stream_(stream)
           , args_(args)
           , scratchpad_grantor_()
-{
-    printf(" +exec_ctx_t(stream*,exec_args_t&&) @%p\n", (void*)this); fflush(stdout);
-}
-exec_ctx_t::exec_ctx_t(stream_t *stream, exec_args_t &args)
-        : stream_(stream)
-          //, args_(std::move(args))
-          , args_(args)
-          , scratchpad_grantor_()
-{
-    printf(" +exec_ctx_t(stream*,exec_args_t&) @%p\n", (void*)this); fflush(stdout);
-}
-exec_ctx_t::exec_ctx_t(stream_t *stream)
-    : stream_(stream)
-      , args_()
-      , scratchpad_grantor_()
-{
-    printf(" +exec_ctx_t(stream*) @%p\n", (void*)this); fflush(stdout);
-}
-exec_ctx_t::~exec_ctx_t()
-{
-    printf(" -exec_ctx_t @%p\n", (void*)this); fflush(stdout);
+{ }
+//exec_ctx_t::exec_ctx_t(stream_t *stream, exec_args_t &args)
+//        : stream_(stream)
+//          , args_(std::move(args))
+//          , scratchpad_grantor_()
+//{ }
+exec_ctx_t::~exec_ctx_t(){
+    printf("~exec_ctx_t stream@%p args[%d]@%p scratch@%p",(void*)stream(),(int)args_.size(), (void*)&args(), (void*)scratchpad_grantor_.get());
 }
 #endif
 
@@ -112,6 +99,7 @@ memory_t *exec_ctx_t::memory(int arg) const {
     return ma.mem;
 }
 
+#if !CRIPPLE_PRIMITIVE_EXEC_TYPES
 memory_desc_wrapper exec_ctx_t::memory_mdw(
         int arg, const memory_desc_t *md_from_primitive_desc) const {
     if (md_from_primitive_desc) {
@@ -122,11 +110,13 @@ memory_desc_wrapper exec_ctx_t::memory_mdw(
     if (args_.count(arg) != 1) return memory_desc_wrapper(&glob_zero_md);
     return memory_desc_wrapper(args_.at(arg).mem->md());
 }
+#endif
 
 void exec_ctx_t::set_scratchpad_grantor(
         const memory_tracking::grantor_t &scratchpad_grantor) {
     scratchpad_grantor_ = utils::make_unique<memory_tracking::grantor_t>(
             scratchpad_grantor);
+    printf(" exec_ctx_t new scratchpad_grantor @i %p\n", (void*)&get_scratchpad_grantor());
 }
 
 const memory_tracking::grantor_t &exec_ctx_t::get_scratchpad_grantor() const {

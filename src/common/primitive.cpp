@@ -29,6 +29,11 @@ using namespace dnnl::impl;
 using namespace dnnl::impl::status;
 using namespace dnnl::impl::primitive_kind;
 
+#ifndef CRIPPLE_PRIMITIVE_CPP
+#define CRIPPLE_PRIMITIVE_CPP 0
+#endif
+
+#if !CRIPPLE_PRIMITIVE_CPP
 namespace {
 // XXX: this is a huge hammer. This disables all and any msan checks on
 // primitives outputs.
@@ -45,6 +50,7 @@ void unpoison_outputs(const exec_args_t &args) {
     }
 }
 } // namespace
+#endif
 
 // API
 status_t dnnl_primitive_desc_destroy(primitive_desc_t *primitive_desc) {
@@ -65,29 +71,30 @@ status_t dnnl_primitive_execute(const primitive_t *primitive, stream_t *stream,
             && IMPLICATION(nargs > 0, c_args != nullptr);
     if (!ok) return invalid_arguments;
 
-    status_t status;
-    {
-        exec_args_t args;
-        status = cvt_primtive_args(primitive->pd(), nargs, c_args, args);
-        if (status == status::success) {
-            //exec_ctx_t ctx(stream, std::move(args));
-            exec_ctx_t ctx(stream, args);
+    exec_args_t args;
+    status_t status = cvt_primtive_args(primitive->pd(), nargs, c_args, args);
+    if (status != status::success) return status;
 
-            if (get_verbose()) {
-                double ms = get_msec();
-                status = primitive->execute(ctx);
-                stream->wait();
-                ms = get_msec() - ms;
-                printf("dnnl_verbose,exec,%s,%g\n", primitive->pd()->info(), ms);
-                fflush(0);
-            } else {
-                status = primitive->execute(ctx);
-            }
-            if (msan_enabled) unpoison_outputs(ctx.args());
-            ctx.~exec_ctx_t();
-        }
-        args.~exec_args_t();
+    exec_ctx_t ctx(stream, std::move(args));
+    //exec_ctx_t ctx(stream, args);
+    //args.~exec_args_t(); // [ejk]
+
+#if !CRIPPLE_PRIMITIVE_CPP
+    if (get_verbose()) {
+        double ms = get_msec();
+        status = primitive->execute(ctx);
+        stream->wait();
+        ms = get_msec() - ms;
+        printf("dnnl_verbose,exec,%s,%g\n", primitive->pd()->info(), ms);
+        fflush(0);
+    } else {
+        status = primitive->execute(ctx);
     }
+#endif
+
+#if !CRIPPLE_PRIMITIVE_CPP
+    if (msan_enabled) unpoison_outputs(ctx.args());
+#endif
 
     return status;
 }
@@ -139,6 +146,7 @@ dnnl_primitive::get_primitive_impl() const {
 
 inline status_t dnnl_primitive::execute(exec_ctx_t &ctx) const {
     const memory_storage_t *mem_storage = nullptr;
+#if !CRIPPLE_PRIMITIVE_CPP
     if (primitive_impl_->pd()->attr()->scratchpad_mode_
             == scratchpad_mode::user) {
         memory_t *scratchpad_memory = ctx.output(DNNL_ARG_SCRATCHPAD);
@@ -150,12 +158,13 @@ inline status_t dnnl_primitive::execute(exec_ctx_t &ctx) const {
 
     ctx.set_scratchpad_grantor(
             primitive_impl_->pd()->scratchpad_registry().grantor(mem_storage));
+#endif
 
     auto status = primitive_impl_->execute(ctx);
     return status;
 }
 
-#if 1 // [ejk] from dnnl.hpp, for debugging
+#if 0 // [ejk] from dnnl.hpp, for debugging
 namespace dnnl {
 void primitive::execute(
         stream &stream, const std::unordered_map<int, memory> &args) const {
@@ -164,15 +173,9 @@ void primitive::execute(
     for (const auto &a : args)
         c_args.push_back({a.first, a.second.get(true)});
 
-    {
-        auto s = stream.get();
-        int n = c_args.size();
-        auto ea = c_args.data();
-        error::wrap_c_api(dnnl_primitive_execute(get(), s, n, ea),
-                          "could not execute a primitive");
-    }
-
-    c_args.~vector<dnnl_exec_arg_t>();
+    error::wrap_c_api(dnnl_primitive_execute(get(), stream.get(),
+                              (int)c_args.size(), c_args.data()),
+            "could not execute a primitive");
 }
 } //dnnl::
 #endif

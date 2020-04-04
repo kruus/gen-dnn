@@ -14,14 +14,20 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include "dnnl_config.h"
+#ifdef DNNL_ENABLE_PRIMITIVE_CACHE
+#include "primitive_hashing.hpp"
 #include "primitive_desc.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
+// some primitives compare memory descriptors
+#if USE_pooling
 #include "pooling_pd.hpp"
+#endif
+#if USE_shuffle
 #include "shuffle_pd.hpp"
-
-#include "primitive_hashing.hpp"
+#endif
 
 namespace dnnl {
 namespace impl {
@@ -49,42 +55,21 @@ void key_t::init_mds(const primitive_desc_t *pd) {
     // XXX: There is too much knowledge about in the internals...
 
     switch (primitive_kind_) {
-        case primitive_kind::batch_normalization: {
-            break;
-        }
-        case primitive_kind::binary: {
-            break;
-        }
-        case primitive_kind::concat: {
-            break;
-        }
-        case primitive_kind::convolution: {
-            break;
-        }
-        case primitive_kind::deconvolution: {
-            break;
-        }
-        case primitive_kind::eltwise: {
-            break;
-        }
-        case primitive_kind::gemm: {
-            break;
-        }
-        case primitive_kind::inner_product: {
-            break;
-        }
-        case primitive_kind::layer_normalization: {
-            break;
-        }
-        case primitive_kind::logsoftmax: {
-            break;
-        }
-        case primitive_kind::lrn: {
-            break;
-        }
-        case primitive_kind::matmul: {
-            break;
-        }
+#define NO_MDS_FOR_(kind) IF_USE_KIND(kind, \
+        case primitive_kind::##kind##: { break; })
+        NO_MDS_FOR_(batch_normalization)
+        NO_MDS_FOR_(binary)
+        NO_MDS_FOR_(concat)
+        NO_MDS_FOR_(convolution)
+        NO_MDS_FOR_(deconvolution)
+        NO_MDS_FOR_(eltwise)
+        NO_MDS_FOR_(gemm)
+        NO_MDS_FOR_(inner_product)
+        NO_MDS_FOR_(layer_normalization)
+        NO_MDS_FOR_(logsoftmax)
+        NO_MDS_FOR_(lrn)
+        NO_MDS_FOR_(matmul)
+#if USE_pooling
         case primitive_kind::pooling: {
             auto typed_pd = utils::downcast<const pooling_pd_t *>(pd);
             if (!typed_pd->is_fwd()) {
@@ -93,15 +78,11 @@ void key_t::init_mds(const primitive_desc_t *pd) {
             }
             break;
         }
-        case primitive_kind::reorder: {
-            break;
-        }
-        case primitive_kind::resampling: {
-            break;
-        }
-        case primitive_kind::rnn: {
-            break;
-        }
+#endif
+        NO_MDS_FOR_(reorder)
+        NO_MDS_FOR_(resampling)
+        NO_MDS_FOR_(rnn)
+#if USE_shuffle
         case primitive_kind::shuffle: {
             auto typed_pd = utils::downcast<const shuffle_pd_t *>(pd);
             if (!typed_pd->is_fwd()) {
@@ -110,14 +91,12 @@ void key_t::init_mds(const primitive_desc_t *pd) {
             }
             break;
         }
-        case primitive_kind::softmax: {
-            break;
-        }
-        case primitive_kind::sum: {
-            break;
-        }
+#endif
+        NO_MDS_FOR_(sum)
+        NO_MDS_FOR_(softmax)
         default: assert(!"unknown primitive_kind");
     }
+#undef NO_MDS_FOR_
 }
 
 bool key_t::operator==(const key_t &rhs) const {
@@ -130,69 +109,38 @@ bool key_t::operator==(const key_t &rhs) const {
     if (!ret) return false;
 
     switch (primitive_kind_) {
+#define CAST_AND_COMPARE(kind) \
+            ret = cast_and_compare<kind##_desc_t>(op_desc_, rhs.op_desc_);
+#define CASE(kind) IF_USE_KIND(kind, \
+        case primitive_kind::kind: CAST_AND_COMPARE(kind); break;)
+
         // NOTE: make sure that op_descs for all primitives are compared below
-        case primitive_kind::batch_normalization:
-            ret = cast_and_compare<batch_normalization_desc_t>(
-                    op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::binary:
-            ret = cast_and_compare<binary_desc_t>(op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::concat:
-            ret = cast_and_compare<concat_desc_t>(op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::convolution:
-            ret = cast_and_compare<convolution_desc_t>(op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::deconvolution:
-            ret = cast_and_compare<deconvolution_desc_t>(
-                    op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::eltwise:
-            ret = cast_and_compare<eltwise_desc_t>(op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::gemm:
-            ret = cast_and_compare<gemm_desc_t>(op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::inner_product:
-            ret = cast_and_compare<inner_product_desc_t>(
-                    op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::layer_normalization:
-            ret = cast_and_compare<layer_normalization_desc_t>(
-                    op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::logsoftmax:
-            ret = cast_and_compare<logsoftmax_desc_t>(op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::lrn:
-            ret = cast_and_compare<lrn_desc_t>(op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::matmul:
-            ret = cast_and_compare<matmul_desc_t>(op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::pooling:
-            ret = cast_and_compare<pooling_desc_t>(op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::reorder:
-            ret = cast_and_compare<reorder_desc_t>(op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::resampling:
-            ret = cast_and_compare<resampling_desc_t>(op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::rnn:
-            ret = cast_and_compare<rnn_desc_t>(op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::shuffle:
-            ret = cast_and_compare<shuffle_desc_t>(op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::softmax:
-            ret = cast_and_compare<softmax_desc_t>(op_desc_, rhs.op_desc_);
-            break;
-        case primitive_kind::sum:
-            ret = cast_and_compare<sum_desc_t>(op_desc_, rhs.op_desc_);
-            break;
+        CASE(batch_normalization)
+        CASE(binary)
+        CASE(concat)
+        CASE(convolution)
+        CASE(deconvolution)
+        CASE(eltwise)
+        CASE(gemm)
+        CASE(inner_product)
+        CASE(layer_normalization)
+        CASE(logsoftmax)
+        CASE(lrn)
+        CASE(matmul)
+        CASE(pooling)
+        CASE(reorder)
+        CASE(resampling)
+        CASE(rnn)
+        CASE(shuffle)
+        CASE(sum)
+        CASE(softmax)
+        //case primitive_kind::batch_normalization:
+        //    ret = cast_and_compare<batch_normalization_desc_t>(
+        //            op_desc_, rhs.op_desc_);
+        //    break;
         default: assert(!"unknown primitive_kind");
+#undef CASE
+#undef CAST_AND_COMPARE
     }
 
     if (!ret) return false;
@@ -206,3 +154,4 @@ bool key_t::operator==(const key_t &rhs) const {
 } // namespace primitive_hashing
 } // namespace impl
 } // namespace dnnl
+#endif // DNNL_ENABLE_PRIMITIVE_CACHE

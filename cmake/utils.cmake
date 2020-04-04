@@ -124,3 +124,30 @@ macro(list_filter_exclude _list _regexp)
     endforeach()
     set(${_list} "${_kept}")
 endmacro()
+
+# helpers to expand list 'var' of source files...
+macro(append_glob var)
+    file(GLOB _x ${ARGN})
+    list(APPEND ${var} ${_x})
+endmacro()
+macro(append_glob_jit var)
+    if(TARGET_X86_JIT)
+        file(GLOB _x ${ARGN})
+        list(APPEND ${var} ${_x})
+    endif()
+endmacro()
+macro(append_subdir_recurse var subdir)
+    file(GLOB_RECURSE _x
+        ${CMAKE_CURRENT_SOURCE_DIR}/S{subdir}/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/S{subdir}/*.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/S{subdir}/*.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/S{subdir}/*.cpp
+        )
+    list(APPEND ${var} ${_x})
+endmacro()
+macro(exclude_jit var)
+    if(NOT TARGET_X86_JIT)
+        list_filter_exclude(${var} "jit.*")
+    endif()
+endmacro()
+

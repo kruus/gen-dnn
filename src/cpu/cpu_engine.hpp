@@ -27,8 +27,8 @@ namespace impl {
 namespace cpu {
 
 #define DECLARE_IMPL_LIST(kind) \
-    const engine_t::primitive_desc_create_f *get_##kind##_impl_list( \
-            const kind##_desc_t *desc);
+     IF_USE_KIND(kind, const engine_t::primitive_desc_create_f * \
+             get_##kind##_impl_list( const kind##_desc_t *desc);)
 
 DECLARE_IMPL_LIST(batch_normalization);
 DECLARE_IMPL_LIST(binary);
@@ -60,40 +60,54 @@ public:
 
     virtual status_t create_stream(stream_t **stream, unsigned flags) override;
 
+    // concat, reorder and sum are "internal" impls
     virtual const concat_primitive_desc_create_f *
-    get_concat_implementation_list() const override;
+    get_concat_implementation_list() const override
+    {
+        static const concat_primitive_desc_create_f empty_list[] = {nullptr};
+        return empty_list;
+    }
     virtual const reorder_primitive_desc_create_f *
     get_reorder_implementation_list(const memory_desc_t *src_md,
-            const memory_desc_t *dst_md) const override;
+            const memory_desc_t *dst_md) const override
+    {
+        static const reorder_primitive_desc_create_f empty_list[] = {nullptr};
+        return empty_list;
+    }
     virtual const sum_primitive_desc_create_f *
-    get_sum_implementation_list() const override;
+    get_sum_implementation_list() const override
+    {
+        static const sum_primitive_desc_create_f empty_list[] = {nullptr};
+        return empty_list;
+    }
+
     virtual const primitive_desc_create_f *get_implementation_list(
             const op_desc_t *desc) const override {
         static const primitive_desc_create_f empty_list[] = {nullptr};
 
-#define CASE(kind) \
-    case primitive_kind::kind: \
-        return get_##kind##_impl_list((const kind##_desc_t *)desc);
+#define CPU_ENGINE_LIST(kind) \
+    IF_USE_KIND(kind, case primitive_kind::kind: \
+        return get_##kind##_impl_list((const kind##_desc_t *)desc);)
         switch (desc->kind) {
-            CASE(batch_normalization);
-            CASE(binary);
-            CASE(convolution);
-            CASE(deconvolution);
-            CASE(eltwise);
-            CASE(inner_product);
-            CASE(layer_normalization);
-            CASE(lrn);
-            CASE(logsoftmax);
-            CASE(matmul);
-            CASE(pooling);
-            CASE(resampling);
-            CASE(rnn);
-            CASE(shuffle);
-            CASE(softmax);
+            CPU_ENGINE_LIST(batch_normalization)
+            CPU_ENGINE_LIST(binary)
+            CPU_ENGINE_LIST(convolution)
+            CPU_ENGINE_LIST(deconvolution)
+            CPU_ENGINE_LIST(eltwise)
+            CPU_ENGINE_LIST(inner_product)
+            CPU_ENGINE_LIST(layer_normalization)
+            CPU_ENGINE_LIST(lrn)
+            CPU_ENGINE_LIST(logsoftmax)
+            CPU_ENGINE_LIST(matmul)
+            CPU_ENGINE_LIST(pooling)
+            CPU_ENGINE_LIST(resampling)
+            CPU_ENGINE_LIST(rnn)
+            CPU_ENGINE_LIST(shuffle)
+            CPU_ENGINE_LIST(softmax)
             default: assert(!"unknown primitive kind"); return empty_list;
         }
-#undef CASE
     }
+#undef CPU_ENGINE_LIST
 };
 
 class cpu_engine_factory_t : public engine_factory_t {

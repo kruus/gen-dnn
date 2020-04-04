@@ -34,6 +34,10 @@
     (ctx.output(arg) ? *(ctx.output(arg)->memory_storage()) \
                      : dnnl::impl::memory_storage_t::empty_storage())
 
+#ifndef CRIPPLE_PRIMITIVE_EXEC_TYPES
+#define CRIPPLE_PRIMITIVE_EXEC_TYPES 0
+#endif
+
 namespace dnnl {
 namespace impl {
 
@@ -53,16 +57,15 @@ status_t cvt_primtive_args(const primitive_desc_t *pd, int nargs,
 
 /** Primitive execution context (helps passing stream, memories, and events. */
 struct exec_ctx_t {
-#if 0 // orig [ejk]
     exec_ctx_t(stream_t *stream) : stream_(stream) {}
+#if 1 // orig [ejk]
     exec_ctx_t(stream_t *stream, exec_args_t &&args)
         : stream_(stream), args_(std::move(args)) {}
 #else
-    exec_ctx_t(stream_t *stream);
+    //exec_ctx_t(stream_t *stream, exec_args_t &args);
     exec_ctx_t(stream_t *stream, exec_args_t &&args);
-    exec_ctx_t(stream_t *stream, exec_args_t &args);
-#endif
     ~exec_ctx_t();
+#endif
 
     stream_t *stream() const { return stream_; }
     const exec_args_t &args() const { return args_; }
@@ -71,6 +74,7 @@ struct exec_ctx_t {
     memory_t *output(int arg) const;
     memory_t *memory(int arg) const;
 
+#if !CRIPPLE_PRIMITIVE_EXEC_TYPES
     // Returns memory descriptor wrapper for the corresponding memory argument.
     //
     // To support sub-memory flow (when primitive descriptor was created with
@@ -88,6 +92,7 @@ struct exec_ctx_t {
     //      require a sub-memory object, though...
     memory_desc_wrapper memory_mdw(int arg,
             const memory_desc_t *md_from_primitive_desc = nullptr) const;
+#endif
 
     void set_scratchpad_grantor(
             const memory_tracking::grantor_t &scratchpad_grantor);

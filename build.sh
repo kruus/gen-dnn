@@ -12,6 +12,7 @@ JOBS="-j$(grep -c processor /proc/cpuinfo)"
 CMAKETRACE=""
 USE_MKL=0
 USE_CBLAS=0
+USE_CACHE=0 # enable primitive cache?
 QUICK=0
 DOGCC_VER=0
 NEC_FTRACE=0
@@ -48,7 +49,7 @@ usage() {
     echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
 }
-while getopts ":m:hvjatdDqQTPFbBrRoOwW1567iMrC" arg; do
+while getopts ":m:hvjatTdDqQPFbBrRoOwW1567iMrcC" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         m) # -mISA "machine", ISA=[ALL] | VANILLA | ANY? ... (prefer j|a|gj|ga)
@@ -77,6 +78,9 @@ while getopts ":m:hvjatdDqQTPFbBrRoOwW1567iMrC" arg; do
             # >=4 : benchdnn default build targets (very long)
             DOTEST=$(( DOTEST + 1 ))
             ;;
+        T) # cmake --trace
+            CMAKETRACE="--trace --debug-trycompile"
+            ;;
         d) # cmake build mode: [0] : cmake Release build.
             # -d   : RelWithDebInfo
             # -dd  : Debug
@@ -91,9 +95,6 @@ while getopts ":m:hvjatdDqQTPFbBrRoOwW1567iMrC" arg; do
             ;;
         Q) # really quick: skip build and doxygen docs [JUST run cmake and stop]
             BUILDOK="n"; DODOC="n"
-            ;;
-        T) # cmake --trace
-            CMAKETRACE="--trace --debug-trycompile"
             ;;
         P) # Primitive extra tracing verbosity, even for release build [option removed]
             VERBOSE_EXTRA="y"
@@ -146,6 +147,9 @@ while getopts ":m:hvjatdDqQTPFbBrRoOwW1567iMrC" arg; do
         r) # reference impls only: no -DUSE_CBLAS compile flag (->no im2col gemm)
             USE_CBLAS=0; USE_MKL=0
             ;;
+        c) # cache: support primitive caching
+            USE_CACHE=1
+            ;;
         C) # force -DUSE_CBLAS compile flag
             # x86: expect errors if not very careful about omp libs
             #      (or set OMP_NUM_THREADS=1)
@@ -176,12 +180,14 @@ if [ "${DOTARGET}" == "x" ]; then
     usage
 fi
 
-if [ ! "x${CC}" == "x" -a ! "`which ${CC}`" ]; then
-    if [ -x ${CC} ]; then
-        echo "Using specific compiler version: ${CC}";
-    else
-        echo "./build.sh: CC=${CC} , but did not find that compiler."
-        exit -1
+if [ ! "x${CC}" == "x" ]; then
+    if [ ! "`which ${CC}`" ]; then
+        if [ -x ${CC} ]; then
+            echo "Using specific compiler version: ${CC}";
+        else
+            echo "./build.sh: CC=${CC} , but did not find that compiler."
+            exit -1
+        fi
     fi
 fi
 
@@ -482,12 +488,22 @@ echo "PATH $PATH"
     #
     if [ "${RNN}" = "n" ]; then
         CMAKEOPT="${CMAKEOPT} -DDNNL_ENABLE_RNN=0"
-        echo "RNN    support OFF"
+        echo "RNN      support OFF"
     elif [ "${RNN}" = "y" ]; then 
         CMAKEOPT="${CMAKEOPT} -DDNNL_ENABLE_RNN=1"
-        echo "RNN    support ON"
+        echo "RNN      support ON"
     else
-        echo "RNN    support = default"
+        echo "RNN      support = default"
+    fi
+    #
+    # -c : enable primitive cache
+    #
+    if [ ${USE_CACHE} -eq 0 ]; then
+        CMAKEOPT="${CMAKEOPT} -DDNNL_ENABLE_PRIMITIVE_CACHE=0"
+        echo "Primitive cache  OFF"
+    else 
+        CMAKEOPT="${CMAKEOPT} -DDNNL_ENABLE_PRIMITIVE_CACHE=1"
+        echo "Primitive cache  ON"
     fi
 
     #
@@ -779,13 +795,13 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
         if [ $DOTEST -ge 2 ]; then
             echo "Testing ... test2"
             (
-                 echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' ${TESTRUNNER} <commnad>";
+                 echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -R .*test_.*' ${TESTRUNNER} <commnad>";
                  cd "${BUILDDIR}" && ${ENV} ${TEST_ENV[@]} ARGS='-VV -N' \
                      ${TESTRUNNER} make test \
                      && ${ENV} ARGS='-VV -R .*test_.*' ${TEST_ENV[@]} ${TESTRUNNER}  make test \
                      ) 2>&1 | tee "${BUILDDIR}/test2.log" || true
         fi
-        if [ $DOTEST -ge 3 ]; then # some [few] convolution timings
+        if [ $DOTEST -ge 3 ]; then # some [few] convolution timings (see that benchdnn runs)
             if [ -x ./bench.sh ]; then
                 #DNNL_VERBOSE=2 BUILDDIR=${BUILDDIR} ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
                 # bench.sh quick convolution tests...

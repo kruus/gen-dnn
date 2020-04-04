@@ -43,4 +43,105 @@
 #define USE_CBLAS DNNL_USE_CBLAS
 #endif
 
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_BATCH_NORMALIZATION)
+#define USE_batch_normalization 1
+#else
+#define USE_batch_normalization 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_BINARY)
+#define USE_binary 1
+#else
+#define USE_binary 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_CONCAT)
+#define USE_concat 1
+#else
+#define USE_concat 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_CONVOLUTION)
+#define USE_convolution 1
+#else
+#define USE_convolution 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_DECONVOLUTION)
+#define USE_deconvolution 1
+#else
+#define USE_deconvolution 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_ELTWISE)
+#define USE_eltwise 1
+#else
+#define USE_eltwise 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_GEMM)
+#define USE_gemm 1
+#else
+#define USE_gemm 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_INNER_PRODUCT)
+#define USE_inner_product 1
+#else
+#define USE_inner_product 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_LAYER_NORMALIZATION)
+#define USE_layer_normalization 1
+#else
+#define USE_layer_normalization 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_LRN)
+#define USE_lrn 1
+#else
+#define USE_lrn 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_LOGSOFTMAX)
+#define USE_logsoftmax 1
+#else
+#define USE_logsoftmax 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_MATMUL)
+#define USE_matmul 1
+#else
+#define USE_matmul 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_POOLING)
+#define USE_pooling 1
+#else
+#define USE_pooling 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_REORDER)
+#define USE_reorder 1
+#else
+#define USE_reorder 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_RESAMPLING)
+#define USE_resampling 1
+#else
+#define USE_resampling 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_RNN)
+#define USE_rnn 1
+#else
+#define USE_rnn 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_SHUFFLE)
+#define USE_shuffle 1
+#else
+#define USE_shuffle 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_SUM)
+#define USE_sum 1
+#else
+#define USE_sum 0
+#endif
+#if defined(DNNLPRIM_ALL) or defined(DNNLPRIM_SOFTMAX)
+#define USE_softmax 1
+#else
+#define USE_softmax 0
+#endif
+
+// expand to code [or nothing] depending on 0/1 flag USE_kind
+#define IF_USE_KIND0(kind, ...)
+#define IF_USE_KIND1(kind, ...) __VA_ARGS__
+#define IF_USE_KIND(kind, ...) CONCAT2(IF_USE_KIND, USE_##kind)(kind, __VA_ARGS__)
+
 #endif // CPU_TARGET_H

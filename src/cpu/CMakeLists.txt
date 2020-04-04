@@ -14,12 +14,47 @@
 # limitations under the License.
 #===============================================================================
 
-file(GLOB_RECURSE SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/*.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/*.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
-    )
+if(DNNLPRIM_ALL)
+    file(GLOB_RECURSE SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/*.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
+        )
+else()
+    # Debug : include primitives piecewise into libdnnl
+    file(GLOB SOURCES_CORE
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu_engine*
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu_memory_storage*
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu_stream*
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpu_isa_traits*
+        )
+    if(TARGET_X86_JIT)
+        append_subdir_recurse(SOURCES_CORE xbyak)
+        append_glob(SOURCES_CORE $(CMAKE_CURRENT_SOURCE_DIR)/jit_utils/jit_utils*)
+        if(DNNL_ENABLE_JIT_PROFILING)
+            append_subdir_recurse(SOURCES_CORE jit_utils/jitprofiling)
+            append_subdir_recurse(SOURCES_CORE jit_utils/linux_perf)
+        endif()
+    endif()
+    
+    message(STATUS "\nsources cpu core:\n${SOURCES_CORE}\n")
+    set(SOURCES_PRIM "")
+    if(DNNLPRIM_ALL OR DNNLPRIM_SOFTMAX)
+        append_glob(SOURCES_PRIM
+            ${CMAKE_CURRENT_SOURCE_DIR}/cpu_softmax*
+            ${CMAKE_CURRENT_SOURCE_DIR}/ref_softmax*
+            # no eltwise postops?
+            )
+        append_glob_jit(SOURCES_PRIM
+            ${CMAKE_CURRENT_SOURCE_DIR}/jit*softmax*
+            ${CMAKE_CURRENT_SOURCE_DIR}/jit*eltwise_injector*
+            )
+    endif()
+    message(STATUS "\nsources cpu prim:\n${SOURCES_PRIM}\n")
+    set(SOURCES ${SOURCES_CORE} ${SOURCES_PRIM})
+    message(STATUS "\nsources cpu     :\n${SOURCES}\n")
+endif()
 
 # vanilla-x86 and non-x86 targets should ignore all x86 jit files
 if(NOT TARGET_X86_JIT)
@@ -29,6 +64,7 @@ if(NOT TARGET_X86_JIT)
     list_filter_exclude(SOURCES ".*(jit|xbyak).*") # equiv. as macro
     message(STATUS "\nend:\n${SOURCES}\n")
 endif()
+#list(REMOVE_DUPLICATES SOURCES)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 if(TARGET_X86_JIT)

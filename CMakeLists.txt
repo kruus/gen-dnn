@@ -148,7 +148,9 @@ include(CMakePackageConfigHelpers)
 
 add_subdirectory(src)
 add_subdirectory(examples)
-add_subdirectory(tests)
+if(DNNL_PRIM_ALL)
+    add_subdirectory(tests)
+endif()
 
 if(DNNL_INSTALL_MODE STREQUAL "BUNDLE")
     install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_PREFIX})
