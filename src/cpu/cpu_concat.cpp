@@ -15,13 +15,24 @@
 *******************************************************************************/
 
 #include "cpu_engine.hpp"
-
+#include "cpu_target.h"
+#if USE_concat
 #include "cpu/ref_concat.hpp"
 #include "cpu/simple_concat.hpp"
+#endif // USE_concat
 
 namespace dnnl {
 namespace impl {
 namespace cpu {
+
+#if !USE_concat
+cpu_engine_t::get_concat_implementation_list() const override
+{
+    static const concat_primitive_desc_create_f empty_list[] = {nullptr};
+    return empty_list;
+}
+
+#else
 
 using cpd_create_f = dnnl::impl::engine_t::concat_primitive_desc_create_f;
 
@@ -44,6 +55,7 @@ static const cpd_create_f cpu_concat_impl_list[] = {
 const cpd_create_f *cpu_engine_t::get_concat_implementation_list() const {
     return cpu_concat_impl_list;
 }
+#endif // USE_concat
 
 } // namespace cpu
 } // namespace impl

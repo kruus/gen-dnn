@@ -148,7 +148,7 @@ include(CMakePackageConfigHelpers)
 
 add_subdirectory(src)
 add_subdirectory(examples)
-if(DNNL_PRIM_ALL)
+if(DNNLPRIM_ALL)
     add_subdirectory(tests)
 endif()
 

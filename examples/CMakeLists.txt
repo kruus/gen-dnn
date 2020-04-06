@@ -35,7 +35,7 @@ include_directories(${PROJECT_SOURCE_DIR}/examples)
 
 set_if(UNIX LIBM m)
 
-if(DNNL_PRIM_ALL)
+if(DNNLPRIM_ALL)
     file(GLOB_RECURSE sources *.cpp *.c)
 else()
     macro(add_primitive_example var MYLAYER) # followed by filename prefixes

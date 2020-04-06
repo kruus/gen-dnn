@@ -19,7 +19,7 @@ NEC_FTRACE=0
 DOTARGET="x"
 BFLOAT16="x"
 RNN="x"
-OMP="y"
+OMP="x"
 ULIMIT=65536 # ulimit is in 1024-byte blocks
 ENV=`which env`
 
@@ -49,7 +49,7 @@ usage() {
     echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
 }
-while getopts ":m:hvjatTdDqQPFbBrRoOwW1567iMrcC" arg; do
+while getopts ":m:hvjatTdDqQPFbBrRowW1567iMrcC" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         m) # -mISA "machine", ISA=[ALL] | VANILLA | ANY? ... (prefer j|a|gj|ga)
@@ -71,11 +71,12 @@ while getopts ":m:hvjatTdDqQPFbBrRoOwW1567iMrcC" arg; do
             ;;
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
             # Apr-14-2017 build timings:
-            # 0   : build    ~ ?? min  (jit), 1     min  (vanilla)
-            # >=1 : examples ~  1 min  (jit), 13-16 mins (vanilla)
-            # >=2 : test_*   ~ 10 mins (jit), 108   mins (vanilla)
-            # >=3 : benchdnn quick performance/correctness tests
-            # >=4 : benchdnn default build targets (very long)
+            # 0   : build    ~ ?? min  (jit), 1     min  (vanilla) | examples/primitives-*
+            # >=1 : examples ~  1 min  (jit), 13-16 mins (vanilla) | other examples
+            # >=2 : test_*   ~ 10 mins (jit), 108   mins (vanilla) | gtests
+            # >=3 : benchdnn quick performance/correctness tests   | demo
+            # >=4 : benchdnn default build targets (very long)     | very long
+            # Warning: -t>=1 with reduced omp (-o or -oo) can take a VERY long time
             DOTEST=$(( DOTEST + 1 ))
             ;;
         T) # cmake --trace
@@ -114,11 +115,11 @@ while getopts ":m:hvjatTdDqQPFbBrRoOwW1567iMrcC" arg; do
         R) # add rnn support and tests
             RNN="y"
             ;;
-        o) # no OpenMp
-            OMP="n"
-            ;;
-        O) # with OpenMP
-            OMP="y"
+        o) # OpenMp support:
+            # once    | 0 | build SEQ (no omp support) (run
+            # twice   | 1 | omp support, but test with OMP_NUM_THREADS=1
+            # thrice  | 2 | [default] omp, test without specifying OMP_NUM_THREADS
+            if [ "${OMP}" = "x" ]; then OMP=0; else OMP=$(( OMP + 1 )); fi
             ;;
         w) # reduce compiler warnings
             DOWARN=0
@@ -162,6 +163,7 @@ while getopts ":m:hvjatTdDqQPFbBrRoOwW1567iMrcC" arg; do
             ;;
     esac
 done
+if [ "${OMP}" = "x" ]; then OMP=2; fi
 # if unspecified, autodetect target via $CC compiler variable
 if [ "${DOTARGET}" == "x" ]; then
     if [ "${CC}" == "ncc" -a "${CXX}" == "nc++" ]; then
@@ -263,7 +265,7 @@ if [ "$BFLOAT16" = "y" ]; then BUILDDIR="${BUILDDIR}-bf16"; fi
 if [ "$BFLOAT16" = "n" ]; then BUILDDIR="${BUILDDIR}-nobf16"; fi
 if [ "$RNN" = "y" ]; then BUILDDIR="${BUILDDIR}-rnn"; fi
 if [ "$RNN" = "n" ]; then BUILDDIR="${BUILDDIR}-nornn"; fi
-if [ "${OMP}" = "n" ]; then BUILDDIR="${BUILDDIR}-seq"; INSTALLDIR="${INSTALLDIR}-seq"; fi
+if [ "${OMP}" -eq 0 ]; then BUILDDIR="${BUILDDIR}-seq"; INSTALLDIR="${INSTALLDIR}-seq"; fi
 
 if [ $DOJUSTDOC -gt 0 ]; then
     echo " JUST building doxygen docs"
@@ -534,7 +536,7 @@ echo "PATH $PATH"
         #CMAKEOPT="${CMAKEOPT} -DDNNL_LIBRARY_TYPE=SHARED" # default
 
         # USE_OPENMP defaults to off, so force it on (VE openmp has improved)
-        if [ "${OMP}" = "n" ]; then
+        if [ "${OMP}" -eq 0 ]; then
             # CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=OFF"
             CMAKEOPT="${CMAKEOPT} -DDNNL_CPU_RUNTIME=SEQ"
         else
@@ -699,6 +701,7 @@ echo "PATH $PATH"
         #TEST_ENV+=(VE_ADVANCEOFF=YES)
         TEST_ENV+=(OMP_DYNAMIC=false)
         TEST_ENV+=(OMP_PROC_BIND=true)
+        if [ ${OMP} -eq 1 ]; then TEST_ENV+=(OMP_NUM_THREADS=1); fi
         #TEST_ENV+=(OMP_WAIT_POLICY=active)
         { echo "api-c                   ...";
             ${ENV} ${TEST_ENV[@]} ${TESTRUNNER} ${VE_EXEC} tests/api-c \
@@ -772,7 +775,7 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
         ) 2>&1 >> "${BUILDDIR}".log || { echo "'make install' in ${BUILDDIR} had issues (ignored)"; }
     fi
     echo "Testing ?"
-    if [ ! $DOTEST -eq 0 -a ! "$DOTARGET" == "s" ]; then # non-SX: -t might run some tests
+    if [ ! "$DOTARGET" == "s" ]; then # non-SX: -t might run some tests
         TEST_ENV=(DNNL_VERBOSE=2)
         TEST_ENV+=(VE_INIT_HEAP=ZERO)
         TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
@@ -783,23 +786,28 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
         #TEST_ENV+=(VE_ADVANCEOFF=YES)
         TEST_ENV+=(OMP_DYNAMIC=false)
         TEST_ENV+=(OMP_PROC_BIND=true)
+        if [ ${OMP} -eq 1 ]; then TEST_ENV+=(OMP_NUM_THREADS=1); fi
         #TEST_ENV+=(OMP_WAIT_POLICY=active)
         rm -f test1.log test2.log test3.log
         echo "Testing in ${BUILDDIR} ... test1"
+        if [ $DOTEST -eq 0 ]; then # some short sanity-check examples
+            ( echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' ${TESTRUNNER} make VERBOSE=1 test"; \
+                cd "${BUILDDIR}" && ${ENV} ${TEST_ENV[@]} ARGS='-VV -R primitives-.*' \
+                ${TESTRUNNER} make VERBOSE=1 test \
+            ) 2>&1 | tee "${BUILDDIR}/test1.log" || true
+        fi
         if [ $DOTEST -ge 1 ]; then
             ( echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' ${TESTRUNNER} make VERBOSE=1 test"; \
-                cd "${BUILDDIR}" && ${ENV} ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' \
+                cd "${BUILDDIR}" && ${ENV} ${TEST_ENV[@]} ARGS='-VV -E primitives-.* -E .*test_.*' \
                 ${TESTRUNNER} make VERBOSE=1 test \
             ) 2>&1 | tee "${BUILDDIR}/test1.log" || true
         fi
         if [ $DOTEST -ge 2 ]; then
             echo "Testing ... test2"
-            (
-                 echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -R .*test_.*' ${TESTRUNNER} <commnad>";
-                 cd "${BUILDDIR}" && ${ENV} ${TEST_ENV[@]} ARGS='-VV -N' \
-                     ${TESTRUNNER} make test \
-                     && ${ENV} ARGS='-VV -R .*test_.*' ${TEST_ENV[@]} ${TESTRUNNER}  make test \
-                     ) 2>&1 | tee "${BUILDDIR}/test2.log" || true
+            ( echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -R .*test_.*' ${TESTRUNNER} <commnad>";
+                 cd "${BUILDDIR}" && ${ENV} ${TEST_ENV[@]} ARGS='-VV -R .*test_.*' \
+                     ${TESTRUNNER}  make VERBOSE=1 test \
+            ) 2>&1 | tee "${BUILDDIR}/test2.log" || true
         fi
         if [ $DOTEST -ge 3 ]; then # some [few] convolution timings (see that benchdnn runs)
             if [ -x ./bench.sh ]; then

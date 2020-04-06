@@ -92,8 +92,8 @@ file(GLOB PRIM_TEST_CASES_SRC
 # AARCH64_SKIP_TESTS is a list of tests to be removed from PRIM_TEST_CASES_SRC.
 if(TARGET_ARCH STREQUAL "AARCH64")
     file(GLOB AARCH64_SKIP_TESTS
-                                  test_isa_iface.cpp
-                                  )
+        test_isa_iface.cpp
+        )
 
 # Remove AARCH64_SKIP_TESTS entries from PRIM_TEST_CASES_SRC.
     foreach(TEST_FILE ${AARCH64_SKIP_TESTS})

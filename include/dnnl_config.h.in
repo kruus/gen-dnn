@@ -100,7 +100,23 @@
 #cmakedefine DNNL_ENABLE_PRIMITIVE_CACHE
 #cmakedefine DNNL_ENABLE_JIT_PROFILING
 #cmakedefine DNNLPRIM_ALL
+#ifndef DNNLPRIM_ALL
+#cmakedefine DNNLPRIM_BATCH_NORMALIZATION
+#cmakedefine DNNLPRIM_BINARY
+#cmakedefine DNNLPRIM_CONVOLUTION
+#cmakedefine DNNLPRIM_DECONVOLUTION
+#cmakedefine DNNLPRIM_ELTWISE
+#cmakedefine DNNLPRIM_INNER_PRODUCT
+#cmakedefine DNNLPRIM_LAYER_NORMALIZATION
+#cmakedefine DNNLPRIM_LRN
+#cmakedefine DNNLPRIM_LOGSOFTMAX
+#cmakedefine DNNLPRIM_MATMUL
+#cmakedefine DNNLPRIM_POOLING
+#cmakedefine DNNLPRIM_RESAMPLING
+#cmakedefine DNNLPRIM_RNN
+#cmakedefine DNNLPRIM_SHUFFLE
 #cmakedefine DNNLPRIM_SOFTMAX
+#endif
 
 /** DNNL CPU build target 1,2,etc = x86, ve, etc.
  * Cmake sets this automatically based on CMAKE_SYSTEM_PROCESSOR.

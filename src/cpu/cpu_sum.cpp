@@ -15,16 +15,28 @@
 *******************************************************************************/
 
 #include "cpu_engine.hpp"
-
+#include "cpu_target.h"
+#if USE_sum
 #include "cpu/ref_sum.hpp"
 #include "cpu/simple_sum.hpp"
 #if TARGET_X86_JIT // && DNNL_ENABLE_BFLOAT16
 #include "jit_avx512_core_bf16_sum.hpp"
 #endif // TARGET_X86_JIT
+#endif // USE_sum
 
 namespace dnnl {
 namespace impl {
 namespace cpu {
+
+#if !USE_sum
+cpu_engine_t const sum_primitive_desc_create_f *
+get_sum_implementation_list() const override
+{
+    static const sum_primitive_desc_create_f empty_list[] = {nullptr};
+    return empty_list;
+}
+
+#else
 
 using spd_create_f = dnnl::impl::engine_t::sum_primitive_desc_create_f;
 
@@ -47,6 +59,7 @@ static const spd_create_f cpu_sum_impl_list[] = {
 const spd_create_f *cpu_engine_t::get_sum_implementation_list() const {
     return cpu_sum_impl_list;
 }
+#endif // USE_sum
 
 } // namespace cpu
 } // namespace impl

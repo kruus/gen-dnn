@@ -14,6 +14,9 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include "cpu_engine.hpp"
+#include "cpu_target.h"
+#if USE_reorder
 #include <assert.h>
 
 #include <assert.h>
@@ -27,10 +30,23 @@
 #include "cpu/rnn/rnn_reorders.hpp"
 #include "cpu/simple_reorder.hpp"
 #include "cpu/wino_reorder.hpp"
+#endif
 
 namespace dnnl {
 namespace impl {
 namespace cpu {
+
+#if !USE_reorder
+const reorder_primitive_desc_create_f *
+cpu_engine_t::get_reorder_implementation_list(
+        const memory_desc_t *src_md,
+        const memory_desc_t *dst_md) const
+{
+    static const reorder_primitive_desc_create_f empty_list[] = {nullptr};
+    return empty_list;
+}
+
+#else
 
 using rpd_create_f = dnnl::impl::engine_t::reorder_primitive_desc_create_f;
 
@@ -572,6 +588,7 @@ const rpd_create_f *cpu_engine_t::get_reorder_implementation_list(
     static const rpd_create_f empty_list[] = {nullptr};
     return empty_list;
 }
+#endif // USE_reorder
 
 } // namespace cpu
 } // namespace impl

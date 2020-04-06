@@ -40,6 +40,31 @@ else()
     
     message(STATUS "\nsources cpu core:\n${SOURCES_CORE}\n")
     set(SOURCES_PRIM "")
+    if(DNNLPRIM_ALL OR DNNLPRIM_BATCH_NORMALIZATION)
+        append_glob(SOURCES_PRIM
+            ${CMAKE_CURRENT_SOURCE_DIR}/cpu_batch_normalization*
+            ${CMAKE_CURRENT_SOURCE_DIR}/ref_batch_normalization*
+            ${CMAKE_CURRENT_SOURCE_DIR}/ncsp_batch_normalization*
+            ${CMAKE_CURRENT_SOURCE_DIR}/nspc_batch_normalization*
+            ${CMAKE_CURRENT_SOURCE_DIR}/cpu_barrier*
+            ${CMAKE_CURRENT_SOURCE_DIR}/bfloat16*
+            )
+        append_glob_jit(SOURCES_PRIM
+            ${CMAKE_CURRENT_SOURCE_DIR}/jit*batch_normalization*
+            )
+    endif()
+    if(DNNLPRIM_ALL OR DNNLPRIM_BINARY)
+        append_glob(SOURCES_PRIM
+            ${CMAKE_CURRENT_SOURCE_DIR}/binary/cpu*
+            ${CMAKE_CURRENT_SOURCE_DIR}/binary/ref*
+            ${CMAKE_CURRENT_SOURCE_DIR}/bfloat16*
+            ${CMAKE_CURRENT_SOURCE_DIR}/ref_eltwise*
+            ${CMAKE_CURRENT_SOURCE_DIR}/cpu_eltwise*
+            )
+        append_glob_jit(SOURCES_PRIM
+            ${CMAKE_CURRENT_SOURCE_DIR}/binary/jit*
+            )
+    endif()
     if(DNNLPRIM_ALL OR DNNLPRIM_SOFTMAX)
         append_glob(SOURCES_PRIM
             ${CMAKE_CURRENT_SOURCE_DIR}/cpu_softmax*

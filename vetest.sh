@@ -11,6 +11,7 @@ TEST_ENV+=(OMP_STACKSIZE=1G)
 #TEST_ENV+=(VE_ADVANCEOFF=YES)
 TEST_ENV+=(OMP_DYNAMIC=false)
 TEST_ENV+=(OMP_PROC_BIND=true)
+TEST_ENV+=(OMP_NUM_THREADS=1)
 #TEST_ENV+=(OMP_WAIT_POLICY=active)
 #
 #ULIMIT=65536 # in 1024-byte increments
@@ -28,15 +29,19 @@ GTESTS=''
 GTEST_FILTER='*'
 EXAMPLES=""
 GDB=0
+LIST=0
 # Transform long options into short ones
 for arg in "$@"; do
   shift
   case "$arg" in
-    --gdb) set -- "$@" "-G"
+    --gdb) # -G
+      set -- "$@" "-G"
       ;;
-    --filter) set -- "$@" "-f"
+    --filter) # -f
+      set -- "$@" "-f"
       ;;
-    --help) set -- "$@" "-h"
+    --help) # -h
+      set -- "$@" "-h"
       ;;
     *) set -- "$@" "$arg"
       ;;
@@ -45,13 +50,18 @@ done
 function usage
 {
   echo "$0: Usage"
-    awk '/getopts/{flag=1;next} /^done/{flag=0} flag&&/^[^#]+) #/; flag&&/^ *# /' $0
-    echo "Example: quick rebuild + single gtest case "
-    echo "   ./vetest.sh -B build-ved4 -q -g test_dnnl_threading -f '*for_nd.Para*/2'"
+    awk '/^for arg in/{flag=1;next} /getopts/{flag=1;next} /^done/{flag=0} flag&&/^[^#]+) #/; flag&&/^ *# /' $0
+    echo "Examples:"
+    echo "  quick rebuild + single gtest case"
+    echo "    ./vetest.sh -B build-ved4 -q -g test_dnnl_threading -f '*for_nd.Para*/2'"
+    echo "  list compiled examples and tests in -B build-dir"
+    echo "    ./vetest.sh -B build-ved4 -l"
+    echo "  run gdb on an existing example (./build-ved4/examples/getting-started-cpp)"
+    echo "    ./vetest.sh -B build-ved4 -x getting-started-cpp -G"
     exit 0
 }
 # Parse short options with bash getopts
-while getopts "L:B:g:x:f:t:qGh" arg; do
+while getopts "L:B:g:x:f:t:qGlh" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
       L) # $LOG file.  "less -r r$LOG" to view colorized version
@@ -78,6 +88,9 @@ while getopts "L:B:g:x:f:t:qGh" arg; do
       G) # (--gdb) run in gdb : requires -g single gtest name)
         GDB=1
         ;;
+      l) # list gtests and examples subdirectory of -B build directory
+        LIST=1
+        ;;
       h) # (--help)
         usage
         ;;
@@ -89,6 +102,22 @@ done
 if [ "$GDB" = 1 -a -z "$GTESTS" -a -z "$EXAMPLES" ]; then
   echo "-G (--gdb) option requires a -g <test_foo> gtest test name"
   usage
+fi
+if [ ! -d "${BLD}" ]; then
+  echo ""
+  echo "Error:  -B ${BLD}  ---  missing build directory?"
+  echo ""
+  usage
+fi
+if [ ${LIST} -eq 1 ]; then
+  for d in examples tests/gtests; do
+    if [ -d "${BLD}/${d}" ]; then
+      echo ""
+      echo "Build subdir ${d}:"
+      (cd "${BLD}/${d}" && find -maxdepth 1 -type f | sed 's/^..//;/[.]/d;/Makefile/d;s/^prim/0000/' | sort | sed 's/^0000/prim/' | column -c 120)
+    fi
+  done
+  exit 0
 fi
 #----------------------- setup for tests
 if [ "$THREADS" ]; then

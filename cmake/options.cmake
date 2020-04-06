@@ -233,10 +233,10 @@ set(DNNL_USE_CLANG_SANITIZER "" CACHE STRING
 
 option(_DNNL_USE_MKL "use BLAS functions from Intel MKL" OFF)
 
-option(DNNLPRIM_ALL "enable all primitives, default=ON overrides all other layer options" OFF)
-# If DNNL_PRIM_ALL is OFF, can specify which layers are ON:
-option(DNNLPRIM_BATCH_NORMALIZATION "enable batch normalization primitive" OFF)
-option(DNNLPRIM_BINARY "enable binary primitive" OFF)
+option(DNNLPRIM_ALL "enable all primitives, default=ON overrides all other layer options" ON)
+# If DNNLPRIM_ALL is OFF, can specify which layers are ON:
+option(DNNLPRIM_BATCH_NORMALIZATION "enable batch normalization primitive" OFF) #ok
+option(DNNLPRIM_BINARY "enable binary primitive" ON) #ok
 option(DNNLPRIM_CONVOLUTION "enable convolution primitive" OFF)
 option(DNNLPRIM_DECONVOLUTION "enable deconvolution primitive" OFF)
 option(DNNLPRIM_ELTWISE "enable eltwise primitive" OFF)
@@ -249,7 +249,7 @@ option(DNNLPRIM_POOLING "enable pooling primitive" OFF)
 option(DNNLPRIM_RESAMPLING "enable resampling primitive" OFF)
 option(DNNLPRIM_RNN "enable rnn primitive" OFF)
 option(DNNLPRIM_SHUFFLE "enable shuffle primitive" OFF)
-option(DNNLPRIM_SOFTMAX "enable softmax primitive" ON)
+option(DNNLPRIM_SOFTMAX "enable softmax primitive" OFF) #ok
 # internal, or special constructor
 option(DNNLPRIM_CONCAT "enable concat primitive" OFF)
 option(DNNLPRIM_REORDER "enable reorder primitive" OFF)
@@ -257,5 +257,9 @@ option(DNNLPRIM_SUM "enable sum primitive" OFF)
 option(DNNLPRIM_GEMM "enable softmax primitive" OFF)
 #  if a layer is ON and requires another layer, the required layer gets turned ON
 # softmax : requires no other primitive
+# concat : can use reorder
+#if(DNNLPRIM_CONCAT)
+#    set(DNNLPRIM_REORDER ON)
+#endif()
 
 # vim: ts=4 sw=4 et

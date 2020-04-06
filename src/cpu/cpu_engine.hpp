@@ -62,24 +62,12 @@ public:
 
     // concat, reorder and sum are "internal" impls
     virtual const concat_primitive_desc_create_f *
-    get_concat_implementation_list() const override
-    {
-        static const concat_primitive_desc_create_f empty_list[] = {nullptr};
-        return empty_list;
-    }
+    get_concat_implementation_list() const override;
     virtual const reorder_primitive_desc_create_f *
     get_reorder_implementation_list(const memory_desc_t *src_md,
-            const memory_desc_t *dst_md) const override
-    {
-        static const reorder_primitive_desc_create_f empty_list[] = {nullptr};
-        return empty_list;
-    }
+            const memory_desc_t *dst_md) const override;
     virtual const sum_primitive_desc_create_f *
-    get_sum_implementation_list() const override
-    {
-        static const sum_primitive_desc_create_f empty_list[] = {nullptr};
-        return empty_list;
-    }
+    get_sum_implementation_list() const override;
 
     virtual const primitive_desc_create_f *get_implementation_list(
             const op_desc_t *desc) const override {
@@ -121,6 +109,7 @@ public:
     };
 };
 
+
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
@@ -147,5 +136,5 @@ public:
 #define INSTANCE_ve(...)
 #endif
 
-// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif
