@@ -21,6 +21,7 @@
 #include "dnnl_thread.hpp"
 #include "memory_tracking.hpp"
 #include "utils.hpp"
+#include "primitive_hashing.hpp"
 
 #include "cpu_convolution_pd.hpp"
 #include "jit_sse41_1x1_conv_kernel_f32.hpp"

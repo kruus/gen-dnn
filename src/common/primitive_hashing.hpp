@@ -17,8 +17,8 @@
 #ifndef PRIMITIVE_HASHING_HPP
 #define PRIMITIVE_HASHING_HPP
 
-#include "dnnl_config.h"
-#ifdef DNNL_ENABLE_PRIMITIVE_CACHE
+#include "cpu_target.h"
+#if defined(DNNL_ENABLE_PRIMITIVE_CACHE) || TARGET_X86_JIT
 
 #include <typeindex>
 

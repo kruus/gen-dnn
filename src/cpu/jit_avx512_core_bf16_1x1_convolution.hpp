@@ -23,6 +23,7 @@
 #include "cpu_reducer.hpp"
 #include "dnnl_thread.hpp"
 #include "utils.hpp"
+#include "primitive_hashing.hpp"
 
 #include "jit_avx512_core_bf16_1x1_conv_kernel.hpp"
 #include "jit_transpose_src_utils.hpp"

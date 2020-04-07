@@ -14,10 +14,13 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "dnnl_config.h"
-#ifdef DNNL_ENABLE_PRIMITIVE_CACHE
-#include "primitive_hashing.hpp"
+#include "cpu_target.h"
+
+// jit code may use primitive hashes even without the cache enabled
+#if defined(DNNL_ENABLE_PRIMITIVE_CACHE) || TARGET_X86_JIT
+
 #include "primitive_desc.hpp"
+#include "primitive_hashing.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
@@ -55,8 +58,10 @@ void key_t::init_mds(const primitive_desc_t *pd) {
     // XXX: There is too much knowledge about in the internals...
 
     switch (primitive_kind_) {
-#define NO_MDS_FOR_(kind) IF_USE_KIND(kind, \
-        case primitive_kind::##kind##: { break; })
+#define NO_MDS_FOR_(kind) \
+    IF_USE_KIND( \
+            kind, case primitive_kind::kind \
+            : { break; })
         NO_MDS_FOR_(batch_normalization)
         NO_MDS_FOR_(binary)
         NO_MDS_FOR_(concat)
@@ -79,9 +84,9 @@ void key_t::init_mds(const primitive_desc_t *pd) {
             break;
         }
 #endif
-        NO_MDS_FOR_(reorder)
-        NO_MDS_FOR_(resampling)
-        NO_MDS_FOR_(rnn)
+            NO_MDS_FOR_(reorder)
+            NO_MDS_FOR_(resampling)
+            NO_MDS_FOR_(rnn)
 #if USE_shuffle
         case primitive_kind::shuffle: {
             auto typed_pd = utils::downcast<const shuffle_pd_t *>(pd);
@@ -92,8 +97,8 @@ void key_t::init_mds(const primitive_desc_t *pd) {
             break;
         }
 #endif
-        NO_MDS_FOR_(sum)
-        NO_MDS_FOR_(softmax)
+            NO_MDS_FOR_(sum)
+            NO_MDS_FOR_(softmax)
         default: assert(!"unknown primitive_kind");
     }
 #undef NO_MDS_FOR_
@@ -110,9 +115,11 @@ bool key_t::operator==(const key_t &rhs) const {
 
     switch (primitive_kind_) {
 #define CAST_AND_COMPARE(kind) \
-            ret = cast_and_compare<kind##_desc_t>(op_desc_, rhs.op_desc_);
-#define CASE(kind) IF_USE_KIND(kind, \
-        case primitive_kind::kind: CAST_AND_COMPARE(kind); break;)
+    ret = cast_and_compare<kind##_desc_t>(op_desc_, rhs.op_desc_);
+#define CASE(kind) \
+    IF_USE_KIND(kind, case primitive_kind::kind \
+                : CAST_AND_COMPARE(kind); \
+                break;)
 
         // NOTE: make sure that op_descs for all primitives are compared below
         CASE(batch_normalization)

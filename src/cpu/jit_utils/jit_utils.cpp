@@ -18,8 +18,12 @@
 
 #include "utils.hpp"
 
-#ifndef DNNL_ENABLE_JIT_PROFILING
+// DNNL_ENABLE_JIT_PROFILING is passed via dnnl_config.h as a cmakedefine:
+#ifdef DNNL_ENABLE_JIT_PROFILING
+#undef DNNL_ENABLE_JIT_PROFILING
 #define DNNL_ENABLE_JIT_PROFILING 1
+#else
+#define DNNL_ENABLE_JIT_PROFILING 0
 #endif
 
 #ifndef DNNL_ENABLE_JIT_DUMP
