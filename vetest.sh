@@ -7,17 +7,21 @@ TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
 TEST_ENV+=(VE_TRACEBACK=VERBOSE)
 TEST_ENV+=(VE_INIT_HEAP=ZERO)
 TEST_ENV+=(VE_PROGINF=DETAIL)
-TEST_ENV+=(OMP_STACKSIZE=1G)
 #TEST_ENV+=(VE_ADVANCEOFF=YES)
+#TEST_ENV+=(VE_LIMIT_OPT="--softs\\ 262144\\ --hards=unlimited")
+#TEST_ENV+=(OMP_STACKSIZE=1G)
+TEST_ENV+=(OMP_STACKSIZE=64M)
 TEST_ENV+=(OMP_DYNAMIC=false)
 TEST_ENV+=(OMP_PROC_BIND=true)
 TEST_ENV+=(OMP_NUM_THREADS=1)
+TEST_ENV+=(VE_OMP_NUM_THREADS=1)
 #TEST_ENV+=(OMP_WAIT_POLICY=active)
+
 #
+ULIMIT=8192 # in 1024-byte increments
 #ULIMIT=65536 # in 1024-byte increments
-ULIMIT=262144
-ulimit -s $ULIMIT
-echo 'ulimit : '`ulimit -s`
+#ULIMIT=262144
+#ULIMIT=unlimited
 echo "${ENV} ${TEST_ENV[@]} <command>"
 LOG="f.log"
 BLD="build-ved4"
@@ -25,9 +29,11 @@ BUILD=0
 # test failure in test_dnnl_threading; others look like random heap corruption
 DEF_GTESTS='test_dnnl_threading test_inner_product_forward test_rnn_forward test_matmul test_convolution_backward_data_f32 test_convolution_backward_weights_f32 test_deconvolution'
 # TODO GTESTS should really be an array of multiple tests (tests with options?)
+# TODO add -R (ctests Require) and run via "ARGS='-R test_api' make -C $BLD test"
 GTESTS=''
 GTEST_FILTER='*'
-EXAMPLES=""
+EXAMPLES=''
+REQUIRE=''
 GDB=0
 LIST=0
 # Transform long options into short ones
@@ -61,7 +67,7 @@ function usage
     exit 0
 }
 # Parse short options with bash getopts
-while getopts "L:B:g:x:f:t:qGlh" arg; do
+while getopts "L:B:g:x:R:f:t:u:qGlh" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
       L) # $LOG file.  "less -r r$LOG" to view colorized version
@@ -76,11 +82,17 @@ while getopts "L:B:g:x:f:t:qGlh" arg; do
       x) # add an 'example/' to run ex. -x primitive-softmax
         EXAMPLES="${EXAMPLES} ${OPTARG}"
         ;;
+      R) # run with ctest ARGS="-R pattern"
+        REQUIRE="${OPTARG}"; GTESTS=''; EXAMPLES=''
+        ;;
       f) # (--filter) gtest filter ex. -g test_matmul -f 'Generic_s8*'
         GTEST_FILTER=${OPTARG}
         ;;
       t) # N OMP_NUM_THREADS
         THREADS="${OPTARG}"
+        ;;
+      u) # soft ulimit (kB)
+        ULIMIT="${OPTARG}"
         ;;
       q) # quick rebuild of $BLD--> q.log
         BUILD=1
@@ -109,6 +121,10 @@ if [ ! -d "${BLD}" ]; then
   echo ""
   usage
 fi
+ulimit -Hs unlimited
+ulimit -Ss $ULIMIT
+echo 'ulimit hard : '`ulimit -Hs`
+echo 'ulimit soft : '`ulimit -Ss`
 if [ ${LIST} -eq 1 ]; then
   for d in examples tests/gtests; do
     if [ -d "${BLD}/${d}" ]; then
@@ -125,11 +141,30 @@ if [ "$THREADS" ]; then
 fi
 rm -f "r${LOG}"
 rm -f typescript # we append /dev/tty raw output here.
+
+#cat /etc/opt/nec/ve/veos/log4crc \
+#  | sed -e 's/INFO/DEBUG/;s/CRIT/DEBUG/;s/layout="ve"/layout="ve_debug"/' \
+#  > ./log4crc
+#export LOG4C_RCPATH=`pwd`
+NODE=0
+TEST_ENV+=(VE_NODE_NUMBER=${NODE})
+VEOSLOG=/var/opt/nec/ve/veos/veos${NODE}.log.0
+
+# VE_LIMIT_OPT is inherited from ulimit if unset
+# VE_LIMIT_OPT supercedes VE_STACK_LIMIT
+# documentation: https://veos-sxarr-nec.github.io/doc/HowToExecuteVEprogram.txt
+unset VE_LIMIT_OPT
+#export VE_LIMIT_OPT="--softs 32768 --hards unlimited"
+ve_exec --show-limit 2>&1 | tee "r{$LOG}"
+#
+# I am unable to set stack larger than 32768 ?
+#
+
 function options
 {
   echo "Build dir      : ${BLD}"
   echo "quick rebuild? : ${BUILD}"
-  if [ -z "${GTESTS}" -a -z "${EXAMPLES}" ]; then
+  if [ -z "${GTESTS}" -a -z "${EXAMPLES}" -a -z "${REQUIRE}" ]; then
     echo "Using default set of gtests"
     GTESTS="$DEF_GTESTS";
   else
@@ -163,15 +198,16 @@ function test # test COMMAND [ARGS...] -- run in TEST_ENV & send console output 
 {
   # run COMMAND in TEST_ENV, returning exit status of COMMAND
   # what's seen on terminal goes to typescript
-  #  so abort message that write to /dev/tty also end up in t${LOG}
+  #  so abort message that write to /dev/tty also end up in r${LOG}
   echo 'ulimit : '`ulimit -s`
   echo "${ENV} ${TEST_ENV[@]} $*"
-  ${ENV} ${TEST_ENV[@]} GTEST_FILTER="${GTEST_FILTER}" script -e -a -c $*
+  ${ENV} ${TEST_ENV[@]} GTEST_FILTER="${GTEST_FILTER}" script -e -a -c "$*"
 }
 function comment
 {
   echo "$*" | tee -a "r${LOG}"
 }
+
 #------------------ run some tests ---------------------------
 tests=0;
 fail=0;
@@ -185,22 +221,41 @@ if [ $GDB = 0 ]; then # "" evaluates to false
       tests=$(($tests+1))
       { >&2 echo; >&2 echo "test ${t}";
         {
+          VEOSLINE=`cat "${VEOSLOG}" | wc -l`
+          >&2 echo "VEOSLINE = ${VEOSLINE}"
           test "${BLD}/tests/gtests/${t}"
         } \
         && { >&2 echo "OK gtest ${t}"; ok=$(($ok+1)); } \
         || { >&2 echo "ERROR gtest ${t} exit code $?"; fail=$(($fail+1)); }
       }
+      VEOSNEW=`awk "NR>${VEOSLINE}" "${VEOSLOG}"`
+      >&2 echo "${VEOSNEW}" >> "r${LOG}"
     done
     for t in $EXAMPLES; do
       tests=$(($tests+1))
       { >&2 echo; >&2 echo "run ${BLD}/examples/${t}";
         {
+          VEOSLINE=`cat "${VEOSLOG}" | wc -l`
           test "${BLD}/examples/${t}"
         } \
         && { >&2 echo "OK gtest ${t}"; ok=$(($ok+1)); } \
         || { >&2 echo "ERROR gtest ${t} exit code $?"; fail=$(($fail+1)); }
       }
+      VEOSNEW=`awk "NR>${VEOSLINE}" "${VEOSLOG}"`
+      >&2 echo "${VEOSNEW}" >> "r${LOG}"
     done
+    if [ "${REQUIRE}" ]; then
+      { >&2 echo; >&2 echo "ARGS='-R ${REQUIRE}' make -C '${BLD}' test";
+        {
+          VEOSLINE=`cat "${VEOSLOG}" | wc -l`
+          ARGS="-R '${REQUIRE}'" test make -C "${BLD}" test
+        } \
+        && { >&2 echo "OK gtest ${t}"; ok=$(($ok+1)); } \
+        || { >&2 echo "ERROR gtest ${t} exit code $?"; fail=$(($fail+1)); }
+      }
+      VEOSNEW=`awk "NR>${VEOSLINE}" "${VEOSLOG}"`
+      >&2 echo "${VEOSNEW}" >> "r${LOG}"
+    fi
   } \
     2>&1 1>>"r${LOG}" 2> >(tee >(cat 1>&2)) # stdout+stderr-->LOG; stderr-->console
     #2>&1 1>>"${LOG}"
@@ -236,6 +291,7 @@ fi
 if [ ${fail} -gt 0 ]; then
   comment "Common VE exit codes:"
   comment "    1 --> failed assertion"
+  comment "  134 --> Unable to grow stack"
   comment "  137 --> free(): invalid pointer: 0x..., and backtrace"
   comment "  139 --> Segmentation fault: Address not mapped to object at 0x..."
 fi

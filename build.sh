@@ -20,7 +20,7 @@ DOTARGET="x"
 BFLOAT16="x"
 RNN="x"
 OMP="x"
-ULIMIT=65536 # ulimit is in 1024-byte blocks
+ULIMIT=16384 # ulimit is in 1024-byte blocks
 ENV=`which env`
 
 # see dnnl_config.h ...
@@ -66,7 +66,7 @@ while getopts ":m:hvjatTdDqQPFbBrRowW1567iMrcC" arg; do
         a) # NEC Aurora VE, full features
             if [ ! "${DOTARGET}" == "x" ]; then echo "-a no good: already have -${DOTARGET}"; usage; fi
             DOTARGET="a"; SIZE_T=64;
-            JOBS="-j8" # -j1 to avoid SIGSEGV in ccom
+            JOBS="-j24" # -j1 to avoid SIGSEGV in ccom, now handle with incr ulimit -s
             if [ `uname -n` = "zoro" ]; then JOBS="-j8"; fi
             ;;
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
@@ -396,11 +396,16 @@ if [ "$DOTARGET" = "a" -o "$DOTARGET" = "s" ]; then
     #export VE_PROGINF=YES;
     export VE_PROGINF=DETAIL;
     export C_PROGINF=YES;
+    ulimit -Hs unlimited
     ulimit -s $ULIMIT
     echo 'ulimit : '`ulimit -s`
+    unset VE_LIMIT_OPT
+    # above default 32768 is not possible???
+    #export VE_LIMIT_OPT='--softs 1000000 --hards=unlimited'
 else
     unset VE_PROGINF
     unset C_PROGINF
+    unset VE_LIMIT_OPT
 fi
 
 if [ "$DOTARGET" = "aXXX" ]; then
@@ -426,7 +431,8 @@ echo "PATH $PATH"
     echo "BUILDDIR   ${BUILDDIR}"
     echo "INSTALLDIR ${INSTALLDIR}"
     echo "JOBS       ${JOBS}"
-    ulimit -s $ULIMIT # 10.1.18 "When compiling a program which code size is large, the compiler aborts by SIGSEGV."
+    #ulimit -Hs unlimited # operation not permitted
+    ulimit -Ss $ULIMIT # 10.1.18 "When compiling a program which code size is large, the compiler aborts by SIGSEGV."
     echo 'ulimit : '`ulimit -s`
     if [ $QUICK -lt 2 ]; then
         mkdir "${BUILDDIR}"
@@ -468,6 +474,10 @@ echo "PATH $PATH"
     CMAKETRACE="${CMAKETRACE} -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON"
     CMAKEOPT="${CMAKEOPT} -DDNNL_VERBOSE=1"
     CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=${ISA}"
+
+    # avoid global scratchpad (thread local storage)
+    CMAKEOPT="${CMAKEOPT} -DDNNL_ENABLE_CONCURRENT_EXEC=ON"
+
     #if [ "$VERBOSE_EXTRA" == "y" -o "${DODEBUG}" == "y" ]; then
     #    # iterator print skipped impls if dnnl_get_verbose=3|4
     #    #CMAKEOPT="${CMAKEOPT} -DDNNL_VERBOSE=EXTRA"
@@ -675,6 +685,13 @@ echo "PATH $PATH"
         set +x
     fi
     set -x
+
+    if [ "$BUILDOK" == "y" -a "$DOTARGET" == "a" ]; then
+        for d in src examples tests tests/gtests tests/gtests tests/benchdnn; do
+            echo "ve_validate_binary in ${BUILDDIR}/${d} ..."
+            ve_validate_binary -d "${BUILDDIR}/${d}"
+        done
+    fi
     if [ "$BUILDOK" == "y" -a ! "$DOTARGET" == "s" ]; then
         echo "DOTARGET  $DOTARGET"
         echo "ISA       $ISA"
@@ -694,7 +711,7 @@ echo "PATH $PATH"
         TEST_ENV=(DNNL_VERBOSE=2)
         TEST_ENV+=(VE_INIT_HEAP=ZERO)
         TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
-        TEST_ENV+=(OMP_STACKSIZE=1G)
+        TEST_ENV+=(OMP_STACKSIZE=128M)
         TEST_ENV+=(VE_TRACEBACK=VERBOSE)
         TEST_ENV+=(VE_INIT_HEAP=ZERO)
         TEST_ENV+=(VE_PROGINF=DETAIL)
@@ -710,7 +727,7 @@ echo "PATH $PATH"
         if [ $DOTEST -eq 13 ]; then # another short test, this one can fail too
             { echo "cpu-cnn-training-f32-c"
                 ${ENV} ${TEST_ENV[@]} ${TESTRUNNER}  ${VE_EXEC} examples/cpu-cnn-training-f32-c \
-                || xBUILDOK="n"; # do not stop tests on failure
+                    || xBUILDOK="n"; # do not stop tests on failure
             }
         fi
     fi
@@ -735,7 +752,8 @@ echo "PATH $PATH"
 ls -l "${BUILDDIR}"
 BUILDOK="n"; if [ -f "${BUILDDIR}/stamp-BUILDOK" ]; then BUILDOK="y"; fi
 
-echo 'ulimit : '`ulimit -s`
+echo 'ulimit hard : '`ulimit -Hs`
+echo 'ulimit soft : '`ulimit -Ss`
 set +x
 # after cmake we might have a better idea about ve_exec (esp. if PATH is not set properly)
 if [ -f "${BUILDDIR}/bash_help.inc" ]; then # file was removed from mkl-dnnl ~ v1.x
@@ -779,34 +797,36 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
         TEST_ENV=(DNNL_VERBOSE=2)
         TEST_ENV+=(VE_INIT_HEAP=ZERO)
         TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
-        TEST_ENV+=(OMP_STACKSIZE=1G)
         TEST_ENV+=(VE_TRACEBACK=VERBOSE)
         TEST_ENV+=(VE_INIT_HEAP=ZERO)
         TEST_ENV+=(VE_PROGINF=DETAIL)
         #TEST_ENV+=(VE_ADVANCEOFF=YES)
+        TEST_ENV+=(OMP_STACKSIZE=128M)
         TEST_ENV+=(OMP_DYNAMIC=false)
         TEST_ENV+=(OMP_PROC_BIND=true)
         if [ ${OMP} -eq 1 ]; then TEST_ENV+=(OMP_NUM_THREADS=1); fi
         #TEST_ENV+=(OMP_WAIT_POLICY=active)
-        rm -f test1.log test2.log test3.log
-        echo "Testing in ${BUILDDIR} ... test1"
-        if [ $DOTEST -eq 0 ]; then # some short sanity-check examples
-            ( echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' ${TESTRUNNER} make VERBOSE=1 test"; \
-                cd "${BUILDDIR}" && ${ENV} ${TEST_ENV[@]} ARGS='-VV -R primitives-.*' \
-                ${TESTRUNNER} make VERBOSE=1 test \
-            ) 2>&1 | tee "${BUILDDIR}/test1.log" || true
+        rm -f ${BUILDDIR}/test[0123].log
+        # 'make test` uses ctest, which recognizes -R (require) and -E (exclude) options
+        if [ $DOTEST -ge 0 ]; then # some short sanity-check examples
+            echo "Testing> ${BUILDDIR}/test0.log"
+            ( echo "${ENV} ${TEST_ENV[@]} ${TESTRUNNER}  examples/primitives*"; \
+                ${ENV} ${TEST_ENV[@]} ARGS="-VV -R 'primitives-'" \
+                ${TESTRUNNER} make VERBOSE=1 -C "${BUILDDIR}" test \
+            ) 2>&1 | tee "${BUILDDIR}/test0.log" || true
         fi
         if [ $DOTEST -ge 1 ]; then
-            ( echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -E .*test_.*' ${TESTRUNNER} make VERBOSE=1 test"; \
-                cd "${BUILDDIR}" && ${ENV} ${TEST_ENV[@]} ARGS='-VV -E primitives-.* -E .*test_.*' \
-                ${TESTRUNNER} make VERBOSE=1 test \
+            echo "Testing> ${BUILDDIR}/test1.log"
+            ( echo "${ENV} ${TEST_ENV[@]}  other examples"; \
+                ${ENV} ${TEST_ENV[@]} ARGS="-VV -E '(test_)|(primitives-)'" \
+                ${TESTRUNNER} make VERBOSE=1 -C "${BUILDDIR}" test \
             ) 2>&1 | tee "${BUILDDIR}/test1.log" || true
         fi
         if [ $DOTEST -ge 2 ]; then
-            echo "Testing ... test2"
-            ( echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -R .*test_.*' ${TESTRUNNER} <commnad>";
-                 cd "${BUILDDIR}" && ${ENV} ${TEST_ENV[@]} ARGS='-VV -R .*test_.*' \
-                     ${TESTRUNNER}  make VERBOSE=1 test \
+            echo "Testing> ${BUILDDIR}/test2.log"
+            ( echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -R 'test_' ${TESTRUNNER} <commnad>";
+                 ${ENV} ${TEST_ENV[@]} ARGS="-VV -R 'test_'" \
+                 ${TESTRUNNER}  make VERBOSE=1 -C "${BUILDDIR}" test \
             ) 2>&1 | tee "${BUILDDIR}/test2.log" || true
         fi
         if [ $DOTEST -ge 3 ]; then # some [few] convolution timings (see that benchdnn runs)

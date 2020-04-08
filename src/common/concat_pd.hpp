@@ -35,13 +35,16 @@ struct concat_pd_t : public primitive_desc_t {
         : primitive_desc_t(engine, attr, primitive_kind::concat)
         , n_(n)
         , concat_dim_(concat_dim)
-        , dst_md_(*dst_md) {
+        , dst_md_(*dst_md)
+        , src_image_mds_()
+        , desc_() {
         src_mds_.reserve(n_);
         for (int i = 0; i < n_; ++i)
             src_mds_.push_back(src_mds[i]);
 
         // Fill a desc that is intended for internal use only
-        desc_ = utils::zero<concat_desc_t>();
+        // internal_desc_types.hpp
+        //desc_ = utils::zero<concat_desc_t>(); // this type is no longer POD
         desc_.primitive_kind = primitive_kind::concat;
         desc_.dst_md = dst_md_;
         desc_.n = n_;

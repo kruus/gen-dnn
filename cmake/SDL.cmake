@@ -28,10 +28,18 @@ if(NECVE) # handle cross-compiler toolchains separately
     if(DNNL_LIBRARY_TYPE STREQUAL "SHARED")
         set(CMAKE_CCXX_FLAGS "-fPIC")
     endif()
+    append(CMAKE_EXE_LINKER_FLAGS "-Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now")
     append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now")
-    append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,stacksize=0x8000000") # 128M stack
+    #append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,stacksize=0x1000000") # 16M stack
+    #append(CMAKE_EXE_LINKER_FLAGS    "-Wl,-z,stacksize=0x1000000") # 16M stack
+    #append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,stacksize=0x8000000") # 128M stack
+    #append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,stacksize=0x10000000") # 256M stack
+    #append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,stacksize=0x80000000") # 1G stack
+    #append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,stacksize=0x100000000") # 2G stack
+    append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,stacksize=0x400000000") # 16G stack
+    append(CMAKE_EXE_LINKER_FLAGS "-Wl,-z,stacksize=0x400000000") # 16G stack
     append(CMAKE_CCXX_FLAGS "-D_FORTIFY_SOURCE=2")
-    #append(CMAKE_CCXX_FLAGS "-D_VE_ITERATOR_DEBUG")
+    append(CMAKE_CCXX_FLAGS "-D_VE_ITERATOR_DEBUG")
 elseif(UNIX)
     # DNNL_LIBRARY_TYPE STATIC might not need -fPIC
     set(CMAKE_CCXX_FLAGS "-fPIC -Wformat -Wformat-security")
