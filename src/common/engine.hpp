@@ -18,6 +18,7 @@
 #define ENGINE_HPP
 
 #include <mutex>
+#include <stdio.h>
 
 #include "dnnl.h"
 
@@ -140,7 +141,16 @@ struct dnnl_engine : public dnnl::impl::c_compatible {
 #else
                 const char *str = "dnnl_verbose,create";
 #endif
+#if defined(__ve)
+#define VE_REG_sp() \
+    ({ void* stack_ptr; \
+     asm volatile("lea %0, (%%sp)":"=r"(stack_ptr)); \
+     stack_ptr; })
+                printf("%s,sp%p,%s,%g\n", str, VE_REG_sp(),
+                       p->pd()->info(), time);
+#else
                 printf("%s,%s,%g\n", str, p->pd()->info(), time);
+#endif
                 fflush(0);
             }
         };

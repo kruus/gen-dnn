@@ -30,16 +30,17 @@ if(NECVE) # handle cross-compiler toolchains separately
     endif()
     append(CMAKE_EXE_LINKER_FLAGS "-Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now")
     append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now")
+
+    # /opt/nec/ve/bin/nld: warning: -z stacksize=0x1000000 ignored.
     #append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,stacksize=0x1000000") # 16M stack
     #append(CMAKE_EXE_LINKER_FLAGS    "-Wl,-z,stacksize=0x1000000") # 16M stack
-    #append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,stacksize=0x8000000") # 128M stack
-    #append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,stacksize=0x10000000") # 256M stack
-    #append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,stacksize=0x80000000") # 1G stack
-    #append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,stacksize=0x100000000") # 2G stack
-    append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,stacksize=0x400000000") # 16G stack
-    append(CMAKE_EXE_LINKER_FLAGS "-Wl,-z,stacksize=0x400000000") # 16G stack
-    append(CMAKE_CCXX_FLAGS "-D_FORTIFY_SOURCE=2")
-    append(CMAKE_CCXX_FLAGS "-D_VE_ITERATOR_DEBUG")
+
+    #append(CMAKE_CCXX_FLAGS "-D_VE_ITERATOR_DEBUG")
+    append(CMAKE_CCXX_FLAGS "-D_FORTIFY_SOURCE=0")
+    #append(CMAKE_CCXX_FLAGS "-D_FORTIFY_SOURCE=1")
+    #append(CMAKE_CCXX_FLAGS "-D_FORTIFY_SOURCE=2") #--> printf in every object file
+    #append(CMAKE_EXE_LINKER_FLAGS "-Wl,-z,muldefs") # if you choose -D_FORTIFY_SOURCE=2
+    #append(CMAKE_SHARED_LINKER_FLAGS "-Wl,-z,muldefs")
 elseif(UNIX)
     # DNNL_LIBRARY_TYPE STATIC might not need -fPIC
     set(CMAKE_CCXX_FLAGS "-fPIC -Wformat -Wformat-security")

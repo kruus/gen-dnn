@@ -85,7 +85,16 @@ status_t dnnl_primitive_execute(const primitive_t *primitive, stream_t *stream,
         status = primitive->execute(ctx);
         stream->wait();
         ms = get_msec() - ms;
+#if defined(__ve)
+#define VE_REG_sp() \
+    ({ void* stack_ptr; \
+     asm volatile("lea %0, (%%sp)":"=r"(stack_ptr)); \
+     stack_ptr; })
+        printf("dnnl_verbose,exec,sp%p,%s,%g\n", VE_REG_sp(),
+               primitive->pd()->info(), ms);
+#else
         printf("dnnl_verbose,exec,%s,%g\n", primitive->pd()->info(), ms);
+#endif
         fflush(0);
     } else {
         status = primitive->execute(ctx);

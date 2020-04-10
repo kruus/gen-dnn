@@ -1,7 +1,7 @@
 #!/bin/bash
 # vim: et sw=2 ts=2 foldlevel=6
 ENV=`which env`
-TEST_ENV=(DNNL_VERBOSE=2)
+TEST_ENV=()
 TEST_ENV+=(VE_INIT_HEAP=ZERO)
 TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
 TEST_ENV+=(VE_TRACEBACK=VERBOSE)
@@ -10,19 +10,19 @@ TEST_ENV+=(VE_PROGINF=DETAIL)
 #TEST_ENV+=(VE_ADVANCEOFF=YES)
 #TEST_ENV+=(VE_LIMIT_OPT="--softs\\ 262144\\ --hards=unlimited")
 #TEST_ENV+=(OMP_STACKSIZE=1G)
-TEST_ENV+=(OMP_STACKSIZE=64M)
-TEST_ENV+=(OMP_DYNAMIC=false)
+TEST_ENV+=(OMP_STACKSIZE=128M)
+#TEST_ENV+=(OMP_STACKSIZE=32M)
+#TEST_ENV+=(OMP_NUM_THREADS=1)
 TEST_ENV+=(OMP_PROC_BIND=true)
-TEST_ENV+=(OMP_NUM_THREADS=1)
-TEST_ENV+=(VE_OMP_NUM_THREADS=1)
-#TEST_ENV+=(OMP_WAIT_POLICY=active)
+TEST_ENV+=(OMP_DYNAMIC=false)
+TEST_ENV+=(OMP_WAIT_POLICY=active)
 
 #
-ULIMIT=8192 # in 1024-byte increments
-#ULIMIT=65536 # in 1024-byte increments
-#ULIMIT=262144
+#ULIMIT=8192 # in 1024-byte increments
+#ULIMIT=65536 # in 1024-byte increments (many will fail below this)
+#ULIMIT=131072
+ULIMIT=262144
 #ULIMIT=unlimited
-echo "${ENV} ${TEST_ENV[@]} <command>"
 LOG="f.log"
 BLD="build-ved4"
 BUILD=0
@@ -34,8 +34,13 @@ GTESTS=''
 GTEST_FILTER='*'
 EXAMPLES=''
 REQUIRE=''
+VERBOSE=-1
+OMP=-1
 GDB=0
+STRACE=''
 LIST=0
+NODE=0
+if [ "$VE_NODE_NUMBER" ]; then NODE="$VE_NODE_NUMBER"; fi
 # Transform long options into short ones
 for arg in "$@"; do
   shift
@@ -67,7 +72,7 @@ function usage
     exit 0
 }
 # Parse short options with bash getopts
-while getopts "L:B:g:x:R:f:t:u:qGlh" arg; do
+while getopts "L:B:x:g:f:R:N:t:u:vqGSolh" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
       L) # $LOG file.  "less -r r$LOG" to view colorized version
@@ -76,17 +81,20 @@ while getopts "L:B:g:x:R:f:t:u:qGlh" arg; do
       B) # $BLD build directory
         if [ "${OPTARG}" ]; then BLD="${OPTARG}"; fi
         ;;
+      x) # add an 'example/' to run ex. -x primitive-softmax
+        EXAMPLES="${EXAMPLES} ${OPTARG}"
+        ;;
       g) # single gtest to run [default=preset set of tests]
         GTESTS="${GTESTS} ${OPTARG}"
         ;;
-      x) # add an 'example/' to run ex. -x primitive-softmax
-        EXAMPLES="${EXAMPLES} ${OPTARG}"
+      f) # (--filter) gtest filter ex. -g test_matmul -f 'Generic_s8*'
+        GTEST_FILTER=${OPTARG}
         ;;
       R) # run with ctest ARGS="-R pattern"
         REQUIRE="${OPTARG}"; GTESTS=''; EXAMPLES=''
         ;;
-      f) # (--filter) gtest filter ex. -g test_matmul -f 'Generic_s8*'
-        GTEST_FILTER=${OPTARG}
+      N) # [0, or from environment] VE_NODE_NUMBER
+        NODE="${OPTARG}"
         ;;
       t) # N OMP_NUM_THREADS
         THREADS="${OPTARG}"
@@ -94,11 +102,23 @@ while getopts "L:B:g:x:R:f:t:u:qGlh" arg; do
       u) # soft ulimit (kB)
         ULIMIT="${OPTARG}"
         ;;
+      v) # DNNL_VERBOSE = 0,1,2 if specified once, twice, thrice
+        VERBOSE=$((VERBOSE+1))
+        ;;
       q) # quick rebuild of $BLD--> q.log
         BUILD=1
         ;;
       G) # (--gdb) run in gdb : requires -g single gtest name)
-        GDB=1
+        GDB=1; STRACE='';
+        ;;
+      S) # (--strace) run under strace
+        STRACE='strace'; GDB=0;
+        ;;
+      o) # OpenMp support [default -ooo]:
+        # once    | 0 | build SEQ (no omp support) (run
+        # twice   | 1 | omp support, but test with OMP_NUM_THREADS=1
+        # thrice  | 2 | [default] omp, test without specifying OMP_NUM_THREADS
+        OMP=$(( OMP + 1 ));
         ;;
       l) # list gtests and examples subdirectory of -B build directory
         LIST=1
@@ -121,10 +141,42 @@ if [ ! -d "${BLD}" ]; then
   echo ""
   usage
 fi
+# ULIMIT (inherited by VE, since VE_LIMIT_OPT with spaces poses difficulty)
 ulimit -Hs unlimited
 ulimit -Ss $ULIMIT
 echo 'ulimit hard : '`ulimit -Hs`
 echo 'ulimit soft : '`ulimit -Ss`
+echo "NODE        : ${NODE}"
+# VE_LIMIT_OPT is inherited from ulimit if unset
+unset VE_LIMIT_OPT
+# VE_LIMIT_OPT supercedes VE_STACK_LIMIT
+# documentation: https://veos-sxarr-nec.github.io/doc/HowToExecuteVEprogram.txt
+export VE_LIMIT_OPT="--softs $ULIMIT --hards unlimited"
+ve_exec --show-limit 2>&1 | tee "r{$LOG}"
+
+# DNNL_VERBOSE?
+if [ $VERBOSE -lt 0 -o $VERBOSE -gt 2 ]; then VERBOSE=2; fi
+TEST_ENV+=(DNNL_VERBOSE=$VERBOSE)
+
+# OMP_NUM_THREADS?
+if [ $OMP -lt 0 -o $OMP -gt 2 ]; then OMP=2; fi
+echo "OMP=${OMP}"
+if [ ${OMP} -eq 1 ]; then TEST_ENV+=(OMP_NUM_THREADS=1);
+else TEST_ENV+=(--unset=OMP_NUM_THREADS); TEST_ENV+=(--unset=VE_OMP_NUM_THREADS); fi
+
+# VE_NODE_NUMBER and VEOS debug mode
+TEST_ENV+=(VE_NODE_NUMBER=${NODE})
+# following put ve_exec (etc.) logs in current directory, at DEBUG level
+if [ ! -d ve ]; then mkdir ve; fi
+cat /etc/opt/nec/ve/veos/log4crc \
+  | sed -e 's/INFO/DEBUG/;s/CRIT/DEBUG/;s/layout="ve"/layout="ve_debug"/' \
+  > ./ve/log4crc
+export LOG4C_RCPATH=`pwd`/ve # ---> ve_exec.log.PID under ve/
+# maybe incompatible with older VEOSLOG approach?
+# (but maybe it gives you at least the PID?)
+VEOSLOG=/var/opt/nec/ve/veos/veos${NODE}.log.0
+
+echo "${ENV} ${TEST_ENV[@]} <command>"
 if [ ${LIST} -eq 1 ]; then
   for d in examples tests/gtests; do
     if [ -d "${BLD}/${d}" ]; then
@@ -142,20 +194,6 @@ fi
 rm -f "r${LOG}"
 rm -f typescript # we append /dev/tty raw output here.
 
-#cat /etc/opt/nec/ve/veos/log4crc \
-#  | sed -e 's/INFO/DEBUG/;s/CRIT/DEBUG/;s/layout="ve"/layout="ve_debug"/' \
-#  > ./log4crc
-#export LOG4C_RCPATH=`pwd`
-NODE=0
-TEST_ENV+=(VE_NODE_NUMBER=${NODE})
-VEOSLOG=/var/opt/nec/ve/veos/veos${NODE}.log.0
-
-# VE_LIMIT_OPT is inherited from ulimit if unset
-# VE_LIMIT_OPT supercedes VE_STACK_LIMIT
-# documentation: https://veos-sxarr-nec.github.io/doc/HowToExecuteVEprogram.txt
-unset VE_LIMIT_OPT
-#export VE_LIMIT_OPT="--softs 32768 --hards unlimited"
-ve_exec --show-limit 2>&1 | tee "r{$LOG}"
 #
 # I am unable to set stack larger than 32768 ?
 #
@@ -201,7 +239,7 @@ function test # test COMMAND [ARGS...] -- run in TEST_ENV & send console output 
   #  so abort message that write to /dev/tty also end up in r${LOG}
   echo 'ulimit : '`ulimit -s`
   echo "${ENV} ${TEST_ENV[@]} $*"
-  ${ENV} ${TEST_ENV[@]} GTEST_FILTER="${GTEST_FILTER}" script -e -a -c "$*"
+  ${ENV} ${TEST_ENV[@]} GTEST_FILTER="${GTEST_FILTER}" script -e -a -c "${STRACE} $*"
 }
 function comment
 {
@@ -289,7 +327,9 @@ elif [ $GDB = 1 ]; then # "" evaluates to false
   }
 fi
 if [ ${fail} -gt 0 ]; then
-  comment "Common VE exit codes:"
+  comment "`ls -1 ve_exec.log*` --> ve/"
+  mv -v ve_*.log* ve/ || echo "(no ve_*.log* in current dir)"
+  comment "Common VE exit codes (${fail} failure[s]):"
   comment "    1 --> failed assertion"
   comment "  134 --> Unable to grow stack"
   comment "  137 --> free(): invalid pointer: 0x..., and backtrace"

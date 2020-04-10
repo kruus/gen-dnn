@@ -19,8 +19,13 @@ NEC_FTRACE=0
 DOTARGET="x"
 BFLOAT16="x"
 RNN="x"
-OMP="x"
-ULIMIT=16384 # ulimit is in 1024-byte blocks
+OMP=-1
+#ULIMIT=16384 # ulimit is in 1024-byte blocks
+#ULIMIT=32768
+#ULIMIT=65536
+#ULIMIT=131072
+ULIMIT=262144
+#ULIMIT=unlimited
 ENV=`which env`
 
 # see dnnl_config.h ...
@@ -49,12 +54,15 @@ usage() {
     echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
 }
-while getopts ":m:hvjatTdDqQPFbBrRowW1567iMrcC" arg; do
+while getopts ":m:u:hvjatTdDqQPFbBrRowW1567iMrcC" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         m) # -mISA "machine", ISA=[ALL] | VANILLA | ANY? ... (prefer j|a|gj|ga)
             ISA="${OPTARG}"
             # check for valid ISA string values XXX
+            ;;
+        u) # soft ulimit (kB) [32768] (avoid nc++ ccom errors)
+            ULIMIT="${OPTARG}"
             ;;
         v) # force Intel x86 JIT compile for VANILLA generic architecture
             ISA=VANILLA
@@ -66,7 +74,8 @@ while getopts ":m:hvjatTdDqQPFbBrRowW1567iMrcC" arg; do
         a) # NEC Aurora VE, full features
             if [ ! "${DOTARGET}" == "x" ]; then echo "-a no good: already have -${DOTARGET}"; usage; fi
             DOTARGET="a"; SIZE_T=64;
-            JOBS="-j24" # -j1 to avoid SIGSEGV in ccom, now handle with incr ulimit -s
+            _cpus=`cat /proc/cpuinfo | grep '^processor' | wc -l` || _cpus=16
+            JOBS="-j$((_cpus/2+1))" # SIGSEGV in ccom now handle with incr ulimit -s
             if [ `uname -n` = "zoro" ]; then JOBS="-j8"; fi
             ;;
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
@@ -115,11 +124,11 @@ while getopts ":m:hvjatTdDqQPFbBrRowW1567iMrcC" arg; do
         R) # add rnn support and tests
             RNN="y"
             ;;
-        o) # OpenMp support:
+        o) # OpenMp support [default -ooo]:
             # once    | 0 | build SEQ (no omp support) (run
             # twice   | 1 | omp support, but test with OMP_NUM_THREADS=1
             # thrice  | 2 | [default] omp, test without specifying OMP_NUM_THREADS
-            if [ "${OMP}" = "x" ]; then OMP=0; else OMP=$(( OMP + 1 )); fi
+            OMP=$(( OMP + 1 ));
             ;;
         w) # reduce compiler warnings
             DOWARN=0
@@ -163,7 +172,10 @@ while getopts ":m:hvjatTdDqQPFbBrRowW1567iMrcC" arg; do
             ;;
     esac
 done
-if [ "${OMP}" = "x" ]; then OMP=2; fi
+if [ $OMP -lt 0 -o $OMP -gt 2 ]; then OMP=2; fi
+if [ ${OMP} -eq 1 ]; then TEST_ENV+=(OMP_NUM_THREADS=1); fi
+#if [ $VERBOSE -lt 0 -o $VERBOSE -gt 2 ]; then VERBOSE=2; fi
+#TEST_ENV+=(DNNL_VERBOSE=$VERBOSE)
 # if unspecified, autodetect target via $CC compiler variable
 if [ "${DOTARGET}" == "x" ]; then
     if [ "${CC}" == "ncc" -a "${CXX}" == "nc++" ]; then
@@ -373,7 +385,7 @@ if [ "" ]; then # old way (now we do not need ve_exec anymore)
     VE_EXEC=''
     TESTRUNNER=''
     if [ "$DOTARGET" = "a" ]; then
-        export OMP_NUM_THREADS=1; # for now XXX
+        #export OMP_NUM_THREADS=1; # for now XXX
         if { ve_exec --version 2> /dev/null; } then
             # oops, this will not work for "${TESTRUNNER} make test"
             #TESTRUNNER="${TESTRUNNER} ve_exec"
@@ -461,19 +473,28 @@ echo "PATH $PATH"
         CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=Debug"
         OPT_FLAGS="-O0"
     fi
-        OPT_FLAGS="${OPT_FLAGS} -O0"
     if [ ! x"${OPT_FLAGS}" = x"" ]; then ccxx_flags ${OPT_FLAGS}; fi
     if [ "${DOTARGET}" = "a" ]; then
         ccxx_flags -include stdint.h
         ccxx_flags -minit-stack=zero
         ccxx_flags -Wunknown-pragma
         ccxx_flags -report-all
-        ccxx_flags -D_FORTIFY_SOURCE=1
+        ccxx_flags -finline-max-function-size=300
+        ccxx_flags -finline-max-depth=5
+        ccxx_flags -finline-max-times=20
+        #ccxx_flags -finline-abort-at-error
+        #ccxx_flags -finline-suppress-diagnostics # 3.0.28?
+        ccxx_flags -ftemplate-depth=20
+        ccxx_flags -fdiag-inline=1
+        ccxx_flags -fdiag-vector=0
+        ccxx_flags -mno-parallel
+        #ccxx_flags -D_FORTIFY_SOURCE=1
+        #ccxx_flags -D_FORTIFY_SOURCE=2 -Wl,-z,-muldefs
     fi
     # Show build commands
     CMAKETRACE="${CMAKETRACE} -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON"
-    CMAKEOPT="${CMAKEOPT} -DDNNL_VERBOSE=1"
-    CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=${ISA}"
+    CMAKEOPT="${CMAKEOPT} -DDNNL_VERBOSE=1" # enable env DNNL_VERBOSE=0|1|2
+    CMAKEOPT="${CMAKEOPT} -DDNNL_ISA=${ISA}" # deprecate?
 
     # avoid global scratchpad (thread local storage)
     CMAKEOPT="${CMAKEOPT} -DDNNL_ENABLE_CONCURRENT_EXEC=ON"
@@ -708,16 +729,16 @@ echo "PATH $PATH"
             # because 'make' tragets already supply VE_EXEC if needed.
         fi
         # Put one test here (maybe one you are currently debugging)
-        TEST_ENV=(DNNL_VERBOSE=2)
+        TEST_ENV=(DNNL_VERBOSE=1)
         TEST_ENV+=(VE_INIT_HEAP=ZERO)
         TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
-        TEST_ENV+=(OMP_STACKSIZE=128M)
         TEST_ENV+=(VE_TRACEBACK=VERBOSE)
         TEST_ENV+=(VE_INIT_HEAP=ZERO)
         TEST_ENV+=(VE_PROGINF=DETAIL)
         #TEST_ENV+=(VE_ADVANCEOFF=YES)
-        TEST_ENV+=(OMP_DYNAMIC=false)
+        TEST_ENV+=(VE_OMP_STACKSIZE=128M)
         TEST_ENV+=(OMP_PROC_BIND=true)
+        TEST_ENV+=(OMP_DYNAMIC=false)
         if [ ${OMP} -eq 1 ]; then TEST_ENV+=(OMP_NUM_THREADS=1); fi
         #TEST_ENV+=(OMP_WAIT_POLICY=active)
         { echo "api-c                   ...";
@@ -794,7 +815,7 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
     fi
     echo "Testing ?"
     if [ ! "$DOTARGET" == "s" ]; then # non-SX: -t might run some tests
-        TEST_ENV=(DNNL_VERBOSE=2)
+        TEST_ENV=(DNNL_VERBOSE=1)
         TEST_ENV+=(VE_INIT_HEAP=ZERO)
         TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
         TEST_ENV+=(VE_TRACEBACK=VERBOSE)

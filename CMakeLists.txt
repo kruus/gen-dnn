@@ -94,7 +94,7 @@ set(CMAKE_TEST_CCXX_FLAGS)      # TESTS specifics
 
 if(NECVE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++14")
 elseif(UNIX OR MINGW)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
@@ -168,5 +168,7 @@ if(NECVE)
     # -traceback enables VE_TRACEBACK=VERBOSE fatal error traceback
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread -traceback=verbose")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -traceback=verbose")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,-z,muldefs -Wl,-z,stacksize=65536")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-z,muldefs -Wl,-z,stacksize=65536")
     show_cmake_stuff("End cmake configuration")
 endif()
