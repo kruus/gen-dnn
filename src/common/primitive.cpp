@@ -153,7 +153,7 @@ dnnl_primitive::get_primitive_impl() const {
     return primitive_impl_;
 }
 
-inline status_t dnnl_primitive::execute(exec_ctx_t &ctx) const {
+status_t dnnl_primitive::execute(exec_ctx_t &ctx) const {
     const memory_storage_t *mem_storage = nullptr;
 #if !CRIPPLE_PRIMITIVE_CPP
     if (primitive_impl_->pd()->attr()->scratchpad_mode_

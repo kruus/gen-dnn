@@ -234,32 +234,52 @@ set(DNNL_USE_CLANG_SANITIZER "" CACHE STRING
 option(_DNNL_USE_MKL "use BLAS functions from Intel MKL" OFF)
 
 option(DNNLPRIM_ALL "enable all primitives, default=ON overrides all other layer options" ON)
-# If DNNLPRIM_ALL is OFF, can specify which layers are ON:
+# For faster build--debug cycle,
+# if DNNLPRIM_ALL is OFF, can specify which layers are ON
 option(DNNLPRIM_BATCH_NORMALIZATION "enable batch normalization primitive" OFF) #ok
-option(DNNLPRIM_BINARY "enable binary primitive" ON) #ok
-option(DNNLPRIM_CONVOLUTION "enable convolution primitive" OFF)
-option(DNNLPRIM_DECONVOLUTION "enable deconvolution primitive" OFF)
-option(DNNLPRIM_ELTWISE "enable eltwise primitive" OFF)
-option(DNNLPRIM_INNER_PRODUCT "enable inner product primitive" OFF)
-option(DNNLPRIM_LAYER_NORMALIZATION "enable layer normalization primitive" OFF)
-option(DNNLPRIM_LRN "enable local response normalization primitive" OFF)
-option(DNNLPRIM_LOGSOFTMAX "enable log_softmax primitive" OFF)
+option(DNNLPRIM_BINARY "enable binary primitive" OFF) #ok
+option(DNNLPRIM_CONVOLUTION "enable convolution primitive" OFF) #ok
+option(DNNLPRIM_DECONVOLUTION "enable deconvolution primitive" OFF) #ok
+option(DNNLPRIM_ELTWISE "enable eltwise primitive" OFF) #ok
+option(DNNLPRIM_INNER_PRODUCT "enable inner product primitive" OFF) #ok
+option(DNNLPRIM_LAYER_NORMALIZATION "enable layer normalization primitive" OFF) #ok
+option(DNNLPRIM_LRN "enable local response normalization primitive" OFF) #ok
+option(DNNLPRIM_LOGSOFTMAX "enable log_softmax primitive" OFF) # impl is part of softmax
 option(DNNLPRIM_MATMUL "enable matmul primitive" OFF)
-option(DNNLPRIM_POOLING "enable pooling primitive" OFF)
-option(DNNLPRIM_RESAMPLING "enable resampling primitive" OFF)
-option(DNNLPRIM_RNN "enable rnn primitive" OFF)
-option(DNNLPRIM_SHUFFLE "enable shuffle primitive" OFF)
+option(DNNLPRIM_POOLING "enable pooling primitive" OFF) #ok
+option(DNNLPRIM_RESAMPLING "enable resampling primitive" OFF) #ok
+option(DNNLPRIM_RNN "enable rnn primitive" OFF) #ok
+option(DNNLPRIM_SHUFFLE "enable shuffle primitive" OFF) #ok
 option(DNNLPRIM_SOFTMAX "enable softmax primitive" OFF) #ok
 # internal, or special constructor
-option(DNNLPRIM_CONCAT "enable concat primitive" OFF)
-option(DNNLPRIM_REORDER "enable reorder primitive" OFF)
-option(DNNLPRIM_SUM "enable sum primitive" OFF)
-option(DNNLPRIM_GEMM "enable softmax primitive" OFF)
+option(DNNLPRIM_CONCAT "enable concat primitive" OFF) #ok
+option(DNNLPRIM_REORDER "enable reorder primitive" OFF) #ok
+option(DNNLPRIM_SUM "enable sum primitive" OFF) #ok
+option(DNNLPRIM_GEMM "enable gemm primitive (maybe)" OFF)
 #  if a layer is ON and requires another layer, the required layer gets turned ON
 # softmax : requires no other primitive
 # concat : can use reorder
-#if(DNNLPRIM_CONCAT)
-#    set(DNNLPRIM_REORDER ON)
-#endif()
+if(DNNLPRIM_BINARY)
+    #set(DNNLPRIM_ELTWISE ON) # ?
+endif()
+if(DNNLPRIM_CONCAT)
+    set(DNNLPRIM_REORDER ON)
+endif()
+if(DNNLPRIM_CONVOLUTION)
+    set(DNNLPRIM_REORDER ON)
+endif()
+if(DNNLPRIM_DECONVOLUTION)
+    set(DNNLPRIM_CONVOLUTION ON)
+    set(DNNLPRIM_REORDER ON)
+endif()
+if(DNNLPRIM_INNER_PRODUCT)
+    set(DNNLPRIM_REORDER ON)
+endif()
+if(DNNLPRIM_LAYER_NORMALIZATION)
+    set(DNNLPRIM_REORDER ON)
+endif()
+if(DNNLPRIM_LOGSOFTMAX)
+    set(DNNLPRIM_SOFTMAX ON)
+endif()
 
 # vim: ts=4 sw=4 et

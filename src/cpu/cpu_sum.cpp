@@ -28,17 +28,15 @@ namespace dnnl {
 namespace impl {
 namespace cpu {
 
+using spd_create_f = dnnl::impl::engine_t::sum_primitive_desc_create_f;
+
 #if !USE_sum
-cpu_engine_t const sum_primitive_desc_create_f *
-get_sum_implementation_list() const override
-{
-    static const sum_primitive_desc_create_f empty_list[] = {nullptr};
+const spd_create_f *cpu_engine_t::get_sum_implementation_list() const {
+    static const spd_create_f empty_list[] = {nullptr};
     return empty_list;
 }
 
 #else
-
-using spd_create_f = dnnl::impl::engine_t::sum_primitive_desc_create_f;
 
 namespace {
 #define INSTANCE_CREATOR(...) __VA_ARGS__::pd_t::create,

@@ -27,7 +27,9 @@
 #if TARGET_X86_JIT
 #include "cpu/jit_uni_reorder.hpp"
 #endif // TARGET_X86_JIT
+#if USE_rnn
 #include "cpu/rnn/rnn_reorders.hpp"
+#endif
 #include "cpu/simple_reorder.hpp"
 #include "cpu/wino_reorder.hpp"
 #endif
@@ -36,19 +38,16 @@ namespace dnnl {
 namespace impl {
 namespace cpu {
 
+using rpd_create_f = dnnl::impl::engine_t::reorder_primitive_desc_create_f;
+
 #if !USE_reorder
-const reorder_primitive_desc_create_f *
-cpu_engine_t::get_reorder_implementation_list(
-        const memory_desc_t *src_md,
-        const memory_desc_t *dst_md) const
-{
-    static const reorder_primitive_desc_create_f empty_list[] = {nullptr};
+const rpd_create_f *cpu_engine_t::get_reorder_implementation_list(
+        const memory_desc_t *src_md, const memory_desc_t *dst_md) const {
+    static const rpd_create_f empty_list[] = {nullptr};
     return empty_list;
 }
 
 #else
-
-using rpd_create_f = dnnl::impl::engine_t::reorder_primitive_desc_create_f;
 
 namespace {
 using namespace dnnl::impl::data_type;
@@ -112,10 +111,16 @@ using impl_list_map_t = std::map<reorder_impl_key_t, std::vector<rpd_create_f>>;
 #define _IF_JIT(...)
 #endif
 
+#if USE_rnn
+#define _IF_RNN(...) __VA_ARGS__ ,
+#else
+#define _IF_RNN(...)
+#endif
+
 static const impl_list_map_t regular_impl_list_map {
     // f32 -> bf16
     {{f32, bf16, 0}, {
-        rnn_weights_reorder_t<f32, bf16>::pd_t::create,
+        _IF_RNN(rnn_weights_reorder_t<f32, bf16>::pd_t::create)
         _IF_JIT(jit_uni_reorder_create)
 
         REG_SR_BIDIR(f32, any, bf16, nChw16c),
@@ -223,7 +228,7 @@ static const impl_list_map_t regular_impl_list_map {
     }},
     {{f32, f32, 5}, {
         wino_reorder_t<f32, f32>::pd_t::create,
-        rnn_weights_reorder_t<f32, f32>::pd_t::create,
+        _IF_RNN(rnn_weights_reorder_t<f32, f32>::pd_t::create)
 
         REG_FAST_DIRECT_COPY_F32_F32_COMMA
 
@@ -308,7 +313,7 @@ static const impl_list_map_t regular_impl_list_map {
     // f32 -> s8
     {{f32, s8, 0}, {
         wino_reorder_t<f32, s8>::pd_t::create,
-        rnn_weights_reorder_s8_t<f32>::pd_t::create,
+        _IF_RNN(rnn_weights_reorder_s8_t<f32>::pd_t::create)
 
         REG_FAST_DIRECT_COPY_COMMA(f32, s8)
 
@@ -325,7 +330,7 @@ static const impl_list_map_t regular_impl_list_map {
 
     // f32 -> u8
     {{f32, u8, 0}, {
-        rnn_data_reorder_t<f32, u8>::pd_t::create,
+        _IF_RNN(rnn_data_reorder_t<f32, u8>::pd_t::create)
 
         REG_FAST_DIRECT_COPY_COMMA(f32, u8)
 
@@ -340,7 +345,7 @@ static const impl_list_map_t regular_impl_list_map {
 
     // bf16 ->
     {{bf16, data_type::undef, 0}, {
-        rnn_weights_reorder_t<bf16, bf16>::pd_t::create,
+        _IF_RNN(rnn_weights_reorder_t<bf16, bf16>::pd_t::create)
 
         _IF_JIT(jit_uni_reorder_create)
 
@@ -391,7 +396,7 @@ static const impl_list_map_t regular_impl_list_map {
 
     // s8 ->
     {{s8, data_type::undef, 0}, {
-        rnn_weights_reorder_s8_t<s8>::pd_t::create,
+        _IF_RNN(rnn_weights_reorder_s8_t<s8>::pd_t::create)
 
         REG_FAST_DIRECT_COPY_COMMA(s8, f32)
         REG_FAST_DIRECT_COPY_COMMA(s8, s32)

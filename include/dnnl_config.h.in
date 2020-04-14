@@ -103,6 +103,7 @@
 #ifndef DNNLPRIM_ALL
 #cmakedefine DNNLPRIM_BATCH_NORMALIZATION
 #cmakedefine DNNLPRIM_BINARY
+#cmakedefine DNNLPRIM_CONCAT
 #cmakedefine DNNLPRIM_CONVOLUTION
 #cmakedefine DNNLPRIM_DECONVOLUTION
 #cmakedefine DNNLPRIM_ELTWISE
@@ -112,10 +113,12 @@
 #cmakedefine DNNLPRIM_LOGSOFTMAX
 #cmakedefine DNNLPRIM_MATMUL
 #cmakedefine DNNLPRIM_POOLING
+#cmakedefine DNNLPRIM_REORDER
 #cmakedefine DNNLPRIM_RESAMPLING
 #cmakedefine DNNLPRIM_RNN
 #cmakedefine DNNLPRIM_SHUFFLE
 #cmakedefine DNNLPRIM_SOFTMAX
+#cmakedefine DNNLPRIM_SUM
 #endif
 
 /** DNNL CPU build target 1,2,etc = x86, ve, etc.

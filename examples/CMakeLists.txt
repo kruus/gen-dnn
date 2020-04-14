@@ -38,6 +38,9 @@ set_if(UNIX LIBM m)
 if(DNNLPRIM_ALL)
     file(GLOB_RECURSE sources *.cpp *.c)
 else()
+    # no primitives (create engine and stream, print hello)
+    set(sources "${CMAKE_CURRENT_SOURCE_DIR}/primitives/stream.cpp")
+
     macro(add_primitive_example var MYLAYER) # followed by filename prefixes
         if(DNNLPRIM_ALL OR DNNLPRIM_${MYLAYER})
             foreach(layer_ ${ARGN})

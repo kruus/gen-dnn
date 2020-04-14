@@ -138,10 +138,10 @@ macro(append_glob_jit var)
 endmacro()
 macro(append_subdir_recurse var subdir)
     file(GLOB_RECURSE _x
-        ${CMAKE_CURRENT_SOURCE_DIR}/S{subdir}/*.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/S{subdir}/*.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/S{subdir}/*.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/S{subdir}/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/*.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/*.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/*.cpp
         )
     list(APPEND ${var} ${_x})
 endmacro()

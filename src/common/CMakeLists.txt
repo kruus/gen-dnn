@@ -70,6 +70,9 @@ else() # Debug: include primitives piecewise into libdnnl
         ${CMAKE_CURRENT_SOURCE_DIR}/verbose.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/verbose.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/z_magic.hpp
+        # jit convolutions require primitive_hashing::key_t
+        ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.hpp
         )
     if(DNNL_ENABLE_PRIMITIVE_CACHE)
         list(APPEND SOURCES_CORE 
@@ -77,9 +80,16 @@ else() # Debug: include primitives piecewise into libdnnl
             ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.hpp
             )
+    elseif(TARGET_X86_JIT AND (DNNLPRIM_ALL OR DNNLPRIM_CONVOLUTION))
+        # jit convolutions require primitive_hashing::key_t
+        list(APPEND SOURCES_CORE 
+            ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.hpp
+            )
     endif()
 
     unset(SOURCES_PRIMITIVES)
+
     # add foo* files from current directory to list 'var', if MYLAYER is enabled in options.cmake
     macro(add_primitive_sources var MYLAYER) # followed by filename prefixes
         if(DNNLPRIM_ALL OR DNNLPRIM_${MYLAYER})
@@ -91,7 +101,7 @@ else() # Debug: include primitives piecewise into libdnnl
     # primitive descriptor private data and create
     add_primitive_sources(SOURCES_PRIMITIVES BATCH_NORMALIZATION batch_normalization)
     add_primitive_sources(SOURCES_PRIMITIVES BINARY binary)
-    add_primitive_sources(SOURCES_PRIMITIVES CONVOLUTION convolution)
+    add_primitive_sources(SOURCES_PRIMITIVES CONVOLUTION convolution reorder)
     add_primitive_sources(SOURCES_PRIMITIVES DECONVOLUTION deconvolution)
     add_primitive_sources(SOURCES_PRIMITIVES ELTWISE eltwise)
     add_primitive_sources(SOURCES_PRIMITIVES INNER_PRODUCT inner_product)
@@ -101,7 +111,7 @@ else() # Debug: include primitives piecewise into libdnnl
     add_primitive_sources(SOURCES_PRIMITIVES MATMUL matmul)
     add_primitive_sources(SOURCES_PRIMITIVES POOLING pooling)
     add_primitive_sources(SOURCES_PRIMITIVES RESAMPLING resampling)
-    add_primitive_sources(SOURCES_PRIMITIVES RNN rnn)
+    add_primitive_sources(SOURCES_PRIMITIVES RNN rnn reorder)
     add_primitive_sources(SOURCES_PRIMITIVES SHUFFLE shuffle)
     add_primitive_sources(SOURCES_PRIMITIVES SOFTMAX softmax)
     # internal, or with special constructor

@@ -25,16 +25,15 @@ namespace dnnl {
 namespace impl {
 namespace cpu {
 
+using cpd_create_f = dnnl::impl::engine_t::concat_primitive_desc_create_f;
+
 #if !USE_concat
-cpu_engine_t::get_concat_implementation_list() const override
-{
-    static const concat_primitive_desc_create_f empty_list[] = {nullptr};
+const cpd_create_f *cpu_engine_t::get_concat_implementation_list() const {
+    static const cpd_create_f empty_list[] = {nullptr};
     return empty_list;
 }
 
 #else
-
-using cpd_create_f = dnnl::impl::engine_t::concat_primitive_desc_create_f;
 
 namespace {
 #define INSTANCE_CREATOR(...) __VA_ARGS__::pd_t::create,
