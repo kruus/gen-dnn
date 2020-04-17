@@ -18,6 +18,7 @@ DOGCC_VER=0
 NEC_FTRACE=0
 DOTARGET="x"
 BFLOAT16="x"
+PRIMITIVES=""
 RNN="x"
 OMP=-1
 #ULIMIT=16384 # ulimit is in 1024-byte blocks
@@ -54,7 +55,7 @@ usage() {
     echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
 }
-while getopts ":m:u:hvjatTdDqQPFbBrRowW1567iMrcC" arg; do
+while getopts ":m:u:hvjatTdDqQP:FbBrRowW1567iMrcC" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         m) # -mISA "machine", ISA=[ALL] | VANILLA | ANY? ... (prefer j|a|gj|ga)
@@ -106,8 +107,9 @@ while getopts ":m:u:hvjatTdDqQPFbBrRowW1567iMrcC" arg; do
         Q) # really quick: skip build and doxygen docs [JUST run cmake and stop]
             BUILDOK="n"; DODOC="n"
             ;;
-        P) # Primitive extra tracing verbosity, even for release build [option removed]
-            VERBOSE_EXTRA="y"
+        P) # all-caps primitives to enable (see end of cmake/option.cmake)
+            #VERBOSE_EXTRA="y"
+            PRIMITIVES="${PRIMITIVES} -DDNNLPRIM_${OPTARG}=1"
             ;;
         F) # NEC Aurora VE or SX : add ftrace support (generate ftrace.out)
             NEC_FTRACE=1
@@ -429,6 +431,11 @@ fi
 
 export PATH
 echo "PATH $PATH"
+# ULIMIT (inherited by VE, since VE_LIMIT_OPT with spaces poses difficulty)
+ulimit -Hs unlimited
+ulimit -Ss $ULIMIT
+echo 'ulimit hard : '`ulimit -Hs`
+echo 'ulimit soft : '`ulimit -Ss`
 (
     echo "# vim: set ro ft=log:"
     echo "DOTARGET   $DOTARGET"
@@ -439,13 +446,17 @@ echo "PATH $PATH"
     echo "DODEBUG    $DODEBUG"
     echo "DODOC      $DODOC"
     echo "QUICK      $QUICK"
-    echo "VERBOSE_EXTRA $VERBOSE_EXTRA"
+    #echo "VERBOSE_EXTRA $VERBOSE_EXTRA"
+    echo "PRIMITIVES $PRIMITIVES"
     echo "BUILDDIR   ${BUILDDIR}"
     echo "INSTALLDIR ${INSTALLDIR}"
     echo "JOBS       ${JOBS}"
     #ulimit -Hs unlimited # operation not permitted
-    ulimit -Ss $ULIMIT # 10.1.18 "When compiling a program which code size is large, the compiler aborts by SIGSEGV."
+    #ulimit -Ss $ULIMIT # 10.1.18 "When compiling a program which code size is large, the compiler aborts by SIGSEGV."
     echo 'ulimit : '`ulimit -s`
+    if [ "${DOTARGET}" = "a" ]; then
+        ve_exec --show-limit 2>&1 | tee "r{$LOG}"
+    fi
     if [ $QUICK -lt 2 ]; then
         mkdir "${BUILDDIR}"
     fi
@@ -459,6 +470,10 @@ echo "PATH $PATH"
     # Show how to run a subset of tests (see cmake/option.config, end of file)
     #CMAKEOPT="${CMAKEOPT} -DDNNLPRIM_ALL=0"
     #CMAKEOPT="${CMAKEOPT} -DDNNLPRIM_CONVOLUTION=1"
+    if [ ! "${PRIMITIVES}" = "" ]; then
+        CMAKEOPT="${CMAKEOPT} -DDNNLPRIM_ALL=0"
+        CMAKEOPT="${CMAKEOPT} ${PRIMITIVES}"
+    fi
 
     if [ "${DOWARN}" = "1" ]; then
         DOWARNFLAGS=""
@@ -734,7 +749,7 @@ echo "PATH $PATH"
             # because 'make' tragets already supply VE_EXEC if needed.
         fi
         # Put one test here (maybe one you are currently debugging)
-        TEST_ENV=(DNNL_VERBOSE=1)
+        TEST_ENV=(DNNL_VERBOSE=2)
         TEST_ENV+=(VE_INIT_HEAP=ZERO)
         TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
         TEST_ENV+=(VE_TRACEBACK=VERBOSE)
@@ -820,7 +835,7 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
     fi
     echo "Testing ?"
     if [ ! "$DOTARGET" == "s" ]; then # non-SX: -t might run some tests
-        TEST_ENV=(DNNL_VERBOSE=1)
+        TEST_ENV=(DNNL_VERBOSE=2)
         TEST_ENV+=(VE_INIT_HEAP=ZERO)
         TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
         TEST_ENV+=(VE_TRACEBACK=VERBOSE)

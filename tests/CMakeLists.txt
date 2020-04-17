@@ -57,7 +57,7 @@ if(DNNLPRIM_ALL OR (DNNLPRIM_CONVOLUTION AND DNNLPRIM_REORDER AND DNNLPRIM_LRN))
     register_exe(api-c api.c "test")
 endif()
 
-if(UNIX OR MINGW)
+if(DNNLPRIM_ALL AND (UNIX OR MINGW))
     get_directory_property(include_dirs INCLUDE_DIRECTORIES)
     set(test_c_symbols "${CMAKE_CURRENT_BINARY_DIR}/test_c_symbols.c")
     add_custom_command(
