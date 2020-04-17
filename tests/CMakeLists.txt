@@ -53,7 +53,9 @@ endif()
 append(CMAKE_C_FLAGS "${CMAKE_TEST_CCXX_NOWARN_FLAGS}")
 append(CMAKE_CXX_FLAGS "${CMAKE_TEST_CCXX_NOWARN_FLAGS}")
 
-register_exe(api-c api.c "test")
+if(DNNLPRIM_ALL OR (DNNLPRIM_CONVOLUTION AND DNNLPRIM_REORDER AND DNNLPRIM_LRN))
+    register_exe(api-c api.c "test")
+endif()
 
 if(UNIX OR MINGW)
     get_directory_property(include_dirs INCLUDE_DIRECTORIES)

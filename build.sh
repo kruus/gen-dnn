@@ -455,6 +455,11 @@ echo "PATH $PATH"
         export CXXFLAGS="${CXXFLAGS} $*"
         echo "ccxx_flags CFLAGS --> ${CFLAGS}"
     }
+    #
+    # Show how to run a subset of tests (see cmake/option.config, end of file)
+    #CMAKEOPT="${CMAKEOPT} -DDNNLPRIM_ALL=0"
+    #CMAKEOPT="${CMAKEOPT} -DDNNLPRIM_CONVOLUTION=1"
+
     if [ "${DOWARN}" = "1" ]; then
         DOWARNFLAGS=""
         if [ "$DOTARGET" = "s" ]; then DOWARNFLAGS="-wall"

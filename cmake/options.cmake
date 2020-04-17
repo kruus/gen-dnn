@@ -250,7 +250,7 @@ option(DNNLPRIM_POOLING "enable pooling primitive" OFF) #ok
 option(DNNLPRIM_RESAMPLING "enable resampling primitive" OFF) #ok
 option(DNNLPRIM_RNN "enable rnn primitive" OFF) #ok
 option(DNNLPRIM_SHUFFLE "enable shuffle primitive" OFF) #ok
-option(DNNLPRIM_SOFTMAX "enable softmax primitive" OFF) #ok
+option(DNNLPRIM_SOFTMAX "enable softmax primitive" OFF) #ok ~equiv 
 # internal, or special constructor
 option(DNNLPRIM_CONCAT "enable concat primitive" OFF) #ok
 option(DNNLPRIM_REORDER "enable reorder primitive" OFF) #ok
@@ -259,27 +259,15 @@ option(DNNLPRIM_GEMM "enable gemm primitive (maybe)" OFF)
 #  if a layer is ON and requires another layer, the required layer gets turned ON
 # softmax : requires no other primitive
 # concat : can use reorder
-if(DNNLPRIM_BINARY)
-    #set(DNNLPRIM_ELTWISE ON) # ?
-endif()
-if(DNNLPRIM_CONCAT)
-    set(DNNLPRIM_REORDER ON)
-endif()
-if(DNNLPRIM_CONVOLUTION)
-    set(DNNLPRIM_REORDER ON)
-endif()
 if(DNNLPRIM_DECONVOLUTION)
     set(DNNLPRIM_CONVOLUTION ON)
+endif()
+if(DNNLPRIM_CONCAT OR DNNLPRIM_CONVOLUTION OR DNNLPRIM_DECONVOLUTION OR DNNLPRIM_INNER_PRODUCT OR DNNLPRIM_LAYER_NORMALIZATION)
     set(DNNLPRIM_REORDER ON)
 endif()
-if(DNNLPRIM_INNER_PRODUCT)
-    set(DNNLPRIM_REORDER ON)
-endif()
-if(DNNLPRIM_LAYER_NORMALIZATION)
-    set(DNNLPRIM_REORDER ON)
-endif()
-if(DNNLPRIM_LOGSOFTMAX)
+if(DNNLPRIM_LOGSOFTMAX OR DNNLPRIM_SOFTMAX)
     set(DNNLPRIM_SOFTMAX ON)
+    set(DNNLPRIM_LOGSOFTMAX ON)
 endif()
 
 # vim: ts=4 sw=4 et

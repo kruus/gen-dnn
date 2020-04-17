@@ -14,13 +14,62 @@
 # limitations under the License.
 #===============================================================================
 
+if(NOT DNNLPRIM_ALL)
+    # benchdnn.cpp pulls in all subdirs.  Would need stubs for each
+    # "subdir::bench(int,char**)" function
+    return()
+endif()
+
 file(GLOB_RECURSE HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.hpp
     )
-file(GLOB_RECURSE SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
-    )
+
+if(DNNLPRIM_ALL)
+    file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
+else()
+    # benchdnn.cpp pulls in all subdirs.  Would need stubs for each
+    # "subdir::bench(int,char**)" function
+    file(GLOB         SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
+    macro(subdir_needs var subdir) # followed by DNNLPRIM_FOO requirements
+        set(_have_layers ${DNNLPRIM_ALL})
+        if(NOT _have_layers)
+            set(_have_layers TRUE)
+            foreach(layer_ ${ARGN})
+                if(NOT DNNLPRIM_${layer_})
+                    set(_have_layers FALSE)
+                    break()
+                endif()
+            endforeach()
+        endif()
+        if(_have_layers)
+            append_subdir_recurse(${var} ${subdir})
+            message(STATUS "+subdir ${subdir}")
+            message(STATUS "${var} = ${${var}}")
+        endif()
+    endmacro()
+    subdir_needs(SOURCES self BATCH_NORMALIZATION CONVOLUTION)
+    subdir_needs(SOURCES binary BINARY)
+    subdir_needs(SOURCES bnorm BATCH_NORMALIZATION)
+    subdir_needs(SOURCES concat CONCAT)
+    subdir_needs(SOURCES conv CONVOLUTION DECONVOLUTION)
+    subdir_needs(SOURCES eltwise ELTWISE)
+    subdir_needs(SOURCES ip INNER_PRODUCT)
+    subdir_needs(SOURCES lnorm LAYER_NORMALIZATION)
+    subdir_needs(SOURCES lrn LRN)
+    subdir_needs(SOURCES matmul MATMUL)
+    subdir_needs(SOURCES pool POOLING)
+    subdir_needs(SOURCES reorder REORDER)
+    subdir_needs(SOURCES resampling RESAMPLING)
+    subdir_needs(SOURCES rnn RNN)
+    subdir_needs(SOURCES shuffle SHUFFLE)
+    subdir_needs(SOURCES softmax SOFTMAX LOGSOFTMAX)
+    subdir_needs(SOURCES sum SUM)
+    if(DNNLPRIM_SOFTMAX)
+        append_subdir_recurse(SOURCES softmax)
+    endif()
+endif()
+
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/conv

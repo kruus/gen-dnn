@@ -17,7 +17,10 @@
 #ifndef DNNL_MEMORY_HPP
 #define DNNL_MEMORY_HPP
 
+#include "common.hpp"
 #include "dnnl_common.hpp"
+#include "dnnl_debug.h"
+#include "src/common/verbose.hpp"
 
 struct dnn_mem_t {
     dnn_mem_t() { map(); }

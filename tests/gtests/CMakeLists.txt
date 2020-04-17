@@ -32,60 +32,143 @@ if(WIN32)
     endif()
 endif()
 
-# TODO: enable me!
-file(GLOB PRIM_TEST_CASES_SRC
-                              test_iface_pd.cpp
-                              test_iface_pd_iter.cpp
-                              test_iface_attr.cpp
-                              test_iface_handle.cpp
-                              test_iface_runtime_dims.cpp
-                              test_iface_runtime_attr.cpp
-                              test_dnnl_threading.cpp
-                              test_memory.cpp
-                              test_sum.cpp
-                              test_reorder.cpp
-                              test_cross_engine_reorder.cpp
-                              test_concat.cpp
-                              test_softmax.cpp
-                              test_eltwise.cpp
-                              test_lrn_forward.cpp
-                              test_lrn_backward.cpp
-                              test_pooling_forward.cpp
-                              test_pooling_backward.cpp
-                              test_batch_normalization_f32.cpp
-                              test_batch_normalization_s8.cpp
-                              test_inner_product_forward.cpp
-                              test_inner_product_backward_data.cpp
-                              test_inner_product_backward_weights.cpp
-                              test_shuffle.cpp
-                              test_convolution_format_any.cpp
-                              test_convolution_forward_f32.cpp
-                              test_convolution_forward_u8s8s32.cpp
-                              test_convolution_forward_u8s8fp.cpp
-                              test_convolution_eltwise_forward_f32.cpp
-                              test_convolution_eltwise_forward_x8s8f32s32.cpp
-                              test_convolution_backward_data_f32.cpp
-                              test_convolution_backward_weights_f32.cpp
-                              test_deconvolution.cpp
-                              test_gemm_f16.cpp
-                              test_gemm_f32.cpp
-                              test_gemm_f16f16f32.cpp
-                              test_gemm_bf16bf16f32.cpp
-                              test_gemm_bf16bf16bf16.cpp
-                              test_gemm_u8s8s32.cpp
-                              test_gemm_s8s8s32.cpp
-                              test_gemm_s8u8s32.cpp
-                              test_gemm_u8u8s32.cpp
-                              test_rnn_forward.cpp
-                              test_layer_normalization.cpp
-                              test_binary.cpp
-                              test_logsoftmax.cpp
-                              test_matmul.cpp
-                              test_resampling.cpp
-                              test_isa_mask.cpp
-                              test_isa_iface.cpp
-                              test_global_scratchpad.cpp
-                              )
+if(DNNLPRIM_ALL)
+    file(GLOB PRIM_TEST_CASES_SRC
+        test_iface_pd.cpp
+        test_iface_pd_iter.cpp
+        test_iface_attr.cpp
+        test_iface_handle.cpp
+        test_iface_runtime_dims.cpp
+        test_iface_runtime_attr.cpp
+        test_dnnl_threading.cpp
+        test_memory.cpp
+        test_sum.cpp
+        test_reorder.cpp
+        test_cross_engine_reorder.cpp
+        test_concat.cpp
+        test_softmax.cpp
+        test_eltwise.cpp
+        test_lrn_forward.cpp
+        test_lrn_backward.cpp
+        test_pooling_forward.cpp
+        test_pooling_backward.cpp
+        test_batch_normalization_f32.cpp
+        test_batch_normalization_s8.cpp
+        test_inner_product_forward.cpp
+        test_inner_product_backward_data.cpp
+        test_inner_product_backward_weights.cpp
+        test_shuffle.cpp
+        test_convolution_format_any.cpp
+        test_convolution_forward_f32.cpp
+        test_convolution_forward_u8s8s32.cpp
+        test_convolution_forward_u8s8fp.cpp
+        test_convolution_eltwise_forward_f32.cpp
+        test_convolution_eltwise_forward_x8s8f32s32.cpp
+        test_convolution_backward_data_f32.cpp
+        test_convolution_backward_weights_f32.cpp
+        test_deconvolution.cpp
+        test_gemm_f16.cpp
+        test_gemm_f32.cpp
+        test_gemm_f16f16f32.cpp
+        test_gemm_bf16bf16f32.cpp
+        test_gemm_bf16bf16bf16.cpp
+        test_gemm_u8s8s32.cpp
+        test_gemm_s8s8s32.cpp
+        test_gemm_s8u8s32.cpp
+        test_gemm_u8u8s32.cpp
+        test_rnn_forward.cpp
+        test_layer_normalization.cpp
+        test_binary.cpp
+        test_logsoftmax.cpp
+        test_matmul.cpp
+        test_resampling.cpp
+        test_isa_mask.cpp
+        test_isa_iface.cpp
+        test_global_scratchpad.cpp
+        )
+else()
+    if(TRUE)
+        append_glob(PRIM_TEST_CASES_SRC
+            test_isa*.cpp
+            test_dnnl_threading.cpp
+            test_dnnl_memory.cpp
+            )
+    endif()
+    if(DNNLPRIM_BATCH_NORMALIZATION AND DNNLPRIM_BINARY AND DNNLPRIM_CONVOLUTION AND DNNLPRIM_DECONVOLUTION AND DNNLPRIM_ELTWISE AND DNNLPRIM_INNER_PRODUCT AND DNNLPRIM_LAYER_NORMALIZATION AND DNNLPRIM_LRN AND DNNLPRIM_POOLING AND DNNLPRIM_SHUFFLE AND DNNLPRIM_SOFTMAX AND DNNLPRIM_REORDER AND DNNLPRIM_RNN AND DNNLPRIM_SUM AND DNNLPRIM_CONCAT)
+        append_glob(PRIM_TEST_CASES_SRC
+            test_iface_runtime_attr.cpp
+            test_iface_runtime_dims.cpp
+            )
+    endif()
+    if(DNNLPRIM_CONVOLUTION)
+        append_glob(PRIM_TEST_CASES_SRC
+            test_iface_handle.cpp
+            test_iface_pd.cpp
+            test_global_scratchpad*.cpp
+            )
+    endif()
+    if(DNNLPRIM_ELTWISE)
+        append_glob(PRIM_TEST_CASES_SRC test_iface_pd_iter.cpp)
+    endif()
+    if(DNNLPRIM_SOFTMAX)
+        append_glob(PRIM_TEST_CASES_SRC test_iface_attr.cpp)
+    endif()
+    #######################
+    if(DNNLPRIM_SUM)
+        append_glob(PRIM_TEST_CASES_SRC test_sum.cpp)
+    endif()
+    if(DNNLPRIM_REORDER)
+        append_glob(PRIM_TEST_CASES_SRC test*_reorder.cpp)
+    endif()
+    if(DNNLPRIM_CONCAT)
+        append_glob(PRIM_TEST_CASES_SRC test_concat.cpp)
+    endif()
+    if(DNNLPRIM_SOFTMAX)
+        append_glob(PRIM_TEST_CASES_SRC test*softmax.cpp)
+    endif()
+    if(DNNLPRIM_ELTWISE)
+        append_glob(PRIM_TEST_CASES_SRC test_eltwise.cpp)
+    endif()
+    if(DNNLPRIM_ELTWISE)
+        append_glob(PRIM_TEST_CASES_SRC test_lrn*.cpp)
+    endif()
+    if(DNNLPRIM_POOLING)
+        append_glob(PRIM_TEST_CASES_SRC test_pooling*.cpp)
+    endif()
+    if(DNNLPRIM_BATCH_NORMALIZATION)
+        append_glob(PRIM_TEST_CASES_SRC test_batch_normalization*.cpp)
+    endif()
+    if(DNNLPRIM_INNER_PRODUCT)
+        append_glob(PRIM_TEST_CASES_SRC test_inner_product*.cpp)
+    endif()
+    if(DNNLPRIM_SHUFFLE)
+        append_glob(PRIM_TEST_CASES_SRC test_shuffle*.cpp)
+    endif()
+    if(DNNLPRIM_CONVOLUTION)
+        append_glob(PRIM_TEST_CASES_SRC test_convolution*.cpp)
+    endif()
+    if(DNNLPRIM_DECONVOLUTION)
+        append_glob(PRIM_TEST_CASES_SRC test_deconvolution*.cpp)
+    endif()
+    if(DNNLPRIM_GEMM)
+        append_glob(PRIM_TEST_CASES_SRC test_gemm*.cpp)
+    endif()
+    if(DNNLPRIM_RNN)
+        append_glob(PRIM_TEST_CASES_SRC test_rnn*.cpp)
+    endif()
+    if(DNNLPRIM_LAYER_NORMALIZATION)
+        append_glob(PRIM_TEST_CASES_SRC test_layer_normalization*.cpp)
+    endif()
+    if(DNNLPRIM_BINARY)
+        append_glob(PRIM_TEST_CASES_SRC test_binary*.cpp)
+    endif()
+    if(DNNLPRIM_MATMUL)
+        append_glob(PRIM_TEST_CASES_SRC test_matmul*.cpp)
+    endif()
+    if(DNNLPRIM_RESAMPLING)
+        list(APPEND PRIM_TEST_CASES_SRC test_resampling.cpp)
+    endif()
+endif()
 
 # Some tests will fail on AArch64 and need to be skipped.
 # For example, any tests wich check for ISAs not present on AArch64.
