@@ -226,10 +226,11 @@ void ref_softmax_bwd_t<data_type>::execute_backward_dense(
     const auto ou_stride = pd()->outer_stride();
 
 #if 1 || defined(__ve)
-    printf("sofmax_bwd_dense\n");
+    printf("sofmax_bwd_dense\n"); fflush(stdout);
 #endif
     parallel_nd(outer_size_, [&](int ou) {
         data_t sbr = (data_t)0;
+        //double sbr = 0.0;
         size_t off = ou * ou_stride;
         if (pd()->is_softmax()) {
             for (size_t loff = off; loff < off + channels_; ++loff)
@@ -256,14 +257,94 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
     const memory_desc_wrapper data_d(pd()->dst_md());
 
 #if 1 || defined(__ve)
-    printf("sofmax_bwd_generic\n");
+    printf("sofmax_bwd_generic\n"); fflush(stdout);
 #endif
 #if defined(__ve) // precision issues
     parallel_nd(outer_size_, inner_size_, [&](int ou, int in) {
         dim_t const ou_in_offset = ou * channels_ * inner_size_ + in;
         if (pd()->is_softmax()) {
+            typedef data_t acc_t; // double was 100x slower and no accuracty improvement
             data_t sbr = (data_t)0;
-            //double sbr = 0.0;
+            //acc_t sbr = (acc_t)0;
+#if 1 // rewrite to allow some vectorization
+            // time 91.8669 --> 0.104004 for
+            // ./vetest.sh -B build-vej --benchdnn --softmax --verbose=10 --dir=BWD_D --axis=0 8192x64
+            // which fails accuracy checks.
+            int constexpr cReg = 256; // single vec register?
+            int constexpr cBy = 4096; // 4096 / 256 = 16 vec regs at most
+            if( channels_ < cReg ){
+                dim_t diff_off[cReg];
+                dim_t data_off[cReg];
+                for (int c = 0; c < channels_; ++c) {
+                    data_off[c] = (ou_in_offset + c * inner_size_);
+                }
+                PragmaQuote(_NEC vob)
+                for (int c = 0; c < channels_; ++c) { // Unvectorized
+                    diff_off[c] = diff_d.off_l(data_off[c]);
+                    data_off[c] = data_d.off_l(data_off[c]);
+                }
+                ShortLoop() for (int c = 0; c < channels_; ++c) {
+                    sbr += (acc_t)(diff_dst[diff_off[c]]) * dst[data_off[c]];
+                }
+                ShortLoop() for (int c = 0; c < channels_; ++c) {
+                    diff_src[diff_off[c]] = dst[data_off[c]] * (diff_dst[diff_off[c]] - sbr);
+                }
+            }else if( channels_ < cBy ){
+                dim_t diff_off[cBy];
+                dim_t data_off[cBy];
+                for (int c = 0; c < channels_; ++c) {
+                    data_off[c] = (ou_in_offset + c * inner_size_); // tmp
+                }
+                PragmaQuote(_NEC vob)
+                for (int c = 0; c < channels_; ++c) { // Unvectorized
+                    diff_off[c] = diff_d.off_l(data_off[c]);
+                    data_off[c] = data_d.off_l(data_off[c]);
+                }
+                PragmaQuote(_NEC vob)
+                for (int c = 0; c < channels_; ++c) {
+                    sbr += (acc_t)(diff_dst[diff_off[c]]) * dst[data_off[c]];
+                }
+                for (int c = 0; c < channels_; ++c) {
+                    diff_src[diff_off[c]] = dst[data_off[c]] * (diff_dst[diff_off[c]] - sbr);
+                }
+            }else{
+                for (int c0 = 0; c0 < channels_; c0+=cBy) {
+                    dim_t diff_off[cBy];
+                    dim_t data_off[cBy];
+                    int const cmax=( c0 < channels_- cBy? c0+cBy: channels_ );
+                    PragmaQuote(_NEC novovertake)
+                    for(int c=c0; c<cmax; ++c){
+                        data_off[c] = (ou_in_offset + c * inner_size_); // tmp
+                    }
+                    PragmaQuote(_NEC vob)
+                    for(int c=c0; c<cmax; ++c){ // unvectorizable func call
+                        diff_off[c] = diff_d.off_l(data_off[c]);
+                        data_off[c] = data_d.off_l(data_off[c]);
+                    }
+                    PragmaQuote(_NEC vob)
+                    for(int c=c0; c<cmax; ++c){
+                        sbr += (acc_t)(diff_dst[diff_off[c]]) * dst[data_off[c]];
+                    }
+                }
+                for (int c0 = 0; c0 < channels_; c0+=cBy) {
+                    dim_t diff_off[cBy];
+                    dim_t data_off[cBy];
+                    int const cmax=( c0 < channels_- cBy? c0+cBy: channels_ );
+                    for(int c=c0; c<cmax; ++c){
+                        data_off[c] = (ou_in_offset + c * inner_size_); // tmp
+                    }
+                    PragmaQuote(_NEC vob)
+                    for(int c=c0; c<cmax; ++c){ // unvectorizable func call
+                        diff_off[c] = diff_d.off_l(data_off[c]);
+                        data_off[c] = data_d.off_l(data_off[c]);
+                    }
+                    PragmaQuote(_NEC vob)
+                    for(int c=c0; c<cmax; ++c){
+                        diff_src[diff_off[c]] = dst[data_off[c]] * (diff_dst[diff_off[c]] - sbr);
+                    }
+                }
+            }
+#else // original : offset function calls ==> scalar loops
             for (int c = 0; c < channels_; ++c) {
                 auto off_diff = diff_d.off_l(ou_in_offset + c * inner_size_);
                 auto off_data = data_d.off_l(ou_in_offset + c * inner_size_);
@@ -274,8 +355,10 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
                 auto off_data = data_d.off_l(ou_in_offset + c * inner_size_);
                 diff_src[off_diff] = dst[off_data] * (diff_dst[off_diff] - sbr);
             }
+#endif
         } else if (pd()->is_logsoftmax()) {
             data_t sbr = (data_t)0;
+            // still unvectorized XXX
             for (int c = 0; c < channels_; ++c) {
                 auto off_diff = diff_d.off_l(ou_in_offset + c * inner_size_);
                 sbr += diff_dst[off_diff];
@@ -322,4 +405,4 @@ template struct ref_softmax_bwd_t<data_type::f32>;
 } // namespace impl
 } // namespace dnnl
 
-// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

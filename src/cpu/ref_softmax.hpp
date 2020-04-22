@@ -81,6 +81,10 @@ struct ref_softmax_fwd_t : public primitive_impl_t {
         use_dense_ = true && inner_size_ == 1 && data_d.is_dense(true)
                 && data_d.only_padded_dim(axis)
                 && bd.strides[axis] == axis_blk_size;
+#if 1 || defined(__ve)
+        printf("%s\n",(use_dense_? "sofmax-fwd-dense": "sofmax-fwd-generic"));
+        fflush(stdout);
+#endif
     }
 
     typedef typename prec_traits<data_type>::type data_t;
@@ -141,16 +145,20 @@ struct ref_softmax_bwd_t : public primitive_impl_t {
                 && diff_d.is_dense() && bd.strides[axis] == axis_blk_size;
 #if 1 || defined(__ve)
         printf("%s\n",(use_dense_? "sofmax-bwd-dense": "sofmax-bwd-generic"));
+        fflush(stdout);
 #endif
     }
 
     typedef typename prec_traits<data_type>::type data_t;
 
     virtual status_t execute(const exec_ctx_t &ctx) const override {
-        if (use_dense_)
+        if (use_dense_){
+            printf("*** DENSE ***\n");
             execute_backward_dense(ctx);
-        else
+        }else{
+            printf("*** GENERIC ***\n");
             execute_backward_generic(ctx);
+        }
         return status::success;
     }
 

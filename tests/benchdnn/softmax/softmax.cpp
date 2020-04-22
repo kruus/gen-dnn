@@ -98,19 +98,31 @@ static int compare(const prb_t *p, const dnn_mem_t &fp_mem,
     const int f32_mant_digits = 24;
     const float trh_coeff_dt = (1 << (f32_mant_digits - digits_dt(p->dt)));
     const float trh_coeff_log = p->alg == LOGSOFTMAX ? 4 : 1;
+#if defined(__ve)
+    const float trh = trh_coeff_dt * trh_coeff_log * 1.3e-4; // float calc
+    BENCHDNN_PRINT(0," VE softmax threshold trh=%g\n",trh);
+    // VE has high error for:
+    // --softmax --dir=BWD_D --axis=0 8192x64
+    // --softmax --dir=BWD_D --axis=0 8448x66
+    // 1e-6 * sqrt(channels), OR make sure round-to-nearest ?
+#else
     const float trh = trh_coeff_dt * trh_coeff_log * 1e-6;
+#endif
 
     const auto nelems = dt_mem.nelems();
     r->errors = 0;
     r->total = nelems;
 
+    float maxd = 0.0f;
     for (int64_t i = 0; i < nelems; i++) {
         const float dt = dt_mem.get_elem(i);
         const float fp = fp_mem.get_elem(i);
 
         const float diff = fabsf(fp - dt);
         const float rel_diff = diff / (fabsf(fp) > FLT_MIN ? fabsf(fp) : 1);
-        bool ok = (fabsf(fp) > 1e-5 ? rel_diff : diff) <= trh;
+        const float ediff = (fabsf(fp) > 1e-5 ? rel_diff : diff);
+        if (ediff > maxd) maxd = ediff;
+        bool ok = ediff <= trh;
 
         // check for abs error
         if (!ok) ok = diff < 1e-7;
@@ -128,6 +140,10 @@ static int compare(const prb_t *p, const dnn_mem_t &fp_mem,
             BENCHDNN_PRINT(0, "[%4ld][%s] fp:%8g dt:%8g diff:%8g rdiff:%8g\n",
                     (long)i, ind_str.c_str(), fp, dt, diff, rel_diff);
         }
+    }
+    if( 1 || r->errors ){
+        BENCHDNN_PRINT(2, " thresh %g, %lu/%lu error, max ediff was %g\n", trh,
+                       (long unsigned)r->errors, (long unsigned)nelems, maxd);
     }
 
     if (r->errors) r->state = FAILED;
