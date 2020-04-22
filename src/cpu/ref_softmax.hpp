@@ -25,6 +25,10 @@
 #include "utils.hpp"
 
 #include "cpu_softmax_pd.hpp"
+#if defined(__ve)
+#include "dnnl_optimize.h"
+#include <stdio.h>
+#endif
 
 namespace dnnl {
 namespace impl {
@@ -70,7 +74,7 @@ struct ref_softmax_fwd_t : public primitive_impl_t {
 
         auto axis = pd()->axis();
         dim_t axis_blk_size = 1;
-        for (int iblk = 0; iblk < bd.inner_nblks; ++iblk)
+        ShortLoop() for (int iblk = 0; iblk < bd.inner_nblks; ++iblk)
             if (bd.inner_idxs[iblk] == axis)
                 axis_blk_size *= bd.inner_blks[iblk];
 
@@ -129,12 +133,15 @@ struct ref_softmax_bwd_t : public primitive_impl_t {
 
         auto axis = pd()->axis();
         dim_t axis_blk_size = 1;
-        for (int iblk = 0; iblk < bd.inner_nblks; ++iblk)
+        ShortLoop() for (int iblk = 0; iblk < bd.inner_nblks; ++iblk)
             if (bd.inner_idxs[iblk] == axis)
                 axis_blk_size *= bd.inner_blks[iblk];
 
         use_dense_ = true && inner_size_ == 1 && diff_d == data_d
                 && diff_d.is_dense() && bd.strides[axis] == axis_blk_size;
+#if 1 || defined(__ve)
+        printf("%s\n",(use_dense_? "sofmax-bwd-dense": "sofmax-bwd-generic"));
+#endif
     }
 
     typedef typename prec_traits<data_type>::type data_t;

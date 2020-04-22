@@ -23,6 +23,7 @@
 #include "type_helpers.hpp"
 
 #include "ref_softmax.hpp"
+#include "stdio.h"
 
 namespace dnnl {
 namespace impl {
@@ -49,7 +50,8 @@ void ref_softmax_fwd_t<data_type>::execute_forward_dense(
 
 #if defined(__ve)
         for (int c = 0; c < channels_; ++c)
-            space_max = nstl::max(space_max, src_data[c]);
+            //space_max = nstl::max(space_max, src_data[c]);
+            if( src_data[c] > space_max ) space_max = src_data[c];
 #elif !defined(__INTEL_COMPILER)
         // The code below makes the compiler generate maxps instruction.
         // rather than maxss, which is generated for the 'else' code path
@@ -89,7 +91,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_dense(
 #endif
 
         // sub + exp + sum
-#if defined(_ve)
+#if defined(__ve)
         if (pd()->is_softmax()) {
             for (int c = 0; c < channels_; ++c) {
                 space_denom += dst_data[c] = expf(src_data[c] - space_max);
@@ -223,6 +225,9 @@ void ref_softmax_bwd_t<data_type>::execute_backward_dense(
 
     const auto ou_stride = pd()->outer_stride();
 
+#if 1 || defined(__ve)
+    printf("sofmax_bwd_dense\n");
+#endif
     parallel_nd(outer_size_, [&](int ou) {
         data_t sbr = (data_t)0;
         size_t off = ou * ou_stride;
@@ -250,15 +255,19 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
     const memory_desc_wrapper diff_d(pd()->diff_src_md());
     const memory_desc_wrapper data_d(pd()->dst_md());
 
-#if defined(__ve)
+#if 1 || defined(__ve)
+    printf("sofmax_bwd_generic\n");
+#endif
+#if defined(__ve) // precision issues
     parallel_nd(outer_size_, inner_size_, [&](int ou, int in) {
-        dim_t ou_in_offset = ou * channels_ * inner_size_ + in;
-        data_t sbr = (data_t)0;
+        dim_t const ou_in_offset = ou * channels_ * inner_size_ + in;
         if (pd()->is_softmax()) {
+            data_t sbr = (data_t)0;
+            //double sbr = 0.0;
             for (int c = 0; c < channels_; ++c) {
                 auto off_diff = diff_d.off_l(ou_in_offset + c * inner_size_);
-                    auto off_data = data_d.off_l(ou_in_offset + c * inner_size_);
-                    sbr += diff_dst[off_diff] * dst[off_data];
+                auto off_data = data_d.off_l(ou_in_offset + c * inner_size_);
+                sbr += diff_dst[off_diff] * dst[off_data];
             }
             for (int c = 0; c < channels_; ++c) {
                 auto off_diff = diff_d.off_l(ou_in_offset + c * inner_size_);
@@ -266,6 +275,7 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
                 diff_src[off_diff] = dst[off_data] * (diff_dst[off_diff] - sbr);
             }
         } else if (pd()->is_logsoftmax()) {
+            data_t sbr = (data_t)0;
             for (int c = 0; c < channels_; ++c) {
                 auto off_diff = diff_d.off_l(ou_in_offset + c * inner_size_);
                 sbr += diff_dst[off_diff];
