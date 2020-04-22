@@ -141,7 +141,7 @@ struct dnnl_engine : public dnnl::impl::c_compatible {
 #else
                 const char *str = "dnnl_verbose,create";
 #endif
-#if defined(__ve)
+#if 0 && defined(__ve)
 #define VE_REG_sp() \
     ({ void* stack_ptr; \
      asm volatile("lea %0, (%%sp)":"=r"(stack_ptr)); \

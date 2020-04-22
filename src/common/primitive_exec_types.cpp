@@ -116,7 +116,7 @@ void exec_ctx_t::set_scratchpad_grantor(
         const memory_tracking::grantor_t &scratchpad_grantor) {
     scratchpad_grantor_ = utils::make_unique<memory_tracking::grantor_t>(
             scratchpad_grantor);
-    printf(" exec_ctx_t new scratchpad_grantor @i %p\n", (void*)&get_scratchpad_grantor());
+    //printf(" exec_ctx_t new scratchpad_grantor @i %p\n", (void*)&get_scratchpad_grantor());
 }
 
 const memory_tracking::grantor_t &exec_ctx_t::get_scratchpad_grantor() const {

@@ -117,7 +117,7 @@ private:
             ker_data_t mv = dst[oc];
 
             // update index of maximum
-#if defined __INTEL_COMPILER
+#if defined(__INTEL_COMPILER) || defined(__ve)
             if ((use_workspace) && (s > mv)) {
                 // if (ws && (s > mv)) {
                 assert(ws_dt == data_type::u8 || ws_dt == data_type::s32);

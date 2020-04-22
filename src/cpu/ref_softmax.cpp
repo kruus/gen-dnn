@@ -41,11 +41,16 @@ void ref_softmax_fwd_t<data_type>::execute_forward_dense(
         data_t *dst_data = dst + ou * ou_stride;
         data_t space_max = -(data_t)FLT_MAX;
         data_t space_denom = (data_t)0;
+#if defined(__ve)
+        constexpr int unroll_factor = 256;
+#else
         constexpr int unroll_factor = 32;
+#endif
 
-// Intel(R) C++ Compiler generates the maxps + shuffle pattern
-// for the max search which works faster
-#if !defined(__INTEL_COMPILER)
+#if defined(__ve)
+        for (int c = 0; c < channels_; ++c)
+            space_max = nstl::max(space_max, src_data[c]);
+#elif !defined(__INTEL_COMPILER)
         // The code below makes the compiler generate maxps instruction.
         // rather than maxss, which is generated for the 'else' code path
         auto max_wrapper = [](data_t a, data_t b) { return nstl::max(a, b); };
@@ -77,11 +82,25 @@ void ref_softmax_fwd_t<data_type>::execute_forward_dense(
             space_max = max_val;
         }
 #else
+        // Intel(R) C++ Compiler generates the maxps + shuffle pattern
+        // for the max search which works faster
         for (int c = 0; c < channels_; ++c)
             space_max = nstl::max(space_max, src_data[c]);
 #endif
 
         // sub + exp + sum
+#if defined(_ve)
+        if (pd()->is_softmax()) {
+            for (int c = 0; c < channels_; ++c) {
+                space_denom += dst_data[c] = expf(src_data[c] - space_max);
+            }
+        } else if (pd()->is_logsoftmax()) {
+            for (int c = 0; c < channels_; ++c) {
+                float D = dst_data[c] = src_data[c] - space_max;
+                space_denom += expf(D);
+            }
+        }
+#else
         int tail = channels_ % unroll_factor;
         for (int i = 0; i < channels_ - tail; i += unroll_factor) {
             PRAGMA_OMP_SIMD()
@@ -103,8 +122,22 @@ void ref_softmax_fwd_t<data_type>::execute_forward_dense(
                 space_denom += expf(D);
             }
         }
+#endif
 
         // scal
+#if defined(__ve)
+        if (pd()->is_softmax()) {
+            space_denom = space_denom ? (data_t(1) / space_denom) : data_t(1);
+            for (int c = 0; c < channels_; ++c) {
+                dst_data[c] *= space_denom;
+            }
+        } else if (pd()->is_logsoftmax()) {
+            space_denom = logf(space_denom);
+            for (int c = 0; c < channels_; ++c) {
+                dst_data[c] -= space_denom;
+            }
+        }
+#else
         if (pd()->is_softmax()) {
             space_denom = space_denom ? (data_t(1) / space_denom) : data_t(1);
         } else if (pd()->is_logsoftmax()) {
@@ -117,6 +150,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_dense(
                 dst_data[c] -= space_denom;
             }
         }
+#endif
     });
 }
 
@@ -216,6 +250,35 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
     const memory_desc_wrapper diff_d(pd()->diff_src_md());
     const memory_desc_wrapper data_d(pd()->dst_md());
 
+#if defined(__ve)
+    parallel_nd(outer_size_, inner_size_, [&](int ou, int in) {
+        dim_t ou_in_offset = ou * channels_ * inner_size_ + in;
+        data_t sbr = (data_t)0;
+        if (pd()->is_softmax()) {
+            for (int c = 0; c < channels_; ++c) {
+                auto off_diff = diff_d.off_l(ou_in_offset + c * inner_size_);
+                    auto off_data = data_d.off_l(ou_in_offset + c * inner_size_);
+                    sbr += diff_dst[off_diff] * dst[off_data];
+            }
+            for (int c = 0; c < channels_; ++c) {
+                auto off_diff = diff_d.off_l(ou_in_offset + c * inner_size_);
+                auto off_data = data_d.off_l(ou_in_offset + c * inner_size_);
+                diff_src[off_diff] = dst[off_data] * (diff_dst[off_diff] - sbr);
+            }
+        } else if (pd()->is_logsoftmax()) {
+            for (int c = 0; c < channels_; ++c) {
+                auto off_diff = diff_d.off_l(ou_in_offset + c * inner_size_);
+                sbr += diff_dst[off_diff];
+            }
+            for (int c = 0; c < channels_; ++c) {
+                auto off_diff = diff_d.off_l(ou_in_offset + c * inner_size_);
+                auto off_data = data_d.off_l(ou_in_offset + c * inner_size_);
+                diff_src[off_diff]
+                        = diff_dst[off_diff] - expf(dst[off_data]) * sbr;
+            }
+        }
+    });
+#else
     parallel_nd(outer_size_, inner_size_, [&](int ou, int in) {
         dim_t ou_in_offset = ou * channels_ * inner_size_ + in;
         data_t sbr = (data_t)0;
@@ -240,6 +303,7 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
             }
         }
     });
+#endif
 }
 
 template struct ref_softmax_bwd_t<data_type::f32>;

@@ -23,9 +23,9 @@ RNN="x"
 OMP=-1
 #ULIMIT=16384 # ulimit is in 1024-byte blocks
 #ULIMIT=32768
-#ULIMIT=65536
+ULIMIT=65536 # cpu-tutorials-matmul-matmul-quantization-cpp like this ulimit
 #ULIMIT=131072
-ULIMIT=262144
+#ULIMIT=262144
 #ULIMIT=unlimited
 ENV=`which env`
 
@@ -410,7 +410,7 @@ if [ "$DOTARGET" = "a" -o "$DOTARGET" = "s" ]; then
     #export VE_PROGINF=YES;
     export VE_PROGINF=DETAIL;
     export C_PROGINF=YES;
-    ulimit -Hs unlimited
+    #ulimit -Hs unlimited # no perms
     ulimit -s $ULIMIT
     echo 'ulimit : '`ulimit -s`
     unset VE_LIMIT_OPT
@@ -432,7 +432,7 @@ fi
 export PATH
 echo "PATH $PATH"
 # ULIMIT (inherited by VE, since VE_LIMIT_OPT with spaces poses difficulty)
-ulimit -Hs unlimited
+#ulimit -Hs unlimited # no perms
 ulimit -Ss $ULIMIT
 echo 'ulimit hard : '`ulimit -Hs`
 echo 'ulimit soft : '`ulimit -Ss`
@@ -506,7 +506,7 @@ echo 'ulimit soft : '`ulimit -Ss`
         #ccxx_flags -finline-suppress-diagnostics # 3.0.28?
         ccxx_flags -ftemplate-depth=20
         ccxx_flags -fdiag-inline=1
-        ccxx_flags -fdiag-vector=0
+        ccxx_flags -fdiag-vector=1
         ccxx_flags -mno-parallel
         #ccxx_flags -D_FORTIFY_SOURCE=1
         #ccxx_flags -D_FORTIFY_SOURCE=2 -Wl,-z,-muldefs
@@ -727,12 +727,12 @@ echo 'ulimit soft : '`ulimit -Ss`
     fi
     set -x
 
-    if [ "$BUILDOK" == "y" -a "$DOTARGET" == "a" ]; then
-        for d in src examples tests tests/gtests tests/gtests tests/benchdnn; do
-            echo "ve_validate_binary in ${BUILDDIR}/${d} ..."
-            ve_validate_binary -d "${BUILDDIR}/${d}"
-        done
-    fi
+    #if [ "$BUILDOK" == "y" -a "$DOTARGET" == "a" ]; then
+    #    for d in src examples tests tests/gtests tests/gtests tests/benchdnn; do
+    #        echo "ve_validate_binary in ${BUILDDIR}/${d} ..."
+    #        ve_validate_binary -d "${BUILDDIR}/${d}"
+    #    done
+    #fi
     if [ "$BUILDOK" == "y" -a ! "$DOTARGET" == "s" ]; then
         echo "DOTARGET  $DOTARGET"
         echo "ISA       $ISA"
@@ -759,6 +759,7 @@ echo 'ulimit soft : '`ulimit -Ss`
         TEST_ENV+=(VE_OMP_STACKSIZE=128M)
         TEST_ENV+=(OMP_PROC_BIND=true)
         TEST_ENV+=(OMP_DYNAMIC=false)
+        TEST_ENV+=(OMP_WAIT_POLICY=active)
         if [ ${OMP} -eq 1 ]; then TEST_ENV+=(OMP_NUM_THREADS=1); fi
         #TEST_ENV+=(OMP_WAIT_POLICY=active)
         { echo "api-c                   ...";
@@ -845,30 +846,89 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
         TEST_ENV+=(OMP_STACKSIZE=128M)
         TEST_ENV+=(OMP_DYNAMIC=false)
         TEST_ENV+=(OMP_PROC_BIND=true)
+        TEST_ENV+=(OMP_WAIT_POLICY=active)
         if [ ${OMP} -eq 1 ]; then TEST_ENV+=(OMP_NUM_THREADS=1); fi
         #TEST_ENV+=(OMP_WAIT_POLICY=active)
         rm -f ${BUILDDIR}/test[0123].log
         # 'make test` uses ctest, which recognizes -R (require) and -E (exclude) options
         if [ $DOTEST -ge 0 ]; then # some short sanity-check examples
             echo "Testing> ${BUILDDIR}/test0.log"
-            ( echo "${ENV} ${TEST_ENV[@]} ${TESTRUNNER}  examples/primitives*"; \
+            ( export;
+              echo "${ENV} ${TEST_ENV[@]} ${TESTRUNNER}  examples/primitives*"; \
                 ${ENV} ${TEST_ENV[@]} ARGS="-VV -R 'primitives-'" \
                 ${TESTRUNNER} make VERBOSE=1 -C "${BUILDDIR}" test \
             ) 2>&1 | tee "${BUILDDIR}/test0.log" || true
         fi
         if [ $DOTEST -ge 1 ]; then
-            echo "Testing> ${BUILDDIR}/test1.log"
-            ( echo "${ENV} ${TEST_ENV[@]}  other examples"; \
-                ${ENV} ${TEST_ENV[@]} ARGS="-VV -E '(test_)|(primitives-)'" \
-                ${TESTRUNNER} make VERBOSE=1 -C "${BUILDDIR}" test \
-            ) 2>&1 | tee "${BUILDDIR}/test1.log" || true
+            if [ "" ]; then
+                # these usually run fine under 'make test'
+                echo "Testing> ${BUILDDIR}/test1.log"
+                ( export;
+                echo "${ENV} ${TEST_ENV[@]}  other examples"; \
+                    ${ENV} ${TEST_ENV[@]} ARGS="-VV -E '(test_)|(primitives-)'" \
+                    ${TESTRUNNER} make VERBOSE=1 -C "${BUILDDIR}" test \
+                    ) 2>&1 | tee "${BUILDDIR}/test1.log" || true
+            else
+                {
+                    set +x
+                    ARGS="-E '(test_)|(primitives-)' -N" make -C "${BUILDDIR}" test | awk '/Test #/{print $3}'
+                    tests=`ARGS="-E '(test_)|(primitives-)' -N" make -C "${BUILDDIR}" test | awk '/Test +#/{print $3}' | sort`
+                    echo 'test1.log alternate, via vetest.sh'
+                    echo "tests ="
+                    echo "${tests}" | sed 's/ /\n    /g'
+                    Targs=''
+                    for t in ${tests}; do
+                        Targs="${Targs} -T ${t}"
+                    done
+                    echo "Targs = ${Targs}"
+                    echo "Running tests via vetests.sh ..."
+                    echo "Command : ./vetest.sh -B ${BUILDDIR} \${Targs} -L xtest1.log"
+                    # note: vetest.sh will recognize cpu-FOO and search for FOO if nec.
+                    ./vetest.sh -B ${BUILDDIR} ${Targs} -L xtest2.log || true
+                    cat xtest2.log
+                    set -x
+                } 2>&1 | tee "${BUILDDIR}/test1.log" || true
+            fi
         fi
         if [ $DOTEST -ge 2 ]; then
-            echo "Testing> ${BUILDDIR}/test2.log"
-            ( echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -R 'test_' ${TESTRUNNER} <commnad>";
-                 ${ENV} ${TEST_ENV[@]} ARGS="-VV -R 'test_'" \
-                 ${TESTRUNNER}  make VERBOSE=1 -C "${BUILDDIR}" test \
-            ) 2>&1 | tee "${BUILDDIR}/test2.log" || true
+            if [ "" ]; then
+                echo "Testing> ${BUILDDIR}/test2.log"
+                ( export;
+                echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -R 'test_' ${TESTRUNNER} <commnad>";
+                ${ENV} ${TEST_ENV[@]} ARGS="-VV -R 'test_'" \
+                    ${TESTRUNNER}  make VERBOSE=1 -C "${BUILDDIR}" test \
+                    ) 2>&1 | tee "${BUILDDIR}/test2.log" || true
+            else # do not run via ctest, run via vetest.sh
+                if [ "" ]; then
+                    tests=`ARGS="-R 'test_' -N" make -C "${BUILDDIR}" test | awk '/Test +#/{print $3}' | sort`
+                    echo 'test2.log alternate, via vetest.sh'
+                    echo "tests = "
+                    echo "${tests}" | sed 's/ /\n    /g'
+                    for t in ${tests}; do
+                        ./vetest.sh -B ${BUILDDIR} -T ${t} || true
+                        cat f.log
+                    done
+                else
+                    {
+                        set +x
+                        tests=`ARGS="-R test_ -N" make -C "${BUILDDIR}" test | awk '/Test +#/{print $3}' | sort`
+                        echo 'test2.log alternate, via vetest.sh'
+                        echo "tests = "
+                        echo "${tests}" | sed 's/ /\n    /g'
+                        Targs=''
+                        for t in ${tests}; do
+                            Targs="${Targs} -T ${t}"
+                        done
+                        echo "Targs = ${Targs}"
+                        echo "Running tests via vetests.sh ..."
+                        echo "Command : ./vetest.sh -B ${BUILDDIR} \${Targs} -L xtest2.log"
+                        # note: vetest.sh will recognize cpu-FOO and search for FOO if nec.
+                        ./vetest.sh -B ${BUILDDIR} ${Targs} -L xtest2.log || true
+                        cat xtest2.log
+                        set -x
+                    } 2>&1 | tee "${BUILDDIR}/test2.log" || true
+                fi
+            fi
         fi
         if [ $DOTEST -ge 3 ]; then # some [few] convolution timings (see that benchdnn runs)
             if [ -x ./bench.sh ]; then

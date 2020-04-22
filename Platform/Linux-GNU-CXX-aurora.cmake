@@ -9,9 +9,13 @@ unset(CMAKE_CXX_COMPILE_OPTIONS_VISIBILITY)
 unset(CMAKE_CXX_COMPILE_OPTIONS_VISIBILITY_INLINES_HIDDEN)
 
 # -Os is not supported
-set(CMAKE_CXX_FLAGS_RELEASE_INIT "${CMAKE_CXX_FLAGS_RELEASE_INIT} -mretain-list-vector")
-set(CMAKE_CXX_FLAGS_DEBUG_INIT "${CMAKE_CXX_FLAGS_DEBUG_INIT} -g2 -mretain-list-vector -O0")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT "${CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT} -g2 -mretain-list-vector")
+#set(CMAKE_CXX_FLAGS_RELEASE_INIT "${CMAKE_CXX_FLAGS_RELEASE_INIT} -mretain-list-vector")
+#set(CMAKE_CXX_FLAGS_DEBUG_INIT "${CMAKE_CXX_FLAGS_DEBUG_INIT} -g2 -mretain-list-vector -O0")
+#set(CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT "${CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT} -g2 -mretain-list-vector")
+# override...
+set(CMAKE_C_FLAGS_RELEASE_INIT "-O4 -mretain-list-vector")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO_INIT "-O4 -g2 -mretain-list-vector")
+set(CMAKE_C_FLAGS_DEBUG_INIT "-O0 -g2 -mretain-list-vector")
 set(CMAKE_CXX_FLAGS_MINSIZEREL_INIT CMAKE_CXX_FLAGS_RELEASE_INIT)
 
 # UnixPaths.cmake adds these host-only locations:
