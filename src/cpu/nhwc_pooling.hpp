@@ -71,7 +71,7 @@ struct nhwc_pooling_fwd_t : public primitive_impl_t {
                 init_default_ws();
             }
 
-            init_scratchpad();
+            init_scratchpad(); // bf16 src and dst conversion areas
 
             return status::success;
         }
@@ -96,6 +96,7 @@ struct nhwc_pooling_fwd_t : public primitive_impl_t {
     typedef typename prec_traits<data_type::f32>::type ker_data_t;
 
     virtual status_t execute(const exec_ctx_t &ctx) const override {
+        //printf("nhwc-pool-execute!!!\n");
         execute_forward(ctx);
         return status::success;
     }
@@ -110,50 +111,64 @@ private:
     void array_nhwc_max(const int n, ker_data_t *dst, const ker_data_t *src,
             unsigned char *ws, const size_t ws_offset, const data_type_t ws_dt,
             const int index) const {
+#ifndef NDEBUG
         assert(!((use_workspace == false) ^ (!ws))); // ensure ws pointer exists
+        if (use_workspace) {
+            assert(ws_dt == data_type::u8 || ws_dt == data_type::s32);
+            if (ws_dt==data_type::s32)
+                assert( ((uintptr_t)ws & (sizeof(int32_t)-1)) == 0 ); // aligned?
+            if (ws_dt == data_type::u8)
+                assert(0 <= index && index <= 255);
+        }
+#endif
         PRAGMA_OMP_SIMD()
         for (int oc = 0; oc < n; ++oc) {
-            auto s = src[oc];
-            ker_data_t mv = dst[oc];
+            auto const s = src[oc];
+            ker_data_t const mv = dst[oc];
 
-            // update index of maximum
-#if defined(__INTEL_COMPILER) || defined(__ve)
-            if ((use_workspace) && (s > mv)) {
-                // if (ws && (s > mv)) {
-                assert(ws_dt == data_type::u8 || ws_dt == data_type::s32);
-                if (ws_dt == data_type::u8) {
-                    assert(0 <= index && index <= 255);
-                    ws[ws_offset + oc] = index;
-                } else
-                    reinterpret_cast<int *>(ws)[ws_offset + oc] = index;
-            }
-#else
-            // Need to add explicit predicates for GCC to vectorize this.
-            // And although the resulting code is ugly, it is still 4 times
-            // faster than scalar
             if (use_workspace) {
-                // if (ws) {
+                // update index of maximum
+#if defined(__INTEL_COMPILER) || defined(__ve)
+                if ((s > mv)) {
+                    if (ws_dt == data_type::u8) {
+                        ws[ws_offset + oc] = index;
+                    } else {
+                        reinterpret_cast<int32_t *>(ws)[ws_offset + oc] = index;
+                    }
+                }
+#else
+                // Need to add explicit predicates for GCC to vectorize this.
+                // And although the resulting code is ugly, it is still 4 times
+                // faster than scalar
                 assert(ws_dt == data_type::u8 || ws_dt == data_type::s32);
 
                 if (ws_dt == data_type::u8) {
-                    assert(0 <= index && index <= 255);
                     unsigned char predicate = (s > mv) ? 0xff : 0;
                     unsigned char current_value = ws[ws_offset + oc];
                     current_value = (predicate & (unsigned char)index)
-                            | ((~predicate) & current_value);
+                        | ((~predicate) & current_value);
                     ws[ws_offset + oc] = current_value;
                 } else {
                     auto wint = reinterpret_cast<int *>(ws);
                     unsigned int predicate = (s > mv) ? 0xffffffff : 0;
                     unsigned int current_value = wint[ws_offset + oc];
                     current_value = (predicate & (unsigned int)index)
-                            | ((~predicate) & current_value);
+                        | ((~predicate) & current_value);
                     wint[ws_offset + oc] = current_value;
                 }
-            }
 #endif
+            }
+#if !defined(__ve)
             // update maximum
-            dst[oc] = nstl::max(s, mv);
+            dst[oc] = nstl::max(s, mv); // __ve bug!
+#else
+            if (s > mv) dst[oc] = s; // vectorizes correctly
+#if 0
+            // adding following print "fixes" VE
+            printf("oc=%d, src[oc] s=%g, dst[oc] mv=%g --> %g\n",
+                   oc,(double)s,(double)mv,(double)(dst[oc]));
+#endif
+#endif
         }
     }
 
@@ -161,15 +176,19 @@ private:
     void array_nhwc_initialize(const int n, ker_data_t *dst, unsigned char *ws,
             const size_t ws_offset, const data_type_t ws_dt) const {
         assert(!((use_workspace == false) ^ (!ws))); // ensure ws pointer exists
+        if(use_workspace && ws_dt==data_type::s32)
+            assert( ((uintptr_t)ws & (sizeof(int)-1)) == 0 ); // aligned?
+        // following allows vectorization on VE (change from data_t)
+        ker_data_t const lowest = nstl::numeric_limits<ker_data_t>::lowest();
         for (int oc = 0; oc < n; ++oc) {
             if (use_workspace) {
                 assert(ws_dt == data_type::u8 || ws_dt == data_type::s32);
-                if (ws_dt == data_type::u8) {
+                if (ws_dt == data_type::u8)
                     ws[ws_offset + oc] = 0;
-                } else
-                    reinterpret_cast<int *>(ws)[ws_offset + oc] = 0;
+                else
+                    reinterpret_cast<int32_t *>(ws)[ws_offset + oc] = 0;
             }
-            dst[oc] = nstl::numeric_limits<data_t>::lowest();
+            dst[oc] = lowest;
         }
     }
 

@@ -327,7 +327,7 @@ function runtest # runtest COMMAND [ARGS...] -- run in TEST_ENV & send console o
   # run COMMAND in TEST_ENV, returning exit status of COMMAND
   # what's seen on terminal goes to typescript
   #  so abort message that write to /dev/tty also end up in r${LOG}
-  echo "Test: $*"
+  >&2 echo "Test: $*"
   echo 'ulimit : '`ulimit -s`
   echo "${ENV} ${TEST_ENV[@]} $*"
   mkdir -p ve
@@ -364,29 +364,28 @@ if [ $GDB = 0 ]; then # "" evaluates to false
       arg=''
       ts=`find "${BLD}" -name "${tt}"`; rc=$?
       >&2 echo "rc=$rc, ts = ${ts}"
-      if [ $rc = 0 ]; then
-        for t in $ts; do # benchdnn is both a dir and an executable
-          >&2 echo "t in ts is $t"
-          if [ -f "${t}" -a -x "${t}" ]; then # regular file and executable
-            # if you get names from ARGS=-N make -C $BLD help, then
-            tx=${tt##cpu-}             # try removing a cpu- prefix
-            if [ ! "$tx" = "$tt" ]; then
-              t=`find "${BLD}" -name "${tx}"`
-              arg="cpu"
-              echo "switch to ${t} ${arg}"
-            fi
-            break;
-          fi
+      if [ "${ts}" ]; then        #if [ ! $rc = 0 ]; then
+        # Select match that is file and executable
+        for tx in $ts; do
+          >&2 echo "tx in ts is $tx"
+          if [ -f "${tx}" -a -x "${tx}" ]; then t="${tx}"; break; fi
         done
+      else # Not found.  Is it a cpu-FOO target?
+        # FOO is the real executable and 'cpu' is the argument
+        tx=${tt##cpu-}   # Try removing a cpu- prefix
+        if [ ! "$tx" = "$tt" ]; then
+          t=`find "${BLD}" -name "${tx}"`
+          arg="cpu"
+          echo "switch to ${t} ${arg}"
+        fi
       fi
       if [ "${tt}" == "benchdnn" ]; then
         >&2 echo "BENCHDNN_ARGS = ${BENCHDNN_ARGS}"
         arg="${BENCHDNN_ARGS}"
       fi
-      >&2 echo "t=$t"
-      >&2 echo "arg=$arg"
+      >&2 echo "Found t arg = $t $arg"
       if [ -x "${t}" ]; then
-        comment "test executable ${t}"
+        comment "test executable t = ${t}"
         tests=$(($tests+1))
         { >&2 echo; >&2 echo "test executable ${t} ${arg}";
           {
@@ -397,14 +396,16 @@ if [ $GDB = 0 ]; then # "" evaluates to false
           >&2 echo  "test ${t} done"
         }
       elif [ ! -z "make target" ]; then
+        # This way runs 'make $t', which builds and sometimes runs a test
+        #   benchdnn targets build and run a test suite
+        #   gtest targets are build-only (they run above be finding actual executable)
         >&2 echo "perhaps ${tt} is a 'make' target..."
         # this approach runs 'make' and some tests still get seg faults even
         # running one test at a time.
         makett=`make -C "${BLD}" help | grep -w "${tt}"`
-        echo "# perhaps it is an exact match with a 'make help' target?"
-        echo "makett ="
-        echo "${makett}"
-        if [ "${makett}" ]; then
+        if [ $? = 0 ]; then
+          >&2 echo "# There is a 'make help' target called ${tt}"
+          >&2 echo "makett = ${makett}"
           tests=$(($tests+1))
           { >&2 echo; >&2 echo "test ${t} ${arg}";
             {
@@ -417,8 +418,10 @@ if [ $GDB = 0 ]; then # "" evaluates to false
         else
           echo "SKIPPED: ${tt}"
         fi
-      elif [ -z "doit" ]; then
-        >&2 echo "run via makecmd..."
+      elif [ -z "old-benchdnn-way" ]; then
+        >&2 echo "look for command to run a benchdnn test suite..."
+        # Searches for benchdnn command that 'make ${tt}' would run,
+        # and run it without rebuild.
         makecmd=`make -C "${BLD}" -n "${tt}" | grep 'engine=' | awk '{sub(/.*&& /,""); print}'`
         #  Note: need to 'cd' to open "inputs/subdir/params" test spec files
         >&2 echo "makecmd: tt=${tt}"
@@ -428,7 +431,7 @@ if [ $GDB = 0 ]; then # "" evaluates to false
           { >&2 echo; >&2 echo "test ${tt}";
             {
               pushd tests/benchdnn
-              runtest ${makecmd} # >& does not work with redirections "vetest.${tt}"
+              runtest ${makecmd}
               rc="$?"
               popd
               tac "r${LOG}" | awk '/^VEOSLINE/{print} //{exit}' | tac > "vetest.${tt}"
@@ -486,6 +489,7 @@ if [ $GDB = 0 ]; then # "" evaluates to false
       }
     done
     if [ "${REQUIRE}" ]; then
+      tests=$(($tests+1))
       { >&2 echo; >&2 echo "ARGS='-R ${REQUIRE}' make -C '${BLD}' test";
         {
           ARGS="-R '${REQUIRE}'" runtest make -C "${BLD}" test

@@ -71,6 +71,7 @@ using namespace nhwc_pooling;
 
 template <data_type_t d_type>
 void nhwc_pooling_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
+    //printf("nchw_pooling_fwd_t\n");
 
     auto alg = pd()->desc()->alg_kind;
 
@@ -113,7 +114,7 @@ void nhwc_pooling_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
     };
 
     parallel_nd(MB, OD, OH, OW, [&](int mb, int od, int oh, int ow) {
-        size_t dst_offset_init = strided_offset(mb, dst_n_stride, od,
+        size_t const dst_offset_init = strided_offset(mb, dst_n_stride, od,
                 dst_d_stride, oh, dst_h_stride, ow, dst_w_stride);
         if (alg == alg_kind::pooling_max) {
             size_t ws_offset_init = 0;
@@ -126,6 +127,8 @@ void nhwc_pooling_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
             // simple loops unless they are singled out
             // into separate helper routines:
             //    array_nhwc_initialize, array_nhwc_max
+            //printf("init ws=%p, OC=%d, dst_i,ws_i=%lu,%lu\n",
+            //       (void*)ws, OC, dst_offset_init, ws_offset_init);
             if (!ws)
                 array_nhwc_initialize<false>(
                         OC, dst + dst_offset_init, ws, ws_offset_init, ws_dt);
@@ -133,6 +136,7 @@ void nhwc_pooling_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
                 array_nhwc_initialize<true>(
                         OC, dst + dst_offset_init, ws, ws_offset_init, ws_dt);
 
+            // VE: not vectorized
             for_(int kd = 0; kd < KD; ++kd)
             for_(int kh = 0; kh < KH; ++kh)
             for (int kw = 0; kw < KW; ++kw) {
