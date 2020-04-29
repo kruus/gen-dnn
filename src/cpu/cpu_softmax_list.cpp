@@ -14,12 +14,14 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "cpu_engine.hpp"
+#include "cpu/cpu_engine.hpp"
 
-#if DNNL_TARGET_X86_JIT
-#include "cpu/jit_uni_softmax.hpp"
-#endif // DNNL_TARGET_X86_JIT
 #include "cpu/ref_softmax.hpp"
+
+#if DNNL_X64
+#include "cpu/x64/jit_uni_softmax.hpp"
+using namespace dnnl::impl::cpu::x64;
+#endif
 
 namespace dnnl {
 namespace impl {
@@ -30,18 +32,20 @@ using pd_create_f = engine_t::primitive_desc_create_f;
 namespace {
 using namespace dnnl::impl::data_type;
 
-#define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
+// clang-format off
 static const pd_create_f impl_list[] = {
-        // clang-format off
-        INSTANCE(jit_uni_softmax_fwd_t<avx512_common>)
-        INSTANCE(jit_uni_softmax_fwd_t<avx2>)
-        INSTANCE(jit_uni_softmax_fwd_t<sse41>)
-        INSTANCE_ref(ref_softmax_fwd_t<f32>)
-        INSTANCE_ref(ref_softmax_bwd_t<f32>)
-        // clang-format on
+        CPU_INSTANCE_X64(jit_uni_softmax_fwd_t<avx512_common>)
+        CPU_INSTANCE_X64(jit_uni_softmax_bwd_t<avx512_common>)
+        CPU_INSTANCE_X64(jit_uni_softmax_fwd_t<avx2>)
+        CPU_INSTANCE_X64(jit_uni_softmax_fwd_t<sse41>)
+        CPU_INSTANCE(ref_softmax_fwd_t<f32>)
+        CPU_INSTANCE(ref_softmax_bwd_t<f32>)
+        CPU_INSTANCE(ref_softmax_fwd_t<bf16>)
+        CPU_INSTANCE(ref_softmax_bwd_t<bf16>)
         /* eol */
         nullptr,
 };
+// clang-format on
 } // namespace
 
 const pd_create_f *get_softmax_impl_list(const softmax_desc_t *desc) {

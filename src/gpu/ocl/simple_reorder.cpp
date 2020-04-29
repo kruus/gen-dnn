@@ -27,7 +27,7 @@ namespace ocl {
 
 using namespace dnnl::impl::memory_tracking::names;
 
-status_t simple_reorder_t::pd_t::init_conf() {
+status_t simple_reorder_t::pd_t::init_conf(engine_t *engine) {
     using namespace format_tag;
 
     const memory_desc_wrapper src_mdw(src_md());
@@ -106,8 +106,7 @@ status_t simple_reorder_t::pd_t::init_conf() {
         conf.sub_group_size = 16;
     }
 
-    auto *compute_engine
-            = utils::downcast<compute::compute_engine_t *>(engine());
+    auto *compute_engine = utils::downcast<compute::compute_engine_t *>(engine);
     conf.dispatch = compute_engine->create_dispatch(dst_mdw.md_);
     for (int i = 0; i < 6; ++i) {
         auto dim_str = utils::format("D%d", i);
@@ -223,17 +222,15 @@ status_t simple_reorder_t::pd_t::init_kernel_ctx(
     return status::success;
 }
 
-status_t simple_reorder_t::pd_t::init_scratchpad(
-        memory_tracking::registrar_t &scratchpad) const {
-    if (conf.scales_num > 0)
+void simple_reorder_t::pd_t::init_scratchpad() {
+    if (conf.scales_num > 0) {
+        auto scratchpad = scratchpad_registry().registrar();
         scratchpad.book(memory_tracking::names::key_reorder_scales,
-                sizeof(float) * conf.scales_num);
-    return status::success;
+                conf.scales_num, sizeof(float), OCL_BUFFER_ALIGNMENT);
+    }
 }
 
 status_t simple_reorder_t::execute(const exec_ctx_t &ctx) const {
-    auto *compute_stream
-            = utils::downcast<compute::compute_stream_t *>(ctx.stream());
 
     auto &src = CTX_IN_STORAGE(DNNL_ARG_FROM);
     auto &dst = CTX_OUT_STORAGE(DNNL_ARG_TO);
@@ -269,7 +266,8 @@ status_t simple_reorder_t::execute(const exec_ctx_t &ctx) const {
     arg_list.set(4, scales ? *scales : memory_storage_t::empty_storage());
 
     auto nd_range = conf.dispatch.nd_range();
-    status = compute_stream->parallel_for(nd_range, kernel_, arg_list);
+
+    status = parallel_for(ctx, nd_range, kernel_, arg_list);
 
     return status;
 }

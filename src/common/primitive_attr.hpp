@@ -14,8 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef PRIMITIVE_ATTR_HPP
-#define PRIMITIVE_ATTR_HPP
+#ifndef COMMON_PRIMITIVE_ATTR_HPP
+#define COMMON_PRIMITIVE_ATTR_HPP
 
 #include <map>
 #include <initializer_list>
@@ -226,8 +226,11 @@ struct zero_points_t : public c_compatible {
             return a == b || (is_runtime_value(a) && is_runtime_value(b));
         };
         return eq(zero_point_src, rhs.zero_point_src)
+                && eq(mask_src, rhs.mask_src)
                 && eq(zero_point_wei, rhs.zero_point_wei)
-                && eq(zero_point_dst, rhs.zero_point_dst);
+                && eq(mask_wei, rhs.mask_wei)
+                && eq(zero_point_dst, rhs.zero_point_dst)
+                && eq(mask_dst, rhs.mask_dst);
     }
 
     // arg-specific checks
@@ -305,9 +308,6 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
             dnnl::impl::alg_kind_t alg;
             float scale, alpha, beta;
         };
-        struct sum_t {
-            float scale;
-        }; // avoid "type declared in anon union" warning
 
         struct depthwise_conv_t {
             int stride;
@@ -321,7 +321,9 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
 
         dnnl::impl::primitive_kind_t kind;
         union {
-            sum_t sum;
+            struct {
+                float scale;
+            } sum;
             eltwise_t eltwise;
             depthwise_conv_t depthwise_conv;
         };
@@ -460,7 +462,6 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
 struct dnnl_primitive_attr : public dnnl::impl::c_compatible {
     dnnl_primitive_attr()
         : scratchpad_mode_(dnnl::impl::scratchpad_mode::library) {}
-    // note: some data intentionally uninitialized
 
     dnnl_primitive_attr *clone() const {
         return new dnnl_primitive_attr(*this);
@@ -547,5 +548,4 @@ inline dnnl_primitive_attr::skip_mask_t operator~(
             ~static_cast<unsigned>(rhs));
 }
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

@@ -72,8 +72,8 @@ Depending on the [flags](@ref dnnl_normalization_flags_t) and
 requires different inputs and outputs. For clarity, a summary is shown below.
 
 |                                                | #dnnl_forward_inference                                                                       | #dnnl_forward_training                                                                        | #dnnl_backward                                                                                                                     | #dnnl_backward_data                                                                                         |
-| :--                                            | :--                                                                                           | :--                                                                                           | :--                                                                                                                                | :--                                                                                                         | 
-| (none)                                         | *Inputs*: \src <br><br> *Outputs*: \dst                                                       | *Inputs*: \src <br><br> *Outputs*: \dst, \f$\mu\f$, \f$\sigma^2\f$                            | *Inputs*: \diffdst, \src, \f$\mu\f$, \f$\sigma^2\f$ <br><br> *Outputs*: \diffsrc                                                   | *Inputs*: \diffdst, \src, \f$\mu\f$, \f$\sigma^2\f$ <br><br> *Outputs*: \diffsrc                            | 
+| :--                                            | :--                                                                                           | :--                                                                                           | :--                                                                                                                                | :--                                                                                                         |
+| #dnnl_normalization_flags_none                 | *Inputs*: \src <br><br> *Outputs*: \dst                                                       | *Inputs*: \src <br><br> *Outputs*: \dst, \f$\mu\f$, \f$\sigma^2\f$                            | *Inputs*: \diffdst, \src, \f$\mu\f$, \f$\sigma^2\f$ <br><br> *Outputs*: \diffsrc                                                   | *Inputs*: \diffdst, \src, \f$\mu\f$, \f$\sigma^2\f$ <br><br> *Outputs*: \diffsrc                            |
 | #dnnl_use_global_stats                         | *Inputs*: \src, \f$\mu\f$, \f$\sigma^2\f$ <br><br> *Outputs*: \dst                            | *Inputs*: \src, \f$\mu\f$, \f$\sigma^2\f$ <br><br> *Outputs*: \dst                            | *Inputs*: \diffdst, \src, \f$\mu\f$, \f$\sigma^2\f$ <br><br> *Outputs*: \diffsrc                                                   | *Inputs*: \diffdst, \src, \f$\mu\f$, \f$\sigma^2\f$ <br><br> *Outputs*: \diffsrc                            |
 | #dnnl_use_scaleshift                           | *Inputs*: \src, \f$\gamma\f$, \f$\beta\f$ <br><br> *Outputs*: \dst                            | *Inputs*: \src, \f$\gamma\f$, \f$\beta\f$ <br><br> *Outputs*: \dst, \f$\mu\f$, \f$\sigma^2\f$ | *Inputs*: \diffdst, \src, \f$\mu\f$, \f$\sigma^2\f$, \f$\gamma\f$, \f$\beta\f$ <br><br> *Outputs*: \diffsrc, \diffgamma, \diffbeta | *Inputs*: \diffdst, \src, \f$\mu\f$, \f$\sigma^2\f$, \f$\gamma\f$, \f$\beta\f$ <br><br> *Outputs*: \diffsrc |
 | #dnnl_use_global_stats \| #dnnl_use_scaleshift | *Inputs*: \src, \f$\mu\f$, \f$\sigma^2\f$, \f$\gamma\f$, \f$\beta\f$ <br><br> *Outputs*: \dst | *Inputs*: \src, \f$\mu\f$, \f$\sigma^2\f$, \f$\gamma\f$, \f$\beta\f$ <br><br> *Outputs*: \dst | *Inputs*: \diffdst, \src, \f$\mu\f$, \f$\sigma^2\f$, \f$\gamma\f$, \f$\beta\f$ <br><br> *Outputs*: \diffsrc, \diffgamma, \diffbeta | *Inputs*: \diffdst, \src, \f$\mu\f$, \f$\sigma^2\f$, \f$\gamma\f$, \f$\beta\f$ <br><br> *Outputs*: \diffsrc |
@@ -114,9 +114,11 @@ argument index as specified by the following table.
    referred to as `diff_data_desc`.
 
 4. Both forward and backward propagation support in-place operations, meaning
-   that `src` can be used as input and output for forward propagation, and
-   `diff_dst` can be used as input and output for backward propagation. In case
-   of an in-place operation, the original data will be overwritten.
+   that \src can be used as input and output for forward propagation, and
+   \diffdst can be used as input and output for backward propagation. In case of
+   an in-place operation, the original data will be overwritten. Note, however,
+   that backward propagation requires original \src, hence the corresponding
+   forward propagation should not be performed in-place.
 
 ### Data Type Support
 
@@ -181,7 +183,7 @@ The layer normalization primitive is optimized for the following memory formats:
    because of the API). Different formats are functionally supported but lead to
    highly suboptimal performance.
 
-4. Use in-place operations whenever possible.
+4. Use in-place operations whenever possible (see caveats in General Notes).
 
 ## Examples
 

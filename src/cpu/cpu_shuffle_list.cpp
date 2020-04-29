@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "cpu_engine.hpp"
+#include "cpu/cpu_engine.hpp"
 
 #include "cpu/ref_shuffle.hpp"
 
@@ -27,17 +27,15 @@ using pd_create_f = engine_t::primitive_desc_create_f;
 namespace {
 using namespace dnnl::impl::data_type;
 
-/// @copydoc INSTANCE_CREATOR
-#define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
+// clang-format off
 static const pd_create_f impl_list[] = {
-        // clang-format off
-        INSTANCE_ref(ref_shuffle_t<4>) /* f32 or s32 */
-        INSTANCE_ref(ref_shuffle_t<2>) /* bf16 */
-        INSTANCE_ref(ref_shuffle_t<1>) /* s8 or u8 */
-        // clang-format on
+        CPU_INSTANCE(ref_shuffle_t<4>) /* f32 or s32 */
+        CPU_INSTANCE(ref_shuffle_t<2>) /* bf16 */
+        CPU_INSTANCE(ref_shuffle_t<1>) /* s8 or u8 */
         /* eol */
         nullptr,
 };
+// clang-format on
 } // namespace
 
 const pd_create_f *get_shuffle_impl_list(const shuffle_desc_t *desc) {

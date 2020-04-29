@@ -1,7 +1,7 @@
 #i8
 --reset
 --mb=2
-#--skip-impl="ref:gemm"      # ! test jit version only (allow for VANILLA build)
+--skip-impl="ref:gemm"      # ! test jit version only
 --allow-unimpl=true
 --dir=FWD_D
 --cfg=u8s8u8 --batch=shapes_mobilenet_dw
@@ -10,7 +10,7 @@
 #i8 attrs
 --reset
 --mb=2
-#--skip-impl="ref:gemm"      # ! test jit version only (allow for VANILLA build)
+--skip-impl="ref:gemm"      # ! test jit version only
 --allow-unimpl=true
 --dir=FWD_B
 --attr=oscale=per_oc:2.25;post_ops='sum:1.5;relu'

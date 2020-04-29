@@ -31,7 +31,7 @@
 ///  - one primitive for all subsequent iterations in the decoder. Note that
 ///    in this example, this primitive computes the states in place.
 ///  - the attention mechanism is implemented separately as there is no support
-///    for the context vectors in MKL-DNN yet
+///    for the context vectors in Intel MKL-DNN yet
 
 #include <assert.h>
 
@@ -341,10 +341,9 @@ void simple_net() {
                 enc_bidir_dst_layer_md, memory::desc(), memory::desc());
     } catch (error &e) {
         if (e.status == mkldnn_unimplemented) {
-            std::cerr
-                    << "Dependency on Intel(R) MKL version 2019u2 or newer is "
-                       "required for int8 RNN"
-                    << std::endl;
+            std::cerr << "Dependency on Intel MKL version 2019u2 or newer is "
+                         "required for int8 RNN"
+                      << std::endl;
         }
         throw;
     }
@@ -368,6 +367,19 @@ void simple_net() {
     primitive_attr attr;
     attr.set_rnn_data_qparams(data_scale, data_shift);
     attr.set_rnn_weights_qparams(weights_scale_mask, weights_scales);
+
+    try {
+        auto enc_bidir_prim_desc
+                = lstm_forward::primitive_desc(bi_layer_desc, attr, cpu_engine);
+    } catch (error &e) {
+        if (e.status == mkldnn_unimplemented) {
+            std::cerr << "Intel MKL-DNN does not have int8 RNN "
+                         "implementation that supports this system. Please "
+                         "refer to the developer guide for details."
+                      << std::endl;
+        }
+        throw;
+    }
 
     auto enc_bidir_prim_desc
             = lstm_forward::primitive_desc(bi_layer_desc, attr, cpu_engine);

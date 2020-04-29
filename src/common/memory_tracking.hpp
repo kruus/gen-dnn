@@ -14,12 +14,13 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef MEMORY_TRACKING_HPP
-#define MEMORY_TRACKING_HPP
+#ifndef COMMON_MEMORY_TRACKING_HPP
+#define COMMON_MEMORY_TRACKING_HPP
 
 #include <assert.h>
 #include <unordered_map>
 
+#include "memory_debug.hpp"
 #include "memory_storage.hpp"
 #include "nstl.hpp"
 #include "utils.hpp"
@@ -85,8 +86,8 @@ namespace memory_tracking {
  *  ``` c++
  *  struct reducer_t {
  *      static void init(registrar_t &scratchpad) {
- *          // preserve space for the reduction (one page aligned)
- *          scratchpad.book(key_space, sizeof(float) * 980 * 1024, 4096);
+ *          // reserve space for 980*1024 floats (one page aligned)
+ *          scratchpad.book<float>(key_space, 980 * 1024, 4096);
  *      }
  *
  *      void exec(const grantor_t &scratchpad) {
@@ -103,8 +104,12 @@ namespace memory_tracking {
  *          void init() {
  *              registrar_t scratchpad(scratchpad_registry_);
  *
- *              // preserve a space for padded bias (using default alignment)
- *              scratchpad.book(key_conv_padded_bias, 128);
+ *              // reserve space for 128 elements which are two bytes long that
+ *              // require 4 byte alignment, but preferably have 64 byte
+ *              // alignment for performance reasons
+ *              // two alignment parameters are included for implementation
+ *              // flexibility targeted at memory debugging purposes
+ *              scratchpad.book(key_conv_padded_bias, 128, 2, 4, 64);
  *
  *              // create a proxy registrar for the reducer All entries made
  *              // by reducer would live in convolution's registry, but would
@@ -174,10 +179,16 @@ enum {
     key_conv_wei_reduction,
     key_conv_wei_bia_reduction,
     key_conv_wei_bia_reduction_bctx,
+    key_eltwise_diff_dst,
+    key_eltwise_src,
     key_fusion_forward_scratchpad,
     key_fusion_inout_buffer,
+    key_gemm_int_c_in_acc_dt,
+    key_gemm_tmp_buffer,
+    key_gemm_flag,
     key_iprod_bias_bf16_convert_wsp,
     key_iprod_dst_bf16_convert_wsp,
+    key_iprod_dst_reorder,
     key_iprod_int_dat_in_acc_dt,
     key_lnorm_tmp_mean,
     key_lnorm_tmp_var,
@@ -196,6 +207,7 @@ enum {
     key_reorder_scales,
     key_reorder_wino_plain,
     key_reorder_wino_transform_space,
+    key_reorder_rnn_space,
     key_reorder_rnn_weights_bf16_cvt,
     key_reorder_rnn_weights_quantization,
     key_reorder_rnn_weights_reduction,
@@ -203,15 +215,22 @@ enum {
     key_rnn_space,
     key_rnn_cell,
     key_rnn_gates,
+    key_rnn_ht,
+    key_rnn_diff_ht,
     key_rnn_ptrs_bia,
     key_rnn_ptrs_wei_layer,
     key_rnn_ptrs_wei_iter,
+    key_rnn_ptrs_wei_projection,
     key_softmax_reduction,
     key_sum_reduction,
     key_sum_srcs_cvt,
     key_wino_U,
     key_wino_V,
     key_wino_M,
+    // These two keys should always be the last ones,
+    // even though they are not in alphabetical order
+    key_nested,
+    key_nested_multiple,
 };
 
 enum {
@@ -250,14 +269,37 @@ inline key_t make_prefix(key_t parent_prefix, key_t prefix) {
 struct registrar_t;
 struct grantor_t;
 
+enum { default_alignment = 128 };
+inline size_t get_alignment(size_t alignment) {
+    size_t minimal_alignment
+            = memory_debug::is_mem_debug() ? getpagesize() : default_alignment;
+    return nstl::max<size_t>(alignment, minimal_alignment);
+}
+
+inline size_t buffer_protect_size() {
+    return memory_debug::is_mem_debug()
+            ? memory_debug::protect_size() + getpagesize()
+            : 0;
+}
+
 struct registry_t {
-    void book(const key_t &key, size_t size, size_t alignment) {
+    // perf_align is the desired alignment for performance.
+    // data_align is the minimum data alignment required for functionality,
+    //    this parameter is included for memory debugging purposes.
+    void book(const key_t &key, size_t size, size_t data_align,
+            size_t perf_align = default_alignment) {
         if (size == 0) return;
         assert(offset_map_.count(key) == 0);
+        size_t alignment = memory_debug::is_mem_debug()
+                ? data_align
+                : nstl::max(data_align, perf_align);
 
-        alignment = nstl::max<size_t>(alignment, minimal_alignment);
+        if (memory_debug::is_mem_debug() && size_ == 0)
+            size_ += get_alignment(alignment) + buffer_protect_size();
+
         assert(alignment > 0 && (alignment & (alignment - 1)) == 0);
-        size_t capacity = size + alignment;
+        size_t capacity
+                = size + get_alignment(alignment) + buffer_protect_size();
         offset_map_[key] = entry_t {size_, size, capacity, alignment};
 
         size_ += capacity;
@@ -270,11 +312,7 @@ struct registry_t {
         }
         if (offset_map_.count(key) != 1) return nullptr;
 
-        const auto &e = offset_map_.at(key);
-        char *ptr = reinterpret_cast<char *>(base_ptr) + e.offset;
-        char *aligned_ptr = utils::align_ptr<char>(ptr, e.alignment);
-        assert(aligned_ptr + e.size <= ptr + e.capacity);
-        return aligned_ptr;
+        return get(offset_map_.at(key), base_ptr);
     }
 
     std::unique_ptr<memory_storage_t> get_memory_storage(
@@ -298,35 +336,98 @@ struct registry_t {
     registrar_t registrar();
     grantor_t grantor(const memory_storage_t *mem_storage) const;
 
-protected:
-#if TARGET_VE // other cpu may have lower alignment possible
-    enum { minimal_alignment = 16 };
-#else // x86 default
-    enum { minimal_alignment = 128 };
-#endif
     struct entry_t {
         size_t offset, size, capacity, alignment;
     };
 
+    class const_iterator {
+    private:
+        const void *base_ptr;
+        std::unordered_map<key_t, entry_t>::const_iterator iter;
+
+    public:
+        const_iterator(const void *base_ptr_,
+                const std::unordered_map<key_t, entry_t> &map,
+                bool is_begin = true) {
+            base_ptr = base_ptr_;
+            if (is_begin) {
+                iter = map.cbegin();
+            } else {
+                iter = map.cend();
+            }
+        }
+        const_iterator &operator++(int) {
+            iter++;
+            return *this;
+        }
+        bool operator==(const const_iterator &rhs) const {
+            return iter == rhs.iter;
+        }
+        bool operator!=(const const_iterator &rhs) const {
+            return iter != rhs.iter;
+        }
+        std::pair<const void *, size_t> operator*() const {
+            const void *ptr_start = nullptr;
+            const entry_t &e = iter->second;
+            ptr_start = get(e, base_ptr);
+            return std::pair<const void *, size_t> {ptr_start, e.size};
+        }
+    };
+    const_iterator cbegin(const void *base_ptr_) const {
+        return const_iterator(base_ptr_, offset_map_);
+    }
+    const_iterator cend(const void *base_ptr_) const {
+        return const_iterator(base_ptr_, offset_map_, false);
+    }
+
+protected:
     std::unordered_map<key_t, entry_t> offset_map_;
     size_t size_ = 0;
+
+    static const void *get(const entry_t &e, const void *base_ptr) {
+        const char *ptr = reinterpret_cast<const char *>(base_ptr) + e.offset;
+        const char *aligned_ptr
+                = utils::align_ptr<const char>(ptr, get_alignment(e.alignment));
+        if (memory_debug::is_mem_debug_overflow()
+                && e.size % getpagesize() != 0) {
+            // Align to end of page
+            size_t page_end_offset
+                    = utils::rnd_up(e.size, e.alignment) % getpagesize();
+            aligned_ptr += getpagesize() - page_end_offset;
+            if (aligned_ptr - getpagesize() > ptr) aligned_ptr -= getpagesize();
+            assert((size_t)aligned_ptr % e.alignment == 0);
+        }
+        assert(aligned_ptr + e.size
+                <= ptr + e.capacity - buffer_protect_size());
+        return aligned_ptr;
+    }
+    static void *get(const entry_t &e, void *base_ptr) {
+        return const_cast<void *>(get(e, (const void *)base_ptr));
+    }
 };
 
 struct registrar_t {
-#if TARGET_VE // other cpu may have lower alignment possible
-    enum { default_alignment = 16 };
-#else // x86 default
-    enum { default_alignment = 128 };
-#endif
-
     registrar_t(registry_t &registry) : registry_(registry), prefix_(0) {}
     registrar_t(registrar_t &parent, const key_t &prefix)
         : registry_(parent.registry_)
         , prefix_(make_prefix(parent.prefix_, prefix)) {}
 
-    void book(const key_t &key, size_t size,
-            size_t alignment = default_alignment) {
-        registry_.book(make_key(prefix_, key), size, alignment);
+    void book(const key_t &key, size_t nelems, size_t data_size,
+            size_t data_align = 0, size_t perf_align = default_alignment) {
+        if (data_align == 0) data_align = data_size;
+        registry_.book(make_key(prefix_, key), nelems * data_size, data_align,
+                perf_align);
+    }
+    template <typename T>
+    void book(const key_t &key, size_t nelems,
+            size_t perf_align = default_alignment) {
+        registry_.book(make_key(prefix_, key), nelems * sizeof(T), alignof(T),
+                perf_align);
+    }
+
+    void book(const key_t &key, const registry_t &registry,
+            size_t perf_align = default_alignment) {
+        registry_.book(make_key(prefix_, key), registry.size(), 1, perf_align);
     }
 
     size_t size() const { return registry_.size(); }
@@ -362,6 +463,11 @@ struct grantor_t {
         return registry_.get_memory_storage(
                 make_key(prefix_, key), base_mem_storage_);
     }
+
+    const memory_storage_t *get_base_storage() const {
+        return base_mem_storage_;
+    }
+    const registry_t &get_registry() const { return registry_; }
 
 protected:
     const registry_t &registry_;

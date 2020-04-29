@@ -14,22 +14,31 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef STREAM_HPP
-#define STREAM_HPP
+#ifndef COMMON_STREAM_HPP
+#define COMMON_STREAM_HPP
 
 #include <assert.h>
 #include "dnnl.h"
 
 #include "c_types_map.hpp"
 #include "engine.hpp"
+#include "stream_attr.hpp"
+#include "utils.hpp"
 
 struct dnnl_stream : public dnnl::impl::c_compatible {
-    dnnl_stream(dnnl::impl::engine_t *engine, unsigned flags)
-        : engine_(engine), flags_(flags) {}
+    dnnl_stream(dnnl::impl::engine_t *engine, unsigned flags,
+            const dnnl::impl::stream_attr_t *attr)
+        : engine_(engine)
+        , flags_(flags)
+        , attr_(attr ? *attr : dnnl::impl::stream_attr_t(engine_->kind())) {}
     virtual ~dnnl_stream() {}
 
     /** returns stream's engine */
     dnnl::impl::engine_t *engine() const { return engine_; }
+    template <typename tgt_engine_t>
+    tgt_engine_t *engine() const {
+        return dnnl::impl::utils::downcast<tgt_engine_t *>(engine_);
+    }
 
     /** returns stream's kind */
     unsigned flags() const { return flags_; }
@@ -37,9 +46,15 @@ struct dnnl_stream : public dnnl::impl::c_compatible {
     /** blocks until all submitted primitives to the stream are completed */
     virtual dnnl::impl::status_t wait() = 0;
 
+    const dnnl::impl::stream_attr_t *attr() const { return &attr_; }
+
+    virtual void before_exec_hook() {}
+    virtual void after_exec_hook() {}
+
 protected:
     dnnl::impl::engine_t *engine_;
     unsigned flags_;
+    const dnnl::impl::stream_attr_t attr_;
 };
 
 #endif

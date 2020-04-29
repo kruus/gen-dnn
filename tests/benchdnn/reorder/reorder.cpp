@@ -231,8 +231,9 @@ static int compare(const prb_t *p, const dnn_mem_t &mem_ref,
     return r->state == FAILED ? FAIL : OK;
 }
 
-static int init_pd(const prb_t *p, dnnl_primitive_desc_t &rpd,
-        const attr_bundle_t &attr_bundle, res_t *r) {
+static int init_pd_custom(const engine_t &engine_tgt, const prb_t *p,
+        dnnl_primitive_desc_t &rpd, const attr_bundle_t &attr_bundle,
+        res_t *r) {
     const auto &rc = p->reorder;
     auto dims = rc.dims;
     for (int d = 0; d < p->ndims; ++d)
@@ -256,25 +257,27 @@ static int init_pd(const prb_t *p, dnnl_primitive_desc_t &rpd,
     if (init_status == dnnl_unimplemented) return r->state = UNIMPLEMENTED, OK;
     SAFE(init_status, WARN);
 
-    const char *impl_str = query_impl_info(rpd);
-    BENCHDNN_PRINT(5, "dnnl implementation: %s\n", impl_str);
+    r->impl_name = query_impl_info(rpd);
+    BENCHDNN_PRINT(5, "oneDNN implementation: %s\n", r->impl_name.c_str());
 
     return OK;
 }
 
 int doit(const prb_t *p, res_t *r) {
     if (bench_mode == LIST) return r->state = LISTED, OK;
+    engine_t engine_tgt;
+
     //                                       ___________________
     //                                      |                   |
     //                                      | performance timer |
     //                                      |___________________|
     //                                                |
     //   _______________           ______________     V     ________________
-    //  |               |  DNNL   |              |  DNNL   |                |
+    //  |               | oneDNN  |              | oneDNN  |                |
     //  | dt_in fmt_ref |-------->| dt_in fmt_in |-------->| dt_out fmt_out |
     //  |_______________|         |______________|    ^    |________________|
     //           |                                    |            |
-    //  benchdnn |<-------------------------------- scales         | DNNL
+    //  benchdnn |<-------------------------------- scales         | oneDNN
     //   ________V_______                                   _______V________
     //  |                |                                 |                |
     //  | dt_out fmt_ref |         <= compare =>           | dt_out fmt_ref |
@@ -285,7 +288,7 @@ int doit(const prb_t *p, res_t *r) {
     // 2. create target reorder primitive
     // 3. create memories
     // 4. fill input memory
-    // 5. execute DNNL and benchdnn reorders / q10n
+    // 5. execute oneDNN and benchdnn reorders / q10n
     // 6. compare results
     // 7. performance measurement
 
@@ -294,13 +297,18 @@ int doit(const prb_t *p, res_t *r) {
     SAFE(prepare_attr_bundle(p, attr_bundle), WARN);
 
     /* Step 2: create target reorder primitive */
-    dnnl_primitive_desc_t rpd;
-    SAFE(init_pd(p, rpd, attr_bundle, r), WARN);
-    if (r->state == SKIPPED || r->state == UNIMPLEMENTED) return OK;
-
     dnnl_primitive_t rp;
-    DNN_SAFE(dnnl_primitive_create(&rp, rpd), WARN);
-    DNN_SAFE(dnnl_primitive_desc_destroy(rpd), CRIT);
+    // TODO: align init_pd interface with a common one which is used
+    // in the rest of the benchdnn drivers
+    auto init_pd = [&](const engine_t &engine_tgt, const prb_t *p,
+                           dnnl_primitive_desc_t &rpd, res_t *r, dir_t dir,
+                           const_dnnl_primitive_desc_t hint) {
+        SAFE(init_pd_custom(engine_tgt, p, rpd, attr_bundle, r), WARN);
+        return OK;
+    };
+
+    SAFE(init_prim(&rp, init_pd, engine_tgt, p, r), WARN);
+    if (r->state == SKIPPED || r->state == UNIMPLEMENTED) return OK;
 
     const_dnnl_primitive_desc_t const_pd;
     DNN_SAFE(dnnl_primitive_get_primitive_desc(rp, &const_pd), CRIT);
@@ -369,16 +377,16 @@ int doit(const prb_t *p, res_t *r) {
     args.set(DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, src_zero_points_m);
     args.set(DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zero_points_m);
 
-    DNN_SAFE(execute_and_wait(rp, stream_tgt, args), WARN);
+    DNN_SAFE(execute_and_wait(rp, engine_tgt, args), WARN);
 
     /* Step 6: check correctness */
     if (bench_mode & CORR) {
         if (p->alg == ALG_BOOT) {
-            /* "bootstrap" algorithm: compare to another dnnl reorder. use
+            /* "bootstrap" algorithm: compare to another oneDNN reorder. use
              * this when benchdnn does not know about all details of the data
              * layout, as is the case for compensated weights formats. */
 
-            /* Step 5a: dnnl reorder from ref format to output format */
+            /* Step 5a: oneDNN reorder from ref format to output format */
             dnnl_memory_extra_desc_t dst_extra {};
             fill_memory_extra(p, dst_extra);
             dnn_mem_t ref_dst_dt_out_fmt_out(dst_md, engine_tgt);
@@ -399,7 +407,7 @@ int doit(const prb_t *p, res_t *r) {
                          p, dst_dt_out_fmt_ref, src_dt_in_fmt_ref, attr_bundle),
                     WARN);
 
-            /* Step 5c: compare benchdnn and dnnl output */
+            /* Step 5c: compare benchdnn and oneDNN output */
             dnn_mem_t dst_dt_out(dst_md, dst_dt, tag, engine_tgt);
             SAFE(dst_dt_out.reorder(dst_dt_out_fmt_out), WARN);
             SAFE(compare(p, dst_dt_out_fmt_ref, dst_dt_out, attr_bundle, r),
@@ -408,7 +416,7 @@ int doit(const prb_t *p, res_t *r) {
     }
 
     /* Step 7: performance measurement */
-    measure_perf(r->timer, rp, args);
+    measure_perf(r->timer, engine_tgt, rp, args);
 
     DNN_SAFE_V(dnnl_primitive_destroy(rp));
 

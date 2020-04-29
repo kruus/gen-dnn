@@ -65,12 +65,15 @@ while getopts ":m:u:hvjatTdDqQP:FbBrRowW1567iMrcC" arg; do
         u) # soft ulimit (kB) [32768] (avoid nc++ ccom errors)
             ULIMIT="${OPTARG}"
             ;;
-        v) # force Intel x86 JIT compile for VANILLA generic architecture
+        v) # force Intel x86 compile for VANILLA generic architecture
             ISA=VANILLA
+            ;;
+        V) # force  x86 compile for VANILLA generic architecture, but with TARGET_VE
+            ISA=VE_SIM
             ;;
         j) # force Intel x86 compile JIT (default FULL x86 build)
             if [ ! "${DOTARGET}" == "x" ]; then echo "-j no good: already have -${DOTARGET}"; usage; fi
-            DOTARGET="j";
+            DOTARGET="j"; USE_CACHE=1
             ;;
         a) # NEC Aurora VE, full features
             if [ ! "${DOTARGET}" == "x" ]; then echo "-a no good: already have -${DOTARGET}"; usage; fi
@@ -504,7 +507,8 @@ echo 'ulimit soft : '`ulimit -Ss`
         ccxx_flags -finline-max-times=20
         #ccxx_flags -finline-abort-at-error
         #ccxx_flags -finline-suppress-diagnostics # 3.0.28?
-        ccxx_flags -ftemplate-depth=20
+        # src/common/tag_traits.hpp uses one_of(31 possibilities)
+        ccxx_flags -ftemplate-depth=50
         ccxx_flags -fdiag-inline=1
         ccxx_flags -fdiag-vector=1
         ccxx_flags -mno-parallel
@@ -559,6 +563,17 @@ echo 'ulimit soft : '`ulimit -Ss`
         echo "Primitive cache  ON"
     fi
 
+    if [ "$DOTARGET" = "j" -a "$ISA" = "VANILLA" ]; then
+        # x86 non-jit by setting bogus DNNL_TARGET_ARCH
+        CMAKEOPT="${CMAKEOPT} -DDNNL_TARGET_ARCH=ARCH_GENERIC"
+        # src/cpu/platform.hpp will define DNNL_X64|DNNL_AAARCH64|DNNL_ARCH_GENERIC
+    fi
+    if [ "$DOTARGET" = "j" -a "$ISA" = "VE_SIM" ]; then
+        # x86 non-jit by setting bogus DNNL_TARGET_ARCH
+        CMAKEOPT="${CMAKEOPT} -DDNNL_TARGET_ARCH=ARCH_GENERIC -DNEC_VE -DTARGET_VE"
+        # src/cpu/platform.hpp will define DNNL_X64|DNNL_AAARCH64|DNNL_ARCH_GENERIC
+        ccxx_flags -DDNNL_ARCH_VE
+    fi
     #
     # CMAKEOPT="" # allow user to pass flag, ex. CMAKEOPT='--trace -LAH' ./build.sh
     #CMAKEOPT="${CMAKEOPT} -DCMAKE_SRC_CCXX_FLAGS"

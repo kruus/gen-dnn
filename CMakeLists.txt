@@ -14,14 +14,15 @@
 # limitations under the License.
 #===============================================================================
 
-if(CMAKE_TOOLCHAIN_FILE)
-    cmake_minimum_required(VERSION 3.8) # nice Platform/ support
-else()
-    cmake_minimum_required(VERSION 2.8.11)
-endif()
+cmake_minimum_required(VERSION 2.8.11)
 
 if(POLICY CMP0022)
     cmake_policy(SET CMP0022 NEW)
+endif()
+
+# Foo::Bar always refers to an IMPORTED target
+if(POLICY CMP0028)
+    cmake_policy(SET CMP0028 NEW)
 endif()
 
 if(POLICY CMP0054)
@@ -33,20 +34,22 @@ if(POLICY CMP0042)
     cmake_policy(SET CMP0042 NEW)
 endif()
 
-# use full path for link libraries
-if(POLICY CMP0060)
-    cmake_policy(SET CMP0060 NEW)
-endif()
-
 # Do not export symbols from executables
 if(POLICY CMP0065)
     cmake_policy(SET CMP0065 NEW)
 endif()
 
-# Pass all flags to try_compile
+# Pass linker flags to try_compile
 if(POLICY CMP0056)
     cmake_policy(SET CMP0056 NEW)
 endif()
+
+# Always link with full path
+if(POLICY CMP0060)
+    cmake_policy(SET CMP0060 NEW)
+endif()
+
+# Pass compiler flags to try_compile
 if(POLICY CMP0066)
     cmake_policy(SET CMP0066 NEW)
 endif()
@@ -56,15 +59,20 @@ if(POLICY CMP0074)
     cmake_policy(SET CMP0074 NEW)
 endif()
 
+# Install rules order
+if(POLICY CMP0082)
+    cmake_policy(SET CMP0082 NEW)
+endif()
+
 if("${CMAKE_BUILD_TYPE}" STREQUAL "")
     message(STATUS "CMAKE_BUILD_TYPE is unset, defaulting to Release")
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING
-        "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel ...")
+        "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel RelWithAssert ...")
 endif()
 
-set(PROJECT_NAME "DNNL")
-set(PROJECT_FULL_NAME "Deep Neural Network Library (DNNL)")
-set(PROJECT_VERSION "1.3.0")
+set(PROJECT_NAME "oneDNN")
+set(PROJECT_FULL_NAME "oneAPI Deep Neural Network Library (oneDNN)")
+set(PROJECT_VERSION "1.4.0")
 
 set(LIB_NAME dnnl)
 
@@ -76,14 +84,18 @@ else()
 endif()
 
 if (NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
-    message(FATAL_ERROR "DNNL supports 64 bit platforms only")
+    message(FATAL_ERROR "oneDNN supports 64 bit platforms only")
 endif()
 
 # Set the target architecture.
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64.*|AARCH64.*|arm64.*|ARM64.*)")
-    set(TARGET_ARCH "AARCH64")
-else()
-    set(TARGET_ARCH "X86_64")
+if(NOT DNNL_TARGET_ARCH)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64.*|AARCH64.*|arm64.*|ARM64.*)")
+        set(DNNL_TARGET_ARCH "AARCH64")
+    elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "aurora")
+        set(DNNL_TARGET_ARCH "VE")
+    else()
+        set(DNNL_TARGET_ARCH "X64")
+    endif()
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
@@ -111,6 +123,7 @@ include("cmake/utils.cmake")
 include("cmake/options.cmake")
 include("cmake/OpenMP.cmake")
 include("cmake/TBB.cmake")
+include("cmake/Threadpool.cmake")
 include("cmake/OpenCL.cmake")
 include("cmake/platform.cmake")
 include("cmake/SDL.cmake")
@@ -118,6 +131,7 @@ include("cmake/MKL.cmake")
 include("cmake/Doxygen.cmake")
 include("cmake/version.cmake")
 include("cmake/coverage.cmake")
+include("cmake/build_types.cmake")
 
 # Handle cases when OpenMP runtime is requested but not found: override CPU
 # runtime to be sequential
@@ -130,8 +144,6 @@ enable_testing()
 
 include_directories(include)
 
-include("cmake/options-config.cmake") # prepare for dnnl_conf
-message(STATUS "DNNL_BUILD_STRING ${DNNL_BUILD_STRING}")
 configure_file(
     "${PROJECT_SOURCE_DIR}/include/dnnl_config.h.in"
     "${PROJECT_BINARY_DIR}/include/dnnl_config.h"

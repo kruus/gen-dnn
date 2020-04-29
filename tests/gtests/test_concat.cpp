@@ -17,7 +17,6 @@
 #include "dnnl_test_common.hpp"
 #include "gtest/gtest.h"
 
-#include "cpu_isa_traits.hpp"
 #include "dnnl.hpp"
 
 namespace dnnl {
@@ -92,14 +91,9 @@ class concat_test : public ::testing::TestWithParam<concat_test_params> {
 
 protected:
     virtual void SetUp() {
-        ::show_dnnl_build();
         auto data_type = data_traits<data_t>::data_type;
-        SKIP_IF(data_type == memory::data_type::f16
-                        && get_test_engine_kind() == engine::kind::cpu,
-                "CPU does not support f16 data type.");
-        SKIP_IF(data_type == impl::data_type::bf16
-                        && !impl::cpu::mayiuse(impl::cpu::avx512_core),
-                "current ISA doesn't support bfloat16 data type");
+        SKIP_IF(unsupported_data_type(data_type),
+                "Engine does not support this data type.");
         concat_test_params p
                 = ::testing::TestWithParam<decltype(p)>::GetParam();
         catch_expected_failures(
@@ -126,7 +120,7 @@ protected:
         }
 
         auto eng = get_test_engine();
-        auto strm = stream(eng);
+        auto strm = make_stream(eng);
         memory::data_type data_type = data_traits<data_t>::data_type;
 
         std::vector<memory::desc> srcs_md;
@@ -149,7 +143,7 @@ protected:
 
         ASSERT_TRUE(concat_pd.query_md(query::exec_arg_md, DNNL_ARG_DST)
                 == concat_pd.dst_desc());
-        for (size_t i = 0; i < srcs.size(); i++)
+        for (int i = 0; i < (int)srcs.size(); i++)
             ASSERT_TRUE(concat_pd.query_md(
                                 query::exec_arg_md, DNNL_ARG_MULTIPLE_SRC + i)
                     == concat_pd.src_desc(i));

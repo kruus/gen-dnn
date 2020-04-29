@@ -21,6 +21,7 @@
  * \sa dnnl_config.h */
 #include "dnnl_config.h"
 
+#if 0 // OLD WAY
 // TARGET_cpu[_subtype] 0/1 values establish uniform names based on
 // CMAKE_SYSTEM_PROCESSOR and DNNL_ISA build option.
 /// default build always is TARGET_X86_JIT
@@ -29,6 +30,29 @@
 #define TARGET_X86 DNNL_TARGET_X86
 /// A cross-compile target, uniform name for defined(__ve)
 #define TARGET_VE DNNL_TARGET_VE
+#else
+#if defined(DNNL_AARCH64)
+#define TARGET_AARCH64 1
+#define TARGET_X86_JIT 0
+#define TARGET_X86 0
+#define TARGET_VE 0
+#elif defined(DNNL_ARCH_VE)
+#define TARGET_AARCH64 0
+#define TARGET_X86_JIT 0
+#define TARGET_X86 0
+#define TARGET_VE 1
+#elif defined(DNNL_X64)
+#define TARGET_AARCH64 0
+#define TARGET_X86_JIT 1
+#define TARGET_X86 1
+#define TARGET_VE 0
+#elif defined(DNNL_ARCH_GENERIC)
+#define TARGET_AARCH64 0
+#define TARGET_X86_JIT 0
+#define TARGET_X86 0
+#define TARGET_VE 0
+#endif
+#endif
 
 // Implies presence of intel intrinsics header.
 #if defined(__x86_64__) || defined(_M_X64)

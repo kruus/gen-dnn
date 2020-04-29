@@ -987,8 +987,8 @@ dnnl_status_t DNNL_API dnnl_memory_get_memory_desc(
 dnnl_status_t DNNL_API dnnl_memory_get_engine(
         const_dnnl_memory_t memory, dnnl_engine_t *engine);
 
-/// Maps a memory object and returns a pointer to a host-side buffer with a
-/// copy of its contents.
+/// Maps a memory object and returns a host-side pointer to a memory buffer
+/// with a copy of its contents.
 ///
 /// Mapping enables explicit direct access to memory contents for the engines
 /// that do not support it implicitly.
@@ -1013,8 +1013,9 @@ dnnl_status_t DNNL_API dnnl_memory_get_engine(
 dnnl_status_t DNNL_API dnnl_memory_map_data(
         const_dnnl_memory_t memory, void **mapped_ptr);
 
-/// Unmaps a memory object and writes back any changes to the previously mapped
-/// buffer.
+/// Unmaps a memory object and writes back any changes made to the previously
+/// mapped memory buffer. The pointer to the mapped buffer must be obtained
+/// via the dnnl_memory_map_data() call.
 ///
 /// @note
 ///     The dnnl_memory_map_data() and dnnl_memory_unmap_data() functions are
@@ -1041,34 +1042,46 @@ dnnl_status_t DNNL_API dnnl_memory_get_data_handle(
 
 /// Sets a memory object's data handle.
 ///
-/// This function may write zeroes to the specified data @p handle if the
-/// memory object has padding to maintain data consistency.
-///
-/// @note
-///     The padding is performed for memory objects created with blocked
-///     memory format tags like #dnnl_aBcd8b when any of the dimensions is not
-///     a multiple of a corresponding block size. The padding is performed only
-///     for memory objects created with plain memory format tags like #dnnl_nchw
-///     or #dnnl_nhwc if requested explicitly. More information is available in
-///     @ref dev_guide_understanding_memory_formats.
-///
-/// The write can be time consuming and happens each time the function is
-/// called. Furthermore, it is performed using an internal service stream in a
-/// blocking manner.
-///
-/// @warning
-///     Even if the memory object is used to hold values that stay constant
-///     (e.g., pre-packed weights during inference), the function will still
-///     write zeroes to the padding area if it exists. Hence, the @p handle
-///     parameter cannot and does not have a const qualifier.
+/// See the description of dnnl_memory_set_data_handle_v2() for more details.
 ///
 /// @param memory Memory object.
 /// @param handle Data handle. For the CPU engine, the data handle is a
-///     pointer to the actual data. For OpenCL it is a cl_mem.
+///     pointer to the actual data. For OpenCL it is a `cl_mem`.
 /// @returns #dnnl_success on success and a status describing the error
 ///     otherwise.
 dnnl_status_t DNNL_API dnnl_memory_set_data_handle(
         dnnl_memory_t memory, void *handle);
+
+/// Sets a memory object's data handle.
+///
+/// This function may write zero values to the memory specified by the @p
+/// handle if the memory object has a zero padding area. This may be time
+/// consuming and happens each time this function is called. The operation is
+/// always blocking and the stream parameter is a hint.
+///
+/// @note
+///     The zero padding is required by memory objects created with blocked
+///     memory format tags like #dnnl_aBcd8b when any of the dimensions is not
+///     a multiple of the corresponding block size. For "plain" formats like
+///     #dnnl_nchw or #dnnl_nhwc zero padding area needs to be set up
+///     explicitly when creating the corresponding memory descriptors. See
+///     @ref dev_guide_understanding_memory_formats for more details.
+///
+/// @note
+///     Even when the memory object is used to hold values that stay constant
+///     during the execution of the program (pre-packed weights during
+///     inference, for example), the function will still write zeroes to the
+///     padding area if it exists. Hence, the @p handle parameter cannot and
+///     does not have a const qualifier.
+///
+/// @param memory Memory object.
+/// @param handle Data handle. For the CPU engine, the data handle is a
+///     pointer to the actual data. For OpenCL it is a `cl_mem`.
+/// @param stream Stream to use to execute padding in.
+/// @returns #dnnl_success on success and a status describing the error
+///     otherwise.
+dnnl_status_t DNNL_API dnnl_memory_set_data_handle_v2(
+        dnnl_memory_t memory, void *handle, dnnl_stream_t stream);
 
 #if DNNL_GPU_RUNTIME == DNNL_RUNTIME_OCL
 /// Returns an OpenCL memory object associated with a memory object.
@@ -2404,10 +2417,14 @@ dnnl_status_t DNNL_API dnnl_primitive_attr_set_rnn_weights_qparams(
 
 /// Initializes a descriptor for vanilla RNN forward propagation primitive.
 ///
-/// The @p src_iter_desc, @p bias_desc, and @p dst_iter_desc may either be @c
-/// NULL or point to a zero memory descriptor. This would then indicate that
-/// the RNN forward propagation primitive should not use them and should
-/// default to zero values instead.
+/// The following arguments may either be @c NULL or point to a zero memory
+/// descriptor:
+/// - @p src_iter_desc,
+/// - @p bias_desc,
+/// - @p dst_iter_desc.
+///
+/// This would then indicate that the RNN forward propagation primitive should
+/// not use them and should default to zero values instead.
 ///
 /// @note
 ///     All memory descriptors can be initialized with
@@ -2465,12 +2482,14 @@ dnnl_status_t DNNL_API dnnl_vanilla_rnn_forward_desc_init(
 
 /// Initializes a descriptor for vanilla RNN backward propagation primitive.
 ///
-/// The @p src_iter_desc together with @p diff_src_iter_desc, @p bias_desc
-/// together with @p diff_bias_desc, and @p dst_iter_desc together with @p
-/// diff_src_iter_desc, may either be @c NULL or point to a zero memory
-/// descriptor. This would then indicate that the RNN backward propagation
-/// primitive should not use the respective data and should use zero values
-/// instead.
+/// The following arguments may either be @c NULL or point to a zero memory
+/// descriptor:
+/// - @p src_iter_desc together with @p diff_src_iter_desc,
+/// - @p bias_desc together with @p diff_bias_desc,
+/// - @p dst_iter_desc together with @p diff_dst_iter_desc.
+///
+/// This would then indicate that the RNN backward propagation primitive should
+/// not use the respective data and should use zero values instead.
 ///
 /// @note
 ///     All memory descriptors can be initialized with
@@ -2550,10 +2569,14 @@ dnnl_status_t DNNL_API dnnl_vanilla_rnn_backward_desc_init(
 
 /// Initializes a descriptor for LSTM forward propagation primitive.
 ///
-/// The @p src_iter_desc, @p src_iter_c_desc, @p bias_desc, @p dst_iter_desc,
-/// and @p dst_iter_c_desc may either be @c NULL or point to a zero memory
-/// descriptor. This would then indicate that the LSTM forward propagation
-/// primitive should not use them and should default to zero values instead.
+/// The following arguments may either be @c NULL or point to a zero memory
+/// descriptor:
+/// - @p src_iter_desc together with @p src_iter_c_desc,
+/// - @p bias_desc,
+/// - @p dst_iter_desc together with @p dst_iter_c_desc.
+///
+/// This would then indicate that the LSTM forward propagation primitive should
+/// not use them and should default to zero values instead.
 ///
 /// @note
 ///     All memory descriptors can be initialized with
@@ -2561,6 +2584,8 @@ dnnl_status_t DNNL_API dnnl_vanilla_rnn_backward_desc_init(
 ///
 /// @sa dnnl_lstm_forward_desc_init_v2 to initialize forward LSTM with and
 ///     without peephole
+/// @sa dnnl_lstm_forward_desc_init_v3 to initialize forward LSTM with and
+///     without peephole / recurrent projection layer
 ///
 /// Inputs:
 ///  - `src_layer` (#dnnl_query_src_md, `0`)
@@ -2617,15 +2642,22 @@ dnnl_status_t DNNL_API dnnl_lstm_forward_desc_init(dnnl_rnn_desc_t *rnn_desc,
 /// Initializes a descriptor for an LSTM (with or without peephole) forward
 /// propagation primitive.
 ///
-/// The @p src_iter_desc, @p src_iter_c_desc, @p weights_peephole_desc, @p
-/// bias_desc, @p dst_iter_desc, and @p dst_iter_c_desc may either be @c NULL
-/// or point to a zero memory descriptor. This would then indicate that the
-/// LSTM forward propagation primitive should not use them and should default
-/// to zero values instead.
+/// The following arguments may either be @c NULL or point to a zero memory
+/// descriptor:
+/// - @p src_iter_desc together with @p src_iter_c_desc,
+/// - @p weights_peephole_desc,
+/// - @p bias_desc,
+/// - @p dst_iter_desc together with @p dst_iter_c_desc.
+///
+/// This would then indicate that the LSTM forward propagation primitive should
+/// not use them and should default to zero values instead.
 ///
 /// @note
 ///     All memory descriptors can be initialized with #dnnl_format_tag_any or
 ///     with format_kind set to #dnnl_format_kind_any.
+///
+/// @sa dnnl_lstm_forward_desc_init_v3 to initialize forward LSTM with and
+///     without peephole / recurrent projection layer
 ///
 /// Inputs:
 ///  - `src_layer` (#dnnl_query_src_md, `0`)
@@ -2684,15 +2716,105 @@ dnnl_status_t DNNL_API dnnl_lstm_forward_desc_init_v2(dnnl_rnn_desc_t *rnn_desc,
         const dnnl_memory_desc_t *dst_iter_desc,
         const dnnl_memory_desc_t *dst_iter_c_desc, unsigned flags);
 
+/// Initializes a descriptor for an LSTM (with or without peephole and with
+/// or without recurrent projection layer) forward propagation primitive.
+///
+/// The following arguments may either be @c NULL or point to a zero memory
+/// descriptor:
+/// - @p src_iter_desc together with @p src_iter_c_desc,
+/// - @p weights_peephole_desc,
+/// - @p bias_desc,
+/// - @p dst_iter_desc together with @p dst_iter_c_desc.
+///
+/// This would then indicate that the LSTM forward propagation primitive should
+/// not use them and should default to zero values instead.
+///
+/// The @p weights_projection_desc could either be @c NULL or point to a zero
+/// memory descriptor. This would then indicate that the LSTM doesn't have
+/// recurrent projection layer.
+///
+/// @note
+///     All memory descriptors can be initialized with #dnnl_format_tag_any or
+///     with format_kind set to #dnnl_format_kind_any.
+///
+/// Inputs:
+///  - src_layer (#dnnl_query_src_md, 0)
+///  - src_iter (#dnnl_query_src_md, 1), if used
+///  - src_iter_c (#dnnl_query_src_md, 2), if used
+///  - weights_layer (#dnnl_query_weights_md, 0)
+///  - weights_iter (#dnnl_query_weights_md, 1)
+///  - weights_peephole (#dnnl_query_weights_md, 2), if used
+///  - weights_projection (#dnnl_query_weights_md, index), if used and index is:
+///    - 2, if there is no weights_peephole
+///    - 3, otherwise
+///  - bias (#dnnl_query_weights_md, index), if used and index is:
+///    - 2, if neither weights_peephole nor weights_projection is used
+///    - 3, if one of weights_peephole or weights_projection is used
+///    - 4, if both weights_peephole and weights_projection are used
+///
+/// Outputs:
+///  - dst_layer (#dnnl_query_dst_md, 0)
+///  - dst_iter (#dnnl_query_dst_md, 1), if used
+///  - dst_iter_c (#dnnl_query_dst_md, 2), if used
+///  - workspace (#dnnl_query_workspace_md, 0),
+///     if @p prop_kind equals #dnnl_forward_training; must be queried for
+///     using @ref dnnl_primitive_desc_query_md() after a corresponding
+///     primitive descriptor is created
+///
+/// @param rnn_desc Output descriptor for LSTM primitive.
+/// @param prop_kind Propagation kind. Possible values are
+///     #dnnl_forward_training and #dnnl_forward_inference.
+/// @param direction RNN direction. See @ref dnnl_rnn_direction_t for more
+///     info.
+/// @param src_layer_desc Memory descriptor for the input vector.
+/// @param src_iter_desc Memory descriptor for the input recurrent hidden
+///     state vector.
+/// @param src_iter_c_desc Memory descriptor for the input recurrent cell
+///     state vector.
+/// @param weights_layer_desc Memory descriptor for the weights applied to the
+///     layer input.
+/// @param weights_iter_desc Memory descriptor for the weights applied to the
+///     recurrent input.
+/// @param weights_peephole_desc Memory descriptor for the weights applied to
+///     the cell states (according to the Peephole LSTM formula).
+/// @param weights_projection_desc Memory descriptor for the weights applied to
+///     the hidden states to get the recurrent projection (according to the
+///     Projection LSTM formula).
+/// @param bias_desc Bias memory descriptor.
+/// @param dst_layer_desc Memory descriptor for the output vector.
+/// @param dst_iter_desc Memory descriptor for the output recurrent hidden
+///     state vector.
+/// @param dst_iter_c_desc Memory descriptor for the output recurrent cell
+///     state vector.
+/// @param flags Unused.
+/// @returns #dnnl_success on success and a status describing the error
+///     otherwise.
+dnnl_status_t DNNL_API dnnl_lstm_forward_desc_init_v3(dnnl_rnn_desc_t *rnn_desc,
+        dnnl_prop_kind_t prop_kind, dnnl_rnn_direction_t direction,
+        const dnnl_memory_desc_t *src_layer_desc,
+        const dnnl_memory_desc_t *src_iter_desc,
+        const dnnl_memory_desc_t *src_iter_c_desc,
+        const dnnl_memory_desc_t *weights_layer_desc,
+        const dnnl_memory_desc_t *weights_iter_desc,
+        const dnnl_memory_desc_t *weights_peephole_desc,
+        const dnnl_memory_desc_t *weights_projection_desc,
+        const dnnl_memory_desc_t *bias_desc,
+        const dnnl_memory_desc_t *dst_layer_desc,
+        const dnnl_memory_desc_t *dst_iter_desc,
+        const dnnl_memory_desc_t *dst_iter_c_desc, unsigned flags);
+
 /// Initializes a descriptor for an LSTM backward propagation primitive.
 ///
-/// The @p src_iter_desc together with @p diff_iter_desc, @p src_iter_c_desc
-/// together with @p src_iter_c_desc, @p bias_desc together with @p
-/// diff_bias_desc, @p dst_iter_desc together with @p diff_dst_iter_desc, and
-/// @p dst_iter_c_desc together with @p diff_dst_iter_c_desc, may either be @c
-/// NULL or point to a zero memory descriptor. This would then indicate that
-/// the LSTM backward propagation primitive should not use them and should
-/// default to zero values instead.
+/// The following arguments may either be @c NULL or point to a zero memory
+/// descriptor:
+/// - @p src_iter_desc together with @p src_iter_c_desc, diff_src_iter_desc,
+///   and @p diff_src_iter_c_desc,
+/// - @p bias_desc together with @p diff_bias_desc,
+/// - @p dst_iter_desc together with @p dst_iter_c_desc, diff_dst_iter_desc,
+///   and @p diff_dst_iter_c_desc.
+///
+/// This would then indicate that the LSTM backward propagation primitive
+/// should not use them and should default to zero values instead.
 ///
 /// @note
 ///     All memory descriptors can be initialized with
@@ -2700,6 +2822,8 @@ dnnl_status_t DNNL_API dnnl_lstm_forward_desc_init_v2(dnnl_rnn_desc_t *rnn_desc,
 ///
 /// @sa dnnl_lstm_backward_desc_init_v2 to initialize backward LSTM with and
 ///     without peephole
+/// @sa dnnl_lstm_backward_desc_init_v3 to initialize backward LSTM with and
+///     without peephole / recurrent projection layer
 ///
 /// Inputs:
 ///  - `src_layer` (#dnnl_query_src_md, `0`)
@@ -2786,18 +2910,24 @@ dnnl_status_t DNNL_API dnnl_lstm_backward_desc_init(dnnl_rnn_desc_t *rnn_desc,
 /// Initializes a descriptor for an LSTM (with or without peephole) backward
 /// propagation primitive.
 ///
-/// The @p src_iter_desc together with @p diff_iter_desc, @p src_iter_c_desc
-/// together with @p diff_src_iter_c_desc, @p weights_peephole_desc together
-/// with @p diff_weights_peephole_desc, @p bias_desc together with @p
-/// diff_bias_desc, @p dst_iter_desc together with @p diff_dst_iter_desc, and
-/// @p dst_iter_c_desc together with @p diff_dst_iter_c_desc, may either be @c
-/// NULL or point to a zero memory descriptor. This would then indicate that
-/// the LSTM backward propagation primitive should not use them and should
-/// default to zero values instead.
+/// The following arguments may either be @c NULL or point to a zero memory
+/// descriptor:
+/// - @p src_iter_desc together with @p src_iter_c_desc, diff_src_iter_desc,
+///   and @p diff_src_iter_c_desc,
+/// - @p weights_peephole_desc together with @p diff_weights_peephole_desc,
+/// - @p bias_desc together with @p diff_bias_desc,
+/// - @p dst_iter_desc together with @p dst_iter_c_desc, diff_dst_iter_desc,
+///   and @p diff_dst_iter_c_desc.
+///
+/// This would then indicate that the LSTM backward propagation primitive
+/// should not use them and should default to zero values instead.
 ///
 /// @note
 ///     All memory descriptors can be initialized with #dnnl_format_tag_any or
 ///     with format_kind set to #dnnl_format_kind_any.
+///
+/// @sa dnnl_lstm_backward_desc_init_v3 to initialize backward LSTM with and
+///     without peephole / recurrent projection layer
 ///
 /// Inputs:
 ///  - `src_layer` (#dnnl_query_src_md, `0`)
@@ -2894,12 +3024,152 @@ dnnl_status_t DNNL_API dnnl_lstm_backward_desc_init_v2(
         const dnnl_memory_desc_t *diff_dst_iter_desc,
         const dnnl_memory_desc_t *diff_dst_iter_c_desc, unsigned flags);
 
+/// Initializes a descriptor for an LSTM (with or without peephole and with or
+/// with out recurrent projection layer) backward propagation primitive.
+///
+/// The following arguments may either be @c NULL or point to a zero memory
+/// descriptor:
+/// - @p src_iter_desc together with @p src_iter_c_desc, diff_src_iter_desc,
+///   and @p diff_src_iter_c_desc,
+/// - @p weights_peephole_desc together with @p diff_weights_peephole_desc,
+/// - @p bias_desc together with @p diff_bias_desc,
+/// - @p dst_iter_desc together with @p dst_iter_c_desc, diff_dst_iter_desc,
+///   and @p diff_dst_iter_c_desc.
+///
+/// This would then indicate that the LSTM backward propagation primitive
+/// should not use them and should default to zero values instead.
+///
+/// The @p weights_projection_desc together with @p
+/// diff_weights_projection_desc could either be @c NULL or point to a zero
+/// memory descriptor. This would then indicate that the LSTM doesn't have
+/// recurrent projection layer.
+///
+/// @note
+///     All memory descriptors can be initialized with #dnnl_format_tag_any or
+///     with format_kind set to #dnnl_format_kind_any.
+///
+/// Inputs:
+///  - src_layer (#dnnl_query_src_md, 0)
+///  - src_iter (#dnnl_query_src_md, 1), if used
+///  - src_iter_c (#dnnl_query_src_md, 2), if used
+///  - weights_layer (#dnnl_query_weights_md, 0)
+///  - weights_iter (#dnnl_query_weights_md, 1)
+///  - weights_peephole (#dnnl_query_weights_md, 2), if used
+///  - weights_projection (#dnnl_query_weights_md, index), if used and index is:
+///    - 2, if there is no weights_peephole
+///    - 3, otherwise
+///  - bias (#dnnl_query_weights_md, index), if used and index is:
+///    - 2, if neither weights_peephole nor weights_projection is used
+///    - 3, if one of weights_peephole or weights_projection is used
+///    - 4, if both weights_peephole and weights_projection are used
+///  - dst_layer (#dnnl_query_dst_md, 0)
+///  - dst_iter (#dnnl_query_dst_md, 1), if used
+///  - dst_iter_c (#dnnl_query_dst_md, 2), if used
+///  - diff_dst_layer (#dnnl_query_diff_dst_md, 0)
+///  - diff_dst_iter (#dnnl_query_diff_dst_md, 1), if used
+///  - diff_dst_iter_c (#dnnl_query_diff_dst_md, 2), if used
+///  - workspace (#dnnl_query_workspace_md, 0)
+///
+/// Outputs:
+///  - diff_src_layer (#dnnl_query_diff_src_md, 0)
+///  - diff_src_iter (#dnnl_query_diff_src_md, 1), if used
+///  - diff_src_iter_c (#dnnl_query_diff_src_md, 2), if used
+///  - diff_weights_layer (#dnnl_query_diff_weights_md, 0)
+///  - diff_weights_iter (#dnnl_query_diff_weights_md, 1)
+///  - diff_weights_peephole (#dnnl_query_weights_md, 2), if used
+///  - diff_weights_projection (#dnnl_query_weights_md, index), if used and
+///    index is:
+///    - 2, if there is no diff_weights_peephole
+///    - 3, otherwise
+///  - diff_bias (#dnnl_query_diff_weights_md, index), if used and index is:
+///    - 2, if neither diff_weights_peephole nor diff_weights_projection is used
+///    - 3, if one of diff_weights_peephole or diff_weights_projection is used
+///    - 4, if both diff_weights_peephole and diff_weights_projection are used
+///
+/// @param rnn_desc Output descriptor for LSTM primitive.
+/// @param prop_kind Propagation kind. Must be #dnnl_backward.
+/// @param direction RNN direction. See @ref dnnl_rnn_direction_t for more
+///     info.
+/// @param src_layer_desc Memory descriptor for the input vector.
+/// @param src_iter_desc Memory descriptor for the input recurrent hidden
+///     state vector.
+/// @param src_iter_c_desc Memory descriptor for the input recurrent cell
+///     state vector.
+/// @param weights_layer_desc Memory descriptor for the weights applied to the
+///     layer input.
+/// @param weights_iter_desc Memory descriptor for the weights applied to the
+///     recurrent input.
+/// @param weights_peephole_desc Memory descriptor for the weights applied to
+///     the cell states (according to the Peephole LSTM formula).
+/// @param weights_projection_desc Memory descriptor for the weights applied to
+///     the hidden states to get the recurrent projection (according to the
+///     Projection LSTM formula).
+/// @param bias_desc Bias memory descriptor.
+/// @param dst_layer_desc Memory descriptor for the output vector.
+/// @param dst_iter_desc Memory descriptor for the output recurrent hidden
+///     state vector.
+/// @param dst_iter_c_desc Memory descriptor for the output recurrent cell
+///     state vector.
+/// @param diff_src_layer_desc Memory descriptor for the diff of input vector.
+/// @param diff_src_iter_desc Memory descriptor for the diff of input recurrent
+///     hidden state vector.
+/// @param diff_src_iter_c_desc Memory descriptor for the diff of input
+/// recurrent cell state vector.
+/// @param diff_weights_layer_desc Memory descriptor for the diff of weights
+///     applied to the layer input.
+/// @param diff_weights_iter_desc Memory descriptor for the diff of weights
+///     applied to the recurrent input.
+/// @param diff_weights_peephole_desc Memory descriptor for the diff of weights
+///     applied to the cell states (according to the Peephole LSTM formula).
+/// @param diff_weights_projection_desc Memory descriptor for the diff of
+///     weights applied to the hidden states to get the recurrent projection
+///     (according to the Projection LSTM formula).
+/// @param diff_bias_desc Diff bias memory descriptor.
+/// @param diff_dst_layer_desc Memory descriptor for the diff of output
+///     vector.
+/// @param diff_dst_iter_desc Memory descriptor for the diff of output
+///     recurrent hidden state vector.
+/// @param diff_dst_iter_c_desc Memory descriptor for the diff of output
+///     recurrent cell state vector.
+/// @param flags Unused.
+/// @returns #dnnl_success on success and a status describing the error
+///     otherwise.
+dnnl_status_t DNNL_API dnnl_lstm_backward_desc_init_v3(
+        dnnl_rnn_desc_t *rnn_desc, dnnl_prop_kind_t prop_kind,
+        dnnl_rnn_direction_t direction,
+        const dnnl_memory_desc_t *src_layer_desc,
+        const dnnl_memory_desc_t *src_iter_desc,
+        const dnnl_memory_desc_t *src_iter_c_desc,
+        const dnnl_memory_desc_t *weights_layer_desc,
+        const dnnl_memory_desc_t *weights_iter_desc,
+        const dnnl_memory_desc_t *weights_peephole_desc,
+        const dnnl_memory_desc_t *weights_projection_desc,
+        const dnnl_memory_desc_t *bias_desc,
+        const dnnl_memory_desc_t *dst_layer_desc,
+        const dnnl_memory_desc_t *dst_iter_desc,
+        const dnnl_memory_desc_t *dst_iter_c_desc,
+        const dnnl_memory_desc_t *diff_src_layer_desc,
+        const dnnl_memory_desc_t *diff_src_iter_desc,
+        const dnnl_memory_desc_t *diff_src_iter_c_desc,
+        const dnnl_memory_desc_t *diff_weights_layer_desc,
+        const dnnl_memory_desc_t *diff_weights_iter_desc,
+        const dnnl_memory_desc_t *diff_weights_peephole_desc,
+        const dnnl_memory_desc_t *diff_weights_projection_desc,
+        const dnnl_memory_desc_t *diff_bias_desc,
+        const dnnl_memory_desc_t *diff_dst_layer_desc,
+        const dnnl_memory_desc_t *diff_dst_iter_desc,
+        const dnnl_memory_desc_t *diff_dst_iter_c_desc, unsigned flags);
+
 /// Initializes a descriptor for GRU forward propagation primitive.
 ///
-/// The @p src_iter_desc, @p bias_desc, and @p dst_iter, may either be @c NULL
-/// or point to a zero memory descriptor. This would then indicate that the
-/// GRU forward propagation primitive should not use them and should default
-/// to zero values instead.
+/// The following arguments may either be @c NULL or point to a zero memory
+/// descriptor:
+/// - @p src_iter_desc,
+/// - @p bias_desc,
+/// - @p dst_iter_desc.
+///
+/// This would then indicate that the GRU forward propagation primitive should
+/// not use them and should default to zero values instead.
 ///
 /// @note
 ///     All memory descriptors can be initialized with
@@ -2951,9 +3221,12 @@ dnnl_status_t DNNL_API dnnl_gru_forward_desc_init(dnnl_rnn_desc_t *rnn_desc,
 
 /// Initializes a descriptor for GRU backward propagation primitive.
 ///
-/// The @p src_iter_desc together with @p diff_src_iter_desc, @p bias_desc
-/// together with @p diff_bias_desc, and @p dst_iter together with @p
-/// diff_dst_iter, may either be @c NULL or point to a zero memory descriptor.
+/// The following arguments may either be @c NULL or point to a zero memory
+/// descriptor:
+/// - @p src_iter_desc together with @p diff_src_iter_desc,
+/// - @p bias_desc together with @p diff_bias_desc,
+/// - @p dst_iter_desc together with @p diff_dst_iter_desc.
+///
 /// This would then indicate that the GRU backward propagation primitive
 /// should not use them and should default to zero values instead.
 ///
@@ -3029,10 +3302,14 @@ dnnl_status_t DNNL_API dnnl_gru_backward_desc_init(dnnl_rnn_desc_t *rnn_desc,
 
 /// Initializes a descriptor for LBR GRU forward propagation primitive.
 ///
-/// The @p src_iter_desc, @p bias_desc, and @p dst_iter, may either be @c NULL
-/// or point to a zero memory descriptor. This would then indicate that the
-/// LBR GRU forward propagation primitive should not use them and should
-/// default to zero values instead.
+/// The following arguments may either be @c NULL or point to a zero memory
+/// descriptor:
+/// - @p src_iter_desc,
+/// - @p bias_desc,
+/// - @p dst_iter_desc.
+///
+/// This would then indicate that the LBR GRU forward propagation primitive
+/// should not use them and should default to zero values instead.
 ///
 /// Inputs:
 ///  - `src_layer` (#dnnl_query_src_md, `0`)
@@ -3080,9 +3357,12 @@ dnnl_status_t DNNL_API dnnl_lbr_gru_forward_desc_init(dnnl_rnn_desc_t *rnn_desc,
 
 /// Initializes a descriptor for LBR GRU backward propagation primitive.
 ///
-/// The @p src_iter_desc together with @p diff_src_iter_desc, @p bias_desc
-/// together with @p diff_bias_desc, and @p dst_iter together with @p
-/// diff_dst_iter, may either be @c NULL or point to a zero memory descriptor.
+/// The following arguments may either be @c NULL or point to a zero memory
+/// descriptor:
+/// - @p src_iter_desc together with @p diff_src_iter_desc,
+/// - @p bias_desc together with @p diff_bias_desc,
+/// - @p dst_iter_desc together with @p diff_dst_iter_desc.
+///
 /// This would then indicate that the LBR GRU backward propagation primitive
 /// should not use them and should default to zero values instead.
 ///
@@ -3320,9 +3600,72 @@ dnnl_status_t DNNL_API dnnl_engine_destroy(dnnl_engine_t engine);
 /// @addtogroup dnnl_api_stream
 /// @{
 
-/// Creates an execution @p stream for @p engine and with @p flags.
+/// Creates execution stream attributes for a stream that runs on an engine of
+/// a particular kind.
+///
+/// @param attr Output execution stream attributes.
+/// @param kind Target engine kind.
+/// @returns #dnnl_success on success and a status describing the error
+///     otherwise.
+dnnl_status_t DNNL_API dnnl_stream_attr_create(
+        dnnl_stream_attr_t *attr, dnnl_engine_kind_t kind);
+
+/// Destroys execution stream attributes.
+///
+/// @param attr Execution stream attributes to destroy.
+/// @returns #dnnl_success on success and a status describing the error
+///     otherwise.
+dnnl_status_t DNNL_API dnnl_stream_attr_destroy(dnnl_stream_attr_t attr);
+
+#if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_THREADPOOL
+/// Sets a threadpool to be used by the execution stream. Always returns
+/// dnnl_invalid_arguments unless oneDNN is built with threadpool runtime.
+///
+/// @sa @ref dev_guide_threadpool
+///
+/// @param attr Execution stream attributes.
+/// @param threadpool Pointer to an instance of a C++ class that implements
+///     dnnl::threapdool_iface interface.
+/// @returns #dnnl_success on success and a status describing the error
+///     otherwise.
+dnnl_status_t DNNL_API dnnl_stream_attr_set_threadpool(
+        dnnl_stream_attr_t attr, void *threadpool);
+
+/// Returns a threadpool to be used by the execution stream. Always returns
+/// dnnl_invalid_arguments unless oneDNN is built with threadpool runtime.
+///
+/// @sa @ref dev_guide_threadpool
+///
+/// @param attr Execution stream attributes.
+/// @param threadpool Output pointer to an instance of a C++ class that
+///     implements dnnl::threapdool_iface interface. Set to NULL if the
+///     threadpool attribute was never set.
+/// @returns #dnnl_success on success and a status describing the error
+///     otherwise.
+dnnl_status_t DNNL_API dnnl_stream_attr_get_threadpool(
+        dnnl_stream_attr_t attr, void **threadpool);
+#endif
+
+/// Creates an execution stream.
+///
+/// @param stream Output execution stream.
+/// @param engine Engine to create the execution stream on.
+/// @param flags Stream behavior flags (@sa dnnl_stream_flags_t).
+/// @returns #dnnl_success on success and a status describing the error
+///     otherwise.
 dnnl_status_t DNNL_API dnnl_stream_create(
         dnnl_stream_t *stream, dnnl_engine_t engine, unsigned flags);
+
+/// Creates an execution stream.
+///
+/// @param stream Output execution stream.
+/// @param engine Engine to create the execution stream on.
+/// @param flags Stream behavior flags (@sa dnnl_stream_flags_t).
+/// @param attr Stream attributes.
+/// @returns #dnnl_success on success and a status describing the error
+///     otherwise.
+dnnl_status_t DNNL_API dnnl_stream_create_v2(dnnl_stream_t *stream,
+        dnnl_engine_t engine, unsigned flags, const_dnnl_stream_attr_t attr);
 
 #if DNNL_GPU_RUNTIME == DNNL_RUNTIME_OCL
 /// Creates an execution stream for a given engine associated with
@@ -3361,6 +3704,34 @@ dnnl_status_t DNNL_API dnnl_stream_wait(dnnl_stream_t stream);
 dnnl_status_t DNNL_API dnnl_stream_destroy(dnnl_stream_t stream);
 
 /// @} dnnl_api_stream
+
+/// @addtogroup dnnl_api_primitive_cache
+/// @{
+
+/// Returns the number of primitives that can be held in the primitive cache
+/// at the same time.
+///
+/// @param capacity Primitive cache capacity to query. Concurrently
+/// accessing @p capacity is safe.
+/// @returns #dnnl_invalid_arguments/#dnnl::status::invalid_arguments if the
+///     @p capacity value is invalid, and #dnnl_success/#dnnl::status::success on
+///     success.
+dnnl_status_t DNNL_API dnnl_get_primitive_cache_capacity(int *capacity);
+
+/// Sets a number of primitives that can be held in the primitive cache
+/// at a time.
+///
+/// @param capacity Primitive cache capacity to set. If a new @p capacity is
+/// less than a number of primitives that the primitive cache already has
+/// then the excess entries will be evicted. Setting the @p capacity to 0
+/// clears the primitive cache and disables it. Concurrently modifying
+/// @p capacity is safe.
+/// @returns #dnnl_invalid_arguments/#dnnl::status::invalid_arguments if the
+///     @p capacity value is invalid, and #dnnl_success/#dnnl::status::success on
+///     success.
+dnnl_status_t DNNL_API dnnl_set_primitive_cache_capacity(int capacity);
+
+/// @} dnnl_api_primitive_cache
 
 /// @addtogroup dnnl_api_service
 /// @{
@@ -3408,7 +3779,8 @@ const dnnl_version_t DNNL_API *dnnl_version();
 /// @sa @ref dev_guide_profilers
 ///
 /// @param flags Profiling flags that can contain the following bits:
-///     - @ref DNNL_JIT_PROFILE_VTUNE -- integration with VTune (on by default)
+///     - @ref DNNL_JIT_PROFILE_VTUNE -- integration with VTune Amplifier
+///         (on by default)
 ///     - @ref DNNL_JIT_PROFILE_LINUX_JITDUMP -- produce Linux-specific
 ///         jit-pid.dump output (off by default). The location of the output
 ///         is controlled via JITDUMPDIR environment variable or via
@@ -3449,7 +3821,7 @@ dnnl_status_t DNNL_API dnnl_set_jit_profiling_flags(unsigned flags);
 /// @returns #dnnl_unimplemented/#dnnl::status::unimplemented on Windows.
 dnnl_status_t DNNL_API dnnl_set_jit_profiling_jitdumpdir(const char *dir);
 
-/// Sets the maximal ISA DNNL can dispatch to on the CPU. See
+/// Sets the maximal ISA the library can dispatch to on the CPU. See
 /// #dnnl_cpu_isa_t and #dnnl::cpu_isa for the list of the values accepted by
 /// the C and C++ API functions respectively.
 ///
@@ -3469,7 +3841,7 @@ dnnl_status_t DNNL_API dnnl_set_jit_profiling_jitdumpdir(const char *dir);
 ///
 /// @sa @ref dev_guide_cpu_dispatcher_control for more details
 ///
-/// @param isa Maximal ISA DNNL should dispatch to. Pass
+/// @param isa Maximal ISA the library should dispatch to. Pass
 ///     #dnnl_cpu_isa_all/#dnnl::cpu_isa::all to remove ISA restrictions.
 /// @returns #dnnl_success/#dnnl::status::success on success and a
 ///     #dnnl_invalid_arguments/#dnnl::status::invalid_arguments if the @p isa
@@ -3663,6 +4035,35 @@ dnnl_status_t DNNL_API dnnl_gemm_s8s8s32(char transa, char transb, char offsetc,
         dnnl_dim_t M, dnnl_dim_t N, dnnl_dim_t K, float alpha, const int8_t *A,
         dnnl_dim_t lda, int8_t ao, const int8_t *B, dnnl_dim_t ldb, int8_t bo,
         float beta, int32_t *C, dnnl_dim_t ldc, const int32_t *co);
+
+#if DNNL_CPU_RUNTIME == DNNL_RUNTIME_THREADPOOL
+/// @copydoc dnnl_sgemm()
+/// @param tp A pointer to a threadpool interface (only when built with the
+///     THREADPOOL CPU runtime).
+dnnl_status_t DNNL_API dnnl_sgemm_tp(char transa, char transb, dnnl_dim_t M,
+        dnnl_dim_t N, dnnl_dim_t K, float alpha, const float *A, dnnl_dim_t lda,
+        const float *B, dnnl_dim_t ldb, float beta, float *C, dnnl_dim_t ldc,
+        void *tp);
+
+/// @copydoc dnnl_gemm_u8s8s32()
+/// @param tp A pointer to a threadpool interface (only when built with the
+///     THREADPOOL CPU runtime).
+dnnl_status_t DNNL_API dnnl_gemm_u8s8s32_tp(char transa, char transb,
+        char offsetc, dnnl_dim_t M, dnnl_dim_t N, dnnl_dim_t K, float alpha,
+        const uint8_t *A, dnnl_dim_t lda, uint8_t ao, const int8_t *B,
+        dnnl_dim_t ldb, int8_t bo, float beta, int32_t *C, dnnl_dim_t ldc,
+        const int32_t *co, void *tp);
+
+/// @copydoc dnnl_gemm_s8s8s32()
+/// @param tp A pointer to a threadpool interface (only when built with the
+///     THREADPOOL CPU runtime).
+dnnl_status_t DNNL_API dnnl_gemm_s8s8s32_tp(char transa, char transb,
+        char offsetc, dnnl_dim_t M, dnnl_dim_t N, dnnl_dim_t K, float alpha,
+        const int8_t *A, dnnl_dim_t lda, int8_t ao, const int8_t *B,
+        dnnl_dim_t ldb, int8_t bo, float beta, int32_t *C, dnnl_dim_t ldc,
+        const int32_t *co, void *tp);
+#endif
+
 /// @} dnnl_api_blas
 
 /// @} dnnl_api

@@ -19,7 +19,6 @@
 #include "dnnl_test_common.hpp"
 #include "gtest/gtest.h"
 
-#include "cpu_isa_traits.hpp"
 #include "dnnl.hpp"
 
 namespace dnnl {
@@ -212,9 +211,8 @@ protected:
         SKIP_IF(data_type == memory::data_type::bf16
                         && get_test_engine_kind() == engine::kind::gpu,
                 "GPU does not support bf16 data type.");
-        SKIP_IF(data_type == memory::data_type::bf16
-                        && !impl::cpu::mayiuse(impl::cpu::avx512_core),
-                "ISA does not support bf16 data type.");
+        SKIP_IF(unsupported_data_type(data_type),
+                "Engine does not support this data type.");
 
         p = ::testing::TestWithParam<decltype(p)>::GetParam();
 
@@ -229,7 +227,7 @@ protected:
         p = ::testing::TestWithParam<decltype(p)>::GetParam();
 
         eng = get_test_engine();
-        strm = stream(eng);
+        strm = make_stream(eng);
         ASSERT_EQ(true,
                 dnnl::impl::utils::one_of(data_type,
                         dnnl::memory::data_type::f32,
@@ -506,7 +504,7 @@ static auto RegressionWeightFormat_cases = [](algorithm lk) {
             GoogleNetV1_nChw16c, test, GoogleNetV1_nChw16c_cases(lk)); \
     INSTANTIATE_TEST_SUITE_P(RegressionWeightFormat, test, \
             RegressionWeightFormat_cases( \
-                    lk)); // This tests compatibility with MKL-DNN 0.14
+                    lk)); // This tests compatibility with Intel MKL-DNN v0.14
 
 using float_across = lrn_test<float>;
 using float_within = lrn_test<float>;

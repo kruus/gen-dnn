@@ -19,14 +19,15 @@
 
 #include <assert.h>
 
-#include "c_types_map.hpp"
-#include "memory_tracking.hpp"
-#include "type_helpers.hpp"
-#include "utils.hpp"
+#include "common/c_types_map.hpp"
+#include "common/memory_tracking.hpp"
+#include "common/primitive.hpp"
+#include "common/type_helpers.hpp"
+#include "common/utils.hpp"
+#include "common/dnnl_optimize.h"
 
-#include "cpu_softmax_pd.hpp"
+#include "cpu/cpu_softmax_pd.hpp"
 #if defined(__ve)
-#include "dnnl_optimize.h"
 #include <stdio.h>
 #endif
 
@@ -35,13 +36,13 @@ namespace impl {
 namespace cpu {
 
 template <impl::data_type_t data_type>
-struct ref_softmax_fwd_t : public primitive_impl_t {
+struct ref_softmax_fwd_t : public primitive_t {
     struct pd_t : public cpu_softmax_fwd_pd_t {
         using cpu_softmax_fwd_pd_t::cpu_softmax_fwd_pd_t;
 
         DECLARE_COMMON_PD_T("ref:any", ref_softmax_fwd_t);
 
-        status_t init() {
+        status_t init(engine_t *engine) {
             bool ok = true && is_fwd() && src_md()->data_type == data_type
                     && attr()->has_default_values();
             if (!ok) return status::unimplemented;
@@ -58,13 +59,14 @@ struct ref_softmax_fwd_t : public primitive_impl_t {
 
             if (in_s > 1) {
                 auto scratchpad = scratchpad_registry().registrar();
-                scratchpad.book(memory_tracking::names::key_softmax_reduction,
-                        sizeof(data_t) * 2 * in_s * ou_s);
+                scratchpad.template book<float>(
+                        memory_tracking::names::key_softmax_reduction,
+                        2 * in_s * ou_s);
             }
         }
     };
 
-    ref_softmax_fwd_t(const pd_t *apd) : primitive_impl_t(apd) {
+    ref_softmax_fwd_t(const pd_t *apd) : primitive_t(apd) {
         outer_size_ = pd()->outer_size();
         channels_ = pd()->axis_size();
         inner_size_ = pd()->inner_size();
@@ -101,20 +103,20 @@ private:
     void execute_forward_dense(const exec_ctx_t &ctx) const;
     void execute_forward_generic(const exec_ctx_t &ctx) const;
 
-    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
+    const pd_t *pd() const { return (const pd_t *)primitive_t::pd().get(); }
 
     bool use_dense_;
     int outer_size_, channels_, inner_size_;
 };
 
 template <impl::data_type_t data_type>
-struct ref_softmax_bwd_t : public primitive_impl_t {
+struct ref_softmax_bwd_t : public primitive_t {
     struct pd_t : public cpu_softmax_bwd_pd_t {
         using cpu_softmax_bwd_pd_t::cpu_softmax_bwd_pd_t;
 
         DECLARE_COMMON_PD_T("ref:any", ref_softmax_bwd_t);
 
-        status_t init() {
+        status_t init(engine_t *engine) {
             bool ok = true && !is_fwd()
                     && utils::everyone_is(data_type, dst_md()->data_type,
                             diff_src_md()->data_type)
@@ -126,7 +128,7 @@ struct ref_softmax_bwd_t : public primitive_impl_t {
         }
     };
 
-    ref_softmax_bwd_t(const pd_t *apd) : primitive_impl_t(apd) {
+    ref_softmax_bwd_t(const pd_t *apd) : primitive_t(apd) {
         outer_size_ = pd()->outer_size();
         channels_ = pd()->axis_size();
         inner_size_ = pd()->inner_size();
@@ -165,7 +167,7 @@ struct ref_softmax_bwd_t : public primitive_impl_t {
 private:
     void execute_backward_dense(const exec_ctx_t &ctx) const;
     void execute_backward_generic(const exec_ctx_t &ctx) const;
-    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
+    const pd_t *pd() const { return (const pd_t *)primitive_t::pd().get(); }
 
     bool use_dense_;
     int outer_size_, channels_, inner_size_;

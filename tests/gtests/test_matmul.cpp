@@ -17,7 +17,6 @@
 #include "dnnl_test_common.hpp"
 #include "gtest/gtest.h"
 
-#include "cpu_isa_traits.hpp"
 #include "dnnl.hpp"
 
 #include <vector>
@@ -93,13 +92,8 @@ protected:
         matmul_test_params p
                 = ::testing::TestWithParam<decltype(p)>::GetParam();
 
-        SKIP_IF(p.base.src.dt == memory::data_type::f16
-                        && get_test_engine_kind() == engine::kind::cpu,
-                "CPU does not support f16 data type.");
-        SKIP_IF(p.base.src.dt == memory::data_type::bf16
-                        && get_test_engine_kind() == engine::kind::cpu
-                        && !impl::cpu::mayiuse(impl::cpu::avx512_core),
-                "current ISA doesn't support bfloat16 data type");
+        SKIP_IF(unsupported_data_type(p.base.src.dt),
+                "Engine does not support this data type.");
 
         catch_expected_failures(
                 [=]() { Test(); }, p.expect_to_fail, p.expected_status, false);
@@ -234,7 +228,7 @@ protected:
                 = ::testing::TestWithParam<matmul_test_params>::GetParam();
 
         auto eng = get_test_engine();
-        auto strm = stream(eng);
+        auto strm = make_stream(eng);
 
         auto check_matrix_flags = [](unsigned flags, unsigned matrix) {
             if (flags) { ASSERT_EQ(flags & P::MATRIX_MASK, matrix); }
@@ -437,11 +431,6 @@ static auto cases_f = [](memory::data_type dt) {
 GPU_INSTANTIATE_TEST_SUITE_P(Generic_f16, iface, cases_f(data_type::f16));
 GPU_INSTANTIATE_TEST_SUITE_P(Generic_bf16, iface, cases_f(data_type::bf16));
 INSTANTIATE_TEST_SUITE_P(Generic_f32, iface, cases_f(data_type::f32));
-
-#if 1 // [ejk] test for vanilla!
-INSTANTIATE_TEST_SUITE_P(Generic_bf16, iface, cases_f(data_type::bf16));
-// "could not create a primitive descriptor iterator" thrown in SetUp()
-#endif
 
 static auto cases_x8 = [](memory::data_type src_dt, memory::data_type dst_dt) {
     std::vector<matmul_test_params> cases;

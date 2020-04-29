@@ -14,14 +14,15 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef FLOAT16_HPP
-#define FLOAT16_HPP
+#ifndef COMMON_FLOAT16_HPP
+#define COMMON_FLOAT16_HPP
 
 #include <cmath>
 #include <cstdint>
 #include <limits>
-#include "bit_cast.hpp"
 #include <type_traits>
+
+#include "bit_cast.hpp"
 
 namespace dnnl {
 namespace impl {

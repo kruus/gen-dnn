@@ -495,7 +495,9 @@ int check_fwd_ws(const dnn_mem_t &dst_dt, const dnn_mem_t &ws_dt, res_t *r) {
     return r->state == FAILED ? FAIL : OK;
 }
 
-static int init_pd(const prb_t *p, dnnl_primitive_desc_t &bpd, res_t *r) {
+static int init_pd(const engine_t &engine_tgt, const prb_t *p,
+        dnnl_primitive_desc_t &bpd, res_t *r, dir_t dir,
+        const_dnnl_primitive_desc_t hint) {
     dnnl_batch_normalization_desc_t bd;
     dnnl_memory_desc_t data_d;
 
@@ -559,14 +561,15 @@ static int init_pd(const prb_t *p, dnnl_primitive_desc_t &bpd, res_t *r) {
     else
         SAFE(init_status, WARN);
 
-    const char *impl_str = query_impl_info(bpd);
-    if (maybe_skip(impl_str)) {
-        BENCHDNN_PRINT(2, "SKIPPED: dnnl implementation: %s\n", impl_str);
+    r->impl_name = query_impl_info(bpd);
+    if (maybe_skip(r->impl_name)) {
+        BENCHDNN_PRINT(2, "SKIPPED: oneDNN implementation: %s\n",
+                r->impl_name.c_str());
         DNN_SAFE(dnnl_primitive_desc_destroy(bpd), WARN);
         return r->state = SKIPPED, OK;
     } else {
-        BENCHDNN_PRINT(5, "dnnl implementation: %s\n", impl_str);
-        if (!strstr(impl_str, "jit")) {
+        BENCHDNN_PRINT(5, "oneDNN implementation: %s\n", r->impl_name.c_str());
+        if (!strstr(r->impl_name.c_str(), "jit")) {
             BENCHDNN_PRINT(2, "WARNING: %s",
                     "accuracy of the implementation being tested "
                     "depends on the compiler and might give "
@@ -581,8 +584,8 @@ static int init_pd(const prb_t *p, dnnl_primitive_desc_t &bpd, res_t *r) {
 }
 
 /** converts benchdnn-understandable mask of {0, 1} to workspace */
-static int cvt_mask_to_ws(
-        const prb_t *p, const dnn_mem_t &mask_fp, dnn_mem_t &ws_dt) {
+static int cvt_mask_to_ws(const engine_t &engine_tgt, const prb_t *p,
+        const dnn_mem_t &mask_fp, dnn_mem_t &ws_dt) {
     dnnl_dims_t data_dims_0d = {p->mb, p->ic};
     dnnl_dims_t data_dims_1d = {p->mb, p->ic, p->iw};
     dnnl_dims_t data_dims_2d = {p->mb, p->ic, p->ih, p->iw};
@@ -626,7 +629,7 @@ static int cvt_mask_to_ws(
     args.set(DNNL_ARG_VARIANCE, var);
     args.set(DNNL_ARG_DST, data);
     args.set(DNNL_ARG_WORKSPACE, ws_dt);
-    DNN_SAFE(execute_and_wait(b, stream_tgt, args), WARN);
+    DNN_SAFE(execute_and_wait(b, engine_tgt, args), WARN);
     DNN_SAFE(dnnl_primitive_destroy(b), CRIT);
 
     return OK;
@@ -634,14 +637,11 @@ static int cvt_mask_to_ws(
 
 int doit(const prb_t *p, res_t *r) {
     if (bench_mode == LIST) return r->state = LISTED, OK;
-
-    dnnl_primitive_desc_t bpd;
-    SAFE(init_pd(p, bpd, r), WARN);
-    if (r->state == SKIPPED || r->state == UNIMPLEMENTED) return OK;
+    engine_t engine_tgt;
 
     dnnl_primitive_t b;
-    DNN_SAFE(dnnl_primitive_create(&b, bpd), WARN);
-    DNN_SAFE(dnnl_primitive_desc_destroy(bpd), CRIT);
+    SAFE(init_prim(&b, init_pd, engine_tgt, p, r), WARN);
+    if (r->state == SKIPPED || r->state == UNIMPLEMENTED) return OK;
 
     const_dnnl_primitive_desc_t const_pd;
     DNN_SAFE(dnnl_primitive_get_primitive_desc(b, &const_pd), CRIT);
@@ -722,7 +722,7 @@ int doit(const prb_t *p, res_t *r) {
         args.set(DNNL_ARG_WORKSPACE, ws_dt);
         args.set(DNNL_ARG_SCRATCHPAD, scratchpad_dt);
 
-        DNN_SAFE(execute_and_wait(b, stream_tgt, args), WARN);
+        DNN_SAFE(execute_and_wait(b, engine_tgt, args), WARN);
 
         if (bench_mode & CORR) {
             compute_ref_fwd(p, src_fp, mean_fp, var_fp, ss_fp, dst_fp);
@@ -771,12 +771,12 @@ int doit(const prb_t *p, res_t *r) {
         args.set(DNNL_ARG_DIFF_SCALE_SHIFT, d_ss_dt);
 
         if (p->flags & FUSE_NORM_RELU) {
-            SAFE(cvt_mask_to_ws(p, ws_fp, ws_dt), WARN);
+            SAFE(cvt_mask_to_ws(engine_tgt, p, ws_fp, ws_dt), WARN);
         }
         args.set(DNNL_ARG_WORKSPACE, ws_dt);
         args.set(DNNL_ARG_SCRATCHPAD, scratchpad_dt);
 
-        DNN_SAFE(execute_and_wait(b, stream_tgt, args), WARN);
+        DNN_SAFE(execute_and_wait(b, engine_tgt, args), WARN);
 
         if (bench_mode & CORR) {
             compute_ref_bwd(p, src_fp, mean_fp, var_fp, d_dst_fp, ss_fp, ws_fp,
@@ -789,7 +789,7 @@ int doit(const prb_t *p, res_t *r) {
         }
     }
 
-    measure_perf(r->timer, b, args);
+    measure_perf(r->timer, engine_tgt, b, args);
 
     DNN_SAFE_V(dnnl_primitive_destroy(b));
 

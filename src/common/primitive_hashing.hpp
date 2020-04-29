@@ -14,25 +14,28 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef PRIMITIVE_HASHING_HPP
-#define PRIMITIVE_HASHING_HPP
-
-#include "cpu_target.h"
-#if defined(DNNL_ENABLE_PRIMITIVE_CACHE) || TARGET_X86_JIT
+#ifndef COMMON_PRIMITIVE_HASHING_HPP
+#define COMMON_PRIMITIVE_HASHING_HPP
 
 #include <typeindex>
 
-#include "dnnl.h"
-
 #include "c_types_map.hpp"
-#include "type_helpers.hpp"
+#include "dnnl.h"
 #include "primitive_attr.hpp"
+#include "type_helpers.hpp"
 
 namespace dnnl {
 namespace impl {
+
+struct primitive_desc_t;
+
 namespace primitive_hashing {
 
 struct key_t {
+    key_t(const primitive_desc_t *pd, const engine_t *engine, int impl_nthr);
+
+    // XXX: this ctor is used to create keys to compare pds
+    // in 1x1 convolution + dw
     key_t(const primitive_desc_t *pd, int impl_nthr);
 
     bool operator==(const key_t &rhs) const;
@@ -43,6 +46,9 @@ struct key_t {
     std::type_index impl_id_;
     int impl_nthr_;
     std::vector<memory_desc_t> mds;
+    engine_kind_t kind_;
+    runtime_kind_t runtime_kind_;
+    intptr_t device_id_;
 
 private:
     template <typename T>
@@ -91,19 +97,17 @@ static inline size_t get_attr_hash(const primitive_attr_t *attr) {
     if (!attr->output_scales_.has_default_values()) {
         // output_scales: mask
         seed = hash_combine(seed, attr->output_scales_.mask_);
+        // output_scales: count
+        seed = hash_combine(seed, attr->output_scales_.count_);
         // output_scales: scales[:]
-        if (attr->output_scales_.scales_) {
-            for (int i = 0; i < attr->output_scales_.count_; i++) {
-                seed = hash_combine(seed, attr->output_scales_.scales_[i]);
-            }
-        }
+        seed = get_array_hash(seed, attr->output_scales_.scales_,
+                attr->output_scales_.count_);
     } else if (!attr->scales_.has_default_values()) {
         // go through scales for all arguments
         for (const auto &p : attr->scales_.scales_) {
             seed = hash_combine(seed, p.second.mask_);
-            for (int i = 0; i < p.second.count_; i++) {
-                seed = hash_combine(seed, p.second.scales_[i]);
-            }
+            seed = hash_combine(seed, p.second.count_);
+            seed = get_array_hash(seed, p.second.scales_, p.second.count_);
         }
     }
     // zero_points
@@ -123,19 +127,36 @@ static inline size_t get_attr_hash(const primitive_attr_t *attr) {
             case primitive_kind::sum:
                 seed = hash_combine(seed, entry.sum.scale);
                 break;
+            case primitive_kind::convolution:
+                seed = hash_combine(
+                        seed, static_cast<size_t>(entry.depthwise_conv.stride));
+                seed = hash_combine(
+                        seed, static_cast<size_t>(entry.depthwise_conv.wei_dt));
+                seed = hash_combine(seed,
+                        static_cast<size_t>(entry.depthwise_conv.bias_dt));
+                seed = hash_combine(
+                        seed, static_cast<size_t>(entry.depthwise_conv.dst_dt));
+                if (entry.depthwise_conv.scales) {
+                    seed = hash_combine(seed, entry.depthwise_conv.mask);
+                    seed = hash_combine(seed, entry.depthwise_conv.count);
+                    seed = get_array_hash(seed, entry.depthwise_conv.scales,
+                            entry.depthwise_conv.count);
+                }
+                break;
             default: assert(!"unknown post_op");
         }
     }
     // rnn_data_qparams: scale, shift
     seed = hash_combine(seed, attr->rnn_data_qparams_.scale_);
     seed = hash_combine(seed, attr->rnn_data_qparams_.shift_);
-    // rnn_weights_qparams: mask
-    seed = hash_combine(seed, attr->rnn_weights_qparams_.mask_);
-    // rnn_weights_qparams_: scales[:]
-    if (attr->rnn_weights_qparams_.scales_) {
-        for (int i = 0; i < attr->rnn_weights_qparams_.count_; i++) {
-            seed = hash_combine(seed, attr->rnn_weights_qparams_.scales_[i]);
-        }
+    if (!attr->rnn_weights_qparams_.has_default_values()) {
+        // rnn_weights_qparams: mask
+        seed = hash_combine(seed, attr->rnn_weights_qparams_.mask_);
+        // rnn_weights_qparams: count
+        seed = hash_combine(seed, attr->rnn_weights_qparams_.count_);
+        // rnn_weights_qparams: scales[:]
+        seed = get_array_hash(seed, attr->rnn_weights_qparams_.scales_,
+                attr->rnn_weights_qparams_.count_);
     }
     // Combined hash for attributes
     return seed;
@@ -517,7 +538,7 @@ size_t get_desc_hash<rnn_desc_t>(const op_desc_t *op_desc) {
     seed = hash_combine(seed, get_md_hash(desc->dst_iter_desc));
     seed = hash_combine(seed, get_md_hash(desc->dst_iter_c_desc));
     seed = hash_combine(seed, get_md_hash(desc->weights_peephole_desc));
-    seed = hash_combine(seed, get_md_hash(desc->placeholder_desc));
+    seed = hash_combine(seed, get_md_hash(desc->weights_projection_desc));
     seed = hash_combine(seed, get_md_hash(desc->diff_src_layer_desc));
     seed = hash_combine(seed, get_md_hash(desc->diff_src_iter_desc));
     seed = hash_combine(seed, get_md_hash(desc->diff_src_iter_c_desc));
@@ -528,7 +549,7 @@ size_t get_desc_hash<rnn_desc_t>(const op_desc_t *op_desc) {
     seed = hash_combine(seed, get_md_hash(desc->diff_dst_iter_desc));
     seed = hash_combine(seed, get_md_hash(desc->diff_dst_iter_c_desc));
     seed = hash_combine(seed, get_md_hash(desc->diff_weights_peephole_desc));
-    seed = hash_combine(seed, get_md_hash(desc->diff_placeholder_desc));
+    seed = hash_combine(seed, get_md_hash(desc->diff_weights_projection_desc));
     // Flags
     seed = hash_combine(seed, desc->flags);
     // Activation kind
@@ -614,6 +635,12 @@ struct hash<dnnl::impl::primitive_hashing::key_t> {
         seed = hash_combine(seed, get_attr_hash(key.attr_));
         seed = hash_combine(seed, hash_combine(0, key.impl_id_));
         seed = hash_combine(seed, hash_combine(0, key.impl_nthr_));
+        seed = hash_combine(
+                seed, hash_combine(0, static_cast<size_t>(key.kind_)));
+        seed = hash_combine(
+                seed, hash_combine(0, static_cast<size_t>(key.runtime_kind_)));
+        seed = hash_combine(
+                seed, hash_combine(0, static_cast<size_t>(key.device_id_)));
         // Combine hash for op_desc with the computed hash
         switch (key.primitive_kind_) {
             case primitive_kind::batch_normalization:
@@ -705,5 +732,4 @@ struct hash<dnnl::impl::primitive_hashing::key_t> {
 
 } // namespace std
 
-#endif // DNNL_ENABLE_PRIMITIVE_CACHE
 #endif

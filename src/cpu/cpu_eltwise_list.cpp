@@ -14,12 +14,15 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "cpu_engine.hpp"
+#include "cpu/cpu_engine.hpp"
 
-#if TARGET_X86_JIT
-#include "cpu/jit_uni_eltwise.hpp"
-#endif // TARGET_X86_JIT
 #include "cpu/ref_eltwise.hpp"
+
+#if DNNL_X64
+#include "cpu/x64/jit_uni_eltwise.hpp"
+#include "cpu/x64/jit_uni_eltwise_int.hpp"
+using namespace dnnl::impl::cpu::x64;
+#endif
 
 namespace dnnl {
 namespace impl {
@@ -30,36 +33,33 @@ using pd_create_f = engine_t::primitive_desc_create_f;
 namespace {
 using namespace dnnl::impl::data_type;
 
-/// @copydoc INSTANCE_CREATOR
-#define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
+// clang-format off
 static const pd_create_f impl_list[] = {
-        // clang-format off
-        INSTANCE(jit_uni_eltwise_fwd_t<avx512_common, f32>)
-        INSTANCE(jit_uni_eltwise_fwd_t<avx512_common, s32>)
-        INSTANCE(jit_uni_eltwise_fwd_t<avx512_common, s8>)
-        INSTANCE(jit_uni_eltwise_bwd_t<avx512_common, f32>)
-        INSTANCE(jit_uni_eltwise_fwd_t<avx512_core, bf16>)
-        INSTANCE(jit_uni_eltwise_bwd_t<avx512_core, bf16>)
-        INSTANCE(jit_uni_eltwise_fwd_t<avx2, f32>)
-        INSTANCE(jit_uni_eltwise_fwd_t<avx2, s32>)
-        INSTANCE(jit_uni_eltwise_fwd_t<avx2, s8>)
-        INSTANCE(jit_uni_eltwise_bwd_t<avx2, f32>)
-        INSTANCE(jit_uni_eltwise_fwd_t<sse41, f32>)
-        INSTANCE(jit_uni_eltwise_fwd_t<sse41, s32>)
-        INSTANCE(jit_uni_eltwise_fwd_t<sse41, s8>)
-        INSTANCE(jit_uni_eltwise_bwd_t<sse41, f32>)
-        INSTANCE_ref(ref_eltwise_fwd_t<f32>)
-        INSTANCE_ref(ref_eltwise_bwd_t<f32>)
-        INSTANCE_ref(ref_eltwise_fwd_t<bf16>)
-        INSTANCE_ref(ref_eltwise_bwd_t<bf16>)
-        INSTANCE_ref(ref_eltwise_fwd_t<s32>)
-        INSTANCE_ref(ref_eltwise_fwd_t<s8>)
-        INSTANCE_ref(ref_eltwise_fwd_t<u8>)
-        INSTANCE_ref(ref_eltwise_bwd_t<s32>)
-        // clang-format on
+        CPU_INSTANCE_X64(jit_uni_eltwise_fwd_t<avx512_common, f32>)
+        CPU_INSTANCE_X64(jit_uni_eltwise_bwd_t<avx512_common, f32>)
+        CPU_INSTANCE_X64(jit_uni_eltwise_fwd_t<avx512_core, bf16>)
+        CPU_INSTANCE_X64(jit_uni_eltwise_bwd_t<avx512_core, bf16>)
+        CPU_INSTANCE_X64(jit_uni_eltwise_fwd_t<avx2, f32>)
+        CPU_INSTANCE_X64(jit_uni_eltwise_bwd_t<avx2, f32>)
+        CPU_INSTANCE_X64(jit_uni_eltwise_fwd_t<sse41, f32>)
+        CPU_INSTANCE_X64(jit_uni_eltwise_bwd_t<sse41, f32>)
+        CPU_INSTANCE_X64(jit_uni_eltwise_int_fwd_t<avx512_common, s32>)
+        CPU_INSTANCE_X64(jit_uni_eltwise_int_fwd_t<avx512_common, s8>)
+        CPU_INSTANCE_X64(jit_uni_eltwise_int_fwd_t<avx2, s32>)
+        CPU_INSTANCE_X64(jit_uni_eltwise_int_fwd_t<avx2, s8>)
+        CPU_INSTANCE_X64(jit_uni_eltwise_int_fwd_t<sse41, s32>)
+        CPU_INSTANCE_X64(jit_uni_eltwise_int_fwd_t<sse41, s8>)
+        CPU_INSTANCE(ref_eltwise_fwd_t<f32>)
+        CPU_INSTANCE(ref_eltwise_bwd_t<f32>)
+        CPU_INSTANCE(ref_eltwise_fwd_t<bf16>)
+        CPU_INSTANCE(ref_eltwise_bwd_t<bf16>)
+        CPU_INSTANCE(ref_eltwise_fwd_t<s32>)
+        CPU_INSTANCE(ref_eltwise_fwd_t<s8>)
+        CPU_INSTANCE(ref_eltwise_fwd_t<u8>)
         /* eol */
         nullptr,
 };
+// clang-format on
 } // namespace
 
 const pd_create_f *get_eltwise_impl_list(const eltwise_desc_t *desc) {

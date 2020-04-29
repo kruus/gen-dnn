@@ -15,13 +15,16 @@
 #===============================================================================
 
 if(DNNLPRIM_ALL)
-    file(GLOB_RECURSE SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/*.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/*.c
-        ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
+    file(GLOB SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/*.[ch]pp)
+    file(GLOB_RECURSE SOURCES_EXTRA
+        ${CMAKE_CURRENT_SOURCE_DIR}/gemm/*.[ch]pp
+        ${CMAKE_CURRENT_SOURCE_DIR}/matmul/*.[ch]pp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rnn/*.[ch]pp
         )
-else()
+    foreach(SOURCE_FILE ${SOURCES_EXTRA})
+        list(APPEND SOURCES "${SOURCE_FILE}")
+    endforeach()
+else() ####### CLEARLY WRONG AFTER DIRECTORY REORGANIZATION
     # Debug : include primitives piecewise into libdnnl
     file(GLOB SOURCES_CORE
         ${CMAKE_CURRENT_SOURCE_DIR}/cpu_engine*
@@ -284,13 +287,13 @@ else()
 endif()
 
 # vanilla-x86 and non-x86 targets should ignore all x86 jit files
-if(NOT TARGET_X86_JIT)
-    message(STATUS "no x86 JIT: removing all '.*jit.*' source code")
-    message(STATUS "\nbegin:\n${SOURCES}\n")
-    #list(FILTER SOURCES EXCLUDE REGEX ".*(jit|xbyak).*") # not in older cmake
-    list_filter_exclude(SOURCES ".*(jit|xbyak).*") # equiv. as macro
-    message(STATUS "\nend:\n${SOURCES}\n")
-endif()
+#if(NOT TARGET_X86_JIT)
+#    message(STATUS "no x86 JIT: removing all '.*jit.*' source code")
+#    message(STATUS "\nbegin:\n${SOURCES}\n")
+#    #list(FILTER SOURCES EXCLUDE REGEX ".*(jit|xbyak).*") # not in older cmake
+#    list_filter_exclude(SOURCES ".*(jit|xbyak).*") # equiv. as macro
+#    message(STATUS "\nend:\n${SOURCES}\n")
+#endif()
 #list(REMOVE_DUPLICATES SOURCES)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
@@ -309,11 +312,13 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
     # with the reference one use precise division and square root
     # by default
     file(GLOB FILES_REQUIRED_PREC_SQRT
-        ${CMAKE_CURRENT_SOURCE_DIR}/*normalization*.cpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/*normalization*.cpp
+        )
     file(GLOB FILES_REQUIRED_PREC_DIV
         ${CMAKE_CURRENT_SOURCE_DIR}/*resampling*.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/*normalization*.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/ref_rnn.cpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/ref_eltwise.cpp
+        )
     if(WIN32)
         set_source_files_properties(${FILES_REQUIRED_PREC_SQRT}
             PROPERTIES COMPILE_FLAGS "/Qprec-sqrt")
@@ -334,20 +339,13 @@ if(MSVC AND (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_COMPILER_ID STRE
     set_source_files_properties(${FILES_REQUIRED_BIGOBJ}
         PROPERTIES COMPILE_FLAGS "/bigobj")
 endif()
-# remove optimizations of files that don't need them for faster build times.
-file(GLOB FILES_WITHOUT_OPT
-    ${CMAKE_CURRENT_SOURCE_DIR}/gemm/*/*_kern_autogen.cpp)
-if(WIN32 AND NOT MINGW)
-    set_source_files_properties(${FILES_WITHOUT_OPT}
-        PROPERTIES COMPILE_FLAGS "/Od")
-else()
-    set_source_files_properties(${FILES_WITHOUT_OPT}
-        PROPERTIES COMPILE_FLAGS "-O0 -U_FORTIFY_SOURCE")
-endif()
-
 
 set(OBJ_LIB ${LIB_NAME}_cpu)
 add_library(${OBJ_LIB} OBJECT ${SOURCES})
 set_property(GLOBAL APPEND PROPERTY DNNL_LIB_DEPS
     $<TARGET_OBJECTS:${OBJ_LIB}>)
+
+if (DNNL_TARGET_ARCH STREQUAL "X64")
+    add_subdirectory(x64)
+endif()
 # vim: set sw=4 ts=4 et

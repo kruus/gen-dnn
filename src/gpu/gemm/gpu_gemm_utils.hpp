@@ -19,6 +19,7 @@
 
 #include "common/c_types_map.hpp"
 #include "common/memory_storage.hpp"
+#include "common/primitive_attr.hpp"
 #include "gpu/gemm/gpu_gemm.hpp"
 
 namespace dnnl {
@@ -28,6 +29,7 @@ namespace gemm_utils {
 
 inline status_t prepare_scales(const primitive_attr_t *attr, engine_t *engine,
         std::unique_ptr<memory_storage_t> &mem_storage) {
+    mem_storage.reset();
     status_t s = status::success;
     const bool is_defined = attr->output_scales_.defined();
 
@@ -55,6 +57,7 @@ inline status_t prepare_scales(const primitive_attr_t *attr, engine_t *engine,
 inline status_t prepare_zero_points(const primitive_attr_t *attr,
         engine_t *engine, int arg,
         std::unique_ptr<memory_storage_t> &mem_storage) {
+    mem_storage.reset();
     status_t s = status::success;
     const bool is_defined = attr->zero_points_.defined(arg);
 
@@ -81,8 +84,8 @@ inline status_t prepare_zero_points(const primitive_attr_t *attr,
     return s;
 }
 
-inline const gpu_gemm_t *gemm_impl(const primitive_t *p) {
-    return utils::downcast<gpu_gemm_t *>(p->get_primitive_impl().get());
+inline const gpu_gemm_t *gpu_gemm(const std::shared_ptr<primitive_t> &p) {
+    return utils::downcast<gpu_gemm_t *>(p.get());
 }
 
 } // namespace gemm_utils

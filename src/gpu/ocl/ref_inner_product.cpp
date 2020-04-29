@@ -28,7 +28,7 @@ namespace gpu {
 namespace ocl {
 
 static status_t init_conf_common(inner_product_conf_t &conf, offsets_t &off,
-        const inner_product_pd_t *pd) {
+        const inner_product_pd_t *pd, engine_t *engine) {
     const inner_product_desc_t &ipd = *pd->desc();
     const memory_desc_wrapper src_d(pd->invariant_src_md());
     const memory_desc_wrapper wei_d(pd->invariant_wei_md());
@@ -74,8 +74,7 @@ static status_t init_conf_common(inner_product_conf_t &conf, offsets_t &off,
     conf.is_backward_data = ipd.prop_kind == prop_kind::backward_data;
     conf.is_backward_weights = ipd.prop_kind == prop_kind::backward_weights;
 
-    auto *compute_engine
-            = utils::downcast<compute::compute_engine_t *>(pd->engine());
+    auto *compute_engine = utils::downcast<compute::compute_engine_t *>(engine);
     if (conf.is_forward) {
         conf.with_bias = ipd.bias_desc.format_kind != format_kind::undef;
         conf.bia_dt = conf.with_bias ? ipd.bias_desc.data_type : data_type::f32;
@@ -164,8 +163,8 @@ static status_t init_kernel_ctx_common(compute::kernel_ctx_t &kernel_ctx,
     return status::success;
 }
 
-status_t ref_inner_product_fwd_t::pd_t::init_conf() {
-    return init_conf_common(conf, off, this);
+status_t ref_inner_product_fwd_t::pd_t::init_conf(engine_t *engine) {
+    return init_conf_common(conf, off, this, engine);
 }
 
 status_t ref_inner_product_fwd_t::pd_t::init_kernel_ctx(
@@ -175,9 +174,6 @@ status_t ref_inner_product_fwd_t::pd_t::init_kernel_ctx(
 }
 
 status_t ref_inner_product_fwd_t::execute_forward(const exec_ctx_t &ctx) const {
-
-    compute::compute_stream_t *compute_stream
-            = utils::downcast<compute::compute_stream_t *>(ctx.stream());
 
     auto &src = CTX_IN_STORAGE(DNNL_ARG_SRC);
     auto &weights = CTX_IN_STORAGE(DNNL_ARG_WEIGHTS);
@@ -204,13 +200,14 @@ status_t ref_inner_product_fwd_t::execute_forward(const exec_ctx_t &ctx) const {
     arg_list.set(8, output_scales[0]);
 
     auto nd_range = conf.dispatch.nd_range();
-    status_t status = compute_stream->parallel_for(nd_range, kernel_, arg_list);
+
+    status_t status = parallel_for(ctx, nd_range, kernel_, arg_list);
 
     return status;
 }
 
-status_t ref_inner_product_bwd_data_t::pd_t::init_conf() {
-    return init_conf_common(conf, off, this);
+status_t ref_inner_product_bwd_data_t::pd_t::init_conf(engine_t *engine) {
+    return init_conf_common(conf, off, this, engine);
 }
 
 status_t ref_inner_product_bwd_data_t::pd_t::init_kernel_ctx(
@@ -221,9 +218,6 @@ status_t ref_inner_product_bwd_data_t::pd_t::init_kernel_ctx(
 
 status_t ref_inner_product_bwd_data_t::execute_backward_data(
         const exec_ctx_t &ctx) const {
-
-    compute::compute_stream_t *compute_stream
-            = utils::downcast<compute::compute_stream_t *>(ctx.stream());
 
     auto &diff_dst = CTX_IN_STORAGE(DNNL_ARG_DIFF_DST);
     auto &weights = CTX_IN_STORAGE(DNNL_ARG_WEIGHTS);
@@ -237,13 +231,14 @@ status_t ref_inner_product_bwd_data_t::execute_backward_data(
     arg_list.set(2, diff_dst);
 
     auto nd_range = conf.dispatch.nd_range();
-    status_t status = compute_stream->parallel_for(nd_range, kernel_, arg_list);
+
+    status_t status = parallel_for(ctx, nd_range, kernel_, arg_list);
 
     return status;
 }
 
-status_t ref_inner_product_bwd_weights_t::pd_t::init_conf() {
-    return init_conf_common(conf, off, this);
+status_t ref_inner_product_bwd_weights_t::pd_t::init_conf(engine_t *engine) {
+    return init_conf_common(conf, off, this, engine);
 }
 
 status_t ref_inner_product_bwd_weights_t::pd_t::init_kernel_ctx(
@@ -254,9 +249,6 @@ status_t ref_inner_product_bwd_weights_t::pd_t::init_kernel_ctx(
 
 status_t ref_inner_product_bwd_weights_t::execute_backward_weights(
         const exec_ctx_t &ctx) const {
-
-    compute::compute_stream_t *compute_stream
-            = utils::downcast<compute::compute_stream_t *>(ctx.stream());
 
     auto &src = CTX_IN_STORAGE(DNNL_ARG_SRC);
     auto &diff_dst = CTX_IN_STORAGE(DNNL_ARG_DIFF_DST);
@@ -272,7 +264,8 @@ status_t ref_inner_product_bwd_weights_t::execute_backward_weights(
     arg_list.set(3, diff_dst);
 
     auto nd_range = conf.dispatch.nd_range();
-    status_t status = compute_stream->parallel_for(nd_range, kernel_, arg_list);
+
+    status_t status = parallel_for(ctx, nd_range, kernel_, arg_list);
 
     return status;
 }

@@ -14,7 +14,7 @@
 # limitations under the License.
 #===============================================================================
 
-# Locate Intel(R) MKL installation using MKLROOT
+# Locate Intel MKL installation using MKLROOT
 #===============================================================================
 
 if(MKL_cmake_included)
@@ -36,7 +36,6 @@ function(detect_mkl LIBNAME)
         PATHS ${__mkl_root}/lib ${__mkl_root}/lib/intel64
         NO_DEFAULT_PATH)
 
-    set(HAVE_MKL FALSE PARENT_SCOPE)
     if(WIN32)
         set(MKLREDIST ${__mkl_root}/../redist/)
         find_file(MKLDLL NAMES ${LIBNAME}.dll
@@ -44,12 +43,7 @@ function(detect_mkl LIBNAME)
         if(NOT MKLDLL)
             return()
         endif()
-    else()
-        if(NOT MKLLIB)
-            return()
-        endif()
     endif()
-    set(HAVE_MKL TRUE PARENT_SCOPE)
 
     if(WIN32)
         # Add paths to DLL to %PATH% on Windows
@@ -58,6 +52,7 @@ function(detect_mkl LIBNAME)
         set(CTESTCONFIG_PATH "${CTESTCONFIG_PATH}" PARENT_SCOPE)
     endif()
 
+    set(HAVE_MKL TRUE PARENT_SCOPE)
     set(MKLINC "${MKLINC}" PARENT_SCOPE)
     set(MKLLIB "${MKLLIB}" PARENT_SCOPE)
     set(MKLDLL "${MKLDLL}" PARENT_SCOPE)
@@ -67,10 +62,10 @@ detect_mkl("mkl_rt")
 
 if(HAVE_MKL)
     list(APPEND EXTRA_SHARED_LIBS ${MKLLIB})
-    #add_definitions(-DUSE_MKL)
+    add_definitions(-DUSE_MKL)
     include_directories(AFTER ${MKLINC})
 
-    set(MSG "Intel(R) MKL:")
+    set(MSG "Intel MKL:")
     message(STATUS "${MSG} include ${MKLINC}")
     message(STATUS "${MSG} lib ${MKLLIB}")
     if(WIN32 AND MKLDLL)

@@ -14,26 +14,19 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef DNNL_THREAD_HPP
-#define DNNL_THREAD_HPP
+#ifndef COMMON_DNNL_THREAD_HPP
+#define COMMON_DNNL_THREAD_HPP
 
+#include <algorithm>
+
+#include "dnnl_omp.h"
 #include "utils.hpp"
-
-#if !defined(ENABLE_OMP_MACROS)
-#define ENABLE_OMP_MACROS (DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP)
-#endif
-#include "dnnl_omp.h" // omp compiler-portable macro definitions, if needed
+#include "z_magic.hpp"
 
 #if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
 #define DNNL_THR_SYNC 1
 inline int dnnl_get_max_threads() {
     return 1;
-}
-inline int dnnl_get_num_threads() {
-    return 1;
-}
-inline int dnnl_get_thread_num() {
-    return 0;
 }
 inline int dnnl_in_parallel() {
     return 0;
@@ -41,17 +34,10 @@ inline int dnnl_in_parallel() {
 inline void dnnl_thr_barrier() {}
 
 #elif DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP
-#include <omp.h>
+#include "omp.h"
 #define DNNL_THR_SYNC 1
-
 inline int dnnl_get_max_threads() {
     return omp_get_max_threads();
-}
-inline int dnnl_get_num_threads() {
-    return omp_get_num_threads();
-}
-inline int dnnl_get_thread_num() {
-    return omp_get_thread_num();
 }
 inline int dnnl_in_parallel() {
     return omp_in_parallel();
@@ -64,15 +50,8 @@ inline void dnnl_thr_barrier() {
 #include "tbb/parallel_for.h"
 #include "tbb/task_arena.h"
 #define DNNL_THR_SYNC 0
-
 inline int dnnl_get_max_threads() {
     return tbb::this_task_arena::max_concurrency();
-}
-inline int dnnl_get_num_threads() {
-    return dnnl_get_max_threads();
-}
-inline int dnnl_get_thread_num() {
-    return tbb::this_task_arena::current_thread_index();
 }
 inline int dnnl_in_parallel() {
     return 0;
@@ -80,19 +59,73 @@ inline int dnnl_in_parallel() {
 inline void dnnl_thr_barrier() {
     assert(!"no barrier in TBB");
 }
-inline tbb::static_partitioner dnnl_tbb_partitioner() {
-    return tbb::static_partitioner();
+
+#elif DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_THREADPOOL
+#include <thread>
+#include "dnnl_threadpool_iface.hpp"
+#define DNNL_THR_SYNC 0
+
+namespace dnnl {
+namespace impl {
+namespace threadpool_utils {
+
+// Each thread maintains a thread-local pointer to a threadpool which is
+// 'active' for the current thread. If this pointer is a nullptr, all the work
+// is executed sequentially.
+
+// Sets `tp` to be the active threadpool for the calling thread. This will
+// make all calls to `get_active_threadpool()` to return `tp` thus enabling
+// `parallel()` and `parallel_nd()` to submit work to `tp`.
+void activate_threadpool(threadpool_iface *tp);
+
+// Resets the active threadpool for the calling thread to nullptr. After this
+// call `parallel()` and `parallel_nd()` would execute work sequentially.
+void deactivate_threadpool();
+
+// Returns the active threadpool for the calling thread.
+threadpool_iface *get_active_threadpool();
+
+} // namespace threadpool_utils
+} // namespace impl
+} // namespace dnnl
+
+inline int dnnl_get_max_threads() {
+    using namespace dnnl::impl::threadpool_utils;
+    dnnl::threadpool_iface *tp = get_active_threadpool();
+    // This is the maximum number of threads oneDNN would use
+    int def_max_threads = std::thread::hardware_concurrency();
+    assert(def_max_threads > 0);
+    // Use the default value if the threadpool-provided is outside the range
+    // [1, def_max_threads]
+    return tp ? std::min(std::max(1, tp->get_num_threads()), def_max_threads)
+              : def_max_threads;
 }
-
-#else
-#error "unsupported DNNL_CPU_THREADING_RUNTIME!"
-
+inline int dnnl_in_parallel() {
+    using namespace dnnl::impl::threadpool_utils;
+    dnnl::threadpool_iface *tp = get_active_threadpool();
+    return tp ? tp->get_in_parallel() : 0;
+}
+inline void dnnl_thr_barrier() {
+    assert(!"no barrier with THREADPOOL");
+}
 #endif
 
-#if 0 // moved to dnnl_omp.h (with more cpus/compilers, have more optimization macros)
-, have more optimization macros)// MSVC still supports omp 2.0 only
+#if 1 // move to dnnl_omp.h ?
+#if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP
+#define PRAGMA_OMP(...) PRAGMA_MACRO(CHAIN2(omp, __VA_ARGS__))
+#define OMP_GET_THREAD_NUM() omp_get_thread_num()
+#define OMP_GET_NUM_THREADS() omp_get_num_threads()
+#else
+#define PRAGMA_OMP(...)
+#define OMP_GET_THREAD_NUM() 0
+#define OMP_GET_NUM_THREADS() 1
+#endif
+
+// MSVC still supports omp 2.0 only
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
 #define collapse(x)
+#define PRAGMA_OMP_SIMD(...)
+#elif defined(__ve)
 #define PRAGMA_OMP_SIMD(...)
 #else
 #define PRAGMA_OMP_SIMD(...) PRAGMA_MACRO(CHAIN2(omp, simd __VA_ARGS__))
@@ -100,8 +133,9 @@ inline tbb::static_partitioner dnnl_tbb_partitioner() {
 
 // process simdlen; it is supported for Clang >= 3.9; ICC >= 17.0; GCC >= 6.1
 // No support on Windows.
-#if (defined(__clang_major__) \
-        && (__clang_major__ < 3 \
+#if defined(__ve) \
+        || (defined(__clang_major__) \
+            && (__clang_major__ < 3 \
                 || (__clang_major__ == 3 && __clang_minor__ < 9))) \
         || (defined(__INTEL_COMPILER) && __INTEL_COMPILER < 1700) \
         || (!defined(__INTEL_COMPILER) && !defined(__clang__) \
@@ -109,7 +143,7 @@ inline tbb::static_partitioner dnnl_tbb_partitioner() {
                         || (__GNUC__ == 6 && __GNUC_MINOR__ < 1)))
 #define simdlen(x)
 #endif // long simdlen if
-#endif // moved to dnnl_omp.h
+#endif // move to dnnl_omp.h
 
 namespace dnnl {
 namespace impl {
@@ -170,4 +204,4 @@ void balance2D(U nthr, U ithr, T ny, T &ny_start, T &ny_end, T nx, T &nx_start,
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

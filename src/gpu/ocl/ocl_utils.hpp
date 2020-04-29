@@ -32,6 +32,8 @@
 #include "common/c_types_map.hpp"
 #include "common/engine.hpp"
 #include "common/utils.hpp"
+#include "common/verbose.hpp"
+#include "gpu/compute/kernel_arg_list.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -83,6 +85,8 @@ inline status_t convert_to_dnnl(cl_int cl_status) {
         default: return status::runtime_error;
     }
 }
+
+enum { OCL_BUFFER_ALIGNMENT = 128 };
 
 #ifndef NDEBUG
 #define MAYBE_REPORT_OCL_ERROR(s) \
@@ -245,6 +249,9 @@ template <typename T>
 ocl_wrapper_t<T> make_ocl_wrapper(T t) {
     return ocl_wrapper_t<T>(t);
 }
+
+status_t get_ocl_kernel_arg_type(
+        compute::scalar_type_t *type, cl_kernel ocl_kernel, int idx);
 
 } // namespace ocl
 } // namespace gpu

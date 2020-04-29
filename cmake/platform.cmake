@@ -28,6 +28,9 @@ if (DNNL_LIBRARY_TYPE STREQUAL "SHARED")
     add_definitions(-DDNNL_DLL)
 endif()
 
+# Specify the target architecture
+add_definitions(-DDNNL_${DNNL_TARGET_ARCH}=1)
+
 # UNIT8_MAX-like macros are a part of the C99 standard and not a part of the
 # C++ standard (see C99 standard 7.18.2 and 7.18.4)
 add_definitions(-D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS)
@@ -37,7 +40,7 @@ set(CMAKE_CCXX_NOWARN_FLAGS)
 set(CMAKE_CCXX_NOEXCEPT_FLAGS)
 set(DEF_ARCH_OPT_FLAGS)
 
-# Compatibility with MKL-DNN
+# Compatibility with Intel MKL-DNN
 if($ENV{MKLDNN_WERROR})
     set(DNNL_WERROR $ENV{MKLDNN_WERROR})
 endif()
@@ -87,7 +90,8 @@ if(MSVC)
         # unconditionally.
         append(CMAKE_CCXX_FLAGS "-Wno-pass-failed")
     endif()
-elseif(NECVE) # cross-compilers may have special flags
+elseif(NECVE) # does not accept many x86 UNIX flags
+    #
 elseif(UNIX OR MINGW)
     append(CMAKE_CCXX_FLAGS "-Wall -Wno-unknown-pragmas")
     append_if(DNNL_WERROR CMAKE_CCXX_FLAGS "-Werror")
@@ -140,11 +144,13 @@ elseif(UNIX OR MINGW)
             append(CMAKE_CCXX_SANITIZER_FLAGS "-g -fno-omit-frame-pointer")
         endif()
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-        if(TARGET_ARCH STREQUAL "AARCH64")
-             set(DEF_ARCH_OPT_FLAGS "-O3 -mcpu=native")
-             set(DNNL_ENABLE_JIT_PROFILING CACHE BOOL "OFF" FORCE)
-             message(WARNING "AArch64 build, DNNL_ENABLE_JIT_PROFILING is OFF")
-        else()
+        if(DNNL_TARGET_ARCH STREQUAL "AARCH64")
+             set(DEF_ARCH_OPT_FLAGS "-O3")
+             # For native compilation tune for the host processor
+             if (CMAKE_SYSTEM_PROCESSOR STREQUAL CMAKE_HOST_SYSTEM_PROCESSOR)
+                 append(DEF_ARCH_OPT_FLAGS "-mcpu=native")
+             endif()
+        elseif(DNNL_TARGET_ARCH STREQUAL "X64")
              set(DEF_ARCH_OPT_FLAGS "-msse4.1")
         endif()
         # suppress warning on assumptions made regarding overflow (#146)
@@ -162,7 +168,17 @@ elseif(UNIX OR MINGW)
     endif()
 endif()
 
-if(UNIX OR MINGW)
+if(MSVC)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+        # There's no opportunity for icl to link its libraries statically
+        # into the library. That's why removing them when searching symbols.
+        # libm symbols will be taken from ucrt.lib, otherwise, linker will
+        # complain about duplicated symbols being linked to the library.
+        append(NO_DYNAMIC_LIBS "/NODEFAULTLIB:libmmd.lib")
+        append(NO_DYNAMIC_LIBS "/NODEFAULTLIB:svml_dispmd.lib svml_dispmt.lib")
+        append(CMAKE_SHARED_LINKER_FLAGS "${NO_DYNAMIC_LIBS}")
+    endif()
+elseif(UNIX OR MINGW)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
         # Link Intel libraries statically (except for iomp5)
         if ("${DNNL_CPU_THREADING_RUNTIME}" STREQUAL "OMP")
@@ -191,16 +207,3 @@ if(APPLE)
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${_rpath}")
     endforeach()
 endif()
-
-# toolchain builds may add checks for compiler/environment/library issues...
-include(CheckCXXSourceCompiles)
-# DNNL_OK_STATIC_THREAD_LOCAL_OBJECTS test removed - scratchpad.cpp reverted
-if(NECVE) # most standard compilers comply with c++11, but...
-    # This bug can often use zero<T> to localize a crude 'memset' workaround
-    include(CheckCXXSourceRuns)
-    file(READ cmake/test_value_initialized_bug.cpp _source)
-    check_cxx_source_runs("${_source}"
-        DNNL_OK_VALUE_INITIALIZATION)
-    message(STATUS "DNNL_OK_VALUE_INITIALIZATION ${DNNL_OK_VALUE_INITIALIZATION}")
-endif()
-# vim : set ts=4 sw=4 ai :

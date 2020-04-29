@@ -14,15 +14,15 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "cpu_engine.hpp"
-#include "cpu_target.h"
-#if USE_sum
+#include "cpu/cpu_engine.hpp"
+
 #include "cpu/ref_sum.hpp"
 #include "cpu/simple_sum.hpp"
-#if TARGET_X86_JIT // && DNNL_ENABLE_BFLOAT16
-#include "jit_avx512_core_bf16_sum.hpp"
-#endif // TARGET_X86_JIT
-#endif // USE_sum
+
+#if DNNL_X64
+#include "cpu/x64/jit_avx512_core_bf16_sum.hpp"
+using namespace dnnl::impl::cpu::x64;
+#endif
 
 namespace dnnl {
 namespace impl {
@@ -30,34 +30,27 @@ namespace cpu {
 
 using spd_create_f = dnnl::impl::engine_t::sum_primitive_desc_create_f;
 
-#if !USE_sum
-const spd_create_f *cpu_engine_t::get_sum_implementation_list() const {
-    static const spd_create_f empty_list[] = {nullptr};
-    return empty_list;
-}
-
-#else
-
 namespace {
-#define INSTANCE_CREATOR(...) __VA_ARGS__::pd_t::create,
+// clang-format off
+#define INSTANCE(...) __VA_ARGS__::pd_t::create,
+#define INSTANCE_X64(...) DNNL_X64_ONLY(INSTANCE(__VA_ARGS__))
 static const spd_create_f cpu_sum_impl_list[] = {
-        // clang-format on
-        INSTANCE(jit_bf16_sum_t<data_type::bf16, data_type::bf16>)
-        INSTANCE(jit_bf16_sum_t<data_type::bf16, data_type::f32>)
-        INSTANCE_ref(simple_sum_t<data_type::bf16>)
-        INSTANCE_ref(simple_sum_t<data_type::bf16, data_type::f32>)
-        INSTANCE_ref(simple_sum_t<data_type::f32>)
-        INSTANCE_ref(ref_sum_t)
-        // clang-format off
+        INSTANCE_X64(jit_bf16_sum_t<data_type::bf16, data_type::bf16>)
+        INSTANCE_X64(jit_bf16_sum_t<data_type::bf16, data_type::f32>)
+        INSTANCE(simple_sum_t<data_type::bf16>)
+        INSTANCE(simple_sum_t<data_type::bf16, data_type::f32>)
+        INSTANCE(simple_sum_t<data_type::f32>)
+        INSTANCE(ref_sum_t)
         nullptr,
 };
+#undef INSTANCE_X64
 #undef INSTANCE
+// clang-format on
 } // namespace
 
 const spd_create_f *cpu_engine_t::get_sum_implementation_list() const {
     return cpu_sum_impl_list;
 }
-#endif // USE_sum
 
 } // namespace cpu
 } // namespace impl

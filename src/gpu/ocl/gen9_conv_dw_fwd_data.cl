@@ -38,7 +38,7 @@ gen9_conv_dw_fwd(const __global DATA_T *src, const __global DATA_T *wei,
         const __global DATA_T *bias, __global DATA_T *dst, float eltwise_alpha,
         float eltwise_beta, float eltwise_scale, float sum_scale) {
 
-#ifdef VER_8OW16C
+#if VER_8OW16C
     const int osp = get_global_id(1);
     const int od = osp / (OWB * OH);
     const int ohw = osp % (OWB * OH);
@@ -70,7 +70,19 @@ gen9_conv_dw_fwd(const __global DATA_T *src, const __global DATA_T *wei,
 
 #if KH != 1 || KW != 1 || KD != 1
     for (int kd = 0; kd < KD; kd++)
-        for (int kh = 0; kh < KH; kh++)
+        for (int kh = 0; kh < KH; kh++) {
+            const __global DATA_T *src1 = src
+                    + (kd * (1 + DD) * IH + kh * (1 + DH)) * IW * MB_BLOCK
+                            * IC_BLOCK;
+            DATA_T tempA[SW * OW_BLOCK + KW * (1 + DW)] = {0};
+            __attribute__((opencl_unroll_hint(
+                    SW * OW_BLOCK + KW * (1 + DW)))) // attr:no-format
+            for (int i = 0; i < SW * OW_BLOCK + KW * (1 + DW); i++) {
+                if ((i + iw) >= 0 && (i + iw) < IW) {
+                    tempA[i] = AS_DATA_T(BLOCK_READ((const __global BLOCK_DATA_T
+                                    *)(&src1[i * IC_BLOCK])));
+                }
+            }
             for (int kw = 0; kw < KW; kw++) {
 
                 if (id + kd * (1 + DD) < 0 || id + kd * (1 + DD) >= ID)
@@ -80,10 +92,6 @@ gen9_conv_dw_fwd(const __global DATA_T *src, const __global DATA_T *wei,
 
                 const __global DATA_T *wei1
                         = wei + (kd * KH * KW + kh * KW + kw) * OC_BLOCK;
-                const __global DATA_T *src1 = src
-                        + (kd * (1 + DD) * IH * IW + kh * (1 + DH) * IW
-                                  + kw * (1 + DW))
-                                * MB_BLOCK * IC_BLOCK;
 #else
     const int kw = 0;
     const __global DATA_T *wei1 = wei;
@@ -95,18 +103,21 @@ gen9_conv_dw_fwd(const __global DATA_T *src, const __global DATA_T *wei,
 
                 __attribute__((opencl_unroll_hint(OW_BLOCK))) // attr:no-format
                 for (int k = 0; k < OW_BLOCK; k++) {
-
-                    if (iw + kw * (1 + DW) + k * SW < 0
-                            || iw + kw * (1 + DW) + k * SW >= IW)
-                        A0 = DATA_ZERO;
-                    else
-                        A0 = AS_DATA_T(BLOCK_READ((const __global BLOCK_DATA_T
-                                        *)(&src1[k * SW * IC_BLOCK])));
-
+#if KH != 1 || KW != 1 || KD != 1
+                    A0 = tempA[k * SW + kw * (1 + DW)];
+#else
+        if (iw + kw * (1 + DW) + k * SW < 0
+                || iw + kw * (1 + DW) + k * SW >= IW)
+            A0 = DATA_ZERO;
+        else
+            A0 = AS_DATA_T(BLOCK_READ(
+                    (const __global BLOCK_DATA_T *)(&src1[k * SW * IC_BLOCK])));
+#endif
                     S00[k] = fma(A0, (DATA_T)B0, S00[k]);
                 }
 #if KH != 1 || KW != 1 || KD != 1
             }
+        }
 #endif
 
 #if WITH_SUM == 1 || WITH_ELTWISE == 1
@@ -129,15 +140,22 @@ gen9_conv_dw_fwd(const __global DATA_T *src, const __global DATA_T *wei,
     }
 #endif
 
-    __attribute__((opencl_unroll_hint(OW_BLOCK))) // attr:no-format
-    for (int k = 0; k < OW_BLOCK; k++) {
-        BLOCK_WRITE(
-                (__global BLOCK_DATA_T *)&dst[k * OC_BLOCK], AS_UINT_T(S00[k]));
+    if (OW % OW_BLOCK == 0 || ow + OW_BLOCK <= OW) {
+        __attribute__((opencl_unroll_hint)) // attr:no-format
+        for (int k = 0; k < OW_BLOCK; k++) {
+            BLOCK_WRITE((__global BLOCK_DATA_T *)&dst[k * OC_BLOCK],
+                    AS_UINT_T(S00[k]));
+        }
+    } else {
+        __attribute__((opencl_unroll_hint)) // attr:no-format
+        for (int k = 0; k < OW % OW_BLOCK; k++) {
+            BLOCK_WRITE((__global BLOCK_DATA_T *)&dst[k * OC_BLOCK],
+                    AS_UINT_T(S00[k]));
+        }
     }
-
 #endif
 
-#ifdef VER_16MB16C
+#if VER_16MB16C
     const int osp = get_global_id(1);
     const int od = osp / (OWB * OH);
     const int ohw = osp % (OWB * OH);

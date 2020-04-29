@@ -112,6 +112,7 @@ function(target_link_libraries_install target list)
     endforeach(lib)
 endfunction()
 
+# ----- added functions [EXTRA] -------
 # list_filter_exclude(<list> <regexp>)
 # behave like list(FILTER <list> EXCLUDE REGEX <regexp>)
 macro(list_filter_exclude _list _regexp)

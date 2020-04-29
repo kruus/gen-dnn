@@ -95,6 +95,11 @@ bool parse_skip_nonlinear(std::vector<bool> &skip, const char *str,
     return parse_vector_option(skip, str2bool, str, option_name);
 }
 
+bool parse_trivial_strides(std::vector<bool> &ts, const char *str,
+        const std::string &option_name /* = "trivial-strides"*/) {
+    return parse_vector_option(ts, str2bool, str, option_name);
+}
+
 bool parse_scale_policy(std::vector<policy_t> &policy, const char *str,
         const std::string &option_name /*= "scaling"*/) {
     return parse_vector_option(
@@ -229,19 +234,8 @@ static bool parse_verbose(
 
 static bool parse_engine_kind(
         const char *str, const std::string &option_name = "engine") {
-    if (parse_single_value_option(
-                engine_tgt_kind, str2engine_kind, str, option_name)) {
-
-        DNN_SAFE(dnnl_stream_destroy(stream_tgt), CRIT);
-        DNN_SAFE(dnnl_engine_destroy(engine_tgt), CRIT);
-
-        DNN_SAFE(dnnl_engine_create(&engine_tgt, engine_tgt_kind, 0), CRIT);
-        DNN_SAFE(dnnl_stream_create(
-                         &stream_tgt, engine_tgt, dnnl_stream_default_flags),
-                CRIT);
-        return true;
-    }
-    return false;
+    return parse_single_value_option(
+            engine_tgt_kind, str2engine_kind, str, option_name);
 }
 
 static bool parse_canonical(
@@ -263,11 +257,9 @@ static bool parse_scratchpad_mode(
 static bool parse_skip_impl(
         const char *str, const std::string &option_name = "skip-impl") {
     const std::string pattern = get_pattern(option_name);
-    if (pattern.find(str, 0, pattern.size()) != eol) {
-        skip_impl = str + pattern.size();
-        return true;
-    }
-    return false;
+    if (pattern.find(str, 0, pattern.size()) == eol) return false;
+    skip_impl = std::string(str + pattern.size());
+    return true;
 }
 
 bool parse_bench_settings(const char *str) {

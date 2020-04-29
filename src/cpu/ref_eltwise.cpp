@@ -16,16 +16,26 @@
 
 #include <assert.h>
 
-#include "c_types_map.hpp"
-#include "dnnl_thread.hpp"
-#include "math_utils.hpp"
-#include "type_helpers.hpp"
+#include "common/c_types_map.hpp"
+#include "common/dnnl_thread.hpp"
+#include "common/math_utils.hpp"
+#include "common/type_helpers.hpp"
 
-#include "ref_eltwise.hpp"
+#include "cpu/ref_eltwise.hpp"
 
 namespace dnnl {
 namespace impl {
 namespace cpu {
+
+#define DATA_OFF(f, n, c, d, h, w) \
+    (ndims == 1) \
+            ? (f).off(n) \
+            : ((ndims == 2) ? (f).off(n, c) \
+                            : ((ndims == 3) ? (f).off(n, c, w) \
+                                            : ((ndims == 4) ? (f).off( \
+                                                       n, c, h, w) \
+                                                            : (f).off(n, c, d, \
+                                                                    h, w))))
 
 using namespace alg_kind;
 using namespace math;
@@ -180,15 +190,13 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_generic(
     const auto alg_kind = pd()->desc()->alg_kind;
     const float alpha = pd()->desc()->alpha;
     const float beta = pd()->desc()->beta;
-    const bool is_3d = pd()->desc()->data_desc.ndims == 5;
+    const int ndims = pd()->desc()->data_desc.ndims;
 
     parallel_nd(
-            MB, C, D, H, W, [&](dim_t n, dim_t c, dim_t id, dim_t h, dim_t w) {
-                auto d_off = is_3d ? data_d.off(n, c, id, h, w)
-                                   : data_d.off(n, c, h, w);
-                data_t s = src[d_off];
-                data_t &d = dst[d_off];
-                d = compute_eltwise_scalar_fwd(alg_kind, s, alpha, beta);
+            MB, C, D, H, W, [&](dim_t n, dim_t c, dim_t d, dim_t h, dim_t w) {
+                auto data_off = DATA_OFF(data_d, n, c, d, h, w);
+                dst[data_off] = compute_eltwise_scalar_fwd(
+                        alg_kind, src[data_off], alpha, beta);
             });
 }
 
@@ -244,14 +252,12 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_generic(
     const auto alg_kind = pd()->desc()->alg_kind;
     const float alpha = pd()->desc()->alpha;
     const float beta = pd()->desc()->beta;
-    const bool is_3d = pd()->desc()->data_desc.ndims == 5;
+    const int ndims = pd()->desc()->data_desc.ndims;
 
     parallel_nd(
             MB, C, D, H, W, [&](dim_t n, dim_t c, dim_t d, dim_t h, dim_t w) {
-                auto data_off = is_3d ? data_d.off(n, c, d, h, w)
-                                      : data_d.off(n, c, h, w);
-                auto diff_data_off = is_3d ? diff_data_d.off(n, c, d, h, w)
-                                           : diff_data_d.off(n, c, h, w);
+                auto data_off = DATA_OFF(data_d, n, c, d, h, w);
+                auto diff_data_off = DATA_OFF(diff_data_d, n, c, d, h, w);
                 data_t s = src[data_off];
                 data_t dd = diff_dst[diff_data_off];
                 data_t &ds = diff_src[diff_data_off];
@@ -259,8 +265,8 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_generic(
             });
 }
 
-template <impl::data_type_t data_type>
-void ref_eltwise_bwd_t<data_type>::execute_backward_dense(
+template <>
+void ref_eltwise_bwd_t<data_type::f32>::execute_backward_dense(
         const exec_ctx_t &ctx) const {
     auto src = pd()->use_dst() ? CTX_IN_MEM(const data_t *, DNNL_ARG_DST)
                                : CTX_IN_MEM(const data_t *, DNNL_ARG_SRC);
@@ -270,7 +276,7 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_dense(
     const memory_desc_wrapper data_d(pd()->src_md());
     const memory_desc_wrapper diff_data_d(pd()->diff_src_md());
 
-    const ptrdiff_t nelems = static_cast<ptrdiff_t>(data_d.nelems(true));
+    const auto nelems = data_d.nelems(true);
     const auto alg_kind = pd()->desc()->alg_kind;
     const float alpha = pd()->desc()->alpha;
     const float beta = pd()->desc()->beta;
@@ -279,11 +285,58 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_dense(
     diff_dst += diff_data_d.offset0();
     diff_src += diff_data_d.offset0();
 
-    parallel_nd(nelems, [&](ptrdiff_t e) {
-        const data_t dd = diff_dst[e];
-        const data_t s = src[e];
-        data_t &ds = diff_src[e];
-        ds = compute_eltwise_scalar_bwd(alg_kind, dd, s, alpha, beta);
+    parallel(0, [&](const int ithr, const int nthr) {
+        dim_t start = 0, end = 0;
+        balance211(nelems, nthr, ithr, start, end);
+        if (start == end) return;
+
+        for (dim_t i = start; i < end; i++) {
+            diff_src[i] = compute_eltwise_scalar_bwd(
+                    alg_kind, diff_dst[i], src[i], alpha, beta);
+        }
+    });
+}
+
+template <>
+void ref_eltwise_bwd_t<data_type::bf16>::execute_backward_dense(
+        const exec_ctx_t &ctx) const {
+    using namespace memory_tracking::names;
+
+    auto src = pd()->use_dst() ? CTX_IN_MEM(const data_t *, DNNL_ARG_DST)
+                               : CTX_IN_MEM(const data_t *, DNNL_ARG_SRC);
+    auto diff_dst = CTX_IN_MEM(const data_t *, DNNL_ARG_DIFF_DST);
+    auto diff_src = CTX_OUT_MEM(data_t *, DNNL_ARG_DIFF_SRC);
+
+    auto scratchpad = ctx.get_scratchpad_grantor();
+    auto s_f = scratchpad.template get<float>(key_eltwise_src);
+    auto dd_f = scratchpad.template get<float>(key_eltwise_diff_dst);
+
+    const memory_desc_wrapper data_d(pd()->src_md());
+    const memory_desc_wrapper diff_data_d(pd()->diff_src_md());
+
+    const auto nelems = data_d.nelems(true);
+    const auto alg_kind = pd()->desc()->alg_kind;
+    const float alpha = pd()->desc()->alpha;
+    const float beta = pd()->desc()->beta;
+
+    src += data_d.offset0();
+    diff_dst += diff_data_d.offset0();
+    diff_src += diff_data_d.offset0();
+
+    parallel(0, [&](const int ithr, const int nthr) {
+        dim_t start = 0, end = 0;
+        balance211(nelems, nthr, ithr, start, end);
+        if (start == end) return;
+
+        cvt_bfloat16_to_float(s_f + start, src + start, end - start);
+        cvt_bfloat16_to_float(dd_f + start, diff_dst + start, end - start);
+
+        for (dim_t i = start; i < end; i++) {
+            dd_f[i] = compute_eltwise_scalar_bwd(
+                    alg_kind, dd_f[i], s_f[i], alpha, beta);
+        }
+
+        cvt_float_to_bfloat16(diff_src + start, dd_f + start, end - start);
     });
 }
 
@@ -295,7 +348,6 @@ template struct ref_eltwise_fwd_t<data_type::u8>;
 
 template struct ref_eltwise_bwd_t<data_type::f32>;
 template struct ref_eltwise_bwd_t<data_type::bf16>;
-template struct ref_eltwise_bwd_t<data_type::s32>;
 
 } // namespace cpu
 } // namespace impl

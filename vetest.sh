@@ -191,7 +191,15 @@ unset VE_LIMIT_OPT
 # documentation: https://veos-sxarr-nec.github.io/doc/HowToExecuteVEprogram.txt
 export VE_LIMIT_OPT="--softs $ULIMIT --hards unlimited"
 rm -rf "r${LOG}"
-ve_exec --show-limit 2>&1 | tee "r${LOG}"
+
+# maybe incompatible with older VEOSLOG approach?
+# (but maybe it gives you at least the PID?)
+VEOSLOG=/var/opt/nec/ve/veos/veos${NODE}.log.0
+if [ ! -f "${VEOSLOG}" ]; then
+  VEOSLOG=""
+  VE_EXEC=""
+fi
+if [ "$VE_EXEC" ]; then ve_exec --show-limit 2>&1 | tee "r${LOG}"; fi
 
 # DNNL_VERBOSE?
 if [ $VERBOSE -lt 0 -o $VERBOSE -gt 2 ]; then VERBOSE=2; fi
@@ -213,7 +221,7 @@ fi
 # VE_NODE_NUMBER and VEOS debug mode
 TEST_ENV+=(VE_NODE_NUMBER=${NODE})
 
-if [ "yah" ]; then
+if [ "debug log4c" -a "${VEOSLOG}" ]; then
   # following put ve_exec (etc.) logs in current directory, at DEBUG level
   if [ ! -d ve ]; then mkdir ve; fi
   cat /etc/opt/nec/ve/veos/log4crc \
@@ -224,10 +232,6 @@ if [ "yah" ]; then
 else
   unset LOG4C_RCPATH
 fi
-
-# maybe incompatible with older VEOSLOG approach?
-# (but maybe it gives you at least the PID?)
-VEOSLOG=/var/opt/nec/ve/veos/veos${NODE}.log.0
 
 echo "${ENV} ${TEST_ENV[@]} <command>"
 if [ ${LIST} -eq 1 ]; then
@@ -295,29 +299,31 @@ function errorcode
 }
 function check_veoserr
 {
-  # if $rc==0, check from VEOSLINE on in VEOSLOG
-  #            and set rc=1 for veos errors
-  #VEOSNEW=`awk "NR>${VEOSLINE}" "${VEOSLOG}" | grep $pid`
-  VEOSNEW=`awk "NR>${VEOSLINE}" "${VEOSLOG}"`
-  echo "Basic VEOSNEW:"
-  echo "${VEOSNEW}"
-  VEOSNEW=`echo "${VEOSNEW}" | grep -v 'exception not served'` # ignorable errors
-  if [ "${VEOSNEW}" ]; then >&2 echo "${VEOSNEW}"; fi
-  if [ $rc == 0 ]; then
-    >&2 echo "test return code seems ok... checking VEOS messages"
-    # Surprisingly, can succeed with many
-    #     veos.os_module.core ERROR 49734 Assign failed exception not served PID 99962
-    # -type messages
-    if [ ${pid} -ge 0 ]; then # we generated a ve_exec.log file, probably a real error
-      VEOSNEW=`echo "${VEOSNEW}" | grep "${pid}"`
-      echo "Pruned VEOSNEW (pid ${pid}):"
-      echo "${VEOSNEW}"
-      _errs=`echo "${VEOSNEW}" | grep 'ERROR'`
-      if [ "${_errs}" ]; then rc=1; echo "${_errs}" >2; fi
-    else # be more picky, "error while mapping memory" is fatal
-      _errs=`echo "${VEOSNEW}" | grep 'error while mapping memory'`
-      if [ "${_errs}" ]; then rc=1; echo "${_errs}" >2
-      else echo "no VEOS memory mapping errors" >2
+  if [ "${VEOSLOG}" ]; then
+    # if $rc==0, check from VEOSLINE on in VEOSLOG
+    #            and set rc=1 for veos errors
+    #VEOSNEW=`awk "NR>${VEOSLINE}" "${VEOSLOG}" | grep $pid`
+    VEOSNEW=`awk "NR>${VEOSLINE}" "${VEOSLOG}"`
+    echo "Basic VEOSNEW:"
+    echo "${VEOSNEW}"
+    VEOSNEW=`echo "${VEOSNEW}" | grep -v 'exception not served'` # ignorable errors
+    if [ "${VEOSNEW}" ]; then >&2 echo "${VEOSNEW}"; fi
+    if [ $rc == 0 ]; then
+      >&2 echo "test return code seems ok... checking VEOS messages"
+      # Surprisingly, can succeed with many
+      #     veos.os_module.core ERROR 49734 Assign failed exception not served PID 99962
+      # -type messages
+      if [ ${pid} -ge 0 ]; then # we generated a ve_exec.log file, probably a real error
+        VEOSNEW=`echo "${VEOSNEW}" | grep "${pid}"`
+        echo "Pruned VEOSNEW (pid ${pid}):"
+        echo "${VEOSNEW}"
+        _errs=`echo "${VEOSNEW}" | grep 'ERROR'`
+        if [ "${_errs}" ]; then rc=1; echo "${_errs}" >2; fi
+      else # be more picky, "error while mapping memory" is fatal
+        _errs=`echo "${VEOSNEW}" | grep 'error while mapping memory'`
+        if [ "${_errs}" ]; then rc=1; echo "${_errs}" >2
+        else echo "no VEOS memory mapping errors" >2
+        fi
       fi
     fi
   fi
@@ -330,13 +336,15 @@ function runtest # runtest COMMAND [ARGS...] -- run in TEST_ENV & send console o
   >&2 echo "Test: $*"
   echo 'ulimit : '`ulimit -s`
   echo "${ENV} ${TEST_ENV[@]} $*"
-  mkdir -p ve
-  mv -f ve_exec.log.* ve/
-  sleep 1
-  sync
-  VEOSLINE=`cat "${VEOSLOG}" | wc -l`
-  #VEOSLINE=`awk 'END{print NR}' ${VEOSLOG}`
-  >&2 echo "VEOSLINE = ${VEOSLINE}, VEOSLOG = ${VEOSLOG}"
+  if [ "${VEOSLOG}" ]; then
+    mkdir -p ve
+    mv -f ve_exec.log.* ve/
+    sleep 1
+    sync
+    VEOSLINE=`cat "${VEOSLOG}" | wc -l`
+    #VEOSLINE=`awk 'END{print NR}' ${VEOSLOG}`
+    >&2 echo "VEOSLINE = ${VEOSLINE}, VEOSLOG = ${VEOSLOG}"
+  fi
   ${ENV} ${TEST_ENV[@]} GTEST_FILTER="${GTEST_FILTER}" script -e -a -c "${STRACE} $*"
   rc=$?
   if [ -f ve_exec.log.* ]; then
@@ -433,28 +441,28 @@ if [ $GDB = 0 ]; then # "" evaluates to false
               pushd tests/benchdnn
               runtest ${makecmd}
               rc="$?"
-              popd
-              tac "r${LOG}" | awk '/^VEOSLINE/{print} //{exit}' | tac > "vetest.${tt}"
-              #cat "vetest.${tt}" # stdout ends up in r${LOG}
+              #popd
+              #tac "r${LOG}" | awk '/^VEOSLINE/{print} //{exit}' | tac > "vetest.${tt}"
+              ##cat "vetest.${tt}" # stdout ends up in r${LOG}
 
-              >&2 echo "runtest --> rc=${rc}"
-              VEOSNEW=`awk "NR>${VEOSLINE}" "${VEOSLOG}"`
-              if [ $rc == 0 ]; then
-                >&2 echo "test return code seems ok... checking ${VEOSLOG}"
-                ERRS=`echo "${VEOSNEW}" | grep 'ERROR'`
-                #if [ -z "${ERRS}" ]; then
-                  #>&2 echo "test return code seems ok... checking tmp run output vetest.${tt}"
-                  ERRS+=`awk 'BEGIN{IGNORECASE=1}/ERROR/||/Segmentation/{print}' < "vetest.${tt}"`
-                #fi
-                if [ "$ERRS" ]; then
-                  rc=1
-                  >&2 echo "${ERRS}"
-                fi
-              else
-                >&2 echo "${VEOSNEW}"
-              fi
+              #>&2 echo "runtest --> rc=${rc}"
+              #VEOSNEW=`awk "NR>${VEOSLINE}" "${VEOSLOG}"`
+              #if [ $rc == 0 ]; then
+              #  >&2 echo "test return code seems ok... checking ${VEOSLOG}"
+              #  ERRS=`echo "${VEOSNEW}" | grep 'ERROR'`
+              #  #if [ -z "${ERRS}" ]; then
+              #    #>&2 echo "test return code seems ok... checking tmp run output vetest.${tt}"
+              #    ERRS+=`awk 'BEGIN{IGNORECASE=1}/ERROR/||/Segmentation/{print}' < "vetest.${tt}"`
+              #  #fi
+              #  if [ "$ERRS" ]; then
+              #    rc=1
+              #    >&2 echo "${ERRS}"
+              #  fi
+              #else
+              #  >&2 echo "${VEOSNEW}"
+              #fi
 
-              rm -f "vetest.${tt}"
+              #rm -f "vetest.${tt}"
               test $rc == 0
             } \
               && { >&2 echo "OK ${tt}"; ok=$(($ok+1)); strok+=";${tt}"; } \

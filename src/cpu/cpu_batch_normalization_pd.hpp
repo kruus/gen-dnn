@@ -14,11 +14,11 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef CPU_BATCH_NORMALIZATION_PD_HPP
-#define CPU_BATCH_NORMALIZATION_PD_HPP
+#ifndef CPU_CPU_BATCH_NORMALIZATION_PD_HPP
+#define CPU_CPU_BATCH_NORMALIZATION_PD_HPP
 
-#include "batch_normalization_pd.hpp"
-#include "cpu_engine.hpp"
+#include "common/batch_normalization_pd.hpp"
+#include "cpu/cpu_engine.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -36,5 +36,6 @@ struct cpu_batch_normalization_bwd_pd_t : public batch_normalization_bwd_pd_t {
 } // namespace impl
 } // namespace dnnl
 
-// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
 #endif
+
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

@@ -30,6 +30,9 @@
  * \sa dnnl_optimize.h for compiler-specific optimizations unrelated to OpenMP
  */
 
+#if 1 // perhaps remove?
+#include "dnnl_thread.hpp"
+#else
 #include "z_magic.hpp"
 
 #if !defined(ENABLE_OMP_MACROS)
@@ -39,29 +42,33 @@
 #if !ENABLE_OMP_MACROS
 #define PRAGMA_OMP(...)
 #define PRAGMA_OMP_SIMD(...)
+#define OMP_GET_THREAD_NUM() 0
+#define OMP_GET_NUM_THREADS() 1
 
 #else
 #define PRAGMA_OMP(...) PRAGMA_MACRO(CHAIN2(omp, __VA_ARGS__))
 
-#if defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER) && !defined(__ve)
-#define collapse(x)
-#endif
+//#if defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+//#define collapse(x)
+//#endif
 
-#ifndef PRAGMA_OMP_SIMD
+//#ifndef PRAGMA_OMP_SIMD
 // MSVC still supports omp 2.0 only
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+#define collapse(x)
 #define PRAGMA_OMP_SIMD(...)
 #elif defined(__ve)
 #define PRAGMA_OMP_SIMD(...)
 #else
 #define PRAGMA_OMP_SIMD(...) PRAGMA_MACRO(CHAIN2(omp, simd __VA_ARGS__))
 #endif // defined(_MSC_VER) && !defined(__clang__) && !defined(__INTEL_COMPILER)
-#endif // ndef PRAGMA_OMP_SIMD
+//#endif // ndef PRAGMA_OMP_SIMD
 
 // process simdlen; it is supported for Clang >= 3.9; ICC >= 17.0; GCC >= 6.1
 // No support on Windows.
-#if (defined(__clang_major__) \
-        && (__clang_major__ < 3 \
+#if defined(__ve) \
+        || (defined(__clang_major__) \
+            && (__clang_major__ < 3 \
                 || (__clang_major__ == 3 && __clang_minor__ < 9))) \
         || (defined(__INTEL_COMPILER) && __INTEL_COMPILER < 1700) \
         || (!defined(__INTEL_COMPILER) && !defined(__clang__) \
@@ -76,4 +83,5 @@
 
 #endif // ENABLE_OMP_MACROS
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+#endif // 1
 #endif // DNNL_OMP_H

@@ -14,12 +14,16 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "cpu_engine.hpp"
+#include "cpu/cpu_engine.hpp"
 
-#include "cpu/gemm_bf16_inner_product.hpp"
 #include "cpu/gemm_inner_product.hpp"
 #include "cpu/gemm_x8s8s32x_inner_product.hpp"
 #include "cpu/ref_inner_product.hpp"
+
+#if DNNL_X64
+#include "cpu/x64/gemm_bf16_inner_product.hpp"
+using namespace dnnl::impl::cpu::x64;
+#endif
 
 namespace dnnl {
 namespace impl {
@@ -30,41 +34,39 @@ using pd_create_f = engine_t::primitive_desc_create_f;
 namespace {
 using namespace dnnl::impl::data_type;
 
-/// @copydoc INSTANCE_CREATOR
-#define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
+// clang-format off
 static const pd_create_f impl_list[] = {
-        // clang-format off
         /* f32 */
-        INSTANCE_ref(gemm_inner_product_fwd_t<f32>)
-        INSTANCE_ref(gemm_inner_product_bwd_data_t<f32>)
-        INSTANCE_ref(gemm_inner_product_bwd_weights_t<f32>)
-        INSTANCE_ref(ref_inner_product_fwd_t<f32>)
-        INSTANCE_ref(ref_inner_product_bwd_data_t<f32, f32, f32, f32>)
-        INSTANCE_ref(ref_inner_product_bwd_weights_t<f32>)
+        CPU_INSTANCE(gemm_inner_product_fwd_t<f32>)
+        CPU_INSTANCE(gemm_inner_product_bwd_data_t<f32>)
+        CPU_INSTANCE(gemm_inner_product_bwd_weights_t<f32>)
+        CPU_INSTANCE(ref_inner_product_fwd_t<f32>)
+        CPU_INSTANCE(ref_inner_product_bwd_data_t<f32, f32, f32, f32>)
+        CPU_INSTANCE(ref_inner_product_bwd_weights_t<f32>)
         /* bfloat16 */
-        INSTANCE_ref(gemm_bf16_inner_product_fwd_t<f32>)
-        INSTANCE_ref(gemm_bf16_inner_product_fwd_t<bf16>)
-        INSTANCE_ref(gemm_bf16_inner_product_bwd_data_t<f32>)
-        INSTANCE_ref(gemm_bf16_inner_product_bwd_data_t<bf16>)
-        INSTANCE_ref(gemm_bf16_inner_product_bwd_weights_t<f32>)
-        INSTANCE_ref(gemm_bf16_inner_product_bwd_weights_t<bf16>)
+        CPU_INSTANCE_X64(gemm_bf16_inner_product_fwd_t<f32>)
+        CPU_INSTANCE_X64(gemm_bf16_inner_product_fwd_t<bf16>)
+        CPU_INSTANCE_X64(gemm_bf16_inner_product_bwd_data_t<f32>)
+        CPU_INSTANCE_X64(gemm_bf16_inner_product_bwd_data_t<bf16>)
+        CPU_INSTANCE_X64(gemm_bf16_inner_product_bwd_weights_t<f32>)
+        CPU_INSTANCE_X64(gemm_bf16_inner_product_bwd_weights_t<bf16>)
         /* int */
-        INSTANCE_ref(gemm_x8s8s32x_inner_product_fwd_t<u8, u8>)
-        INSTANCE_ref(gemm_x8s8s32x_inner_product_fwd_t<u8, s8>)
-        INSTANCE_ref(gemm_x8s8s32x_inner_product_fwd_t<u8, s32>)
-        INSTANCE_ref(gemm_x8s8s32x_inner_product_fwd_t<u8, f32>)
-        INSTANCE_ref(gemm_x8s8s32x_inner_product_fwd_t<s8, u8>)
-        INSTANCE_ref(gemm_x8s8s32x_inner_product_fwd_t<s8, s8>)
-        INSTANCE_ref(gemm_x8s8s32x_inner_product_fwd_t<s8, s32>)
-        INSTANCE_ref(gemm_x8s8s32x_inner_product_fwd_t<s8, f32>)
-        INSTANCE_ref(ref_inner_product_fwd_t<u8, s8, u8, s32>)
-        INSTANCE_ref(ref_inner_product_fwd_t<u8, s8, s8, s32>)
-        INSTANCE_ref(ref_inner_product_fwd_t<u8, s8, s32, s32>)
-        INSTANCE_ref(ref_inner_product_fwd_t<u8, s8, f32, s32>)
-        // clang-format on
+        CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t<u8, u8>)
+        CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t<u8, s8>)
+        CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t<u8, s32>)
+        CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t<u8, f32>)
+        CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t<s8, u8>)
+        CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t<s8, s8>)
+        CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t<s8, s32>)
+        CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t<s8, f32>)
+        CPU_INSTANCE(ref_inner_product_fwd_t<u8, s8, u8, s32>)
+        CPU_INSTANCE(ref_inner_product_fwd_t<u8, s8, s8, s32>)
+        CPU_INSTANCE(ref_inner_product_fwd_t<u8, s8, s32, s32>)
+        CPU_INSTANCE(ref_inner_product_fwd_t<u8, s8, f32, s32>)
         /* eol */
         nullptr,
 };
+// clang-format on
 } // namespace
 
 const pd_create_f *get_inner_product_impl_list(

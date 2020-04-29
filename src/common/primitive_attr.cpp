@@ -239,6 +239,7 @@ status_t post_ops_t::append_dw_k3s1p1(data_type_t wei_dt, data_type_t bias_dt,
 
 status_t post_ops_t::append_dw_k3s2p1(data_type_t wei_dt, data_type_t bias_dt,
         data_type_t dst_dt, dim_t count, int mask, const float *scales) {
+
     auto status
             = append_dw_k3s1p1(wei_dt, bias_dt, dst_dt, count, mask, scales);
     if (status != success) return status;

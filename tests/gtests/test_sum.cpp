@@ -17,7 +17,6 @@
 #include "dnnl_test_common.hpp"
 #include "gtest/gtest.h"
 
-#include "cpu_isa_traits.hpp"
 #include "dnnl.hpp"
 
 namespace dnnl {
@@ -33,7 +32,7 @@ protected:
 
     virtual void SetUp() {
         eng = get_test_engine();
-        strm = stream(eng);
+        strm = make_stream(eng);
     }
 };
 
@@ -140,11 +139,8 @@ protected:
         SKIP_IF(get_test_engine_kind() == engine::kind::gpu
                         && src_data_type == memory::data_type::bf16,
                 "GPU does not support bfloat16 data type.");
-#if 0 // XXX ???
-        SKIP_IF(src_data_type == memory::data_type::bf16
-                        && !impl::cpu::mayiuse(impl::cpu::avx512_core),
-                "current ISA doesn't support bfloat16 data type");
-#endif
+        SKIP_IF(unsupported_data_type(src_data_type),
+                "Engine does not support this data type.");
         catch_expected_failures(
                 [=]() { Test(); }, p.expect_to_fail, p.expected_status);
     }
@@ -156,7 +152,7 @@ protected:
         const auto num_srcs = p.srcs_format.size();
 
         auto eng = get_test_engine();
-        auto strm = stream(eng);
+        auto strm = make_stream(eng);
 
         std::vector<memory::desc> srcs_md;
         std::vector<memory> srcs;
@@ -204,7 +200,7 @@ protected:
 
         ASSERT_TRUE(sum_pd.query_md(query::exec_arg_md, DNNL_ARG_DST)
                 == sum_pd.dst_desc());
-        for (size_t i = 0; i < srcs.size(); i++)
+        for (int i = 0; i < (int)srcs.size(); i++)
             ASSERT_TRUE(sum_pd.query_md(
                                 query::exec_arg_md, DNNL_ARG_MULTIPLE_SRC + i)
                     == sum_pd.src_desc(i));
@@ -388,4 +384,3 @@ GPU_INST_TEST_CASE(sum_test_f16, 0)
 #undef CPU_INST_TEST_CASE
 #undef GPU_INST_TEST_CASE
 } // namespace dnnl
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

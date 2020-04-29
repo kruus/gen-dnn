@@ -204,12 +204,17 @@
 #define DEF_ACC_DATA4_T int4
 #define DEF_ACC_DATA8_T int8
 #define POST_OP_DATA_T float
-#define TO_DATA_T(v) (char)(v)
+#define TO_DATA_T(v) convert_char_sat_rte(v)
+#define TO_DEF_ACC_DATA_T(v) (float)(v)
 #define DATA_TO_REF convert_float
 #define CONVERT_DATA_T convert_char_sat_rte
 #define CONVERT_DATA2_T convert_char2_sat_rte
 #define CONVERT_DATA4_T convert_char4_sat_rte
 #define CONVERT_DATA8_T convert_char8_sat_rte
+#define CONVERT_FLOAT_T convert_float
+#define CONVERT_FLOAT2_T convert_float2
+#define CONVERT_FLOAT4_T convert_float4
+#define CONVERT_FLOAT8_T convert_float8
 #define ROUND rint
 
 #define BLOCK_READ intel_sub_group_block_read_uc
@@ -252,12 +257,17 @@
 #define DEF_ACC_DATA4_T int4
 #define DEF_ACC_DATA8_T int8
 #define POST_OP_DATA_T float
-#define TO_DATA_T(v) (uchar)(v)
+#define TO_DATA_T(v) convert_uchar_sat_rte(v)
+#define TO_DEF_ACC_DATA_T(v) (float)(v)
 #define DATA_TO_REF convert_float
 #define CONVERT_DATA_T convert_uchar_sat_rte
 #define CONVERT_DATA2_T convert_uchar2_sat_rte
 #define CONVERT_DATA4_T convert_uchar4_sat_rte
 #define CONVERT_DATA8_T convert_uchar8_sat_rte
+#define CONVERT_FLOAT_T convert_float
+#define CONVERT_FLOAT2_T convert_float2
+#define CONVERT_FLOAT4_T convert_float4
+#define CONVERT_FLOAT8_T convert_float8
 #define ROUND rint
 
 #define BLOCK_READ intel_sub_group_block_read_uc
@@ -288,7 +298,7 @@
 #define AS_BLOCK_DATA8_T as_uchar8
 #elif DT_S32 == 1
 #define DATA_T int
-#define DATA_TO_REF
+#define DATA_TO_REF convert_float
 #define CONVERT_DATA_T convert_int_sat_rte
 #define POST_OP_DATA_T float
 #elif !defined(DT_UNDEF)
@@ -495,21 +505,33 @@
 #endif
 #if DST_DT_BF16
 #define TO_DST(x) convert_f32_to_bf16(x)
+#define TO_DST2(x) convert_f32_to_bf16_vec2(convert_float8(x))
+#define TO_DST4(x) convert_f32_to_bf16_vec4(convert_float8(x))
 #define TO_DST8(x) convert_f32_to_bf16_vec8(convert_float8(x))
 #elif DST_DT_F16
 #define TO_DST(x) convert_half(x)
+#define TO_DST2(x) convert_half2(x)
+#define TO_DST4(x) convert_half4(x)
 #define TO_DST8(x) convert_half8(x)
 #elif DST_DT_U8
 #define TO_DST(x) convert_uchar_sat_rte(x)
+#define TO_DST2(x) convert_uchar2_sat_rte(x)
+#define TO_DST4(x) convert_uchar4_sat_rte(x)
 #define TO_DST8(x) convert_uchar8_sat_rte(x)
 #elif DST_DT_S8
 #define TO_DST(x) convert_char_sat_rte(x)
+#define TO_DST2(x) convert_char2_sat_rte(x)
+#define TO_DST4(x) convert_char4_sat_rte(x)
 #define TO_DST8(x) convert_char8_sat_rte(x)
 #elif DST_DT_S32
 #define TO_DST(x) convert_int_sat_rte(x)
+#define TO_DST2(x) convert_int2_sat_rte(x)
+#define TO_DST4(x) convert_int4_sat_rte(x)
 #define TO_DST8(x) convert_int8_sat_rte(x)
 #elif DST_DT_F32
 #define TO_DST(x) convert_float(x)
+#define TO_DST2(x) convert_float2(x)
+#define TO_DST4(x) convert_float4(x)
 #define TO_DST8(x) convert_float8(x)
 #else
 #error "Not expected"
@@ -696,12 +718,12 @@
 #define GWS_OP_MOD(x, y) ((x) % (y))
 #define ROUND_UP(a,b) (((a) + (b) - 1) / (b))
 
-#define GWS0_GET_ID0() GWS0_OP0((get_global_id(GWS0_IDX0) / GWS0_STRIDE0), ROUND_UP(GWS0_DIM0, GWS0_BLOCK0)) * GWS0_BLOCK0 / GWS0_VEC_SIZE0 * GWS0_VEC_SIZE0
-#define GWS0_GET_ID1() GWS0_OP1((get_global_id(GWS0_IDX1) / GWS0_STRIDE1), ROUND_UP(GWS0_DIM1, GWS0_BLOCK1)) * GWS0_BLOCK1 / GWS0_VEC_SIZE1 * GWS0_VEC_SIZE1
-#define GWS0_GET_ID2() GWS0_OP2((get_global_id(GWS0_IDX2) / GWS0_STRIDE2), ROUND_UP(GWS0_DIM2, GWS0_BLOCK2)) * GWS0_BLOCK2 / GWS0_VEC_SIZE2 * GWS0_VEC_SIZE2
-#define GWS0_GET_ID3() GWS0_OP3((get_global_id(GWS0_IDX3) / GWS0_STRIDE3), ROUND_UP(GWS0_DIM3, GWS0_BLOCK3)) * GWS0_BLOCK3 / GWS0_VEC_SIZE3 * GWS0_VEC_SIZE3
-#define GWS0_GET_ID4() GWS0_OP4((get_global_id(GWS0_IDX4) / GWS0_STRIDE4), ROUND_UP(GWS0_DIM4, GWS0_BLOCK4)) * GWS0_BLOCK4 / GWS0_VEC_SIZE4 * GWS0_VEC_SIZE4
-#define GWS0_GET_ID5() GWS0_OP5((get_global_id(GWS0_IDX5) / GWS0_STRIDE5), ROUND_UP(GWS0_DIM5, GWS0_BLOCK5)) * GWS0_BLOCK5 / GWS0_VEC_SIZE5 * GWS0_VEC_SIZE5
+#define GWS0_GET_ID0() GWS0_OP0((get_global_id(GWS0_IDX0) / GWS0_STRIDE0), ROUND_UP(GWS0_DIM0, GWS0_BLOCK0)) / GWS0_VEC_SIZE0 * GWS0_VEC_SIZE0 * GWS0_BLOCK0
+#define GWS0_GET_ID1() GWS0_OP1((get_global_id(GWS0_IDX1) / GWS0_STRIDE1), ROUND_UP(GWS0_DIM1, GWS0_BLOCK1)) / GWS0_VEC_SIZE1 * GWS0_VEC_SIZE1 * GWS0_BLOCK1
+#define GWS0_GET_ID2() GWS0_OP2((get_global_id(GWS0_IDX2) / GWS0_STRIDE2), ROUND_UP(GWS0_DIM2, GWS0_BLOCK2)) / GWS0_VEC_SIZE2 * GWS0_VEC_SIZE2 * GWS0_BLOCK2
+#define GWS0_GET_ID3() GWS0_OP3((get_global_id(GWS0_IDX3) / GWS0_STRIDE3), ROUND_UP(GWS0_DIM3, GWS0_BLOCK3)) / GWS0_VEC_SIZE3 * GWS0_VEC_SIZE3 * GWS0_BLOCK3
+#define GWS0_GET_ID4() GWS0_OP4((get_global_id(GWS0_IDX4) / GWS0_STRIDE4), ROUND_UP(GWS0_DIM4, GWS0_BLOCK4)) / GWS0_VEC_SIZE4 * GWS0_VEC_SIZE4 * GWS0_BLOCK4
+#define GWS0_GET_ID5() GWS0_OP5((get_global_id(GWS0_IDX5) / GWS0_STRIDE5), ROUND_UP(GWS0_DIM5, GWS0_BLOCK5)) / GWS0_VEC_SIZE5 * GWS0_VEC_SIZE5 * GWS0_BLOCK5
 
 #define GWS0_GET_BLOCK0() GWS0_BLOCK0
 #define GWS0_GET_BLOCK1() GWS0_BLOCK1
@@ -710,12 +732,12 @@
 #define GWS0_GET_BLOCK4() GWS0_BLOCK4
 #define GWS0_GET_BLOCK5() GWS0_BLOCK5
 
-#define GWS1_GET_ID0() GWS1_OP0((get_global_id(GWS1_IDX0) / GWS1_STRIDE0), ROUND_UP(GWS1_DIM0, GWS1_BLOCK0)) * GWS1_BLOCK0 / GWS1_VEC_SIZE0 * GWS1_VEC_SIZE0
-#define GWS1_GET_ID1() GWS1_OP1((get_global_id(GWS1_IDX1) / GWS1_STRIDE1), ROUND_UP(GWS1_DIM1, GWS1_BLOCK1)) * GWS1_BLOCK1 / GWS1_VEC_SIZE1 * GWS1_VEC_SIZE1
-#define GWS1_GET_ID2() GWS1_OP2((get_global_id(GWS1_IDX2) / GWS1_STRIDE2), ROUND_UP(GWS1_DIM2, GWS1_BLOCK2)) * GWS1_BLOCK2 / GWS1_VEC_SIZE2 * GWS1_VEC_SIZE2
-#define GWS1_GET_ID3() GWS1_OP3((get_global_id(GWS1_IDX3) / GWS1_STRIDE3), ROUND_UP(GWS1_DIM3, GWS1_BLOCK3)) * GWS1_BLOCK3 / GWS1_VEC_SIZE3 * GWS1_VEC_SIZE3
-#define GWS1_GET_ID4() GWS1_OP4((get_global_id(GWS1_IDX4) / GWS1_STRIDE4), ROUND_UP(GWS1_DIM4, GWS1_BLOCK4)) * GWS1_BLOCK4 / GWS1_VEC_SIZE4 * GWS1_VEC_SIZE4
-#define GWS1_GET_ID5() GWS1_OP5((get_global_id(GWS1_IDX5) / GWS1_STRIDE5), ROUND_UP(GWS1_DIM5, GWS1_BLOCK5)) * GWS1_BLOCK5 / GWS1_VEC_SIZE5 * GWS1_VEC_SIZE5
+#define GWS1_GET_ID0() GWS1_OP0((get_global_id(GWS1_IDX0) / GWS1_STRIDE0), ROUND_UP(GWS1_DIM0, GWS1_BLOCK0)) / GWS1_VEC_SIZE0 * GWS1_VEC_SIZE0 * GWS1_BLOCK0
+#define GWS1_GET_ID1() GWS1_OP1((get_global_id(GWS1_IDX1) / GWS1_STRIDE1), ROUND_UP(GWS1_DIM1, GWS1_BLOCK1)) / GWS1_VEC_SIZE1 * GWS1_VEC_SIZE1 * GWS1_BLOCK1
+#define GWS1_GET_ID2() GWS1_OP2((get_global_id(GWS1_IDX2) / GWS1_STRIDE2), ROUND_UP(GWS1_DIM2, GWS1_BLOCK2)) / GWS1_VEC_SIZE2 * GWS1_VEC_SIZE2 * GWS1_BLOCK2
+#define GWS1_GET_ID3() GWS1_OP3((get_global_id(GWS1_IDX3) / GWS1_STRIDE3), ROUND_UP(GWS1_DIM3, GWS1_BLOCK3)) / GWS1_VEC_SIZE3 * GWS1_VEC_SIZE3 * GWS1_BLOCK3
+#define GWS1_GET_ID4() GWS1_OP4((get_global_id(GWS1_IDX4) / GWS1_STRIDE4), ROUND_UP(GWS1_DIM4, GWS1_BLOCK4)) / GWS1_VEC_SIZE4 * GWS1_VEC_SIZE4 * GWS1_BLOCK4
+#define GWS1_GET_ID5() GWS1_OP5((get_global_id(GWS1_IDX5) / GWS1_STRIDE5), ROUND_UP(GWS1_DIM5, GWS1_BLOCK5)) / GWS1_VEC_SIZE5 * GWS1_VEC_SIZE5 * GWS1_BLOCK5
 
 #define GWS1_GET_BLOCK0() GWS1_BLOCK0
 #define GWS1_GET_BLOCK1() GWS1_BLOCK1
@@ -724,12 +746,12 @@
 #define GWS1_GET_BLOCK4() GWS1_BLOCK4
 #define GWS1_GET_BLOCK5() GWS1_BLOCK5
 
-#define GWS2_GET_ID0() GWS2_OP0((get_global_id(GWS2_IDX0) / GWS2_STRIDE0), ROUND_UP(GWS2_DIM0, GWS2_BLOCK0)) * GWS2_BLOCK0 / GWS2_VEC_SIZE0 * GWS2_VEC_SIZE0
-#define GWS2_GET_ID1() GWS2_OP1((get_global_id(GWS2_IDX1) / GWS2_STRIDE1), ROUND_UP(GWS2_DIM1, GWS2_BLOCK1)) * GWS2_BLOCK1 / GWS2_VEC_SIZE1 * GWS2_VEC_SIZE1
-#define GWS2_GET_ID2() GWS2_OP2((get_global_id(GWS2_IDX2) / GWS2_STRIDE2), ROUND_UP(GWS2_DIM2, GWS2_BLOCK2)) * GWS2_BLOCK2 / GWS2_VEC_SIZE2 * GWS2_VEC_SIZE2
-#define GWS2_GET_ID3() GWS2_OP3((get_global_id(GWS2_IDX3) / GWS2_STRIDE3), ROUND_UP(GWS2_DIM3, GWS2_BLOCK3)) * GWS2_BLOCK3 / GWS2_VEC_SIZE3 * GWS2_VEC_SIZE3
-#define GWS2_GET_ID4() GWS2_OP4((get_global_id(GWS2_IDX4) / GWS2_STRIDE4), ROUND_UP(GWS2_DIM4, GWS2_BLOCK4)) * GWS2_BLOCK4 / GWS2_VEC_SIZE4 * GWS2_VEC_SIZE4
-#define GWS2_GET_ID5() GWS2_OP5((get_global_id(GWS2_IDX5) / GWS2_STRIDE5), ROUND_UP(GWS2_DIM5, GWS2_BLOCK5)) * GWS2_BLOCK5 / GWS2_VEC_SIZE5 * GWS2_VEC_SIZE5
+#define GWS2_GET_ID0() GWS2_OP0((get_global_id(GWS2_IDX0) / GWS2_STRIDE0), ROUND_UP(GWS2_DIM0, GWS2_BLOCK0)) / GWS2_VEC_SIZE0 * GWS2_VEC_SIZE0 * GWS2_BLOCK0
+#define GWS2_GET_ID1() GWS2_OP1((get_global_id(GWS2_IDX1) / GWS2_STRIDE1), ROUND_UP(GWS2_DIM1, GWS2_BLOCK1)) / GWS2_VEC_SIZE1 * GWS2_VEC_SIZE1 * GWS2_BLOCK1
+#define GWS2_GET_ID2() GWS2_OP2((get_global_id(GWS2_IDX2) / GWS2_STRIDE2), ROUND_UP(GWS2_DIM2, GWS2_BLOCK2)) / GWS2_VEC_SIZE2 * GWS2_VEC_SIZE2 * GWS2_BLOCK2
+#define GWS2_GET_ID3() GWS2_OP3((get_global_id(GWS2_IDX3) / GWS2_STRIDE3), ROUND_UP(GWS2_DIM3, GWS2_BLOCK3)) / GWS2_VEC_SIZE3 * GWS2_VEC_SIZE3 * GWS2_BLOCK3
+#define GWS2_GET_ID4() GWS2_OP4((get_global_id(GWS2_IDX4) / GWS2_STRIDE4), ROUND_UP(GWS2_DIM4, GWS2_BLOCK4)) / GWS2_VEC_SIZE4 * GWS2_VEC_SIZE4 * GWS2_BLOCK4
+#define GWS2_GET_ID5() GWS2_OP5((get_global_id(GWS2_IDX5) / GWS2_STRIDE5), ROUND_UP(GWS2_DIM5, GWS2_BLOCK5)) / GWS2_VEC_SIZE5 * GWS2_VEC_SIZE5 * GWS2_BLOCK5
 
 #define GWS2_GET_BLOCK0() GWS2_BLOCK0
 #define GWS2_GET_BLOCK1() GWS2_BLOCK1

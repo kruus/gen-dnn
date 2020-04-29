@@ -14,12 +14,17 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef C_TYPES_MAP_HPP
-#define C_TYPES_MAP_HPP
+#ifndef COMMON_C_TYPES_MAP_HPP
+#define COMMON_C_TYPES_MAP_HPP
 
 #include "dnnl_types.h"
 #include "gemm_types.hpp"
 #include "internal_desc_types.hpp"
+
+// These aliases should be in the global namespace as they are intended
+// to give names that better reflects the meaning of the entities
+using primitive_iface_t = dnnl_primitive;
+using primitive_desc_iface_t = dnnl_primitive_desc;
 
 namespace dnnl {
 namespace impl {
@@ -152,6 +157,7 @@ const format_tag_t abc = dnnl_abc;
 const format_tag_t abcd = dnnl_abcd;
 const format_tag_t abcde = dnnl_abcde;
 const format_tag_t abcdef = dnnl_abcdef;
+const format_tag_t abdc = dnnl_abdc;
 const format_tag_t abdec = dnnl_abdec;
 const format_tag_t acb = dnnl_acb;
 const format_tag_t acbde = dnnl_acbde;
@@ -166,6 +172,7 @@ const format_tag_t bcda = dnnl_bcda;
 const format_tag_t bcdea = dnnl_bcdea;
 const format_tag_t cba = dnnl_cba;
 const format_tag_t cdba = dnnl_cdba;
+const format_tag_t dcab = dnnl_dcab;
 const format_tag_t cdeba = dnnl_cdeba;
 const format_tag_t decab = dnnl_decab;
 const format_tag_t defcab = dnnl_defcab;
@@ -298,6 +305,18 @@ const format_tag_t Abcdef16a = dnnl_Abcdef16a;
 const format_tag_t Acdb32a = dnnl_Acdb32a;
 const format_tag_t BAc16b16a = dnnl_BAc16b16a;
 const format_tag_t BAcd16b16a = dnnl_BAcd16b16a;
+const format_tag_t aBCd2b4c2b = dnnl_aBCd2b4c2b;
+const format_tag_t aBCde2b4c2b = dnnl_aBCde2b4c2b;
+const format_tag_t aBCdef2b4c2b = dnnl_aBCdef2b4c2b;
+const format_tag_t aBCd2c4b2c = dnnl_aBCd2c4b2c;
+const format_tag_t aBCde2c4b2c = dnnl_aBCde2c4b2c;
+const format_tag_t aBCdef2c4b2c = dnnl_aBCdef2c4b2c;
+const format_tag_t aBCd4b8c2b = dnnl_aBCd4b8c2b;
+const format_tag_t aBCde4b8c2b = dnnl_aBCde4b8c2b;
+const format_tag_t aBCdef4b8c2b = dnnl_aBCdef4b8c2b;
+const format_tag_t aBCd4c8b2c = dnnl_aBCd4c8b2c;
+const format_tag_t aBCde4c8b2c = dnnl_aBCde4c8b2c;
+const format_tag_t aBCdef4c8b2c = dnnl_aBCdef4c8b2c;
 const format_tag_t last = dnnl_format_tag_last;
 
 const format_tag_t x = dnnl_x;
@@ -327,6 +346,7 @@ const format_tag_t odhwi = dnnl_odhwi;
 const format_tag_t idhwo = dnnl_idhwo;
 const format_tag_t goiw = dnnl_goiw;
 const format_tag_t goihw = dnnl_goihw;
+const format_tag_t wigo = dnnl_wigo;
 const format_tag_t hwigo = dnnl_hwigo;
 const format_tag_t dhwigo = dnnl_dhwigo;
 const format_tag_t giohw = dnnl_giohw;
@@ -337,6 +357,8 @@ const format_tag_t ntc = dnnl_ntc;
 const format_tag_t ldnc = dnnl_ldnc;
 const format_tag_t ldigo = dnnl_ldigo;
 const format_tag_t ldgoi = dnnl_ldgoi;
+const format_tag_t ldio = dnnl_ldio;
+const format_tag_t ldoi = dnnl_ldoi;
 const format_tag_t ldgo = dnnl_ldgo;
 const format_tag_t nCdhw16c = dnnl_nCdhw16c;
 const format_tag_t nCdhw4c = dnnl_nCdhw4c;
@@ -476,6 +498,18 @@ const format_tag_t gOIdhw8o16i2o = dnnl_gOIdhw8o16i2o;
 const format_tag_t gIOdhw8o16i2o = dnnl_gIOdhw8o16i2o;
 const format_tag_t gOIdhw8i8o = dnnl_gOIdhw8i8o;
 const format_tag_t gOIdhw8o8i = dnnl_gOIdhw8o8i;
+const format_tag_t gOIw2i4o2i = dnnl_gOIw2i4o2i;
+const format_tag_t gOIhw2i4o2i = dnnl_gOIhw2i4o2i;
+const format_tag_t gOIdhw2i4o2i = dnnl_gOIdhw2i4o2i;
+const format_tag_t gOIw2o4i2o = dnnl_gOIw2o4i2o;
+const format_tag_t gOIhw2o4i2o = dnnl_gOIhw2o4i2o;
+const format_tag_t gOIdhw2o4i2o = dnnl_gOIdhw2o4i2o;
+const format_tag_t gOIw4i8o2i = dnnl_gOIw4i8o2i;
+const format_tag_t gOIhw4i8o2i = dnnl_gOIhw4i8o2i;
+const format_tag_t gOIdhw4i8o2i = dnnl_gOIdhw4i8o2i;
+const format_tag_t gOIw4o8i2o = dnnl_gOIw4o8i2o;
+const format_tag_t gOIhw4o8i2o = dnnl_gOIhw4o8i2o;
+const format_tag_t gOIdhw4o8i2o = dnnl_gOIdhw4o8i2o;
 } // namespace format_tag
 
 using memory_extra_flags_t = dnnl_memory_extra_flags_t;
@@ -500,6 +534,7 @@ enum runtime_kind_t {
     dnnl_runtime_seq,
     dnnl_runtime_omp,
     dnnl_runtime_tbb,
+    dnnl_runtime_threadpool,
     dnnl_runtime_ocl,
 };
 
@@ -508,6 +543,7 @@ const runtime_kind_t none = dnnl_runtime_none;
 const runtime_kind_t seq = dnnl_runtime_seq;
 const runtime_kind_t omp = dnnl_runtime_omp;
 const runtime_kind_t tbb = dnnl_runtime_tbb;
+const runtime_kind_t threadpool = dnnl_runtime_threadpool;
 const runtime_kind_t ocl = dnnl_runtime_ocl;
 } // namespace runtime_kind
 
@@ -685,11 +721,9 @@ struct op_desc_t {
 
 using engine_t = dnnl_engine;
 using primitive_desc_iterator_t = dnnl_primitive_desc_iterator;
-using primitive_desc_t = dnnl_primitive_desc;
 using primitive_attr_t = dnnl_primitive_attr;
 using post_ops_t = dnnl_post_ops;
 using memory_t = dnnl_memory;
-using primitive_t = dnnl_primitive;
 
 using stream_flags_t = dnnl_stream_flags_t;
 namespace stream_flags {
@@ -699,6 +733,7 @@ const stream_flags_t out_of_order = dnnl_stream_out_of_order;
 const stream_flags_t default_flags = dnnl_stream_default_flags;
 } // namespace stream_flags
 using stream_t = dnnl_stream;
+using stream_attr_t = dnnl_stream_attr;
 
 /* forward declaration of the internal primitive_desc types */
 struct batch_normalization_bwd_pd_t;

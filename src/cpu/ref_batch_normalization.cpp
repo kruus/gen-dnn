@@ -17,13 +17,13 @@
 #include <assert.h>
 #include <math.h>
 
-#include "bfloat16.hpp"
-#include "c_types_map.hpp"
-#include "dnnl_thread.hpp"
-#include "memory_tracking.hpp"
-#include "ref_batch_normalization.hpp"
-#include "simple_q10n.hpp"
-#include "type_helpers.hpp"
+#include "common/bfloat16.hpp"
+#include "common/c_types_map.hpp"
+#include "common/dnnl_thread.hpp"
+#include "common/memory_tracking.hpp"
+#include "common/type_helpers.hpp"
+#include "cpu/ref_batch_normalization.hpp"
+#include "cpu/simple_q10n.hpp"
 
 #define DECLARE_DATA_OFFSET \
     auto data_offset = [&](const memory_desc_wrapper &data_d, int n, int c, \
@@ -124,7 +124,7 @@ void ref_batch_normalization_fwd_t<d_type>::execute_forward(
     // auto data_offset(const memory_desc_wrapper &, int, int, int, int, int)
     DECLARE_DATA_OFFSET;
 
-    parallel_nd(C, [&](int c) {
+    parallel_nd(C, [&](dim_t c) {
         acc_data_t v_mean = calculate_stats ? 0 : mean[c];
         acc_data_t v_variance = calculate_stats ? 0 : variance[c];
 
@@ -249,20 +249,21 @@ void ref_batch_normalization_bwd_t<d_type>::execute_backward(
         acc_data_t diff_gamma = acc_data_t(0);
         acc_data_t diff_beta = acc_data_t(0);
 
-        for_(dim_t n = 0; n < N; ++n)
-        for_(dim_t d = 0; d < D; ++d)
-        for_(dim_t h = 0; h < H; ++h)
-        for (dim_t w = 0; w < W; ++w) {
-            const size_t s_off = data_offset(data_d, n, c, d, h, w);
-            acc_data_t dd;
-            if (fuse_norm_relu && !ws[s_off])
-                dd = 0;
-            else
-                dd = maybe_up_convert(
-                        diff_dst[data_offset(diff_data_d, n, c, d, h, w)]);
-            diff_gamma += (maybe_up_convert(src[s_off]) - v_mean) * dd;
-            diff_beta += dd;
-        }
+        for (dim_t n = 0; n < N; ++n)
+            for (dim_t d = 0; d < D; ++d)
+                for (dim_t h = 0; h < H; ++h)
+                    for (dim_t w = 0; w < W; ++w) {
+                        const size_t s_off = data_offset(data_d, n, c, d, h, w);
+                        acc_data_t dd;
+                        if (fuse_norm_relu && !ws[s_off])
+                            dd = 0;
+                        else
+                            dd = maybe_up_convert(diff_dst[data_offset(
+                                    diff_data_d, n, c, d, h, w)]);
+                        diff_gamma
+                                += (maybe_up_convert(src[s_off]) - v_mean) * dd;
+                        diff_beta += dd;
+                    }
         diff_gamma *= sqrt_variance;
 
         if (diff_scaleshift) {
@@ -300,4 +301,4 @@ template struct ref_batch_normalization_bwd_t<bf16>;
 } // namespace impl
 } // namespace dnnl
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

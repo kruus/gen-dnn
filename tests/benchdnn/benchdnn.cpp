@@ -49,7 +49,7 @@
 int verbose {0};
 bool canonical {false};
 bool mem_check {true};
-const char *skip_impl = "";
+std::string skip_impl;
 bench_mode_t bench_mode {CORR};
 stat_t benchdnn_stat {0};
 const char *driver_name = "";
@@ -72,7 +72,6 @@ int main(int argc, char **argv) {
     ++argv;
 
     init_fp_mode();
-    init();
 
     for (; argc > 0; --argc, ++argv)
         if (!parse_bench_settings(argv[0])) break;
@@ -116,8 +115,6 @@ int main(int argc, char **argv) {
     } else {
         fprintf(stderr, "err: unknown driver\n");
     }
-
-    finalize();
 
     printf("tests:%d passed:%d "
            "skipped:%d mistrusted:%d unimplemented:%d "

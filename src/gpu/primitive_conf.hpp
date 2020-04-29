@@ -76,17 +76,6 @@ struct memory_desc_info_t {
             md_info.strides[d][levels[d]] = blk_stride;
         }
 
-        // Permute inner blocks for O dimension in OIhw4o8i8o4i and
-        // gOIhw4o8i8o4i formats.
-        //
-        // This is specific for GPU and required for the
-        // implementations relying on the subgroup extension.
-        if (mdw.matches_one_of_tag(
-                    format_tag::OIhw4o8i8o4i, format_tag::gOIhw4o8i8o4i)) {
-            int d = (levels[0] == 2) ? 0 : 1;
-            nstl::swap(md_info.blocks[d][2], md_info.blocks[d][1]);
-            nstl::swap(md_info.strides[d][2], md_info.strides[d][1]);
-        }
         return md_info;
     }
 };
@@ -146,6 +135,7 @@ struct conv_conf_t {
     int od_block, oh_block, ow_block;
     int id_block, ih_block, iw_block;
     int oc_block, ic_block, nchunk;
+    int omb;
     int odb, ohb, owb;
     int icb;
     int ocb;
@@ -167,7 +157,6 @@ struct conv_conf_t {
     bool is_nhwc;
     float relu_negative_slope;
     float sum_scale;
-    int scale_idx_mult, rmode;
     int ver;
     format_tag_t src_tag, dst_tag, wei_tag;
     bool is_src_nchw, is_src_nhwc;
@@ -190,7 +179,9 @@ struct pool_conf_t {
     data_type_t src_dt;
     alg_kind_t alg;
     bool is_training, is_backward;
-    bool use_16mb_unroll, use_16c_unroll;
+    bool use_mb_block, use_c_block;
+    int vect_dt_n;
+    int nvect;
     compute::dispatch_t dispatch;
     int sub_group_size;
 };
@@ -205,6 +196,7 @@ struct inner_product_conf_t {
     bool with_bias, has_spatial;
     bool is_forward, is_backward_data, is_backward_weights;
     compute::dispatch_t dispatch;
+    bool reorder_dst = false;
 
     data_type_t src_dt;
     data_type_t wei_dt;
@@ -309,9 +301,13 @@ struct bnorm_conf_t {
 
     int ndims;
     int mb, ic, mb_block, ic_block;
-    int reduce_stat_nblocks;
+    int reduce_dim_idx, reduce_dim;
     int id, ih, iw;
+    int nn, sp, sp_tail, vect_size;
+    int stat_sp_nblocks, stat_sp_tail, stat_sp_block;
+    int reduce_stat_nblocks;
     bool with_relu, use_16mb_unroll, use_nhwc;
+    int stat_ic;
     bool is_forward, is_backward;
     bool use_scaleshift, save_stats, is_training;
     bool fuse_norm_relu, calculate_stats, calculate_diff_stats;
@@ -346,7 +342,8 @@ struct lnorm_conf_t {
 
 // Binary
 struct binary_conf_t {
-    int ndims;
+    int ndims, nvect;
+    bool use_unroll_16b, src0_unroll_16b;
     data_type_t src0_data_type;
     data_type_t src1_data_type;
     data_type_t dst_data_type;
@@ -355,7 +352,6 @@ struct binary_conf_t {
     bool is_max;
     bool is_min;
     bool is_tensor_op;
-    bool use_unroll_16b, src0_unroll_16b;
     compute::dispatch_t dispatch;
     int dim0[MAX_NDIMS];
     int bcast_dims[MAX_NDIMS];
@@ -392,6 +388,18 @@ struct reorder_conf_t {
     memory_desc_info_t dst_md_info;
 };
 
+// Concat
+struct concat_conf_t {
+    data_type_t data_type;
+    dim_t dst_extern_dim_size;
+    dim_t src_extern_dim_sizes[16];
+    dim_t offset[16];
+    dim_t inner_axis;
+    int block;
+    int n;
+    size_t gws_d[3], lws_d[3];
+};
+
 // Elementwise
 struct eltwise_conf_t {
     int ndims;
@@ -416,6 +424,46 @@ struct shuffle_conf_t {
     int ndims;
     size_t gws_d[3];
 };
+
+inline void set_default_pool_conf(pool_conf_t &conf, const pooling_desc_t &desc,
+        const memory_desc_t &src_md, const memory_desc_t &dst_md) {
+    const memory_desc_wrapper src_mdw(src_md);
+    const memory_desc_wrapper dst_mdw(dst_md);
+
+    const auto &src_dims = src_mdw.padded_dims();
+    const auto &dst_dims = dst_mdw.padded_dims();
+
+    int ndims = src_mdw.ndims();
+    conf.ndims = ndims;
+
+    conf.mb = src_dims[0];
+
+    conf.c = src_dims[1];
+    conf.id = (ndims == 5) ? src_dims[2] : 1;
+    conf.ih = (ndims == 3) ? 1 : src_dims[ndims - 2];
+    conf.iw = src_dims[ndims - 1];
+    conf.od = (ndims == 5) ? dst_dims[2] : 1;
+    conf.oh = (ndims == 3) ? 1 : dst_dims[ndims - 2];
+    conf.ow = dst_dims[ndims - 1];
+
+    conf.stride_d = (ndims == 5) ? desc.strides[0] : 1;
+    conf.stride_h = (ndims == 3) ? 1 : desc.strides[ndims - 4];
+    conf.stride_w = desc.strides[ndims - 3];
+    conf.kd = (ndims == 5) ? desc.kernel[0] : 1;
+    conf.kh = (ndims == 3) ? 1 : desc.kernel[ndims - 4];
+    conf.kw = desc.kernel[ndims - 3];
+
+    conf.f_pad = (ndims == 5) ? desc.padding[0][0] : 0;
+    conf.t_pad = (ndims == 3) ? 0 : desc.padding[0][ndims - 4];
+    conf.l_pad = desc.padding[0][ndims - 3];
+
+    conf.alg = desc.alg_kind;
+
+    conf.src_dt = src_mdw.data_type();
+
+    conf.is_training = desc.prop_kind == prop_kind::forward_training;
+    conf.is_backward = desc.prop_kind == prop_kind::backward_data;
+}
 
 inline void set_default_conf(conv_conf_t &conf, const convolution_desc_t &cd,
         const memory_desc_t &src_md, const memory_desc_t &weights_md,
@@ -491,10 +539,10 @@ inline void set_default_conf(conv_conf_t &conf, const convolution_desc_t &cd,
     if (conf.eltwise_alg_relu) conf.relu_negative_slope = conf.eltwise.alpha;
 
     conf.with_scales = !attr.output_scales_.has_default_values();
-    conf.scale_idx_mult = attr.output_scales_.mask_ == (1 << 1);
+    bool scale_idx_mult = attr.output_scales_.mask_ == (1 << 1);
     conf.with_common_scales
             = conf.with_scales && attr.output_scales_.mask_ == 0;
-    conf.with_per_oc_scales = conf.with_scales && conf.scale_idx_mult;
+    conf.with_per_oc_scales = conf.with_scales && scale_idx_mult;
 }
 
 inline void set_offsets(compute::kernel_ctx_t &kernel_ctx,

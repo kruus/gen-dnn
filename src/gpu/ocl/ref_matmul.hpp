@@ -20,9 +20,12 @@
 #include <assert.h>
 
 #include "common/c_types_map.hpp"
+#include "common/primitive.hpp"
 #include "common/type_helpers.hpp"
 #include "common/utils.hpp"
 #include "gpu/gpu_matmul_pd.hpp"
+#include "gpu/gpu_primitive.hpp"
+#include "gpu/gpu_resource.hpp"
 #include "gpu/ocl/ocl_utils.hpp"
 #include "gpu/primitive_conf.hpp"
 
@@ -31,13 +34,13 @@ namespace impl {
 namespace gpu {
 namespace ocl {
 
-struct ref_matmul_t : public primitive_impl_t {
+struct ref_matmul_t : public gpu_primitive_t {
     struct pd_t : public gpu_matmul_pd_t {
         using gpu_matmul_pd_t::gpu_matmul_pd_t;
 
         DECLARE_COMMON_PD_T("ocl:ref:any", ref_matmul_t);
 
-        status_t init() {
+        status_t init(engine_t *engine) {
             using namespace data_type;
             using smask_t = primitive_attr_t::skip_mask_t;
 
@@ -140,7 +143,8 @@ struct ref_matmul_t : public primitive_impl_t {
                     : dnnl_alg_kind_undef;
         }
 
-        bool non_default_attrs_ = false, is_defined_[4];
+        bool non_default_attrs_ = false;
+        bool is_defined_[4] = {};
         data_type_t bia_dt_ = data_type::undef;
         data_type_t src_dt_ = data_type::undef;
         data_type_t dst_dt_ = data_type::undef;
@@ -186,28 +190,10 @@ struct ref_matmul_t : public primitive_impl_t {
         int eltwise_idx_ = -1;
     };
 
-    ref_matmul_t(const pd_t *apd) : primitive_impl_t(apd) {}
+    ref_matmul_t(const pd_t *apd) : gpu_primitive_t(apd) {}
 
-    status_t init() override {
-        auto *compute_engine
-                = utils::downcast<compute::compute_engine_t *>(engine());
+    status_t init(engine_t *engine) override {
         compute::kernel_ctx_t kernel_ctx;
-
-        status_t status = handle_runtime_value(
-                A0_, pd()->zero_points_md(A0_), a0_mem_storage_);
-        if (status != status::success) return status;
-
-        status = handle_runtime_value(
-                B0_, pd()->zero_points_md(B0_), b0_mem_storage_);
-        if (status != status::success) return status;
-
-        status = handle_runtime_value(
-                C0_, pd()->zero_points_md(C0_), c0_mem_storage_);
-        if (status != status::success) return status;
-
-        status = handle_runtime_value(
-                SCALES_, pd()->scales_md(), s_mem_storage_);
-        if (status != status::success) return status;
 
         kernel_ctx.define_int("WITH_BIAS", pd()->with_bias());
         kernel_ctx.define_int("NON_DEFAULT_ATTRS", pd()->non_default_attrs_);
@@ -224,9 +210,8 @@ struct ref_matmul_t : public primitive_impl_t {
         def_data_type(kernel_ctx, pd()->dst_dt_, "DST");
         def_data_type(kernel_ctx, pd()->bia_dt_, "BIA");
         def_data_type(kernel_ctx, pd()->desc()->accum_data_type, "ACC");
-        compute_engine->create_kernel(&kernel_, "ref_matmul", kernel_ctx);
+        create_kernel(engine, &kernel_, "ref_matmul", kernel_ctx);
         if (!kernel_) return status::runtime_error;
-
         return status::success;
     }
 
@@ -234,16 +219,20 @@ struct ref_matmul_t : public primitive_impl_t {
         return execute_ref(ctx);
     }
 
-    status_t handle_runtime_value(int idx, const memory_desc_t *md,
-            std::unique_ptr<memory_storage_t> &mem_storage) {
+    status_t handle_runtime_value(engine_t *engine, int idx,
+            const memory_desc_t *md,
+            std::unique_ptr<memory_storage_t> &mem_storage) const {
         const primitive_attr_t &attr = *pd()->attr();
         void *p;
         memory_desc_wrapper mdw(*md);
         size_t sz = (idx == SCALES_) ? sizeof(float) : sizeof(int);
         memory_storage_t *mem_s_ptr;
-        status_t status = this->engine()->create_memory_storage(
-                &mem_s_ptr, mdw.nelems() * sz);
-        if (status != status::success) return status;
+        status_t status
+                = engine->create_memory_storage(&mem_s_ptr, mdw.nelems() * sz);
+        if (status != status::success) {
+            mem_storage.reset();
+            return status;
+        }
         mem_storage.reset(mem_s_ptr);
         status = mem_storage->map_data(&p);
         if (status != status::success) return status;
@@ -280,15 +269,27 @@ struct ref_matmul_t : public primitive_impl_t {
         return status;
     }
 
+protected:
+    status_t init_res_storage(
+            engine_t *engine, gpu_resource_t *r) const override {
+        std::unique_ptr<memory_storage_t> tmp_mem_storage;
+        for (const auto &idx : {A0_, B0_, C0_}) {
+            CHECK(handle_runtime_value(
+                    engine, idx, pd()->zero_points_md(idx), tmp_mem_storage));
+            r->add_memory_storage(idx, std::move(tmp_mem_storage));
+        }
+
+        CHECK(handle_runtime_value(
+                engine, SCALES_, pd()->scales_md(), tmp_mem_storage));
+        r->add_memory_storage(SCALES_, std::move(tmp_mem_storage));
+        return status::success;
+    }
+
 private:
-    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
+    const pd_t *pd() const { return (const pd_t *)primitive_t::pd().get(); }
     status_t execute_ref(const exec_ctx_t &ctx) const;
     compute::kernel_t kernel_;
-    std::unique_ptr<memory_storage_t> a0_mem_storage_;
-    std::unique_ptr<memory_storage_t> b0_mem_storage_;
-    std::unique_ptr<memory_storage_t> c0_mem_storage_;
-    std::unique_ptr<memory_storage_t> s_mem_storage_;
-    static const int SCALES_ = 0, A0_ = 1, B0_ = 2, C0_ = 3;
+    enum { SCALES_ = 0, A0_ = 1, B0_ = 2, C0_ = 3 };
 };
 
 } // namespace ocl

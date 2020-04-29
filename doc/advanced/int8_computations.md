@@ -60,8 +60,8 @@ systems and the reasons behind them.
 @anchor dg_i8_comp_s11
 ### 1. Inputs of mixed type: u8 and s8
 
-The Intel(R) Instruction Set Architecture has special instructions that enable
-multiplying and adding the vectors of u8 and s8 very efficiently. DNNL
+Instruction Set Architecture (ISA) has special instructions that enable
+multiplying and adding the vectors of u8 and s8 very efficiently. oneDNN
 enables int8 support using these particular instructions.
 
 Unfortunately, these instructions do not have the counterparts that work with
@@ -69,12 +69,12 @@ vectors of the same type (either s8/s8 or u8/u8). The details for the s8/s8
 case are covered in the
 [2. Inputs of the same type: s8](@ref dg_i8_comp_s12) section below.
 
-#### 1.1. Processors with the Intel AVX2 or Intel AVX512 Instruction Set
+#### 1.1. Processors with the Intel AVX2 or Intel AVX-512 Support
 
-*System examples: Intel Xeon Processor E7 v3 Family (formerly Haswell),
+*System examples: Intel Xeon processor E7 v3 Family (formerly Haswell),
 Intel Xeon Scalable processor x1xx series (formerly Skylake).*
 
-DNNL implements matrix multiplication such as operations with u8 and s8
+oneDNN implements matrix multiplication such as operations with u8 and s8
 operands on the Intel AVX2 and Intel AVX512 Instruction Set by using a sequence
 of `VPMADDUBSW, VPMADDWD, VPADDD` instructions [[1]](@ref dg_i8_ref_sdm):
 
@@ -130,7 +130,7 @@ precise result is concerned, one of the possible instruction sequences would be
 where the first ones casts the s8/u8 values to s16. Unfortunately, using them
 would lead to 2x lower performance.
 
-When one input is of type u8 and the other one is of type s8, DNNL
+When one input is of type u8 and the other one is of type s8, oneDNN
 assumes that it is the user's responsibility to choose the quantization
 parameters so that no overflow/saturation occurs. For instance, a user can use
 u7 `[0, 127]` instead of u8 for the unsigned input, or s7 `[-64, 63]` instead
@@ -154,7 +154,7 @@ The recommended ones are:
    where `W_max` is \f$\max | W_{f32}(:)| {}_{} \f$.
 
 
-#### 1.2. Processors with the Intel(R) DL Boost Instruction Set
+#### 1.2. Processors with the Intel DL Boost Support
 
 *System examples: Intel Xeon Scalable processor x2xx series
 (formerly Cascade Lake).*
@@ -194,9 +194,9 @@ multiply and add two vectors of the s8 data type as efficiently as it is
 for the mixed case. However, in real-world applications the inputs are
 typically signed.
 
-To overcome this issue, DNNL employs a trick: at run-time, it adds 128
+To overcome this issue, oneDNN employs a trick: at run-time, it adds 128
 to one of the s8 input to make it of type u8 instead. Once the result is
-computed, DNNL subtracts the extra value it added by replacing the s8
+computed, oneDNN subtracts the extra value it added by replacing the s8
 with u8. This subtracted value sometimes referred as a **compensation**.
 
 Conceptually the formula is:

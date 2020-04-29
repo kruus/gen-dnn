@@ -46,6 +46,8 @@
 #include "src/common/memory_desc_wrapper.hpp"
 #include "src/common/nstl.hpp"
 
+#include "src/cpu/platform.hpp"
+
 #define for_ for
 
 using dnnl::impl::bfloat16_t;
@@ -66,9 +68,22 @@ dnnl::engine::kind get_test_engine_kind();
 dnnl::engine get_test_engine();
 #endif
 
-inline void show_dnnl_build() {
-    printf("DNNL build : %s\n", DNNL_BUILD_STRING);
+inline bool unsupported_data_type(memory::data_type dt, dnnl::engine eng) {
+    dnnl::engine::kind kind = eng.get_kind();
+
+    bool supported = true; // optimism
+    if (kind == dnnl::engine::kind::cpu)
+        supported = dnnl::impl::cpu::platform::has_data_type_support(
+                memory::convert_to_c(dt));
+
+    return !supported;
 }
+
+#ifdef DNNL_TEST_WITH_ENGINE_PARAM
+inline bool unsupported_data_type(memory::data_type dt) {
+    return unsupported_data_type(dt, get_test_engine());
+}
+#endif
 
 template <typename data_t>
 struct data_traits {};
@@ -797,6 +812,20 @@ void test_bwd_pd_constructors(const op_desc_t &op_desc, const pd_t &pd,
     test_bwd_pd_attr_scales<op_desc_t, pd_t>(op_desc, eng, hint_pd, aa.scales);
     // check allow empty, should not throw
     test_bwd_pd_allow_empty<op_desc_t, pd_t>(test_pd, hint_pd);
+}
+
+inline dnnl::stream make_stream(dnnl::engine engine,
+        dnnl::stream::flags flags = dnnl::stream::flags::default_flags) {
+#if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_THREADPOOL
+    if (engine.get_kind() != dnnl::engine::kind::cpu)
+        return dnnl::stream(engine, flags);
+    dnnl::stream_attr stream_attr(dnnl::engine::kind::cpu);
+    stream_attr.set_threadpool(
+            dnnl::impl::threadpool_utils::get_active_threadpool());
+    return dnnl::stream(engine, flags, stream_attr);
+#else
+    return dnnl::stream(engine, flags);
+#endif
 }
 
 #endif

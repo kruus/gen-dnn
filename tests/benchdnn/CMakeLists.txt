@@ -102,24 +102,16 @@ if(WIN32 AND (NOT DNNL_BUILD_FOR_CI))
     )
 endif()
 
-find_program(HAVE_NUMACTL numactl)
-if($HAVE_NUMACTL)
-    set(BENCH_RUNNER numactl --cpunodebind=0 --membind=0) # Please adjust
-endif()
-
 # register benchdnn test case
 function(register_benchdnn_test name engine cmd)
     set(benchdnn_target ${name}_${engine})
-    # to run correctness AND performance, try something like:
-    #  export BENCHDNN_ARGS='--mode=CP'; make -C build VERBOSE=1 test_benchdnn_binary
-    # [TODO check how for WIN32)
 
     if(DNNL_BUILD_FOR_CI)
-        string(REPLACE " " ";" cmd
-            "benchdnn -v1 --engine=${engine} $$BENCHDNN_ARGS ${cmd}")
+       string(REPLACE " " ";" cmd
+            "benchdnn -v1 --engine=${engine} ${cmd}")
         if (ARGC GREATER 3)
             string(REPLACE " " ";" cmd2
-                "benchdnn -v1 --engine=${engine} $$BENCHDNN_ARGS ${ARGV3}")
+                "benchdnn -v1 --engine=${engine} ${ARGV3}")
         endif()
 
         add_test(${benchdnn_target} ${cmd})
@@ -129,10 +121,10 @@ function(register_benchdnn_test name engine cmd)
         endif()
     else()
         string(REPLACE " " ";" cmd
-            "$<TARGET_FILE:benchdnn> -v1 --engine=${engine} $$BENCHDNN_ARGS ${cmd}")
+            "$<TARGET_FILE:benchdnn> -v1 --engine=${engine} ${cmd}")
         if (ARGC GREATER 3)
             string(REPLACE " " ";" cmd2
-                "$<TARGET_FILE:benchdnn> -v1 --engine=${engine} $$BENCHDNN_ARGS ${ARGV3}")
+                "$<TARGET_FILE:benchdnn> -v1 --engine=${engine} ${ARGV3}")
         endif()
 
         if(WIN32)
@@ -161,14 +153,20 @@ endfunction()
 
 register_benchdnn_test(test_benchdnn_conv_topologies
     cpu "--conv --batch=inputs/conv/test_conv_all_topologies")
+register_benchdnn_test(test_benchdnn_conv_topologies_f32_nxc
+    cpu "--conv --batch=inputs/conv/test_conv_all_topologies_f32_nxc")
 register_benchdnn_test(test_benchdnn_conv_bfloat16 # temporary proxy
     cpu "--conv --batch=inputs/conv/test_conv_bfloat16")
 register_benchdnn_test(test_benchdnn_conv_bf16
     cpu "--conv --batch=inputs/conv/test_conv_bfloat16")
 register_benchdnn_test(test_benchdnn_conv_f32
     cpu "--conv --batch=inputs/conv/test_conv_f32")
+register_benchdnn_test(test_benchdnn_conv_f32_nxc
+    cpu "--conv --batch=inputs/conv/test_conv_f32_nxc")
 register_benchdnn_test(test_benchdnn_conv_3d
     cpu "--conv --batch=inputs/conv/test_conv_3d")
+register_benchdnn_test(test_benchdnn_conv_3d_f32_nxc
+    cpu "--conv --batch=inputs/conv/test_conv_3d_f32_nxc")
 register_benchdnn_test(test_benchdnn_conv_wino
     cpu "--conv --batch=inputs/conv/test_conv_f32_wino")
 register_benchdnn_test(test_benchdnn_conv_int8_wino
@@ -177,8 +175,12 @@ register_benchdnn_test(test_benchdnn_conv_depthwise
     cpu "--conv --batch=inputs/conv/test_conv_depthwise")
 register_benchdnn_test(test_benchdnn_conv_dilated
     cpu "--conv --batch=inputs/conv/test_conv_dilated")
+register_benchdnn_test(test_benchdnn_conv_dilated_f32_nxc
+    cpu "--conv --batch=inputs/conv/test_conv_dilated_f32_nxc")
 register_benchdnn_test(test_benchdnn_conv_attributes
     cpu "--conv --batch=inputs/conv/test_conv_attrs")
+register_benchdnn_test(test_benchdnn_conv_attributes_f32_nxc
+    cpu "--conv --batch=inputs/conv/test_conv_attrs_f32_nxc")
 register_benchdnn_test(test_benchdnn_conv_int8
     cpu "--conv --batch=inputs/conv/test_conv_int8")
 register_benchdnn_test(test_benchdnn_conv_function
@@ -219,6 +221,8 @@ register_benchdnn_test(test_benchdnn_shuffle_bf16
     cpu "--shuffle --batch=inputs/shuffle/test_shuffle_bfloat16")
 register_benchdnn_test(test_benchdnn_softmax
     cpu "--softmax --batch=inputs/softmax/test_softmax_all")
+register_benchdnn_test(test_benchdnn_softmax_bf16
+    cpu "--softmax --batch=inputs/softmax/test_softmax_bfloat16")
 register_benchdnn_test(test_benchdnn_pool
     cpu "--pool --batch=inputs/pool/test_pool_all")
 register_benchdnn_test(test_benchdnn_pool_bf16

@@ -23,6 +23,7 @@
 #include "c_types_map.hpp"
 #include "engine.hpp"
 #include "memory_desc_wrapper.hpp"
+#include "stream.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
@@ -33,7 +34,7 @@ using namespace dnnl::impl::data_type;
 
 namespace dnnl {
 namespace impl {
-memory_desc_t glob_zero_md = types::zero_md();
+memory_desc_t glob_zero_md = memory_desc_t();
 }
 } // namespace dnnl
 
@@ -75,7 +76,6 @@ dnnl_memory::dnnl_memory(dnnl::impl::engine_t *engine,
     memory_storage_t *memory_storage_ptr;
     status_t status = engine->create_memory_storage(
             &memory_storage_ptr, flags, size, handle);
-    assert(status == success);
     if (status != success) return;
 
     memory_storage_.reset(memory_storage_ptr);
@@ -84,24 +84,12 @@ dnnl_memory::dnnl_memory(dnnl::impl::engine_t *engine,
 
 status_t dnnl_memory_desc_init_by_tag(memory_desc_t *memory_desc, int ndims,
         const dims_t dims, data_type_t data_type, format_tag_t tag) {
-#ifndef NDEBUG
-#define INVARIANTS(md) do{ \
-    assert((md).offset0 == 0); \
-    assert((md).extra.flags == 0); \
-    assert((md).extra.compensation_mask == 0); \
-    for(size_t i=0; i<ndims; ++i) { \
-        assert((md).padded_offsets[i] == 0); \
-    } \
-}while(0)
-#else
-#define INVARIANTS(md) do{}while(0)
-#endif
     if (any_null(memory_desc)) return invalid_arguments;
     if (ndims == 0 || tag == format_tag::undef) {
         *memory_desc = types::zero_md();
-        INVARIANTS(*memory_desc);
         return success;
     }
+
     format_kind_t format_kind = types::format_tag_to_kind(tag);
 
     /* memory_desc != 0 */
@@ -109,17 +97,13 @@ status_t dnnl_memory_desc_init_by_tag(memory_desc_t *memory_desc, int ndims,
             && memory_desc_sanity_check(ndims, dims, data_type, format_kind);
     if (!args_ok) return invalid_arguments;
 
+    //auto md = memory_desc_t();
     auto md = types::zero_md();
-    INVARIANTS(md);
-#if defined(__ve)
-    //memset(&md, 0, sizeof(md));
-#endif
     md.ndims = ndims;
     array_copy(md.dims, dims, ndims);
     md.data_type = data_type;
     array_copy(md.padded_dims, dims, ndims);
     md.format_kind = format_kind;
-    INVARIANTS(md);
 
     status_t status = success;
     if (tag == format_tag::undef) {
@@ -128,40 +112,21 @@ status_t dnnl_memory_desc_init_by_tag(memory_desc_t *memory_desc, int ndims,
         // nop
     } else if (format_kind == format_kind::blocked) {
         status = memory_desc_wrapper::compute_blocking(md, tag);
-        INVARIANTS(md);
     } else {
         assert(!"unreachable");
         status = invalid_arguments;
     }
 
-    if (status == success) {
-        *memory_desc = md;
-        INVARIANTS(*memory_desc);
-    }
+    if (status == success) *memory_desc = md;
 
     return status;
-#undef INVARIANTS
 }
 
 status_t dnnl_memory_desc_init_by_strides(memory_desc_t *memory_desc, int ndims,
         const dims_t dims, data_type_t data_type, const dims_t strides) {
-#ifndef NDEBUG
-#define INVARIANTS(md) do{ \
-    assert((md).offset0 == 0); \
-    assert((md).format_desc.blocking.inner_nblks==0); \
-    assert((md).extra.flags == 0); \
-    assert((md).extra.compensation_mask == 0); \
-    for(size_t i=0; i<ndims; ++i) { \
-        assert((md).padded_offsets[i] == 0); \
-    } \
-}while(0)
-#else
-#define INVARIANTS(md) do{}while(0)
-#endif
     if (any_null(memory_desc)) return invalid_arguments;
     if (ndims == 0) {
         *memory_desc = types::zero_md();
-        INVARIANTS(*memory_desc);
         return success;
     }
 
@@ -171,15 +136,13 @@ status_t dnnl_memory_desc_init_by_strides(memory_desc_t *memory_desc, int ndims,
                     ndims, dims, data_type, format_kind::undef);
     if (!args_ok) return invalid_arguments;
 
+    //auto md = memory_desc_t();
     auto md = types::zero_md();
-    INVARIANTS(md);
     md.ndims = ndims;
     array_copy(md.dims, dims, ndims);
     md.data_type = data_type;
     array_copy(md.padded_dims, dims, ndims);
     md.format_kind = format_kind::blocked;
-    INVARIANTS(md);
-    assert(md.format_desc.blocking.strides[0]==0);
 
     dims_t default_strides = {0};
     if (strides == nullptr) {
@@ -200,10 +163,8 @@ status_t dnnl_memory_desc_init_by_strides(memory_desc_t *memory_desc, int ndims,
     array_copy(md.format_desc.blocking.strides, strides, md.ndims);
 
     *memory_desc = md;
-    INVARIANTS(*memory_desc);
 
     return success;
-#undef INVARIANTS
 }
 
 status_t dnnl_memory_desc_init_submemory(memory_desc_t *md,
@@ -549,8 +510,16 @@ status_t dnnl_memory_get_data_handle(const memory_t *memory, void **handle) {
 }
 
 status_t dnnl_memory_set_data_handle(memory_t *memory, void *handle) {
+    return dnnl_memory_set_data_handle_v2(memory, handle, nullptr);
+}
+
+status_t dnnl_memory_set_data_handle_v2(
+        memory_t *memory, void *handle, stream_t *stream) {
     if (any_null(memory)) return invalid_arguments;
-    return memory->set_data_handle(handle);
+    if (stream) stream->before_exec_hook();
+    status_t status = memory->set_data_handle(handle);
+    if (stream) stream->after_exec_hook();
+    return status;
 }
 
 status_t dnnl_memory_map_data(const memory_t *memory, void **mapped_ptr) {

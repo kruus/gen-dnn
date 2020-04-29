@@ -18,17 +18,17 @@
 #include <float.h>
 #include <math.h>
 
-#include "c_types_map.hpp"
-#include "dnnl_thread.hpp"
-#include "memory_tracking.hpp"
-#include "type_helpers.hpp"
-#include "utils.hpp"
+#include "common/c_types_map.hpp"
+#include "common/dnnl_thread.hpp"
+#include "common/memory_tracking.hpp"
+#include "common/type_helpers.hpp"
+#include "common/utils.hpp"
 
 #include "cpu/cpu_primitive.hpp"
 
-#include "gemm_x8s8s32x_matmul.hpp"
+#include "cpu/gemm/gemm.hpp"
 
-#include "gemm/gemm.hpp"
+#include "cpu/matmul/gemm_x8s8s32x_matmul.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -50,8 +50,8 @@ bool need_post_processing(const pd_t *pd, float runtime_dst_zero_point = 0.f) {
 } // namespace
 
 template <data_type_t src_type, data_type_t weights_type, data_type_t dst_type>
-status_t
-gemm_x8s8s32x_matmul_t<src_type, weights_type, dst_type>::pd_t::init() {
+status_t gemm_x8s8s32x_matmul_t<src_type, weights_type, dst_type>::pd_t::init(
+        engine_t *engine) {
     using namespace utils;
 
     auto check_bias = [&]() -> bool {
@@ -146,7 +146,6 @@ template <data_type_t src_type, data_type_t weights_type, data_type_t dst_type>
 status_t gemm_x8s8s32x_matmul_t<src_type, weights_type, dst_type>::execute_ref(
         const exec_ctx_t &ctx) const {
     using math::get_bias;
-    using math::saturate;
 
     const auto src = CTX_IN_MEM(const src_data_t *, DNNL_ARG_SRC);
     const auto weights = CTX_IN_MEM(const weights_data_t *, DNNL_ARG_WEIGHTS);
@@ -172,8 +171,9 @@ status_t gemm_x8s8s32x_matmul_t<src_type, weights_type, dst_type>::execute_ref(
     const auto dst_d = ctx.memory_mdw(DNNL_ARG_DST, pd()->dst_md());
 
     const gemm_based::params_t &params = pd()->params();
+    bool dst_is_acc = params.dst_is_acc_;
 
-    acc_data_t *acc = params.dst_is_acc_
+    acc_data_t *acc = dst_is_acc
             ? (acc_data_t *)dst
             : ctx.get_scratchpad_grantor().template get<acc_data_t>(
                     memory_tracking::names::key_matmul_dst_in_acc_dt);
@@ -194,6 +194,7 @@ status_t gemm_x8s8s32x_matmul_t<src_type, weights_type, dst_type>::execute_ref(
                         * nstl::min(batch, (dim_t)dnnl_get_max_threads()) * M
                         * N,
                 64);
+        if (acc == nullptr) return status::out_of_memory;
         need_free_acc = true;
     }
 
@@ -207,13 +208,9 @@ status_t gemm_x8s8s32x_matmul_t<src_type, weights_type, dst_type>::execute_ref(
             ? "N"
             : "T";
 
-    const int M_s32 = (int)M;
-    const int N_s32 = (int)N;
-    const int K_s32 = (int)K;
-
-    const int lda = (int)src_strides[*transA == 'N' ? 0 : 1];
-    const int ldb = (int)weights_strides[*transB == 'N' ? 0 : 1];
-    const int ldc = (int)dst_bd.strides[batched + 0];
+    const dim_t lda = src_strides[*transA == 'N' ? 0 : 1];
+    const dim_t ldb = weights_strides[*transB == 'N' ? 0 : 1];
+    const dim_t ldc = dst_is_acc ? dst_bd.strides[batched + 0] : N;
 
     const float alpha = params.get_gemm_alpha(scales);
     const float beta = params.gemm_beta_;
@@ -248,8 +245,8 @@ status_t gemm_x8s8s32x_matmul_t<src_type, weights_type, dst_type>::execute_ref(
                 dst_data_t *curr_dst = dst + b * dst_batch_stride;
                 if (!reuse_acc) curr_acc = acc + b * acc_batch_stride;
 
-                gemm_s8x8s32(transB, transA, "F", &N_s32, &M_s32, &K_s32,
-                        &alpha, curr_weights, &ldb, &gemm_off_b, curr_src, &lda,
+                gemm_s8x8s32(transB, transA, "F", &N, &M, &K, &alpha,
+                        curr_weights, &ldb, &gemm_off_b, curr_src, &lda,
                         &gemm_off_a, &beta, curr_acc, &ldc, &gemm_off_c);
 
                 // if igemm cannot handle src and weights zero points
@@ -276,9 +273,9 @@ status_t gemm_x8s8s32x_matmul_t<src_type, weights_type, dst_type>::execute_ref(
         // at compilation time in lambdas
         const int32_t gemm_off_c = 0;
 
-        gemm_s8x8s32(transB, transA, "F", &N_s32, &M_s32, &K_s32, &alpha,
-                weights, &ldb, &gemm_off_b, src, &lda, &gemm_off_a, &beta, acc,
-                &ldc, &gemm_off_c);
+        gemm_s8x8s32(transB, transA, "F", &N, &M, &K, &alpha, weights, &ldb,
+                &gemm_off_b, src, &lda, &gemm_off_a, &beta, acc, &ldc,
+                &gemm_off_c);
 
         std::vector<acc_data_t> src_compensation(M, 0);
         std::vector<acc_data_t> weights_compensation(N, 0);

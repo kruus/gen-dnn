@@ -16,12 +16,12 @@
 
 #include "dnnl_types.h"
 
-#include "c_types_map.hpp"
-#include "dnnl_thread.hpp"
-#include "gemm_convolution.hpp"
-#include "ref_eltwise.hpp"
-#include "type_helpers.hpp"
-#include "utils.hpp"
+#include "common/c_types_map.hpp"
+#include "common/dnnl_thread.hpp"
+#include "common/type_helpers.hpp"
+#include "common/utils.hpp"
+#include "cpu/gemm_convolution.hpp"
+#include "cpu/ref_eltwise.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -51,7 +51,7 @@ void gemm_convolution_fwd_t::execute_forward(const exec_ctx_t &ctx) const {
 
     auto col = ctx.get_scratchpad_grantor().get<data_t>(key_conv_gemm_col);
 
-    const jit_gemm_conv_conf_t &jcp = this->pd()->jcp_;
+    const conv_gemm_conf_t &jcp = this->pd()->jcp_;
 
     const size_t src_step = jcp.ic * jcp.ih * jcp.iw * jcp.id;
     const size_t weights_oc_size = jcp.ic * jcp.ks;
@@ -93,15 +93,15 @@ void gemm_convolution_fwd_t::execute_forward(const exec_ctx_t &ctx) const {
             }
             const data_t one = 1.0;
 
-            const int M = jcp.os * jcp.od;
+            const dim_t M = jcp.os * jcp.od;
             const size_t dst_step = jcp.oc * M;
-            const int m = step.sp;
-            const int LDA = jcp.im2col_sz ? m : M;
+            const dim_t m = step.sp;
+            const dim_t LDA = jcp.im2col_sz ? m : M;
             data_t *_dst = dst + (curr.n * jcp.ngroups + curr.g) * dst_step
                     + curr.oc * M + curr.od * jcp.os + curr.sp;
-            const int K = step.ic * jcp.ks;
-            const int LDB = jcp.ic * jcp.ks;
-            const int N = step.oc;
+            const dim_t K = step.ic * jcp.ks;
+            const dim_t LDB = jcp.ic * jcp.ks;
+            const dim_t N = step.oc;
 
             // TODO: what if this->beta_ != 0 && != 1 ?
             const float beta = (curr.ic == 0) ? this->beta_ : one;
@@ -208,17 +208,17 @@ void gemm_convolution_bwd_data_t::execute_backward_data(
 
     auto col = ctx.get_scratchpad_grantor().get<data_t>(key_conv_gemm_col);
 
-    const jit_gemm_conv_conf_t &jcp = this->pd()->jcp_;
+    const conv_gemm_conf_t &jcp = this->pd()->jcp_;
 
-    const int M = jcp.os * jcp.od;
+    const dim_t M = jcp.os * jcp.od;
     const size_t src_step = (size_t)jcp.ic * jcp.ih * jcp.iw * jcp.id;
     const size_t dst_step = (size_t)jcp.oc * M;
     const size_t weights_g_size = (size_t)jcp.ic * jcp.oc * jcp.ks;
 
-    const int m = jcp.os;
-    const int K = jcp.oc;
-    const int N = jcp.ic * jcp.ks;
-    const int LDC = jcp.im2col_sz ? m : M;
+    const dim_t m = jcp.os;
+    const dim_t K = jcp.oc;
+    const dim_t N = jcp.ic * jcp.ks;
+    const dim_t LDC = jcp.im2col_sz ? m : M;
 
     const size_t work_amount = (size_t)jcp.ngroups * jcp.mb;
     const bool is_problem_3d = pd()->ndims() == 5;
@@ -275,17 +275,17 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights(
     auto wei_reduction
             = ctx.get_scratchpad_grantor().get<data_t>(key_conv_wei_reduction);
 
-    const jit_gemm_conv_conf_t &jcp = this->pd()->jcp_;
+    const conv_gemm_conf_t &jcp = this->pd()->jcp_;
 
-    const int K = jcp.os * jcp.od;
+    const dim_t K = jcp.os * jcp.od;
     const size_t src_step = jcp.ic * jcp.ih * jcp.iw * jcp.id;
     const size_t dst_step = jcp.oc * K;
     const size_t weights_g_size = jcp.ic * jcp.oc * jcp.ks;
 
-    const int k = jcp.os;
-    const int N = jcp.oc;
-    const int M = jcp.ic * jcp.ks;
-    const int LDA = jcp.im2col_sz ? k : K;
+    const dim_t k = jcp.os;
+    const dim_t N = jcp.oc;
+    const dim_t M = jcp.ic * jcp.ks;
+    const dim_t LDA = jcp.im2col_sz ? k : K;
     const bool is_problem_3d = pd()->ndims() == 5;
 
     parallel(jcp.nthr, [&](const int ithr, const int nthr) {

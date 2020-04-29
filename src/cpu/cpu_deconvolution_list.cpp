@@ -14,13 +14,15 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "cpu_engine.hpp"
+#include "cpu/cpu_engine.hpp"
 
-#if TARGET_X86_JIT
-#include "cpu/jit_avx512_core_x8s8s32x_1x1_deconvolution.hpp"
-#include "cpu/jit_avx512_core_x8s8s32x_deconvolution.hpp"
-#endif // TARGET_X86_JIT
 #include "cpu/ref_deconvolution.hpp"
+
+#if DNNL_X64
+#include "cpu/x64/jit_avx512_core_x8s8s32x_1x1_deconvolution.hpp"
+#include "cpu/x64/jit_avx512_core_x8s8s32x_deconvolution.hpp"
+using namespace dnnl::impl::cpu::x64;
+#endif
 
 namespace dnnl {
 namespace impl {
@@ -31,33 +33,31 @@ using pd_create_f = engine_t::primitive_desc_create_f;
 namespace {
 using namespace dnnl::impl::data_type;
 
-/// @copydoc INSTANCE_CREATOR
-#define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
+// clang-format off
 static const pd_create_f impl_list[] = {
-        // clang-format off
-        INSTANCE(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<u8, f32>)
-        INSTANCE(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<u8, s32>)
-        INSTANCE(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<u8, u8>)
-        INSTANCE(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<u8, s8>)
-        INSTANCE(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<s8, f32>)
-        INSTANCE(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<s8, s32>)
-        INSTANCE(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<s8, u8>)
-        INSTANCE(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<s8, s8>)
-        INSTANCE(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<u8, s32>)
-        INSTANCE(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<u8, u8>)
-        INSTANCE(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<u8, s8>)
-        INSTANCE(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<u8, f32>)
-        INSTANCE(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<s8, s32>)
-        INSTANCE(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<s8, u8>)
-        INSTANCE(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<s8, s8>)
-        INSTANCE(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<s8, f32>)
-        INSTANCE_ref(ref_deconvolution_bwd_weights_t)
-        INSTANCE_ref(ref_deconvolution_bwd_data_t)
-        INSTANCE_ref(ref_deconvolution_fwd_t)
-        // clang-format on
+        CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<u8, f32>)
+        CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<u8, s32>)
+        CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<u8, u8>)
+        CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<u8, s8>)
+        CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<s8, f32>)
+        CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<s8, s32>)
+        CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<s8, u8>)
+        CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<s8, s8>)
+        CPU_INSTANCE_X64(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<u8, s32>)
+        CPU_INSTANCE_X64(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<u8, u8>)
+        CPU_INSTANCE_X64(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<u8, s8>)
+        CPU_INSTANCE_X64(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<u8, f32>)
+        CPU_INSTANCE_X64(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<s8, s32>)
+        CPU_INSTANCE_X64(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<s8, u8>)
+        CPU_INSTANCE_X64(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<s8, s8>)
+        CPU_INSTANCE_X64(_jit_avx512_core_x8s8s32x_deconvolution_fwd_t<s8, f32>)
+        CPU_INSTANCE(ref_deconvolution_bwd_weights_t)
+        CPU_INSTANCE(ref_deconvolution_bwd_data_t)
+        CPU_INSTANCE(ref_deconvolution_fwd_t)
         /* eol */
         nullptr,
 };
+// clang-format on
 } // namespace
 
 const pd_create_f *get_deconvolution_impl_list(

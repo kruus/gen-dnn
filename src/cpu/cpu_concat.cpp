@@ -14,8 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "cpu_engine.hpp"
-#include "cpu_target.h"
+#include "cpu/cpu_engine.hpp"
 #if USE_concat
 #include "cpu/ref_concat.hpp"
 #include "cpu/simple_concat.hpp"
@@ -36,19 +35,19 @@ const cpd_create_f *cpu_engine_t::get_concat_implementation_list() const {
 #else
 
 namespace {
-#define INSTANCE_CREATOR(...) __VA_ARGS__::pd_t::create,
+// clang-format off
+#define INSTANCE(...) __VA_ARGS__::pd_t::create,
 static const cpd_create_f cpu_concat_impl_list[] = {
-        // clang-format on
-        INSTANCE_ref(simple_concat_t<data_type::f32>)
-        INSTANCE_ref(simple_concat_t<data_type::u8>)
-        INSTANCE_ref(simple_concat_t<data_type::s8>)
-        INSTANCE_ref(simple_concat_t<data_type::s32>)
-        INSTANCE_ref(simple_concat_t<data_type::bf16>)
-        INSTANCE_ref(ref_concat_t)
-        // clang-format off
+        INSTANCE(simple_concat_t<data_type::f32>)
+        INSTANCE(simple_concat_t<data_type::u8>)
+        INSTANCE(simple_concat_t<data_type::s8>)
+        INSTANCE(simple_concat_t<data_type::s32>)
+        INSTANCE(simple_concat_t<data_type::bf16>)
+        INSTANCE(ref_concat_t)
         nullptr,
 };
 #undef INSTANCE
+// clang-format on
 } // namespace
 
 const cpd_create_f *cpu_engine_t::get_concat_implementation_list() const {

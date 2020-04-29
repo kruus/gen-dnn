@@ -23,8 +23,8 @@ namespace impl {
 namespace gpu {
 namespace ocl {
 
-static status_t init_conf_common(
-        conv_conf_t &conf, offsets_t &off, const convolution_pd_t *pd) {
+static status_t init_conf_common(conv_conf_t &conf, offsets_t &off,
+        const convolution_pd_t *pd, engine_t *engine) {
     const convolution_desc_t &cd = *pd->desc();
     const memory_desc_t &src_md = *pd->invariant_src_md();
     const memory_desc_t &weights_md = *pd->invariant_wei_md();
@@ -39,8 +39,7 @@ static status_t init_conf_common(
     set_offsets(dst_md, off.dst_off);
 
     int oc_idx = (int)conf.with_groups;
-    auto *compute_engine
-            = utils::downcast<compute::compute_engine_t *>(pd->engine());
+    auto *compute_engine = utils::downcast<compute::compute_engine_t *>(engine);
     switch (cd.prop_kind) {
         case prop_kind::forward_training:
         case prop_kind::forward_inference: {
@@ -172,8 +171,8 @@ static status_t init_kernel_ctx_common(compute::kernel_ctx_t &kernel_ctx,
     return status::success;
 }
 
-status_t ref_convolution_fwd_t::pd_t::init_conf() {
-    return init_conf_common(conf, off, this);
+status_t ref_convolution_fwd_t::pd_t::init_conf(engine_t *engine) {
+    return init_conf_common(conf, off, this, engine);
 }
 
 status_t ref_convolution_fwd_t::pd_t::init_kernel_ctx(
@@ -183,12 +182,10 @@ status_t ref_convolution_fwd_t::pd_t::init_kernel_ctx(
 
 status_t ref_convolution_fwd_t::execute_forward(const exec_ctx_t &ctx) const {
 
-    compute::compute_stream_t *compute_stream
-            = utils::downcast<compute::compute_stream_t *>(ctx.stream());
-
     auto &src = CTX_IN_STORAGE(DNNL_ARG_SRC);
     auto &weights = CTX_IN_STORAGE(DNNL_ARG_WEIGHTS);
     auto &bias = CTX_IN_STORAGE(DNNL_ARG_BIAS);
+    auto &oscales = CTX_IN_STORAGE(DNNL_ARG_ATTR_OUTPUT_SCALES);
     auto &dst = CTX_OUT_STORAGE(DNNL_ARG_DST);
 
     auto eltwise_alpha = pd()->eltwise_alpha();
@@ -212,17 +209,21 @@ status_t ref_convolution_fwd_t::execute_forward(const exec_ctx_t &ctx) const {
             arg_list.set(8, scales);
         }
         if (pd()->with_per_oc_scales()) {
-            arg_list.set(8, *scales_mem_->memory_storage());
+            if (pd()->with_runtime_scales())
+                arg_list.set(8, oscales);
+            else
+                arg_list.set(8, CTX_GPU_RES_STORAGE(SCALES_));
         }
     }
 
     auto nd_range = pd()->conf.dispatch.nd_range();
-    status_t status = compute_stream->parallel_for(nd_range, kernel_, arg_list);
+
+    status_t status = parallel_for(ctx, nd_range, kernel_, arg_list);
     return status;
 }
 
-status_t ref_convolution_bwd_data_t::pd_t::init_conf() {
-    return init_conf_common(conf, off, this);
+status_t ref_convolution_bwd_data_t::pd_t::init_conf(engine_t *engine) {
+    return init_conf_common(conf, off, this, engine);
 }
 
 status_t ref_convolution_bwd_data_t::pd_t::init_kernel_ctx(
@@ -232,9 +233,6 @@ status_t ref_convolution_bwd_data_t::pd_t::init_kernel_ctx(
 
 status_t ref_convolution_bwd_data_t::execute_backward_data(
         const exec_ctx_t &ctx) const {
-
-    compute::compute_stream_t *compute_stream
-            = utils::downcast<compute::compute_stream_t *>(ctx.stream());
 
     auto &diff_dst = CTX_IN_STORAGE(DNNL_ARG_DIFF_DST);
     auto &weights = CTX_IN_STORAGE(DNNL_ARG_WEIGHTS);
@@ -248,13 +246,14 @@ status_t ref_convolution_bwd_data_t::execute_backward_data(
     arg_list.set(3, bias);
 
     auto nd_range = pd()->conf.dispatch.nd_range();
-    status_t status = compute_stream->parallel_for(nd_range, kernel_, arg_list);
+
+    status_t status = parallel_for(ctx, nd_range, kernel_, arg_list);
 
     return status;
 }
 
-status_t ref_convolution_bwd_weights_t::pd_t::init_conf() {
-    return init_conf_common(conf, off, this);
+status_t ref_convolution_bwd_weights_t::pd_t::init_conf(engine_t *engine) {
+    return init_conf_common(conf, off, this, engine);
 }
 
 status_t ref_convolution_bwd_weights_t::pd_t::init_kernel_ctx(
@@ -264,9 +263,6 @@ status_t ref_convolution_bwd_weights_t::pd_t::init_kernel_ctx(
 
 status_t ref_convolution_bwd_weights_t::execute_backward_weights(
         const exec_ctx_t &ctx) const {
-
-    compute::compute_stream_t *compute_stream
-            = utils::downcast<compute::compute_stream_t *>(ctx.stream());
 
     auto &src = CTX_IN_STORAGE(DNNL_ARG_SRC);
     auto &diff_dst = CTX_IN_STORAGE(DNNL_ARG_DIFF_DST);
@@ -280,7 +276,8 @@ status_t ref_convolution_bwd_weights_t::execute_backward_weights(
     arg_list.set(3, diff_dst);
 
     auto nd_range = pd()->conf.dispatch.nd_range();
-    status_t status = compute_stream->parallel_for(nd_range, kernel_, arg_list);
+
+    status_t status = parallel_for(ctx, nd_range, kernel_, arg_list);
 
     return status;
 }

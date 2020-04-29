@@ -20,6 +20,7 @@
 #include "gpu/gemm/gpu_gemm.hpp"
 #include "gpu/gemm/gpu_gemm_utils.hpp"
 #include "gpu/gpu_gemm_pd.hpp"
+#include "gpu/gpu_resource.hpp"
 #include "gpu/primitive_conf.hpp"
 
 namespace dnnl {
@@ -33,7 +34,7 @@ struct ref_gemm_t : public gpu_gemm_t {
 
         DECLARE_COMMON_PD_T("ocl:ref:any", ref_gemm_t);
 
-        status_t init() {
+        status_t init(engine_t *engine) {
             using namespace data_type;
             using smask_t = primitive_attr_t::skip_mask_t;
 
@@ -137,35 +138,16 @@ struct ref_gemm_t : public gpu_gemm_t {
         bool with_bias() const { return desc()->bias_type != data_type::undef; }
     };
 
-    status_t init() override {
-        using namespace gemm_utils;
+    ref_gemm_t(const pd_t *apd) : gpu_gemm_t(apd) {}
 
-        const auto attr = pd()->attr();
-        auto e = pd()->engine();
-
-        status_t s = status::success;
-
-        s = prepare_zero_points(attr, e, DNNL_ARG_A, a0_mem_storage_);
-        if (s != status::success) return s;
-
-        s = prepare_zero_points(attr, e, DNNL_ARG_B, b0_mem_storage_);
-        if (s != status::success) return s;
-
-        s = prepare_zero_points(attr, e, DNNL_ARG_C, c0_mem_storage_);
-        if (s != status::success) return s;
-
-        s = prepare_scales(attr, e, s_mem_storage_);
-        if (s != status::success) return s;
-
-        auto *compute_engine
-                = utils::downcast<compute::compute_engine_t *>(engine());
+    status_t init(engine_t *engine) override {
         compute::kernel_ctx_t kernel_ctx;
 
         kernel_ctx.define_int("WITH_BIAS", pd()->with_bias());
         kernel_ctx.define_int(
                 "NON_DEFAULT_ATTRS", !pd()->attr()->has_default_values());
-        kernel_ctx.define_int(
-                "DO_SUM", attr->post_ops_.contain(primitive_kind::sum, 0));
+        kernel_ctx.define_int("DO_SUM",
+                pd()->attr()->post_ops_.contain(primitive_kind::sum, 0));
         kernel_ctx.define_int(
                 "WITH_ELTWISE", pd()->with_eltwise(0) || pd()->with_eltwise(1));
 
@@ -181,24 +163,38 @@ struct ref_gemm_t : public gpu_gemm_t {
         def_data_type(kernel_ctx, d->c_type, "C");
         def_data_type(kernel_ctx, d->acc_type, "ACC");
         def_data_type(kernel_ctx, bias_type, "BIAS");
-        compute_engine->create_kernel(&kernel_, "ref_gemm", kernel_ctx);
+        create_kernel(engine, &kernel_, "ref_gemm", kernel_ctx);
         if (!kernel_) return status::runtime_error;
 
         return status::success;
     }
 
-    ref_gemm_t(const pd_t *apd) : gpu_gemm_t(apd) {}
-
     virtual status_t execute(const gemm_exec_ctx_t &ctx) const override;
 
-    const pd_t *pd() const { return (const pd_t *)primitive_impl_t::pd(); }
+protected:
+    status_t init_res_storage(
+            engine_t *engine, gpu_resource_t *r) const override {
+        const auto *attr = pd()->attr();
+        std::unique_ptr<memory_storage_t> tmp_mem_storage;
+        for (const auto idx : {A0_, B0_, C0_}) {
+            CHECK(gemm_utils::prepare_zero_points(
+                    attr, engine, idx, tmp_mem_storage));
+            r->add_memory_storage(idx, std::move(tmp_mem_storage));
+        }
+        CHECK(gemm_utils::prepare_scales(attr, engine, tmp_mem_storage));
+        r->add_memory_storage(SCALES_, std::move(tmp_mem_storage));
+        return status::success;
+    }
 
 private:
+    const pd_t *pd() const { return (const pd_t *)primitive_t::pd().get(); }
     compute::kernel_t kernel_;
-    std::unique_ptr<memory_storage_t> a0_mem_storage_;
-    std::unique_ptr<memory_storage_t> b0_mem_storage_;
-    std::unique_ptr<memory_storage_t> c0_mem_storage_;
-    std::unique_ptr<memory_storage_t> s_mem_storage_;
+    enum {
+        A0_ = DNNL_ARG_A,
+        B0_ = DNNL_ARG_B,
+        C0_ = DNNL_ARG_C,
+        SCALES_ = DNNL_ARG_ATTR_OUTPUT_SCALES
+    };
 };
 
 } // namespace ocl

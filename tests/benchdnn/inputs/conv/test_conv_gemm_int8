@@ -7,7 +7,7 @@
 # Int8 GeMM w/Attributes
 --reset
 --mb=2
-#--skip-impl="ref"      # ! test gemm version only (allow them for VANILLA build/dispatch)
+--skip-impl="ref"      # ! test gemm version only
 --allow-unimpl=true
 --dir=FWD_B
 --attr=post_ops='relu'

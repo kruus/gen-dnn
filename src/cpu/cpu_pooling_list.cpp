@@ -14,15 +14,17 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "cpu_engine.hpp"
+#include "cpu/cpu_engine.hpp"
 
-#if TARGET_X86_JIT
-#include "cpu/jit_uni_i8i8_pooling.hpp"
-#include "cpu/jit_uni_pooling.hpp"
-#endif // TARGET_X86_JIT
 #include "cpu/nchw_pooling.hpp"
 #include "cpu/nhwc_pooling.hpp"
 #include "cpu/ref_pooling.hpp"
+
+#if DNNL_X64
+#include "cpu/x64/jit_uni_i8i8_pooling.hpp"
+#include "cpu/x64/jit_uni_pooling.hpp"
+using namespace dnnl::impl::cpu::x64;
+#endif
 
 namespace dnnl {
 namespace impl {
@@ -33,42 +35,40 @@ using pd_create_f = engine_t::primitive_desc_create_f;
 namespace {
 using namespace dnnl::impl::data_type;
 
-/// @copydoc INSTANCE_CREATOR
-#define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
+// clang-format off
 static const pd_create_f impl_list[] = {
-        // clang-format off
         /* fp */
-        INSTANCE(jit_uni_pooling_fwd_t<avx512_core, bf16>)
-        INSTANCE(jit_uni_pooling_bwd_t<avx512_core, bf16>)
-        INSTANCE(jit_uni_pooling_fwd_t<avx512_common, f32>)
-        INSTANCE(jit_uni_pooling_bwd_t<avx512_common, f32>)
-        INSTANCE(jit_uni_pooling_fwd_t<avx, f32>)
-        INSTANCE(jit_uni_pooling_bwd_t<avx, f32>)
-        INSTANCE(jit_uni_pooling_fwd_t<sse41, f32>)
-        INSTANCE(jit_uni_pooling_bwd_t<sse41, f32>)
-        INSTANCE_ref(nchw_pooling_fwd_t<bf16>)
-        INSTANCE_ref(nchw_pooling_bwd_t<bf16>)
-        INSTANCE_ref(nchw_pooling_fwd_t<f32>)
-        INSTANCE_ref(nchw_pooling_bwd_t<f32>)
-        INSTANCE_ref(nhwc_pooling_fwd_t<bf16>)
-        INSTANCE_ref(nhwc_pooling_bwd_t<bf16>)
-        INSTANCE_ref(nhwc_pooling_fwd_t<f32>)
-        INSTANCE_ref(nhwc_pooling_bwd_t<f32>)
-        INSTANCE_ref(ref_pooling_fwd_t<f32>)
-        INSTANCE_ref(ref_pooling_fwd_t<bf16, f32>)
-        INSTANCE_ref(ref_pooling_bwd_t<f32>)
-        INSTANCE_ref(ref_pooling_bwd_t<bf16>)
+        CPU_INSTANCE_X64(jit_uni_pooling_fwd_t<avx512_core, bf16>)
+        CPU_INSTANCE_X64(jit_uni_pooling_bwd_t<avx512_core, bf16>)
+        CPU_INSTANCE_X64(jit_uni_pooling_fwd_t<avx512_common, f32>)
+        CPU_INSTANCE_X64(jit_uni_pooling_bwd_t<avx512_common, f32>)
+        CPU_INSTANCE_X64(jit_uni_pooling_fwd_t<avx, f32>)
+        CPU_INSTANCE_X64(jit_uni_pooling_bwd_t<avx, f32>)
+        CPU_INSTANCE_X64(jit_uni_pooling_fwd_t<sse41, f32>)
+        CPU_INSTANCE_X64(jit_uni_pooling_bwd_t<sse41, f32>)
+        CPU_INSTANCE(nchw_pooling_fwd_t<bf16>)
+        CPU_INSTANCE(nchw_pooling_bwd_t<bf16>)
+        CPU_INSTANCE(nchw_pooling_fwd_t<f32>)
+        CPU_INSTANCE(nchw_pooling_bwd_t<f32>)
+        CPU_INSTANCE(nhwc_pooling_fwd_t<bf16>)
+        CPU_INSTANCE(nhwc_pooling_bwd_t<bf16>)
+        CPU_INSTANCE(nhwc_pooling_fwd_t<f32>)
+        CPU_INSTANCE(nhwc_pooling_bwd_t<f32>)
+        CPU_INSTANCE(ref_pooling_fwd_t<f32>)
+        CPU_INSTANCE(ref_pooling_fwd_t<bf16, f32>)
+        CPU_INSTANCE(ref_pooling_bwd_t<f32>)
+        CPU_INSTANCE(ref_pooling_bwd_t<bf16>)
         /* int */
-        INSTANCE(jit_uni_i8i8_pooling_fwd_t<avx512_core>)
-        INSTANCE(jit_uni_i8i8_pooling_fwd_t<avx2>)
-        INSTANCE_ref(ref_pooling_fwd_t<s32>)
-        INSTANCE_ref(ref_pooling_fwd_t<s8, s32>)
-        INSTANCE_ref(ref_pooling_fwd_t<u8, s32>)
-        INSTANCE_ref(ref_pooling_bwd_t<s32>)
-        // clang-format on
+        CPU_INSTANCE_X64(jit_uni_i8i8_pooling_fwd_t<avx512_core>)
+        CPU_INSTANCE_X64(jit_uni_i8i8_pooling_fwd_t<avx2>)
+        CPU_INSTANCE(ref_pooling_fwd_t<s32>)
+        CPU_INSTANCE(ref_pooling_fwd_t<s8, s32>)
+        CPU_INSTANCE(ref_pooling_fwd_t<u8, s32>)
+        CPU_INSTANCE(ref_pooling_bwd_t<s32>)
         /* eol */
         nullptr,
 };
+// clang-format on
 } // namespace
 
 const pd_create_f *get_pooling_impl_list(const pooling_desc_t *desc) {

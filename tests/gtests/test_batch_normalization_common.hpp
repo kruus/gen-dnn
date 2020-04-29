@@ -74,12 +74,6 @@ private:
 
 protected:
     virtual void SetUp() {
-        data_type = data_traits<data_t>::data_type;
-
-        SKIP_IF(data_type == memory::data_type::s8
-                        && get_test_engine_kind() == engine::kind::gpu,
-                "GPU does not support int8 data type.");
-
         p = ::testing::TestWithParam<decltype(p)>::GetParam();
         catch_expected_failures(
                 [=]() { Test(); }, p.expect_to_fail, p.expected_status);
@@ -90,8 +84,9 @@ protected:
         p = ::testing::TestWithParam<decltype(p)>::GetParam();
 
         eng = get_test_engine();
-        strm = stream(eng);
+        strm = make_stream(eng);
 
+        memory::data_type data_type = data_traits<data_t>::data_type;
         ASSERT_TRUE(isF32(data_type) || isS8(data_type));
 
         test_bnorm_sizes_t bs = p.sizes;
@@ -143,8 +138,8 @@ protected:
         }
     }
 
-    void Forward(
-            prop_kind pk, normalization_flags flags = (normalization_flags)0u) {
+    void Forward(prop_kind pk,
+            normalization_flags flags = normalization_flags::none) {
         bool useScaleShift
                 = (bool)(flags & normalization_flags::use_scale_shift);
         bool useGlobalStats
@@ -198,8 +193,8 @@ protected:
                 p, src->get(), mean, variance, weights, dst->get(), flags, pk);
     }
 
-    void Backward(
-            prop_kind pk, normalization_flags flags = (normalization_flags)0u) {
+    void Backward(prop_kind pk,
+            normalization_flags flags = normalization_flags::none) {
         bool useScaleShift
                 = (bool)(flags & normalization_flags::use_scale_shift);
 
@@ -219,6 +214,8 @@ protected:
                 == bnorm_bwd_pd.src_desc());
         ASSERT_TRUE(bnorm_bwd_pd.query_md(query::exec_arg_md, DNNL_ARG_DIFF_DST)
                 == bnorm_bwd_pd.diff_dst_desc());
+        ASSERT_TRUE(bnorm_bwd_pd.query_md(query::exec_arg_md, DNNL_ARG_DIFF_SRC)
+                == bnorm_bwd_pd.diff_src_desc());
         ASSERT_TRUE(bnorm_bwd_pd.query_md(query::exec_arg_md, DNNL_ARG_MEAN)
                 == bnorm_bwd_pd.mean_desc()); // a *very* mean desc
         ASSERT_TRUE(bnorm_bwd_pd.query_md(query::exec_arg_md, DNNL_ARG_VARIANCE)

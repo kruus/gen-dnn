@@ -14,17 +14,18 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef CPU_RNN_PD_HPP
-#define CPU_RNN_PD_HPP
+#ifndef CPU_RNN_CPU_RNN_PD_HPP
+#define CPU_RNN_CPU_RNN_PD_HPP
 
-#include "c_types_map.hpp"
-#include "nstl.hpp"
-#include "type_helpers.hpp"
-#include "utils.hpp"
+#include "common/c_types_map.hpp"
+#include "common/nstl.hpp"
+#include "common/rnn_pd.hpp"
+#include "common/type_helpers.hpp"
+#include "common/utils.hpp"
 
-#include "cpu_engine.hpp"
-#include "rnn_pd.hpp"
-#include "rnn_utils.hpp"
+#include "cpu/cpu_engine.hpp"
+
+#include "cpu/rnn/rnn_utils.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -49,6 +50,9 @@ protected:
         if (is_lstm_peephole()
                 && weights_peephole_md_.format_kind == format_kind::any)
             CHECK(memory_desc_init_by_tag(weights_peephole_md_, ldgo));
+        if (is_lstm_projection()
+                && weights_projection_md_.format_kind == format_kind::any)
+            CHECK(memory_desc_init_by_tag(weights_projection_md_, ldio));
         if (with_bias() && bias_md_.format_kind == format_kind::any)
             CHECK(memory_desc_init_by_tag(bias_md_, ldgo));
         if (with_dst_iter() && dst_iter_md_.format_kind == format_kind::any)
@@ -103,6 +107,10 @@ protected:
                         memory_desc_matches_tag(weights_peephole_md_, ldgo));
 
         ok = ok
+                && IMPLICATION(!is_zero_md(&weights_projection_md_),
+                        memory_desc_matches_tag(weights_projection_md_, ldio));
+
+        ok = ok
                 && IMPLICATION(!is_zero_md(&bias_md_),
                         memory_desc_matches_tag(bias_md_, ldgo));
 
@@ -154,6 +162,9 @@ protected:
         if (is_lstm_peephole()
                 && weights_peephole_md_.format_kind == format_kind::any)
             CHECK(memory_desc_init_by_tag(weights_peephole_md_, ldgo));
+        if (is_lstm_projection()
+                && weights_projection_md_.format_kind == format_kind::any)
+            CHECK(memory_desc_init_by_tag(weights_projection_md_, ldoi));
         if (with_bias() && bias_md_.format_kind == format_kind::any)
             CHECK(memory_desc_init_by_tag(bias_md_, ldgo));
         if (with_dst_iter() && dst_iter_md_.format_kind == format_kind::any)
@@ -170,6 +181,9 @@ protected:
         if (is_lstm_peephole()
                 && diff_weights_peephole_md_.format_kind == format_kind::any)
             CHECK(memory_desc_init_by_tag(diff_weights_peephole_md_, ldgo));
+        if (is_lstm_projection()
+                && diff_weights_projection_md_.format_kind == format_kind::any)
+            CHECK(memory_desc_init_by_tag(diff_weights_projection_md_, ldio));
         if (with_bias() && diff_bias_md_.format_kind == format_kind::any)
             CHECK(memory_desc_init_by_tag(diff_bias_md_, ldgo));
         if (with_dst_iter()
@@ -224,6 +238,9 @@ protected:
                 && IMPLICATION(!is_zero_md(&weights_peephole_md_),
                         memory_desc_matches_tag(weights_peephole_md_, ldgo));
         ok = ok
+                && IMPLICATION(!is_zero_md(&weights_projection_md_),
+                        memory_desc_matches_tag(weights_projection_md_, ldoi));
+        ok = ok
                 && IMPLICATION(!is_zero_md(&bias_md_),
                         memory_desc_matches_tag(bias_md_, ldgo));
 
@@ -246,12 +263,17 @@ protected:
                         memory_desc_matches_tag(
                                 diff_weights_peephole_md_, ldgo));
         ok = ok
+                && IMPLICATION(!is_zero_md(&diff_weights_projection_md_),
+                        memory_desc_matches_tag(
+                                diff_weights_projection_md_, ldio));
+        ok = ok
                 && IMPLICATION(!is_zero_md(&diff_bias_md_),
                         memory_desc_matches_tag(diff_bias_md_, ldgo));
 
         return ok ? status::success : status::unimplemented;
     }
 };
+
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl

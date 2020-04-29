@@ -1,19 +1,19 @@
 Build Options {#dev_guide_build_options}
 ====================================
 
-DNNL supports the following build-time options.
+oneDNN supports the following build-time options.
 
 | Option                      | Supported values (defaults in bold) | Description
 | :---                        | :---                                | :---
 | DNNL_LIBRARY_TYPE           | **SHARED**, STATIC                  | Defines the resulting library type
-| DNNL_CPU_RUNTIME            | **OMP**, TBB, SEQ                   | Defines the threading runtime for CPU engines
+| DNNL_CPU_RUNTIME            | **OMP**, TBB, SEQ, THREADPOOL       | Defines the threading runtime for CPU engines
 | DNNL_GPU_RUNTIME            | **NONE**, OCL                       | Defines the offload runtime for GPU engines
 | DNNL_BUILD_EXAMPLES         | **ON**, OFF                         | Controls building the examples
 | DNNL_BUILD_TESTS            | **ON**, OFF                         | Controls building the tests
 | DNNL_ARCH_OPT_FLAGS         | *compiler flags*                    | Specifies compiler optimization flags (see warning note below)
 | DNNL_ENABLE_CONCURRENT_EXEC | ON, **OFF**                         | Disables sharing a common scratchpad between primitives in #dnnl::scratchpad_mode::library mode
 | DNNL_ENABLE_JIT_PROFILING   | **ON**, OFF                         | Enables integration with Intel(R) VTune(TM) Amplifier
-| DNNL_ENABLE_PRIMITIVE_CACHE | ON, **OFF**                         | Enables primitive cache
+| DNNL_ENABLE_PRIMITIVE_CACHE | **ON**, OFF                         | Enables primitive cache
 | DNNL_ENABLE_MAX_CPU_ISA     | **ON**, OFF                         | Enables controlling CPU dispatcher at run-time
 
 All other building options that can be found in CMake files are dedicated for
@@ -22,21 +22,15 @@ Please avoid using them.
 
 ## Common options
 
-### Primitive cache
-Primitive cache is disabled in the default build configuration.
-
-To enable the primitive cache you can use `DNNL_ENABLE_PRIMITIVE_CACHE` CMake option.
-The default value is `"OFF"`.
-
 ## CPU Options
 Intel Architecture Processors and compatible devices are supported by
-DNNL CPU engine. The CPU engine is built by default and cannot
+oneDNN CPU engine. The CPU engine is built by default and cannot
 be disabled at build time.
 
 ### Targeting Specific Architecture
-DNNL uses JIT code generation to implement most of its functionality
+oneDNN uses JIT code generation to implement most of its functionality
 and will choose the best code based on detected processor features. However,
-some DNNL functionality will still benefit from targeting a specific
+some oneDNN functionality will still benefit from targeting a specific
 processor architecture at build time. You can use `DNNL_ARCH_OPT_FLAGS` CMake
 option for this.
 
@@ -55,19 +49,19 @@ should be set to an empty string (`""`) if the resulting library needs to be
 portable.
 
 ### Runtime CPU dispatcher control
-DNNL JIT relies on ISA features obtained from the processor it is being run
+oneDNN JIT relies on ISA features obtained from the processor it is being run
 on.  There are situations when it is necessary to control this behavior at
 run-time to, for example, test SSE4.1 code on an AVX2-capable processor. The
 `DNNL_ENABLE_MAX_CPU_ISA` build option controls the availability of this
 feature. See @ref dev_guide_cpu_dispatcher_control for more information.
 
 ### Runtimes
-CPU engine can use OpenMP, TBB or sequential threading runtimes. OpenMP
-threading is the default build mode. This behavior is controlled by the
-`DNNL_CPU_RUNTIME` CMake option.
+CPU engine can use OpenMP, Threading Building Blocks (TBB) or sequential
+threading runtimes. OpenMP threading is the default build mode. This behavior
+is controlled by the `DNNL_CPU_RUNTIME` CMake option.
 
 #### OpenMP
-DNNL uses OpenMP runtime library provided by the compiler.
+oneDNN uses OpenMP runtime library provided by the compiler.
 
 @warning
 Because different OpenMP runtimes may not be binary-compatible, it's important
@@ -77,8 +71,8 @@ undefined behavior including incorrect results or crashes. However as long as
 both the library and the application use the same or compatible compilers there
 would be no conflicts.
 
-#### TBB
-To build DNNL with TBB support, set `DNNL_CPU_RUNTIME` to `TBB`:
+#### Threading Building Blocks (TBB)
+To build oneDNN with TBB support, set `DNNL_CPU_RUNTIME` to `TBB`:
 
 ~~~sh
 $ cmake -DDNNL_CPU_RUNTIME=TBB ..
@@ -91,15 +85,37 @@ installation path or pass the path directly to CMake:
 $ cmake -DDNNL_CPU_RUNTIME=TBB -DTBBROOT=/opt/intel/path/tbb ..
 ~~~
 
-DNNL has limited optimizations for Intel TBB and has some functional
-limitations if built with Intel TBB.
-
-Functional limitations:
+oneDNN has functional limitations if built with TBB:
 * Winograd convolution algorithm is not supported for fp32 backward
   by data and backward by weights propagation.
 
+#### Threadpool
+To build oneDNN with support for threadpool threading, set `DNNL_CPU_RUNTIME` to
+`THREADPOOL`
+
+~~~sh
+$ cmake -DDNNL_CPU_RUNTIME=THREADPOOL ..
+~~~
+
+The `DNNL_TEST_THREADPOOL_IMPL` CMake variable controls which of the three
+threadpool implementations would be used for testing: `STANDALONE`, `TBB`, or
+`EIGEN`. The latter two require also passing `TBBROOT` or `Eigen3_DIR` paths
+to CMake. For example:
+
+~~~sh
+$ cmake -DDNNL_CPU_RUNTIME=THREADPOOL -DDNNL_TEST_THREADPOOL_IMPL=EIGEN -DEigen3_DIR=/path/to/eigen/share/eigen3/cmake ..
+~~~
+
+Threadpool threading support is experimental and has the same limitations as
+TBB plus more:
+* As threadpools are attached to streams which are only passed during
+  primitive execution, work decomposition is performed statically at the
+  primitive creation time. At the primitive execution time, the threadpool is
+  responsible for balancing the static decomposition from the previous item
+  across available worker threads.
+
 ## GPU Options
-Intel Processor Graphics is supported by DNNLs GPU engine. GPU engine
+Intel Processor Graphics is supported by oneDNN GPU engine. GPU engine
 is disabled in the default build configuration.
 
 ### Runtimes
@@ -114,44 +130,3 @@ explicitly specify the path to the SDK using `-DOPENCLROOT` CMake option.
 ~~~sh
 cmake -DDNNL_GPU_RUNTIME=OCL -DOPENCLROOT=/path/to/opencl/sdk ..
 ~~~
-
-## Chipset support (advanced developer topic)
-
-The default x86 build uses `cmake -DCPU_ISA=ALL`, which provides Intel DNNL
-provides a well designed API appropriate for consideration on non-x86 systems.
-Firstly, you can build a reference-only version of libdnnl with no xbyak JIT
-support using `cmake -DCPU_ISA=VANILLA`.  Secondly, you create a fork/branch,
-add a cmake toolchain file, adjust compiler flags and tweak a few source
-files (use your new TARGET_mycpu preprocessor boolean as required).
-Cross-compile with a configuration something like:
-
-~~~
-cmake -DTOOLCHAIN_FILE=cmake/mycpu.cmake -DCPU_ISA=VANILLA ..
-~~~
-
-You will need add support for your CPU to a few files (dnnl_config.h.in, and
-eventually cpu_isa_traits).  Begin optimizing the VANILLA build by adjusting
-variables like cache and page sizes, alignment restrictions,
-optimization-related macros (OpenMP support has wide variations), etc.  All
-non-x86 cpu-specific code in mkl-dnn sources is not officially supported and
-should be viewed solely as example code
-
-CPU_ISA config values have 3 cross-platform values, VANILLA, ANY and ALL.  You
-may begin with all equivalent.  ANY must run on the lowest variation of your chip,
-but is not restricted to cross-platform code.  ALL supports the broadest set
-of features for your chipset.
-
-The VANILLA build strips out xbyak and x86-jit support, supplying only C/C++
-reference implementations in the cross-compiled libdnnl.  In practice, libdnnl
-turns out to be an excellent test of your cross-compiler, so compiler
-workarounds mey be needed.  Run `make test` frequently.
-
-The DNNL API configuration and version files have been extended to better show
-the build configuration.  gtests now frequently print the DNNL_BUILD_STRING,
-which should mirror any 'nonstandard' build options used for libdnnl.
-
-The purpose of the cross-platform VANILLA build is to provide a reasonably
-complete **reference baseline** upon which you can build more specialized
-chip-specific optimizations.  A -DCPU_ISA=VANILLA build has limited support for
-bfloat16, and several features may be absent or run appreciably slower (int8
-operations and rnn).

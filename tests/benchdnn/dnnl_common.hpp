@@ -77,16 +77,13 @@
 
 /* aux */
 using bfloat16_t = dnnl::impl::bfloat16_t;
-
 using float16_t = dnnl::impl::float16_t;
 template <dnnl_data_type_t>
 struct prec_traits;
-
 template <>
 struct prec_traits<dnnl_bf16> {
     typedef bfloat16_t type;
 };
-
 template <>
 struct prec_traits<dnnl_f16> {
     typedef float16_t type;
@@ -188,40 +185,7 @@ float round_to_nearest_representable(dnnl_data_type_t dt, float value);
 
 /* simplification */
 extern dnnl_engine_kind_t engine_tgt_kind;
-
-extern dnnl_engine_t engine_tgt;
-extern dnnl_stream_t stream_tgt;
 extern dnnl_scratchpad_mode_t scratchpad_mode;
-
-/* for fast-ref-gpu support */
-extern dnnl_engine_t engine_cpu;
-extern dnnl_stream_t stream_cpu;
-
-inline int init() {
-    printf("DNNL build : %s\n", DNNL_BUILD_STRING);
-    if (!engine_tgt) {
-        DNN_SAFE(dnnl_engine_create(&engine_tgt, engine_tgt_kind, 0), CRIT);
-        DNN_SAFE(dnnl_stream_create(
-                         &stream_tgt, engine_tgt, dnnl_stream_default_flags),
-                CRIT);
-    }
-    if (!engine_cpu) {
-        DNN_SAFE(dnnl_engine_create(&engine_cpu, dnnl_cpu, 0), CRIT);
-        DNN_SAFE(dnnl_stream_create(
-                         &stream_cpu, engine_cpu, dnnl_stream_default_flags),
-                CRIT);
-    }
-
-    return OK;
-}
-
-inline int finalize() {
-    DNN_SAFE(dnnl_stream_destroy(stream_tgt), CRIT);
-    DNN_SAFE(dnnl_engine_destroy(engine_tgt), CRIT);
-    DNN_SAFE(dnnl_engine_destroy(engine_cpu), CRIT);
-    DNN_SAFE(dnnl_stream_destroy(stream_cpu), CRIT);
-    return OK;
-}
 
 inline const char *query_impl_info(const_dnnl_primitive_desc_t pd) {
     const char *str;
@@ -245,18 +209,62 @@ private:
     std::vector<std::pair<int, const dnn_mem_t *>> args_;
 };
 
-dnnl_status_t execute_and_wait(
-        dnnl_primitive_t prim, dnnl_stream_t stream, const args_t &args);
+// this function is used to create a primitive and engine
+template <typename func_t, typename prb_t>
+int init_prim(dnnl_primitive_t *prim, const func_t &init_pd_func,
+        engine_t &engine, prb_t *p, res_t *r, dir_t dir = FLAG_FWD,
+        const_dnnl_primitive_desc_t hint = nullptr) {
+    // create 1st engine
+    engine.reset(engine_tgt_kind);
 
-int measure_perf(benchdnn_timer_t &t, dnnl_primitive_t prim, args_t &args);
+    dnnl_primitive_desc_t pd;
+    int status = init_pd_func(engine, p, pd, r, dir, hint);
+    if (status != OK) return status;
+    if (r->state == SKIPPED || r->state == UNIMPLEMENTED) return OK;
+    DNN_SAFE(dnnl_primitive_create(prim, pd), WARN);
+
+#ifdef DNNL_ENABLE_PRIMITIVE_CACHE
+    // The idea is to create the requested primitive twice for different engines.
+    // Rationale:
+    // 1. Make sure that the primitive cache is robust for the cases when:
+    //   - CPU engine is re-created
+    //   - GPU engine is re-created for the same device but different context
+    // These 2 cases are commonly used or expected to be used in the frameworks.
+    // 2. (for GPU only) Identify context dependent parts in primitive implementations, e.g.
+    // if a primitive implementation contains memory_storage_t (for scales,
+    // zero points or buffers), which depends on a particular engine,
+    // then it should crash or fail at execution time
+
+    // TODO: add an internal API to be able to get information about cache hit
+    // e.g. bool from_cache = dnnl_primitive_get_cache_hit_state(prim) == true;
+    // If from_cache == true then this step can be skipped
+    DNN_SAFE(dnnl_primitive_desc_destroy(pd), CRIT);
+    DNN_SAFE(dnnl_primitive_destroy(*prim), CRIT);
+    // create 2nd engine
+    engine.reset(engine_tgt_kind);
+    init_pd_func(engine, p, pd, r, dir, hint);
+    // this primitive comes from the cache
+    DNN_SAFE(dnnl_primitive_create(prim, pd), WARN);
+    // XXX: maybe check if the primitive didn't come from the cache and
+    // return FAIL in that case?
+#endif
+    DNN_SAFE(dnnl_primitive_desc_destroy(pd), CRIT);
+    return OK;
+}
+
+dnnl_status_t execute_and_wait(
+        dnnl_primitive_t prim, dnnl_engine_t engine, const args_t &args);
+
+int measure_perf(benchdnn_timer_t &t, dnnl_engine_t engine,
+        dnnl_primitive_t prim, args_t &args);
 
 void maybe_prepare_runtime_scales(dnn_mem_t &scales_m, const attr_t &attr,
-        int64_t scale_cnt, const float *scales, dnnl_engine_t engine);
+        int64_t scale_cnt, const float *scales, dnnl_engine_t engine_tgt);
 void maybe_prepare_runtime_scales(dnn_mem_t &scales_m,
-        const attr_bundle_t &attr_bundle, dnnl_engine_t engine);
+        const attr_bundle_t &attr_bundle, dnnl_engine_t engine_tgt);
 
 void maybe_prepare_runtime_zero_points(dnn_mem_t &zero_points_m,
-        const attr_t &attr, int arg, dnnl_engine_t engine);
+        const attr_t &attr, int arg, dnnl_engine_t engine_tgt);
 
 bool check_md_consistency_with_tag(
         const dnnl_memory_desc_t &md, const std::string &tag);

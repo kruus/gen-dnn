@@ -34,10 +34,12 @@ endif()
 
 if(DNNLPRIM_ALL)
     file(GLOB PRIM_TEST_CASES_SRC
+        test_iface_primitive_cache.cpp
         test_iface_pd.cpp
         test_iface_pd_iter.cpp
         test_iface_attr.cpp
         test_iface_handle.cpp
+        test_iface_stream_attr.cpp
         test_iface_runtime_dims.cpp
         test_iface_runtime_attr.cpp
         test_dnnl_threading.cpp
@@ -58,6 +60,7 @@ if(DNNLPRIM_ALL)
         test_inner_product_backward_data.cpp
         test_inner_product_backward_weights.cpp
         test_shuffle.cpp
+        test_rnn_forward.cpp
         test_convolution_format_any.cpp
         test_convolution_forward_f32.cpp
         test_convolution_forward_u8s8s32.cpp
@@ -76,17 +79,15 @@ if(DNNLPRIM_ALL)
         test_gemm_s8s8s32.cpp
         test_gemm_s8u8s32.cpp
         test_gemm_u8u8s32.cpp
-        test_rnn_forward.cpp
         test_layer_normalization.cpp
         test_binary.cpp
         test_logsoftmax.cpp
         test_matmul.cpp
         test_resampling.cpp
-        test_isa_mask.cpp
-        test_isa_iface.cpp
         test_global_scratchpad.cpp
+        test_alloc_scratchpad.cpp
         )
-else()
+else() # THIS MIGHT BE ALL WRONG NOW [ejk]
     if(TRUE)
         append_glob(PRIM_TEST_CASES_SRC
             test_isa*.cpp
@@ -181,6 +182,17 @@ if(TARGET_ARCH STREQUAL "AARCH64")
 # Remove AARCH64_SKIP_TESTS entries from PRIM_TEST_CASES_SRC.
     foreach(TEST_FILE ${AARCH64_SKIP_TESTS})
         list(REMOVE_ITEM PRIM_TEST_CASES_SRC "${TEST_FILE}")
+    endforeach()
+endif()
+
+# Add X64-specific tests
+if(DNNL_TARGET_ARCH STREQUAL "X64")
+    file(GLOB X64_PRIM_TEST_CASES_SRC
+        test_isa_mask.cpp
+        test_isa_iface.cpp
+        )
+    foreach(TEST_FILE ${X64_PRIM_TEST_CASES_SRC})
+        list(APPEND PRIM_TEST_CASES_SRC "${TEST_FILE}")
     endforeach()
 endif()
 

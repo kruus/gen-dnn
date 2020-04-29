@@ -44,7 +44,7 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
 
     if (padding_r == nullptr) padding_r = padding_l;
 
-    auto cd = zero<convolution_desc_t>();
+    auto cd = convolution_desc_t();
     cd.primitive_kind = primitive_kind::convolution;
     cd.prop_kind = prop_kind;
     cd.alg_kind = alg_kind;
@@ -92,6 +92,7 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
     const int g = with_groups ? weights_desc->dims[0] : 1;
     const int bias_dim = prop_kind == backward_data ? src_desc->dims[1]
                                                     : dst_desc->dims[1];
+
     bool consistency = true && memory_desc_wrapper(weights_desc).nelems()
             && src_desc->ndims == dst_desc->ndims
             && utils::one_of(src_desc->ndims, 3, 4, 5)
@@ -102,7 +103,6 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
             && src_desc->dims[0] == dst_desc->dims[0]
             && src_desc->dims[1] == g * weights_desc->dims[with_groups + 1]
             && dst_desc->dims[1] == g * weights_desc->dims[with_groups + 0];
-
     for (int i = 2; i < src_desc->ndims; ++i) {
         int src = src_desc->dims[i];
         int ker = weights_desc->dims[with_groups + i];
@@ -190,4 +190,4 @@ status_t dnnl_dilated_convolution_backward_weights_desc_init(
             dilates, padding_l, padding_r);
 }
 
-// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
+// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

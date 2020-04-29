@@ -59,7 +59,8 @@ public:
     virtual status_t create_memory_storage(memory_storage_t **storage,
             unsigned flags, size_t size, void *handle) override;
 
-    virtual status_t create_stream(stream_t **stream, unsigned flags) override;
+    virtual status_t create_stream(stream_t **stream, unsigned flags,
+            const stream_attr_t *attr) override;
     status_t create_stream(stream_t **stream, cl_command_queue queue);
 
     virtual status_t create_kernels(std::vector<compute::kernel_t> *kernels,
@@ -90,6 +91,10 @@ public:
 
     virtual cl_device_id device() const { return device_; }
     virtual cl_context context() const { return context_; }
+
+    virtual intptr_t device_id() const override {
+        return reinterpret_cast<intptr_t>(device());
+    }
 
     stream_t *service_stream() const { return service_stream_.get(); }
 

@@ -75,23 +75,6 @@ __kernel void ref_binary(__global DATA_T *src0, __global DATA_T *src1,
     dst[off] = TO_DST(d);
 }
 #else
-#if !SAME_SRC_DT
-#if SRC0_S
-#define SRC0_DATA_T char
-#else
-#define SRC0_DATA_T uchar
-#endif
-
-#if SRC1_S
-#define SRC1_DATA_T char
-#else
-#define SRC1_DATA_T uchar
-#endif
-
-#else
-#define SRC1_DATA_T DATA_T
-#define SRC0_DATA_T DATA_T
-#endif
 KERNEL_ATTR
 __kernel void ref_binary(__global SRC0_DATA_T *src0, __global SRC1_DATA_T *src1,
         __global DATA_T *dst, float eltwise_alpha, float eltwise_beta,

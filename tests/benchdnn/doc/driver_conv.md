@@ -35,9 +35,10 @@ and *conv-desc* is a problem descriptor. The canonical form is:
 ```
     gXmbX_icXidXihXiwX_ocXodXohXowX_kdXkhXkwX_sdXshXswX_pdXphXpwX_ddXdhXdwX_nS
 ```
-Here X is an integer number and S is a string (n stands for name).
-The special symbol `_` is ignored, so it may be used as a delimiter.
-Refer to the common glossary in README.md for the entity name and description.
+Here `X` is an integer number and `S` is a string literal without spaces (`n`
+stands for name). The special symbol `_` is ignored, so it may be used as a
+delimiter for better readability. Refer to the common glossary in README.md for
+the entity name and description.
 
 There are default values for some entities in case they were not specified:
  - g = 1;
@@ -80,10 +81,10 @@ The table below shows supported name configurations for this driver:
 
 ## Essence of Testing
 
-DNNL supports different data types, such as single-precision floating
+oneDNN supports different data types, such as single-precision floating
 point (`dnnl_f32`) and signed/unsigned integer of different lengths
 (`dnnl_{s,u}{8,16,32}`). We need to cover all those cases with tests. It is
-essential to test real convolution sizes, because DNNL provides
+essential to test real convolution sizes, because oneDNN provides
 different optimizations depending on the convolution parameters. There is no
 single unified approach inside, so it would not be enough to test only a few
 convolutions (also known as unit tests).

@@ -26,7 +26,7 @@ Let \src and \dst be \f$N \times C \times IH \times IW\f$ and \f$N
 \f$ F_h = \frac{OH}{IH} \f$ and \f$ F_w = \frac{OW}{IW} \f$ define scaling
 factors in each spatial dimension.
 
-The following formulas show how DNNL computes resampling for nearest neighbor
+The following formulas show how oneDNN computes resampling for nearest neighbor
 and bilinear interpolation methods.
 To further simplify the formulas, we assume the following:
 - \f$\src(n, ic, ih, iw) = 0\f$ if \f$ih < 0\f$ or \f$iw < 0\f$,
@@ -113,10 +113,10 @@ argument index as specified by the following table.
 Resampling primitive supports the following combination of data types for
 source and destination memory objects:
 
-| Propagation        | Source    |  Destination  |
-| :--                | :--       |  :--          |
-| forward / backward | f32       | f32           |
-| forward / backward | bf16      | bf16          |
+| Propagation        | Source / Destination  |
+| :--                | :--                   |
+| forward / backward | f32, bf16             |
+| forward            | f16, s8, u8           |
 
 ### Post-ops and Attributes
 
@@ -126,6 +126,8 @@ The resampling primitive doesn't support any post-ops or attributes.
 
 1. No primitive specific limitations. Refer to @ref dev_guide_data_types for
    limitations related to data types support.
+2. **CPU**
+    - No support for f16, u8, s8 data types.
 
 ## Performance Tips
 

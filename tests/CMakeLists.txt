@@ -36,8 +36,11 @@ append(CMAKE_C_FLAGS "${CMAKE_CCXX_SANITIZER_FLAGS}")
 append(CMAKE_CXX_FLAGS "${CMAKE_CCXX_SANITIZER_FLAGS}")
 
 # allow tests to include internal header files with, e.g.
-# include "src/common/dnnl_thread.hpp"
+# include "src/common/dnnl_thread.hpp" ...
 include_directories(${PROJECT_SOURCE_DIR})
+# ... and allow the included files transitively include other headers files
+# e.g. include "common/dnnl_thread_parallel_nd.hpp" from "dnnl_thread.hpp"
+include_directories(${PROJECT_SOURCE_DIR}/src)
 
 if(WIN32 AND NOT MINGW)
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
@@ -47,6 +50,10 @@ if(WIN32 AND NOT MINGW)
         # c4244: conversion with possible loss of data
         # c4996: unsafe / deprecated functions
         append(CMAKE_TEST_CCXX_NOWARN_FLAGS "/wd4996 /wd4244")
+        if ("${DNNL_CPU_THREADING_RUNTIME}" STREQUAL "THREADPOOL" AND Eigen3_FOUND)
+            # c4267: conversion with possible loss of data
+            append(CMAKE_TEST_CCXX_NOWARN_FLAGS "/wd4267")
+        endif()
     endif()
 endif()
 
@@ -68,6 +75,10 @@ if(DNNLPRIM_ALL AND (UNIX OR MINGW))
     register_exe(test_c_symbols-c ${test_c_symbols} "test")
 # elseif(WIN32)
 # No Windows support for: test_c_symbols.c
+endif()
+
+if(DNNL_ENABLE_PRIMITIVE_CACHE)
+    add_definitions(-DDNNL_ENABLE_PRIMITIVE_CACHE)
 endif()
 
 add_subdirectory(gtests)

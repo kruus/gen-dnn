@@ -14,13 +14,21 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef CPU_ENGINE_HPP
-#define CPU_ENGINE_HPP
+#ifndef CPU_CPU_ENGINE_HPP
+#define CPU_CPU_ENGINE_HPP
 
 #include <assert.h>
 
-#include "../common/engine.hpp"
-#include "c_types_map.hpp"
+#include "dnnl.h"
+
+#include "common/c_types_map.hpp"
+#include "common/engine.hpp"
+#include "common/cpu_target.h"
+
+#include "cpu/platform.hpp"
+
+#define CPU_INSTANCE(...) &primitive_desc_t::create<__VA_ARGS__::pd_t>,
+#define CPU_INSTANCE_X64(...) DNNL_X64_ONLY(CPU_INSTANCE(__VA_ARGS__))
 
 namespace dnnl {
 namespace impl {
@@ -54,11 +62,11 @@ public:
         : engine_t(engine_kind::cpu, get_default_runtime(engine_kind::cpu)) {}
 
     /* implementation part */
-
     virtual status_t create_memory_storage(memory_storage_t **storage,
             unsigned flags, size_t size, void *handle) override;
 
-    virtual status_t create_stream(stream_t **stream, unsigned flags) override;
+    virtual status_t create_stream(stream_t **stream, unsigned flags,
+            const stream_attr_t *attr) override;
 
     // concat, reorder and sum are "internal" impls
     virtual const concat_primitive_desc_create_f *
@@ -113,28 +121,6 @@ public:
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-
-/** Often the following definition for INSTANCE_CREATOR is appropriate. */
-#define DEFAULT_INSTANCE_CREATOR(...) \
-    &primitive_desc_t::create<__VA_ARGS__::pd_t>,
-
-/** Reference impls are always include in libdnnl.  It's OK to claim being
- * a ref impl if init() handles cases that actually require jit. */
-#define INSTANCE_ref(...) INSTANCE_CREATOR(__VA_ARGS__)
-
-/** Default allows x86 jit; N/A for vanilla or non-x86 builds.*/
-#if TARGET_X86_JIT
-#define INSTANCE(...) INSTANCE_CREATOR(__VA_ARGS__)
-#else
-#define INSTANCE(...)
-#endif
-
-/** For example, an implementation ONLY working for some non-x86 chip */
-#if DNNL_ISA >= DNNL_ISA_VE && DNNL_ISA <= DNNL_ISA_VE_ALL
-#define INSTANCE_ve(...) INSTANCE_CREATOR(__VA_ARGS__)
-#else
-#define INSTANCE_ve(...)
-#endif
 
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif

@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "cpu_engine.hpp"
+#include "cpu/cpu_engine.hpp"
 
 #include "cpu/matmul/gemm_bf16_matmul.hpp"
 #include "cpu/matmul/gemm_f32_matmul.hpp"
@@ -30,38 +30,34 @@ using pd_create_f = engine_t::primitive_desc_create_f;
 namespace {
 using namespace dnnl::impl::data_type;
 
-/// @copydoc INSTANCE_CREATOR
-#define INSTANCE_CREATOR(...) DEFAULT_INSTANCE_CREATOR(__VA_ARGS__)
-// don't really know yet about which ones require jit.
-// Can run vanilla tests with extra verbosity and see which ones get skipped? XXX
+#define INSTANCE(...) &primitive_desc_t::create<__VA_ARGS__::pd_t>
 static const pd_create_f impl_list[] = {
-        // clang-format off
-        INSTANCE_ref(matmul::gemm_f32_matmul_t)
-        INSTANCE_ref(matmul::gemm_bf16_matmul_t<f32>)
-        INSTANCE_ref(matmul::gemm_bf16_matmul_t<bf16>)
-        INSTANCE_ref(matmul::gemm_x8s8s32x_matmul_t<s8, s8, f32>)
-        INSTANCE_ref(matmul::gemm_x8s8s32x_matmul_t<s8, s8, s32>)
-        INSTANCE_ref(matmul::gemm_x8s8s32x_matmul_t<s8, s8, s8>)
-        INSTANCE_ref(matmul::gemm_x8s8s32x_matmul_t<s8, s8, u8>)
-        INSTANCE_ref(matmul::gemm_x8s8s32x_matmul_t<u8, s8, f32>)
-        INSTANCE_ref(matmul::gemm_x8s8s32x_matmul_t<u8, s8, s32>)
-        INSTANCE_ref(matmul::gemm_x8s8s32x_matmul_t<u8, s8, s8>)
-        INSTANCE_ref(matmul::gemm_x8s8s32x_matmul_t<u8, s8, u8>)
-        INSTANCE_ref(matmul::ref_matmul_t<f32>)
-        INSTANCE_ref(matmul::ref_matmul_t<bf16, bf16, f32, f32>)
-        INSTANCE_ref(matmul::ref_matmul_t<bf16, bf16, bf16, f32>)
-        INSTANCE_ref(matmul::ref_matmul_t<s8, s8, f32, s32>)
-        INSTANCE_ref(matmul::ref_matmul_t<s8, s8, s32, s32>)
-        INSTANCE_ref(matmul::ref_matmul_t<s8, s8, s8, s32>)
-        INSTANCE_ref(matmul::ref_matmul_t<s8, s8, u8, s32>)
-        INSTANCE_ref(matmul::ref_matmul_t<u8, s8, f32, s32>)
-        INSTANCE_ref(matmul::ref_matmul_t<u8, s8, s32, s32>)
-        INSTANCE_ref(matmul::ref_matmul_t<u8, s8, s8, s32>)
-        INSTANCE_ref(matmul::ref_matmul_t<u8, s8, u8, s32>)
-        // clang-format off
+        INSTANCE(matmul::gemm_f32_matmul_t),
+        INSTANCE(matmul::gemm_bf16_matmul_t<f32>),
+        INSTANCE(matmul::gemm_bf16_matmul_t<bf16>),
+        INSTANCE(matmul::gemm_x8s8s32x_matmul_t<s8, s8, f32>),
+        INSTANCE(matmul::gemm_x8s8s32x_matmul_t<s8, s8, s32>),
+        INSTANCE(matmul::gemm_x8s8s32x_matmul_t<s8, s8, s8>),
+        INSTANCE(matmul::gemm_x8s8s32x_matmul_t<s8, s8, u8>),
+        INSTANCE(matmul::gemm_x8s8s32x_matmul_t<u8, s8, f32>),
+        INSTANCE(matmul::gemm_x8s8s32x_matmul_t<u8, s8, s32>),
+        INSTANCE(matmul::gemm_x8s8s32x_matmul_t<u8, s8, s8>),
+        INSTANCE(matmul::gemm_x8s8s32x_matmul_t<u8, s8, u8>),
+        INSTANCE(matmul::ref_matmul_t<f32>),
+        INSTANCE(matmul::ref_matmul_t<bf16, bf16, f32, f32>),
+        INSTANCE(matmul::ref_matmul_t<bf16, bf16, bf16, f32>),
+        INSTANCE(matmul::ref_matmul_t<s8, s8, f32, s32>),
+        INSTANCE(matmul::ref_matmul_t<s8, s8, s32, s32>),
+        INSTANCE(matmul::ref_matmul_t<s8, s8, s8, s32>),
+        INSTANCE(matmul::ref_matmul_t<s8, s8, u8, s32>),
+        INSTANCE(matmul::ref_matmul_t<u8, s8, f32, s32>),
+        INSTANCE(matmul::ref_matmul_t<u8, s8, s32, s32>),
+        INSTANCE(matmul::ref_matmul_t<u8, s8, s8, s32>),
+        INSTANCE(matmul::ref_matmul_t<u8, s8, u8, s32>),
         /* eol */
         nullptr,
 };
+#undef INSTANCE
 } // namespace
 
 const pd_create_f *get_matmul_impl_list(const matmul_desc_t *desc) {

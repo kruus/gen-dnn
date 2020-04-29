@@ -3,11 +3,11 @@ Build from Source {#dev_guide_build}
 
 ## Download the Source Code
 
-Download [DNNL source code](https://github.com/intel/mkl-dnn/archive/master.zip)
-or clone [the repository](https://github.com/intel/mkl-dnn.git).
+Download [oneDNN source code](https://github.com/oneapi-src/oneDNN/archive/master.zip)
+or clone [the repository](https://github.com/oneapi-src/oneDNN.git).
 
 ~~~sh
-git clone https://github.com/intel/mkl-dnn.git
+git clone https://github.com/oneapi-src/oneDNN.git
 ~~~
 
 ## Build the Library
@@ -15,7 +15,7 @@ git clone https://github.com/intel/mkl-dnn.git
 Ensure that all software dependencies are in place and have at least the
 minimal supported version.
 
-The DNNL build system is based on CMake. Use
+The oneDNN build system is based on CMake. Use
 
 - `CMAKE_INSTALL_PREFIX` to control the library installation location,
 
@@ -27,10 +27,32 @@ configuration options.
 
 ### Linux/macOS
 
-- Generate makefile:
+#### Prepare the Build Space
+
 ~~~sh
-mkdir -p build && cd build && cmake ..
+mkdir -p build && cd build
 ~~~
+
+#### Generate makefile
+
+- Native compilation:
+~~~sh
+cmake .. <extra build options>
+~~~
+
+- Cross compilation (AArch64 target on Intel 64 host)
+
+~~~sh
+export CC=aarch64-linux-gnu-gcc
+export CXX=aarch64-linux-gnu-g++
+cmake .. \
+          -DCMAKE_SYSTEM_NAME=Linux \
+          -DCMAKE_SYSTEM_PROCESSOR=AARCH64 \
+          -DCMAKE_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib \
+          <extra build options>
+~~~
+
+#### Build and Install the Library
 
 - Build the library:
 ~~~sh
@@ -67,7 +89,7 @@ You can also use the `msbuild` command-line tool directly (here
 `/p:Configuration` selects the build configuration which can be different from
 the one specified in `CMAKE_BUILD_TYPE`, and `/m` enables a parallel build):
 ~~~bat
-msbuild "DNNL.sln" /p:Configuration=Release /m
+msbuild "oneDNN.sln" /p:Configuration=Release /m
   ~~~
 
 - Build the documentation
@@ -82,7 +104,7 @@ cmake --build . --target INSTALL
 
 ## Validate the Build
 
-Run unit tests:
+If the library is built for the host system, you can run unit tests using:
 
 ~~~sh
 ctest

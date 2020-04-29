@@ -19,6 +19,10 @@
 #include <windows.h>
 #endif
 
+#if defined __linux__ || defined __APPLE__
+#include <unistd.h>
+#endif
+
 #ifdef __linux__
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -32,12 +36,10 @@
 #include <string>
 
 #include "dnnl.h"
+#include "memory_debug.hpp"
 #include "utils.hpp"
 
-#if defined(__ve)
-// N/A      #include <stdatomic.h>
-#include <atomic> // avail ncc-2.3.20
-#endif
+#include "cpu/platform.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -94,8 +96,20 @@ FILE *fopen(const char *filename, const char *mode) {
 #endif
 }
 
+int getpagesize() {
+#ifdef _WIN32
+    SYSTEM_INFO info;
+    GetSystemInfo(&info);
+    return info.dwPageSize;
+#else
+    return ::getpagesize();
+#endif
+}
+
 void *malloc(size_t size, int alignment) {
     void *ptr;
+    if (memory_debug::is_mem_debug())
+        return memory_debug::malloc(size, alignment);
 
 #ifdef _WIN32
     ptr = _aligned_malloc(size, alignment);
@@ -108,6 +122,9 @@ void *malloc(size_t size, int alignment) {
 }
 
 void free(void *p) {
+
+    if (memory_debug::is_mem_debug()) return memory_debug::free(p);
+
 #ifdef _WIN32
     _aligned_free(p);
 #else
@@ -120,8 +137,6 @@ int32_t fetch_and_add(int32_t *dst, int32_t val) {
 #ifdef _WIN32
     return InterlockedExchangeAdd(reinterpret_cast<long *>(dst), val);
 #else
-    // XXX #elif defined(__ve) && __NEC_VERSION__ < 30000 use atomic_fetch_add(dst, val)
-    // o/w VE compile may compile but give undefined symbol during link.
     return __sync_fetch_and_add(dst, val);
 #endif
 }
@@ -201,4 +216,35 @@ dnnl_status_t dnnl_set_jit_profiling_flags(unsigned flags) {
 dnnl_status_t dnnl_set_jit_profiling_jitdumpdir(const char *dir) {
     return dnnl::impl::init_jit_profiling_jitdumpdir(dir, true);
 }
-/* vim: set et ts=4 sw=4 cino=^=l0,\:0,N-s: */
+
+dnnl_status_t dnnl_set_max_cpu_isa(dnnl_cpu_isa_t isa) {
+    return dnnl::impl::cpu::platform::set_max_cpu_isa(isa);
+}
+
+#if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_THREADPOOL
+#include "dnnl_threadpool_iface.hpp"
+namespace dnnl {
+namespace impl {
+namespace threadpool_utils {
+
+namespace {
+static thread_local threadpool_iface *active_threadpool = nullptr;
+}
+
+void DNNL_API activate_threadpool(threadpool_iface *tp) {
+    assert(!active_threadpool);
+    if (!active_threadpool) active_threadpool = tp;
+}
+
+void DNNL_API deactivate_threadpool() {
+    active_threadpool = nullptr;
+}
+
+threadpool_iface *get_active_threadpool() {
+    return active_threadpool;
+}
+
+} // namespace threadpool_utils
+} // namespace impl
+} // namespace dnnl
+#endif
