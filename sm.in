@@ -1,0 +1,40 @@
+--inplace=true 2222x5000
+--inplace=false 2222x5000
+--inplace=true  --alg=LOGSOFTMAX 2222x5000
+--inplace=false --alg=LOGSOFTMAX 2222x5000
+--axis=0 --alg=SOFTMAX 128x5000
+--axis=0 --alg=SOFTMAX --inplace=false 128x5000
+--axis=0 --alg=LOGSOFTMAX 128x5000
+--axis=0 --alg=SOFTMAX --inplace=false --axis=0 128x5000
+--dir=FWD_D --alg=SOFTMAX    --axis=0 --inplace=false 256x5555
+--dir=FWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 256x5555
+--dir=FWD_D --alg=SOFTMAX    --axis=0 --inplace=false 2560x555
+--dir=FWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 2560x555
+--dir=FWD_D --alg=SOFTMAX    --axis=0 --inplace=false 25600x55
+--dir=FWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 25600x55
+--dir=FWD_D --alg=SOFTMAX    --axis=1 --inplace=false 3333x256
+--dir=FWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 3333x256
+--dir=FWD_D --alg=SOFTMAX    --axis=1 --inplace=false 333x2560
+--dir=FWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 333x2560
+--dir=FWD_D --alg=SOFTMAX    --axis=1 --inplace=false 33x25600
+--dir=FWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 33x25600
+--dir=BWD_D --alg=SOFTMAX    --axis=0 --inplace=false 256x556
+--dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 256x556
+--dir=BWD_D --alg=SOFTMAX    --axis=0 --inplace=false 2560x556
+--dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 2560x556
+--dir=BWD_D --alg=SOFTMAX    --axis=0 --inplace=false 25600x55
+--dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 25600x55
+--dir=BWD_D --alg=SOFTMAX    --axis=1 --inplace=false 3334x256
+--dir=BWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 3334x256
+--dir=BWD_D --alg=SOFTMAX    --axis=1 --inplace=false 333x2560
+--dir=BWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 333x2560
+--dir=BWD_D --alg=SOFTMAX    --axis=1 --inplace=false 33x25600
+--dir=BWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 33x25600
+--dir=BWD_D --alg=SOFTMAX    --axis=0 --inplace=false 96x1000
+--dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 96x1000
+--dir=BWD_D --alg=SOFTMAX    --axis=1 --inplace=false 96x1000
+--dir=BWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 96x1000
+--dir=BWD_D --alg=SOFTMAX    --axis=0 --inplace=false 128x5000
+--dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 128x5000
+--dir=BWD_D --alg=SOFTMAX    --axis=1 --inplace=false 128x5000
+--dir=BWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 128x5000

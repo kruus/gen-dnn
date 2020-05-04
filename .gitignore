@@ -19,6 +19,7 @@ external
 *.out
 *.c
 *.log
+log-*
 buildd*
 build-*
 install
@@ -37,6 +38,9 @@ compile_commands.json
 **.o
 **.vg
 **.diff
+**.L
+**.LL
+veos*
 gmon.out
 oprofile*
 typescript

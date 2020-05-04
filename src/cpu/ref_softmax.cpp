@@ -13,6 +13,8 @@
 * See the License for the specific language governing permissions and
 * limitations under the License.
 *******************************************************************************/
+// internal compiler error?
+//#pragma _NEC options "-floop-split"
 
 #include <assert.h>
 #include <float.h>
@@ -28,12 +30,20 @@
 namespace dnnl {
 namespace impl {
 namespace cpu {
-
+#define VE_FWD_DENSE 1
+#define VE_FWD_GEN   1   // 3x VE speedup on --softmax --axis=0 96x1000
+#define VE_BWD_DENSE 1
+#define VE_BWD_GEN   1
+#define PRINT 1
 template <impl::data_type_t data_type>
 void ref_softmax_fwd_t<data_type>::execute_forward_dense(
         const exec_ctx_t &ctx) const {
     auto src = CTX_IN_MEM(const data_t *, DNNL_ARG_SRC);
     auto dst = CTX_OUT_MEM(data_t *, DNNL_ARG_DST);
+#if PRINT
+    fprintf(stderr,"sofmax_fwd_dense outer %d channels %d inner %d\n",
+            (int)outer_size_,(int)channels_,(int)inner_size_);
+#endif
 
     const auto ou_stride = pd()->outer_stride();
 
@@ -48,13 +58,12 @@ void ref_softmax_fwd_t<data_type>::execute_forward_dense(
         constexpr int unroll_factor = 32;
 #endif
 
-#if defined(__ve)
-        space_max = src_data[0];
+#if VE_FWD_DENSE
         for (int c = 0; c < channels_; ++c)
             //space_max = nstl::max(space_max, src_data[c]);
             //if( src_data[c] > space_max ) space_max = src_data[c];
             space_max = (src_data[c] > space_max? (float)src_data[c]: space_max);
-#elif !defined(__INTEL_COMPILER)
+#elif !defined(__INTEL_COMPILER) && !defined(__ve)
         // The code below makes the compiler generate maxps instruction.
         // rather than maxss, which is generated for the 'else' code path
         auto max_wrapper = [](float a, float b) { return nstl::max(a, b); };
@@ -85,7 +94,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_dense(
             }
             space_max = max_val;
         }
-#else
+#else /* ic++ or nc++ */
         // Intel(R) C++ Compiler generates the maxps + shuffle pattern
         // for the max search which works faster
         for (int c = 0; c < channels_; ++c)
@@ -93,7 +102,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_dense(
 #endif
 
         // sub + exp + sum
-#if defined(__ve)
+#if VE_FWD_DENSE
         if (pd()->is_softmax()) {
             for (int c = 0; c < channels_; ++c) {
                 space_denom += dst_data[c] = expf(src_data[c] - space_max);
@@ -134,7 +143,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_dense(
 #endif
 
         // scal
-#if defined(__ve)
+#if VE_FWD_DENSE
         if (pd()->is_softmax()) {
             space_denom = space_denom ? (1.f / space_denom) : 1.f;
             // '*=', '-='  :  not avail for bfloat16
@@ -147,7 +156,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_dense(
                 dst_data[c] = dst_data[c] - space_denom;
             }
         }
-#else
+#else // VE definite vectorization bug in this section
         if (pd()->is_softmax()) {
             space_denom = space_denom ? (1.f / space_denom) : 1.f;
         } else if (pd()->is_logsoftmax()) {
@@ -170,15 +179,21 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
 
     auto src = CTX_IN_MEM(const data_t *, DNNL_ARG_SRC);
     auto dst = CTX_OUT_MEM(data_t *, DNNL_ARG_DST);
+    auto const is_softmax = pd()->is_softmax();
+    auto const is_logsoftmax = pd()->is_logsoftmax();
+#if defined(__ve)
+    constexpr int unroll_factor = 256;
+#else
+    constexpr int unroll_factor = 32;
+#endif
 
     const memory_desc_wrapper data_d(pd()->src_md());
+#if PRINT
+    fprintf(stderr,"sofmax_fwd_generic outer %d channels %d inner %d\n",
+            (int)outer_size_,(int)channels_,(int)inner_size_);
+#endif
 
     parallel_nd(outer_size_, [&](int ou) {
-#if defined(__ve)
-        constexpr int unroll_factor = 256;
-#else
-        constexpr int unroll_factor = 32;
-#endif
         float space_max_val = 0, space_denom_val = 0;
         float *space_max = &space_max_val, *space_denom = &space_denom_val;
         if (inner_size_ > 1) {
@@ -194,57 +209,198 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
 
         for (int in = 0; in < inner_size_; in++) {
             dim_t const ou_in_offset = ou * channels_ * inner_size_ + in;
-
-#if defined(__ve)
-            // XXX need to check if 4*unroll_factor really uses 4 regs XXX
-            //size_t constexpr cthresh = 4 * unroll_factor;
-            size_t constexpr cthresh = unroll_factor;
-            if (channels_ < cthresh) {
-                size_t coff[cthresh];
-                VREG(coff);
-                for (int c = 0; c < channels_; c++) {
+#if VE_FWD_GEN
+            // But we expect NON-BLOCKED formats for VE, which **do** have constant
+            // channel-stride, and should be optimized (between "dense", inner~1
+            // and this "generic", in>1 cases).
+#define MVL 256
+#define MEDIUM (16*MVL)
+#define WHICH 0
+            if (WHICH >= 0 && channels_ <= MVL) {
+#define Short_ PragmaQuote(_NEC loop_count(MVL)) PragmaQuote(_NEC shortloop)
+#if 0 // slower! even though ind. loops vectorize (128x5000)
+                size_t coff[MVL];
+                Short_ for (int c = 0; c < channels_; c++)
                     coff[c] = data_d.off_l(ou_in_offset + c * inner_size_);
+                float vsrc[MVL]; VREG(vsrc); // vsrc is NOT pure register!
+                Short_ for (int c = 0; c < channels_; c++) {
+                    vsrc[c] = src[coff[c]];
                 }
-                for (int c = 0; c < channels_; c++) {
-                    space_max[in] = nstl::max(space_max[in], (float)src[coff[c]]);
+                float smax = src[coff[0]];
+                Short_ for (int c = 0; c < channels_; c++) {
+                    if( vsrc[c] > smax ) smax = vsrc[c];
                 }
-                if (pd()->is_softmax()) {
-                    for (int c = 0; c < channels_; c++) {
-                        float D = expf(src[coff[c]] - space_max[in]);
-                        space_denom[in] += D;
+
+                float vdst[MVL]; VREG(vdst); // don't scatter until very end
+                float denom = 0;
+                if (is_softmax) {
+                    Short_ for (int c = 0; c < channels_; c++) {
+                        float D = expf(vsrc[c]- smax);
+                        vdst[c] = D;
+                        denom += D;
+                    }
+                    float const mul = 1.0 / denom;
+                    Short_ for (int c = 0; c < channels_; c++)
+                        dst[coff[c]] = vdst[c] * mul;
+                } else if (is_logsoftmax) {
+                    Short_ for (int c = 0; c < channels_; c++) {
+                        float D = vsrc[c]- smax;
+                        vdst[c] = D;
+                        denom += expf(D);
+                    }
+                    denom = logf(denom);
+                    Short_ for (int c = 0; c < channels_; c++)
+                        dst[coff[c]] = vdst[c] - denom;
+                }
+                space_denom[in] = denom;
+                space_max[in] = smax;
+#else // older, faster
+                size_t coff[MVL];
+                Short_ for (int c = 0; c < channels_; ++c)
+                    coff[c] = data_d.off_l(ou_in_offset + c * inner_size_);
+                float smax = src[coff[0]];
+                Short_ for (int c = 0; c < channels_; c++)
+                    if( src[coff[c]] > smax ) smax = src[coff[c]];
+                space_max[in] = smax;
+
+                float denom = 0;
+                if (is_softmax) {
+                    Short_ for (int c = 0; c < channels_; c++) {
+                        float D = expf(src[coff[c]] - smax);
+                        denom += D;
+                        dst[coff[c]] = D;
+                    }
+                } else if (is_logsoftmax) {
+                    Short_ for (int c = 0; c < channels_; c++) {
+                        float D = src[coff[c]] - smax;
+                        denom += expf(D);
                         dst[coff[c]] = D;
                     }
                 }
-                else if (pd()->is_logsoftmax()) {
-                    for (int c = 0; c < channels_; c++) {
-                        float D = src[coff[c]] - space_max[in];
-                        space_denom[in] += expf(D);
-                        dst[coff[c]] = D;
-                    }
-                }
+                if (is_logsoftmax) denom = logf(denom);
 
-                if (pd()->is_logsoftmax()) {
-                    space_denom[in] = logf(space_denom[in]);
-                }
-
-                // VE: both "Partially vectorized"
-                if (pd()->is_softmax()) {
-                    float const mul = 1.0 / space_denom[in];
-                    //PragmaQuote(_NEC list_vector)/*not enough*/
-                    IVDEP()
-                    for (int c = 0; c < channels_; c++){
+                // VE: both "Partially vectorized" until IVDEP (even wtih list_vector hint)
+                if (is_softmax) {
+                    float const mul = 1.0 / denom;
+                    IVDEP() Short_ for (int c = 0; c < channels_; c++)
                         dst[coff[c]] = dst[coff[c]] * mul;
-                        //float tmpdst[coff[c]] = dst[coff[c]] * mul;
-                    }
-                } else if (pd()->is_logsoftmax()) {
-                    float const sub = space_denom[in];
-                    IVDEP()
-                    for (int c = 0; c < channels_; c++)
-                        dst[coff[c]] = dst[coff[c]] - sub;
+                } else if (is_logsoftmax) {
+                    IVDEP() Short_ for (int c = 0; c < channels_; c++)
+                        dst[coff[c]] = dst[coff[c]] - denom;
                 }
-            } else
+                space_denom[in] = denom;
 #endif
-            { // original way
+#undef Short_
+            }
+            // XXX add MEDIUM channels_ case here (reps w/ templated kernel trick?)
+            else if( WHICH==1 || channels_ > MVL )
+            { // the initial max means a full scalar pass (not caching off_l func values)
+                float smax = -FLT_MAX;
+#define HELP_ PragmaQuote(_NEC loop_count(MEDIUM))
+#if 0
+                // Hmmm the removed factor COULD be done blockwise.
+                for (int c = 0; c < channels_; c++) {
+                    size_t off = data_d.off_l(ou_in_offset + c * inner_size_);
+                    smax = nstl::max(smax, (float)src[off]);
+                }
+#else
+                for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
+                    dim_t data_off[MEDIUM];
+                    int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
+                    PragmaQuote(_NEC novector)
+                    for(int c=0; c<cmax; ++c){ // unvectorizable func call
+                        data_off[c] = data_d.off_l(ou_in_offset + (c0 + c) * inner_size_);
+                    }
+                    HELP_ for(int c=0; c<cmax; ++c){ // unvectorizable func call
+                        if( src[data_off[c]] > smax ) smax = src[data_off[c]];
+                    }
+                }
+#endif
+                float sdenom = 0.0;
+#if 0
+                for (int c = 0; c < channels_; c++) { // unvec
+                    size_t off = data_d.off_l(ou_in_offset + c * inner_size_);
+                    if (is_softmax) {
+                        float const D = expf(src[off] - smax);
+                        sdenom += D;
+                        dst[off] = D;
+                    } else if (is_logsoftmax) {
+                        float const D = src[off] - smax;
+                        sdenom += expf(D);
+                        dst[off] = D;
+                    }
+                }
+#else
+                for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
+                    dim_t data_off[MEDIUM];
+                    int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
+                    PragmaQuote(_NEC novector)
+                    for(int c=0; c<cmax; ++c){ // unvectorizable func call
+                        data_off[c] = data_d.off_l(ou_in_offset + (c0 + c) * inner_size_);
+                    }
+                    if (is_softmax) {
+                        HELP_ for(int c=0; c<cmax; ++c){ // pd-> blocks vectorization
+                            float const D = expf(src[data_off[c]] - smax);
+                            sdenom += D;
+                            dst[data_off[c]] = D;
+                        }
+                    } else if (is_logsoftmax) {
+                        HELP_ for(int c=0; c<cmax; ++c){ // pd-> blocks vectorization
+                            float const D = src[data_off[c]] - smax;
+                            sdenom += expf(D);
+                            dst[data_off[c]] = D;
+                        }
+                    }
+                }
+#endif
+                space_max[in] = smax; // but actually do not need scratchpad? XXX
+
+                if (is_softmax) {
+                    space_denom[in] = sdenom; // but actually do not need to store XXX
+                    sdenom = 1.0 / sdenom;
+                } else if (is_logsoftmax) {
+                    sdenom = logf(sdenom);
+                    space_denom[in] = sdenom; // but actually do not need to store XXX
+                }
+
+#if 0
+                for (int c = 0; c < channels_; c++) {
+                    size_t off = data_d.off_l(ou_in_offset + c * inner_size_);
+                    if (is_softmax) {
+                        dst[off] = dst[off] * sdenom;
+                    } else if (is_logsoftmax) {
+                        dst[off] = dst[off] - sdenom;
+                    }
+                }
+#else
+                PragmaQuote(_NEC novovertake)
+                for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
+                    dim_t data_off[MEDIUM];
+                    int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
+                    PragmaQuote(_NEC novector)
+                    for(int c=0; c<cmax; ++c){ // unvectorizable func call
+                        data_off[c] = data_d.off_l(ou_in_offset + (c0 + c) * inner_size_);
+                    }
+                    if (is_softmax) {
+                        PragmaQuote(_NEC vob)
+                        HELP_ IVDEP() for (int c = 0; c < cmax; c++) {
+                            dst[data_off[c]] = dst[data_off[c]] * sdenom;
+                        }
+                    } else if (is_logsoftmax) {
+                        PragmaQuote(_NEC vob)
+                        HELP_ IVDEP() for (int c = 0; c < cmax; c++) {
+                            dst[data_off[c]] = dst[data_off[c]] - sdenom;
+                        }
+                    }
+                }
+#endif
+#undef HELP_
+#undef WHICH
+#undef MVL
+#undef MEDIUM
+            }
+#else // VE_FWD_GEN
+            { // original way was JUST the following
                 for (int c = 0; c < channels_; c++) {
                     size_t off = data_d.off_l(ou_in_offset + c * inner_size_);
                     space_max[in] = nstl::max(space_max[in], (float)src[off]);
@@ -252,30 +408,31 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
 
                 for (int c = 0; c < channels_; c++) {
                     size_t off = data_d.off_l(ou_in_offset + c * inner_size_);
-                    if (pd()->is_softmax()) {
+                    if (is_softmax) {
                         float D = expf(src[off] - space_max[in]);
                         space_denom[in] += D;
                         dst[off] = D;
-                    } else if (pd()->is_logsoftmax()) {
+                    } else if (is_logsoftmax) {
                         float D = src[off] - space_max[in];
                         space_denom[in] += expf(D);
                         dst[off] = D;
                     }
                 }
 
-                if (pd()->is_logsoftmax()) {
+                if (is_logsoftmax) {
                     space_denom[in] = logf(space_denom[in]);
                 }
 
                 for (int c = 0; c < channels_; c++) {
                     size_t off = data_d.off_l(ou_in_offset + c * inner_size_);
-                    if (pd()->is_softmax()) {
+                    if (is_softmax) {
                         dst[off] = dst[off] / space_denom[in];
-                    } else if (pd()->is_logsoftmax()) {
+                    } else if (is_logsoftmax) {
                         dst[off] = dst[off] - space_denom[in];
                     }
                 }
-            }
+            } // end original way
+#endif // VE_FWD_GEN
         }
     });
 }
@@ -293,8 +450,9 @@ void ref_softmax_bwd_t<data_type>::execute_backward_dense(
 
     const auto ou_stride = pd()->outer_stride();
 
-#if 0 || defined(__ve)
-    printf("sofmax_bwd_dense\n"); fflush(stdout);
+#if PRINT
+    fprintf(stderr,"sofmax_bwd_dense outer %d channels %d inner %d\n",
+            (int)outer_size_,(int)channels_,(int)inner_size_);
 #endif
     parallel_nd(outer_size_, [&](int ou) {
         float sbr = 0;
@@ -323,94 +481,98 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
     const memory_desc_wrapper diff_d(pd()->diff_src_md());
     const memory_desc_wrapper data_d(pd()->dst_md());
 
-#if 0 || defined(__ve)
-    printf("sofmax_bwd_generic\n"); fflush(stdout);
+#if PRINT
+    fprintf(stderr,"sofmax_bwd_generic outer %d channels %d inner %d\n",
+            (int)outer_size_,(int)channels_,(int)inner_size_);
 #endif
-#if defined(__ve) // precision issues
+#if VE_BWD_GEN // precision issues
     parallel_nd(outer_size_, inner_size_, [&](int ou, int in) {
         dim_t const ou_in_offset = ou * channels_ * inner_size_ + in;
         if (pd()->is_softmax()) {
             typedef data_t acc_t; // double was 100x slower and no accuracty improvement
+            //typedef float acc_t;
             data_t sbr = (data_t)0;
             //acc_t sbr = (acc_t)0;
-#if defined(__ve) // rewrite to allow some vectorization
+#if VE_BWD_GEN // rewrite to allow some vectorization
             // time 91.8669 --> 0.104004 for
             // ./vetest.sh -B build-vej --benchdnn --softmax --verbose=10 --dir=BWD_D --axis=0 8192x64
             // which fails accuracy checks.
-            int constexpr cReg = 256; // single vec register?
-            int constexpr cBy = 4096; // 4096 / 256 = 16 vec regs at most
-            if( channels_ < cReg ){
-                dim_t diff_off[cReg];
-                dim_t data_off[cReg];
-                for (int c = 0; c < channels_; ++c) {
-                    data_off[c] = (ou_in_offset + c * inner_size_);
-                }
-                PragmaQuote(_NEC vob)
+#define MVL 256
+#define MEDIUM (16*MVL) /*potentially 16 vec regs*/
+            if( channels_ <= MVL ){
+                // the scalar loop dominates run-time.  although vector code looks great,
+                // not visibly much faster than default!
+                asm("## short");
+                dim_t diff_off[MVL];
+                dim_t data_off[MVL];
                 for (int c = 0; c < channels_; ++c) { // Unvectorized
-                    diff_off[c] = diff_d.off_l(data_off[c]);
-                    data_off[c] = data_d.off_l(data_off[c]);
+                    size_t const coff = ou_in_offset + c * inner_size_;
+                    diff_off[c] = diff_d.off_l(coff);
+                    data_off[c] = data_d.off_l(coff);
                 }
                 ShortLoop() for (int c = 0; c < channels_; ++c) {
                     sbr += (acc_t)(diff_dst[diff_off[c]]) * dst[data_off[c]];
                 }
                 ShortLoop() for (int c = 0; c < channels_; ++c) {
-                    diff_src[diff_off[c]] = dst[data_off[c]] * (diff_dst[diff_off[c]] - sbr);
+                    diff_src[diff_off[c]] = dst[data_off[c]]
+                            * (diff_dst[diff_off[c]] - sbr);
                 }
-            }else if( channels_ < cBy ){
-                dim_t diff_off[cBy];
-                dim_t data_off[cBy];
-                for (int c = 0; c < channels_; ++c) {
-                    data_off[c] = (ou_in_offset + c * inner_size_); // tmp
+            }else if( channels_ < MEDIUM ){
+                asm("## medium");
+#define HELP_ PragmaQuote(_NEC loop_count(MEDIUM))
+                dim_t diff_off[MEDIUM];
+                dim_t data_off[MEDIUM];
+                HELP_ for (int c = 0; c < channels_; ++c) { // Unvectorized
+                    size_t const coff = ou_in_offset + c * inner_size_;
+                    diff_off[c] = diff_d.off_l(coff);
+                    data_off[c] = data_d.off_l(coff);
                 }
-                PragmaQuote(_NEC vob)
-                for (int c = 0; c < channels_; ++c) { // Unvectorized
-                    diff_off[c] = diff_d.off_l(data_off[c]);
-                    data_off[c] = data_d.off_l(data_off[c]);
-                }
-                PragmaQuote(_NEC vob)
-                for (int c = 0; c < channels_; ++c) {
+                //PragmaQuote(_NEC nofuse)
+                HELP_ for (int c = 0; c < channels_; ++c) {
                     sbr += (acc_t)(diff_dst[diff_off[c]]) * dst[data_off[c]];
                 }
-                for (int c = 0; c < channels_; ++c) {
-                    diff_src[diff_off[c]] = dst[data_off[c]] * (diff_dst[diff_off[c]] - sbr);
+                HELP_ for (int c = 0; c < channels_; ++c) {
+                    diff_src[diff_off[c]] = dst[data_off[c]]
+                            * (diff_dst[diff_off[c]] - sbr);
                 }
+#undef HELP_
             }else{
-                for (int c0 = 0; c0 < channels_; c0+=cBy) {
-                    dim_t diff_off[cBy];
-                    dim_t data_off[cBy];
-                    int const cmax=( c0 < channels_- cBy? c0+cBy: channels_ );
-                    PragmaQuote(_NEC novovertake)
-                    for(int c=c0; c<cmax; ++c){
-                        data_off[c] = (ou_in_offset + c * inner_size_); // tmp
+                asm("## long");
+#define HELP_ PragmaQuote(_NEC loop_count(MEDIUM))
+                for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
+                    dim_t diff_off[MEDIUM];
+                    dim_t data_off[MEDIUM];
+                    int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
+                    //PragmaQuote(_NEC novector)
+                    HELP_ for(int c=0; c<cmax; ++c){ // unvectorizable func call
+                        size_t const coff = ou_in_offset + (c0 + c) * inner_size_;
+                        diff_off[c] = diff_d.off_l(coff);
+                        data_off[c] = data_d.off_l(coff);
                     }
-                    PragmaQuote(_NEC vob)
-                    for(int c=c0; c<cmax; ++c){ // unvectorizable func call
-                        diff_off[c] = diff_d.off_l(data_off[c]);
-                        data_off[c] = data_d.off_l(data_off[c]);
-                    }
-                    PragmaQuote(_NEC vob)
-                    for(int c=c0; c<cmax; ++c){
+                    //PragmaQuote(_NEC vob)
+                    HELP_ for(int c=0; c<cmax; ++c){
                         sbr += (acc_t)(diff_dst[diff_off[c]]) * dst[data_off[c]];
                     }
                 }
-                for (int c0 = 0; c0 < channels_; c0+=cBy) {
-                    dim_t diff_off[cBy];
-                    dim_t data_off[cBy];
-                    int const cmax=( c0 < channels_- cBy? c0+cBy: channels_ );
-                    for(int c=c0; c<cmax; ++c){
-                        data_off[c] = (ou_in_offset + c * inner_size_); // tmp
+                for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
+                    dim_t diff_off[MEDIUM];
+                    dim_t data_off[MEDIUM];
+                    int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
+                    HELP_ for(int c=0; c<cmax; ++c){ // unvectorizable func call
+                        size_t const coff = ou_in_offset + (c0 + c) * inner_size_;
+                        diff_off[c] = diff_d.off_l(coff);
+                        data_off[c] = data_d.off_l(coff);
                     }
-                    PragmaQuote(_NEC vob)
-                    for(int c=c0; c<cmax; ++c){ // unvectorizable func call
-                        diff_off[c] = diff_d.off_l(data_off[c]);
-                        data_off[c] = data_d.off_l(data_off[c]);
-                    }
-                    PragmaQuote(_NEC vob)
-                    for(int c=c0; c<cmax; ++c){
-                        diff_src[diff_off[c]] = dst[data_off[c]] * (diff_dst[diff_off[c]] - sbr);
+                    //PragmaQuote(_NEC vob)
+                    HELP_ for(int c=0; c<cmax; ++c){
+                        diff_src[diff_off[c]] = dst[data_off[c]]
+                                * (diff_dst[diff_off[c]] - sbr);
                     }
                 }
+#undef HELP_
             }
+#undef MVL
+#undef MEDIUM
 #else // original : offset function calls ==> scalar loops
             for (int c = 0; c < channels_; ++c) {
                 auto off_diff = diff_d.off_l(ou_in_offset + c * inner_size_);
@@ -424,8 +586,137 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
             }
 #endif
         } else if (pd()->is_logsoftmax()) {
-            data_t sbr = (data_t)0;
-            // still unvectorized because of off_l on VE
+            //typedef data_t acc_t; // double was 100x slower and no accuracty improvement
+            typedef float acc_t;
+            acc_t sbr = (acc_t)0;
+#if VE_BWD_DENSE // rewrite to allow some vectorization
+            // time 91.8669 --> 0.104004 for
+            // ./vetest.sh -B build-vej --benchdnn --softmax --verbose=10 --dir=BWD_D --axis=0 8192x64
+            // which fails accuracy checks.
+#define MVL 256         /* max simd vector length */
+#define MEDIUM (16*MVL) /*potentially 16 vec regs*/
+            if( channels_ <= 1*MVL ){ // nc++-3.0.27 will not used packed vector :/
+                // the scalar loop dominates run-time.  although vector code looks great,
+                // not visibly much faster than default!
+                asm("## logshort");
+                dim_t diff_off[1*MVL];
+                dim_t data_off[1*MVL];
+                float data_exp[1*MVL];
+#define Short() PragmaQuote(_NEC shortloop)
+//#define Short() PragmaQuote(_NEC loop_count(2*MVL))
+#define Vpack() PragmaQuote(_NEC packed_vector)
+#define PVREG(array_name) PragmaQuote(_NEC pvreg(array_name))
+                // unvectorized
+                Short()for (int c = 0; c < channels_; ++c) {
+                    size_t const coff = ou_in_offset + c * inner_size_;
+                    data_off[c] = data_d.off_l(coff);
+                    //data_exp[c] = expf( dst[data_d.off_l(coff)] );
+                    diff_off[c] = diff_d.off_l(coff);
+                }
+                data_t vdst[1*MVL]; VREG(vdst);
+                Short() for (int c = 0; c < channels_; ++c) {
+                    vdst[c] = dst[data_off[c]];         // gather
+                    data_exp[c] = expf( vdst[c] );      // __vec_expf
+                }
+                Short()for (int c = 0; c < channels_; ++c) {
+                    sbr += diff_dst[diff_off[c]]; // gather, vec reduction
+                }
+                Short()for (int c = 0; c < channels_; ++c) {
+                    // gather, load, fused-neg-mul-sub, scatter
+                    diff_src[diff_off[c]] = diff_dst[diff_off[c]]
+                            - data_exp[c] * sbr;
+                }
+            }else if( channels_ < MEDIUM ){
+                asm("## logmedium");
+                dim_t diff_off[MEDIUM];
+                dim_t data_off[MEDIUM];
+                float data_exp[MEDIUM];
+                PragmaQuote(_NEC loop_count(MEDIUM))
+                //PragmaQuote(_NEC novector)
+                for (int c = 0; c < channels_; ++c) { // Unvectorized
+                    size_t const coff = ou_in_offset + c * inner_size_;
+                    data_off[c] = data_d.off_l(coff);
+                    diff_off[c] = diff_d.off_l(coff);
+                }
+                // nc++ DOES have an __vec_expf ... how to get it?
+                {
+                    data_t vdst[MEDIUM];
+                    for (int c = 0; c < channels_; ++c) { // sneaky: allows __vec_expf
+                        // NO data_exp[c] = expf( dst[data_off[c]] );
+                        vdst[c] = dst[data_off[c]];
+                        data_exp[c] = expf( vdst[c] );
+                    }
+                }
+                PragmaQuote(_NEC loop_count(MEDIUM))
+                for (int c = 0; c < channels_; ++c) {
+                    sbr += diff_dst[diff_off[c]];
+                }
+                PragmaQuote(_NEC loop_count(MEDIUM))
+                for (int c = 0; c < channels_; ++c) {
+                    diff_src[diff_off[c]] = diff_dst[diff_off[c]]
+                            - data_exp[c] * sbr;
+                }
+            }else{
+                asm("## loglong"); // ouch. double calc of offsets
+#if 1 // orig
+                PragmaQuote(_NEC novector)
+                for (int c = 0; c < channels_; ++c) {
+                    auto off_diff = diff_d.off_l(ou_in_offset + c * inner_size_);
+                    sbr += diff_dst[off_diff];
+                }
+                for (int c = 0; c < channels_; ++c) {
+                    auto off_diff = diff_d.off_l(ou_in_offset + c * inner_size_);
+                    auto off_data = data_d.off_l(ou_in_offset + c * inner_size_);
+                    diff_src[off_diff] = diff_dst[off_diff]
+                            - expf(dst[off_data]) * sbr;
+                }
+#else
+                for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
+                    dim_t diff_off[MEDIUM];
+                    int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
+                    //PragmaQuote(_NEC novector)
+                    for(int c=0; c<cmax; ++c){ // unvectorizable func call
+                        size_t const coff = ou_in_offset + (c0 + c) * inner_size_;
+                        diff_off[c] = diff_d.off_l(coff);
+                    }
+                    PragmaQuote(_NEC loop_count(MEDIUM))
+                    for(int c=0; c<cmax; ++c){
+                        sbr += diff_dst[diff_off[c]];
+                    }
+                } // blockwise sbr adds mul & div corrections (keep as original!)
+                for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
+                    dim_t diff_off[MEDIUM];
+                    dim_t data_off[MEDIUM];
+                    float data_exp[MEDIUM];
+                    int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
+                    PragmaQuote(_NEC loop_count(MEDIUM))
+                    //PragmaQuote(_NEC novector)
+                    for(int c=0; c<cmax; ++c){ // unvectorizable func calls
+                        size_t const coff = ou_in_offset + (c0 + c) * inner_size_;
+                        data_off[c] = data_d.off_l(coff);
+                        diff_off[c] = diff_d.off_l(coff);
+                    }
+                    {
+                        data_t vdst[MEDIUM];
+                        for(int c=0; c<cmax; ++c){
+                            vdst[c] = dst[data_off[c]];   // gather
+                        }
+                        for(int c=0; c<cmax; ++c){
+                            data_exp[c] = expf(vdst[c]);  // __vec_expf
+                        }
+                    }
+                    PragmaQuote(_NEC loop_count(MEDIUM))
+                    for(int c=0; c<cmax; ++c){ // gather, load, fma, scatter
+                        diff_src[diff_off[c]] = diff_dst[diff_off[c]]
+                                - data_exp[c] * sbr;
+                    }
+                }
+#endif // orig
+            }
+#undef MVL
+#undef MEDIUM
+#else // original bwd logsoftmax: offset function calls ==> scalar loops
+            // still unvectorized because of off_l on VE XXX TODO
             for (int c = 0; c < channels_; ++c) {
                 auto off_diff = diff_d.off_l(ou_in_offset + c * inner_size_);
                 sbr += diff_dst[off_diff];
@@ -433,12 +724,13 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
             for (int c = 0; c < channels_; ++c) {
                 auto off_diff = diff_d.off_l(ou_in_offset + c * inner_size_);
                 auto off_data = data_d.off_l(ou_in_offset + c * inner_size_);
-                diff_src[off_diff]
-                        = diff_dst[off_diff] - expf(dst[off_data]) * sbr;
+                diff_src[off_diff] = diff_dst[off_diff]
+                        - expf(dst[off_data]) * sbr;
             }
+#endif
         }
     });
-#else
+#else // original code
     parallel_nd(outer_size_, inner_size_, [&](int ou, int in) {
         dim_t ou_in_offset = ou * channels_ * inner_size_ + in;
         float sbr = 0;

@@ -1,0 +1,109 @@
+smin-orig.log     ----------------------------------------------------------------------------------------smin-ve.log    ---------------------------------------------------------------------------------------------
+run: --softmax 128x5000                                                                                   run: --softmax 128x5000 sofmax_fwd_dense outer 128 channels 5000 inner 1
+forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:softmax axis:1,128x5000,14.4871       forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:softmax axis:1,128x5000,0.364014
+run: --softmax --inplace=false 128x5000                                                                   run: --softmax --inplace=false 128x5000 sofmax_fwd_dense outer 128 channels 5000 inner 1
+forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:softmax axis:1,128x5000,14.4829       forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:softmax axis:1,128x5000,0.359863
+run: --softmax --alg=LOGSOFTMAX 128x5000                                                                  run: --softmax --alg=LOGSOFTMAX 128x5000 sofmax_fwd_dense outer 128 channels 5000 inner 1
+forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:logsoftmax axis:1,128x5000,20.0891    forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:logsoftmax axis:1,128x5000,0.374023
+run: --softmax --alg=LOGSOFTMAX --inplace=false 128x5000                                                  run: --softmax --alg=LOGSOFTMAX --inplace=false 128x5000 sofmax_fwd_dense outer 128 channels 5000 inner 1
+forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:logsoftmax axis:1,128x5000,20.1292    forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:logsoftmax axis:1,128x5000,0.366943
+run: --softmax --axis=0 --inplace=false 128x5000                                                          run: --softmax --axis=0 --inplace=false 128x5000 sofmax_fwd_generic outer 1 channels 128 inner 5000
+forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:softmax axis:0,128x5000,792.255       forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:softmax axis:0,128x5000,225.759
+run: --softmax --axis=0 --inplace=false 128x5000                                                          run: --softmax --axis=0 --inplace=false 128x5000 sofmax_fwd_generic outer 1 channels 128 inner 5000
+forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:softmax axis:0,128x5000,792.263       forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:softmax axis:0,128x5000,225.778
+run: --softmax --alg=LOGSOFTMAX --axis=0 --inplace=false 128x5000                                         run: --softmax --alg=LOGSOFTMAX --axis=0 --inplace=false 128x5000 sofmax_fwd_generic outer 1 channels 128 inner 5000
+forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:logsoftmax axis:0,128x5000,842.018    forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:logsoftmax axis:0,128x5000,226.53
+run: --softmax --axis=0 --inplace=false 128x5000                                                          run: --softmax --axis=0 --inplace=false 128x5000 sofmax_fwd_generic outer 1 channels 128 inner 5000
+forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:softmax axis:0,128x5000,792.259       forward_training,data_f32::blocked:ab:f0 diff_undef::undef::f0,,alg:softmax axis:0,128x5000,225.788
+run: --softmax --dir=BWD_D --axis=0 --inplace=false 888x256                                               run: --softmax --dir=BWD_D --axis=0 --inplace=false 888x256 sofmax_bwd_generic outer 1 channels 888 inner 256
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:0,888x256,40.7451         backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:0,888x256,18.2981
+run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 888x256                              run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 888x256 sofmax_bwd_generic outer 1 channels 888 inner 256
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:0,888x256,34.4751      backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:0,888x256,32.313
+run: --softmax --dir=BWD_D --axis=0 --inplace=false 888x4000                                              run: --softmax --dir=BWD_D --axis=0 --inplace=false 888x4000 sofmax_bwd_generic outer 1 channels 888 inner 4000
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:0,888x4000,754.321        backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:0,888x4000,279.972
+run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 888x4000                             run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 888x4000 sofmax_bwd_generic outer 1 channels 888 inner 4000
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:0,888x4000,625.88      backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:0,888x4000,584.355
+run: --softmax --dir=BWD_D --axis=0 --inplace=false 888x10000                                             run: --softmax --dir=BWD_D --axis=0 --inplace=false 888x10000 sofmax_bwd_generic outer 1 channels 888 inner 10000
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:0,888x10000,1900.41       backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:0,888x10000,698.909
+run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 888x10000                            run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 888x10000 sofmax_bwd_generic outer 1 channels 888 inner 10000
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:0,888x10000,1602.63    backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:0,888x10000,1488.18
+run: --softmax --dir=BWD_D --inplace=false 888x256                                                        run: --softmax --dir=BWD_D --inplace=false 888x256 sofmax_bwd_dense outer 888 channels 256 inner 1
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:1,888x256,0.352051        backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:1,888x256,0.353027
+run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 888x256                                       run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 888x256 sofmax_bwd_dense outer 888 channels 256 inner 1
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:1,888x256,0.334961     backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:1,888x256,0.363037
+run: --softmax --dir=BWD_D --inplace=false 888x4000                                                       run: --softmax --dir=BWD_D --inplace=false 888x4000 sofmax_bwd_dense outer 888 channels 4000 inner 1
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:1,888x4000,0.469971       backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:1,888x4000,0.482178
+run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 888x4000                                      run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 888x4000 sofmax_bwd_dense outer 888 channels 4000 inner 1
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:1,888x4000,0.461914    backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:1,888x4000,0.498047
+run: --softmax --dir=BWD_D --inplace=false 888x10000                                                      run: --softmax --dir=BWD_D --inplace=false 888x10000 sofmax_bwd_dense outer 888 channels 10000 inner 1
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:1,888x10000,0.555908      backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:1,888x10000,0.583984
+run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 888x10000                                     run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 888x10000 sofmax_bwd_dense outer 888 channels 10000 inner 1
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:1,888x10000,0.623047   backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:1,888x10000,0.648926
+run: --softmax --dir=BWD_D --axis=0 --inplace=false 96x1000                                               run: --softmax --dir=BWD_D --axis=0 --inplace=false 96x1000 sofmax_bwd_generic outer 1 channels 96 inner 1000
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:0,96x1000,16.0669         backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:0,96x1000,8.01782
+run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 96x1000                              run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 96x1000 sofmax_bwd_generic outer 1 channels 96 inner 1000
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:0,96x1000,13.4868      backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:0,96x1000,12.6809
+run: --softmax --dir=BWD_D --inplace=false 96x1000                                                        run: --softmax --dir=BWD_D --inplace=false 96x1000 sofmax_bwd_dense outer 96 channels 1000 inner 1
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:1,96x1000,0.303955        backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:1,96x1000,0.328125
+run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 96x1000                                       run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 96x1000 sofmax_bwd_dense outer 96 channels 1000 inner 1
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:1,96x1000,0.305908     backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:1,96x1000,0.333008
+run: --softmax --dir=BWD_D --axis=0 --inplace=false 128x5000                                              run: --softmax --dir=BWD_D --axis=0 --inplace=false 128x5000 sofmax_bwd_generic outer 1 channels 128 inner 5000
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:0,128x5000,114.373        backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:0,128x5000,51.301
+run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 128x5000                             run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 128x5000 sofmax_bwd_generic outer 1 channels 128 inner 5000
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:0,128x5000,96.2429     backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:0,128x5000,89.967
+run: --softmax --dir=BWD_D --inplace=false 128x5000                                                       run: --softmax --dir=BWD_D --inplace=false 128x5000 sofmax_bwd_dense outer 128 channels 5000 inner 1
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:1,128x5000,0.320068       backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:softmax axis:1,128x5000,0.315918
+run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 128x5000                                      run: --softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 128x5000 sofmax_bwd_dense outer 128 channels 5000 inner 1
+backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:1,128x5000,0.322021    backward_data,data_f32::blocked:ab:f0 diff_f32::blocked:ab:f0,,alg:logsoftmax axis:1,128x5000,0.322021
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+src/cpu/ref_softmax.cpp (both measured on VE)
+rm -f `find ./build-vejd -name 'ref_softmax.cpp.o'`; rm -rf install-vejd; ./build.sh -adqqT >& x.log
+./vetest.sh -B build-vejd -L smin-xx.log --benchdnn -v1 --engine=cpu --softmax --batch=sm.in
+		orig	VE
+-- old settings
+fwd_dense	14.4871	0.364014		--softmax 128x5000
+		14.4829	0.359863		--softmax --inplace=false 128x5000 (same)
+		20.0891	0.374023		--softmax --alg=LOGSOFTMAX 128x5000
+		20.1292	0.374023		--softmax --alg=LOGSOFTMAX --inplace=false 128x5000
+-- new settings
+			1.2749 			--softmax 2222x5000
+			1.25195			--softmax --inplace=false 2222x5000
+			1.33496			--softmax --alg=LOGSOFTMAX 2222x5000
+			1.28198			--softmax --alg=LOGSOFTMAX --inplace=false 2222x5000
+
+# cannot reproduce VE #s -- stuck ~ 278 :(
+fwd_generic	792.255	225.759			--softmax --axis=0 --inplace=false 128x5000
+		792.263	225.778 		--softmax --axis=0 --inplace=false 128x5000
+		842.018	226.53			--softmax --alg=LOGSOFTMAX --axis=0 --inplace=false 128x5000
+		792.259	225.788			--softmax --axis=0 --inplace=false 128x5000
+bwd_generic	40.7451	18.5762			--softmax --dir=BWD_D --axis=0 --inplace=false 888x256
+		34.4751	18.7949			--dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 888x256
+		754.321	284.582			--softmax --dir=BWD_D --axis=0 --inplace=false 888x4000
+		625.88	289.547 		--dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 888x4000
+		1900.41	710.51			--softmax --dir=BWD_D --axis=0 --inplace=false 888x10000
+		1602.63	718.892			--dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 888x10000
+
+-- old settings
+bwd_dense	0.352051	0.353027	--softmax --dir=BWD_D --inplace=false 888x256
+		0.334961	0.363037	--softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 888x256
+		0.469971	0.482178	--softmax --dir=BWD_D --inplace=false 888x4000
+		0.461914	0.498047	--softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 888x4000
+		0.555908	0.583984	--softmax --dir=BWD_D --inplace=false 888x10000
+		0.623047	0.648926	--softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 888x10000
+-- new settings
+bwd_dense	0.911133	0.903076	--softmax --dir=BWD_D --inplace=false 11111x256
+		0.875		0.851074	--softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 11111x256
+		1.96191		1.95093		--softmax --dir=BWD_D --inplace=false 11111x4000
+		2.19214		2.2041		--softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 11111x4000
+		3.37915		3.36499		--softmax --dir=BWD_D --inplace=false 11111x10000
+		4.18799		4.17603		--softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 11111x10000
+
+bwd_generic	16.0669	8.24414			--softmax --dir=BWD_D --axis=0 --inplace=false 96x1000
+		13.486	8.29004			--softmax --dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 96x1000
+bwd_dense	0.303955	0.304199	--softmax --dir=BWD_D --inplace=false 96x1000 
+		0.305908	0.307861	--softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 96x1000
+bwd_generic	114.373	52.7219			--softmax --dir=BWD_D --axis=0 --inplace=false 128x5000
+		96.2429	53.0999			--softmax --dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 128x5000
+bwd_dense	0.320068	0.315918	--softmax --dir=BWD_D --inplace=false 128x5000
+		0.322021	0.322021	--softmax --dir=BWD_D --alg=LOGSOFTMAX --inplace=false 128x5000

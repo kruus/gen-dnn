@@ -2,7 +2,8 @@
 # vim: et sw=2 ts=2 foldlevel=6
 ENV=`which env`
 TEST_ENV=()
-TEST_ENV+=(DNNL_VERBOSE=2)
+# DNNL_VERBOSE 1:show exec  2:also show create times
+TEST_ENV+=(DNNL_VERBOSE=1)
 TEST_ENV+=(VE_INIT_HEAP=ZERO)
 TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
 #TEST_ENV+=(VE_ERRCTL_DEALLOCATE=ERROR)
@@ -110,7 +111,7 @@ function usage
 while getopts "L:B:T:x:g:f:R:N:t:u:vqGSlh" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
-      L) # $LOG file.  "less -r r$LOG" to view colorized version
+      L) # [f.log] $LOG file.  "less -r r$LOG" to view colorized version
         if [ "${OPTARG}" ]; then LOG="${OPTARG}"; fi
         ;;
       B) # $BLD build directory
@@ -152,12 +153,6 @@ while getopts "L:B:T:x:g:f:R:N:t:u:vqGSlh" arg; do
       S) # (--strace) run under strace
         STRACE='strace'; GDB=0;
         ;;
-      #o) # OpenMp support [default -ooo]:
-      #  # once    | 0 | build SEQ (no omp support) (run
-      #  # twice   | 1 | omp support, but test with OMP_NUM_THREADS=1
-      #  # thrice  | 2 | [default] omp, test without specifying OMP_NUM_THREADS
-      #  OMP=$(( OMP + 1 ));
-      #  ;;
       l) # list gtests and examples subdirectory of -B build directory
         LIST=1
         ;;
@@ -169,6 +164,12 @@ while getopts "L:B:T:x:g:f:R:N:t:u:vqGSlh" arg; do
         ;;
     esac
 done
+#o) # OpenMp support [default -ooo]:
+#  # once    | 0 | build SEQ (no omp support) (run
+#  # twice   | 1 | omp support, but test with OMP_NUM_THREADS=1
+#  # thrice  | 2 | [default] omp, test without specifying OMP_NUM_THREADS
+#  OMP=$(( OMP + 1 ));
+#  ;;
 if [ "$GDB" = 1 -a -z "$GTESTS" -a -z "$EXAMPLES" ]; then
   echo "-G (--gdb) option requires a -g <test_foo> gtest test name"
   usage
