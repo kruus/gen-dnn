@@ -210,6 +210,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
         for (int in = 0; in < inner_size_; in++) {
             dim_t const ou_in_offset = ou * channels_ * inner_size_ + in;
 #if VE_FWD_GEN
+            // large-block
             // But we expect NON-BLOCKED formats for VE, which **do** have constant
             // channel-stride, and should be optimized (between "dense", inner~1
             // and this "generic", in>1 cases).
@@ -293,10 +294,50 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
 #undef Short_
             }
             // XXX add MEDIUM channels_ case here (reps w/ templated kernel trick?)
-            else if( WHICH==1 || channels_ > MVL )
+            else if( WHICH==1 || channels_ <= MEDIUM )
+            {
+#define Medium_ PragmaQuote(_NEC loop_count(MEDIUM))
+                size_t coff[MEDIUM];
+                Medium_ for (int c = 0; c < channels_; ++c)
+                    coff[c] = data_d.off_l(ou_in_offset + c * inner_size_);
+                float smax = src[coff[0]];
+                Medium_ for (int c = 0; c < channels_; c++)
+                    if( src[coff[c]] > smax ) smax = src[coff[c]];
+
+                float denom = 0;
+                if (is_softmax) {
+                    Medium_ for (int c = 0; c < channels_; c++) {
+                        float D = expf(src[coff[c]] - smax);
+                        denom += D;
+                        dst[coff[c]] = D;
+                    }
+                } else if (is_logsoftmax) {
+                    Medium_ for (int c = 0; c < channels_; c++) {
+                        float D = src[coff[c]] - smax;
+                        denom += expf(D);
+                        dst[coff[c]] = D;
+                    }
+                }
+                space_max[in] = smax;
+                if (is_logsoftmax) denom = logf(denom);
+
+                // VE: both "Partially vectorized" until IVDEP (even wtih list_vector hint)
+                if (is_softmax) {
+                    float const mul = 1.0 / denom;
+                    IVDEP() Medium_ for (int c = 0; c < channels_; c++)
+                        dst[coff[c]] = dst[coff[c]] * mul;
+                } else if (is_logsoftmax) {
+                    IVDEP() Medium_ for (int c = 0; c < channels_; c++)
+                        dst[coff[c]] = dst[coff[c]] - denom;
+                }
+                space_denom[in] = denom;
+#undef Medium_
+            }
+            else if( WHICH==2 || channels_ > MEDIUM )
             { // the initial max means a full scalar pass (not caching off_l func values)
                 float smax = -FLT_MAX;
-#define HELP_ PragmaQuote(_NEC loop_count(MEDIUM))
+#define OUTER_
+#define INNER_ PragmaQuote(_NEC loop_count(MEDIUM))
 #if 0
                 // Hmmm the removed factor COULD be done blockwise.
                 for (int c = 0; c < channels_; c++) {
@@ -304,14 +345,14 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                     smax = nstl::max(smax, (float)src[off]);
                 }
 #else
-                for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
+                OUTER_ for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
                     dim_t data_off[MEDIUM];
                     int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
                     PragmaQuote(_NEC novector)
                     for(int c=0; c<cmax; ++c){ // unvectorizable func call
                         data_off[c] = data_d.off_l(ou_in_offset + (c0 + c) * inner_size_);
                     }
-                    HELP_ for(int c=0; c<cmax; ++c){ // unvectorizable func call
+                    INNER_ for(int c=0; c<cmax; ++c){ // unvectorizable func call
                         if( src[data_off[c]] > smax ) smax = src[data_off[c]];
                     }
                 }
@@ -331,7 +372,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                     }
                 }
 #else
-                for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
+                OUTER_ for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
                     dim_t data_off[MEDIUM];
                     int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
                     PragmaQuote(_NEC novector)
@@ -339,13 +380,13 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                         data_off[c] = data_d.off_l(ou_in_offset + (c0 + c) * inner_size_);
                     }
                     if (is_softmax) {
-                        HELP_ for(int c=0; c<cmax; ++c){ // pd-> blocks vectorization
+                        INNER_ for(int c=0; c<cmax; ++c){ // pd-> blocks vectorization
                             float const D = expf(src[data_off[c]] - smax);
                             sdenom += D;
                             dst[data_off[c]] = D;
                         }
                     } else if (is_logsoftmax) {
-                        HELP_ for(int c=0; c<cmax; ++c){ // pd-> blocks vectorization
+                        INNER_ for(int c=0; c<cmax; ++c){ // pd-> blocks vectorization
                             float const D = src[data_off[c]] - smax;
                             sdenom += expf(D);
                             dst[data_off[c]] = D;
@@ -374,7 +415,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                 }
 #else
                 PragmaQuote(_NEC novovertake)
-                for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
+                OUTER_ for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
                     dim_t data_off[MEDIUM];
                     int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
                     PragmaQuote(_NEC novector)
@@ -383,18 +424,18 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                     }
                     if (is_softmax) {
                         PragmaQuote(_NEC vob)
-                        HELP_ IVDEP() for (int c = 0; c < cmax; c++) {
+                        INNER_ IVDEP() for (int c = 0; c < cmax; c++) {
                             dst[data_off[c]] = dst[data_off[c]] * sdenom;
                         }
                     } else if (is_logsoftmax) {
                         PragmaQuote(_NEC vob)
-                        HELP_ IVDEP() for (int c = 0; c < cmax; c++) {
+                        INNER_ IVDEP() for (int c = 0; c < cmax; c++) {
                             dst[data_off[c]] = dst[data_off[c]] - sdenom;
                         }
                     }
                 }
 #endif
-#undef HELP_
+#undef INNER_
 #undef WHICH
 #undef MVL
 #undef MEDIUM
