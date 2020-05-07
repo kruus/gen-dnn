@@ -15,12 +15,27 @@
 #===============================================================================
 
 if(DNNLPRIM_ALL)
-    file(GLOB_RECURSE SOURCES
+    file(GLOB SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/*.h
         ${CMAKE_CURRENT_SOURCE_DIR}/*.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/*.c
         ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
         )
+    if(NECVE)
+        file(GLOB SOURCES_VE
+            ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.hpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.cpp
+            )
+        # Same-Name files in subdirectory REPLACE parent ones:
+        #   some cpu-specific code / optimization is too ugly!
+        string(REPLACE "/ve/" "/" x_ "${SOURCES_VE}")
+        list(REMOVE_ITEM SOURCES ${x_})
+
+        # add VE files to [maybe shortened] SOURCES
+        list(APPEND SOURCES ${SOURCES_VE})
+    endif()
 else() # Debug: include primitives piecewise into libdnnl
     file(GLOB SOURCES_CORE
         ${CMAKE_CURRENT_SOURCE_DIR}/bit_cast.hpp

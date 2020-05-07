@@ -404,12 +404,12 @@ private:
         const int O = dims[4];
 
         /* Quantize src & compute compensation */
-        auto scratch_quantized
-                = (int8_t * __restrict) ctx.get_scratchpad_grantor()
+        auto __restrict scratch_quantized
+                = (int8_t * ) ctx.get_scratchpad_grantor()
                           .template get<void>(memory_tracking::names::
                                           key_reorder_rnn_weights_quantization);
-        auto scratch_compensation
-                = (int32_t * __restrict) ctx.get_scratchpad_grantor()
+        auto __restrict scratch_compensation
+                = (int32_t * ) ctx.get_scratchpad_grantor()
                           .template get<void>(memory_tracking::names::
                                           key_reorder_rnn_weights_reduction);
         float *comp = reinterpret_cast<float *>(
@@ -427,7 +427,7 @@ private:
                 default: assert(!"Unsupported reorder");
             }
         } else
-            scratch_quantized = (int8_t * __restrict) src;
+            scratch_quantized = (int8_t * ) src;
 
         /* Step 2: we pre-compute the compensation */
         switch (pd()->itag_) {

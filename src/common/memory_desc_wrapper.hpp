@@ -22,8 +22,19 @@
 #include "c_types_map.hpp"
 #include "nstl.hpp"
 #include "utils.hpp"
+#include "dnnl_optimize.h"
 
 #include "type_helpers.hpp"
+
+#if defined(__ve)
+// Since most dimension lists are short
+#define DNNL_DIMS_NOVEC PragmaQuote(_NEC novector) PragmaQuote(_NEC unroll(6)) PragmaQuote(_NEC loop_count(6))
+// Note: you may add IVDEP() on case-by-case-basis
+#define DNNL_DIMS_VEC PragmaQuote(_NEC loop_count(6)) ShortLoop()
+#else
+#define DNNL_DIMS_NOVEC
+#define DNNL_DIMS_VEC
+#endif
 
 namespace dnnl {
 namespace impl {
@@ -283,19 +294,24 @@ struct memory_desc_wrapper : public c_compatible {
         const blocking_desc_t &blk = blocking_desc();
 
         dims_t pos_copy = {0};
-        for (int d = 0; d < ndims(); ++d)
+        /* for VE, unrolling is more effective than vectorization. */
+#define VEC 0
+#if VEC == 0
+#define Short_ PragmaQuote(_NEC novector) PragmaQuote(_NEC unroll(6)) PragmaQuote(_NEC loop_count(6))
+        Short_ for (int d = 0; d < ndims(); ++d)
             pos_copy[d] = pos[d] + (is_pos_padded ? 0 : padded_offsets()[d]);
 
         dim_t phys_offset = offset0();
 
         if (blk.inner_nblks > 0) {
             dim_t blk_stride = 1;
-            for (int iblk = blk.inner_nblks - 1; iblk >= 0; --iblk) {
+            Short_ for (int iblk = blk.inner_nblks - 1; iblk >= 0; --iblk) {
                 const int d = blk.inner_idxs[iblk];
 
                 dim_t p;
                 /* switch to faster 32-bit division when possible.
                  * inner blocks always fit 32-bit. */
+                // XXX use FASTMUL division (lazy-calc magic?)
                 if (pos_copy[d] <= INT32_MAX) {
                     p = (int32_t)pos_copy[d] % (int32_t)blk.inner_blks[iblk];
                     pos_copy[d] = (int32_t)pos_copy[d]
@@ -311,11 +327,54 @@ struct memory_desc_wrapper : public c_compatible {
             }
         }
 
-        for (int d = 0; d < ndims(); ++d) {
+        Short_ for (int d = 0; d < ndims(); ++d) {
             const dim_t p = pos_copy[d];
             phys_offset += p * blk.strides[d];
         }
+#undef Short_
+#else
+#define Short_ PragmaQuote(_NEC loop_count(6)) IVDEP() ShortLoop()
+        Short_ for (int d = 0; d < ndims(); ++d)
+            pos_copy[d] = pos[d] + (is_pos_padded ? 0 : padded_offsets()[d]);
 
+        dim_t phys_offset = offset0();
+
+        if (blk.inner_nblks > 0) {
+            //dim_t blk_stride = 1;
+            dim_t blk_strides[DNNL_MAX_NDIMS+1];
+            blk_strides[blk.inner_nblks+1] = 1;
+            Short_ for (int iblk = blk.inner_nblks - 1; iblk >= 0; --iblk) {
+                blk_strides[iblk] = blk_strides[iblk+1] * blk.inner_blks[iblk];
+            }
+            Short_ for (int iblk = blk.inner_nblks - 1; iblk >= 0; --iblk) {
+                const int d = blk.inner_idxs[iblk];
+
+                dim_t p;
+                /* switch to faster 32-bit division when possible.
+                 * inner blocks always fit 32-bit. */
+                // XXX use FASTMUL division (lazy-calc magic?)
+                if (pos_copy[d] <= INT32_MAX) {
+                    p = (int32_t)pos_copy[d] % (int32_t)blk.inner_blks[iblk];
+                    pos_copy[d] = (int32_t)pos_copy[d]
+                            / (int32_t)blk.inner_blks[iblk];
+                } else {
+                    p = pos_copy[d] % blk.inner_blks[iblk];
+                    pos_copy[d] /= blk.inner_blks[iblk];
+                }
+
+                //phys_offset += p * blk_stride;
+                //blk_stride *= blk.inner_blks[iblk];
+                phys_offset += p * blk_strides[iblk];
+            }
+        }
+
+        Short_ for (int d = 0; d < ndims(); ++d) {
+            const dim_t p = pos_copy[d];
+            phys_offset += p * blk.strides[d];
+        }
+#undef Short_
+#endif
+#undef VEC
         return phys_offset;
     }
 
@@ -325,6 +384,7 @@ struct memory_desc_wrapper : public c_compatible {
     dim_t off_l(dim_t l_offset, bool is_pos_padded = false) const {
         assert(is_blocking_desc());
         dims_t pos;
+        PragmaQuote(_NEC novector) PragmaQuote(_NEC unroll(6)) PragmaQuote(_NEC loop_count(6))//;
         for (int rd = 0; rd < ndims(); ++rd) {
             const int d = ndims() - 1 - rd;
             const dim_t cur_dim = is_pos_padded ? padded_dims()[d] : dims()[d];

@@ -26,6 +26,10 @@
 #include "common/bfloat16.hpp"
 
 #include "cpu/ref_softmax.hpp"
+#if defined(__ve)
+#include "common/ve/memory_desc_wrapper_opt.hpp"
+#define memory_desc_wrapper memory_desc_wrapper_opt
+#endif
 
 namespace dnnl {
 namespace impl {
@@ -337,7 +341,8 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
             { // the initial max means a full scalar pass (not caching off_l func values)
                 float smax = -FLT_MAX;
 #define OUTER_
-#define INNER_ PragmaQuote(_NEC loop_count(MEDIUM))
+#define INNER_ PragmaQuote(_NEC loop_count(MEDIUM)) PragmaQuote(_NEC list_vector) PragmaQuote(_NEC cncall)
+                // cncall did not seem to work - unsure why.  constexpr?
 #if 0
                 // Hmmm the removed factor COULD be done blockwise.
                 for (int c = 0; c < channels_; c++) {
@@ -424,12 +429,12 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                     }
                     if (is_softmax) {
                         PragmaQuote(_NEC vob)
-                        INNER_ IVDEP() for (int c = 0; c < cmax; c++) {
+                        INNER_ for (int c = 0; c < cmax; c++) {
                             dst[data_off[c]] = dst[data_off[c]] * sdenom;
                         }
                     } else if (is_logsoftmax) {
                         PragmaQuote(_NEC vob)
-                        INNER_ IVDEP() for (int c = 0; c < cmax; c++) {
+                        INNER_ for (int c = 0; c < cmax; c++) {
                             dst[data_off[c]] = dst[data_off[c]] - sdenom;
                         }
                     }
@@ -543,7 +548,7 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
             if( channels_ <= MVL ){
                 // the scalar loop dominates run-time.  although vector code looks great,
                 // not visibly much faster than default!
-                asm("## short");
+                //asm("## short");
                 dim_t diff_off[MVL];
                 dim_t data_off[MVL];
                 for (int c = 0; c < channels_; ++c) { // Unvectorized
@@ -559,7 +564,7 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
                             * (diff_dst[diff_off[c]] - sbr);
                 }
             }else if( channels_ < MEDIUM ){
-                asm("## medium");
+                //asm("## medium");
 #define HELP_ PragmaQuote(_NEC loop_count(MEDIUM))
                 dim_t diff_off[MEDIUM];
                 dim_t data_off[MEDIUM];
@@ -578,7 +583,7 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
                 }
 #undef HELP_
             }else{
-                asm("## long");
+                //asm("## long");
 #define HELP_ PragmaQuote(_NEC loop_count(MEDIUM))
                 for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
                     dim_t diff_off[MEDIUM];
@@ -639,7 +644,7 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
             if( channels_ <= 1*MVL ){ // nc++-3.0.27 will not used packed vector :/
                 // the scalar loop dominates run-time.  although vector code looks great,
                 // not visibly much faster than default!
-                asm("## logshort");
+                //asm("## logshort");
                 dim_t diff_off[1*MVL];
                 dim_t data_off[1*MVL];
                 float data_exp[1*MVL];
@@ -668,7 +673,7 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
                             - data_exp[c] * sbr;
                 }
             }else if( channels_ < MEDIUM ){
-                asm("## logmedium");
+                //asm("## logmedium");
                 dim_t diff_off[MEDIUM];
                 dim_t data_off[MEDIUM];
                 float data_exp[MEDIUM];
@@ -698,7 +703,7 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
                             - data_exp[c] * sbr;
                 }
             }else{
-                asm("## loglong"); // ouch. double calc of offsets
+                //asm("## loglong"); // ouch. double calc of offsets
 #if 1 // orig
                 PragmaQuote(_NEC novector)
                 for (int c = 0; c < channels_; ++c) {

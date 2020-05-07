@@ -307,6 +307,24 @@ if(NOT DNNL_ENABLE_JIT_PROFILING)
     list(FILTER SOURCES EXCLUDE REGEX "linux_perf")
 endif()
 
+if(NECVE)
+    file(GLOB FILES_REDUCE_INLINING
+        ${CMAKE_CURRENT_SOURCE_DIR}/*resampling*.cpp
+        )
+    # error:
+    # !(cd /home/kruus/vanilla-dbg/build-vejd/src/cpu && /opt/nec/ve/bin/nc++  -DDNNL_DLL -DDNNL_DLL_EXPORTS
+    # -DDNNL_ENABLE_CONCURRENT_EXEC -DDNNL_ENABLE_MAX_CPU_ISA -DDNNL_VE=1 -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS
+    # -I/home/kruus/vanilla-dbg/include -I/home/kruus/vanilla-dbg/build-vejd/include -I/home/kruus/vanilla-dbg/src
+    # -I/home/kruus/vanilla-dbg/src/cpu  -include stdint.h -minit-stack=zero -Wunknown-pragma -report-all
+    # -O4 -finline -finline-functions -finline-max-function-size=300 -finline-max-depth=5 -finline-max-times=20
+    # -ftemplate-depth=50 -fdiag-inline=2 -fdiag-vector=2 -mno-parallel -DCBLAS_LAYOUT=CBLAS_ORDER
+    # -DDNNL_VALUE_INITIALIZATION_BUG -pthread -std=gnu++14 -fopenmp   -D_SDL_beg -fPIC -D_FORTIFY_SOURCE=0 -D_SDL_end
+    #    -O4 -g -DNDEBUG   -o CMakeFiles/dnnl_cpu.dir/simple_resampling.cpp.o
+    # -c /home/kruus/vanilla-dbg/src/cpu/simple_resampling.cpp) && echo YAY || echo OHOH
+    set_source_files_properties(${FILES_REDUCE_INLINING}
+        PROPERTIES COMPILE_FLAGS "-finline-max-depth=4")
+endif()
+
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
     # to make computations more stable and to align the jitted code
     # with the reference one use precise division and square root
