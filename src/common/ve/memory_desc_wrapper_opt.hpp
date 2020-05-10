@@ -36,9 +36,10 @@ namespace impl {
 #define VEC_ _Pragma("_NEC vector")
 
 #if 0
-VEC     OFF_V   OFF_L   VOS     time    u64
+original time ?? 1500-2000 ?? (check!)
+VEC     OFF_V   OFF_L   VOS     time    u64     vec_off
 0       0       0       0       365
-0       0       0       1       365 --> 209  *** best
+0       0       0       1       365 --> 209 --> 8
 1       0       0       0       380
 1       0       0       1       380 --> 366
 0       1       0       0       455
@@ -208,7 +209,7 @@ public:
     };
 
     void vec_off_l(dim_t const* const l_offsets, ///< vector of logical offsets [noff]
-                   int const noff,               ///< restricted to 0..MVL at a time [remove restriction later]
+                   int const noff,               ///< we block by MVL any value OK.
                    dim_t * p_offsets,            ///< output: physical offsets [noff]
                    bool is_pos_padded = false) const {
         assert( noff > 0 && noff <= MVL );
@@ -220,40 +221,43 @@ public:
                //assert( l_offsets[i] < size_or_padded_size );
         }
 #endif
-        VecPos vp;
+        VecPos vp; // tmp memory, to transfer vector content to vec_off_v
+        // perhaps get rid of this by inlining, using up to 12 vec registers?
 #define SHORT_ _Pragma("_NEC vector") _Pragma("_NEC shortloop") _Pragma("_NEC assume")
-        uint64_t off[MVL];
-        uint64_t rem[MVL];
-        uint64_t div[MVL];
-        _Pragma("_NEC vreg(off)");
-        _Pragma("_NEC vreg(rem)");
-        _Pragma("_NEC vreg(div)");
-        SHORT_ for(int i=0;i<noff;++i) {
-            off[i] = l_offsets[i];
-        }
 
         int const nd = ndims();
         const auto dm  = is_pos_padded ? padded_dims(): dims();
-        NOVEC_ for (int d = 0; d < nd; ++d) {
-            const int rd = nd - 1 - d;          // reverse
-            const dim_t cur_dim = dm[rd];       // dims
-            /* switch to faster 32-bit division when possible. */
-            SHORT_ for(int l=0; l<noff; ++l) { // l ~ logical offset
-                rem[l] = off[l] % cur_dim; /* does the right thing (div,mul,sub) */
-                off[l] = off[l] / cur_dim;
-                vp.vp[rd][l] = rem[l];
+
+        for ( int lb = 0; lb < noff; lb += MVL ) { // XXX sometimes < MVL is faster/ lower latency
+            int llen = (noff-lb > MVL? MVL: noff-lb);
+            // load a vector register of logical offset inputs
+            uint64_t off[MVL];
+            _Pragma("_NEC vreg(off)");
+            SHORT_ for(int l=0; l<llen; ++l) {
+                off[l] = l_offsets[lb+l];
             }
+            // convert to coords [up to 12=DNNL_MAX_NDIMS]
+            NOVEC_ for (int d = 0; d < nd; ++d) {
+                const int rd = nd - 1 - d;          // reverse
+                const dim_t cur_dim = dm[rd];       // dims
+                /* check for 32-bit division ? */
+                SHORT_ for(int l=0; l<llen; ++l) { // l ~ logical offset
+                    vp.vp[rd][l] = off[l] % cur_dim; // does the right thing (div,mul,sub)
+                    off[l] = off[l] / cur_dim;       // store vec reg to vp
+                }
+            }
+            // "dense-layout" coords in vp --> output p_offset
+            vec_off_v(vp, &p_offsets[lb], llen, is_pos_padded);
         }
 #undef SHORT_
-        // now have "dense-layout" coords in vp.
-        // correct for inner blocking and back to physical offset.
-        // (vector version of "off_v")
-        vec_off_v(vp, p_offsets, noff, is_pos_padded);
     }
 private:
     /** vector-of-physical-offsets version of \c off_v.
      * Unlike \c off_v, we are \e private and can modify
-     * our coords \c vp, to save memory. */
+     * our coords \c vp, to save memory.
+     *
+     * \note This only does a MVL-long section at a time
+     */
     void vec_off_v( VecPos & vp,         // list of coords (from vec_off_l)
                       dim_t * p_offsets, // output physical offsets
                       int const noff,    // how many offsets in vp and p_offsets

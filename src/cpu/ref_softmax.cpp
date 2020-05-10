@@ -26,9 +26,20 @@
 #include "common/bfloat16.hpp"
 
 #include "cpu/ref_softmax.hpp"
+
 #if defined(__ve)
+// (should still work for x86, but with pragma warning)
+// reference calcs hugely slowed by offset calcs
+// 1. rearrange loops to split off "scalar" offset calcs.
+// 1b. "batch" over channels
+// 2. "batch" --> new vector-of-offsets API for memory_desc
+// Maybe go back to cleaner loops, with vectorized offset calcs ?
 #include "common/ve/memory_desc_wrapper_opt.hpp"
 #define memory_desc_wrapper memory_desc_wrapper_opt
+
+#else
+// to compare with "original" times:
+#include "common/memory_desc_wrapper.hpp"
 #endif
 
 namespace dnnl {
@@ -259,13 +270,26 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                 }
                 space_denom[in] = denom;
                 space_max[in] = smax;
-#else // older, faster
-                size_t coff[MVL];
+#else // older, faster [channels_ <= MVL]
+#define VECTOR_OFFSET_CALC 1
+                dim_t coff[MVL]; // physical offsets [padded/blocked mem layout]
+#if VECTOR_OFFSET_CALC && defined(COMMON_MEMORY_DESC_WRAPPER_OPT_HPP)
+                {   //
+                    dim_t l_off[MVL];
+                    // VREG(l_off); if can inline vec_off_l (asm?)
+                    // logical offsets, "as if dense" inner dims
+                    Short_ for (int c = 0; c < channels_; ++c)
+                            l_off[c] = ou_in_offset + c * inner_size_;
+                    data_d.vec_off_l( &l_off[0], channels_, &coff[0] );
+                }
+#else
                 Short_ for (int c = 0; c < channels_; ++c)
-                    coff[c] = data_d.off_l(ou_in_offset + c * inner_size_);
+                        // default: is_pos_padded=false
+                        coff[c] = data_d.off_l(ou_in_offset + c * inner_size_);
+#endif
                 float smax = src[coff[0]];
                 Short_ for (int c = 0; c < channels_; c++)
-                    if( src[coff[c]] > smax ) smax = src[coff[c]];
+                        if( src[coff[c]] > smax ) smax = src[coff[c]];
                 space_max[in] = smax;
 
                 float denom = 0;
@@ -288,10 +312,10 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                 if (is_softmax) {
                     float const mul = 1.0 / denom;
                     IVDEP() Short_ for (int c = 0; c < channels_; c++)
-                        dst[coff[c]] = dst[coff[c]] * mul;
+                            dst[coff[c]] = dst[coff[c]] * mul;
                 } else if (is_logsoftmax) {
                     IVDEP() Short_ for (int c = 0; c < channels_; c++)
-                        dst[coff[c]] = dst[coff[c]] - denom;
+                            dst[coff[c]] = dst[coff[c]] - denom;
                 }
                 space_denom[in] = denom;
 #endif
@@ -302,8 +326,20 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
             {
 #define Medium_ PragmaQuote(_NEC loop_count(MEDIUM))
                 size_t coff[MEDIUM];
+#if VECTOR_OFFSET_CALC && defined(COMMON_MEMORY_DESC_WRAPPER_OPT_HPP)
+                {   // we need to BLOCK by MVL (or so)
+                    dim_t l_off[MEDIUM];
+                    // VREG(l_off); if can inline vec_off_l (asm?)
+                    // logical offsets, "as if dense" inner dims
+                    Medium_ for (int c = 0; c < channels_; ++c)
+                            l_off[c] = ou_in_offset + c * inner_size_;
+                    data_d.vec_off_l( &l_off[0], channels_, (dim_t*)&coff[0] );
+                    //                [is_pos_padded=false]
+                }
+#else
                 Medium_ for (int c = 0; c < channels_; ++c)
                     coff[c] = data_d.off_l(ou_in_offset + c * inner_size_);
+#endif
                 float smax = src[coff[0]];
                 Medium_ for (int c = 0; c < channels_; c++)
                     if( src[coff[c]] > smax ) smax = src[coff[c]];
@@ -341,7 +377,8 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
             { // the initial max means a full scalar pass (not caching off_l func values)
                 float smax = -FLT_MAX;
 #define OUTER_
-#define INNER_ PragmaQuote(_NEC loop_count(MEDIUM)) PragmaQuote(_NEC list_vector) PragmaQuote(_NEC cncall)
+//#define INNER_ PragmaQuote(_NEC loop_count(MEDIUM)) PragmaQuote(_NEC list_vector) PragmaQuote(_NEC cncall)
+#define INNER_ PragmaQuote(_NEC loop_count(MEDIUM)) PragmaQuote(_NEC list_vector)
                 // cncall did not seem to work - unsure why.  constexpr?
 #if 0
                 // Hmmm the removed factor COULD be done blockwise.
@@ -352,18 +389,33 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
 #else
                 OUTER_ for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
                     dim_t data_off[MEDIUM];
-                    int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
+                    int const cmax=( channels_ - c0 > MEDIUM? MEDIUM: channels_ - c0 );
+                    // segfault XXX FIXME TODO
+#if 0 && VECTOR_OFFSET_CALC && defined(COMMON_MEMORY_DESC_WRAPPER_OPT_HPP)
+                    {
+                        dim_t l_off[MEDIUM]; // logical offsets, "as if dense" inner dims
+                        // VREG(l_off); if can inline vec_off_l (asm?)
+                        INNER_ for (int c = 0; c < cmax; ++c)
+                            l_off[c] = ou_in_offset + (c0 + c) * inner_size_;
+                        // XXX Actually, the coords of l_off[0] can just
+                        // increment the 'axis'th coord by one each time,
+                        // so a much faster vec_off_l is possible XXX
+                        data_d.vec_off_l( &l_off[0], channels_, &data_off[0] );
+                        //                [is_pos_padded=false]
+                    }
+#else
                     PragmaQuote(_NEC novector)
                     for(int c=0; c<cmax; ++c){ // unvectorizable func call
                         data_off[c] = data_d.off_l(ou_in_offset + (c0 + c) * inner_size_);
                     }
+#endif
                     INNER_ for(int c=0; c<cmax; ++c){ // unvectorizable func call
                         if( src[data_off[c]] > smax ) smax = src[data_off[c]];
                     }
                 }
 #endif
                 float sdenom = 0.0;
-#if 0
+#if 0 // older
                 for (int c = 0; c < channels_; c++) { // unvec
                     size_t off = data_d.off_l(ou_in_offset + c * inner_size_);
                     if (is_softmax) {
@@ -376,14 +428,28 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                         dst[off] = D;
                     }
                 }
-#else
+#endif
                 OUTER_ for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
                     dim_t data_off[MEDIUM];
-                    int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
+                    int const cmax=( channels_ - c0 > MEDIUM? MEDIUM: channels_ - c0 );
+#if 0 && VECTOR_OFFSET_CALC && defined(COMMON_MEMORY_DESC_WRAPPER_OPT_HPP)
+                    {
+                        dim_t l_off[MEDIUM]; // logical offsets, "as if dense" inner dims
+                        // VREG(l_off); if can inline vec_off_l (asm?)
+                        INNER_ for (int c = 0; c < cmax; ++c)
+                            l_off[c] = ou_in_offset + (c0 + c) * inner_size_;
+                        // XXX Actually, the coords of l_off[0] can just
+                        // increment the 'axis'th coord by one each time,
+                        // so a much faster vec_off_l is possible XXX
+                        data_d.vec_off_l( &l_off[0], channels_, &data_off[0] );
+                        //                [is_pos_padded=false]
+                    }
+#else
                     PragmaQuote(_NEC novector)
                     for(int c=0; c<cmax; ++c){ // unvectorizable func call
                         data_off[c] = data_d.off_l(ou_in_offset + (c0 + c) * inner_size_);
                     }
+#endif
                     if (is_softmax) {
                         INNER_ for(int c=0; c<cmax; ++c){ // pd-> blocks vectorization
                             float const D = expf(src[data_off[c]] - smax);
@@ -398,7 +464,6 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                         }
                     }
                 }
-#endif
                 space_max[in] = smax; // but actually do not need scratchpad? XXX
 
                 if (is_softmax) {
@@ -409,7 +474,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                     space_denom[in] = sdenom; // but actually do not need to store XXX
                 }
 
-#if 0
+#if 0 // old version
                 for (int c = 0; c < channels_; c++) {
                     size_t off = data_d.off_l(ou_in_offset + c * inner_size_);
                     if (is_softmax) {
@@ -418,7 +483,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                         dst[off] = dst[off] - sdenom;
                     }
                 }
-#else
+#endif
                 PragmaQuote(_NEC novovertake)
                 OUTER_ for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
                     dim_t data_off[MEDIUM];
@@ -439,7 +504,6 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                         }
                     }
                 }
-#endif
 #undef INNER_
 #undef WHICH
 #undef MVL
