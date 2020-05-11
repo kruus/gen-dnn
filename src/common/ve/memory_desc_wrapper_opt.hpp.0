@@ -318,8 +318,7 @@ private:
         const int nd = ndims();
         assert( nd < 6 );
         if (is_pos_padded) {
-            NOVEC_ ShortLoop() PragmaQuote(_NEC nounroll) PragmaQuote(_NEC loop_count(6))//;
-            for (int d = 0; d < nd; ++d) {
+            NOVEC_ for (int d = 0; d < nd; ++d) {
                VEC_ for(int l = 0; l < noff; ++l) {
                     vp.vp[d][l] += padded_offsets()[d];
                }
@@ -334,27 +333,22 @@ private:
             phys[l] = offset0();
 
         if (blk.inner_nblks > 0) {
-#if 0
-            // probably makes sense to reconsider if packed regs used (but then other things change too)
-            if (size() < INT32_MAX){
-                NOVEC_ for (int iblk = blk.inner_nblks - 1; iblk >= 0; --iblk) {
-                    const int d = blk.inner_idxs[iblk];
-                    VEC_ for(int l=0; l<noff; ++l) {
-                        uint32_t const p = vp.vp[d][l] % (uint64_t)blk.inner_blks[iblk];
-                        vp.vp[d][l] /= (uint32_t)blk.inner_blks[iblk];
-                        phys[l] += p * (uint32_t)(ib_strides[iblk]);
-                    }
-                }
-            }else
-#endif
-            {
-                NOVEC_ for (int iblk = blk.inner_nblks - 1; iblk >= 0; --iblk) {
-                    const int d = blk.inner_idxs[iblk];
-                    VEC_ for(int l=0; l<noff; ++l) {
-                        uint64_t const p = vp.vp[d][l] % (uint64_t)blk.inner_blks[iblk];
-                        vp.vp[d][l] /= (uint64_t)blk.inner_blks[iblk];
-                        phys[l] += p * ib_strides[iblk];
-                    }
+            NOVEC_ for (int iblk = blk.inner_nblks - 1; iblk >= 0; --iblk) {
+                const int d = blk.inner_idxs[iblk];
+
+                //uint64_t p[MVL]; //_Pragma("_NEC vreg(p)")
+                //if (pos_copy[d] <= UINT32_MAX) ...
+                VEC_ for(int l=0; l<noff; ++l) {
+                    //p = pos_copy[d] % (uint64_t)blk.inner_blks[iblk];
+                    uint64_t const p = vp.vp[d][l] % (uint64_t)blk.inner_blks[iblk];
+                    //
+                    //phys[l] += (p[l] = vp.vp[d][l] % (uint64_t)blk.inner_blks[iblk]) * ib_strides[iblk];
+
+                    //pos_copy[d] /= (uint64_t)blk.inner_blks[iblk];
+                    vp.vp[d][l] /= (uint64_t)blk.inner_blks[iblk];
+
+                    //phys_offset += p * ib_strides[iblk];
+                    phys[l] += p * ib_strides[iblk];
                 }
             }
         }
@@ -872,5 +866,5 @@ private:
 #undef MDW64
 #undef MDW32
 
-// vim: et ts=4 sw=4 cindent cino=+2s,l0,\:4,N-s
+// vim: et ts=4 sw=4 cindent cino+=+2s,l0,\:4,N-s
 #endif // COMMON_MEMORY_DESC_WRAPPER_OPT_HPP
