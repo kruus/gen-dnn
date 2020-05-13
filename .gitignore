@@ -41,6 +41,7 @@ compile_commands.json
 **.L
 **.LL
 veos*
+ve
 gmon.out
 oprofile*
 typescript

@@ -33,6 +33,7 @@ if(DNNLPRIM_ALL)
         string(REPLACE "/ve/" "/" x_ "${SOURCES_VE}")
         list(REMOVE_ITEM SOURCES ${x_})
 
+        message(STATUS "SOURCES_VE      ${SOURCES_VE}")
         # add VE files to [maybe shortened] SOURCES
         list(APPEND SOURCES ${SOURCES_VE})
     endif()

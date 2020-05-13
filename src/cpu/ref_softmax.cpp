@@ -353,31 +353,25 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                 space_denom[in] = denom;
 #undef Medium_
             } else if( WHICH==2 || channels_ > MEDIUM ) {
-                // the initial max means a full scalar pass (not caching off_l func values)
-                float smax = -FLT_MAX;
 #define OUTER_
 #define Medium_ PragmaQuote(_NEC loop_count(MEDIUM))
-#define INNER_ Medium_ PragmaQuote(_NEC list_vector)
+#define Medium_lv_ Medium_ PragmaQuote(_NEC list_vector)
+                // the initial max means a full scalar pass (not caching off_l func values)
+                float smax = -FLT_MAX;
                 OUTER_ for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
                     dim_t data_off[MEDIUM];
                     int const cmax=( channels_ - c0 > MEDIUM? MEDIUM: channels_ - c0 );
-#if VECTOR_OFFSET_CALC3
-                    {
+                    if (VECTOR_OFFSET_CALC3 && cmax > 1) {
                         dim_t l_off[MEDIUM]; // use cmax <= MEDIUM
                         Medium_ for (int c = 0; c < cmax; ++c)
                             l_off[c] = ou_in_offset + (c0 + c) * inner_size_;
-                        // XXX Actually, the coords of l_off[0] can just
-                        // increment the 'axis'th coord by one each time,
-                        // so a much faster vec_off_l is possible XXX
                         data_d.vec_off_l( &l_off[0], cmax, &data_off[0] ); // is_pos_padded=false
+                    } else {
+                        Medium_ for(int c=0; c<cmax; ++c){ // unvectorizable func call
+                            data_off[c] = data_d.off_l(ou_in_offset + (c0 + c) * inner_size_);
+                        }
                     }
-#else
-                    PragmaQuote(_NEC novector)
-                    for(int c=0; c<cmax; ++c){ // unvectorizable func call
-                        data_off[c] = data_d.off_l(ou_in_offset + (c0 + c) * inner_size_);
-                    }
-#endif
-                    INNER_ for(int c=0; c<cmax; ++c){ // unvectorizable func call
+                    Medium_lv_ for(int c=0; c<cmax; ++c){ // unvectorizable func call
                         if( src[data_off[c]] > smax ) smax = src[data_off[c]];
                     }
                 }
@@ -385,27 +379,24 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                 OUTER_ for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
                     dim_t data_off[MEDIUM];
                     int const cmax=( channels_ - c0 > MEDIUM? MEDIUM: channels_ - c0 );
-#if VECTOR_OFFSET_CALC4
-                    {
+                    if (VECTOR_OFFSET_CALC4 && cmax > 1) {
                         dim_t l_off[MEDIUM]; // use cmax <= MEDIUM
                         Medium_ for (int c = 0; c < cmax; ++c)
                             l_off[c] = ou_in_offset + (c0 + c) * inner_size_;
                         data_d.vec_off_l( &l_off[0], cmax, &data_off[0] ); // is_pos_padded=false
+                    } else {
+                        for(int c=0; c<cmax; ++c){ // unvectorizable func call
+                            data_off[c] = data_d.off_l(ou_in_offset + (c0 + c) * inner_size_);
+                        }
                     }
-#else
-                    PragmaQuote(_NEC novector)
-                    for(int c=0; c<cmax; ++c){ // unvectorizable func call
-                        data_off[c] = data_d.off_l(ou_in_offset + (c0 + c) * inner_size_);
-                    }
-#endif
                     if (is_softmax) {
-                        INNER_ for(int c=0; c<cmax; ++c){ // pd-> blocks vectorization
+                        Medium_lv_ for(int c=0; c<cmax; ++c){ // pd-> blocks vectorization
                             float const D = expf(src[data_off[c]] - smax);
                             sdenom += D;
                             dst[data_off[c]] = D;
                         }
                     } else if (is_logsoftmax) {
-                        INNER_ for(int c=0; c<cmax; ++c){ // pd-> blocks vectorization
+                        Medium_lv_ for(int c=0; c<cmax; ++c){ // pd-> blocks vectorization
                             float const D = src[data_off[c]] - smax;
                             sdenom += expf(D);
                             dst[data_off[c]] = D;
@@ -424,26 +415,30 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
 
                 PragmaQuote(_NEC novovertake)
                 OUTER_ for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
-                    dim_t data_off[MEDIUM];
                     int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
-                    PragmaQuote(_NEC novector)
-                    for(int c=0; c<cmax; ++c){ // unvectorizable func call
-                        data_off[c] = data_d.off_l(ou_in_offset + (c0 + c) * inner_size_);
+                    dim_t data_off[MEDIUM];
+                    if (VECTOR_OFFSET_CALC3 && cmax > 1) {
+                        dim_t l_off[MEDIUM]; // use cmax <= MEDIUM
+                        Medium_ for (int c = 0; c < cmax; ++c)
+                            l_off[c] = ou_in_offset + (c0 + c) * inner_size_;
+                        data_d.vec_off_l( &l_off[0], cmax, &data_off[0] ); // is_pos_padded=false
+                    } else {
+                        Medium_ for(int c=0; c<cmax; ++c){ // unvectorizable func call
+                            data_off[c] = data_d.off_l(ou_in_offset + (c0 + c) * inner_size_);
+                        }
                     }
                     if (is_softmax) {
-                        PragmaQuote(_NEC vob)
-                        INNER_ for (int c = 0; c < cmax; c++) {
+                        Medium_lv_ for (int c = 0; c < cmax; c++) {
                             dst[data_off[c]] = dst[data_off[c]] * sdenom;
                         }
                     } else if (is_logsoftmax) {
-                        PragmaQuote(_NEC vob)
-                        INNER_ for (int c = 0; c < cmax; c++) {
+                        Medium_lv_ for (int c = 0; c < cmax; c++) {
                             dst[data_off[c]] = dst[data_off[c]] - sdenom;
                         }
                     }
                 }
 #undef Medium_
-#undef INNER_
+#undef Medium_lv_
 #undef OUTER_
 #undef WHICH
 #undef MVL
