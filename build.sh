@@ -84,11 +84,11 @@ while getopts ":m:u:hvjatTdDqQP:FbBrRowW1567iMrcC" arg; do
             ;;
         t) # [0] increment test level: (1) examples, (2) tests (longer), ...
             # Apr-14-2017 build timings:
-            # 0   : build    ~ ?? min  (jit), 1     min  (vanilla) | examples/primitives-*
-            # >=1 : examples ~  1 min  (jit), 13-16 mins (vanilla) | other examples
-            # >=2 : test_*   ~ 10 mins (jit), 108   mins (vanilla) | gtests
-            # >=3 : benchdnn quick performance/correctness tests   | demo
-            # >=4 : benchdnn default build targets (very long)     | very long
+            # >=1 : build    ~ ?? min  (jit), 1     min  (vanilla) | examples/primitives-*
+            # >=2 : examples ~  1 min  (jit), 13-16 mins (vanilla) | other examples
+            # >=3 : test_*   ~ 10 mins (jit), 108   mins (vanilla) | gtests
+            # >=4 : benchdnn quick performance/correctness tests   | demo
+            # >=5 : benchdnn default build targets (very long)     | very long
             # Warning: -t>=1 with reduced omp (-o or -oo) can take a VERY long time
             DOTEST=$(( DOTEST + 1 ))
             ;;
@@ -507,6 +507,12 @@ echo 'ulimit soft : '`ulimit -Ss`
         ccxx_flags -finline-max-function-size=300
         ccxx_flags -finline-max-depth=10
         ccxx_flags -finline-max-times=20
+        if [ $DODEBUG -gt 0 ]; then
+            ccxx_flags -traceback=verbose
+            # add this code to get backtrace
+            #   __builtin_traceback((unsigned long *)__builtin_frame_address(0));
+            # when env VE_TRACEBACK=VERBOSE
+        fi
         #ccxx_flags -finline-abort-at-error
         #ccxx_flags -finline-suppress-diagnostics # 3.0.28?
         # src/common/tag_traits.hpp uses one_of(31 possibilities)
@@ -868,7 +874,7 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
         #TEST_ENV+=(OMP_WAIT_POLICY=active)
         rm -f ${BUILDDIR}/test[0123].log
         # 'make test` uses ctest, which recognizes -R (require) and -E (exclude) options
-        if [ $DOTEST -ge 0 ]; then # some short sanity-check examples
+        if [ $DOTEST -ge 1 ]; then # some short sanity-check examples
             echo "Testing> ${BUILDDIR}/test0.log"
             ( export;
               echo "${ENV} ${TEST_ENV[@]} ${TESTRUNNER}  examples/primitives*"; \
@@ -876,7 +882,7 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
                 ${TESTRUNNER} make VERBOSE=1 -C "${BUILDDIR}" test \
             ) 2>&1 | tee "${BUILDDIR}/test0.log" || true
         fi
-        if [ $DOTEST -ge 1 ]; then
+        if [ $DOTEST -ge 2 ]; then
             if [ "" ]; then
                 # these usually run fine under 'make test'
                 echo "Testing> ${BUILDDIR}/test1.log"
@@ -907,7 +913,7 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
                 } 2>&1 | tee "${BUILDDIR}/test1.log" || true
             fi
         fi
-        if [ $DOTEST -ge 2 ]; then
+        if [ $DOTEST -ge 3 ]; then
             if [ "" ]; then
                 echo "Testing> ${BUILDDIR}/test2.log"
                 ( export;
@@ -947,7 +953,7 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
                 fi
             fi
         fi
-        if [ $DOTEST -ge 3 ]; then # some [few] convolution timings (see that benchdnn runs)
+        if [ $DOTEST -ge 4 ]; then # some [few] convolution timings (see that benchdnn runs)
             if [ -x ./bench.sh ]; then
                 #DNNL_VERBOSE=2 BUILDDIR=${BUILDDIR} ${TESTRUNNER} ./bench.sh -q${DOTARGET} 2>&1 | tee "${BUILDDIR}/test3.log" || true
                 # bench.sh quick convolution tests...
@@ -963,7 +969,7 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
                 } 2>&1 | tee ${BUILDDIR}/test3.log || true
             fi
         fi
-        if [ $DOTEST -ge 4 ]; then # relevant CPU tests defined in tests/benchdnn/CMakeLists.txt
+        if [ $DOTEST -ge 5 ]; then # relevant CPU tests defined in tests/benchdnn/CMakeLists.txt
             # create list of relevant cmake benchdnn targets
             set +x
             if [ "$ISA" = "VANILLA" -o ! "$DOTARGET" = "j" ]; then

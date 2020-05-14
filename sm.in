@@ -2,49 +2,85 @@
 --inplace=false 2222x5000
 --inplace=true  --alg=LOGSOFTMAX 2222x5000
 --inplace=false --alg=LOGSOFTMAX 2222x5000
---axis=0 --alg=SOFTMAX 128x5000
---axis=0 --alg=SOFTMAX --inplace=false 128x5000
---axis=0 --alg=LOGSOFTMAX 128x5000
---axis=0 --alg=SOFTMAX --inplace=false --axis=0 128x5000
---dir=FWD_D --alg=SOFTMAX    --axis=0 --inplace=false 256x5555
---dir=FWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 256x5555
---dir=FWD_D --alg=SOFTMAX    --axis=0 --inplace=false 2560x555
---dir=FWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 2560x555
---dir=FWD_D --alg=SOFTMAX    --axis=0 --inplace=false 25600x55
---dir=FWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 25600x55
---dir=FWD_D --alg=SOFTMAX    --axis=1 --inplace=false 3333x256
---dir=FWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 3333x256
---dir=FWD_D --alg=SOFTMAX    --axis=1 --inplace=false 333x2560
---dir=FWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 333x2560
---dir=FWD_D --alg=SOFTMAX    --axis=1 --inplace=false 33x25600
---dir=FWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 33x25600
---dir=BWD_D --alg=SOFTMAX    --axis=0 --inplace=false 256x11111
---dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 256x11111
---dir=BWD_D --alg=SOFTMAX    --axis=0 --inplace=false 2560x1111
---dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 2560x1111
---dir=BWD_D --alg=SOFTMAX    --axis=0 --inplace=false 25600x111
---dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 25600x111
---dir=BWD_D --alg=SOFTMAX    --axis=1 --inplace=false 3334x256
---dir=BWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 3334x256
---dir=BWD_D --alg=SOFTMAX    --axis=1 --inplace=false 333x2560
---dir=BWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 333x2560
---dir=BWD_D --alg=SOFTMAX    --axis=1 --inplace=false 33x25600
---dir=BWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 33x25600
---dir=BWD_D --alg=SOFTMAX    --axis=0 --inplace=false 96x1000
---dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 96x1000
---dir=BWD_D --alg=SOFTMAX    --axis=1 --inplace=false 96x1000
---dir=BWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 96x1000
---dir=BWD_D --alg=SOFTMAX    --axis=0 --inplace=false 128x5000
---dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 128x5000
---dir=BWD_D --alg=SOFTMAX    --axis=1 --inplace=false 128x5000
---dir=BWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 128x5000
-#--dir=FWD_D --alg=SOFTMAX --tag=axb --axis=2 256x1280x1x1
-#--dir=FWD_D --alg=SOFTMAX --tag=axb --axis=2 256x1280x2x1
-#--dir=FWD_D --alg=SOFTMAX --tag=axb --axis=2 256x1280x3x1
-#--dir=FWD_D --alg=SOFTMAX --tag=axb --axis=2 256x1280x4x1
-#--dir=FWD_D --alg=SOFTMAX --tag=axb --axis=2 256x1280x6x1
-#--dir=FWD_D --alg=SOFTMAX --tag=axb --axis=2 256x1280x7x1
-#--dir=FWD_D --alg=SOFTMAX --tag=axb --axis=2 256x1280x8x1
-#--dir=FWD_D --alg=SOFTMAX --tag=axb --axis=2 256x1280x64x1
-#--dir=FWD_D --alg=SOFTMAX --tag=axb --axis=2 256x1280x128x1
-#--dir=FWD_D --alg=SOFTMAX --tag=axb --axis=2 256x1280x256x1
+--axis=0 --alg=SOFTMAX 127x5000
+--axis=0 --alg=SOFTMAX --inplace=false 127x5000
+--axis=0 --alg=LOGSOFTMAX 127x5000
+--axis=0 --alg=SOFTMAX --inplace=false --axis=0 127x5000
+--tag=aBx16b --mode=P
+--dir=FWD_D --alg=SOFTMAX    --axis=1 --inplace=false 3x255x5555
+--dir=FWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 3x255x5555
+--dir=FWD_D --alg=SOFTMAX    --axis=1 --inplace=false 3x2550x555
+--dir=FWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 3x2550x555
+--dir=FWD_D --alg=SOFTMAX    --axis=1 --inplace=false 3x25500x55
+--dir=FWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 3x25500x55
+#
+--dir=FWD_D --alg=SOFTMAX    --axis=1 --inplace=false 3x3333x255
+--dir=FWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 3x3333x255
+--dir=FWD_D --alg=SOFTMAX    --axis=1 --inplace=false 3x333x2550
+--dir=FWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 3x333x2550
+--dir=FWD_D --alg=SOFTMAX    --axis=1 --inplace=false 3x33x25500
+--dir=FWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 3x33x25500
+--dir=FWD_D --alg=SOFTMAX    --axis=2 --inplace=false 3x3333x255
+--dir=FWD_D --alg=LOGSOFTMAX --axis=2 --inplace=false 3x3333x255
+--dir=FWD_D --alg=SOFTMAX    --axis=2 --inplace=false 3x333x2550
+--dir=FWD_D --alg=LOGSOFTMAX --axis=2 --inplace=false 3x333x2550
+--dir=FWD_D --alg=SOFTMAX    --axis=2 --inplace=false 3x33x25500
+--dir=FWD_D --alg=LOGSOFTMAX --axis=2 --inplace=false 3x33x25500
+#
+--dir=BWD_D --alg=SOFTMAX    --axis=0 --inplace=false 3x255x11111
+--dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 3x255x11111
+--dir=BWD_D --alg=SOFTMAX    --axis=0 --inplace=false 3x2550x1111
+--dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 3x2550x1111
+--dir=BWD_D --alg=SOFTMAX    --axis=0 --inplace=false 3x25500x111
+--dir=BWD_D --alg=LOGSOFTMAX --axis=0 --inplace=false 3x25500x111
+#
+--dir=BWD_D --alg=SOFTMAX    --axis=1 --inplace=false 3x3334x255
+--dir=BWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 3x3334x255
+--dir=BWD_D --alg=SOFTMAX    --axis=1 --inplace=false 3x333x2550
+--dir=BWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 3x333x2550
+--dir=BWD_D --alg=SOFTMAX    --axis=1 --inplace=false 3x33x25500
+--dir=BWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 3x33x25500
+--dir=BWD_D --alg=SOFTMAX    --axis=2 --inplace=false 3x3334x255
+--dir=BWD_D --alg=LOGSOFTMAX --axis=2 --inplace=false 3x3334x255
+--dir=BWD_D --alg=SOFTMAX    --axis=2 --inplace=false 3x333x2550
+--dir=BWD_D --alg=LOGSOFTMAX --axis=2 --inplace=false 3x333x2550
+--dir=BWD_D --alg=SOFTMAX    --axis=2 --inplace=false 3x33x25500
+--dir=BWD_D --alg=LOGSOFTMAX --axis=2 --inplace=false 3x33x25500
+#
+--dir=BWD_D --alg=SOFTMAX    --axis=1 --inplace=false 3x98x1000
+--dir=BWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 3x98x1000
+--dir=BWD_D --alg=SOFTMAX    --axis=2 --inplace=false 3x98x1000
+--dir=BWD_D --alg=LOGSOFTMAX --axis=2 --inplace=false 3x98x1000
+--dir=BWD_D --alg=SOFTMAX    --axis=1 --inplace=false 3x127x5000
+--dir=BWD_D --alg=LOGSOFTMAX --axis=1 --inplace=false 3x127x5000
+--dir=BWD_D --alg=SOFTMAX    --axis=2 --inplace=false 3x127x5000
+--dir=BWD_D --alg=LOGSOFTMAX --axis=2 --inplace=false 3x127x5000
+#
+--dir=FWD_D --alg=SOFTMAX --axis=1 100x1x333
+--dir=FWD_D --alg=SOFTMAX --axis=1 100x2x333
+--dir=FWD_D --alg=SOFTMAX --axis=1 100x3x333
+--dir=FWD_D --alg=SOFTMAX --axis=1 100x4x333
+--dir=FWD_D --alg=SOFTMAX --axis=1 100x6x333
+--dir=FWD_D --alg=SOFTMAX --axis=1 100x7x333
+--dir=FWD_D --alg=SOFTMAX --axis=1 100x8x333
+--dir=FWD_D --alg=SOFTMAX --axis=1 100x64x333
+--dir=FWD_D --alg=SOFTMAX --axis=1 100x127x333
+--dir=FWD_D --alg=SOFTMAX --axis=1 100x255x333
+--dir=FWD_D --alg=SOFTMAX --axis=1 100x511x333
+--dir=FWD_D --alg=SOFTMAX --axis=1 100x2047x333
+--dir=FWD_D --alg=SOFTMAX --axis=1 100x8191x333
+--dir=FWD_D --alg=SOFTMAX --axis=1 100x16383x333
+--dir=BWD_D --alg=SOFTMAX --axis=1 100x1x333
+--dir=BWD_D --alg=SOFTMAX --axis=1 100x2x333
+--dir=BWD_D --alg=SOFTMAX --axis=1 100x3x333
+--dir=BWD_D --alg=SOFTMAX --axis=1 100x4x333
+--dir=BWD_D --alg=SOFTMAX --axis=1 100x6x333
+--dir=BWD_D --alg=SOFTMAX --axis=1 100x7x333
+--dir=BWD_D --alg=SOFTMAX --axis=1 100x8x333
+--dir=BWD_D --alg=SOFTMAX --axis=1 100x64x333
+--dir=BWD_D --alg=SOFTMAX --axis=1 100x127x333
+--dir=BWD_D --alg=SOFTMAX --axis=1 100x255x333
+--dir=BWD_D --alg=SOFTMAX --axis=1 100x511x333
+--dir=BWD_D --alg=SOFTMAX --axis=1 100x2047x333
+--dir=BWD_D --alg=SOFTMAX --axis=1 100x8191x333
+--dir=BWD_D --alg=SOFTMAX --axis=1 100x16383x333
