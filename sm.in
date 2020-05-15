@@ -1,3 +1,4 @@
+--dir=FWD_D --alg=SOFTMAX --axis=1 3x4x5
 --inplace=true 2222x5000
 --inplace=false 2222x5000
 --inplace=true  --alg=LOGSOFTMAX 2222x5000

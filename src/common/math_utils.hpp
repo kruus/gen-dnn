@@ -213,7 +213,12 @@ inline U soft_relu_fwd(T s) {
 }
 template <typename T, typename U = typename utils::remove_reference<T>::type>
 inline U soft_relu_bwd(T dd, T s) {
+#if defined(__ve)
+    // When VE generates VRCP of 1+__vec_expf, get nan (scalar loops seem OK)
+    return s <= U{-87} ? U{0} : (U)(dd / (1 + ::expf((float)(-s))));
+#else
     return (U)(dd / (1 + ::expf((float)(-s))));
+#endif
 }
 
 template <typename T, typename U = typename utils::remove_reference<T>::type>

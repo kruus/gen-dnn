@@ -28,6 +28,7 @@
 
 namespace self {
 
+#undef CHECK // ignore OneDNN's CHECK from src/common/utils.hpp
 #define CHECK(c, ...) \
     do { \
         if (!(c)) { \

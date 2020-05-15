@@ -38,10 +38,19 @@ void compute_ref_bwd(const prb_t *p, const dnn_mem_t &src,
     float *d_src_ptr = (float *)diff_src;
     const auto nelems = src.nelems();
 
+#if 0 // XXX testing
     dnnl::impl::parallel_nd(nelems, [&](int64_t i) {
         d_src_ptr[i] = compute_eltwise_bwd(
                 p->alg, d_dst_ptr[i], src_ptr[i], p->alpha, p->beta);
     });
+#else
+    for(int64_t i=0; i<nelems; ++i) {
+        d_src_ptr[i] = compute_eltwise_bwd(
+                p->alg, d_dst_ptr[i], src_ptr[i], p->alpha, p->beta);
+    }
+#endif
+
+
 }
 
 } // namespace eltwise

@@ -7,7 +7,8 @@ TEST_ENV+=(DNNL_VERBOSE=1)
 TEST_ENV+=(VE_INIT_HEAP=ZERO)
 TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
 #TEST_ENV+=(VE_ERRCTL_DEALLOCATE=ERROR)
-TEST_ENV+=(VE_TRACEBACK=VERBOSE)
+TEST_ENV+=(VE_TRACEBACK=VERBOSE) # -traceback=verbose compile option for build.sh -add
+#TEST_ENV+=(VE_TRACEBACK=FULL) # naddr2line doesn't resolve coming from .so (?)
 #TEST_ENV+=(VE_TRACEBACK=NONE)
 TEST_ENV+=(VE_PROGINF=DETAIL)
 #TEST_ENV+=(VE_ADVANCEOFF=YES)
@@ -105,6 +106,9 @@ function usage
     echo "    ./vetest.sh -B build-ved4 -l"
     echo "  run gdb on an existing example (./build-ved4/examples/getting-started-cpp)"
     echo "    ./vetest.sh -B build-ved4 -x getting-started-cpp -G"
+    echo "    manual gdb+logging (example):    script -f -c 'gdb --args \\"
+    echo "          ./build-vejd2/tests/benchdnn/benchdnn -v5 --engine=cpu --softmax --batch=sm.in'"
+    echo "    with output in file 'typescript'"
     exit 0
 }
 # Parse short options with bash getopts

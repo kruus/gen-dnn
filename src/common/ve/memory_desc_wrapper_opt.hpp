@@ -22,6 +22,11 @@
 #include "common/memory_desc_wrapper.hpp"
 #include "ve_fastdiv.h"
 
+#ifndef NDEBUG
+#include <iostream>
+#include <sstream>
+#endif
+
 namespace dnnl {
 namespace impl {
 
@@ -32,7 +37,6 @@ namespace impl {
 #define FD_OFF_V 0 // actually decent speed
 #define FD_OFF_L 0 /* about twice as slow? */
 #define VEC_OF_STRUCTS 1 /* zero may vectorize more */
-#define VEC_OFF_API 1
 #define OPTU64 0
 
 #else
@@ -42,7 +46,6 @@ namespace impl {
 #define FD_OFF_L 0 /* fastdiv? about twice as slow? */
 #define VEC_OF_STRUCTS 1 /* zero may vectorize more */
 // do not change: vec_off_l public function (vec_off_v private for now)
-#define VEC_OFF_API 1 /* useful if # offsets to calc > 1 */
 #define OPTU64 1 /* 0 [signed dim_t original] is only partially supported */
 #endif
 
@@ -88,6 +91,7 @@ VEC     OFF_V   OFF_L   VOS     time    u64     vec_off(1)    | orig(*)
         for (int i = 0; i < len; ++i){
             assert( (uint32_t)d[i] <= UINT32_MAX );
             struct ve_fastdiv f;
+
             vednn_fastdiv( &f, d[i] );
             ret[i].mul = f.mul;         // first mul
             ret[i].add = f.add;         // then add
@@ -198,20 +202,23 @@ VEC     OFF_V   OFF_L   VOS     time    u64     vec_off(1)    | orig(*)
  */
 struct memory_desc_wrapper_opt : public memory_desc_wrapper {
 
-#if VEC_OFF_API
     /** vec_off_l uses a work area to pass "as-if-dense" coords to vec_off_v.
      * Potentially could be a set of vector registers.
      * (Or just call vec_off_v directly if modified and made public) */
     struct VecPos {
         uint64_t vp[DNNL_MAX_NDIMS][MVL];
     };
-#endif
 
     /** constructor which takes a reference to a constant underlying C memory
      * descriptor \param md */
     memory_desc_wrapper_opt(const memory_desc_t *md)
             : memory_desc_wrapper(md)
               , ib_strides()
+              , offsets_u32( nelems(true/*padded*/) <= UINT32_MAX )
+              // if offsets_u32, also set:
+              , ib_strides32()
+              , blk_strides32()
+              , padded_offsets32()
 #if FD_OFF_V
               , ib(init_ib(*md))
 #endif
@@ -221,10 +228,17 @@ struct memory_desc_wrapper_opt : public memory_desc_wrapper {
 #endif
               , dims_small(all_dims_u32(false))
               , padded_dims_small(all_dims_u32(true))
-    { set_ib_strides(); }
+              // if padded_dims_small, also set:
+              , ibs32()
+    { set_ib_info(); }
     memory_desc_wrapper_opt(const memory_desc_t &md)
             : memory_desc_wrapper(md)
               , ib_strides()
+              , offsets_u32( nelems(true/*padded*/) <= UINT32_MAX )
+              // if offsets_u32, also set:
+              , ib_strides32()
+              , blk_strides32()
+              , padded_offsets32()
 #if FD_OFF_V
               , ib(init_ib(md))
 #endif
@@ -234,20 +248,21 @@ struct memory_desc_wrapper_opt : public memory_desc_wrapper {
 #endif
               , dims_small(all_dims_u32(false))
               , padded_dims_small(all_dims_u32(true))
-    { set_ib_strides(); }
+              // if padded_dims_small, also set:
+              , ibs32()
+    { set_ib_info(); }
 
 
 public:
 
     /* offset section : replace non-virtual base class versions */
 
-#if VEC_OFF_API
     void vec_off_l(dim_t const* const l_offsets, ///< vector of logical offsets [noff]
                    int const noff,               ///< we block by MVL any value OK.
                    dim_t * p_offsets,            ///< output: physical offsets [noff]
                    bool is_pos_padded = false) const {
-        assert( noff > 0 && noff <= MVL );
         assert(is_blocking_desc());
+#define SHORT_ _Pragma("_NEC vector") _Pragma("_NEC shortloop") _Pragma("_NEC assume")
 #ifndef NDEBUG
         // negative and out-of-bounds input l_offsets create nonsense outputs
         SHORT_ for(int i=0;i<noff;++i) {
@@ -255,35 +270,102 @@ public:
                //assert( l_offsets[i] < size_or_padded_size );
         }
 #endif
-        VecPos vp; // tmp memory, to transfer vector content to vec_off_v
-        // perhaps get rid of this by inlining, using up to 12 vec registers?
-#define SHORT_ _Pragma("_NEC vector") _Pragma("_NEC shortloop") _Pragma("_NEC assume")
-
-        int const nd = ndims();
-        const auto dm  = is_pos_padded ? padded_dims(): dims();
-
-        for ( int lb = 0; lb < noff; lb += MVL ) { // XXX sometimes < MVL is faster/ lower latency
-            int llen = (noff-lb > MVL? MVL: noff-lb);
-            // load a vector register of logical offset inputs
-            uint64_t off[MVL];
-            _Pragma("_NEC vreg(off)");
-            SHORT_ for(int l=0; l<llen; ++l) {
-                off[l] = l_offsets[lb+l];
+        if (noff <= 1) {
+            if (noff == 1) {
+                // noff == 1 does not admit vectorization over channels,
+                // so use default (might vectorize a little over dims)
+                p_offsets[0] = off_l(l_offsets[0]);
+                // return;
             }
-            // convert to coords [up to 12=DNNL_MAX_NDIMS]
-            NOVEC_ for (int d = 0; d < nd; ++d) {
-                const int rd = nd - 1 - d;          // reverse
-                const dim_t cur_dim = dm[rd];       // dims
-                /* check for 32-bit division ? */
-                SHORT_ for(int l=0; l<llen; ++l) { // l ~ logical offset
-                    vp.vp[rd][l] = off[l] % cur_dim; // does the right thing (div,mul,sub)
-                    off[l] = off[l] / cur_dim;       // store vec reg to vp
+        } else { // yes, vector routines make sense
+
+            int const nd = ndims();
+
+#define VEC_U32 0
+#if VEC_U32
+            if (offsets_u32) {
+                const auto dm  = is_pos_padded ? padded_dims32: dims32;
+                VecPos32 vp; // tmp memory, to transfer vector content to vec_off_v
+                // perhaps get rid of this by inlining, using up to 12 vec registers?
+                for ( int lb = 0; lb < noff; lb += MVL ) { // XXX sometimes < MVL is faster/ lower latency
+                    int llen = (noff-lb > MVL? MVL: noff-lb);
+                    // load a vector register of logical offset inputs
+                    uint32_t off[MVL];
+                    _Pragma("_NEC vreg(off)");
+                    SHORT_ for(int l=0; l<llen; ++l) {
+                        off[l] = l_offsets[lb+l];
+                    }
+                    // convert to coords [up to 12=DNNL_MAX_NDIMS]
+                    NOVEC_ for (int d = 0; d < nd; ++d) { // reverse
+                        const int rd = nd - 1 - d;        // dims
+                        const uint32_t cur_dim = dm32[rd];
+                        SHORT_ for(int l=0; l<llen; ++l) {   // l ~ logical offset
+                            vp.vp[rd][l] = off[l] % cur_dim; // still div,mul,sub
+                            off[l] = off[l] / cur_dim;       // store vec reg to vp
+                        }
+                    }
+                }
+                // "dense-layout" coords in vp --> output p_offset
+                vec_off_v(vp, &p_offsets[lb], llen, is_pos_padded);
+            } else
+#else // not VEC_U32
+            {
+                const auto dm  = is_pos_padded ? padded_dims(): dims();
+                VecPos vp; // tmp memory, to transfer vector content to vec_off_v
+                // perhaps get rid of this by inlining, using up to 12 vec registers?
+                for ( int lb = 0; lb < noff; lb += MVL ) { // XXX sometimes < MVL is faster/ lower latency
+                    int llen = (noff-lb > MVL? MVL: noff-lb);
+                    // load a vector register of logical offset inputs
+                    uint64_t off[MVL];
+                    _Pragma("_NEC vreg(off)");
+                    SHORT_ for(int l=0; l<llen; ++l) {
+                        off[l] = l_offsets[lb+l];
+                    }
+                    // convert to coords [up to 12=DNNL_MAX_NDIMS]
+                    NOVEC_ for (int d = 0; d < nd; ++d) {
+                        const int rd = nd - 1 - d;          // reverse
+                        const dim_t cur_dim = dm[rd];       // dims
+
+                        SHORT_ for(int l=0; l<llen; ++l) { // l ~ logical offset
+                            vp.vp[rd][l] = off[l] % cur_dim; // does the right thing (div,mul,sub)
+                            off[l] = off[l] / cur_dim;       // store vec reg to vp
+                        }
+                    }
+#if 0 && !defined(NDEBUG)  // (yes, softmax l_offsets are nicely regular (better API possible)
+                    if(1){ // test regularity of vp (as generated from ref_softmax.cpp)
+                        using namespace std;
+                        bool ok = true;
+                        ostringstream oss;
+                        oss<<"\n lb="<<lb<<" llen="<<llen;
+                        NOVEC_ for (int d = 0; d < nd; ++d) {
+                            oss<<"\n    d="<<d<<" vp["<<d<<"]=";
+                            char sep='{';
+                            SHORT_ for(int l=1; l<llen; ++l) {
+                                oss<<sep<<vp.vp[d][l];
+                                sep=',';
+                            }
+                            oss<<"}";
+                            SHORT_ for(int l=1; l<llen; ++l) { // l ~ logical offset
+                                if( vp.vp[d][l] != vp.vp[d][0] && vp.vp[d][l] != vp.vp[d][l-1] + 1 ) {
+                                    oss<<"\thuh? vp[d][0]="<<vp.vp[d][0]<<" vp[d]["<<l-1<<"]="<<vp.vp[d][l-1]
+                                            <<" but vp[d]["<<l<<"]="<<vp.vp[d][l];
+                                    ok = false;
+                                }
+                            }
+                        }
+                        if (!ok) {
+                            oss<<"warning: we are not traversing a single axis\n";
+                        }
+                        cout<<oss.str()<<endl;
+                    }
+#endif
+                    // "dense-layout" coords in vp --> output p_offset
+                    vec_off_v(vp, &p_offsets[lb], llen, is_pos_padded);
                 }
             }
-            // "dense-layout" coords in vp --> output p_offset
-            vec_off_v(vp, &p_offsets[lb], llen, is_pos_padded);
-        }
+#endif // VEC_U32
 #undef SHORT_
+        }
     }
 private:
     /** vector-of-physical-offsets version of \c off_v.
@@ -296,24 +378,25 @@ private:
                       dim_t * p_offsets, // output physical offsets
                       int const noff,    // how many offsets in vp and p_offsets
                       bool is_pos_padded = false) const {
-        assert(npos <= MVL);
+        assert(noff <= MVL);
         assert(is_blocking_desc());
+        const blocking_desc_t &blk = blocking_desc();
 #if 0 // just to see if things compile ...
         for(int p=0; p<noff; ++p){
             p_offsets[p] = 0;
         }
 #else
 #ifndef NDEBUG
+        unsigned nsame=0U;
         for (int i=0; i<blk.inner_nblks; ++i) {
             for (int j=i+1; j<blk.inner_nblks; ++j) {
                 if (blk.inner_idxs[i] == blk.inner_idxs[j])
                     ++nsame;
             }
         }
-        assert( nsame == 0 ); // inner_idxs[] MUST be distinct
+        assert( nsame == 0U ); // inner_idxs[] MUST be distinct
 #endif
 
-        const blocking_desc_t &blk = blocking_desc();
 #define Short_ PragmaQuote(_NEC vector) PragmaQuote(_NEC nounroll)
         const int nd = ndims();
         assert( nd < 6 );
@@ -373,7 +456,71 @@ private:
 #undef Short_
 #endif
     }
-#endif // VEC_OFF_API
+
+#if VEC_U32
+    void vec_off_v( VecPos32 & vp,         // list of coords (from vec_off_l)
+                      dim_t * p_offsets, // output physical offsets
+                      int const noff,    // how many offsets in vp and p_offsets
+                      bool is_pos_padded = false) const {
+        assert(noff <= MVL);
+        assert(is_blocking_desc());
+        const blocking_desc_t &blk = blocking_desc();
+#ifndef NDEBUG
+        unsigned nsame=0U;
+        for (int i=0; i<blk.inner_nblks; ++i) {
+            for (int j=i+1; j<blk.inner_nblks; ++j) {
+                if (blk.inner_idxs[i] == blk.inner_idxs[j])
+                    ++nsame;
+            }
+        }
+        assert( nsame == 0U ); // inner_idxs[] MUST be distinct
+#endif
+
+#define Short_ PragmaQuote(_NEC vector) PragmaQuote(_NEC nounroll)
+        const int nd = ndims();
+        assert( nd < 6 );
+        if (is_pos_padded) {
+            NOVEC_ ShortLoop() PragmaQuote(_NEC nounroll) PragmaQuote(_NEC loop_count(6))//;
+            for (int d = 0; d < nd; ++d) {
+               VEC_ for(int l = 0; l < noff; ++l) {
+                    vp.vp[d][l] += padded_offsets32[d];
+               }
+            }
+        }
+
+        //uint64_t phys_offset = offset0();
+        // phys[] : vreg mirror of p_offsets[noff] output, until final vector store
+        uint64_t phys[MVL];
+        _Pragma("_NEC vreg(phys)")
+        for(int l=0; l<noff; ++l)
+            phys[l] = offset0();
+
+        if (blk.inner_nblks > 0) {
+            NOVEC_ for (int iblk = blk.inner_nblks - 1; iblk >= 0; --iblk) {
+                const int d = blk.inner_idxs[iblk];
+                const ib32 = (uint32_t)blk.inner_blks[iblk];
+                VEC_ for(int l=0; l<noff; ++l) {
+                    uint32_t const p = vp.vp[d][l] % ibs32[iblk]; // ibs32 ~ blk.inner_blocks
+                    vp.vp[d][l] /= ibs32[iblk]
+                            phys[l] += p * ib_strides32[iblk];
+                }
+            }
+        }
+
+        NOVEC_ for (int d = 0; d < nd; ++d) {
+            uint32_t tmp[MVL];
+            _Pragma("_NEC vreg(tmp)")
+            VEC_ for(int l=0; l<noff; ++l) tmp[l] = vp.vp[d][l]; // VLD (nec.?)
+            VEC_ for(int l=0; l<noff; ++l) {
+                phys[l] += tmp[l] * blk_strides32[d];     // VMUL,VADD (extra vcopy) XXX check for vec reduc?
+            }
+        }
+
+        Short_ for(int l=0; l<noff; ++l)
+            p_offsets[l] = phys[l]; // final vector store VST to output
+#undef Short_
+    }
+#endif // VEC_U32
 
 public:
 
@@ -818,7 +965,7 @@ public:
 
 private:
     /** inner block strides get precalculated */
-    void set_ib_strides() {
+    void set_ib_info() {
         // reverse order -- does not vectorize
         const blocking_desc_t &blk = blocking_desc();
         const int ibs = blk.inner_nblks;
@@ -828,6 +975,18 @@ private:
             for (int iblk = ibs - 1; iblk >= 0; --iblk) {
                 ib_strides[iblk] = ib_stride;
                 ib_stride *= (MDW64) blk.inner_blks[iblk];
+            }
+            if (offsets_u32) {
+                for (int iblk = 0; iblk < ibs; ++iblk) {
+                    ib_strides32[iblk] = (uint32_t)ib_strides[iblk];
+                    ibs32[iblk] = (uint32_t)blk.inner_blks[iblk];
+                }
+            }
+        }
+        if (offsets_u32) { // not really inner info, here anyway.
+            for (int d = 0; d < ndims(); ++d) {
+                blk_strides32[d] = (uint32_t)blk.strides[d];
+                padded_offsets32[d] = (uint32_t)padded_offsets()[d];
             }
         }
     }
@@ -852,7 +1011,15 @@ private:
     }
 #endif
 
+    /** precalc inner block strides (load vec once vs inner multiplies) */
     MDW64 ib_strides[DNNL_MAX_NDIMS];
+
+    /** quick test for uint32_t offset arithmetic */
+    bool const offsets_u32;
+    uint32_t ib_strides32[DNNL_MAX_NDIMS];      ///< u32 version
+    uint32_t blk_strides32[DNNL_MAX_NDIMS];     ///< blk.strides
+    uint32_t padded_offsets32[DNNL_MAX_NDIMS];  ///< if is_pos_padded, padded_offset()[]
+
 #if FD_OFF_V
     DimsFastDiv ib; // for md->format_desc.blocking.inner_blocks
 #endif
@@ -862,8 +1029,12 @@ private:
 #endif
 
 
-    const bool dims_small;        // fit in u32?
-    const bool padded_dims_small; // fit in u32?
+    const bool dims_small;        // fit in u32? XXX always true
+    const bool padded_dims_small; // fit in u32? XXX always true
+    uint32_t ibs32[DNNL_MAX_NDIMS];            ///< if padded_dims_small, blk.inner_blocks[]
+    //const auto dm  = is_pos_padded ? padded_dims(): dims();
+    uint32_t padded_dims32[DNNL_MAX_NDIMS];
+    uint32_t dims32[DNNL_MAX_NDIMS];
 };
 
 } // namespace impl

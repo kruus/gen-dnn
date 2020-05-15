@@ -69,11 +69,34 @@ void parallel(int nthr, F f) {
         return;
     }
 #if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP
+    if (omp_in_parallel()){
+        printf(" warning: nested parallelism - pre-existing nthr=%d"
+               " may not get desired nthr=%d",
+               omp_get_num_threads(), nthr);
+    }
 #pragma omp parallel num_threads(nthr)
     {
         int nthr_ = omp_get_num_threads();
         int ithr_ = omp_get_thread_num();
-        assert(nthr_ == nthr);
+#ifndef NDEBUG
+        if(1){
+            bool ok;
+            ok = (nthr_ == nthr);
+            if(1){
+                char const* fmt = ok
+                    ? " good parallel: Thread %d expected omp nthr_=%d to be nthr=%d\n"
+                    : " error: Unexpected parallel: Thread %d expected omp nthr_=%d, got nthr=%d\n";
+                if (!ok)
+                    printf(fmt, (int)ithr_,(int)nthr_,(int)nthr);
+#if defined(__ve)
+                // if env VE_TRACEBACK is set...
+                __builtin_traceback((unsigned long *)__builtin_frame_address(0));
+#endif
+            }
+        }else{
+            assert(nthr_ == nthr); // this was failing before printfs?
+        }
+#endif
         f(ithr_, nthr_);
     }
 #elif DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_TBB
