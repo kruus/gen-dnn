@@ -27,6 +27,8 @@ ULIMIT=65536 # cpu-tutorials-matmul-matmul-quantization-cpp like this ulimit
 #ULIMIT=131072
 #ULIMIT=262144
 #ULIMIT=unlimited
+NODE=0
+if [ "$VE_NODE_NUMBER" ]; then NODE="$VE_NODE_NUMBER"; fi
 ENV=`which env`
 
 # see dnnl_config.h ...
@@ -55,7 +57,7 @@ usage() {
     echo "  We look at CC and CXX to try to guess -S or -a (SX or Aurora)"
     exit 0
 }
-while getopts ":m:u:hvjatTdDqQP:FbBrRowW1567iMrcC" arg; do
+while getopts ":m:u:N:hvjatTdDqQP:FbBrRowW1567iMrcC" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
         m) # -mISA "machine", ISA=[ALL] | VANILLA | ANY? ... (prefer j|a|gj|ga)
@@ -64,6 +66,9 @@ while getopts ":m:u:hvjatTdDqQP:FbBrRowW1567iMrcC" arg; do
             ;;
         u) # soft ulimit (kB) [32768] (avoid nc++ ccom errors)
             ULIMIT="${OPTARG}"
+            ;;
+        N) # [0, or from environment] VE_NODE_NUMBER
+            NODE="${OPTARG}"
             ;;
         v) # force Intel x86 compile for VANILLA generic architecture
             ISA=VANILLA
@@ -416,6 +421,7 @@ if [ "$DOTARGET" = "a" -o "$DOTARGET" = "s" ]; then
     #ulimit -Hs unlimited # no perms
     ulimit -s $ULIMIT
     echo 'ulimit : '`ulimit -s`
+    echo "NODE        : ${NODE}"
     unset VE_LIMIT_OPT
     # above default 32768 is not possible???
     #export VE_LIMIT_OPT='--softs 1000000 --hards=unlimited'
@@ -450,6 +456,7 @@ echo 'ulimit soft : '`ulimit -Ss`
     echo "DODOC      $DODOC"
     echo "QUICK      $QUICK"
     #echo "VERBOSE_EXTRA $VERBOSE_EXTRA"
+    echo "NODE       $NODE"
     echo "PRIMITIVES $PRIMITIVES"
     echo "BUILDDIR   ${BUILDDIR}"
     echo "INSTALLDIR ${INSTALLDIR}"
@@ -780,11 +787,15 @@ echo 'ulimit soft : '`ulimit -Ss`
         TEST_ENV+=(VE_PROGINF=DETAIL)
         #TEST_ENV+=(VE_ADVANCEOFF=YES)
         TEST_ENV+=(VE_OMP_STACKSIZE=128M)
-        TEST_ENV+=(OMP_PROC_BIND=true)
-        TEST_ENV+=(OMP_DYNAMIC=false)
+        #TEST_ENV+=(OMP_PROC_BIND=true)
+        TEST_ENV+=(--unset=OMP_PROC_BIND)
+        TEST_ENV+=(--unset=OMP_DYNAMIC) # really want false
+        TEST_ENV+=(--unset=VE_OMP_DYNAMIC) # really want false
         TEST_ENV+=(OMP_WAIT_POLICY=active)
         if [ ${OMP} -eq 1 ]; then TEST_ENV+=(OMP_NUM_THREADS=1); fi
         #TEST_ENV+=(OMP_WAIT_POLICY=active)
+        TEST_ENV+=(VE_NODE_NUMBER=${NODE})
+
         { echo "api-c                   ...";
             ${ENV} ${TEST_ENV[@]} ${TESTRUNNER} ${VE_EXEC} tests/api-c \
                 || xBUILDOK="n"; # do not stop tests on failure
@@ -867,11 +878,15 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
         TEST_ENV+=(VE_PROGINF=DETAIL)
         #TEST_ENV+=(VE_ADVANCEOFF=YES)
         TEST_ENV+=(OMP_STACKSIZE=128M)
-        TEST_ENV+=(OMP_DYNAMIC=false)
-        TEST_ENV+=(OMP_PROC_BIND=true)
+        #TEST_ENV+=(OMP_DYNAMIC=false)
+        TEST_ENV+=(--unset=OMP_DYNAMIC)
+        TEST_ENV+=(--unset=VE_OMP_DYNAMIC)
+        #TEST_ENV+=(OMP_PROC_BIND=true)
+        TEST_ENV+=(--unset=OMP_PROC_BIND)
         TEST_ENV+=(OMP_WAIT_POLICY=active)
         if [ ${OMP} -eq 1 ]; then TEST_ENV+=(OMP_NUM_THREADS=1); fi
         #TEST_ENV+=(OMP_WAIT_POLICY=active)
+        TEST_ENV+=(VE_NODE_NUMBER=${NODE})
         rm -f ${BUILDDIR}/test[0123].log
         # 'make test` uses ctest, which recognizes -R (require) and -E (exclude) options
         if [ $DOTEST -ge 1 ]; then # some short sanity-check examples
@@ -885,13 +900,14 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
         if [ $DOTEST -ge 2 ]; then
             if [ "" ]; then
                 # these usually run fine under 'make test'
-                echo "Testing> ${BUILDDIR}/test1.log"
+                echo "Testing> ${BUILDDIR}/test2.log"
                 ( export;
                 echo "${ENV} ${TEST_ENV[@]}  other examples"; \
                     ${ENV} ${TEST_ENV[@]} ARGS="-VV -E '(test_)|(primitives-)'" \
                     ${TESTRUNNER} make VERBOSE=1 -C "${BUILDDIR}" test \
-                    ) 2>&1 | tee "${BUILDDIR}/test1.log" || true
+                    ) 2>&1 | tee "${BUILDDIR}/test2.log" || true
             else
+                echo "Testing> xtest2-${BUILDDIR}.log"
                 {
                     set +x
                     ARGS="-E '(test_)|(primitives-)' -N" make -C "${BUILDDIR}" test | awk '/Test #/{print $3}'
@@ -905,26 +921,29 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
                     done
                     echo "Targs = ${Targs}"
                     echo "Running tests via vetests.sh ..."
-                    echo "Command : ./vetest.sh -B ${BUILDDIR} \${Targs} -L xtest1.log"
+                    echo "Command : ./vetest.sh -B ${BUILDDIR} \${Targs} -L xtest1-${BUILDDIR}.log"
                     # note: vetest.sh will recognize cpu-FOO and search for FOO if nec.
-                    ./vetest.sh -B ${BUILDDIR} ${Targs} -L xtest2.log || true
-                    cat xtest2.log
+                    ./vetest.sh -B ${BUILDDIR} -L xtest2-${BUILDDIR}.log ${Targs} || true
+                    cat xtest2-${BUILDDIR}.log
                     set -x
-                } 2>&1 | tee "${BUILDDIR}/test1.log" || true
+                } 2>&1 | tee "${BUILDDIR}/test2.log" || true
+                echo "cat..."
+                cat xtest2-${BUILDDIR}.log || true
             fi
         fi
         if [ $DOTEST -ge 3 ]; then
             if [ "" ]; then
-                echo "Testing> ${BUILDDIR}/test2.log"
+                echo "Testing> ${BUILDDIR}/test3.log"
                 ( export;
                 echo "${ENV} ${TEST_ENV[@]} ARGS='-VV -R 'test_' ${TESTRUNNER} <commnad>";
                 ${ENV} ${TEST_ENV[@]} ARGS="-VV -R 'test_'" \
                     ${TESTRUNNER}  make VERBOSE=1 -C "${BUILDDIR}" test \
-                    ) 2>&1 | tee "${BUILDDIR}/test2.log" || true
+                    ) 2>&1 | tee "${BUILDDIR}/test3.log" || true
             else # do not run via ctest, run via vetest.sh
+                echo "Testing> xtest3-${BUILDDIR}.log"
                 if [ "" ]; then
                     tests=`ARGS="-R 'test_' -N" make -C "${BUILDDIR}" test | awk '/Test +#/{print $3}' | sort`
-                    echo 'test2.log alternate, via vetest.sh'
+                    echo 'test3.log alternate, via vetest.sh'
                     echo "tests = "
                     echo "${tests}" | sed 's/ /\n    /g'
                     for t in ${tests}; do
@@ -935,7 +954,7 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
                     {
                         set +x
                         tests=`ARGS="-R test_ -N" make -C "${BUILDDIR}" test | awk '/Test +#/{print $3}' | sort`
-                        echo 'test2.log alternate, via vetest.sh'
+                        echo 'test3.log alternate, via vetest.sh'
                         echo "tests = "
                         echo "${tests}" | sed 's/ /\n    /g'
                         Targs=''
@@ -944,12 +963,14 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
                         done
                         echo "Targs = ${Targs}"
                         echo "Running tests via vetests.sh ..."
-                        echo "Command : ./vetest.sh -B ${BUILDDIR} \${Targs} -L xtest2.log"
+                        echo "Command : ./vetest.sh -B ${BUILDDIR} \${Targs} -L xtest3-${BUILDDIR}.log"
                         # note: vetest.sh will recognize cpu-FOO and search for FOO if nec.
-                        ./vetest.sh -B ${BUILDDIR} ${Targs} -L xtest2.log || true
-                        cat xtest2.log
+                        ./vetest.sh -B ${BUILDDIR} -L xtest3-${BUILDDIR}.log ${Targs} || true
+                        cat xtest3-${BUILDDIR}.log
                         set -x
-                    } 2>&1 | tee "${BUILDDIR}/test2.log" || true
+                    } 2>&1 | tee "${BUILDDIR}/test3.log" || true
+                    echo "cat..."
+                    cat xtest3-${BUILDDIR}.log
                 fi
             fi
         fi
@@ -966,7 +987,7 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
                    mb32_ic3ih44iw44_oc7oh10_kh11kw11_sh4sw4ph0pw0_nsmall1 \
                    mb32_ic3ih44kh3_oc7oh42_nsmall2 \
                   ) || { echo "Ohoh"; } ; \
-                } 2>&1 | tee ${BUILDDIR}/test3.log || true
+                } 2>&1 | tee ${BUILDDIR}/test4.log || true
             fi
         fi
         if [ $DOTEST -ge 5 ]; then # relevant CPU tests defined in tests/benchdnn/CMakeLists.txt

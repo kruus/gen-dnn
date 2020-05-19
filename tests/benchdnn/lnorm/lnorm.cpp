@@ -276,9 +276,15 @@ static int compare(const prb_t *p, data_kind_t kind, const dnn_mem_t &fp_mem,
     const char *skind = data_kind2str(kind);
     const int f32_mant_digits = 24;
     const float eps_coeff = (1 << (f32_mant_digits - digits_dt(p->dt)));
+#if TARGET_VE || defined(__ve) // VE simd via partial 32-long intermediates (e.g.) less exact
+    const float eps = eps_coeff
+            * (p->dir & FLAG_FWD ? (kind == DATA ? 5e-7 : 0)
+                                 : (kind == DATA ? 2e-7 : kind == SS ? 5e-7 : 0));
+#else
     const float eps = eps_coeff
             * (p->dir & FLAG_FWD ? (kind == DATA ? 5e-7 : 0)
                                  : (kind == DATA || kind == SS ? 2e-7 : 0));
+#endif
     const int64_t N = kind == SS ? 1 : p->n;
     const int64_t C = kind == DATA ? p->c : (kind == SS ? 2 * p->c : 1);
     const auto nelems = N * C;

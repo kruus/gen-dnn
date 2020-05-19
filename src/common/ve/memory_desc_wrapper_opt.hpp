@@ -164,10 +164,9 @@ public:
     /* vectorized offset section : additional API functions */
 
     void vec_off_l(dim_t const* const l_offsets, ///< vector of logical offsets [noff]
-                   int const noff,               ///< we block by MVL any value OK.
+                   int const noff,               ///< any value OK (>1 beneficial on VE)
                    dim_t * p_offsets,            ///< output: physical offsets [noff]
                    bool is_pos_padded = false) const {
-        assert( noff > 0 && noff <= MVL );
         assert(is_blocking_desc());
 #define SHORT_ _Pragma("_NEC vector") _Pragma("_NEC shortloop") _Pragma("_NEC assume")
 #ifndef NDEBUG
@@ -279,8 +278,7 @@ private:
             }
         }
 
-        //uint64_t phys_offset = offset0();
-        // phys[] : vreg mirror of p_offsets[noff] output, until final vector store
+        // phys[] : a vreg mirror of p_offsets[noff] output, until final vector store
         uint64_t phys[MVL];
         _Pragma("_NEC vreg(phys)")
         for(int l=0; l<noff; ++l)

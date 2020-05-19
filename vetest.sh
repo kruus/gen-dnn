@@ -17,8 +17,10 @@ TEST_ENV+=(VE_PROGINF=DETAIL)
 #TEST_ENV+=(OMP_STACKSIZE=32M)
 #TEST_ENV+=(OMP_STACKSIZE=8M)
 
-TEST_ENV+=(OMP_DYNAMIC=false)
-TEST_ENV+=(OMP_PROC_BIND=true)
+TEST_ENV+=(--unset=OMP_DYNAMIC)
+TEST_ENV+=(--unset=VE_OMP_DYNAMIC)
+#TEST_ENV+=(OMP_PROC_BIND=true)
+TEST_ENV+=(--unset=OMP_PROC_BIND)
 TEST_ENV+=(OMP_WAIT_POLICY=active)
 
 # Use -t to control this
@@ -111,7 +113,7 @@ function usage
 while getopts "L:B:T:x:g:f:R:N:t:u:vqGSlh" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
-      L) # [f.log] $LOG file.  "less -r r$LOG" to view colorized version
+      L) # [f.log] $LOG file [subdirs NOT supported].  "less -r r$LOG" to view colorized version
         if [ "${OPTARG}" ]; then LOG="${OPTARG}"; fi
         ;;
       B) # $BLD build directory
@@ -561,7 +563,9 @@ if [ ${fail} -gt 0 ]; then
   comment "FAILED: ${fail}" "`echo "$strfail" | sed 's/^/\n    /g'`"
 fi
 comment "Summary: ${tests} tests; OK ${ok}   FAILED ${fail}" 
-comment "$((100 * $ok / $tests))% tests passed, ${fail} tests failed out of ${tests}"
+if [ $(( $ok + $fail )) -gt 0 ]; then
+  comment "$((100 * $ok / $tests))% tests passed, ${fail} tests failed out of ${tests}"
+fi
 decolorize "r${LOG}" > "${LOG}"
 
 #

@@ -69,11 +69,40 @@ void parallel(int nthr, F f) {
         return;
     }
 #if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP
+#ifndef NDEBUG
+    if (omp_in_parallel()){
+        printf(" warning: nested parallelism - pre-existing nthr=%d"
+               " may not get desired nthr=%d",
+               omp_get_num_threads(), nthr);
+    }
+#endif
 #pragma omp parallel num_threads(nthr)
     {
         int nthr_ = omp_get_num_threads();
         int ithr_ = omp_get_thread_num();
-        assert(nthr_ == nthr);
+
+#if defined(__ve) && defined(NDEBUG)
+        if(1){
+            bool ok;
+            ok = (nthr_ == nthr);
+            if (omp_get_dynamic()) printf(" omp_dynamic!");
+            if(1){
+                char const* fmt = ok
+                    ? " good parallel: Thread %d asked for omp nthr=%d, and got nthr_=%d\n"
+                    : " warning: Unexpected parallel: Thread %d asked for omp nthr=%d, but got nthr_=%d\n";
+                if (!ok)
+                    printf(fmt, (int)ithr_,(int)nthr,(int)nthr_);
+#if defined(__ve)
+                if env VE_TRACEBACK is set...
+                    __builtin_traceback((unsigned long *)__builtin_frame_address(0));
+#endif
+            }
+        }
+#endif
+#if !defined(__ve)
+        // omp dynamic teams might allow lower nthr_
+        assert(nthr_ == nthr || omp_get_dynamic()==true);
+#endif
         f(ithr_, nthr_);
     }
 #elif DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_TBB

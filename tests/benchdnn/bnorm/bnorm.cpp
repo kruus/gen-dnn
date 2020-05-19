@@ -326,7 +326,7 @@ static int compare(const prb_t *p, data_kind_t kind, const dnn_mem_t &fp_mem,
 
     const int f32_mant_digits = 24;
     const float eps_coeff = (1 << (f32_mant_digits - digits_dt(p->dt)));
-#if TARGET_VE // VE simd via partial 32-long intermediates (e.g.) less exact
+#if TARGET_VE || defined(__ve) // VE simd via partial 32-long intermediates (e.g.) less exact
     // 2 groups of test failures many with
     // l0:7.3e-6 --bnorm --flags=SR --inplace=false mb96ic384ih17n"googlenet_v3:mixed_3_conv_batchnorm"
     // and a last group with

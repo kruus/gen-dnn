@@ -36,7 +36,7 @@
 #define TARGET_X86_JIT 0
 #define TARGET_X86 0
 #define TARGET_VE 0
-#elif defined(DNNL_ARCH_VE)
+#elif defined(DNNL_ARCH_VE) || defined(DNNL_VE) || defined(__ve)
 #define TARGET_AARCH64 0
 #define TARGET_X86_JIT 0
 #define TARGET_X86 0

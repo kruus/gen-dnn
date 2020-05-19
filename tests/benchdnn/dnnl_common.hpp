@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "dnnl.h"
+#include "src/common/cpu_target.h"
 #include "src/common/bfloat16.hpp"
 #include "src/common/float16.hpp"
 #include "src/common/nstl.hpp"
