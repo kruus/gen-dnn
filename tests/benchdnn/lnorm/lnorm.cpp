@@ -276,9 +276,16 @@ static int compare(const prb_t *p, data_kind_t kind, const dnn_mem_t &fp_mem,
     const char *skind = data_kind2str(kind);
     const int f32_mant_digits = 24;
     const float eps_coeff = (1 << (f32_mant_digits - digits_dt(p->dt)));
+#if TARGET_VE || defined(__ve) // VE simd via partial 32-long intermediates (e.g.) less exact
+    const float eps = eps_coeff
+            * (p->dir & FLAG_FWD ? (kind == DATA ? 5e-7 : 0)
+                                 : (kind == DATA ? 5e-7 : kind == SS ? 2e-7 : 0));
+    //printf(" lnorm compare, eps = %g\n", eps);
+#else
     const float eps = eps_coeff
             * (p->dir & FLAG_FWD ? (kind == DATA ? 5e-7 : 0)
                                  : (kind == DATA || kind == SS ? 2e-7 : 0));
+#endif
     const int64_t N = kind == SS ? 1 : p->n;
     const int64_t C = kind == DATA ? p->c : (kind == SS ? 2 * p->c : 1);
     const auto nelems = N * C;
@@ -297,17 +304,17 @@ static int compare(const prb_t *p, data_kind_t kind, const dnn_mem_t &fp_mem,
             bool ok = (fabsf(fp) > 1e-5 ? rel_diff : diff) <= eps;
 
             /* When the error is larger than eps, It could be
-         * due to catastrophic cancellation in final result
-         * which is computed as `Y = a * X + b`.
-         * When `a * X`  is close to `b` and `sign(a * X) = - sign(b)`.
-         * Then large error in `a * X` could result in a final
-         * result (which has a cancellation i.e. `|Y| = |a*X - (-b)|`)
-         * which has no meaningful digits left in mantissa.*/
+             * due to catastrophic cancellation in final result
+             * which is computed as `Y = a * X + b`.
+             * When `a * X`  is close to `b` and `sign(a * X) = - sign(b)`.
+             * Then large error in `a * X` could result in a final
+             * result (which has a cancellation i.e. `|Y| = |a*X - (-b)|`)
+             * which has no meaningful digits left in mantissa.*/
             if (!ok && (p->dir & FLAG_FWD) && kind == DATA && ss) {
                 const float beta = ((float *)*ss)[p->c + c];
                 /* Using an empirically derived threshold,
-             * check if cancellation error
-             * in `|Y| = |a*X - (-b)|` is huge.*/
+                 * check if cancellation error
+                 * in `|Y| = |a*X - (-b)|` is huge.*/
                 bool maybe_cancellation_error
                         = (fabsf(fp - beta)
                                   / (fabsf(fp) > FLT_MIN ? fabsf(fp) : 1))

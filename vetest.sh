@@ -7,8 +7,7 @@ TEST_ENV+=(DNNL_VERBOSE=1)
 TEST_ENV+=(VE_INIT_HEAP=ZERO)
 TEST_ENV+=(VE_ERRCTL_DEALLOCATE=MSG)
 #TEST_ENV+=(VE_ERRCTL_DEALLOCATE=ERROR)
-TEST_ENV+=(VE_TRACEBACK=VERBOSE) # -traceback=verbose compile option for build.sh -add
-#TEST_ENV+=(VE_TRACEBACK=FULL) # naddr2line doesn't resolve coming from .so (?)
+TEST_ENV+=(VE_TRACEBACK=VERBOSE)
 #TEST_ENV+=(VE_TRACEBACK=NONE)
 TEST_ENV+=(VE_PROGINF=DETAIL)
 #TEST_ENV+=(VE_ADVANCEOFF=YES)
@@ -18,8 +17,10 @@ TEST_ENV+=(VE_PROGINF=DETAIL)
 #TEST_ENV+=(OMP_STACKSIZE=32M)
 #TEST_ENV+=(OMP_STACKSIZE=8M)
 
-TEST_ENV+=(OMP_DYNAMIC=false)
-TEST_ENV+=(OMP_PROC_BIND=true)
+TEST_ENV+=(--unset=OMP_DYNAMIC)
+TEST_ENV+=(--unset=VE_OMP_DYNAMIC)
+#TEST_ENV+=(OMP_PROC_BIND=true)
+TEST_ENV+=(--unset=OMP_PROC_BIND)
 TEST_ENV+=(OMP_WAIT_POLICY=active)
 
 # Use -t to control this
@@ -106,16 +107,13 @@ function usage
     echo "    ./vetest.sh -B build-ved4 -l"
     echo "  run gdb on an existing example (./build-ved4/examples/getting-started-cpp)"
     echo "    ./vetest.sh -B build-ved4 -x getting-started-cpp -G"
-    echo "    manual gdb+logging (example):    script -f -c 'gdb --args \\"
-    echo "          ./build-vejd2/tests/benchdnn/benchdnn -v5 --engine=cpu --softmax --batch=sm.in'"
-    echo "    with output in file 'typescript'"
     exit 0
 }
 # Parse short options with bash getopts
 while getopts "L:B:T:x:g:f:R:N:t:u:vqGSlh" arg; do
     #echo "arg = ${arg}, OPTIND = ${OPTIND}, OPTARG=${OPTARG}"
     case $arg in
-      L) # [f.log] $LOG file.  "less -r r$LOG" to view colorized version
+      L) # [f.log] $LOG file [subdirs NOT supported].  "less -r r$LOG" to view colorized version
         if [ "${OPTARG}" ]; then LOG="${OPTARG}"; fi
         ;;
       B) # $BLD build directory
@@ -219,7 +217,7 @@ if [ "${THREADS}" = 0 ]; then
   TEST_ENV+=(--unset=OMP_NUM_THREADS)
   TEST_ENV+=(--unset=VE_OMP_NUM_THREADS)
 else
-  TEST_ENV+=(--unset=OMP_NUM_THREADS)
+  TEST_ENV+=(OMP_NUM_THREADS=${THREADS})
   TEST_ENV+=(VE_OMP_NUM_THREADS=${THREADS})
 fi
 
@@ -565,7 +563,9 @@ if [ ${fail} -gt 0 ]; then
   comment "FAILED: ${fail}" "`echo "$strfail" | sed 's/^/\n    /g'`"
 fi
 comment "Summary: ${tests} tests; OK ${ok}   FAILED ${fail}" 
-comment "$((100 * $ok / $tests))% tests passed, ${fail} tests failed out of ${tests}"
+if [ $(( $ok + $fail )) -gt 0 ]; then
+  comment "$((100 * $ok / $tests))% tests passed, ${fail} tests failed out of ${tests}"
+fi
 decolorize "r${LOG}" > "${LOG}"
 
 #

@@ -84,10 +84,10 @@ void parallel(int nthr, F f) {
             ok = (nthr_ == nthr);
             if(1){
                 char const* fmt = ok
-                    ? " good parallel: Thread %d expected omp nthr_=%d to be nthr=%d\n"
-                    : " error: Unexpected parallel: Thread %d expected omp nthr_=%d, got nthr=%d\n";
+                    ? " good parallel: Thread %d asked for omp nthr=%d, but got nthr_=%d\n"
+                    : " warning: Unexpected parallel: Thread %d asked for omp nthr=%d, got nthr_=%d\n";
                 if (!ok)
-                    printf(fmt, (int)ithr_,(int)nthr_,(int)nthr);
+                    printf(fmt, (int)ithr_,(int)nthr,(int)nthr_);
 #if defined(__ve)
                 // if env VE_TRACEBACK is set...
                 __builtin_traceback((unsigned long *)__builtin_frame_address(0));
