@@ -93,14 +93,14 @@ void parallel(int nthr, F f) {
                 if (!ok)
                     printf(fmt, (int)ithr_,(int)nthr,(int)nthr_);
 #if defined(__ve)
-                if env VE_TRACEBACK is set...
-                    __builtin_traceback((unsigned long *)__builtin_frame_address(0));
+                // if env VE_TRACEBACK is set...
+                __builtin_traceback((unsigned long *)__builtin_frame_address(0));
 #endif
             }
         }
 #endif
 #if !defined(__ve)
-        // omp dynamic teams might allow lower nthr_
+        // omp dynamic teams might allow lower nthr_?
         assert(nthr_ == nthr || omp_get_dynamic()==true);
 #endif
         f(ithr_, nthr_);

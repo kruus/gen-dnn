@@ -42,6 +42,8 @@ void compute_ref_bwd(const prb_t *p, const dnn_mem_t &src,
         d_src_ptr[i] = compute_eltwise_bwd(
                 p->alg, d_dst_ptr[i], src_ptr[i], p->alpha, p->beta);
     });
+
+
 }
 
 } // namespace eltwise

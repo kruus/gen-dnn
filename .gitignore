@@ -17,7 +17,8 @@
 build
 external
 *.out
-*.c
+*.log
+?.c
 log-*
 buildd*
 build-*
@@ -43,5 +44,5 @@ veos*
 gmon.out
 oprofile*
 typescript
-ve_*
+ve_exec*
 veos_command.log.0 veos_command.log.1 veos_command.log.2 veos_command.log.3 veos_command.log.4 veos_command.log.5 veos_command.log.6 veos_command.log.7 veos_command.log.8 veos_command.log.9

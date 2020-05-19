@@ -526,7 +526,7 @@ echo 'ulimit soft : '`ulimit -Ss`
         ccxx_flags -ftemplate-depth=50
         ccxx_flags -fdiag-inline=2
         ccxx_flags -fdiag-vector=2
-        ccxx_flags -mno-parallel
+        #ccxx_flags -mno-parallel # does this OVERRIDE (disable) -fopenmp?
         #ccxx_flags -D_FORTIFY_SOURCE=1
         #ccxx_flags -D_FORTIFY_SOURCE=2 -Wl,-z,-muldefs
     fi

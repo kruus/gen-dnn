@@ -217,7 +217,7 @@ if [ "${THREADS}" = 0 ]; then
   TEST_ENV+=(--unset=OMP_NUM_THREADS)
   TEST_ENV+=(--unset=VE_OMP_NUM_THREADS)
 else
-  TEST_ENV+=(--unset=OMP_NUM_THREADS)
+  TEST_ENV+=(OMP_NUM_THREADS=${THREADS})
   TEST_ENV+=(VE_OMP_NUM_THREADS=${THREADS})
 fi
 
