@@ -59,7 +59,9 @@ inline int adjust_num_threads(int nthr, size_t work_amount) {
 /* general parallelization */
 template <typename F>
 void parallel(int nthr, F f) {
+    printf(" parallel nthr=%d",nthr);
     nthr = adjust_num_threads(nthr, SIZE_MAX);
+    printf(" --> adjusted nthr=%d\n",nthr);
 #if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ
     assert(nthr == 1);
     f(0, 1);

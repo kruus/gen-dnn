@@ -87,7 +87,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
     };
 
     auto ker_max = [=](data_t *d, int mb, int oc, int od, int oh, int ow) {
-#if defined(_ve)
+#if 0 && defined(_ve)
         auto id_start = max(od * SD - padF, 0);
         auto ih_start = max(oh * SH - padT, 0);
         auto iw_start = max(ow * SW - padL, 0);

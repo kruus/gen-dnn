@@ -36,6 +36,9 @@ if(DNNLPRIM_ALL)
         message(STATUS "SOURCES_VE      ${SOURCES_VE}")
         # add VE files to [maybe shortened] SOURCES
         list(APPEND SOURCES ${SOURCES_VE})
+
+        set_source_files_properties(${SOURCES_VE} PROPERTIES COMPILE_FLAGS
+            "-I${CMAKE_CURRENT_SOURCE_DIR}/ve -I${CMAKE_CURRENT_SOURCE_DIR}")
     endif()
 else() # Debug: include primitives piecewise into libdnnl
     file(GLOB SOURCES_CORE

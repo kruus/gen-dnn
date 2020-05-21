@@ -505,16 +505,20 @@ echo 'ulimit soft : '`ulimit -Ss`
     fi
     if [ ! x"${OPT_FLAGS}" = x"" ]; then ccxx_flags ${OPT_FLAGS}; fi
     if [ "${DOTARGET}" = "a" ]; then
-        # very strange ... when -O4 is specified AFTER, sometimes inlining does not happen
+        # The following works around a -std=c++11 issue (not needed if -std=gnu++11)
         ccxx_flags -include stdint.h
         ccxx_flags -minit-stack=zero
         ccxx_flags -Wunknown-pragma
+        ccxx_flags -fdiag-inline=2
+        ccxx_flags -fdiag-vector=2
         ccxx_flags -report-all
+        # -O4 early... when -O4 is specified AFTER, sometimes inlining does not happen
         ccxx_flags -O4 -finline -finline-functions
         ccxx_flags -finline-max-function-size=300
         ccxx_flags -finline-max-depth=10
         ccxx_flags -finline-max-times=20
         if [ $DODEBUG -gt 0 ]; then
+            # in nc++-3.0.28 manual (but apparently not in nc++-3.0.27!)
             ccxx_flags -traceback=verbose
             # add this code to get backtrace
             #   __builtin_traceback((unsigned long *)__builtin_frame_address(0));
@@ -524,8 +528,6 @@ echo 'ulimit soft : '`ulimit -Ss`
         #ccxx_flags -finline-suppress-diagnostics # 3.0.28?
         # src/common/tag_traits.hpp uses one_of(31 possibilities)
         ccxx_flags -ftemplate-depth=50
-        ccxx_flags -fdiag-inline=2
-        ccxx_flags -fdiag-vector=2
         #ccxx_flags -mno-parallel # does this OVERRIDE (disable) -fopenmp?
         #ccxx_flags -D_FORTIFY_SOURCE=1
         #ccxx_flags -D_FORTIFY_SOURCE=2 -Wl,-z,-muldefs
