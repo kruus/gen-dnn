@@ -8,7 +8,7 @@ namespace impl {
 using wo = memory_desc_wrapper_opt;
 /** optimize divisions by inner_block sizes, blk.inner_blks[iblk] */
 wo::DimsFastDiv wo::init_fastdiv(dims_t const d, int const len){
-    DimsFastDiv ret{{0,0,0}};
+    DimsFastDiv ret{{0,0,0,0}};
     NOVEC_ for (int i = 0; i < len; ++i){
         assert( (uint32_t)d[i] <= UINT32_MAX );
         struct ve_fastdiv f;
@@ -23,7 +23,7 @@ wo::DimsFastDiv wo::init_fastdiv(dims_t const d, int const len){
 }
 /** vectorizable variant */
 wo::DimsFastDivVec wo::init_fastdiv_vec(dims_t const d, int const len){
-    DimsFastDivVec ret{{0},{0},{0}};
+    DimsFastDivVec ret{{0},{0},{0},{0}};
     NOVEC_ for (int i = 0; i < len; ++i){
         struct ve_fastdiv f;
         vednn_fastdiv( &f, d[i] );

@@ -39,6 +39,18 @@ if(DNNLPRIM_ALL)
 
         set_source_files_properties(${SOURCES_VE} PROPERTIES COMPILE_FLAGS
             "-I${CMAKE_CURRENT_SOURCE_DIR}/ve -I${CMAKE_CURRENT_SOURCE_DIR}")
+    else()
+        # optional enhancement: vectorized offset calculations:
+        # [OK to never make use of these]
+        list(APPEND SOURCES_VE
+            ${CMAKE_CURRENT_SOURCE_DIR}/ve/memory_desc_wrapper_opt.hpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/ve/memory_desc_wrapper_opt.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/ve/ve_fastdiv.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/ve/ve_fastdiv.c
+            )
+        set_source_files_properties(${SOURCES_VE} PROPERTIES COMPILE_FLAGS
+            "-I${CMAKE_CURRENT_SOURCE_DIR}/ve -I${CMAKE_CURRENT_SOURCE_DIR}")
+        list(APPEND SOURCES ${SOURCES_VE})
     endif()
 else() # Debug: include primitives piecewise into libdnnl
     file(GLOB SOURCES_CORE

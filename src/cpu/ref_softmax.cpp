@@ -92,7 +92,9 @@
 #define VE_FWD_GEN   0
 #define VE_BWD_DENSE 0
 #define VE_BWD_GEN   0
+#ifndef MVL
 #define MVL 32          /* x86 ~ 'simd vector length'*/
+#endif
 #endif
 
 #define MEDIUM (16*MVL) /*potentially 16 vec regs*/

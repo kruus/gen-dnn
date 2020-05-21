@@ -84,7 +84,7 @@ struct concat_pd_t : public primitive_desc_t {
     int concat_dim() const { return concat_dim_; }
 
     const memory_desc_t *src_image_md(int index = 0) const {
-        assert( index < src_image_mds_.size() );
+        assert( (size_t)index < src_image_mds_.size() );
         return index < n_inputs() ? &src_image_mds_[index] : &glob_zero_md;
     }
 

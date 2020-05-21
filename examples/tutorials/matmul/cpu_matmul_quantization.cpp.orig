@@ -127,9 +127,6 @@
 
 using namespace dnnl;
 
-//#define DBG defined(__ve)
-#define DBG 1
-
 enum class q10n_scheme_t { DYNAMIC, STATIC };
 
 namespace {
@@ -144,20 +141,11 @@ void init_vector(std::vector<float> &v, float min_value, float max_value) {
 
 template <typename T>
 void find_min_max(const std::vector<T> &v, float &min_value, float &max_value) {
-    min_value = max_value = (float)v[0];
-#if DBG
-    for(int i=0; i<v.size(); ++i){
-        float const vi = (float)v[i];
-        if (vi > max_value) max_value = vi;
-        if (vi < min_value) min_value = vi;
-        printf("v[%3d] = %g\n", i, vi);
-    }
-#else
+    min_value = max_value = v[0];
     for (auto &e : v) {
         min_value = std::min<float>(min_value, e);
         max_value = std::max<float>(max_value, e);
     }
-#endif
 }
 
 template <typename T>
@@ -175,8 +163,7 @@ void compute_q10n_params(const char *message, const std::vector<float> &v,
 #endif
 
     // Find min and max value in array
-    //float min_val = v[0], max_val = v[0];
-    float min_val, max_val;
+    float min_val = v[0], max_val = v[0];
     find_min_max(v, min_val, max_val);
 
     // Compute appropriate scale
@@ -189,11 +176,10 @@ void compute_q10n_params(const char *message, const std::vector<float> &v,
         zp = (int32_t)(max_int - max_val / scale);
     printf("\tComputing q10n params for %s\n"
            "\t\tData type: %s\n"
-           "\t\tData range: [%g,%g]\n"
            "\t\tScale:%.3g (inverse scale:%.3g)\n"
            "\t\tZero point:%d\n\n",
             message, std::is_same<T, int8_t>::value ? "int8_t" : "uint8_t",
-            min_val, max_val, scale, 1 / scale, zp);
+            scale, 1 / scale, zp);
 }
 
 int compare_vectors(const std::vector<float> &v1,
@@ -205,12 +191,6 @@ int compare_vectors(const std::vector<float> &v1,
         float diff = v1[n] - v2_n;
         v1_l2 += v1[n] * v1[n];
         diff_l2 += diff * diff;
-#if DBG
-        if (diff > 0.73) {
-            printf(" [%3d]  float ref %-12g dequant %-12g diff %-12g\n",
-                   n, v1[n], v2_n, diff);
-        }
-#endif
     }
 
     v1_l2 = std::sqrt(v1_l2);
@@ -337,7 +317,7 @@ void dynamic_q10n_matmul(int64_t M, int64_t N, int64_t K,
     quantize(q10n_scheme_t::DYNAMIC, A_f32, scale_A, zp_A, A_u8_m);
 
     // Quantize matrix B_s8 using reorder primitive
-    std::vector<int8_t> B_s8(K * N, 0);
+    std::vector<uint8_t> B_s8(K * N, 0);
     memory::desc b_s8_md({K, N}, memory::data_type::s8, {N, 1});
     memory B_s8_m(b_s8_md, eng, (void *)B_s8.data());
     quantize(q10n_scheme_t::DYNAMIC, B_f32, scale_B, 0, B_s8_m);
@@ -383,12 +363,6 @@ void dynamic_q10n_matmul(int64_t M, int64_t N, int64_t K,
                         {DNNL_ARG_ATTR_OUTPUT_SCALES, output_scales_m},
                         {DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, zp_A_m}});
     }
-#if DBG
-    printf(" M, K, N = %lu, %lu, %lu\n",(long)M,(long)K,(long)N);
-    for(int i=0; i<std::min(long{20},std::min(M*K, std::min(K*N, M*N))); ++i){
-        printf(" A,B,C[%2d] = %8lu %8ld %g\n",i,(long unsigned)A_u8[i],(long int)B_s8[i],C_f32[i]);
-    } 
-#endif
 
     // Find quantization parameters for matrix C
     compute_q10n_params<uint8_t>("C", C_f32, scale_C, zp_C);
@@ -397,11 +371,6 @@ void dynamic_q10n_matmul(int64_t M, int64_t N, int64_t K,
     memory::desc c_u8_md({M, N}, memory::data_type::u8, {N, 1});
     memory C_u8_m(c_u8_md, eng, (void *)C_u8.data());
     quantize(q10n_scheme_t::DYNAMIC, C_f32, scale_C, zp_C, C_u8_m);
-#if DBG
-    for(int i=0; i<std::min(long{20},std::min(M*K, std::min(K*N, M*N))); ++i){
-        printf(" C_u8[%2d] = %8lu\n",i,(long unsigned)C_u8[i]);
-    } 
-#endif
 }
 
 // Reduced precision MatMul with **static** quantization
@@ -496,21 +465,9 @@ void compare_f32_and_quantized_matmuls() {
                 scale_C_dynamic_q10n, zp_C_dynamic_q10n);
 
         // Compare _true_ f32 result with dynamic q10n
-#if DBG
-        printf( "C_f32 ref scale %g zp %d thresh", scale_C_dynamic_q10n, zp_C_dynamic_q10n, threshold_dynamic_q10n);
-        for(int i=0; i<20; ++i){
-            printf(" ref C_F32[%2d] = %g-12g  cf C_u8 %u\n", i, C_f32[i], (unsigned)C_u8_dynamic_q10n[i]);
-        }
-#endif
         int rc = compare_vectors(C_f32, C_u8_dynamic_q10n, scale_C_dynamic_q10n,
                 zp_C_dynamic_q10n, threshold_dynamic_q10n);
-        if (rc){
-#if DBG
-            printf("Dynamic quantization accuracy failed.\n");
-#else
-            throw std::logic_error("Dynamic quantization accuracy failed.");
-#endif
-        }
+        if (rc) throw std::logic_error("Dynamic quantization accuracy failed.");
     }
 
     // Compute quantized variant (static)

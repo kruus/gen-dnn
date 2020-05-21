@@ -120,14 +120,32 @@ struct rnn_tparams_t : public c_compatible {
 };
 
 struct scales_t : public c_compatible {
-    scales_t() : count_(1), mask_(0), scales_(scales_buf_) { set(1.); }
+#define DBG_SCALES 1
+#if DBG_SCALES
+#define MSG(STR) do { \
+    printf(" %s:%lu,%d,%g",#STR,(long unsigned)count_,mask_,scales_[0]); \
+    if (is_runtime_value(*scales_)) printf(" R"); \
+    if (has_default_values()) printf(" D"); \
+    printf("\n"); \
+}while(0)
+#else
+#define MSG(STR) do {}while(0)
+#endif
+    scales_t() : count_(1), mask_(0), scales_(scales_buf_) {
+        set(1.);
+        assert( scales_[0] = 1.0 );
+        assert( defined() );
+        MSG(+scales_t());
+    }
     scales_t(dim_t count, int mask, const float *scales)
         : scales_(scales_buf_) {
         set(count, mask, scales);
+        MSG(+scales_t(count,mask,scales));
     }
 
     scales_t(const scales_t &rhs) : scales_t() {
         set(rhs.count_, rhs.mask_, rhs.scales_);
+        MSG(+scales_t(const scales_t&));
     }
 
     ~scales_t() { cleanup(); }
@@ -137,8 +155,11 @@ struct scales_t : public c_compatible {
         status_t status = set(rhs.count_, rhs.mask_, rhs.scales_);
         assert(status == status::success);
         (void)status;
+        MSG(+scales_t::operator=);
         return *this;
     }
+#undef MSG
+#undef DBG_SCALES
 
     bool operator==(const scales_t &rhs) const {
         bool ret = count_ == rhs.count_ && mask_ == rhs.mask_

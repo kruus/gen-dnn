@@ -16,6 +16,18 @@
 
 #ifndef COMMON_MEMORY_DESC_WRAPPER_OPT_DEV_HPP
 #define COMMON_MEMORY_DESC_WRAPPER_OPT_DEV_HPP
+/** \file
+ * This replaces and extends offset calculation functions of memory_desc_wrapper.
+ *
+ * Use only when needed, i.e. src/cpu/ref_foo.cpp.
+ * Constructor will precalculate dimension-related quantities to support
+ * \c off_v, \c off_l, \c vec_off_l public functions.
+ *
+ * TODO: constant-MVL loop limits and separate tail-loop might be useful
+ *
+ * TODO: Consider api appropriate for \c vec_off_v
+ * (dims_t[DNNL_MAX_NDIMS][MVL] vs variable args version)
+ */
 
 #include <array>
 
@@ -53,7 +65,11 @@ namespace impl {
 #endif
 
 #ifndef MVL
+#if defined(__ve)
 #define MVL 256
+#else // assume x86 32-float simd is good for loops
+#define MVL 32
+#endif
 #endif
 
 #define NOVEC_ _Pragma("_NEC novector")
