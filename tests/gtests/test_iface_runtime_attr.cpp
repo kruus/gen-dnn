@@ -20,6 +20,7 @@
 #include "dnnl.hpp"
 
 #include "src/cpu/platform.hpp"
+#include "common/primitive_attr.hpp"
 
 namespace dnnl {
 
@@ -50,8 +51,43 @@ protected:
 #define CHECK_INVALID(...) CHECK_STATUS(dnnl_invalid_arguments, __VA_ARGS__)
 #define CHECK_UNIMPL(...) CHECK_STATUS(dnnl_unimplemented, __VA_ARGS__)
 
+#define CHECK_TRUE(...) GTEST_CHECK_(__VA_ARGS__)
+
 // TODO: replace primitive descriptor creation with iterator fetching
 //       to test all possible implementations
+
+TEST_F(runtime_attr_test, TestOutputScales) {
+    // VE: had bad runtime oscale init during matmul quantization tutorial ?
+#define OScales (attr.get()->output_scales_)
+    {
+        primitive_attr attr;
+        CHECK_TRUE( OScales.has_default_values() );
+        CHECK_TRUE( OScales.defined() );
+        CHECK_TRUE( OScales.count_ == 1 );
+        CHECK_TRUE( OScales.mask_ == 0 );
+        CHECK_TRUE( OScales.scales_ != nullptr && *OScales.scales_ == 1.0 );
+        attr.set_output_scales(0,{0.5f});
+        CHECK_TRUE( !OScales.has_default_values() );
+        CHECK_TRUE( OScales.defined() );
+    }
+    {
+        auto attr = gen_attr(true /*runtime*/);
+        CHECK_TRUE( !OScales.has_default_values() );
+        CHECK_TRUE( !OScales.defined() );
+        attr.set_output_scales(0,{1.0f});
+        CHECK_TRUE( OScales.has_default_values() );
+        CHECK_TRUE( OScales.defined() );
+    }
+    {
+        auto attr = gen_attr(false /*runtime*/);
+        CHECK_TRUE( !OScales.has_default_values() );
+        CHECK_TRUE( OScales.defined() );
+        attr.set_output_scales(0,{1.0f});
+        CHECK_TRUE( OScales.has_default_values() );
+        CHECK_TRUE( OScales.defined() );
+    }
+#undef OScales
+}
 
 TEST_F(runtime_attr_test, TestBNorm) {
     for (auto dt : {data_type::f32, data_type::s8}) {
