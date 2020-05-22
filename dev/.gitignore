@@ -1,0 +1,10 @@
+*.cpp.s
+*.L
+*.LL
+test_int8
+test_int8-b
+*.i
+sr
+log
+vrsqrt
+*.log

@@ -171,8 +171,11 @@ struct scales_t : public c_compatible {
     }
 
     bool has_default_values() const {
+#pragma _NEC novector
+        // VE vfcmp instruction does not test nan properly, whereas scalar vcmp does
+        // [ejk] also changed to compare with 1.f to avoid double converision
         for (dim_t c = 0; c < count_; ++c) {
-            if (scales_[c] != 1.) return false;
+            if (scales_[c] != 1.f) return false;
         }
         return true;
     }
