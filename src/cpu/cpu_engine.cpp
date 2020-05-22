@@ -35,16 +35,10 @@ namespace cpu {
 
 cpu_engine_t::cpu_engine_t()
     : engine_t(engine_kind::cpu, get_default_runtime(engine_kind::cpu)) {
-#if defined(__ve)
-        if(0){
-            int const originalRounding = fesetround(FE_DOWNWARD);
-            int const tonearest = fegetround();
-            printf(" cpu engine rounding mode %d --> %d (nearest)\n",
-                   originalRounding, tonearest);
-        }
+#if 1 || defined(__ve)
         if(1){
             int const rounding_mode = fegetround();
-            printf(" cpu engine rounding mode %d [ FE_DOWNWARD, FE_TONEAREST, FE_TOWARDZERO, FE_UPWARD ] = [%x, %x, %x, %x]\n",
+            printf(" default fegetround() is %#x.  {FE_DOWNWARD, FE_TONEAREST, FE_TOWARDZERO, FE_UPWARD} = {%#x, %#x, %#x, %#x}\n",
                    rounding_mode, FE_DOWNWARD, FE_TONEAREST, FE_TOWARDZERO, FE_UPWARD);
         }
 #endif
