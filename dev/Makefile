@@ -28,6 +28,10 @@ vrsqrt: vrsqrt.cpp
 	$(CXX) $(CXXFLAGS) -S $< -o $<.s
 	$(CXX) $(CXXFLAGS) $< -o $@
 	./$@
+has_def: has_def.cpp
+	$(CXX) $(CXXFLAGS) -S $< -o $<.s
+	$(CXX) $(CXXFLAGS) $< -o $@
+	./$@
 test_int8-b.o : test_int8-b.cpp
 	$(CXX) -O3 -std=c++11 -Wall -g -c $< -o $@
 	$(CXX) -O3 -std=c++11 -Wall -g -dD -E $< -o $<.i
@@ -40,6 +44,7 @@ clean:
 	rm -f sr sr.cpp.s sr.L sr.LL
 	rm -f log log.cpp.s log.L log.LL
 	rm -f vrsqrt vrsqrt.cpp.s vrsqrt.L vrsqrt.LL
+	rm -f has_def has_def.cpp.s has_def.L has_def.LL
 realclean: clean
 	rm -f *.log
 	#
