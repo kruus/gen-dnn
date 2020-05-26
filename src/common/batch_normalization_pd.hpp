@@ -40,7 +40,10 @@ struct batch_normalization_pd_t : public primitive_desc_t {
         , data_md_(desc_.data_desc)
         , stat_md_(desc_.stat_desc)
         , scaleshift_md_(desc_.data_scaleshift_desc)
-        , ws_md_() {}
+        , ws_md_() {
+            printf(" +bnorm_pd(hint_fwd_pd=%p)\n",
+                   (void*)hint_fwd_pd);
+        }
 
     const batch_normalization_desc_t *desc() const { return &desc_; }
     virtual const op_desc_t *op_desc() const override {
@@ -113,6 +116,9 @@ protected:
                 data_nelems * bits_per_element, bits_per_byte)};
         dnnl_memory_desc_init_by_tag(
                 &ws_md_, 1, ws_sz, impl::data_type::u8, format_tag::x);
+
+        char s[80]; dnnl_md2fmt_str(s, 80, &ws_md_);
+        printf(" bnorm-pd-init_default_ws[%lu]: %s\n", (long unsigned)ws_sz, s);
     }
 
 private:
@@ -177,6 +183,8 @@ struct batch_normalization_fwd_pd_t : public batch_normalization_pd_t {
     }
 
     virtual const memory_desc_t *workspace_md(int index = 0) const override {
+        printf(" bnorm worspace_md(%d),training=%d,fuse_norm_relu=%d\n",
+               index, (int)is_training(), (int)fuse_norm_relu());
         return index == 0 && is_training() && fuse_norm_relu() ? &ws_md_
                                                                : &glob_zero_md;
     }

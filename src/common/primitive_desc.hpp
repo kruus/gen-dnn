@@ -222,6 +222,18 @@ protected:
      *              exactly match the one from fwd_pd */
     bool compare_ws(const primitive_desc_t *fwd_pd) const {
         if (!workspace_md()) return true; // the impl lives fine w/o workspace
+        printf(" compare_ws: ");
+        if (fwd_pd) {
+            printf(" fwd_pd ");
+            if (fwd_pd->workspace_md()) {
+                char s[80];
+                dnnl_md2fmt_str(s, 80, fwd_pd->workspace_md());
+                printf(" fwd_pd->ws_md=%s@%p", s, (void*)fwd_pd->workspace_md());
+                dnnl_md2fmt_str(s, 80, workspace_md());
+                printf(" ws_md=%s@%p", s, workspace_md());
+                printf(" equal? %d", (int)(*fwd_pd->workspace_md() == *workspace_md()));
+            }
+        }
         return fwd_pd && fwd_pd->workspace_md()
                 && *fwd_pd->workspace_md() == *workspace_md();
     }
