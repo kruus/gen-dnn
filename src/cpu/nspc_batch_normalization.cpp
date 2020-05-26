@@ -192,6 +192,8 @@ void nspc_batch_normalization_fwd_t<d_type>::execute_forward(
             for (dim_t sp = 0; sp < SP; sp++) {
                 acc_data_t *_dst;
                 const acc_data_t *_src;
+                // "Potential dependency due to pointer XXX
+                //  -- use restrict qualifier if ok: _src"
                 const size_t s_off = (size_t)n * SP * C + sp * C;
                 if (d_type == bf16) {
                     // store dst to f32 buffer

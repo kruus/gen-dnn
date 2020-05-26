@@ -170,8 +170,53 @@ int main(int,char**){
         for (int i=0; i<200; ++i)
             // absolutely horrid:
             //    f[i] = sqrt_bwd(float{1.0},x[i]);
-            // still bad:
+            // better:
             f[i] = float{1.0} * (1.0f / ::sqrtf(x[i]));
+            // %s61 = 1056964608 = 0.5f 
+            // %s62 = 1065353216 = 1.0f
+            // (x) in %v63
+            // --- vrsqrt.s %v62,%v63
+            // (w) y = vrsqrt(x)
+            // --- vfmul.s %v61,%v63,%v62
+            // (a) y = x*w                  approx sqrt(x)
+            // --- vfnmsb.s %v61,%s62,%v61,%v62 (%s62 is 1065353216 = 0.5f
+            //                x   y    z    w   --> -y + z * w
+            // (b) y = 1 - a*w              = 1 - x*w*w
+            // --- vfmul.s %v61,%s61,%v61
+            // (c) y = 0.5 * b              = 0.5 - 0.5*x*w*w
+            // --- vfmad.s %v61,%v62,%v62,%v61
+            // (d) y = w + c*w = w + 0.5*w + 0.5*x*w*w*w
+            //          = 1.5*w - 0.5*x*w*w*w
+            //          = (y/2) (3-x*y*y)  "official formula"
+            // // summary
+            // w = vrsqrt(x)
+            // a = x*w
+            // b = 1-a*w
+            // c = 0.5b
+            // d = w + c*w
+            // // cf alt method (wikipedia)
+            // y = vrsqrt(x)
+            // a = x*y
+            // h = 0.5*y
+            // iter:
+            // r = 0.5 - ah
+            // x' = a + a*r   (close to sqrt(x))
+            // h' = h + h*r   (close to 1/sqrt(x))
+            // --- one less scalar const load, a,h can parallelize
+            //
+            // vfmul.s %[a], %[x], %[y]
+            // vfmul.s %[h], %[half], %[y]
+            // // iter:
+            // vfnmsb.s %[r], %[half], %[a], %[h]
+            // vfmad.s %[x], %[a], %[a], %[r]           # sqrt(x)
+            // vfmad.s %[h], %[h], %[h], %[r]           # 1/sqrt(x)
+            //
+            // This way also gives path to x**(1.5) etc.
+            // But should directly apply to get actual x**1.5 iteration formula!
+            //
+            // --- vstu %v61,4,%s60
+            //
+            //
         out(x,g,f);
     }
     if(1){

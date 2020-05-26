@@ -79,12 +79,21 @@ void inner_product_example(dnnl::engine::kind engine_kind) {
         return std::cos(i++ / 10.f);
     });
     std::generate(weights_data.begin(), weights_data.end(), []() {
-        static int i = 0;
-        return std::sin(i++ * 2.f);
+        static uint32_t i = 0;
+        //return std::sin(i++ * 2.f);
+        //   "|Argument| of SIN exceeds the range" after 2i=6588398
+        // So LCG as per Lemire "Tables of Linear Congruential Generators
+        // of Different Sizes and Good Lattice Structure". [ejk]
+        return std::sinf( (float) (i=i*uint32_t{2891336453U} + 13U)
+                         * 1.46e-9f/*u32 --> ~ 0..2pi*/ );
     });
     std::generate(bias_data.begin(), bias_data.end(), []() {
         static int i = 0;
-        return std::tanh(i++);
+        return std::tanh(i++); // intentionally smooth & +ve?
+        // could use sinf with a different LCG; ex:
+        //static uint32_t i = 0;
+        //return std::sinf( (float) (i=i*uint32_t{29943829} + 13U)
+        //                 * 1.46e-9f/*u32 --> ~ 0..2pi*/ );
     });
 
     // Create memory descriptors and memory objects for src and dst. In this

@@ -242,8 +242,8 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
                 acc_data_t sv = use_scaleshift ? (acc_data_t)scaleshift[C + off]
                                                : (acc_data_t)0;
                 for (dim_t n = N_s; n < N_e; ++n) {
-                    acc_data_t *_dst;
-                    const acc_data_t *_src;
+                    acc_data_t *_dst;       // Consider restrict? XXX
+                    const acc_data_t *_src; // Consider restrict? XXX
                     size_t s_off = off * SP + n * C * SP;
                     if (d_type == bf16) {
                         // store dst to f32 buffer
@@ -263,6 +263,7 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
                         _src = reinterpret_cast<const acc_data_t *>(
                                 src + s_off);
                     }
+#pragma _NEC novector // [ejk] XXX revisit for VE
 #if SAFE_TO_USE_OMP_SIMD
                     PRAGMA_OMP_SIMD()
 #endif
@@ -277,7 +278,8 @@ void ncsp_batch_normalization_fwd_t<d_type>::execute_forward(
                                 if (is_training) ws[d_off] = 1;
                             }
                         }
-                        _dst[sp] = maybe_post_op(bn_res);
+                        _dst[sp] = maybe_post_op(bn_res); // XXX vectorizable?
+                        // "Feedback of scalar value from one loop pass to another."
                     }
                     if (d_type == bf16) {
                         // convert dst from f32 to bf16

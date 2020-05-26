@@ -14,15 +14,13 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef CPU_NCSP_BATCH_NORMALIZATION_HPP
-#define CPU_NCSP_BATCH_NORMALIZATION_HPP
+#ifndef CPU_VE_NCSP_BATCH_NORMALIZATION_HPP
+#define CPU_VE_NCSP_BATCH_NORMALIZATION_HPP
 
-#if defined(__ve)
-#include "cpu/ve/ncsp_batch_normalization.hpp"
-#else
 #include <assert.h>
 
 #include "common/c_types_map.hpp"
+#include "common/ve/consistency.hpp"
 #include "common/dnnl_thread.hpp"
 #include "common/memory_tracking.hpp"
 #include "common/primitive.hpp"
@@ -50,15 +48,20 @@ struct ncsp_batch_normalization_fwd_t : public primitive_t {
             using namespace prop_kind;
             using namespace format_tag;
 
-            bool ok = is_fwd() && !has_zero_dim_memory()
-                    && src_md()->data_type == d_type
-                    && platform::has_data_type_support(d_type)
-                    && IMPLICATION(
-                            use_scaleshift(), weights_md()->data_type == f32)
-                    && memory_desc_matches_one_of_tag(
-                            *src_md(), ncdhw, nchw, nc)
-                    && (attr()->has_default_values()
-                            || this->with_relu_post_op());
+            Consistency ok("nspc_batch_normalization_fwd_t");
+#define AND_(...) SCHKVV(ok,(__VA_ARGS__))
+            AND_(is_bwd());
+            AND_(is_fwd());
+            AND_(!has_zero_dim_memory());
+            AND_(src_md()->data_type == d_type);
+            AND_(platform::has_data_type_support(d_type));
+            AND_(IMPLICATION(use_scaleshift(),
+                        weights_md()->data_type == f32));
+            AND_(memory_desc_matches_one_of_tag(
+                    *src_md(), ncdhw, nchw, nc));
+            AND_(attr()->has_default_values()
+                    || this->with_relu_post_op());
+#undef AND_
             if (!ok) return status::unimplemented;
 
             if (is_training() && fuse_norm_relu()) init_default_ws(8);
@@ -125,26 +128,38 @@ struct ncsp_batch_normalization_bwd_t : public primitive_t {
             using namespace data_type;
             using namespace format_tag;
 
-            bool ok = is_bwd() && !has_zero_dim_memory()
-                    && set_default_formats_common()
-                    && utils::everyone_is(d_type, src_md()->data_type,
-                            diff_src_md()->data_type)
-                    && platform::has_data_type_support(d_type)
-                    && IMPLICATION(use_scaleshift(),
-                            utils::everyone_is(f32, weights_md()->data_type,
-                                    diff_weights_md()->data_type))
-                    && memory_desc_matches_one_of_tag(
-                            *src_md(), ncdhw, nchw, nc)
-                    && memory_desc_matches_one_of_tag(
-                            *diff_src_md(), ncdhw, nchw, nc)
-                    && attr()->has_default_values();
+            Consistency ok("nspc_batch_normalization_bwd_t");
+#define AND_(...) SCHKVV(ok,(__VA_ARGS__))
+#if defined(__ve)
+            printf(" d_type=%d ; src, weights & diff_weights data_type are "
+                    "%d %d %d ; use_scaleshift()=%d\n",
+                    (int)d_type, (int)src_md()->data_type,
+                    (int)weights_md()->data_type,
+                    (int)diff_weights_md()->data_type,
+                    (int)use_scaleshift() );
+#endif
+            AND_(is_bwd());
+            AND_(!has_zero_dim_memory());
+            AND_(set_default_formats_common());
+            AND_(utils::everyone_is(d_type, src_md()->data_type,
+                        diff_src_md()->data_type));
+            AND_(platform::has_data_type_support(d_type));
+            AND_(IMPLICATION(use_scaleshift(),
+                        utils::everyone_is(f32, weights_md()->data_type,
+                            diff_weights_md()->data_type)));
+            AND_(memory_desc_matches_one_of_tag(
+                            *src_md(), ncdhw, nchw, nc));
+            AND_(memory_desc_matches_one_of_tag(
+                            *diff_src_md(), ncdhw, nchw, nc));
+            AND_(attr()->has_default_values());
             if (!ok) return status::unimplemented;
 
             if (fuse_norm_relu()) {
                 init_default_ws(8);
-                if (!compare_ws(hint_fwd_pd_)) return status::unimplemented;
+                AND_(compare_ws(hint_fwd_pd_));
+                if (!ok) return status::unimplemented;
             }
-
+#undef AND_
             init_scratchpad();
 
             return status::success;
@@ -193,7 +208,5 @@ private:
 } // namespace impl
 } // namespace dnnl
 
-#endif // defined(__ve)
-#endif
-
-// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
+// vim: et ts=4 sw=4 cindent cino=+s,l0,\:4,N-s
+#endif // CPU_VE_NCSP_BATCH_NORMALIZATION_HPP

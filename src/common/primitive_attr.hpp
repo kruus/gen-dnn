@@ -120,7 +120,7 @@ struct rnn_tparams_t : public c_compatible {
 };
 
 struct scales_t : public c_compatible {
-#define DBG_SCALES 1
+#define DBG_SCALES 0
 #if DBG_SCALES
 #define MSG(STR) do { \
     printf(" %s:%lu,%d,%g",#STR,(long unsigned)count_,mask_,scales_[0]); \
