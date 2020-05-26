@@ -533,7 +533,7 @@ void init_fp_mode() {
     // We set ftz to avoid denormals in perf measurements
     _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
 }
-#else
+#else // should agree with cpu/simple_q10n.hpp ?
 int mxcsr_round(float f) {
     return (int)nearbyintf(f);
 }

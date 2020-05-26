@@ -15,7 +15,7 @@
  * but for temporary file scope debug you can choose a more verbose macro
  */
 
-#include "verbose.hpp"
+#include "common/verbose.hpp"
 #include <cstdio>
 #include <cstdlib>
 

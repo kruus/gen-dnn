@@ -5,6 +5,7 @@
 #include <type_traits>
 #include <array>
 #include <assert.h>
+#include <limits>
 
 using namespace std;
 
@@ -193,13 +194,23 @@ struct scales_t : public impl::c_compatible
     }
 
     bool has_default_values() const {
+        static_assert( std::numeric_limits<float>::is_iec559,
+                " IEC559 states x {==,>,>=,<,<=} NaN is false; x!=NaN, true");
+        // VE (Aurora) vfcp instruction does not test nan properly
+        // This VIOLATES compiler claim to respect IEC 559/IEEE 754
         // **************************************
-        //    VE BUG WORKAROUND HERE
+        //    VE BUG WORKAROUNDS HERE
         // **************************************
-#pragma _NEC novector
-        // VE vfcmp instruction does not test nan properly
+        //
+        // First workaround:
+//#pragma _NEC novector
+        // (does using == instead of != "fix" the bug?)
         for (dim_t c = 0; c < count_; ++c) {
-            if (scales_[c] != 1.f) return false;
+            //if (scales_[c] != 1.f) return false;
+            //
+            // alternate workaround (still allows vectorization)
+            //
+            if (!(scales_[c] == 1.f)) return false;
         }
         return true;
     }

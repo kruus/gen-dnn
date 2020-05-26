@@ -32,6 +32,11 @@ has_def: has_def.cpp
 	$(CXX) $(CXXFLAGS) -S $< -o $<.s
 	$(CXX) $(CXXFLAGS) $< -o $@
 	./$@
+round: round.cpp
+	$(CXX) $(CXXFLAGS) -dD -E $< -o $<.i
+	$(CXX) $(CXXFLAGS) -S $< -o $<.s
+	$(CXX) $(CXXFLAGS) $< -o $@
+	./$@
 test_int8-b.o : test_int8-b.cpp
 	$(CXX) -O3 -std=c++11 -Wall -g -c $< -o $@
 	$(CXX) -O3 -std=c++11 -Wall -g -dD -E $< -o $<.i
@@ -45,6 +50,7 @@ clean:
 	rm -f log log.cpp.s log.L log.LL
 	rm -f vrsqrt vrsqrt.cpp.s vrsqrt.L vrsqrt.LL
 	rm -f has_def has_def.cpp.s has_def.L has_def.LL
+	rm -f round round.cpp.s round.L round.LL
 realclean: clean
 	rm -f *.log
 	#

@@ -14,15 +14,13 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef CPU_REF_BATCH_NORMALIZATION_HPP
-#define CPU_REF_BATCH_NORMALIZATION_HPP
+#ifndef CPU_VE_REF_BATCH_NORMALIZATION_HPP
+#define CPU_VE_REF_BATCH_NORMALIZATION_HPP
 
-#if 1 || defined(__ve) // debugging why UNIMPLEMENTED_FAILED in benchdnn regression_large
-#include "cpu/ve/ref_batch_normalization.hpp"
-#else
 #include <assert.h>
 
 #include "common/c_types_map.hpp"
+#include "common/ve/consistency.hpp"
 #include "common/primitive.hpp"
 #include "common/type_helpers.hpp"
 #include "common/utils.hpp"
@@ -47,19 +45,45 @@ struct ref_batch_normalization_fwd_t : public primitive_t {
 
         status_t init(engine_t *engine) {
             using namespace data_type;
-            bool ok = is_fwd() && src_md()->data_type == d_type
-                    && platform::has_data_type_support(d_type)
-                    && IMPLICATION(
-                            use_scaleshift(), weights_md()->data_type == f32)
-                    && (attr()->has_default_values() || with_relu_post_op());
+            Consistency ok("ref_batch_normalization_fwd_t");
+#define AND_(...) SCHKVV(ok,__VA_ARGS__)
+#if 1 || defined(__ve)
+            printf(" d_type=%d ; src, weights & diff_weights data_type are "
+                    "%d %d %d ; use_scaleshift()=%d\n",
+                    (int)d_type, (int)src_md()->data_type,
+                    (int)weights_md()->data_type,
+                    (int)diff_weights_md()->data_type,
+                    (int)use_scaleshift() );
+#endif
+            AND_((is_fwd()));
+            AND_((src_md()->data_type == d_type));
+            AND_((platform::has_data_type_support(d_type)));
+            AND_(IMPLICATION(use_scaleshift(),
+                        weights_md()->data_type == f32));
+            AND_((attr()->has_default_values() || with_relu_post_op()));
             if (!ok) return status::unimplemented;
 
-            if (src_md()->data_type == s8 && !stats_is_src())
-                return status::unimplemented;
+            //if (src_md()->data_type == s8 && !stats_is_src())
+            //    return status::unimplemented;
+            //#define IMPLICATION(cause, effect) (!(cause) || !!(effect))
+            //#define IMPLICATION(cause, effect) (!(cause) || (effect))
+            //#define IMPLICATION(cause, effect) (!(!!(cause) && !(effect)))
+            //#define IMPLICATION(cause, effect) (!((cause) && !(effect)))
+            // cause = src_md()->data_type == s8
+            // effect = stats_is_src()
+            AND_(IMPLICATION(src_md()->data_type == s8,
+                        stats_is_src()));
+            if (!ok) return status::unimplemented;
 
-            if (is_training() && fuse_norm_relu()) init_default_ws(8);
+            if (is_training() && fuse_norm_relu()) {
+                init_default_ws(8);
+                char s[80]; dnnl_md2fmt_str(s, 80, &ws_md_);
+                printf( __FILE__ " ws %s\n", s);
+            }
 
+            printf(__FILE__ " fwd init!\n");
             return status::success;
+#undef AND_
         }
     };
 
@@ -89,22 +113,38 @@ struct ref_batch_normalization_bwd_t : public primitive_t {
 
         status_t init(engine_t *engine) {
             using namespace data_type;
-            bool ok = is_bwd() && set_default_formats_common()
-                    && utils::everyone_is(d_type, src_md()->data_type,
-                            diff_src_md()->data_type)
-                    && platform::has_data_type_support(d_type)
-                    && IMPLICATION(use_scaleshift(),
+            Consistency ok("ref_batch_normalization_fwd_t");
+#define AND_(...) SCHKVV(ok,__VA_ARGS__)
+#if 1 || defined(__ve)
+            printf(" d_type=%d ; src, weights & diff_weights data_type are "
+                    "%d %d %d ; use_scaleshift()=%d\n",
+                    (int)d_type, (int)src_md()->data_type,
+                    (int)weights_md()->data_type,
+                    (int)diff_weights_md()->data_type,
+                    (int)use_scaleshift() );
+#endif
+            AND_((is_bwd()));
+            AND_((set_default_formats_common()));
+            AND_((utils::everyone_is(d_type, src_md()->data_type,
+                            diff_src_md()->data_type)));
+            AND_((platform::has_data_type_support(d_type)));
+            AND_((IMPLICATION(use_scaleshift(),
                             utils::everyone_is(d_type, weights_md()->data_type,
-                                    diff_weights_md()->data_type))
-                    && attr()->has_default_values();
+                                    diff_weights_md()->data_type))));
+            AND_((attr()->has_default_values()));
             if (!ok) return status::unimplemented;
 
             if (fuse_norm_relu()) {
+                printf(" fuse_norm_relu! ");
                 init_default_ws(8);
-                if (!compare_ws(hint_fwd_pd_)) return status::unimplemented;
+                //if (!compare_ws(hint_fwd_pd_)) return status::unimplemented;
+                AND_(compare_ws(hint_fwd_pd_));
+                if (!ok) return status::unimplemented;
             }
 
+            printf(__FILE__ " bwd init!\n");
             return status::success;
+#undef AND_
         }
     };
 
@@ -125,6 +165,5 @@ private:
 } // namespace impl
 } // namespace dnnl
 
-#endif // not VE
-// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
-#endif // CPU_REF_BATCH_NORMALIZATION_HPP
+// vim: et ts=4 sw=4 cindent cino=+2s,l0,\:4,N-s
+#endif

@@ -323,6 +323,12 @@ if(NECVE)
     # -c /home/kruus/vanilla-dbg/src/cpu/simple_resampling.cpp) && echo YAY || echo OHOH
     set_source_files_properties(${FILES_REDUCE_INLINING}
         PROPERTIES COMPILE_FLAGS "-finline-max-depth=4")
+
+    # nc++ "compiler error" if use -mvector-intrinsic-check option [append default option]
+    set_source_files_properties(
+        ${CMAKE_CURRENT_SOURCE_DIR}/ncsp_batch_normalization.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/nspc_batch_normalization.cpp
+        PROPERTIES COMPILE_FLAGS "-mno-vector-intrinsic-check")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")

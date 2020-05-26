@@ -519,7 +519,7 @@ echo 'ulimit soft : '`ulimit -Ss`
         ccxx_flags -finline-max-times=20
         if [ $DODEBUG -gt 0 ]; then
             # in nc++-3.0.28 manual (but apparently not in nc++-3.0.27!)
-            ccxx_flags -traceback=verbose
+            : #ccxx_flags -traceback=verbose
             # add this code to get backtrace
             #   __builtin_traceback((unsigned long *)__builtin_frame_address(0));
             # when env VE_TRACEBACK=VERBOSE
@@ -531,6 +531,16 @@ echo 'ulimit soft : '`ulimit -Ss`
         #ccxx_flags -mno-parallel # does this OVERRIDE (disable) -fopenmp?
         #ccxx_flags -D_FORTIFY_SOURCE=1
         #ccxx_flags -D_FORTIFY_SOURCE=2 -Wl,-z,-muldefs
+        if [ $DODEBUG -gt 0 ]; then
+            # default is -mno-vector-intrinsic-check
+            # In optimized mode, we are OK with failing some tests for
+            # limit cases of some math functions.
+            ccxx_flags -mvector-intrinsic-check
+            # In debug modes, check for benchdnn NaN,0,inf limit cases,
+            # -- does this resolve benchdnn failures in these cases ? XXX
+            # Reasoning:
+            #   Do NOT want more limit checks in src/common/math_utils.hpp
+        fi
     fi
     # Show build commands
     CMAKETRACE="${CMAKETRACE} -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON"

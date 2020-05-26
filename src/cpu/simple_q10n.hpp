@@ -40,7 +40,9 @@ inline int mxcsr_round(float f) ATTR_NO_MSAN {
 #if DNNL_X64
     return _mm_cvtss_si32(_mm_load_ss(&f));
 #elif defined(__ve)
-    return ::lrint(f);  // round according to fesetround, in program status word
+    // \sa tests/benchdnn/common.hpp, which also defines mxcsr_round
+    return (int)nearbyintf(f);
+    //return ::lrint(f);  // round according to fesetround, in program status word
     //return ::lround(f);    // always round-to-nearest-even  (wrong?)
     //return ::lround(f);    // always round-to-nearest-even  (wrong?)
     //// FIX op: sx/zx sign extension, ne~nearest_even (absent => default)

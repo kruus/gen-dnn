@@ -546,8 +546,9 @@ int compare_dat(const prb_t &p, data_kind_t kind, dnn_mem_t &mem_dt,
     size_t errors = 0;
     r->total += nelems;
 
-//#define BENCHDNN_RNN_PRINT_STATISTICS
+#define BENCHDNN_RNN_PRINT_STATISTICS
 #ifdef BENCHDNN_RNN_PRINT_STATISTICS
+    final_compare = true; // in this case, always print those stats too
     double min_dt, max_dt, mean_dt = 0.0f, var_dt = 0.0f;
     double min_fp, max_fp, mean_fp = 0.0f, var_fp = 0.0f;
     min_dt = max_dt = mem_dt.get_elem(0);
@@ -562,13 +563,19 @@ int compare_dat(const prb_t &p, data_kind_t kind, dnn_mem_t &mem_dt,
     int64_t acc_dim = fwd_acc_dim;
     if (p.prop == dnnl_backward) acc_dim *= MAX2(bwdd_acc_dim, bwdw_acc_dim);
     // Here the factor 4 just gives some wiggle room for fp32 testing
-    float rel_eps = 4
+#if ! defined(__ve)
+    float const eps = p.cfg[kind].eps;
+#else // VE Aurora less precise: TODO compare with -mno-vector build)
+    float const eps = p.cfg[kind].eps * 8; // VE benchdnn l0 up to 0.000137431
+#endif
+    float const rel_eps = 4
             * (1 + (p.prop == dnnl_backward)) // double wiggle room for bwd
             * ((p.direction == dnnl_bidirectional_sum)
                     + 1) // double threshold if bidir_sum
-            * ceilf(log2f(acc_dim * p.n_iter)) * p.cfg[kind].eps;
+            * ceilf(log2f(acc_dim * p.n_iter)) * eps;
 #ifdef BENCHDNN_RNN_PRINT_STATISTICS
-    printf("rel_eps(%a) eps(%a) %ld\n", rel_eps, p.cfg[kind].eps, acc_dim);
+    printf("rel_eps(%a) eps(%a) %ld\n", rel_eps, eps, acc_dim);
+    printf("rel_eps(%g) eps(%g) %ld\n", rel_eps, eps, acc_dim);
 #endif
 
     /* Note: we do an eltwise comparison only when:
@@ -627,7 +634,7 @@ int compare_dat(const prb_t &p, data_kind_t kind, dnn_mem_t &mem_dt,
         if (check_norm0) {
             const float diff = fabsf(fp - dt);
             const float rel_diff = diff / (fabsf(fp) > FLT_MIN ? fabsf(fp) : 1);
-            const float diff_threshold = p.cfg[kind].eps;
+            const float diff_threshold = eps;
 
             // very strict error bound for int8 data type
             if (p.cfg[kind].dt == dnnl_u8)
@@ -682,7 +689,11 @@ int compare_dat(const prb_t &p, data_kind_t kind, dnn_mem_t &mem_dt,
 #ifdef BENCHDNN_RNN_PRINT_STATISTICS
     printf("dt: min(%a) max(%a) mean(%a), var(%a)\n", min_dt, max_dt,
             mean_dt / nelems, var_dt / nelems);
+    printf("dt: min(%g) max(%g) mean(%g), var(%g)\n", min_dt, max_dt,
+            mean_dt / nelems, var_dt / nelems);
     printf("fp: min(%a) max(%a) mean(%a), var(%a)\n", min_fp, max_fp,
+            mean_fp / nelems, var_fp / nelems);
+    printf("fp: min(%g) max(%g) mean(%g), var(%g)\n", min_fp, max_fp,
             mean_fp / nelems, var_fp / nelems);
 #endif
 
