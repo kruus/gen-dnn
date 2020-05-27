@@ -36,16 +36,37 @@ bool primitive_desc_t::compare_ws(const primitive_desc_t *fwd_pd) const {
             printf(" fwd_pd->ws_md=%s @%p", s, (void*)fwd_pd->workspace_md());
             dnnl_md2fmt_str(s, 80, workspace_md());
             printf(" ws_md=%s @%p", s, workspace_md());
-            printf(" equal? %d", (int)(*fwd_pd->workspace_md() == *workspace_md()));
+            int equal = (*fwd_pd->workspace_md() == *workspace_md());
+            printf(" equal? %d", equal);
         }else{
             printf(" has no ws, ws@%p (null)", fwd_pd->workspace_md());
         }
     }
     printf("\n");
-    //return fwd_pd && fwd_pd->workspace_md()
-    //    && *fwd_pd->workspace_md() == *workspace_md();
+#if 0 // mis-compiled on VE !!!
+    return fwd_pd && fwd_pd->workspace_md()
+        && *fwd_pd->workspace_md() == *workspace_md();
+#elif 0 // also failed
+    return fwd_pd && fwd_pd->workspace_md()
+        && (*fwd_pd->workspace_md() == *workspace_md());
+#elif 1 // this worked?
     int equal = (*fwd_pd->workspace_md() == *workspace_md());
-    return fwd_pd && fwd_pd->workspace_md() && equal;
+    return fwd_pd!=nullptr && fwd_pd->workspace_md()!=nullptr
+        && equal;
+#else
+    bool ret = fwd_pd;
+    printf( "fwd_pd?ret=%d", (int)ret);
+    if(ret){
+        ret &&= fwd_pd->workspace_md();
+        printf(" fwd_pd->ws?ret=%d", (int)ret);
+        if(ret){
+            int equal = (*fwd_pd->workspace_md() == *workspace_md());
+            ret &&= equal;
+            printf(" equal?%d-->ret=%d", equal, (int)ret);
+        }
+    }
+    return ret;
+#endif
 }
 dnnl_primitive_desc::dnnl_primitive_desc(primitive_desc_t *pd, engine_t *engine)
     : pd_(pd), engine_(engine) {}
