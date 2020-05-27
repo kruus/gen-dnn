@@ -30,15 +30,16 @@ struct batch_normalization_fwd_pd_t;
 
 #define BNORM_CONSTRUCTOR_DEBUG 1
 #if BNORM_CONSTRUCTOR_DEBUG
-void dump(memory_desc_t const* pmd){
+inline void dump(memory_desc_t const* pmd){
     if(pmd == nullptr){
         printf(" &md=NULL");
         return;
     }
+    printf(" dump md @%p",(void*)pmd);
     memory_desc_t const& md = *pmd;
         
     typedef long unsigned lu;
-    printf(" md{%d,{",md.ndims);
+    printf(" md{%lu,{",(lu)md.ndims);
     if(md.ndims) {
         for(int i=0;i<md.ndims;++i) {
             printf("%lu%c",(lu)md.dims[i],(i==md.ndims-1? '}':','));
@@ -336,22 +337,27 @@ protected:
 #if BNORM_CONSTRUCTOR_DEBUG
 inline void batch_normalization_pd_t::constructor_debug() {
     printf(" +bnorm_pd(hint_fwd_pd_=%p)", (void*)hint_fwd_pd_);
+    fflush(stdout);
     if(hint_fwd_pd_ != nullptr){
         printf(" hint_fwd_pd_->ws_md_ @%p",(void*)&hint_fwd_pd_->ws_md_);
         char s[80]; dnnl_md2fmt_str(s, 80, &hint_fwd_pd_->ws_md_);
-        printf(" is %s",s);
-        printf("\n\thint ");
+        printf(" is %s",s); fflush(stdout);
+        printf("\n\thint "); fflush(stdout);
         dump(&hint_fwd_pd_->ws_md_);
     }
     printf("\n");
 }
 
-void batch_normalization_pd_t::init_ws_debug(long unsigned bytes, long unsigned elements) {
+inline void batch_normalization_pd_t::init_ws_debug(long unsigned bytes, long unsigned elements) {
     char s[80]; dnnl_md2fmt_str(s, 80, &ws_md_);
-    printf(" bnorm-pd-init_default_ws[%lu bytes] for %lu elements @%p %s\n",
+    printf(" bnorm-pd-init_default_ws[%lu bytes] for %lu elements @%p %s",
            bytes, elements, (void*)&ws_md_, s);
-    printf("\n\tinit_ws ");
-    dump(&hint_fwd_pd_->ws_md_);
+    printf("\n\tinit ws ");
+    dump(&ws_md_);
+    printf("\n\thint ws ");
+    if (hint_fwd_pd_) dump(&hint_fwd_pd_->ws_md_);
+    else printf(" no hint");
+    printf("\n");
 }
 #endif // BNORM_CONSTRUCTOR_DEBUG
 
