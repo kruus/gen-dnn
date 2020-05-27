@@ -28,9 +28,48 @@ namespace impl {
 
 struct batch_normalization_fwd_pd_t;
 
+#define BNORM_CONSTRUCTOR_DEBUG 1
+#if BNORM_CONSTRUCTOR_DEBUG
+void dump(memory_desc_t const* pmd){
+    if(pmd == nullptr){
+        printf(" &md=NULL");
+        return;
+    }
+    memory_desc_t const& md = *pmd;
+        
+    typedef long unsigned lu;
+    printf(" md{%d,{",md.ndims);
+    if(md.ndims) {
+        for(int i=0;i<md.ndims;++i) {
+            printf("%lu%c",(lu)md.dims[i],(i==md.ndims-1? '}':','));
+        }
+    }else printf("}");
+    printf(",dt=%d,padded_dims={",(int)md.data_type);
+    if(md.ndims) {
+        for(int i=0;i<md.ndims;++i) {
+            printf("%lu%c",(lu)md.padded_dims[i],(i==md.ndims-1? '}':','));
+        }
+    }else printf("}");
+    printf(",padded_offsets={");
+    if(md.ndims) {
+        for(int i=0;i<md.ndims;++i) {
+            printf("%ld%c",(long)md.padded_offsets[i],(i==md.ndims-1? '}':','));
+        }
+    }else printf("}");
+    printf(",offset0=%ld,format_kind=%d",(long)md.offset0,(int)md.format_kind);
+    printf("}");
+}
+#endif
+
+
 struct batch_normalization_pd_t : public primitive_desc_t {
     static constexpr auto base_pkind = primitive_kind::batch_normalization;
 
+#if BNORM_CONSTRUCTOR_DEBUG
+    void constructor_debug();
+    void init_ws_debug(long unsigned bytes, long unsigned elements);
+    memory_desc_t const& ws_md() const { return this->ws_md_; }
+#endif
     batch_normalization_pd_t(const batch_normalization_desc_t *adesc,
             const primitive_attr_t *attr,
             const batch_normalization_fwd_pd_t *hint_fwd_pd)
@@ -41,8 +80,9 @@ struct batch_normalization_pd_t : public primitive_desc_t {
         , stat_md_(desc_.stat_desc)
         , scaleshift_md_(desc_.data_scaleshift_desc)
         , ws_md_() {
-            printf(" +bnorm_pd(hint_fwd_pd=%p)\n",
-                   (void*)hint_fwd_pd);
+#if BNORM_CONSTRUCTOR_DEBUG
+            constructor_debug();
+#endif
         }
 
     const batch_normalization_desc_t *desc() const { return &desc_; }
@@ -114,16 +154,21 @@ protected:
         const dim_t bits_per_byte = 8;
         const dims_t ws_sz = {(dim_t)utils::div_up(
                 data_nelems * bits_per_element, bits_per_byte)};
+#if BNORM_CONSTRUCTOR_DEBUG
+        printf(" ws_sz[1]=%lu", ws_sz[1]);
+#endif
         dnnl_memory_desc_init_by_tag(
                 &ws_md_, 1, ws_sz, impl::data_type::u8, format_tag::x);
-
-        char s[80]; dnnl_md2fmt_str(s, 80, &ws_md_);
-        printf(" bnorm-pd-init_default_ws[%lu]: %s\n", (long unsigned)ws_sz, s);
+#if BNORM_CONSTRUCTOR_DEBUG
+        printf(" ws_sz[1]=%lu", ws_sz[1]);
+        init_ws_debug(ws_sz[0], data_nelems);
+#endif // BNORM_CONSTRUCTOR_DEBUG
     }
 
 private:
     const memory_desc_t &data_desc() const { return desc_.data_desc; }
 };
+
 
 struct batch_normalization_fwd_pd_t : public batch_normalization_pd_t {
     typedef batch_normalization_fwd_pd_t base_class;
@@ -200,6 +245,7 @@ struct batch_normalization_fwd_pd_t : public batch_normalization_pd_t {
         return 1 + (fuse_norm_relu() + 2 * (!stats_is_src())) * is_training();
     }
 };
+
 
 struct batch_normalization_bwd_pd_t : public batch_normalization_pd_t {
     typedef batch_normalization_bwd_pd_t base_class;
@@ -286,6 +332,28 @@ protected:
                 == status::success;
     }
 };
+
+#if BNORM_CONSTRUCTOR_DEBUG
+inline void batch_normalization_pd_t::constructor_debug() {
+    printf(" +bnorm_pd(hint_fwd_pd_=%p)", (void*)hint_fwd_pd_);
+    if(hint_fwd_pd_ != nullptr){
+        printf(" hint_fwd_pd_->ws_md_ @%p",(void*)&hint_fwd_pd_->ws_md_);
+        char s[80]; dnnl_md2fmt_str(s, 80, &hint_fwd_pd_->ws_md_);
+        printf(" is %s",s);
+        printf("\n\thint ");
+        dump(&hint_fwd_pd_->ws_md_);
+    }
+    printf("\n");
+}
+
+void batch_normalization_pd_t::init_ws_debug(long unsigned bytes, long unsigned elements) {
+    char s[80]; dnnl_md2fmt_str(s, 80, &ws_md_);
+    printf(" bnorm-pd-init_default_ws[%lu bytes] for %lu elements @%p %s\n",
+           bytes, elements, (void*)&ws_md_, s);
+    printf("\n\tinit_ws ");
+    dump(&hint_fwd_pd_->ws_md_);
+}
+#endif // BNORM_CONSTRUCTOR_DEBUG
 
 } // namespace impl
 } // namespace dnnl

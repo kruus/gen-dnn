@@ -138,6 +138,29 @@ struct ref_batch_normalization_bwd_t : public primitive_t {
                 printf(" fuse_norm_relu! ");
                 init_default_ws(8);
                 //if (!compare_ws(hint_fwd_pd_)) return status::unimplemented;
+                if(hint_fwd_pd_) {
+                    memory_desc_t const& lhs = ws_md();
+                    memory_desc_t const& rhs = hint_fwd_pd_->ws_md();
+                    // to avoid changing src/common/type_helpers.hpp...
+                    using dnnl::impl::utils::array_cmp;
+                    AND_(lhs.ndims == rhs.ndims);
+                    AND_(array_cmp(lhs.dims, rhs.dims, lhs.ndims));
+                    AND_(lhs.data_type == rhs.data_type);
+                    AND_(array_cmp(lhs.padded_dims, rhs.padded_dims, lhs.ndims));
+                    AND_(array_cmp(lhs.padded_offsets, rhs.padded_offsets, lhs.ndims));
+                    AND_(lhs.offset0 == rhs.offset0);
+                    AND_(lhs.format_kind == rhs.format_kind);
+                    AND_(types::memory_extra_desc_is_equal(lhs.extra, rhs.extra));
+
+                    if (lhs.format_kind == format_kind::blocked)
+                        AND_(types::blocking_desc_is_equal(lhs, rhs));
+                    else if (lhs.format_kind == format_kind::wino)
+                        AND_(types::wino_desc_is_equal(
+                                lhs.format_desc.wino_desc, rhs.format_desc.wino_desc));
+                    else if (lhs.format_kind == format_kind::rnn_packed)
+                        AND_(types::rnn_packed_desc_is_equal(lhs.format_desc.rnn_packed_desc,
+                                rhs.format_desc.rnn_packed_desc));
+                }
                 AND_(compare_ws(hint_fwd_pd_));
                 if (!ok) return status::unimplemented;
             }

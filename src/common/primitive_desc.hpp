@@ -233,6 +233,8 @@ protected:
                 printf(" ws_md=%s@%p", s, workspace_md());
                 printf(" equal? %d", (int)(*fwd_pd->workspace_md() == *workspace_md()));
             }
+        }else{
+            printf(" ws@%p (null)", fwd_pd->workspace_md());
         }
         return fwd_pd && fwd_pd->workspace_md()
                 && *fwd_pd->workspace_md() == *workspace_md();
