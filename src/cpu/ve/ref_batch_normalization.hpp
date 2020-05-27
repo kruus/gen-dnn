@@ -48,7 +48,7 @@ struct ref_batch_normalization_fwd_t : public primitive_t {
             Consistency ok("ref_batch_normalization_fwd_t");
 #define AND_(...) SCHKVV(ok,__VA_ARGS__)
 #if 1 || defined(__ve)
-            printf(" d_type=%d ; src, weights & diff_weights data_type are "
+            printf(" ref_batch_normalization_fwd_t d_type=%d ; src, weights & diff_weights data_type are "
                     "%d %d %d ; use_scaleshift()=%d\n",
                     (int)d_type, (int)src_md()->data_type,
                     (int)weights_md()->data_type,
@@ -113,10 +113,10 @@ struct ref_batch_normalization_bwd_t : public primitive_t {
 
         status_t init(engine_t *engine) {
             using namespace data_type;
-            Consistency ok("ref_batch_normalization_fwd_t");
+            Consistency ok("ref_batch_normalization_bwd_t");
 #define AND_(...) SCHKVV(ok,__VA_ARGS__)
 #if 1 || defined(__ve)
-            printf(" d_type=%d ; src, weights & diff_weights data_type are "
+            printf(" ref_batch_normalization_bwd_t d_type=%d ; src, weights & diff_weights data_type are "
                     "%d %d %d ; use_scaleshift()=%d\n",
                     (int)d_type, (int)src_md()->data_type,
                     (int)weights_md()->data_type,
@@ -135,7 +135,7 @@ struct ref_batch_normalization_bwd_t : public primitive_t {
             if (!ok) return status::unimplemented;
 
             if (fuse_norm_relu()) {
-                printf(" fuse_norm_relu! ");
+                printf(" ref bwd fuse_norm_relu! ");
                 init_default_ws(8);
                 //if (!compare_ws(hint_fwd_pd_)) return status::unimplemented;
                 if(hint_fwd_pd_) {
@@ -160,6 +160,7 @@ struct ref_batch_normalization_bwd_t : public primitive_t {
                     else if (lhs.format_kind == format_kind::rnn_packed)
                         AND_(types::rnn_packed_desc_is_equal(lhs.format_desc.rnn_packed_desc,
                                 rhs.format_desc.rnn_packed_desc));
+                    if(!ok) printf(" compare_ws should fail!\n");
                 }
                 AND_(compare_ws(hint_fwd_pd_));
                 if (!ok) return status::unimplemented;

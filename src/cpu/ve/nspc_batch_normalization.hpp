@@ -50,7 +50,7 @@ struct nspc_batch_normalization_fwd_t : public primitive_t {
             Consistency ok("nspc_batch_normalization_fwd_t");
 #define AND_(...) SCHKVV(ok,(__VA_ARGS__))
 #if 1 || defined(__ve)
-            printf(" d_type=%d ; src, weights & diff_weights data_type are "
+            printf(" nspc_batch_normalization_fwd_t d_type=%d ; src, weights & diff_weights data_type are "
                     "%d %d %d ; use_scaleshift()=%d\n",
                     (int)d_type, (int)src_md()->data_type,
                     (int)weights_md()->data_type,
@@ -140,7 +140,7 @@ struct nspc_batch_normalization_bwd_t : public primitive_t {
             Consistency ok("nspc_batch_normalization_bwd_t");
 #define AND_(...) SCHKVV(ok,(__VA_ARGS__))
 #if 1 || defined(__ve)
-            printf(" d_type=%d ; src, weights & diff_weights data_type are "
+            printf(" nspc_batch_normalization_bwd_t d_type=%d ; src, weights & diff_weights data_type are "
                     "%d %d %d ; use_scaleshift()=%d\n",
                     (int)d_type, (int)src_md()->data_type,
                     (int)weights_md()->data_type,
@@ -162,8 +162,32 @@ struct nspc_batch_normalization_bwd_t : public primitive_t {
             if (!ok) return status::unimplemented;
 
             if (fuse_norm_relu()) {
-                printf(" fuse_norm_relu! ");
+                printf(" nspc bwd fuse_norm_relu! ");
                 init_default_ws(8);
+                if(hint_fwd_pd_) {
+                    memory_desc_t const& lhs = ws_md();
+                    memory_desc_t const& rhs = hint_fwd_pd_->ws_md();
+                    // to avoid changing src/common/type_helpers.hpp...
+                    using dnnl::impl::utils::array_cmp;
+                    AND_(lhs.ndims == rhs.ndims);
+                    AND_(array_cmp(lhs.dims, rhs.dims, lhs.ndims));
+                    AND_(lhs.data_type == rhs.data_type);
+                    AND_(array_cmp(lhs.padded_dims, rhs.padded_dims, lhs.ndims));
+                    AND_(array_cmp(lhs.padded_offsets, rhs.padded_offsets, lhs.ndims));
+                    AND_(lhs.offset0 == rhs.offset0);
+                    AND_(lhs.format_kind == rhs.format_kind);
+                    AND_(types::memory_extra_desc_is_equal(lhs.extra, rhs.extra));
+
+                    if (lhs.format_kind == format_kind::blocked)
+                        AND_(types::blocking_desc_is_equal(lhs, rhs));
+                    else if (lhs.format_kind == format_kind::wino)
+                        AND_(types::wino_desc_is_equal(
+                                lhs.format_desc.wino_desc, rhs.format_desc.wino_desc));
+                    else if (lhs.format_kind == format_kind::rnn_packed)
+                        AND_(types::rnn_packed_desc_is_equal(lhs.format_desc.rnn_packed_desc,
+                                rhs.format_desc.rnn_packed_desc));
+                    if(!ok) printf(" compare_ws should fail!\n");
+                }
                 AND_(compare_ws(hint_fwd_pd_));
                 if (!ok) return status::unimplemented;
             }
