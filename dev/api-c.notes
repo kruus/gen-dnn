@@ -1,0 +1,45 @@
+-----------------------------------------------------
+# restart a debug compile: o=no OpenMP W=warnings
+./build.sh -avddddoWTttt >& sm.log && echo YAY || echo OHOH
+# continue existing build
+./build.sh -avddddoWqqTttt >& sm.log && echo YAY || echo OHOH
+# run a failing example in gdb (see log for -B BUILDDIR arg)
+./vetest.sh -B build-ved4-seq -q -x primitives-softmax-cpp -L psm.log -G
+
+-----------------------------------------------------
++ tests/api-c 
+dnnl_verbose,info,verbose:2 
+dnnl_verbose,info,build:CPU aurora ISA vanilla quiet ARCH_OPT_FLAGS='' 
+dnnl_verbose,info,DNNL v1.3.0 (commit 3d7f33fc08ba8d824c3fef25c2c0a44473942bd0) 
+dnnl_verbose,info,cpu,runtime:OpenMP 
+dnnl_verbose,info,cpu,isa:Vanilla 
+dnnl_verbose,info,gpu,runtime:none 
+dnnl_verbose,create,cpu,convolution,ref:any,forward_training,src_f32::blocked:aBcd8b:f0 wei_f32::blocked:aBCde8c8b:f0 bia_f32::blocked:a:f0 dst_f32::blocked:aBcd8b:f0,,alg:convolution_direct,mb2_g2ic256oc384_ih13oh11kh3sh1dh0ph0_iw13ow11kw3sw1dw0pw0,0.120117 
+dnnl_verbose,exec,cpu,convolution,ref:any,forward_training,src_f32::blocked:aBcd8b:f0 wei_f32::blocked:aBCde8c8b:f0 bia_f32::blocked:a:f0 dst_f32::blocked:aBcd8b:f0,,alg:convolution_direct,mb2_g2ic256oc384_ih13oh11kh3sh1dh0ph0_iw13ow11kw3sw1dw0pw0,101536 
+dnnl_verbose,create,cpu,reorder,simple:any,undef,src_f32::blocked:aBcd8b:f0 dst_f32::blocked:abcd:f0,,,2x384x11x11,0.078125 
+dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:aBcd8b:f0 dst_f32::blocked:abcd:f0,,,2x384x11x11,4.13403 
+            ********  Program  Information  ******** 
+  Real Time (sec)                         :           101.556645 
+  User Time (sec)                         :           101.555364 
+  Vector Time (sec)                       :            20.484845 
+  Inst. Count                             :         142167763578 
+  V. Inst. Count                          :            428584404 
+  V. Element Count                        :           5143044334 
+  V. Load Element Count                   :           2571517909 
+  FLOP Count                              :            214558011 
+  MOPS                                    :          1446.353815 
+  MOPS (Real)                             :          1446.324983 
+  MFLOPS                                  :             2.112759 
+  MFLOPS (Real)                           :             2.112717 
+  A. V. Length                            :            12.000073 
+  V. Op. Ratio (%)                        :             3.501475 
+  L1 Cache Miss (sec)                     :            12.241819 
+  VLD LLC Hit Element Ratio (%)           :            99.999982 
+  Memory Size Used (MB)                   :           388.000000 
+ 
+  Start Time (date)        :        Sat Mar 21 10:34:44 2020 JST 
+  End   Time (date)        :        Sat Mar 21 10:36:26 2020 JST 
+[/usr/uhome/aurora/4gi/nlabhpg/work/kruus/vanilla-pull/tests/api.c:303] dnnl_primitive_desc_query_s32( l2_pd, dnnl_query_num_of_outputs_s32, 0) == 1 failed 
+
+.........................................
+

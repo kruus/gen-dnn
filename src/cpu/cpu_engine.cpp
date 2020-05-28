@@ -23,41 +23,12 @@
 #include "cpu/cpu_memory_storage.hpp"
 #include "cpu/cpu_stream.hpp"
 
-#if 1 || defined(__ve)
-#include <fenv.h>
-#include <stdio.h>
-//? #pragma STDC FENV_ACCESS ON
-#endif
-
 namespace dnnl {
 namespace impl {
 namespace cpu {
 
 cpu_engine_t::cpu_engine_t()
-    : engine_t(engine_kind::cpu, get_default_runtime(engine_kind::cpu)) {
-#if 1 || defined(__ve)
-        if(1){
-            int const rounding_mode = fegetround();
-            printf(" default fegetround() is %#x.  {FE_DOWNWARD, FE_TONEAREST,"
-                   " FE_TOWARDZERO, FE_UPWARD} = {%#x, %#x, %#x, %#x}\n",
-                   rounding_mode, FE_DOWNWARD, FE_TONEAREST,
-                   FE_TOWARDZERO, FE_UPWARD);
-        }
-#endif
-
-#if defined(__ve)
-        if(0){
-            int const originalRounding = fesetround(FE_DOWNWARD);
-            int const tonearest = fegetround();
-            printf(" cpu engine rounding mode %d --> %d (nearest)\n",
-                   originalRounding, tonearest);
-        }
-        if(1){
-            int const rounding_mode = fegetround();
-            printf(" default fegetround() is %#x.  {FE_DOWNWARD, FE_TONEAREST, FE_TOWARDZERO, FE_UPWARD} = {%#x, %#x, %#x, %#x}\n",
-                   rounding_mode, FE_DOWNWARD, FE_TONEAREST, FE_TOWARDZERO, FE_UPWARD);
-        }
-#endif
+    : engine_t(engine_kind::cpu, get_default_runtime(engine_kind::cpu)){
     }
 
 status_t cpu_engine_t::create_memory_storage(

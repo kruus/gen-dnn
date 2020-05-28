@@ -28,7 +28,7 @@ namespace impl {
 
 struct batch_normalization_fwd_pd_t;
 
-#define BNORM_CONSTRUCTOR_DEBUG 1
+#define BNORM_CONSTRUCTOR_DEBUG 0
 #if BNORM_CONSTRUCTOR_DEBUG
 inline void dump(memory_desc_t const* pmd){
     if(pmd == nullptr){
@@ -229,8 +229,10 @@ struct batch_normalization_fwd_pd_t : public batch_normalization_pd_t {
     }
 
     virtual const memory_desc_t *workspace_md(int index = 0) const override {
+#if BNORM_CONSTRUCTOR_DEBUG
         printf(" bnorm worspace_md(%d),training=%d,fuse_norm_relu=%d\n",
                index, (int)is_training(), (int)fuse_norm_relu());
+#endif
         return index == 0 && is_training() && fuse_norm_relu() ? &ws_md_
                                                                : &glob_zero_md;
     }

@@ -27,6 +27,8 @@ using namespace dnnl::impl::status;
 
 bool primitive_desc_t::compare_ws(const primitive_desc_t *fwd_pd) const {
     if (!workspace_md()) return true; // the impl lives fine w/o workspace
+#if defined(__ve)
+#if 0
     printf(" compare_ws: ");
     if (fwd_pd) {
         printf(" fwd_pd ");
@@ -43,29 +45,13 @@ bool primitive_desc_t::compare_ws(const primitive_desc_t *fwd_pd) const {
         }
     }
     printf("\n");
-#if 0 // mis-compiled on VE !!!
-    return fwd_pd && fwd_pd->workspace_md()
-        && *fwd_pd->workspace_md() == *workspace_md();
-#elif 0 // also failed
-    return fwd_pd && fwd_pd->workspace_md()
-        && (*fwd_pd->workspace_md() == *workspace_md());
-#elif 1 // this worked?
+#endif
     int equal = (*fwd_pd->workspace_md() == *workspace_md());
     return fwd_pd!=nullptr && fwd_pd->workspace_md()!=nullptr
-        && equal;
-#else
-    bool ret = fwd_pd;
-    printf( "fwd_pd?ret=%d", (int)ret);
-    if(ret){
-        ret &&= fwd_pd->workspace_md();
-        printf(" fwd_pd->ws?ret=%d", (int)ret);
-        if(ret){
-            int equal = (*fwd_pd->workspace_md() == *workspace_md());
-            ret &&= equal;
-            printf(" equal?%d-->ret=%d", equal, (int)ret);
-        }
-    }
-    return ret;
+        && equal; // --> correct answer, on VE.
+#else // your compiler works...
+    return fwd_pd && fwd_pd->workspace_md()
+        && *fwd_pd->workspace_md() == *workspace_md();
 #endif
 }
 dnnl_primitive_desc::dnnl_primitive_desc(primitive_desc_t *pd, engine_t *engine)

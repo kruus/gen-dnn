@@ -59,11 +59,11 @@ inline int adjust_num_threads(int nthr, size_t work_amount) {
 /* general parallelization */
 template <typename F>
 void parallel(int nthr, F f) {
-#if !defined(NDEBUG) && defined(__ve)
+#if 0 && !defined(NDEBUG) && defined(__ve)
     printf(" parallel nthr=%d",nthr);
 #endif
     nthr = adjust_num_threads(nthr, SIZE_MAX);
-#if !defined(NDEBUG) && defined(__ve)
+#if 0 && !defined(NDEBUG) && defined(__ve)
     printf(" --> adjusted nthr=%d\n",nthr);
 #endif
 
@@ -76,7 +76,7 @@ void parallel(int nthr, F f) {
         return;
     }
 #if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP
-#if !defined(NDEBUG) && defined(__ve)
+#if 0 && !defined(NDEBUG) && defined(__ve)
     if (omp_in_parallel()){
         printf(" warning: nested parallelism - pre-existing nthr=%d"
                " may not get desired nthr=%d",

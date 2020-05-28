@@ -29,10 +29,13 @@ struct CondLoc { // Quiet default: never print, so struct is simpler
 //     for futher downstream use?   Ex. evaluate condition *and* store (say) mkldnn_status?
 struct CondLocV { // CondLoc with "verbose in debug compile" hint
     bool cond;          // streamlined for cmake -DDNNL_VERBOSE=NONE|DEFAULT
-#if DNNL_VERBOSE_EXTRA
+#if DNNL_VERBOSE_EXTRA || !defined(NDEBUG)
+#define CONDLOCV_FILEINFO 1
     char const* file;
     int line;
     char const* cond_msg;
+#else
+#define CONDLOCV_FILEINFO 0
 #endif
 };
 struct CondLocVV { // CondLoc with "verbose always" hint (even in optimized -DNDEBUG mode)
@@ -46,7 +49,7 @@ struct CondLocVV { // CondLoc with "verbose always" hint (even in optimized -DND
 //@{
 #define COND_LOC(...) CondLoc{bool{!!(__VA_ARGS__)}}
 
-#if DNNL_VERBOSE_EXTRA
+#if CONDLOCV_FILEINFO
 #define COND_LOCV(...) CondLocV{bool{!!(__VA_ARGS__)}, __FILE__, __LINE__, #__VA_ARGS__}
 #else
 #define COND_LOCV(...) CondLocV{bool{!!(__VA_ARGS__)}}
@@ -85,16 +88,28 @@ struct Consistency {
         var = var && cl.cond;
         return *this;
     }
-    /** Using '&& COND_LOCV(cond)' will print failure only if dnnl_get_verbose() >= 3. */
+    /** Using '&& COND_LOCV(cond)' will print failure only if dnnl_get_verbose() >= 3.
+     * ... execpt dnnl_get_verbose() was not accepted into public API ...
+     *
+     * so for now "runtime" SCHKV macro will just be "quiet" */
     Consistency& operator &&(CondLocV const& cl){
-        var = var && cl.cond;
-#if DNNL_VERBOSE_EXTRA
-        if (!cl.cond
-                && dnnl_get_verbose() >= 3
-           ){
-            fprintf(stdout," %s [%s:%d] %s\n",
-                    pfx, cl.file, cl.line, cl.cond_msg);
-            fflush(stdout);
+#if !CONDLOCV_FILEINFO
+        var &&= cl.cond;        // no file info --> silent
+#else
+        if (!cl.cond) {
+#if DNNL_VERBOSE_EXTRA // runtime dnnl_get_verbose() is available (even in opt mode?)
+            bool const prtfail = dnnl_get_verbose() >= 3;
+#elif !defined(NDEBUG) // debug compile --> always print failures
+            bool const prtfail = true;
+#else
+            bool const prtfail = false;
+#endif
+            var = false;
+            if (prtfail) {
+                fprintf(stdout," %s [%s:%d] %s\n",
+                        pfx, cl.file, cl.line, cl.cond_msg);
+                fflush(stdout);
+            }
         }
 #endif
         return *this;
@@ -117,14 +132,21 @@ struct Consistency {
 }//impl::
 }//mkldnn::
 /** @defgroup consistency_checks Consistency Check macros
+ *
  * {S|A}CHK[V|VV] macros wrap printing behavior of consistency checks
  *        S=Short-circuit [default]
  *        A=All (run all checks, do not short-circuit, might be dangerous)
  *        quiet is default (never print)
  *        V=Verbose[print unless -DNDEBUG=1].
- *           new: 1 'V" means print according to dnnl_get_verbose()>=3
+ *           rejected: 1 'V" means print according to dnnl_get_verbose()>=3
+ *                ... except this uses a non-existent function 'dnnl_get_verbose()'
+ *                    that I've removed because it was not accepted in OneDNN public API.
  *        V=Verbose[even print fails for -DNDEBUG=1].
- * suggested usage:
+ *
+ * \note SCHK macro is silent, short-circuiting, and should be pretty much identical
+ * to the lengthy logic expressions in 'init' functions.
+ *
+ * Basic usage:
  * ```
  * Consistency ok;
  * SCHK(ok,foo!=nullptr); // repeat for other (short-circuited) checks
@@ -132,14 +154,16 @@ struct Consistency {
  * ```
  * \c ok then casts to bool, as usual
  *
- * If you find a need to debug consistency checks in some file, then you might:
+ * For many debug consistency checks in some file, a useful idiom is:
  * ```
- * #define MYCHK SCHKVV // very-verbose, switch back to SCHK when done debugging
- * Consistency ok;  // optionally override the warning string with a constructor parm
- * MYCHK(ok,cond1);
- * MYCHK(ok,cond2);
- * #undef MYCHK
+ * Consistency ok("myname");
+ * #define AND_(...) SCHKVV(ok,(__VA_ARGS__))
+ * AND_(iamclean); AND_(!iamsmelly);
+ * if(!ok) printf("take a shower");
+ * #undef AND_
  * ```
+ * Failures are then printed with "myname" prefix,
+ * and by setting `AND_` back to `SCHK` you get the original fast, silent behavior.
  *
  * If something should always be checked, (i.e. it throws an exception for which you want
  * slightly better debug output in debug compiles) you can give a better prefix on the message:

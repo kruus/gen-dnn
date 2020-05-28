@@ -46,15 +46,15 @@ struct ref_batch_normalization_fwd_t : public primitive_t {
         status_t init(engine_t *engine) {
             using namespace data_type;
             Consistency ok("ref_batch_normalization_fwd_t");
-#define AND_(...) SCHKVV(ok,__VA_ARGS__)
-#if 1 || defined(__ve)
-            printf(" ref_batch_normalization_fwd_t d_type=%d ; src, weights & diff_weights data_type are "
+#define BNORM_PRT(...) do{}while(0)
+//#define BNORM_PRT(...) printf(__VA_ARGS__)
+#define AND_(...) SCHK(ok,__VA_ARGS__)
+            BNORM_PRT(" ref_batch_normalization_fwd_t d_type=%d ; src, weights & diff_weights data_type are "
                     "%d %d %d ; use_scaleshift()=%d\n",
                     (int)d_type, (int)src_md()->data_type,
                     (int)weights_md()->data_type,
                     (int)diff_weights_md()->data_type,
                     (int)use_scaleshift() );
-#endif
             AND_((is_fwd()));
             AND_((src_md()->data_type == d_type));
             AND_((platform::has_data_type_support(d_type)));
@@ -63,27 +63,20 @@ struct ref_batch_normalization_fwd_t : public primitive_t {
             AND_((attr()->has_default_values() || with_relu_post_op()));
             if (!ok) return status::unimplemented;
 
-            //if (src_md()->data_type == s8 && !stats_is_src())
-            //    return status::unimplemented;
-            //#define IMPLICATION(cause, effect) (!(cause) || !!(effect))
-            //#define IMPLICATION(cause, effect) (!(cause) || (effect))
-            //#define IMPLICATION(cause, effect) (!(!!(cause) && !(effect)))
-            //#define IMPLICATION(cause, effect) (!((cause) && !(effect)))
-            // cause = src_md()->data_type == s8
-            // effect = stats_is_src()
             AND_(IMPLICATION(src_md()->data_type == s8,
                         stats_is_src()));
             if (!ok) return status::unimplemented;
 
             if (is_training() && fuse_norm_relu()) {
                 init_default_ws(8);
-                char s[80]; dnnl_md2fmt_str(s, 80, &ws_md_);
-                printf( __FILE__ " ws %s\n", s);
+                //char s[80]; dnnl_md2fmt_str(s, 80, &ws_md_);
+                //BNORM_PRT( __FILE__ " ws %s\n", s);
             }
 
-            printf(__FILE__ " fwd init!\n");
+            BNORM_PRT(__FILE__ " fwd init!\n");
             return status::success;
 #undef AND_
+#undef BNORM_PRT
         }
     };
 
@@ -114,15 +107,15 @@ struct ref_batch_normalization_bwd_t : public primitive_t {
         status_t init(engine_t *engine) {
             using namespace data_type;
             Consistency ok("ref_batch_normalization_bwd_t");
-#define AND_(...) SCHKVV(ok,__VA_ARGS__)
-#if 1 || defined(__ve)
-            printf(" ref_batch_normalization_bwd_t d_type=%d ; src, weights & diff_weights data_type are "
+#define BNORM_PRT(...) do{}while(0)
+//#define BNORM_PRT(...) printf(__VA_ARGS__)
+#define AND_(...) SCHK(ok,__VA_ARGS__)
+            BNORM_PRT(" ref_batch_normalization_bwd_t d_type=%d ; src, weights & diff_weights data_type are "
                     "%d %d %d ; use_scaleshift()=%d\n",
                     (int)d_type, (int)src_md()->data_type,
                     (int)weights_md()->data_type,
                     (int)diff_weights_md()->data_type,
                     (int)use_scaleshift() );
-#endif
             AND_((is_bwd()));
             AND_((set_default_formats_common()));
             AND_((utils::everyone_is(d_type, src_md()->data_type,
@@ -135,8 +128,9 @@ struct ref_batch_normalization_bwd_t : public primitive_t {
             if (!ok) return status::unimplemented;
 
             if (fuse_norm_relu()) {
-                printf(" ref bwd fuse_norm_relu! ");
                 init_default_ws(8);
+#if 0 // longhand check of 'compare_ws' conditions, one by one
+                BNORM_PRT(" ref bwd fuse_norm_relu! ");
                 //if (!compare_ws(hint_fwd_pd_)) return status::unimplemented;
                 if(hint_fwd_pd_) {
                     memory_desc_t const& lhs = ws_md();
@@ -160,15 +154,17 @@ struct ref_batch_normalization_bwd_t : public primitive_t {
                     else if (lhs.format_kind == format_kind::rnn_packed)
                         AND_(types::rnn_packed_desc_is_equal(lhs.format_desc.rnn_packed_desc,
                                 rhs.format_desc.rnn_packed_desc));
-                    if(!ok) printf(" compare_ws should fail!\n");
                 }
+#endif
+                // VE mis-compiled 'compare_ws' logic expression
                 AND_(compare_ws(hint_fwd_pd_));
                 if (!ok) return status::unimplemented;
             }
 
-            printf(__FILE__ " bwd init!\n");
+            BNORM_PRT(__FILE__ " bwd init!\n");
             return status::success;
 #undef AND_
+#undef BNORM_PRT
         }
     };
 

@@ -49,15 +49,15 @@ struct ncsp_batch_normalization_fwd_t : public primitive_t {
             using namespace format_tag;
 
             Consistency ok("ncsp_batch_normalization_fwd_t");
-#define AND_(...) SCHKVV(ok,(__VA_ARGS__))
-#if 1 || defined(__ve)
-            printf(" ncsp_batch_normalization_fwd_t d_type=%d ; src, weights & diff_weights data_type are "
+#define BNORM_PRT(...) do{}while(0)
+//#define BNORM_PRT(...) printf(__VA_ARGS__)
+#define AND_(...) SCHK(ok,(__VA_ARGS__))
+            BNORM_PRT(" ncsp_batch_normalization_fwd_t d_type=%d ; src, weights & diff_weights data_type are "
                     "%d %d %d ; use_scaleshift()=%d\n",
                     (int)d_type, (int)src_md()->data_type,
                     (int)weights_md()->data_type,
                     (int)diff_weights_md()->data_type,
                     (int)use_scaleshift() );
-#endif
             AND_(is_fwd());
             AND_(!has_zero_dim_memory());
             AND_(src_md()->data_type == d_type);
@@ -68,18 +68,19 @@ struct ncsp_batch_normalization_fwd_t : public primitive_t {
                     *src_md(), ncdhw, nchw, nc));
             AND_(attr()->has_default_values()
                     || this->with_relu_post_op());
-#undef AND_
             if (!ok) return status::unimplemented;
 
             if (is_training() && fuse_norm_relu()) {
                 init_default_ws(8);
-                char s[80]; dnnl_md2fmt_str(s, 80, &ws_md_);
-                printf( __FILE__ " ws %s\n", s);
+                //char s[80]; dnnl_md2fmt_str(s, 80, &ws_md_);
+                //BNORM_PRT( __FILE__ " ws %s\n", s);
             }
 
             init_scratchpad();
 
-            printf(__FILE__ " fwd init!\n");
+            BNORM_PRT(__FILE__ " fwd init!\n");
+#undef AND_
+#undef BNORM_PRT
             return status::success;
         }
 
@@ -141,15 +142,15 @@ struct ncsp_batch_normalization_bwd_t : public primitive_t {
             using namespace format_tag;
 
             Consistency ok("ncsp_batch_normalization_bwd_t");
-#define AND_(...) SCHKVV(ok,(__VA_ARGS__))
-#if 1 || defined(__ve)
-            printf(" ncsp_batch_normalization_bwd_t d_type=%d ; src, weights & diff_weights data_type are "
+#define BNORM_PRT(...) do{}while(0)
+//#define BNORM_PRT(...) printf(__VA_ARGS__)
+#define AND_(...) SCHK(ok,(__VA_ARGS__))
+            BNORM_PRT(" ncsp_batch_normalization_bwd_t d_type=%d ; src, weights & diff_weights data_type are "
                     "%d %d %d ; use_scaleshift()=%d\n",
                     (int)d_type, (int)src_md()->data_type,
                     (int)weights_md()->data_type,
                     (int)diff_weights_md()->data_type,
                     (int)use_scaleshift() );
-#endif
             AND_(is_bwd());
             AND_(!has_zero_dim_memory());
             AND_(set_default_formats_common());
@@ -167,8 +168,9 @@ struct ncsp_batch_normalization_bwd_t : public primitive_t {
             if (!ok) return status::unimplemented;
 
             if (fuse_norm_relu()) {
-                printf(" ncsp bwd fuse_norm_relu! ");
                 init_default_ws(8);
+#if 0
+                BNORM_PRT(" ncsp bwd fuse_norm_relu! ");
                 if(hint_fwd_pd_) {
                     memory_desc_t const& lhs = ws_md();
                     memory_desc_t const& rhs = hint_fwd_pd_->ws_md();
@@ -191,15 +193,16 @@ struct ncsp_batch_normalization_bwd_t : public primitive_t {
                     else if (lhs.format_kind == format_kind::rnn_packed)
                         AND_(types::rnn_packed_desc_is_equal(lhs.format_desc.rnn_packed_desc,
                                 rhs.format_desc.rnn_packed_desc));
-                    if(!ok) printf(" compare_ws should fail!\n");
                 }
+#endif
                 AND_(compare_ws(hint_fwd_pd_));
                 if (!ok) return status::unimplemented;
             }
-#undef AND_
             init_scratchpad();
 
-            printf(__FILE__ " bwd init!\n");
+            BNORM_PRT(__FILE__ " bwd init!\n");
+#undef AND_
+#undef BNORM_PRT
             return status::success;
         }
 

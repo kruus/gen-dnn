@@ -1,0 +1,30 @@
+<!-- $Id: authreq.dat,v 1.3 2012/06/25 07:02:36 iap Exp $ -->
+<html>
+<head>
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Cache-Control" content="no-cache">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Authentication Request Page</title>
+</head>
+<body onload="document.smform.submit()">
+
+<!-- JavaScript offの場合の記述 -->
+<noscript>
+認証が必要です
+<form action="https://auth2.park.nec.co.jp/AuthServer/AuthRequest" method="POST" name="noscript">
+<input type="hidden" name="SM_URL" value="vSVJ5fLuc25FtZ5hXoPO2Kx5c6utzZX/d4nzmxcfTzbeFxUoZufApvpxziquovVzohulp8CKe+L0DjMUZYZTolu3yoBBfDBBl01j3aKMRVg=">
+<input type="hidden" name="SM_METHOD" value="GET">
+<input type="hidden" name="SM_STATUS" value="4">
+<input type="submit" value="送信">
+</form>
+</noscript>
+
+<!-- 自動リダイレクト用の記述 -->
+<form action="https://auth2.park.nec.co.jp/AuthServer/AuthRequest" method="POST" name="smform">
+<input type="hidden" name="SM_URL" value="vSVJ5fLuc25FtZ5hXoPO2Kx5c6utzZX/d4nzmxcfTzbeFxUoZufApvpxziquovVzohulp8CKe+L0DjMUZYZTolu3yoBBfDBBl01j3aKMRVg=">
+<input type="hidden" name="SM_METHOD" value="GET">
+<input type="hidden" name="SM_STATUS" value="4">
+</form>
+
+</body>
+</html>

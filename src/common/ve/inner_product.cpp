@@ -41,7 +41,7 @@ status_t ip_desc_init(inner_product_desc_t *ip_desc, prop_kind_t prop_kind,
         const memory_desc_t *src_desc, const memory_desc_t *weights_desc,
         const memory_desc_t *bias_desc, const memory_desc_t *dst_desc) {
     Consistency ok("ip_desc_init");
-#define AND_(...) SCHKVV(ok,__VA_ARGS__)
+#define AND_(...) SCHK(ok,__VA_ARGS__)
     AND_((!any_null(ip_desc, src_desc, weights_desc, dst_desc)));
     if (!ok) return invalid_arguments;
 
@@ -103,7 +103,7 @@ status_t dnnl_inner_product_forward_desc_init(inner_product_desc_t *ip_desc,
         const memory_desc_t *weights_desc, const memory_desc_t *bias_desc,
         const memory_desc_t *dst_desc) {
     Consistency ok("dnnl_inner_product_forward_desc_init");
-#define AND_(...) SCHKVV(ok,__VA_ARGS__)
+#define AND_(...) SCHK(ok,__VA_ARGS__)
 #define SHOW(XXX) do{ std::cout<<std::setw(60)<<#XXX<<" is "<<XXX<<std::endl; }while(0)
     //printf("(int)prop_kind=%d, (int)forward_training=%d, (int)forward_inference=%d\n",
     //       (int)prop_kind, (int)forward_training, (int)forward_inference);

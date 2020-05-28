@@ -1,0 +1,12 @@
+i)
+	pragma omp parallel
+	{ f(ithr,nthr,func) }
+	seems to need the { } braces (should make no difference)
+	- badness in test_dnnl_threading
+ii)
+	pragma omp parallel
+	f(ithr,nthr,args...)
+	with && xvalue argpacks.
+	- many segfaults, bad free attempts
+
+

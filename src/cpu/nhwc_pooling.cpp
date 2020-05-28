@@ -73,7 +73,6 @@ using namespace nhwc_pooling;
 
 template <data_type_t d_type>
 void nhwc_pooling_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
-    //printf("nchw_pooling_fwd_t\n");
 
     auto alg = pd()->desc()->alg_kind;
 

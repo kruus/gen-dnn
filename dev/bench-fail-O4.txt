@@ -1,0 +1,606 @@
+------------
+pooling fixed: vectorizer bug with nstl::max (replace by 'if' and it is ok)
+------------Apr 22 2020
+FAILED:
+cpu-tutorials-matmul-matmul-quantization-cpp
+bnorm:failed:206-->0 (yay)
+test_pooling_forward      failed:4 (fwd,axb,max,f32 fp=fp0, got dt=0)
+test_benchdnn_pool_cpu    failed:145(was 142) (fwd,axb,max,f32  dt=0) 145 fails, all for nhwc, but ok with AVG_P|AVG_NP \sa pool-fail.txt
+test_benchdnn_rnn_cpu     failed:24 (wildly wrong)
+test_benchdnn_softmax_cpu failed:4(was 148) (imprecise calculation, but not blatantly wrong)
+SEGFAULT: many convolutions (gemm:ref)
+run: --conv --dir=BWD_D --cfg=f32_full ic16id10ih13iw50oc16od10oh13ow50kd3kh3kw3pd1ph1pw1n"3d_conv_pad:1"
+ create gemm:ref & reorder. segfault
+run: --conv --cfg=f32_full ic4ih8iw8oc6oh4ow8kh3kw3sh2sw1ph1pw1dh1dw0n"dilated_conv:11"
+  fwd ref:any, exec many reorders. segfault
+benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_function
+  no output, Address not mapped to object at 0x60000a19ee88
+run: --conv --dir=BWD_WB ic256id10ih11iw11oc512od8oh9ow9kd3kh3kw3pd0ph0pw0n"3d_unet:conv_8"
+ create conv gemm:ref, exec reorders, exec conv, exec 2 reorders. segfault (Address no mapped to object)
+run: --conv --cfg=f32_full mb1ic16ih1oc16oh1kh3ph0
+  Address not mapped during initial reorders
+----
+softmax imprecise list:
+394:FAILED (errors:131072 total:524288) __REPRO: --softmax --dir=BWD_D --axis=0 8192x64
+395:FAILED (errors:131072 total:524288) __REPRO: --softmax --dir=BWD_D --axis=0 --inplace=false 8192x64
+410:FAILED (errors:553212 total:557568) __REPRO: --softmax --dir=BWD_D --axis=0 8448x66
+411:FAILED (errors:553212 total:557568) __REPRO: --softmax --dir=BWD_D --axis=0 --inplace=false 8448x66
+(same as logsoftmax seem OK)
+------------
+At -O4, Some benchdnn tests segfaulted:
+
+-- grep -R ': line.*Segment' avdt4b.log >> bench-fail-O4.txt
+/bin/sh: line 1: 38280 Segmentation fault      /home/kruus/vanilla-dbg/build-ved/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_3d
+/bin/sh: line 1: 38399 Segmentation fault      /home/kruus/vanilla-dbg/build-ved/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_attrs
+/bin/sh: line 1: 38648 Segmentation fault      /home/kruus/vanilla-dbg/build-ved/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_depthwise
+/bin/sh: line 1: 38837 Segmentation fault      /home/kruus/vanilla-dbg/build-ved/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_dilated
+/bin/sh: line 1: 39039 Segmentation fault      /home/kruus/vanilla-dbg/build-ved/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_f32
+/bin/sh: line 1: 39141 Segmentation fault      /home/kruus/vanilla-dbg/build-ved/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_function
+/bin/sh: line 1: 89609 Segmentation fault      /home/kruus/vanilla-dbg/build-ved/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_all_topologies
+/bin/sh: line 1: 36269 Segmentation fault      /home/kruus/vanilla-dbg/build-ved/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_regression
+
+-- grep -R ': line.*Segment' a2.log >> bench-fail-O4.txt
+/bin/sh: line 1: 26174 Segmentation fault      /home/kruus/vanilla-dbg/build-vej/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_3d
+/bin/sh: line 1: 26293 Segmentation fault      /home/kruus/vanilla-dbg/build-vej/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_attrs
+/bin/sh: line 1: 26475 Segmentation fault      /home/kruus/vanilla-dbg/build-vej/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_depthwise
+/bin/sh: line 1: 26653 Segmentation fault      /home/kruus/vanilla-dbg/build-vej/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_dilated
+bin/sh: line 1: 26904 Segmentation fault      /home/kruus/vanilla-dbg/build-vej/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_f32
+/bin/sh: line 1: 27006 Segmentation fault      /home/kruus/vanilla-dbg/build-vej/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_function
+/bin/sh: line 1: 77289 Segmentation fault      /home/kruus/vanilla-dbg/build-vej/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_all_topologies
+/bin/sh: line 1: 112977 Segmentation fault      /home/kruus/vanilla-dbg/build-vej/tests/benchdnn/benchdnn -v1 --engine=cpu $BENCHDNN_ARGS --conv --batch=inputs/conv/test_conv_regression
+
+At -O4, four benchdnn tests have issues: (sm10.log, some fixed by loop rewrite / eps)
+
+test:test_benchdnn_bnorm_cpu
+tests:4910 passed:944 skipped:1420 mistrusted:0 unimplemented:2340 failed:206 listed:0
+12:FAILED (errors:3 total:512) __REPRO: --bnorm --flags=SR --inplace=false mb50ic256ih56n"resnet_50:bn2a_branch1"
+------> eps = FWD? 6e-7: 2e-7  has 15 failures,
+Ex. l0 = 7.3e-6 ---> adjusted "eps" upward (from zero)
+
+test:test_benchdnn_pool_cpu
+tests:9288 passed:5663 skipped:0 mistrusted:0 unimplemented:3483 failed:142 listed:0
+[   0][0,0,0,0,0] fp:    -385 fp0:    -385 dt:       0 diff:     385 rdiff:       1
+15:FAILED (errors:2047 total:2048) __REPRO: --pool --dir=FWD_I --tag=axb ic64iw32ow16kw3sw2pw0
+[   0][0,0,0,0,0] fp:    -411 fp0:    -411 dt:       0 diff:     411 rdiff:       1
+[   1][1,0,0,0,0] fp:    -398 fp0:    -398 dt:       0 diff:     398 rdiff:       1
+159:FAILED (errors:2 total:2) __REPRO: --pool --dir=FWD_I --tag=axb ic1iw2ow1kw1pw0
+------ all failures for --pool --dir=FWD_I --tag=axb <spec>   (max pooling)
+
+test:test_benchdnn_rnn_cpu
+tests:412 passed:194 skipped:0 mistrusted:0 unimplemented:194 failed:24 listed:0
+411:FAILED (errors:4548 total:6912) __REPRO: --rnn --cfg=f32u8f32u8 --alg=VANILLA_LSTM --activation=TANH --scaling=per_oc l1t1mb18sic128slc64dhc128
+407:FAILED (errors:1526 total:2304) __REPRO: --rnn --cfg=f32u8f32u8 --alg=VANILLA_LSTM --activation=TANH --scaling=per_oc l1t1mb12sic64slc128dhc64
+400:FAILED (errors:254 total:384) __REPRO: --rnn --cfg=f32u8f32f32 --alg=VANILLA_LSTM --activation=TANH --scaling=per_oc l1t1mb1sic128slc128dhc128
+395:FAILED (errors:1504 total:2304) __REPRO: --rnn --cfg=u8u8u8u8 --alg=VANILLA_LSTM --activation=TANH --scaling=common l1t1mb12sic64slc128dhc64
+----> failed ones all have 'u8' somewhere
+
+test:test_benchdnn_softmax_cpu
+tests:1328 passed:1180 skipped:0 mistrusted:0 unimplemented:0 failed:148 listed:0
+0:FAILED (errors:4029 total:96000) __REPRO: --softmax 96x1000
+run: --softmax --inplace=false 96x1000
+32:FAILED (errors:1349 total:3200) __REPRO: --softmax 32x100 (nan)
+133:FAILED (errors:156800 total:156800) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 4480x35 (dt: inf)
+even 1x33 fails
+adjusted loops a bit, seems better
+
+------------------------- grep '^[0-9]*:FAILED' sm10.log >> bench-fail-O4.txt
+12:FAILED (errors:3 total:512) __REPRO: --bnorm --flags=SR --inplace=false mb50ic256ih56n"resnet_50:bn2a_branch1"
+14:FAILED (errors:3 total:512) __REPRO: --bnorm --flags=S --inplace=false mb50ic256ih56n"resnet_50:bn2a_branch1"
+108:FAILED (errors:13 total:128) __REPRO: --bnorm --flags=SR --inplace=false mb96ic64ih112n"googlenet_v2:conv1/7x7_s2/bn"
+110:FAILED (errors:13 total:128) __REPRO: --bnorm --flags=S --inplace=false mb96ic64ih112n"googlenet_v2:conv1/7x7_s2/bn"
+120:FAILED (errors:8 total:128) __REPRO: --bnorm --flags=SR --inplace=false mb96ic64ih56n"googlenet_v2:conv2/3x3_reduce/bn"
+122:FAILED (errors:8 total:128) __REPRO: --bnorm --flags=S --inplace=false mb96ic64ih56n"googlenet_v2:conv2/3x3_reduce/bn"
+132:FAILED (errors:34 total:384) __REPRO: --bnorm --flags=SR --inplace=false mb96ic192ih56n"googlenet_v2:conv2/3x3/bn"
+134:FAILED (errors:34 total:384) __REPRO: --bnorm --flags=S --inplace=false mb96ic192ih56n"googlenet_v2:conv2/3x3/bn"
+144:FAILED (errors:10 total:128) __REPRO: --bnorm --flags=SR --inplace=false mb96ic64ih28n"googlenet_v2:inception_3a/1x1/bn"
+146:FAILED (errors:10 total:128) __REPRO: --bnorm --flags=S --inplace=false mb96ic64ih28n"googlenet_v2:inception_3a/1x1/bn"
+156:FAILED (errors:19 total:192) __REPRO: --bnorm --flags=SR --inplace=false mb96ic96ih28n"googlenet_v2:inception_3a/double3x3a/bn"
+158:FAILED (errors:19 total:192) __REPRO: --bnorm --flags=S --inplace=false mb96ic96ih28n"googlenet_v2:inception_3a/double3x3a/bn"
+168:FAILED (errors:5 total:64) __REPRO: --bnorm --flags=SR --inplace=false mb96ic32ih28n"googlenet_v2:inception_3a/pool_proj/bn"
+170:FAILED (errors:5 total:64) __REPRO: --bnorm --flags=S --inplace=false mb96ic32ih28n"googlenet_v2:inception_3a/pool_proj/bn"
+180:FAILED (errors:28 total:256) __REPRO: --bnorm --flags=SR --inplace=false mb96ic128ih28n"googlenet_v2:inception_3c/3x3_reduce/bn"
+182:FAILED (errors:28 total:256) __REPRO: --bnorm --flags=S --inplace=false mb96ic128ih28n"googlenet_v2:inception_3c/3x3_reduce/bn"
+396:FAILED (errors:23 total:64) __REPRO: --bnorm --flags=SR --inplace=false mb96ic32ih147n"googlenet_v3:conv_1_1_batchnorm"
+398:FAILED (errors:23 total:64) __REPRO: --bnorm --flags=S --inplace=false mb96ic32ih147n"googlenet_v3:conv_1_1_batchnorm"
+408:FAILED (errors:43 total:128) __REPRO: --bnorm --flags=SR --inplace=false mb96ic64ih147n"googlenet_v3:conv_2_2_batchnorm"
+410:FAILED (errors:43 total:128) __REPRO: --bnorm --flags=S --inplace=false mb96ic64ih147n"googlenet_v3:conv_2_2_batchnorm"
+420:FAILED (errors:38 total:160) __REPRO: --bnorm --flags=SR --inplace=false mb96ic80ih73n"googlenet_v3:conv_3_3_batchnorm"
+422:FAILED (errors:38 total:160) __REPRO: --bnorm --flags=S --inplace=false mb96ic80ih73n"googlenet_v3:conv_3_3_batchnorm"
+432:FAILED (errors:93 total:384) __REPRO: --bnorm --flags=SR --inplace=false mb96ic192ih71n"googlenet_v3:conv_4_4_batchnorm"
+434:FAILED (errors:93 total:384) __REPRO: --bnorm --flags=S --inplace=false mb96ic192ih71n"googlenet_v3:conv_4_4_batchnorm"
+444:FAILED (errors:24 total:128) __REPRO: --bnorm --flags=SR --inplace=false mb96ic64ih35n"googlenet_v3:mixed_conv_batchnorm"
+446:FAILED (errors:24 total:128) __REPRO: --bnorm --flags=S --inplace=false mb96ic64ih35n"googlenet_v3:mixed_conv_batchnorm"
+456:FAILED (errors:19 total:96) __REPRO: --bnorm --flags=SR --inplace=false mb96ic48ih35n"googlenet_v3:mixed_tower_conv_batchnorm"
+458:FAILED (errors:19 total:96) __REPRO: --bnorm --flags=S --inplace=false mb96ic48ih35n"googlenet_v3:mixed_tower_conv_batchnorm"
+468:FAILED (errors:37 total:192) __REPRO: --bnorm --flags=SR --inplace=false mb96ic96ih35n"googlenet_v3:mixed_tower_1_conv_1_batchnorm"
+470:FAILED (errors:37 total:192) __REPRO: --bnorm --flags=S --inplace=false mb96ic96ih35n"googlenet_v3:mixed_tower_1_conv_1_batchnorm"
+480:FAILED (errors:13 total:64) __REPRO: --bnorm --flags=SR --inplace=false mb96ic32ih35n"googlenet_v3:mixed_tower_2_conv_batchnorm"
+482:FAILED (errors:13 total:64) __REPRO: --bnorm --flags=S --inplace=false mb96ic32ih35n"googlenet_v3:mixed_tower_2_conv_batchnorm"
+492:FAILED (errors:384 total:384) __REPRO: --bnorm --flags=SR --inplace=false mb96ic384ih17n"googlenet_v3:mixed_3_conv_batchnorm"
+494:FAILED (errors:384 total:384) __REPRO: --bnorm --flags=S --inplace=false mb96ic384ih17n"googlenet_v3:mixed_3_conv_batchnorm"
+504:FAILED (errors:96 total:96) __REPRO: --bnorm --flags=SR --inplace=false mb96ic96ih17n"googlenet_v3:mixed_3_tower_conv_2_batchnorm"
+506:FAILED (errors:96 total:96) __REPRO: --bnorm --flags=S --inplace=false mb96ic96ih17n"googlenet_v3:mixed_3_tower_conv_2_batchnorm"
+516:FAILED (errors:192 total:192) __REPRO: --bnorm --flags=SR --inplace=false mb96ic192ih17n"googlenet_v3:mixed_4_conv_batchnorm"
+518:FAILED (errors:192 total:192) __REPRO: --bnorm --flags=S --inplace=false mb96ic192ih17n"googlenet_v3:mixed_4_conv_batchnorm"
+528:FAILED (errors:128 total:128) __REPRO: --bnorm --flags=SR --inplace=false mb96ic128ih17n"googlenet_v3:mixed_4_tower_conv_batchnorm"
+530:FAILED (errors:128 total:128) __REPRO: --bnorm --flags=S --inplace=false mb96ic128ih17n"googlenet_v3:mixed_4_tower_conv_batchnorm"
+540:FAILED (errors:160 total:160) __REPRO: --bnorm --flags=SR --inplace=false mb96ic160ih17n"googlenet_v3:mixed_5_tower_conv_batchnorm"
+542:FAILED (errors:160 total:160) __REPRO: --bnorm --flags=S --inplace=false mb96ic160ih17n"googlenet_v3:mixed_5_tower_conv_batchnorm"
+612:FAILED (errors:10 total:128) __REPRO: --bnorm --flags=SR --inplace=false mb1ic64ih57n"densenet_121:conv2_1/x1/bn"
+614:FAILED (errors:10 total:128) __REPRO: --bnorm --flags=S --inplace=false mb1ic64ih57n"densenet_121:conv2_1/x1/bn"
+624:FAILED (errors:20 total:256) __REPRO: --bnorm --flags=SR --inplace=false mb1ic128ih57n"densenet_121:conv2_1/x2/bn"
+626:FAILED (errors:20 total:256) __REPRO: --bnorm --flags=S --inplace=false mb1ic128ih57n"densenet_121:conv2_1/x2/bn"
+636:FAILED (errors:15 total:192) __REPRO: --bnorm --flags=SR --inplace=false mb1ic96ih57n"densenet_121:conv2_2/x1/bn"
+638:FAILED (errors:15 total:192) __REPRO: --bnorm --flags=S --inplace=false mb1ic96ih57n"densenet_121:conv2_2/x1/bn"
+648:FAILED (errors:25 total:320) __REPRO: --bnorm --flags=SR --inplace=false mb1ic160ih57n"densenet_121:conv2_4/x1/bn"
+650:FAILED (errors:25 total:320) __REPRO: --bnorm --flags=S --inplace=false mb1ic160ih57n"densenet_121:conv2_4/x1/bn"
+660:FAILED (errors:30 total:384) __REPRO: --bnorm --flags=SR --inplace=false mb1ic192ih57n"densenet_121:conv2_5/x1/bn"
+662:FAILED (errors:30 total:384) __REPRO: --bnorm --flags=S --inplace=false mb1ic192ih57n"densenet_121:conv2_5/x1/bn"
+672:FAILED (errors:35 total:448) __REPRO: --bnorm --flags=SR --inplace=false mb1ic224ih57n"densenet_121:conv2_6/x1/bn"
+674:FAILED (errors:35 total:448) __REPRO: --bnorm --flags=S --inplace=false mb1ic224ih57n"densenet_121:conv2_6/x1/bn"
+684:FAILED (errors:40 total:512) __REPRO: --bnorm --flags=SR --inplace=false mb1ic256ih57n"densenet_121:conv2_blk/bn"
+686:FAILED (errors:40 total:512) __REPRO: --bnorm --flags=S --inplace=false mb1ic256ih57n"densenet_121:conv2_blk/bn"
+696:FAILED (errors:18 total:256) __REPRO: --bnorm --flags=SR --inplace=false mb1ic128ih29n"densenet_121:conv3_1/x1/bn"
+698:FAILED (errors:18 total:256) __REPRO: --bnorm --flags=S --inplace=false mb1ic128ih29n"densenet_121:conv3_1/x1/bn"
+708:FAILED (errors:23 total:320) __REPRO: --bnorm --flags=SR --inplace=false mb1ic160ih29n"densenet_121:conv3_2/x1/bn"
+710:FAILED (errors:23 total:320) __REPRO: --bnorm --flags=S --inplace=false mb1ic160ih29n"densenet_121:conv3_2/x1/bn"
+720:FAILED (errors:27 total:384) __REPRO: --bnorm --flags=SR --inplace=false mb1ic192ih29n"densenet_121:conv3_3/x1/bn"
+722:FAILED (errors:27 total:384) __REPRO: --bnorm --flags=S --inplace=false mb1ic192ih29n"densenet_121:conv3_3/x1/bn"
+732:FAILED (errors:32 total:448) __REPRO: --bnorm --flags=SR --inplace=false mb1ic224ih29n"densenet_121:conv3_4/x1/bn"
+734:FAILED (errors:32 total:448) __REPRO: --bnorm --flags=S --inplace=false mb1ic224ih29n"densenet_121:conv3_4/x1/bn"
+744:FAILED (errors:36 total:512) __REPRO: --bnorm --flags=SR --inplace=false mb1ic256ih29n"densenet_121:conv3_5/x1/bn"
+746:FAILED (errors:36 total:512) __REPRO: --bnorm --flags=S --inplace=false mb1ic256ih29n"densenet_121:conv3_5/x1/bn"
+756:FAILED (errors:41 total:576) __REPRO: --bnorm --flags=SR --inplace=false mb1ic288ih29n"densenet_121:conv3_6/x1/bn"
+758:FAILED (errors:41 total:576) __REPRO: --bnorm --flags=S --inplace=false mb1ic288ih29n"densenet_121:conv3_6/x1/bn"
+768:FAILED (errors:45 total:640) __REPRO: --bnorm --flags=SR --inplace=false mb1ic320ih29n"densenet_121:conv3_7/x1/bn"
+770:FAILED (errors:45 total:640) __REPRO: --bnorm --flags=S --inplace=false mb1ic320ih29n"densenet_121:conv3_7/x1/bn"
+780:FAILED (errors:50 total:704) __REPRO: --bnorm --flags=SR --inplace=false mb1ic352ih29n"densenet_121:conv3_8/x1/bn"
+782:FAILED (errors:50 total:704) __REPRO: --bnorm --flags=S --inplace=false mb1ic352ih29n"densenet_121:conv3_8/x1/bn"
+792:FAILED (errors:54 total:768) __REPRO: --bnorm --flags=SR --inplace=false mb1ic384ih29n"densenet_121:conv3_9/x1/bn"
+794:FAILED (errors:54 total:768) __REPRO: --bnorm --flags=S --inplace=false mb1ic384ih29n"densenet_121:conv3_9/x1/bn"
+804:FAILED (errors:59 total:832) __REPRO: --bnorm --flags=SR --inplace=false mb1ic416ih29n"densenet_121:conv3_10/x1/bn"
+806:FAILED (errors:59 total:832) __REPRO: --bnorm --flags=S --inplace=false mb1ic416ih29n"densenet_121:conv3_10/x1/bn"
+816:FAILED (errors:63 total:896) __REPRO: --bnorm --flags=SR --inplace=false mb1ic448ih29n"densenet_121:conv3_11/x1/bn"
+818:FAILED (errors:63 total:896) __REPRO: --bnorm --flags=S --inplace=false mb1ic448ih29n"densenet_121:conv3_11/x1/bn"
+828:FAILED (errors:68 total:960) __REPRO: --bnorm --flags=SR --inplace=false mb1ic480ih29n"densenet_121:conv3_12/x1/bn"
+830:FAILED (errors:68 total:960) __REPRO: --bnorm --flags=S --inplace=false mb1ic480ih29n"densenet_121:conv3_12/x1/bn"
+840:FAILED (errors:72 total:1024) __REPRO: --bnorm --flags=SR --inplace=false mb1ic512ih29n"densenet_121:conv3_blk/bn"
+842:FAILED (errors:72 total:1024) __REPRO: --bnorm --flags=S --inplace=false mb1ic512ih29n"densenet_121:conv3_blk/bn"
+852:FAILED (errors:64 total:512) __REPRO: --bnorm --flags=SR --inplace=false mb1ic256ih15n"densenet_121:conv4_1/x1/bn"
+854:FAILED (errors:64 total:512) __REPRO: --bnorm --flags=S --inplace=false mb1ic256ih15n"densenet_121:conv4_1/x1/bn"
+864:FAILED (errors:32 total:256) __REPRO: --bnorm --flags=SR --inplace=false mb1ic128ih15n"densenet_121:conv4_1/x2/bn"
+866:FAILED (errors:32 total:256) __REPRO: --bnorm --flags=S --inplace=false mb1ic128ih15n"densenet_121:conv4_1/x2/bn"
+876:FAILED (errors:69 total:576) __REPRO: --bnorm --flags=SR --inplace=false mb1ic288ih15n"densenet_121:conv4_2/x1/bn"
+878:FAILED (errors:69 total:576) __REPRO: --bnorm --flags=S --inplace=false mb1ic288ih15n"densenet_121:conv4_2/x1/bn"
+888:FAILED (errors:77 total:640) __REPRO: --bnorm --flags=SR --inplace=false mb1ic320ih15n"densenet_121:conv4_3/x1/bn"
+890:FAILED (errors:77 total:640) __REPRO: --bnorm --flags=S --inplace=false mb1ic320ih15n"densenet_121:conv4_3/x1/bn"
+900:FAILED (errors:89 total:704) __REPRO: --bnorm --flags=SR --inplace=false mb1ic352ih15n"densenet_121:conv4_4/x1/bn"
+902:FAILED (errors:89 total:704) __REPRO: --bnorm --flags=S --inplace=false mb1ic352ih15n"densenet_121:conv4_4/x1/bn"
+912:FAILED (errors:96 total:768) __REPRO: --bnorm --flags=SR --inplace=false mb1ic384ih15n"densenet_121:conv4_5/x1/bn"
+914:FAILED (errors:96 total:768) __REPRO: --bnorm --flags=S --inplace=false mb1ic384ih15n"densenet_121:conv4_5/x1/bn"
+924:FAILED (errors:101 total:832) __REPRO: --bnorm --flags=SR --inplace=false mb1ic416ih15n"densenet_121:conv4_6/x1/bn"
+926:FAILED (errors:101 total:832) __REPRO: --bnorm --flags=S --inplace=false mb1ic416ih15n"densenet_121:conv4_6/x1/bn"
+936:FAILED (errors:109 total:896) __REPRO: --bnorm --flags=SR --inplace=false mb1ic448ih15n"densenet_121:conv4_7/x1/bn"
+938:FAILED (errors:109 total:896) __REPRO: --bnorm --flags=S --inplace=false mb1ic448ih15n"densenet_121:conv4_7/x1/bn"
+948:FAILED (errors:121 total:960) __REPRO: --bnorm --flags=SR --inplace=false mb1ic480ih15n"densenet_121:conv4_8/x1/bn"
+950:FAILED (errors:121 total:960) __REPRO: --bnorm --flags=S --inplace=false mb1ic480ih15n"densenet_121:conv4_8/x1/bn"
+960:FAILED (errors:128 total:1024) __REPRO: --bnorm --flags=SR --inplace=false mb1ic512ih15n"densenet_121:conv4_9/x1/bn"
+962:FAILED (errors:128 total:1024) __REPRO: --bnorm --flags=S --inplace=false mb1ic512ih15n"densenet_121:conv4_9/x1/bn"
+972:FAILED (errors:133 total:1088) __REPRO: --bnorm --flags=SR --inplace=false mb1ic544ih15n"densenet_121:conv4_10/x1/bn"
+974:FAILED (errors:133 total:1088) __REPRO: --bnorm --flags=S --inplace=false mb1ic544ih15n"densenet_121:conv4_10/x1/bn"
+984:FAILED (errors:141 total:1152) __REPRO: --bnorm --flags=SR --inplace=false mb1ic576ih15n"densenet_121:conv4_11/x1/bn"
+986:FAILED (errors:141 total:1152) __REPRO: --bnorm --flags=S --inplace=false mb1ic576ih15n"densenet_121:conv4_11/x1/bn"
+996:FAILED (errors:153 total:1216) __REPRO: --bnorm --flags=SR --inplace=false mb1ic608ih15n"densenet_121:conv4_12/x1/bn"
+998:FAILED (errors:153 total:1216) __REPRO: --bnorm --flags=S --inplace=false mb1ic608ih15n"densenet_121:conv4_12/x1/bn"
+1008:FAILED (errors:160 total:1280) __REPRO: --bnorm --flags=SR --inplace=false mb1ic640ih15n"densenet_121:conv4_13/x1/bn"
+1010:FAILED (errors:160 total:1280) __REPRO: --bnorm --flags=S --inplace=false mb1ic640ih15n"densenet_121:conv4_13/x1/bn"
+1020:FAILED (errors:165 total:1344) __REPRO: --bnorm --flags=SR --inplace=false mb1ic672ih15n"densenet_121:conv4_14/x1/bn"
+1022:FAILED (errors:165 total:1344) __REPRO: --bnorm --flags=S --inplace=false mb1ic672ih15n"densenet_121:conv4_14/x1/bn"
+1032:FAILED (errors:173 total:1408) __REPRO: --bnorm --flags=SR --inplace=false mb1ic704ih15n"densenet_121:conv4_15/x1/bn"
+1034:FAILED (errors:173 total:1408) __REPRO: --bnorm --flags=S --inplace=false mb1ic704ih15n"densenet_121:conv4_15/x1/bn"
+1044:FAILED (errors:185 total:1472) __REPRO: --bnorm --flags=SR --inplace=false mb1ic736ih15n"densenet_121:conv4_16/x1/bn"
+1046:FAILED (errors:185 total:1472) __REPRO: --bnorm --flags=S --inplace=false mb1ic736ih15n"densenet_121:conv4_16/x1/bn"
+1056:FAILED (errors:192 total:1536) __REPRO: --bnorm --flags=SR --inplace=false mb1ic768ih15n"densenet_121:conv4_17/x1/bn"
+1058:FAILED (errors:192 total:1536) __REPRO: --bnorm --flags=S --inplace=false mb1ic768ih15n"densenet_121:conv4_17/x1/bn"
+1068:FAILED (errors:197 total:1600) __REPRO: --bnorm --flags=SR --inplace=false mb1ic800ih15n"densenet_121:conv4_18/x1/bn"
+1070:FAILED (errors:197 total:1600) __REPRO: --bnorm --flags=S --inplace=false mb1ic800ih15n"densenet_121:conv4_18/x1/bn"
+1080:FAILED (errors:205 total:1664) __REPRO: --bnorm --flags=SR --inplace=false mb1ic832ih15n"densenet_121:conv4_19/x1/bn"
+1082:FAILED (errors:205 total:1664) __REPRO: --bnorm --flags=S --inplace=false mb1ic832ih15n"densenet_121:conv4_19/x1/bn"
+1092:FAILED (errors:217 total:1728) __REPRO: --bnorm --flags=SR --inplace=false mb1ic864ih15n"densenet_121:conv4_20/x1/bn"
+1094:FAILED (errors:217 total:1728) __REPRO: --bnorm --flags=S --inplace=false mb1ic864ih15n"densenet_121:conv4_20/x1/bn"
+1104:FAILED (errors:224 total:1792) __REPRO: --bnorm --flags=SR --inplace=false mb1ic896ih15n"densenet_121:conv4_21/x1/bn"
+1106:FAILED (errors:224 total:1792) __REPRO: --bnorm --flags=S --inplace=false mb1ic896ih15n"densenet_121:conv4_21/x1/bn"
+1116:FAILED (errors:229 total:1856) __REPRO: --bnorm --flags=SR --inplace=false mb1ic928ih15n"densenet_121:conv4_22/x1/bn"
+1118:FAILED (errors:229 total:1856) __REPRO: --bnorm --flags=S --inplace=false mb1ic928ih15n"densenet_121:conv4_22/x1/bn"
+1128:FAILED (errors:237 total:1920) __REPRO: --bnorm --flags=SR --inplace=false mb1ic960ih15n"densenet_121:conv4_23/x1/bn"
+1130:FAILED (errors:237 total:1920) __REPRO: --bnorm --flags=S --inplace=false mb1ic960ih15n"densenet_121:conv4_23/x1/bn"
+1140:FAILED (errors:249 total:1984) __REPRO: --bnorm --flags=SR --inplace=false mb1ic992ih15n"densenet_121:conv4_24/x1/bn"
+1142:FAILED (errors:249 total:1984) __REPRO: --bnorm --flags=S --inplace=false mb1ic992ih15n"densenet_121:conv4_24/x1/bn"
+1152:FAILED (errors:256 total:2048) __REPRO: --bnorm --flags=SR --inplace=false mb1ic1024ih15n"densenet_121:conv4_blk/bn"
+1154:FAILED (errors:256 total:2048) __REPRO: --bnorm --flags=S --inplace=false mb1ic1024ih15n"densenet_121:conv4_blk/bn"
+1385:FAILED (errors:3 total:512) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb50ic256ih56n"resnet_50:bn2a_branch1"
+1417:FAILED (errors:13 total:128) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic64ih112n"googlenet_v2:conv1/7x7_s2/bn"
+1421:FAILED (errors:8 total:128) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic64ih56n"googlenet_v2:conv2/3x3_reduce/bn"
+1425:FAILED (errors:34 total:384) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic192ih56n"googlenet_v2:conv2/3x3/bn"
+1429:FAILED (errors:10 total:128) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic64ih28n"googlenet_v2:inception_3a/1x1/bn"
+1433:FAILED (errors:19 total:192) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic96ih28n"googlenet_v2:inception_3a/double3x3a/bn"
+1437:FAILED (errors:5 total:64) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic32ih28n"googlenet_v2:inception_3a/pool_proj/bn"
+1441:FAILED (errors:28 total:256) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic128ih28n"googlenet_v2:inception_3c/3x3_reduce/bn"
+1513:FAILED (errors:23 total:64) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic32ih147n"googlenet_v3:conv_1_1_batchnorm"
+1517:FAILED (errors:43 total:128) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic64ih147n"googlenet_v3:conv_2_2_batchnorm"
+1521:FAILED (errors:38 total:160) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic80ih73n"googlenet_v3:conv_3_3_batchnorm"
+1525:FAILED (errors:93 total:384) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic192ih71n"googlenet_v3:conv_4_4_batchnorm"
+1529:FAILED (errors:24 total:128) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic64ih35n"googlenet_v3:mixed_conv_batchnorm"
+1533:FAILED (errors:19 total:96) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic48ih35n"googlenet_v3:mixed_tower_conv_batchnorm"
+1537:FAILED (errors:37 total:192) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic96ih35n"googlenet_v3:mixed_tower_1_conv_1_batchnorm"
+1541:FAILED (errors:13 total:64) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic32ih35n"googlenet_v3:mixed_tower_2_conv_batchnorm"
+1545:FAILED (errors:384 total:384) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic384ih17n"googlenet_v3:mixed_3_conv_batchnorm"
+1549:FAILED (errors:96 total:96) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic96ih17n"googlenet_v3:mixed_3_tower_conv_2_batchnorm"
+1553:FAILED (errors:192 total:192) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic192ih17n"googlenet_v3:mixed_4_conv_batchnorm"
+1557:FAILED (errors:128 total:128) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic128ih17n"googlenet_v3:mixed_4_tower_conv_batchnorm"
+1561:FAILED (errors:160 total:160) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb96ic160ih17n"googlenet_v3:mixed_5_tower_conv_batchnorm"
+1585:FAILED (errors:10 total:128) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic64ih57n"densenet_121:conv2_1/x1/bn"
+1589:FAILED (errors:20 total:256) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic128ih57n"densenet_121:conv2_1/x2/bn"
+1593:FAILED (errors:15 total:192) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic96ih57n"densenet_121:conv2_2/x1/bn"
+1597:FAILED (errors:25 total:320) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic160ih57n"densenet_121:conv2_4/x1/bn"
+1601:FAILED (errors:30 total:384) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic192ih57n"densenet_121:conv2_5/x1/bn"
+1605:FAILED (errors:35 total:448) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic224ih57n"densenet_121:conv2_6/x1/bn"
+1609:FAILED (errors:40 total:512) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic256ih57n"densenet_121:conv2_blk/bn"
+1613:FAILED (errors:18 total:256) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic128ih29n"densenet_121:conv3_1/x1/bn"
+1617:FAILED (errors:23 total:320) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic160ih29n"densenet_121:conv3_2/x1/bn"
+1621:FAILED (errors:27 total:384) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic192ih29n"densenet_121:conv3_3/x1/bn"
+1625:FAILED (errors:32 total:448) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic224ih29n"densenet_121:conv3_4/x1/bn"
+1629:FAILED (errors:36 total:512) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic256ih29n"densenet_121:conv3_5/x1/bn"
+1633:FAILED (errors:41 total:576) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic288ih29n"densenet_121:conv3_6/x1/bn"
+1637:FAILED (errors:45 total:640) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic320ih29n"densenet_121:conv3_7/x1/bn"
+1641:FAILED (errors:50 total:704) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic352ih29n"densenet_121:conv3_8/x1/bn"
+1645:FAILED (errors:54 total:768) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic384ih29n"densenet_121:conv3_9/x1/bn"
+1649:FAILED (errors:59 total:832) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic416ih29n"densenet_121:conv3_10/x1/bn"
+1653:FAILED (errors:63 total:896) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic448ih29n"densenet_121:conv3_11/x1/bn"
+1657:FAILED (errors:68 total:960) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic480ih29n"densenet_121:conv3_12/x1/bn"
+1661:FAILED (errors:72 total:1024) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic512ih29n"densenet_121:conv3_blk/bn"
+1665:FAILED (errors:64 total:512) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic256ih15n"densenet_121:conv4_1/x1/bn"
+1669:FAILED (errors:32 total:256) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic128ih15n"densenet_121:conv4_1/x2/bn"
+1673:FAILED (errors:69 total:576) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic288ih15n"densenet_121:conv4_2/x1/bn"
+1677:FAILED (errors:77 total:640) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic320ih15n"densenet_121:conv4_3/x1/bn"
+1681:FAILED (errors:89 total:704) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic352ih15n"densenet_121:conv4_4/x1/bn"
+1685:FAILED (errors:96 total:768) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic384ih15n"densenet_121:conv4_5/x1/bn"
+1689:FAILED (errors:101 total:832) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic416ih15n"densenet_121:conv4_6/x1/bn"
+1693:FAILED (errors:109 total:896) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic448ih15n"densenet_121:conv4_7/x1/bn"
+1697:FAILED (errors:121 total:960) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic480ih15n"densenet_121:conv4_8/x1/bn"
+1701:FAILED (errors:128 total:1024) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic512ih15n"densenet_121:conv4_9/x1/bn"
+1705:FAILED (errors:133 total:1088) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic544ih15n"densenet_121:conv4_10/x1/bn"
+1709:FAILED (errors:141 total:1152) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic576ih15n"densenet_121:conv4_11/x1/bn"
+1713:FAILED (errors:153 total:1216) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic608ih15n"densenet_121:conv4_12/x1/bn"
+1717:FAILED (errors:160 total:1280) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic640ih15n"densenet_121:conv4_13/x1/bn"
+1721:FAILED (errors:165 total:1344) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic672ih15n"densenet_121:conv4_14/x1/bn"
+1725:FAILED (errors:173 total:1408) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic704ih15n"densenet_121:conv4_15/x1/bn"
+1729:FAILED (errors:185 total:1472) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic736ih15n"densenet_121:conv4_16/x1/bn"
+1733:FAILED (errors:192 total:1536) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic768ih15n"densenet_121:conv4_17/x1/bn"
+1737:FAILED (errors:197 total:1600) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic800ih15n"densenet_121:conv4_18/x1/bn"
+1741:FAILED (errors:205 total:1664) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic832ih15n"densenet_121:conv4_19/x1/bn"
+1745:FAILED (errors:217 total:1728) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic864ih15n"densenet_121:conv4_20/x1/bn"
+1749:FAILED (errors:224 total:1792) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic896ih15n"densenet_121:conv4_21/x1/bn"
+1753:FAILED (errors:229 total:1856) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic928ih15n"densenet_121:conv4_22/x1/bn"
+1757:FAILED (errors:237 total:1920) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic960ih15n"densenet_121:conv4_23/x1/bn"
+1761:FAILED (errors:249 total:1984) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic992ih15n"densenet_121:conv4_24/x1/bn"
+1765:FAILED (errors:256 total:2048) __REPRO: --bnorm --flags=S --attr="post_ops='relu';" --inplace=false mb1ic1024ih15n"densenet_121:conv4_blk/bn"
+2004:FAILED (errors:381480 total:10653696) __REPRO: --bnorm --dir=FWD_I --inplace=false mb96ic384ih17n"googlenet_v3:mixed_3_conv_batchnorm"
+2008:FAILED (errors:97104 total:2663424) __REPRO: --bnorm --dir=FWD_I --inplace=false mb96ic96ih17n"googlenet_v3:mixed_3_tower_conv_2_batchnorm"
+2012:FAILED (errors:190740 total:5326848) __REPRO: --bnorm --dir=FWD_I --inplace=false mb96ic192ih17n"googlenet_v3:mixed_4_conv_batchnorm"
+2016:FAILED (errors:128316 total:3551232) __REPRO: --bnorm --dir=FWD_I --inplace=false mb96ic128ih17n"googlenet_v3:mixed_4_tower_conv_batchnorm"
+2020:FAILED (errors:159528 total:4439040) __REPRO: --bnorm --dir=FWD_I --inplace=false mb96ic160ih17n"googlenet_v3:mixed_5_tower_conv_batchnorm"
+15:FAILED (errors:2047 total:2048) __REPRO: --pool --dir=FWD_I --tag=axb ic64iw32ow16kw3sw2pw0
+51:FAILED (errors:9663 total:9664) __REPRO: --pool --dir=FWD_I --tag=axb ic32iw300ow151kw3sw2pw1
+87:FAILED (errors:1053 total:1054) __REPRO: --pool --dir=FWD_I --tag=axb ic17iw60ow31kw3sw2pw1
+123:FAILED (errors:128 total:128) __REPRO: --pool --dir=FWD_I --tag=axb ic8iw14ow8kw3sw2pw1
+159:FAILED (errors:2 total:2) __REPRO: --pool --dir=FWD_I --tag=axb ic1iw2ow1kw1pw0
+195:FAILED (errors:384 total:384) __REPRO: --pool --dir=FWD_I --tag=axb ic32iw32ow6kw6sw6pw2
+231:FAILED (errors:140 total:140) __REPRO: --pool --dir=FWD_I --tag=axb ic5iw42ow14kw3sw3pw0
+267:FAILED (errors:140 total:140) __REPRO: --pool --dir=FWD_I --tag=axb ic5iw15ow14kw3pw1
+303:FAILED (errors:140 total:140) __REPRO: --pool --dir=FWD_I --tag=axb ic5iw16ow14kw3pw0
+339:FAILED (errors:144 total:144) __REPRO: --pool --dir=FWD_I --tag=axb ic8ih3oh3kh3ph1
+375:FAILED (errors:1024 total:1024) __REPRO: --pool --dir=FWD_I --tag=axb ic128ih4oh2kh3ph0
+411:FAILED (errors:768 total:768) __REPRO: --pool --dir=FWD_I --tag=axb ic96ih4oh2kh3ph0
+447:FAILED (errors:128 total:128) __REPRO: --pool --dir=FWD_I --tag=axb ic64ih1oh1kh3ph1
+483:FAILED (errors:128 total:128) __REPRO: --pool --dir=FWD_I --tag=axb ic4ih4oh4kh3ph1
+519:FAILED (errors:1022 total:1024) __REPRO: --pool --dir=FWD_I --tag=axb ic32ih4oh4kh3ph1
+555:FAILED (errors:9201 total:9216) __REPRO: --pool --dir=FWD_I --tag=axb ic32ih13oh12kh3ph0
+591:FAILED (errors:32759 total:32768) __REPRO: --pool --dir=FWD_I --tag=axb ic64ih32oh16kh3sh2ph0
+627:FAILED (errors:3193 total:3200) __REPRO: --pool --dir=FWD_I --tag=axb ic16ih10oh10kh2ph1
+663:FAILED (errors:401369 total:401408) __REPRO: --pool --dir=FWD_I --tag=axb ic64ih56oh56kh3ph1
+699:FAILED (errors:4092 total:4096) __REPRO: --pool --dir=FWD_I --tag=axb ic32ih32iw2oh32ow2kh3kw3ph1pw1
+735:FAILED (errors:2425105 total:2425664) __REPRO: --pool --dir=FWD_I --tag=axb ic32ih300iw500oh151ow251kh3kw3sh2sw2ph1pw1
+771:FAILED (errors:1664 total:1666) __REPRO: --pool --dir=FWD_I --tag=axb ic17ih6oh7kh2ph1
+807:FAILED (errors:44196 total:44206) __REPRO: --pool --dir=FWD_I --tag=axb ic23ih60iw60oh31ow31kh3kw4sh2sw2ph1pw1
+843:FAILED (errors:26899 total:26908) __REPRO: --pool --dir=FWD_I --tag=axb ic14ih60iw60oh31ow31kh3kw2sh2sw2ph1pw1
+879:FAILED (errors:32664 total:32674) __REPRO: --pool --dir=FWD_I --tag=axb ic17ih60iw60oh31ow31kh4kw3sh2sw2ph1pw1
+915:FAILED (errors:26898 total:26908) __REPRO: --pool --dir=FWD_I --tag=axb ic14ih60iw60oh31ow31kh2kw3sh2sw2ph1pw1
+951:FAILED (errors:48040 total:48050) __REPRO: --pool --dir=FWD_I --tag=axb ic25ih60iw60oh31ow31kh2kw4sh2sw2ph1pw1
+987:FAILED (errors:53806 total:53816) __REPRO: --pool --dir=FWD_I --tag=axb ic28ih60iw60oh31ow31kh4kw2sh2sw2ph1pw1
+1023:FAILED (errors:80 total:80) __REPRO: --pool --dir=FWD_I --tag=axb ic8ih3iw4oh1ow5kh3kw3ph0pw1
+1059:FAILED (errors:128 total:128) __REPRO: --pool --dir=FWD_I --tag=axb ic8ih3iw14oh1ow8kh3kw3sh1sw2ph0pw1
+1095:FAILED (errors:9790 total:9792) __REPRO: --pool --dir=FWD_I --tag=axb ic96ih3iw100oh1ow51kh3kw3sh1sw2ph0pw1
+1131:FAILED (errors:69880 total:69888) __REPRO: --pool --dir=FWD_I --tag=axb ic96ih103iw9oh52ow7kh3kw3sh2sw1ph1pw0
+1167:FAILED (errors:72 total:72) __REPRO: --pool --dir=FWD_I --tag=axb ic1ih32oh6kh6sh6ph2
+1203:FAILED (errors:12 total:12) __REPRO: --pool --dir=FWD_I --tag=axb ic1ih32iw2oh6ow1kh6kw1sh6sw1ph2pw0
+1239:FAILED (errors:16650 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih20iw42oh17ow14kh4kw3sh1sw3ph0pw0
+1275:FAILED (errors:16652 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih20iw45oh17ow14kh4kw6sh1sw3ph0pw0
+1311:FAILED (errors:16651 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih52iw16oh17ow14kh4kw3sh3sw1ph0pw0
+1347:FAILED (errors:16650 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih52iw19oh17ow14kh4kw6sh3sw1ph0pw0
+1383:FAILED (errors:16638 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih20iw15oh17ow14kh4kw3ph0pw1
+1419:FAILED (errors:16640 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih20iw18oh17ow14kh4kw6ph0pw1
+1455:FAILED (errors:16636 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih19iw16oh17ow14kh4kw3ph1pw0
+1491:FAILED (errors:16639 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih19iw19oh17ow14kh4kw6ph1pw0
+1527:FAILED (errors:3564 total:3570) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih19iw10oh17ow3kh4kw2sh1sw4ph1pw0
+1563:FAILED (errors:630 total:630) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih9iw10oh3ow3kh2kw2sh4sw4ph1pw0
+1599:FAILED (errors:7596 total:7616) __REPRO: --pool --dir=FWD_I --tag=axb ic16ih20iw15oh17ow14kh4kw3ph0pw1
+1635:FAILED (errors:15210 total:15232) __REPRO: --pool --dir=FWD_I --tag=axb ic32ih20iw15oh17ow14kh4kw3ph0pw1
+1671:FAILED (errors:30918 total:30940) __REPRO: --pool --dir=FWD_I --tag=axb ic65ih20iw15oh17ow14kh4kw3ph0pw1
+1707:FAILED (errors:13254 total:13260) __REPRO: --pool --dir=FWD_I --tag=axb ic130ih19iw10oh17ow3kh4kw2sh1sw4ph1pw0
+1743:FAILED (errors:26407 total:26418) __REPRO: --pool --dir=FWD_I --tag=axb ic259ih19iw10oh17ow3kh4kw2sh1sw4ph1pw0
+1779:FAILED (errors:52615 total:52632) __REPRO: --pool --dir=FWD_I --tag=axb ic516ih19iw10oh17ow3kh4kw2sh1sw4ph1pw0
+1815:FAILED (errors:139959 total:139968) __REPRO: --pool --dir=FWD_I --tag=axb ic96ih55oh27kh3sh2ph0n"alexnet:max_pool1"
+1851:FAILED (errors:86502 total:86528) __REPRO: --pool --dir=FWD_I --tag=axb ic256ih27oh13kh3sh2ph0n"alexnet:max_pool2"
+1887:FAILED (errors:18424 total:18432) __REPRO: --pool --dir=FWD_I --tag=axb ic256ih13oh6kh3sh2ph0n"alexnet:max_pool5"
+1923:FAILED (errors:415863 total:415872) __REPRO: --pool --dir=FWD_I --tag=axb ic64ih114oh57kh3sh2ph0n"googlenet_v1:max_pool1/3x3_s2"
+1959:FAILED (errors:301005 total:301056) __REPRO: --pool --dir=FWD_I --tag=axb ic192ih57oh28kh3sh2ph0n"googlenet_v1:max_pool2/3x3_s2"
+1995:FAILED (errors:301019 total:301056) __REPRO: --pool --dir=FWD_I --tag=axb ic192ih28oh28kh3ph1n"googlenet_v1:inception_3a/max_pool"
+2031:FAILED (errors:401285 total:401408) __REPRO: --pool --dir=FWD_I --tag=axb ic256ih28oh28kh3ph1n"googlenet_v1:inception_3b/max_pool"
+2067:FAILED (errors:188109 total:188160) __REPRO: --pool --dir=FWD_I --tag=axb ic480ih28oh14kh3sh2ph0n"googlenet_v1:max_pool3/3x3_s2"
+2103:FAILED (errors:188104 total:188160) __REPRO: --pool --dir=FWD_I --tag=axb ic480ih14oh14kh3ph1n"googlenet_v1:inception_4a/max_pool"
+2139:FAILED (errors:200648 total:200704) __REPRO: --pool --dir=FWD_I --tag=axb ic512ih14oh14kh3ph1n"googlenet_v1:inception_4b/max_pool"
+2175:FAILED (errors:206920 total:206976) __REPRO: --pool --dir=FWD_I --tag=axb ic528ih14oh14kh3ph1n"googlenet_v1:inception_4e/max_pool"
+2211:FAILED (errors:81515 total:81536) __REPRO: --pool --dir=FWD_I --tag=axb ic832ih14oh7kh3sh2ph0n"googlenet_v1:max_pool4/3x3_s2"
+2247:FAILED (errors:81518 total:81536) __REPRO: --pool --dir=FWD_I --tag=axb ic832ih7oh7kh3ph1n"googlenet_v1:inception_5a/max_pool"
+2283:FAILED (errors:2047 total:2048) __REPRO: --pool --dir=FWD_I --tag=axb ic1024ih7oh1kh7ph0n"googlenet_v1:avg_pool5/7x7_s1"
+2319:FAILED (errors:682029 total:682112) __REPRO: --pool --dir=FWD_I --tag=axb ic64ih147oh73kh3sh2ph0n"googlenet_v3:max_pool"
+2355:FAILED (errors:470303 total:470400) __REPRO: --pool --dir=FWD_I --tag=axb ic192ih71oh35kh3sh2ph0n"googlenet_v3:max_pool1"
+2391:FAILED (errors:470353 total:470400) __REPRO: --pool --dir=FWD_I --tag=axb ic192ih35oh35kh3ph1n"googlenet_v3:ave_pool_mixed_pool"
+2427:FAILED (errors:627034 total:627200) __REPRO: --pool --dir=FWD_I --tag=axb ic256ih35oh35kh3ph1n"googlenet_v3:ave_pool_mixed_1_pool"
+2463:FAILED (errors:705434 total:705600) __REPRO: --pool --dir=FWD_I --tag=axb ic288ih35oh35kh3ph1n"googlenet_v3:ave_pool_mixed_2_pool"
+2499:FAILED (errors:166425 total:166464) __REPRO: --pool --dir=FWD_I --tag=axb ic288ih35oh17kh3sh2ph0n"googlenet_v3:max_pool_mixed_3_pool"
+2535:FAILED (errors:443782 total:443904) __REPRO: --pool --dir=FWD_I --tag=axb ic768ih17oh17kh3ph1n"googlenet_v3:ave_pool_mixed_4_pool"
+2571:FAILED (errors:98278 total:98304) __REPRO: --pool --dir=FWD_I --tag=axb ic768ih17oh8kh3sh2ph0n"googlenet_v3:max_pool_mixed_8_pool"
+2607:FAILED (errors:163804 total:163840) __REPRO: --pool --dir=FWD_I --tag=axb ic1280ih8oh8kh3ph1n"googlenet_v3:ave_pool_mixed_9_pool"
+2643:FAILED (errors:262076 total:262144) __REPRO: --pool --dir=FWD_I --tag=axb ic2048ih8oh8kh3ph1n"googlenet_v3:max_pool_mixed_10_pool"
+2679:FAILED (errors:4095 total:4096) __REPRO: --pool --dir=FWD_I --tag=axb ic2048ih8oh1kh8ph0n"googlenet_v3:ave_global_pool"
+2715:FAILED (errors:401397 total:401408) __REPRO: --pool --dir=FWD_I --tag=axb ic64ih112oh56kh3sh2ph0n"resnet_50:max_pool1"
+2751:FAILED (errors:4095 total:4096) __REPRO: --pool --dir=FWD_I --tag=axb ic2048ih7oh1kh7ph0n"resnet_50:ave_pool5"
+2787:FAILED (errors:114522 total:114576) __REPRO: --pool --dir=FWD_I --tag=axb ic8id20ih40iw60od11oh21ow31kd2kh3kw4sd2sh2sw2pd1ph1pw1
+2823:FAILED (errors:128839 total:128898) __REPRO: --pool --dir=FWD_I --tag=axb ic9id22ih62iw42od11oh31ow21kd2kh4kw3sd2sh2sw2pd1ph1pw1
+2859:FAILED (errors:172958 total:173056) __REPRO: --pool --dir=FWD_I --tag=axb ic13id31ih50iw31od16oh26ow16kd3kh4kw2sd2sh2sw2pd1ph1pw1
+2895:FAILED (errors:953165 total:953312) __REPRO: --pool --dir=FWD_I --tag=axb ic16id60ih60iw60od31oh31ow31kd4kh2kw3sd2sh2sw2pd1ph1pw1
+2931:FAILED (errors:1131912 total:1132058) __REPRO: --pool --dir=FWD_I --tag=axb ic19id60ih60iw60od31oh31ow31kd4kh3kw2sd2sh2sw2pd1ph1pw1
+2967:FAILED (errors:31919 total:32000) __REPRO: --pool --dir=FWD_I --tag=axb ic16id10od10kd2pd1
+3003:FAILED (errors:175338 total:175616) __REPRO: --pool --dir=FWD_I --tag=axb ic32id14od14kd3pd1
+3039:FAILED (errors:175338 total:175616) __REPRO: --pool --dir=FWD_I --tag=axb ic32id14od14kd3pd1
+3075:FAILED (errors:83245 total:83300) __REPRO: --pool --dir=FWD_I --tag=axb ic35id52ih20iw16od17oh5ow14kd4kh4kw3sd3sh4sw1pd0ph0pw0
+3111:FAILED (errors:83258 total:83300) __REPRO: --pool --dir=FWD_I --tag=axb ic35id52ih20iw19od17oh5ow14kd4kh4kw6sd3sh4sw1pd0ph0pw0
+3147:FAILED (errors:83220 total:83300) __REPRO: --pool --dir=FWD_I --tag=axb ic35id15ih20iw20od14oh17ow5kd3kh4kw4sd1sh1sw4pd1ph0pw0
+3183:FAILED (errors:83225 total:83300) __REPRO: --pool --dir=FWD_I --tag=axb ic35id18ih20iw20od14oh17ow5kd6kh4kw4sd1sh1sw4pd1ph0pw0
+3219:FAILED (errors:1258 total:1260) __REPRO: --pool --dir=FWD_I --tag=axb ic35id11ih12iw7od3oh3ow2kd3kh4kw2sd4sh4sw5pd0ph0pw0
+3255:FAILED (errors:1257 total:1260) __REPRO: --pool --dir=FWD_I --tag=axb ic35id13ih7iw10od3oh2ow3kd2kh2kw3sd6sh5sw4pd1ph0pw1
+3291:FAILED (errors:38005 total:38080) __REPRO: --pool --dir=FWD_I --tag=axb ic16id18ih20iw20od14oh17ow5kd6kh4kw4sd1sh1sw4pd1ph0pw0
+3327:FAILED (errors:78465 total:78540) __REPRO: --pool --dir=FWD_I --tag=axb ic33id18ih20iw20od14oh17ow5kd6kh4kw4sd1sh1sw4pd1ph0pw0
+3363:FAILED (errors:157005 total:157080) __REPRO: --pool --dir=FWD_I --tag=axb ic66id18ih20iw20od14oh17ow5kd6kh4kw4sd1sh1sw4pd1ph0pw0
+3399:FAILED (errors:311725 total:311780) __REPRO: --pool --dir=FWD_I --tag=axb ic131id52ih20iw16od17oh5ow14kd4kh4kw3sd3sh4sw1pd0ph0pw0
+3435:FAILED (errors:618620 total:618800) __REPRO: --pool --dir=FWD_I --tag=axb ic260id52ih20iw16od17oh5ow14kd4kh4kw3sd3sh4sw1pd0ph0pw0
+3471:FAILED (errors:1230154 total:1230460) __REPRO: --pool --dir=FWD_I --tag=axb ic517id52ih20iw16od17oh5ow14kd4kh4kw3sd3sh4sw1pd0ph0pw0
+3507:FAILED (errors:4194164 total:4194304) __REPRO: --pool --dir=FWD_I --tag=axb ic64id64od32kd2sd2pd0n"3d_unet:max_pool1"
+3543:FAILED (errors:702363 total:702464) __REPRO: --pool --dir=FWD_I --tag=axb ic128id28od14kd2sd2pd0n"3d_unet:max_pool2"
+3579:FAILED (errors:110547 total:110592) __REPRO: --pool --dir=FWD_I --tag=axb ic256id12od6kd2sd2pd0n"3d_unet:max_pool3"
+3615:FAILED (errors:3211189 total:3211264) __REPRO: --pool --dir=FWD_I --tag=axb ic64id16ih112iw112od8oh56ow56kd1kh3kw3sd2sh2sw2pd0ph1pw1n"i3d_resnet50_v1:max_pool1"
+3651:FAILED (errors:6421046 total:6422528) __REPRO: --pool --dir=FWD_I --tag=axb ic256id8ih56iw56od4oh56ow56kd2kh1kw1sd2sh1sw1pd0ph0pw0n"i3d_resnet50_v1:max_pool2"
+3687:FAILED (errors:4095 total:4096) __REPRO: --pool --dir=FWD_I --tag=axb ic2048id4ih7iw7od1oh1ow1kd4kh7kw7pd0ph0pw0n"i3d_resnet50_v1:max_pool3"
+3718:FAILED (errors:910 total:980) __REPRO: --pool --dir=FWD_I --tag=axb ic35iw13ow14kw3pw3
+3742:FAILED (errors:910 total:980) __REPRO: --pool --dir=FWD_I --tag=axb ic35iw13ow14kw6pw6
+3766:FAILED (errors:979 total:980) __REPRO: --pool --dir=FWD_I --tag=axb ic35iw30ow14kw3sw2pw0
+3790:FAILED (errors:979 total:980) __REPRO: --pool --dir=FWD_I --tag=axb ic35iw33ow14kw6sw2pw0
+3814:FAILED (errors:128 total:1152) __REPRO: --pool --dir=FWD_I --tag=axb ic16ih10oh6kh5sh5ph10
+3838:FAILED (errors:40 total:360) __REPRO: --pool --dir=FWD_I --tag=axb ic20ih16oh3kh16sh16ph16
+3862:FAILED (errors:28291 total:46546) __REPRO: --pool --dir=FWD_I --tag=axb ic17ih13oh37kh17ph20
+3886:FAILED (errors:15450 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih20iw13oh17ow14kh4kw3ph0pw3
+3910:FAILED (errors:15459 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih36iw13oh17ow14kh4kw3sh2sw1ph0pw3
+3934:FAILED (errors:15450 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih20iw13oh17ow14kh4kw6ph0pw6
+3958:FAILED (errors:15459 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih36iw13oh17ow14kh4kw6sh2sw1ph0pw6
+3982:FAILED (errors:15656 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih16iw16oh17ow14kh4kw3ph4pw0
+4006:FAILED (errors:15666 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih32iw16oh17ow14kh4kw3sh2sw1ph4pw0
+4030:FAILED (errors:15658 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih16iw19oh17ow14kh4kw6ph4pw0
+4054:FAILED (errors:15669 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih32iw19oh17ow14kh4kw6sh2sw1ph4pw0
+4078:FAILED (errors:14538 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih16iw13oh17ow14kh4kw3ph4pw3
+4102:FAILED (errors:14547 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih32iw13oh17ow14kh4kw3sh2sw1ph4pw3
+4126:FAILED (errors:14538 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih16iw13oh17ow14kh4kw6ph4pw6
+4150:FAILED (errors:14547 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih32iw13oh17ow14kh4kw6sh2sw1ph4pw6
+4174:FAILED (errors:16646 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih20iw30oh17ow14kh4kw3sh1sw2ph0pw0
+4198:FAILED (errors:16644 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih19iw30oh17ow14kh4kw3sh1sw2ph1pw0
+4222:FAILED (errors:16648 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih20iw33oh17ow14kh4kw6sh1sw2ph0pw0
+4246:FAILED (errors:16646 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih19iw33oh17ow14kh4kw6sh1sw2ph1pw0
+4270:FAILED (errors:16648 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih37iw16oh17ow14kh4kw3sh2sw1ph0pw0
+4294:FAILED (errors:16646 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih36iw16oh17ow14kh4kw3sh2sw1ph1pw0
+4318:FAILED (errors:16649 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih37iw19oh17ow14kh4kw6sh2sw1ph0pw0
+4342:FAILED (errors:16650 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih36iw19oh17ow14kh4kw6sh2sw1ph1pw0
+4366:FAILED (errors:16652 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih37iw30oh17ow14kh4kw3sh2sw2ph0pw0
+4390:FAILED (errors:16651 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih36iw30oh17ow14kh4kw3sh2sw2ph1pw0
+4414:FAILED (errors:16653 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih37iw33oh17ow14kh4kw6sh2sw2ph0pw0
+4438:FAILED (errors:16653 total:16660) __REPRO: --pool --dir=FWD_I --tag=axb ic35ih36iw33oh17ow14kh4kw6sh2sw2ph1pw0
+4462:FAILED (errors:145408 total:183260) __REPRO: --pool --dir=FWD_I --tag=axb ic35id30ih16iw13od11oh17ow14kd3kh4kw3sd3sh1sw1pd3ph4pw3
+4486:FAILED (errors:145484 total:183260) __REPRO: --pool --dir=FWD_I --tag=axb ic35id20ih32iw13od11oh17ow14kd2kh4kw3sd2sh2sw1pd2ph4pw3
+4510:FAILED (errors:145408 total:183260) __REPRO: --pool --dir=FWD_I --tag=axb ic35id30ih16iw13od11oh17ow14kd3kh4kw6sd3sh1sw1pd3ph4pw6
+4534:FAILED (errors:145484 total:183260) __REPRO: --pool --dir=FWD_I --tag=axb ic35id20ih32iw13od11oh17ow14kd2kh4kw6sd2sh2sw1pd2ph4pw6
+4558:FAILED (errors:66541 total:66640) __REPRO: --pool --dir=FWD_I --tag=axb ic35id37ih7iw16od17oh4ow14kd4kh5kw3sd2sh1sw1pd0ph1pw0
+4582:FAILED (errors:66544 total:66640) __REPRO: --pool --dir=FWD_I --tag=axb ic35id36ih7iw16od17oh4ow14kd4kh5kw3sd2sh1sw1pd1ph1pw0
+4606:FAILED (errors:66550 total:66640) __REPRO: --pool --dir=FWD_I --tag=axb ic35id37ih7iw19od17oh4ow14kd4kh5kw6sd2sh1sw1pd0ph1pw0
+4630:FAILED (errors:66552 total:66640) __REPRO: --pool --dir=FWD_I --tag=axb ic35id36ih7iw19od17oh4ow14kd4kh5kw6sd2sh1sw1pd1ph1pw0
+388:FAILED (errors:252 total:384) __REPRO: --rnn --cfg=u8u8u8f32 --alg=VANILLA_LSTM --activation=TANH --scaling=common l1t1mb1sic128slc128dhc128
+389:FAILED (errors:252 total:384) __REPRO: --rnn --cfg=u8u8u8u8 --alg=VANILLA_LSTM --activation=TANH --scaling=common l1t1mb1sic128slc128dhc128
+390:FAILED (errors:3002 total:4608) __REPRO: --rnn --cfg=u8u8u8f32 --alg=VANILLA_LSTM --activation=TANH --scaling=common l1t1mb12sic128slc128dhc128
+391:FAILED (errors:3002 total:4608) __REPRO: --rnn --cfg=u8u8u8u8 --alg=VANILLA_LSTM --activation=TANH --scaling=common l1t1mb12sic128slc128dhc128
+392:FAILED (errors:4580 total:6912) __REPRO: --rnn --cfg=u8u8u8f32 --alg=VANILLA_LSTM --activation=TANH --scaling=common l1t1mb32sic72slc72dhc72
+393:FAILED (errors:4580 total:6912) __REPRO: --rnn --cfg=u8u8u8u8 --alg=VANILLA_LSTM --activation=TANH --scaling=common l1t1mb32sic72slc72dhc72
+394:FAILED (errors:1504 total:2304) __REPRO: --rnn --cfg=u8u8u8f32 --alg=VANILLA_LSTM --activation=TANH --scaling=common l1t1mb12sic64slc128dhc64
+395:FAILED (errors:1504 total:2304) __REPRO: --rnn --cfg=u8u8u8u8 --alg=VANILLA_LSTM --activation=TANH --scaling=common l1t1mb12sic64slc128dhc64
+396:FAILED (errors:8188 total:12480) __REPRO: --rnn --cfg=u8u8u8f32 --alg=VANILLA_LSTM --activation=TANH --scaling=common l1t1mb32sic130slc64dhc130
+397:FAILED (errors:8188 total:12480) __REPRO: --rnn --cfg=u8u8u8u8 --alg=VANILLA_LSTM --activation=TANH --scaling=common l1t1mb32sic130slc64dhc130
+398:FAILED (errors:4544 total:6912) __REPRO: --rnn --cfg=u8u8u8f32 --alg=VANILLA_LSTM --activation=TANH --scaling=common l1t1mb18sic128slc64dhc128
+399:FAILED (errors:4544 total:6912) __REPRO: --rnn --cfg=u8u8u8u8 --alg=VANILLA_LSTM --activation=TANH --scaling=common l1t1mb18sic128slc64dhc128
+400:FAILED (errors:254 total:384) __REPRO: --rnn --cfg=f32u8f32f32 --alg=VANILLA_LSTM --activation=TANH --scaling=per_oc l1t1mb1sic128slc128dhc128
+401:FAILED (errors:254 total:384) __REPRO: --rnn --cfg=f32u8f32u8 --alg=VANILLA_LSTM --activation=TANH --scaling=per_oc l1t1mb1sic128slc128dhc128
+402:FAILED (errors:3028 total:4608) __REPRO: --rnn --cfg=f32u8f32f32 --alg=VANILLA_LSTM --activation=TANH --scaling=per_oc l1t1mb12sic128slc128dhc128
+403:FAILED (errors:3028 total:4608) __REPRO: --rnn --cfg=f32u8f32u8 --alg=VANILLA_LSTM --activation=TANH --scaling=per_oc l1t1mb12sic128slc128dhc128
+404:FAILED (errors:4550 total:6912) __REPRO: --rnn --cfg=f32u8f32f32 --alg=VANILLA_LSTM --activation=TANH --scaling=per_oc l1t1mb32sic72slc72dhc72
+405:FAILED (errors:4550 total:6912) __REPRO: --rnn --cfg=f32u8f32u8 --alg=VANILLA_LSTM --activation=TANH --scaling=per_oc l1t1mb32sic72slc72dhc72
+406:FAILED (errors:1526 total:2304) __REPRO: --rnn --cfg=f32u8f32f32 --alg=VANILLA_LSTM --activation=TANH --scaling=per_oc l1t1mb12sic64slc128dhc64
+407:FAILED (errors:1526 total:2304) __REPRO: --rnn --cfg=f32u8f32u8 --alg=VANILLA_LSTM --activation=TANH --scaling=per_oc l1t1mb12sic64slc128dhc64
+408:FAILED (errors:8182 total:12480) __REPRO: --rnn --cfg=f32u8f32f32 --alg=VANILLA_LSTM --activation=TANH --scaling=per_oc l1t1mb32sic130slc64dhc130
+409:FAILED (errors:8182 total:12480) __REPRO: --rnn --cfg=f32u8f32u8 --alg=VANILLA_LSTM --activation=TANH --scaling=per_oc l1t1mb32sic130slc64dhc130
+410:FAILED (errors:4548 total:6912) __REPRO: --rnn --cfg=f32u8f32f32 --alg=VANILLA_LSTM --activation=TANH --scaling=per_oc l1t1mb18sic128slc64dhc128
+411:FAILED (errors:4548 total:6912) __REPRO: --rnn --cfg=f32u8f32u8 --alg=VANILLA_LSTM --activation=TANH --scaling=per_oc l1t1mb18sic128slc64dhc128
+0:FAILED (errors:4029 total:96000) __REPRO: --softmax 96x1000
+1:FAILED (errors:4029 total:96000) __REPRO: --softmax --inplace=false 96x1000
+4:FAILED (errors:48000 total:96000) __REPRO: --softmax --alg=LOGSOFTMAX 96x1000
+5:FAILED (errors:48000 total:96000) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 96x1000
+32:FAILED (errors:1349 total:3200) __REPRO: --softmax 32x100
+33:FAILED (errors:1349 total:3200) __REPRO: --softmax --inplace=false 32x100
+36:FAILED (errors:1600 total:3200) __REPRO: --softmax --alg=LOGSOFTMAX 32x100
+37:FAILED (errors:1600 total:3200) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 32x100
+48:FAILED (errors:5449 total:4678144) __REPRO: --softmax 128x36548
+49:FAILED (errors:5449 total:4678144) __REPRO: --softmax --inplace=false 128x36548
+52:FAILED (errors:2339072 total:4678144) __REPRO: --softmax --alg=LOGSOFTMAX 128x36548
+53:FAILED (errors:2339072 total:4678144) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 128x36548
+128:FAILED (errors:156800 total:156800) __REPRO: --softmax 4480x35
+129:FAILED (errors:156800 total:156800) __REPRO: --softmax --inplace=false 4480x35
+132:FAILED (errors:156800 total:156800) __REPRO: --softmax --alg=LOGSOFTMAX 4480x35
+133:FAILED (errors:156800 total:156800) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 4480x35
+144:FAILED (errors:175232 total:175232) __REPRO: --softmax 4736x37
+145:FAILED (errors:175232 total:175232) __REPRO: --softmax --inplace=false 4736x37
+148:FAILED (errors:175232 total:175232) __REPRO: --softmax --alg=LOGSOFTMAX 4736x37
+149:FAILED (errors:175232 total:175232) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 4736x37
+160:FAILED (errors:184832 total:184832) __REPRO: --softmax 4864x38
+161:FAILED (errors:184832 total:184832) __REPRO: --softmax --inplace=false 4864x38
+164:FAILED (errors:184832 total:184832) __REPRO: --softmax --alg=LOGSOFTMAX 4864x38
+165:FAILED (errors:184832 total:184832) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 4864x38
+176:FAILED (errors:194688 total:194688) __REPRO: --softmax 4992x39
+177:FAILED (errors:194688 total:194688) __REPRO: --softmax --inplace=false 4992x39
+180:FAILED (errors:194688 total:194688) __REPRO: --softmax --alg=LOGSOFTMAX 4992x39
+181:FAILED (errors:194688 total:194688) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 4992x39
+192:FAILED (errors:204800 total:204800) __REPRO: --softmax 5120x40
+193:FAILED (errors:204800 total:204800) __REPRO: --softmax --inplace=false 5120x40
+196:FAILED (errors:204800 total:204800) __REPRO: --softmax --alg=LOGSOFTMAX 5120x40
+197:FAILED (errors:204800 total:204800) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 5120x40
+208:FAILED (errors:215168 total:215168) __REPRO: --softmax 5248x41
+209:FAILED (errors:215168 total:215168) __REPRO: --softmax --inplace=false 5248x41
+212:FAILED (errors:215168 total:215168) __REPRO: --softmax --alg=LOGSOFTMAX 5248x41
+213:FAILED (errors:215168 total:215168) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 5248x41
+224:FAILED (errors:225792 total:225792) __REPRO: --softmax 5376x42
+225:FAILED (errors:225792 total:225792) __REPRO: --softmax --inplace=false 5376x42
+228:FAILED (errors:225792 total:225792) __REPRO: --softmax --alg=LOGSOFTMAX 5376x42
+229:FAILED (errors:225792 total:225792) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 5376x42
+240:FAILED (errors:236672 total:236672) __REPRO: --softmax 5504x43
+241:FAILED (errors:236672 total:236672) __REPRO: --softmax --inplace=false 5504x43
+244:FAILED (errors:236672 total:236672) __REPRO: --softmax --alg=LOGSOFTMAX 5504x43
+245:FAILED (errors:236672 total:236672) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 5504x43
+256:FAILED (errors:247808 total:247808) __REPRO: --softmax 5632x44
+257:FAILED (errors:247808 total:247808) __REPRO: --softmax --inplace=false 5632x44
+260:FAILED (errors:247808 total:247808) __REPRO: --softmax --alg=LOGSOFTMAX 5632x44
+261:FAILED (errors:247808 total:247808) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 5632x44
+272:FAILED (errors:294912 total:294912) __REPRO: --softmax 6144x48
+273:FAILED (errors:294912 total:294912) __REPRO: --softmax --inplace=false 6144x48
+276:FAILED (errors:294912 total:294912) __REPRO: --softmax --alg=LOGSOFTMAX 6144x48
+277:FAILED (errors:294912 total:294912) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 6144x48
+288:FAILED (errors:307328 total:307328) __REPRO: --softmax 6272x49
+289:FAILED (errors:307328 total:307328) __REPRO: --softmax --inplace=false 6272x49
+292:FAILED (errors:307328 total:307328) __REPRO: --softmax --alg=LOGSOFTMAX 6272x49
+293:FAILED (errors:307328 total:307328) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 6272x49
+304:FAILED (errors:320000 total:320000) __REPRO: --softmax 6400x50
+305:FAILED (errors:320000 total:320000) __REPRO: --softmax --inplace=false 6400x50
+308:FAILED (errors:320000 total:320000) __REPRO: --softmax --alg=LOGSOFTMAX 6400x50
+309:FAILED (errors:320000 total:320000) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 6400x50
+320:FAILED (errors:359552 total:359552) __REPRO: --softmax 6784x53
+321:FAILED (errors:359552 total:359552) __REPRO: --softmax --inplace=false 6784x53
+324:FAILED (errors:359552 total:359552) __REPRO: --softmax --alg=LOGSOFTMAX 6784x53
+325:FAILED (errors:359552 total:359552) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 6784x53
+336:FAILED (errors:415872 total:415872) __REPRO: --softmax 7296x57
+337:FAILED (errors:415872 total:415872) __REPRO: --softmax --inplace=false 7296x57
+340:FAILED (errors:415872 total:415872) __REPRO: --softmax --alg=LOGSOFTMAX 7296x57
+341:FAILED (errors:415872 total:415872) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 7296x57
+352:FAILED (errors:430592 total:430592) __REPRO: --softmax 7424x58
+353:FAILED (errors:430592 total:430592) __REPRO: --softmax --inplace=false 7424x58
+356:FAILED (errors:430592 total:430592) __REPRO: --softmax --alg=LOGSOFTMAX 7424x58
+357:FAILED (errors:430592 total:430592) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 7424x58
+368:FAILED (errors:476288 total:476288) __REPRO: --softmax 7808x61
+369:FAILED (errors:476288 total:476288) __REPRO: --softmax --inplace=false 7808x61
+372:FAILED (errors:476288 total:476288) __REPRO: --softmax --alg=LOGSOFTMAX 7808x61
+373:FAILED (errors:476288 total:476288) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 7808x61
+384:FAILED (errors:524288 total:524288) __REPRO: --softmax 8192x64
+385:FAILED (errors:524288 total:524288) __REPRO: --softmax --inplace=false 8192x64
+388:FAILED (errors:524288 total:524288) __REPRO: --softmax --alg=LOGSOFTMAX 8192x64
+389:FAILED (errors:524288 total:524288) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 8192x64
+394:FAILED (errors:131072 total:524288) __REPRO: --softmax --dir=BWD_D --axis=0 8192x64
+395:FAILED (errors:131072 total:524288) __REPRO: --softmax --dir=BWD_D --axis=0 --inplace=false 8192x64
+400:FAILED (errors:557568 total:557568) __REPRO: --softmax 8448x66
+401:FAILED (errors:557568 total:557568) __REPRO: --softmax --inplace=false 8448x66
+404:FAILED (errors:557568 total:557568) __REPRO: --softmax --alg=LOGSOFTMAX 8448x66
+405:FAILED (errors:557568 total:557568) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 8448x66
+410:FAILED (errors:553212 total:557568) __REPRO: --softmax --dir=BWD_D --axis=0 8448x66
+411:FAILED (errors:553212 total:557568) __REPRO: --softmax --dir=BWD_D --axis=0 --inplace=false 8448x66
+416:FAILED (errors:574592 total:574592) __REPRO: --softmax 8576x67
+417:FAILED (errors:574592 total:574592) __REPRO: --softmax --inplace=false 8576x67
+420:FAILED (errors:574592 total:574592) __REPRO: --softmax --alg=LOGSOFTMAX 8576x67
+421:FAILED (errors:574592 total:574592) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 8576x67
+432:FAILED (errors:4029 total:96000) __REPRO: --softmax 96x1000x1x1
+433:FAILED (errors:4029 total:96000) __REPRO: --softmax --inplace=false 96x1000x1x1
+440:FAILED (errors:48000 total:96000) __REPRO: --softmax --alg=LOGSOFTMAX 96x1000x1x1
+441:FAILED (errors:48000 total:96000) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 96x1000x1x1
+448:FAILED (errors:4029 total:96000) __REPRO: --softmax --tag=axb 96x1000x1x1
+449:FAILED (errors:4029 total:96000) __REPRO: --softmax --tag=axb --inplace=false 96x1000x1x1
+456:FAILED (errors:48000 total:96000) __REPRO: --softmax --tag=axb --alg=LOGSOFTMAX 96x1000x1x1
+457:FAILED (errors:48000 total:96000) __REPRO: --softmax --tag=axb --alg=LOGSOFTMAX --inplace=false 96x1000x1x1
+464:FAILED (errors:4029 total:96000) __REPRO: --softmax --tag=aBx8b 96x1000x1x1
+465:FAILED (errors:4029 total:96000) __REPRO: --softmax --tag=aBx8b --inplace=false 96x1000x1x1
+472:FAILED (errors:48000 total:96000) __REPRO: --softmax --tag=aBx8b --alg=LOGSOFTMAX 96x1000x1x1
+473:FAILED (errors:48000 total:96000) __REPRO: --softmax --tag=aBx8b --alg=LOGSOFTMAX --inplace=false 96x1000x1x1
+480:FAILED (errors:4029 total:96000) __REPRO: --softmax --tag=aBx16b 96x1000x1x1
+481:FAILED (errors:4029 total:96000) __REPRO: --softmax --tag=aBx16b --inplace=false 96x1000x1x1
+488:FAILED (errors:48000 total:96000) __REPRO: --softmax --tag=aBx16b --alg=LOGSOFTMAX 96x1000x1x1
+489:FAILED (errors:48000 total:96000) __REPRO: --softmax --tag=aBx16b --alg=LOGSOFTMAX --inplace=false 96x1000x1x1
+688:FAILED (errors:1349 total:3200) __REPRO: --softmax 32x100x1x1
+689:FAILED (errors:1349 total:3200) __REPRO: --softmax --inplace=false 32x100x1x1
+696:FAILED (errors:1600 total:3200) __REPRO: --softmax --alg=LOGSOFTMAX 32x100x1x1
+697:FAILED (errors:1600 total:3200) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 32x100x1x1
+704:FAILED (errors:1349 total:3200) __REPRO: --softmax --tag=axb 32x100x1x1
+705:FAILED (errors:1349 total:3200) __REPRO: --softmax --tag=axb --inplace=false 32x100x1x1
+712:FAILED (errors:1600 total:3200) @@@ error [int softmax::doit(const softmax::prb_t *, res_t *):259]: 'compare(p, dst_fp, dst, r)' -> 1
+713:FAILED (errors:1600 total:3200) __REPRO: --softmax --tag=axb --alg=LOGSOFTMAX --inplace=false 32x100x1x1
+720:FAILED (errors:1349 total:3200) __REPRO: --softmax --tag=aBx8b 32x100x1x1
+721:FAILED (errors:1349 total:3200) __REPRO: --softmax --tag=aBx8b --inplace=false 32x100x1x1
+728:FAILED (errors:1600 total:3200) __REPRO: --softmax --tag=aBx8b --alg=LOGSOFTMAX 32x100x1x1
+729:FAILED (errors:1600 total:3200) __REPRO: --softmax --tag=aBx8b --alg=LOGSOFTMAX --inplace=false 32x100x1x1
+736:FAILED (errors:1349 total:3200) __REPRO: --softmax --tag=aBx16b 32x100x1x1
+737:FAILED (errors:1349 total:3200) __REPRO: --softmax --tag=aBx16b --inplace=false 32x100x1x1
+744:FAILED (errors:1600 total:3200) __REPRO: --softmax --tag=aBx16b --alg=LOGSOFTMAX 32x100x1x1
+745:FAILED (errors:1600 total:3200) __REPRO: --softmax --tag=aBx16b --alg=LOGSOFTMAX --inplace=false 32x100x1x1
+816:FAILED (errors:5449 total:4678144) __REPRO: --softmax 128x36548x1x1
+817:FAILED (errors:5449 total:4678144) __REPRO: --softmax --inplace=false 128x36548x1x1
+824:FAILED (errors:2339072 total:4678144) __REPRO: --softmax --alg=LOGSOFTMAX 128x36548x1x1
+825:FAILED (errors:2339072 total:4678144) __REPRO: --softmax --alg=LOGSOFTMAX --inplace=false 128x36548x1x1
+832:FAILED (errors:5449 total:4678144) __REPRO: --softmax --tag=axb 128x36548x1x1
+833:FAILED (errors:5449 total:4678144) __REPRO: --softmax --tag=axb --inplace=false 128x36548x1x1
+840:FAILED (errors:2339072 total:4678144) __REPRO: --softmax --tag=axb --alg=LOGSOFTMAX 128x36548x1x1
+841:FAILED (errors:2339072 total:4678144) __REPRO: --softmax --tag=axb --alg=LOGSOFTMAX --inplace=false 128x36548x1x1
+848:FAILED (errors:5449 total:4678144) __REPRO: --softmax --tag=aBx8b 128x36548x1x1
+849:FAILED (errors:5449 total:4678144) __REPRO: --softmax --tag=aBx8b --inplace=false 128x36548x1x1
+856:FAILED (errors:2339072 total:4678144) __REPRO: --softmax --tag=aBx8b --alg=LOGSOFTMAX 128x36548x1x1
+857:FAILED (errors:2339072 total:4678144) __REPRO: --softmax --tag=aBx8b --alg=LOGSOFTMAX --inplace=false 128x36548x1x1
+864:FAILED (errors:5449 total:4678144) __REPRO: --softmax --tag=aBx16b 128x36548x1x1
+865:FAILED (errors:5449 total:4678144) __REPRO: --softmax --tag=aBx16b --inplace=false 128x36548x1x1
+872:FAILED (errors:2339072 total:4678144) __REPRO: --softmax --tag=aBx16b --alg=LOGSOFTMAX 128x36548x1x1
+873:FAILED (errors:2339072 total:4678144) __REPRO: --softmax --tag=aBx16b --alg=LOGSOFTMAX --inplace=false 128x36548x1x1
+950:FAILED (errors:204292 total:1245184) __REPRO: --softmax --axis=3 2x19x128x256
+951:FAILED (errors:204292 total:1245184) __REPRO: --softmax --axis=3 --inplace=false 2x19x128x256
+958:FAILED (errors:622592 total:1245184) __REPRO: --softmax --alg=LOGSOFTMAX --axis=3 2x19x128x256
+959:FAILED (errors:622592 total:1245184) __REPRO: --softmax --alg=LOGSOFTMAX --axis=3 --inplace=false 2x19x128x256
+1206:FAILED (errors:8192 total:8192) __REPRO: --softmax --axis=3 1x2x64x64
+1207:FAILED (errors:8192 total:8192) __REPRO: --softmax --axis=3 --inplace=false 1x2x64x64
+1214:FAILED (errors:8192 total:8192) __REPRO: --softmax --alg=LOGSOFTMAX --axis=3 1x2x64x64
+1215:FAILED (errors:8192 total:8192) __REPRO: --softmax --alg=LOGSOFTMAX --axis=3 --inplace=false 1x2x64x64

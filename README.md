@@ -1,6 +1,24 @@
 oneAPI Deep Neural Network Library (oneDNN)
 ===========================================
 
+### VE Aurora port : v1.4
+
+- nc++ full build OK: examples, tests, benchdnn targets all OK
+  (except one test that is no longer possible with 'vanilla' build)
+- still quite a bit of debug stuff in cmake stuff.
+- last set of nc++ bugs were: (i) complicated '&&' expressions misevaluated,
+  and (ii) vector VFCP compare with NaN gave wrong result.
+- older issues include workarounds for incorrect C++11 zero-initialization
+
+- current design can extend/replace files by adding to a ve/ subdirectory
+  if file mods are too ugly, or full of debug code.
+- cmake files need to be cleaned up (supporting just a few layers, for fast
+  compile, was only to shorten the hour-long compilation while debugging).
+
+- still have to change 'any' format to prefer (say) nchw, and retest.
+
+### Original README:
+
 > This software was previously known as
 > **Intel(R) Math Kernel Library for Deep Neural Networks (Intel(R) MKL-DNN)**
 > and

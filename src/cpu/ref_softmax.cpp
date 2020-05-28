@@ -27,35 +27,19 @@
 
 #include "cpu/ref_softmax.hpp"
 
-#if 0 // offset calc method : "normal" scalar memory_desc_wrapper
-#include "common/memory_desc_wrapper.hpp"
+// offset calc method : newer approaches...
 
-// no choice here: (we only have the original api)
-#define VECTOR_OFFSET_CALC1 0
-#define VECTOR_OFFSET_CALC2 0
-#define VECTOR_OFFSET_CALC3 0
-#define VECTOR_OFFSET_CALC4 0
-#define VECTOR_OFFSET_BWD 0
-
-#else // offset calc method : newer approaches...
 // Dense loops are OK, but calls to 'off_l' did not vectorize
-// Provide vectorizing alternatives:
-#include "common/ve/memory_desc_wrapper_opt_dev.hpp"
-#include "common/ve/memory_desc_wrapper_opt.hpp"
+//      VE speedup on sm.in: avg ~ 68x (at high channels can be 100-200x faster)
 
 // Choose vectorization
 //      default vectorization
+#include "common/ve/memory_desc_wrapper_opt.hpp"
 #define memory_desc_wrapper memory_desc_wrapper_opt
 //      experimental features
+//#include "common/ve/memory_desc_wrapper_opt_dev.hpp"
 //#define memory_desc_wrapper memory_desc_wrapper_opt_dev
 
-// allow using new 'vec_off_l' vectorized offset calc
-//      VE speedup on sm.in: avg ~ 68x (at high channels can be 100-200x faster)
-#define VECTOR_OFFSET_CALC1 1
-#define VECTOR_OFFSET_CALC2 1
-#define VECTOR_OFFSET_CALC3 1
-#define VECTOR_OFFSET_CALC4 1
-#define VECTOR_OFFSET_BWD 1
 // before code cleanup --> ve/dev/ref_softmax.cpp
 //
 // investigate whether nc++ uses 'shortloop' hint well
@@ -71,8 +55,6 @@
 // code for WHICH==0 removed [slower on VE] see src/common/ve/dev/
 #define WHICH 1 /* best setting for VE, 2 loop cases */
 
-#endif // offset calc method
-
 
 // enable the new offset calc methods...
 // XXX messy -- sometimes VE-specific, but sometimes want this for x86 too ?
@@ -81,16 +63,14 @@
 
 #if defined(__ve)
 // settings for VE [these also incorporate bug workarounds for nc++]
-#define VE_FWD_DENSE 1
 #define VE_FWD_GEN   1
-#define VE_BWD_DENSE 1
 #define VE_BWD_GEN   1
+#ifndef MVL
 #define MVL 256         /* max simd vector length */
+#endif
 #else
 // TODO test/adapt VE vectorization mods to x86 (perhaps only WHICH==2 case)
-#define VE_FWD_DENSE 0
 #define VE_FWD_GEN   0
-#define VE_BWD_DENSE 0
 #define VE_BWD_GEN   0
 #ifndef MVL
 #define MVL 32          /* x86 ~ 'simd vector length'*/
@@ -282,7 +262,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
             } else if( WHICH >= 1 && channels_ <= MEDIUM ) {
 #define Medium_ PragmaQuote(_NEC loop_count(MEDIUM))
                 size_t coff[MEDIUM];
-                if (VECTOR_OFFSET_CALC1 && channels_ > 1) {   //
+                if (channels_ > 1) {   //
                     dim_t l_off[MEDIUM];
                     // VREG(l_off); if can inline vec_off_l (asm?)
                     // logical offsets, "as if dense" inner dims
@@ -336,7 +316,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                 OUTER_ for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
                     dim_t data_off[MEDIUM];
                     int const cmax=( channels_ - c0 > MEDIUM? MEDIUM: channels_ - c0 );
-                    if (VECTOR_OFFSET_CALC3 && cmax > 1) {
+                    if (cmax > 1) {
                         dim_t l_off[MEDIUM]; // use cmax <= MEDIUM
                         Medium_ for (int c = 0; c < cmax; ++c)
                             l_off[c] = ou_in_offset + (c0 + c) * inner_size_;
@@ -354,7 +334,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                 OUTER_ for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
                     dim_t data_off[MEDIUM];
                     int const cmax=( channels_ - c0 > MEDIUM? MEDIUM: channels_ - c0 );
-                    if (VECTOR_OFFSET_CALC4 && cmax > 1) {
+                    if (cmax > 1) {
                         dim_t l_off[MEDIUM]; // use cmax <= MEDIUM
                         Medium_ for (int c = 0; c < cmax; ++c)
                             l_off[c] = ou_in_offset + (c0 + c) * inner_size_;
@@ -392,7 +372,7 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic(
                 OUTER_ for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
                     int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
                     dim_t data_off[MEDIUM];
-                    if (VECTOR_OFFSET_CALC3 && cmax > 1) {
+                    if (cmax > 1) {
                         dim_t l_off[MEDIUM]; // use cmax <= MEDIUM
                         Medium_ for (int c = 0; c < cmax; ++c)
                             l_off[c] = ou_in_offset + (c0 + c) * inner_size_;
@@ -545,7 +525,7 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
 #define Medium_ PragmaQuote(_NEC loop_count(MEDIUM))
                 dim_t diff_off[MEDIUM];
                 dim_t data_off[MEDIUM];
-                if (VECTOR_OFFSET_BWD && channels_ > 1) {
+                if (channels_ > 1) {
                     dim_t l_off[MEDIUM];
                     Medium_ for (int c = 0; c < channels_; ++c)
                         l_off[c] = ou_in_offset + c * inner_size_;
@@ -574,7 +554,7 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
                     dim_t diff_off[MEDIUM];
                     dim_t data_off[MEDIUM];
                     int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
-                    if (VECTOR_OFFSET_BWD && cmax > 1) {
+                    if (cmax > 1) {
                         dim_t l_off[MEDIUM];
                         Medium_ for (int c = 0; c < cmax; ++c)
                             l_off[c] = ou_in_offset + (c0 + c) * inner_size_;
@@ -596,7 +576,7 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
                     dim_t diff_off[MEDIUM];
                     dim_t data_off[MEDIUM];
                     int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
-                    if (VECTOR_OFFSET_BWD && cmax > 1) {
+                    if (cmax > 1) {
                         dim_t l_off[MEDIUM];
                         Medium_ for (int c = 0; c < cmax; ++c)
                             l_off[c] = ou_in_offset + (c0 + c) * inner_size_;
@@ -643,7 +623,7 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
                 dim_t diff_off[MEDIUM];
                 dim_t data_off[MEDIUM];
                 float data_exp[MEDIUM];
-                if (VECTOR_OFFSET_BWD && channels_ > 1) {
+                if (channels_ > 1) {
                     dim_t l_off[MEDIUM];
                     Medium_ for (int c = 0; c < channels_; ++c)
                         l_off[c] = ou_in_offset + c * inner_size_;
@@ -679,7 +659,7 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
                 for (int c0 = 0; c0 < channels_; c0+=MEDIUM) {
                     dim_t diff_off[MEDIUM];
                     int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
-                    if (VECTOR_OFFSET_BWD && cmax > 1) {
+                    if (cmax > 1) {
                         dim_t l_off[MEDIUM];
                         Medium_ for (int c = 0; c < cmax; ++c)
                             l_off[c] = ou_in_offset + (c0 + c) * inner_size_;
@@ -699,7 +679,7 @@ void ref_softmax_bwd_t<data_type>::execute_backward_generic(
                     dim_t data_off[MEDIUM];
                     float data_exp[MEDIUM];
                     int const cmax=( c0 < channels_- MEDIUM? MEDIUM: channels_ - c0 );
-                    if (VECTOR_OFFSET_BWD && cmax > 1) {
+                    if (cmax > 1) {
                         dim_t l_off[MEDIUM];
                         Medium_ for (int c = 0; c < cmax; ++c)
                             l_off[c] = ou_in_offset + (c0 + c) * inner_size_;

@@ -95,6 +95,7 @@ struct nhwc_pooling_fwd_t : public primitive_t {
     typedef typename prec_traits<data_type::f32>::type ker_data_t;
 
     virtual status_t execute(const exec_ctx_t &ctx) const override {
+        //printf("nhwc-pool-execute!!!\n");
         execute_forward(ctx);
         return status::success;
     }
@@ -156,11 +157,16 @@ private:
                 }
 #endif
             }
-            // update maximum
 #if !defined(__ve)
-            dst[oc] = nstl::max(s, mv);
+            // update maximum
+            dst[oc] = nstl::max(s, mv); // __ve bug!
 #else
             if (s > mv) dst[oc] = s; // vectorizes correctly
+#if 0
+            // adding following print "fixes" VE
+            printf("oc=%d, src[oc] s=%g, dst[oc] mv=%g --> %g\n",
+                   oc,(double)s,(double)mv,(double)(dst[oc]));
+#endif
 #endif
         }
     }
