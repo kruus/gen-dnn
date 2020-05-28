@@ -1,41 +1,34 @@
 # Generic MKL-DNN for vector compilers
 
-### Note: Proposed "cross-platform" branch
-
-A prototype that will slowly conform to discussion of
-https://github.com/intel/mkl-dnn/issues/664
-is on
-https://github.com/necla-ml/gen-dnn/tree/vanilla-pull,
-which has a much-reduced number of diffs from intel mkl-dnn master.
-
-It is runs through all examples, tests and gtests and benchdnn, in a
-default build, a VANILLA build, and a default build with CPU dispatch
-to VANILLA.  It's intent is to be **"close to cross-platform"**, reducing
-the amount of customization required to get a working API for a cmake
-toolchain-file build.
-
-While the reference gemm and parallel_nd provide a respectable baseline speed,
-performance is *not* the primary goal.
-
-There were some segfaults in benchdnn related to
-test_benchdnn_concat, but these also occured in intel master code.
-
-Implementation-wise, the main difference I saw between VANILLA build and default
-`make` test_benchdnn_\* targets in terms of benchdnn passed/skipped/... stats
-are in `test_benchdnn_regression`:
-vanilla:
-~~~
-+ make -C build-gen test_benchdnn_regression
-tests:402 passed:376 skipped:13 mistrusted:7 unimplemented:6 failed:0 listed:0
-tests:368 passed:184 skipped:184 mistrusted:0 unimplemented:0 failed:0 listed:0
-~~~
-cf. default jit build
-~~~
-tests:402 passed:386 skipped:3 mistrusted:7 unimplemented:6 failed:0 listed:0
-tests:368 passed:276 skipped:92 mistrusted:0 unimplemented:0 failed:0 listed:0
-~~~
-
 ### Beware:  The master branch is now historical (at v0.16 mkl-dnn API)
+Support for the NEC SX mainframe build has been dropped (sxcc and sxc++)
+
+### Branch vanilla-dbg (new development tip)
+
+Branches based on v1.0+ support only NEC SX-Aurora TSUBASA chip, using
+the ncc/nc++ compiler.
+
+This began as a proposed "cross-platform" branch, but a subdirectory-based
+structure was adopted instead.  So now this branch is the **current development**
+tip, based on OneDNN v1.4.
+
+- **nc++ full build OK**: examples, tests, benchdnn targets all OK
+  (except one test that is no longer possible with 'vanilla' build)
+  - note: full test requires ~ 6 hr or so to run all benchdnn targets
+  
+- still quite a bit of debug stuff in cmake stuff.
+- last set of nc++ bugs were: (i) complicated '&&' expressions misevaluated,
+  and (ii) vector VFCP compare with NaN gave wrong result.
+- older issues include workarounds for incorrect C++11 zero-initialization
+
+- current design can extend/replace files by adding to a ve/ subdirectory
+  if file mods are too ugly, or full of debug code.
+- cmake files need to be cleaned up (supporting just a few layers, for fast
+  compile, was only to shorten the hour-long compilation while debugging).
+
+- still have to change 'any' format to prefer (say) nchw, and retest.
+
+### other branches (keeping up with master, but still some tests failing)
 
 DNNL v1.0+ ports disable rnn support for vanilla compiles,
 mainly awaiting ref impls for some jit-only post-ops cases.
@@ -62,10 +55,7 @@ DNNL (v1.0+) branches:
     * Add a non-default cmake option to support runtime CPU dispatch
       all the way down to 'vanilla'
 
-### This fork of MKL-DNN provides the same API for non-Intel chips, targeting:
-
-* NEC SX-Aurora TSUBASA chip, ncc compiler
-* NEC SX,            sxcc compiler (deprecated)
+### General NEC VE Aurora comments
 
 It provides a "vanilla" build that removes Intel-specific JIT instructions
 as well as an Aurora build with a few optimized instructions for Aurora.
@@ -78,13 +68,11 @@ for several primitives via the hand-coded VEDNN library.
 We plan to develop some simple jit examples for convolutions on NEC's Aurora
 chip.
 
-Last merge with upstream was around v0.16 of mkl-dnn (~ Sept 2018)
-* This fork: [gen-dnn Github URL](https://github.com/necla-ml/gen-dnn)
 * Upstream: [mkl-dnn Github URL](https://github.com/intel/mkl-dnn)
 
 [Erik Kruus, NEC Labs America]
 
-### Getting started on NEC Aurora
+### Getting started on NEC Aurora (v0.16 instructions)
 
 First untar the `ve*.tar.gz` tarballs at the top level of the source directory.
 VEDNN contains optimized implementations of various convolution kernels.
@@ -93,6 +81,10 @@ VEDNN contains optimized implementations of various convolution kernels.
 tar xvfz vednnx.tar.gz
 tar xvfz vejit.tar.gz
 ```
+
+(**v1.0+** note if using more modern branches: using these optimized kernels and libraries
+needs to be re-introduced. Use `./build.sh -h` for some help about new build options for VE.
+Perhaps try `./build.sh -att` to get started with a default build and run a few sanity checks)
 
 Before building, make sure `CC` and `CXX` are set to `ncc` and `nc++`
 and that they are in your path.  Also, `NLC_HOME` must be set
