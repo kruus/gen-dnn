@@ -23,12 +23,26 @@
 #include "cpu/cpu_memory_storage.hpp"
 #include "cpu/cpu_stream.hpp"
 
+#if 0 && DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP
+#include <iostream>
+#include <iomanip>
+#endif
+
 namespace dnnl {
 namespace impl {
 namespace cpu {
 
 cpu_engine_t::cpu_engine_t()
     : engine_t(engine_kind::cpu, get_default_runtime(engine_kind::cpu)){
+#if 0 &&  DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP
+        using namespace std;
+#define SHOW(X) cout<<right<<setw(40)<<(#X)<<" : "<<X<<endl;
+        SHOW(omp_get_max_threads());
+        SHOW(omp_get_num_procs());
+        SHOW(omp_get_num_threads());
+        SHOW(omp_get_thread_num());
+        SHOW(omp_in_parallel());
+#endif
     }
 
 status_t cpu_engine_t::create_memory_storage(

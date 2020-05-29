@@ -16,6 +16,11 @@ CXXFLAGS+= -I../build-vejd/include # adjust this for dnnl_config.h
 CXXFLAGS+= -fdiag-inline=2 -fdiag-vector=2 -fdiag-parallel=2 -report-all
 CXXFLAGS+= -std=gnu++11 -O2
 CXXFLAGS+= -ffast-math
+CXXFLAGS+= -fopenmp
+thr: thr.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@.o
+	$(CXX) -fopenmp $@.o -o $@
+	./$@
 sr: sr.cpp
 	$(CXX) $(CXXFLAGS) -S $< -o $<.s
 	$(CXX) $(CXXFLAGS) $< -o $@

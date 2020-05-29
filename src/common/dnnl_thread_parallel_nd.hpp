@@ -76,12 +76,15 @@ void parallel(int nthr, F f) {
         return;
     }
 #if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP
-#if 0 && !defined(NDEBUG) && defined(__ve)
+#if 1 && !defined(NDEBUG) && defined(__ve)
     if (omp_in_parallel()){
         printf(" warning: nested parallelism - pre-existing nthr=%d"
                " may not get desired nthr=%d",
                omp_get_num_threads(), nthr);
     }
+    //printf(" ask-nthr=%d,max_threads=%d\n",(int)nthr,(int)dnnl_get_max_threads());
+    // oh, we might not have dnnl_thread.hpp included...
+    //printf(" ask-nthr=%d,max_threads=%d\n",(int)nthr,(int)omp_get_max_threads());
 #endif
 #pragma omp parallel num_threads(nthr)
     {

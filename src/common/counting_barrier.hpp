@@ -22,6 +22,7 @@
 #include <mutex>
 #include <thread>
 #include <condition_variable>
+#include "assert.h"
 
 namespace dnnl {
 namespace impl {

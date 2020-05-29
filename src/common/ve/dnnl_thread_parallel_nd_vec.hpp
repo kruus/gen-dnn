@@ -17,7 +17,7 @@
 #ifndef COMMON_DNNL_THREAD_PARALLEL_ND_HPP
 #define COMMON_DNNL_THREAD_PARALLEL_ND_HPP
 
-/* This header must be included by dnnl_thread_parallel_nd.hpp only */
+/* WIP This header must be included by dnnl_thread_parallel_nd.hpp only */
 
 /* Functions:
  *  This EXTENDS parallelization to vectorized functions of a few "dimensions"

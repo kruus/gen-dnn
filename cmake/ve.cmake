@@ -957,7 +957,6 @@ function(VE_PARANOID_RPATH)
         SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
     ENDIF("${isSystemDir}" STREQUAL "-1")
 
-
     # ; --> : and prepend -Wl,-rpath-link [or -Wl,-rpath]
     VE_JOIN("${_nlc_ldlibrarypath}" "${CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG_SEP}" _nlc_ldlibrarypath)
     #message(STATUS "                       _nlc_ldlibrarypath = ${_nlc_ldlibrarypath}")
