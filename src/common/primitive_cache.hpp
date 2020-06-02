@@ -19,6 +19,9 @@
 
 #include "dnnl_config.h"
 //#ifdef DNNL_ENABLE_PRIMITIVE_CACHE
+// ACTUALLY, should further stub-ify if provide dnnl.h/dnnl.hpp API functions
+//      dnnl_set_primitive_cache_capacity
+//      dnnl_get_primitive_cache_capacity
 
 #include <list>
 #include <memory>
@@ -115,14 +118,16 @@ private:
     std::unordered_map<key_t, cache_list_t::iterator> cache_mapper_;
 };
 
+//#ifdef DNNL_ENABLE_PRIMITIVE_CACHE
 lru_primitive_cache_t &primitive_cache();
+//#endif
 
 // undocumented API, for testing only
 status_t DNNL_API get_primitive_cache_size(int *size);
 
 } // namespace impl
 } // namespace dnnl
-#endif // DNNL_ENABLE_PRIMITIVE_CACHE
-//#endif // PRIMITIVE_CACHE_HPP
+//#endif // DNNL_ENABLE_PRIMITIVE_CACHE
+#endif // PRIMITIVE_CACHE_HPP
 
 // vim: et ts=4 sw=4 cindent cino^=l0,\:0,N-s

@@ -204,5 +204,8 @@ if(DNNLPRIM_LOGSOFTMAX OR DNNLPRIM_SOFTMAX)
     set(DNNLPRIM_SOFTMAX ON)
     set(DNNLPRIM_LOGSOFTMAX ON)
 endif()
+if(DNNLPRIM_LRN)
+    set(DNNLPRIM_SUM ON)
+endif()
 
 # vim: ts=4 sw=4 et

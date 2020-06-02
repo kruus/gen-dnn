@@ -24,6 +24,9 @@
 #include "c_types_map.hpp"
 #include "memory_storage.hpp"
 #include "memory_tracking.hpp"
+#ifdef DNNL_ENABLE_PRIMITIVE_CACHE
+#include "primitive_cache.hpp"
+#endif
 #include "primitive_desc.hpp"
 #include "primitive_exec_types.hpp"
 #include "rw_mutex.hpp"

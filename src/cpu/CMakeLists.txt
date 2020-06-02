@@ -36,6 +36,7 @@ else() ####### CLEARLY WRONG AFTER DIRECTORY REORGANIZATION
         ${CMAKE_CURRENT_SOURCE_DIR}/cpu_sum.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/cpu_reorder.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/cpu_concat.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/platform.cpp
         )
     if(TARGET_X86_JIT)
         append_subdir_recurse(SOURCES_CORE xbyak)
@@ -152,15 +153,7 @@ else() ####### CLEARLY WRONG AFTER DIRECTORY REORGANIZATION
         append_glob_jit(SOURCES_PRIM
             ${CMAKE_CURRENT_SOURCE_DIR}/jit*_lrn*
             )
-    endif()
-    if(DNNLPRIM_ALL OR DNNLPRIM_LRN)
-        append_glob(SOURCES_PRIM
-            ${CMAKE_CURRENT_SOURCE_DIR}/ref_lrn*
-            ${CMAKE_CURRENT_SOURCE_DIR}/cpu_lrn*
-            )
-        append_glob_jit(SOURCES_PRIM
-            ${CMAKE_CURRENT_SOURCE_DIR}/jit*_lrn*
-            )
+        set(_gemm ON) # dnnl::impl::cpu::sgemm_pack, gemm_s8u8s32_pack (for primitives test)
     endif()
     if(DNNLPRIM_ALL OR DNNLPRIM_MATMUL)
         append_subdir_recurse(SOURCES_CORE matmul)
@@ -299,6 +292,41 @@ endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 if(TARGET_X86_JIT)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/xbyak)
+endif()
+if(NECVE)
+    file(GLOB SOURCES_VE
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.cpp
+        )
+    # Same-Name cpp files in subdirectory REPLACE parent ones:
+    #   some cpu-specific code / optimization is too ugly!
+    string(REPLACE "/ve/" "/" x_ "${SOURCES_VE}")
+    list(REMOVE_ITEM SOURCES ${x_})
+
+    message(STATUS "SOURCES_VE      ${SOURCES_VE}")
+    # add VE files to [maybe shortened] SOURCES
+    file(GLOB HEADERS_VE
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.hpp
+        )
+    list(APPEND SOURCES ${SOURCES_VE} ${HEADERS_VE})
+    # note: headers do not REPLACE because of likelihood of confusion
+    #     : parent xxx.hpp header must include the ve/xxx.hpp one case by case
+
+    set_source_files_properties(${SOURCES_VE} PROPERTIES COMPILE_FLAGS
+        "-I${CMAKE_CURRENT_SOURCE_DIR}/ve -I${CMAKE_CURRENT_SOURCE_DIR}")
+else()
+    # perhaps allow testing some ve/ enhancements on x86
+    # [OK to never make use of these]
+    #list(APPEND SOURCES_VE
+    #    ${CMAKE_CURRENT_SOURCE_DIR}/ve/memory_desc_wrapper_opt.hpp
+    #    ${CMAKE_CURRENT_SOURCE_DIR}/ve/memory_desc_wrapper_opt.cpp
+    #    ${CMAKE_CURRENT_SOURCE_DIR}/ve/ve_fastdiv.h
+    #    ${CMAKE_CURRENT_SOURCE_DIR}/ve/ve_fastdiv.c
+    #    )
+    #set_source_files_properties(${SOURCES_VE} PROPERTIES COMPILE_FLAGS
+    #    "-I${CMAKE_CURRENT_SOURCE_DIR}/ve -I${CMAKE_CURRENT_SOURCE_DIR}")
+    #list(APPEND SOURCES ${SOURCES_VE})
 endif()
 
 # Don't build sources from linux_perf direcotry if JIT Profiling isn't enabled.

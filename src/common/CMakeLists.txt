@@ -21,36 +21,14 @@ if(DNNLPRIM_ALL)
         ${CMAKE_CURRENT_SOURCE_DIR}/*.c
         ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
         )
-    if(NECVE)
-        file(GLOB SOURCES_VE
-            ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.hpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.c
-            ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.cpp
-            )
-        # Same-Name files in subdirectory REPLACE parent ones:
-        #   some cpu-specific code / optimization is too ugly!
-        string(REPLACE "/ve/" "/" x_ "${SOURCES_VE}")
-        list(REMOVE_ITEM SOURCES ${x_})
-
-        message(STATUS "SOURCES_VE      ${SOURCES_VE}")
-        # add VE files to [maybe shortened] SOURCES
-        list(APPEND SOURCES ${SOURCES_VE})
-
-        set_source_files_properties(${SOURCES_VE} PROPERTIES COMPILE_FLAGS
-            "-I${CMAKE_CURRENT_SOURCE_DIR}/ve -I${CMAKE_CURRENT_SOURCE_DIR}")
-    else()
-        # optional enhancement: vectorized offset calculations:
-        # [OK to never make use of these]
-        list(APPEND SOURCES_VE
-            ${CMAKE_CURRENT_SOURCE_DIR}/ve/memory_desc_wrapper_opt.hpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/ve/memory_desc_wrapper_opt.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/ve/ve_fastdiv.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/ve/ve_fastdiv.c
-            )
-        set_source_files_properties(${SOURCES_VE} PROPERTIES COMPILE_FLAGS
-            "-I${CMAKE_CURRENT_SOURCE_DIR}/ve -I${CMAKE_CURRENT_SOURCE_DIR}")
-        list(APPEND SOURCES ${SOURCES_VE})
+    if(NOT DNNL_ENABLE_PRIMITIVE_CACHE)
+        # x86 jit uses primitive_hashing.  Can we skip primitive_cache entirely?
+        # Kinda' -- public API **could** use a much smaller stub, since only
+        #      dnnl_set_primitive_cache_capacity
+        #      dnnl_get_primitive_cache_capacity
+        # are officially needed. `primitive_cache.[hc]pp` can be emptier.
+        # TODO More complete stub-ification of primitive_cache.[hc]pp ?
+        #list(REMOVE_ITEM SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/primitive_cache.cpp)
     endif()
 else() # Debug: include primitives piecewise into libdnnl
     file(GLOB SOURCES_CORE
@@ -91,6 +69,7 @@ else() # Debug: include primitives piecewise into libdnnl
         ${CMAKE_CURRENT_SOURCE_DIR}/primitive_iterator.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/primitive_iterator.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/query.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/rw_mutex.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/scratchpad.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/scratchpad.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/stream.cpp
@@ -102,22 +81,28 @@ else() # Debug: include primitives piecewise into libdnnl
         ${CMAKE_CURRENT_SOURCE_DIR}/verbose.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/z_magic.hpp
         # jit convolutions require primitive_hashing::key_t
-        ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.cpp
+        # for now, primtiive_cache.hpp/cpp are "fat" stubs...
+        ${CMAKE_CURRENT_SOURCE_DIR}/primitive_cache.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/primitive_cache.cpp
         )
-    if(DNNL_ENABLE_PRIMITIVE_CACHE)
-        list(APPEND SOURCES_CORE 
-            ${CMAKE_CURRENT_SOURCE_DIR}/primitive_cache.hpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.hpp
-            )
-    elseif(TARGET_X86_JIT AND (DNNLPRIM_ALL OR DNNLPRIM_CONVOLUTION))
-        # jit convolutions require primitive_hashing::key_t
-        list(APPEND SOURCES_CORE 
-            ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.hpp
-            )
-    endif()
+    # if primitive_cache.hpp/cpp become "thin" stubs again...
+    # and non-x86 has no jit cache...  (OLD gen-dnn approach)
+    #if(DNNL_ENABLE_PRIMITIVE_CACHE)
+    #    list(APPEND SOURCES_CORE 
+    #        ${CMAKE_CURRENT_SOURCE_DIR}/primitive_cache.hpp
+    #        ${CMAKE_CURRENT_SOURCE_DIR}/primitive_cache.cpp
+    #        ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.cpp
+    #        ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.hpp
+    #        )
+    #elseif(TARGET_X86_JIT AND (DNNLPRIM_ALL OR DNNLPRIM_CONVOLUTION))
+    #    # jit convolutions require primitive_hashing::key_t
+    #    list(APPEND SOURCES_CORE 
+    #        ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.cpp
+    #        ${CMAKE_CURRENT_SOURCE_DIR}/primitive_hashing.hpp
+    #        )
+    #endif()
 
     unset(SOURCES_PRIMITIVES)
 
@@ -159,6 +144,39 @@ else() # Debug: include primitives piecewise into libdnnl
     message(STATUS "\nsources common prim:\n${SOURCES_PRIMITIVES}\n")
     message(STATUS "\nsources common     :\n${SOURCES}\n")
  
+endif()
+
+# for simplicity let's include the ve/ stuff "as in full build"
+if(NECVE)
+    file(GLOB SOURCES_VE
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.cpp
+        )
+    # Same-Name files in subdirectory REPLACE parent ones:
+    #   some cpu-specific code / optimization is too ugly!
+    string(REPLACE "/ve/" "/" x_ "${SOURCES_VE}")
+    list(REMOVE_ITEM SOURCES ${x_})
+
+    message(STATUS "SOURCES_VE      ${SOURCES_VE}")
+    # add VE files to [maybe shortened] SOURCES
+    list(APPEND SOURCES ${SOURCES_VE})
+
+    set_source_files_properties(${SOURCES_VE} PROPERTIES COMPILE_FLAGS
+        "-I${CMAKE_CURRENT_SOURCE_DIR}/ve -I${CMAKE_CURRENT_SOURCE_DIR}")
+else()
+    # optional enhancement: vectorized offset calculations:
+    # [OK to never make use of these]
+    list(APPEND SOURCES_VE
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/memory_desc_wrapper_opt.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/memory_desc_wrapper_opt.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/ve_fastdiv.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/ve_fastdiv.c
+        )
+    set_source_files_properties(${SOURCES_VE} PROPERTIES COMPILE_FLAGS
+        "-I${CMAKE_CURRENT_SOURCE_DIR}/ve -I${CMAKE_CURRENT_SOURCE_DIR}")
+    list(APPEND SOURCES ${SOURCES_VE})
 endif()
 
 set(OBJ_LIB ${LIB_NAME}_common)

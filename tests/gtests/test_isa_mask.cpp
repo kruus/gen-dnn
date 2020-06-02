@@ -20,9 +20,30 @@
 #include "gtest/gtest.h"
 
 #include "dnnl.hpp"
+
+#if defined(__ve)
+// reinstate this test for VE! TODO
+#else
 #include "src/cpu/x64/cpu_isa_traits.hpp"
+#endif
 
 namespace dnnl {
+
+#if defined(__ve)
+class isa_test : public ::testing::TestWithParam<cpu_isa> {
+protected:
+    virtual void SetUp() {
+        printf(" test_isa_mask REMOVED for VE (temporarily)\n");
+        ASSERT_TRUE(true);
+    }
+};
+
+TEST_P(isa_test, TestISA) {}
+INSTANTIATE_TEST_SUITE_P(TestISACompatibility, isa_test
+        //, ::testing::Values(); // TODO test VE generic vs vednn vs vejit
+        );
+
+#else // x86 original
 
 using namespace impl::cpu::x64;
 
@@ -37,6 +58,9 @@ struct isa_compat_info {
 // This mostly duplicates isa_traits, but the idea is to *not* rely on that
 // information...
 static std::map<cpu_isa, isa_compat_info> isa_compatibility_table = {
+#if defined(__ve)
+        ::testing::Values(); // TODO test VE generic vs vednn vs vejit
+#else
         {cpu_isa::sse41, {sse41, {sse41}}},
         {cpu_isa::avx, {avx, {sse41, avx}}},
         {cpu_isa::avx2, {avx2, {sse41, avx, avx2}}},
@@ -52,6 +76,7 @@ static std::map<cpu_isa, isa_compat_info> isa_compatibility_table = {
                 {avx512_core_bf16,
                         {sse41, avx, avx2, avx512_core, avx512_core_vnni,
                                 avx512_core_bf16}}},
+#endif
 };
 
 class isa_test : public ::testing::TestWithParam<cpu_isa> {
@@ -82,9 +107,15 @@ protected:
 
 TEST_P(isa_test, TestISA) {}
 INSTANTIATE_TEST_SUITE_P(TestISACompatibility, isa_test,
+#if defined(__ve)
+        ::testing::Values(); // TODO test VE generic vs vednn vs vejit
+#else
         ::testing::Values(cpu_isa::sse41, cpu_isa::avx, cpu_isa::avx2,
                 cpu_isa::avx512_mic, cpu_isa::avx512_mic_4ops,
                 cpu_isa::avx512_core, cpu_isa::avx512_core_vnni,
-                cpu_isa::avx512_core_bf16));
+                cpu_isa::avx512_core_bf16)
+#endif
+        );
+#endif // this test has been completely excised [temporarily]
 
 } // namespace dnnl

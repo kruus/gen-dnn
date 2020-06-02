@@ -21,6 +21,7 @@
 namespace dnnl {
 namespace impl {
 
+// XXX primitive_cache() is not in public API, remove entirely if disabled?
 lru_primitive_cache_t &primitive_cache() {
 #ifdef DNNL_ENABLE_PRIMITIVE_CACHE
     static const int capacity

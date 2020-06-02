@@ -90,7 +90,10 @@ if(DNNLPRIM_ALL)
 else() # THIS MIGHT BE ALL WRONG NOW [ejk]
     if(TRUE)
         append_glob(PRIM_TEST_CASES_SRC
-            test_isa*.cpp
+            # in v1.4 need to rethink isa_mask and isa_iface for VE
+            #test_isa_iface*.cpp
+            test_isa_mask*.cpp
+
             test_dnnl_threading.cpp
             test_dnnl_memory.cpp
             )
