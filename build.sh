@@ -647,7 +647,8 @@ echo 'ulimit soft : '`ulimit -Ss`
             #ccxx_flags -ftrace
             # at some point above was sufficent (ve.cmake) set things
             # TODO have ve.cmake etc do this NICELY with a cmake option...
-            VEPERF_DIR="/usr/uhome/aurora/mpc/pub/veperf/180218-ELF"
+            #VEPERF_DIR="/usr/uhome/aurora/mpc/pub/veperf/180218-ELF"
+            VEPERF_DIR="/usr/uhome/aurora/mpc/pub/veperf/latest"
             VEPERF_INC_DIR="${VEPERF_DIR}/include"
             VEPERF_LIB_DIR="${VEPERF_DIR}/lib"
             ccxx_flags "-I${VEPERF_INC_DIR} -DFTRACE -ftrace"
