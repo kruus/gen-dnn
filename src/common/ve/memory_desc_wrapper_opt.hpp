@@ -24,6 +24,223 @@
 namespace dnnl {
 namespace impl {
 
+#ifndef MVL
+#if defined(__ve)
+#define MVL 256
+#else // x86?
+#define MVL 32
+#endif
+#endif
+
+/** memory-backed replacement for <TT>a set of vector registers</TT>.
+ *
+ * In assembler, this would be a set of vector registers where dim-wise
+ * vectors could be selected by the VIDX register.
+ *
+ * In C++, these may still generate vector-load vector-store at entry/end
+ * of code blocks. nc++ support for the old SX vreg/alloc_on_vreg
+ * pragmas seems to have slipped.
+ *
+ * We use \c unsigned by default because many of the 'modulo' and 'division'
+ * algs break with \c C rounding conventions.  "Arithmetic rounding"
+ * (round toward -inf) is suitable for signed tensor indexing calcs.
+ * OneDNN tends to use 'int', which will behave unexpectedly when
+ * offsets/indices are negative.  OTOH, using \c int allows easy reverse
+ * loops, like `for(int i=3; i>=0; --i);`.
+ *
+ * Choose \c Crd to match your arithmetic requirements.  Even if 32-bit might
+ * suffice, Crd=uint64_t may reduce 32-to-64-bit conversions in inner loops.
+ */
+template<typename Crd = unsigned, unsigned MaxDims = DNNL_MAX_NDIMS>
+struct CoordRegs {
+    static constexpr unsigned MaxVl = MVL;
+    static constexpr unsigned nd = MaxDims; // useful if "exactly sized" at compile time
+    Crd vp[MaxDims][MaxVl];
+};
+
+/** Compile-time dim helper to produce coordinate vectors of compile-time
+ * dimension.  This can represent vectors of coords produced from nested
+ * for loops, batched to fit into your SIMD vector length.
+ *
+ * - init with arrays of lo[dim], hi[dim] nested-for-loop-limits
+ * - produces batches of for-loop-coordinate "vectors" sized to
+ *   fit in your SIMD length.
+ * - can use '++' and 'operator bool' to produce all the simd-batched
+ *   coords that the for loop would cover, in for loop order
+ *
+ * - intended as a use for physical-offset calculation to streamline
+ *   memory_desc_wrapper_opt conversion of logical coords to physical
+ *   offset (repecting complex memory blockings/padding).
+ * - "logical" outputs are fully independent of any particular memory layout.
+ *
+ * Example:
+ *
+ * Representing ordering of `for(0..4) for(0..3) for(0..2)`,
+ * ```
+ * for(auto c = CoordsFor<3>{{0,0,0},{4,3,2}}; c; ++c)
+ *     cout<<c.coord_str("c")<<endl;
+ * ```
+ * would, if your simd length were 7, produce coordinate output:
+ * ```
+ * c[3][vl=7]~{{0,0,0},{0,0,1},{0,1,0},{0,1,1},{0,2,0},{0,2,1},{1,0,0}}
+ * c[3][vl=7]~{{1,0,1},{1,1,0},{1,1,1},{1,2,0},{1,2,1},{2,0,0},{2,0,1}}
+ * c[3][vl=7]~{{2,1,0},{2,1,1},{2,2,0},{2,2,1},{3,0,0},{3,0,1},{3,1,0}}
+ * c[3][vl=3]~{{3,1,1},{3,2,0},{3,2,1}}
+ * ```
+ * Memory order is transpose of coord-view printout, so initial c.vp[0] is
+ * 7 contiguous values, {0,0,0,0,0,0,1}, six (3*2) zeros, then one.
+ *
+ * - Unfortunately, nc++ might not optimize away the memory and use
+ * vector registers, as you would naturally do in JIT (or if vreg or
+ * alloc_on_vreg pragmas worked).
+ *
+ * - also have runtime 'dim' version in dev/, if nec.
+ */
+template<unsigned dim, typename Crd = unsigned, typename Pos=size_t>
+struct CoordsFor : public CoordRegs<Crd,dim> {
+    typedef CoordRegs<Crd,dim> Base;
+    private:
+    static typename std::array<Crd,dim> getspan(std::array<Crd,dim>& h, std::array<Crd,dim>& l) {
+        std::array<Crd,dim> ret;
+        for(unsigned d=0U; d<dim; ++d) {
+            ret[d] = h[d] - l[d];
+        }
+        return ret;
+    }
+    public:
+    /// General constructor
+    CoordsFor( std::array<Crd,dim>&& lo, std::array<Crd,dim>&& hi, size_t pos=0 )
+        : vl(0), ilo{lo}
+        , ihi{hi} // maybe don't keep this ?
+        , span{getspan(ihi,ilo)}
+        , sz(1), pos(pos) {
+            for(unsigned d=0U; d<dim; ++d) {
+                //span[d] =  ihi[d] - ilo[d]; 
+                sz *= ihi[d] - ilo[d];
+            }
+#ifndef NDEBUG
+            for(unsigned d=0U; d<dim; ++d) assert( ihi[d] >= ilo[d] );
+            // Following might be intentional, so not an error:
+            //if (sz == 0) printf("Warning: zero-size CoordsVP3\n");
+#endif
+            init(pos); // expect pos=0
+        }
+
+    // easy access to base().vp, for invoking memory_desc_wrapper_opt::vec_off_v,
+    // which can bow be made a public member (with a few mods)
+    Base const& base() const { return *this; }
+
+    /// allow syntax `for(auto CoordsFor<2> c({h_st,w_st},{h_en,w_en}); c; ++c){}`
+    operator bool() const { return vl > 0; }
+    operator ++() { this->step(); return *this; }
+
+    /// If get_vl(), then we have something in this->vp to process.
+    /// Use `step()` which returns true and next batch (or false).
+    unsigned get_vl()  const {return vl;}
+    unsigned constexpr get_dim() const {return dim;}
+    std::array<Crd,dim> const& get_lo() const { return ilo; }
+    std::array<Crd,dim> const& get_hi() const { return ihi; }
+    // unchecked lo for loop limit
+    //Crd get_lo(unsigned const d)  const { return ilo[d]; }
+    //Crd get_hi(unsigned const d)  const { return ihi[d]; }
+    /** init at linear iter pos, shorten vl from MaxVl if pos+vl "past end".
+     * Produces coord vectors in nested-for-loop-order.
+     * Note diff with off_l_vec API where a vector of `lin` values are input.
+     * \return true iff remaining iteration length vl > 0.
+     */
+    bool init(Pos lin){
+        if(lin >= sz){
+            //cout<<" lin="<<lin<<" > sz="<<sz<<endl;
+            pos = sz;
+            vl = 0;
+            return false;
+        }
+        pos = lin;
+        vl = MVL;
+        if(pos + vl > sz){
+            //cout<<" [pos+vl="<<pos<<"+"<<vl<<"] > [sz="<<sz<<"]"<<endl;
+            vl = sz - pos;
+        }
+        assert( vl > 0 );
+        Pos carry[Base::MaxVl]; VREG(carry); // it would be nice if this forced tmp vec reg!
+        for(unsigned i=0U; i<vl; ++i)
+            carry[i] = pos+i;
+        NOVEC_ for(unsigned d = dim; d--; ) {
+            auto const span = ihi[d] - ilo[d];
+            for(unsigned i=0U; i<vl; ++i){
+                (this->vp)[d][i] = ilo[d] + carry[i] % span;
+                carry[i] = carry[i] / span;
+            }
+        }
+        return true;
+    }
+    /** set next coord vectors at linear pos+vl.
+     * \return true iff remaining iteration lenght vl > 0 */
+    bool step(){
+#ifndef NDEBUG
+        if (pos < sz ) assert( vl > 0 );
+#endif
+        return pos < sz? init(pos + vl): false;
+    }
+    /** Maybe "extend" at linear iter pos, increasing existing vl up to MVL.
+     * Keeps old set of vl coords. Possible to extend by zero new coords if vl==MVL already!
+     * Check that `vl+sz<=MVL` if you need all coords to fit with no `step`.
+     * \b Untested.
+     * \return true iff some coords were be added.
+     *
+     * Idea: in some cases you might 'pack' sets of loops into a longer vector?
+     * Problem: How to efficiently unpack/mask the sets later.
+     */
+    bool extend(Pos lin){
+        if(lin >= sz || vl >= MVL){
+            return false;
+        }
+        pos = lin;
+        auto addvl = sz - lin;
+        assert( addvl > 0 );
+        if (vl + addvl >= MVL) addvl = MVL - vl;
+        for(unsigned i=0U; i<addvl; ++i){
+            uint64_t carry = pos+i;
+            uint64_t mod;
+            for(unsigned d = dim; d--; ) {
+                auto const span = ihi[d] - ilo[d];
+                mod   = carry % span;
+                carry = carry / span;
+                vp[d][vl+i] = ilo[d] + mod;
+            }
+        }
+        vl += addvl;
+        return true;
+    }
+    public:
+    /** terse output of current 'vp' coordinate vectors. */
+    std::string coord_str(char const* pfx="crd") {
+        std::ostringstream oss;
+        auto const& c = base();
+        oss<<pfx<<"["<<dim<<"][vl="<<vl<<"]~{";
+        for(unsigned v=0; v<vl; ++v){
+            if(v < 5 || v > vl - 5){
+                oss<<(v>0? ",":"")<<"{";
+                for(unsigned d=0; d<dim; ++d){
+                    oss<<(d>0? ",":"")<<c.vp[d][v];
+                }
+                oss<<"}";
+            }else if(v==5) oss<<"...";
+        }
+        oss<<"}";
+        return oss.str();
+    }
+    private:
+    //unsigned dim;               ///< 0..DNNL_MAX_NDIMS
+    unsigned vl;                ///< 0..MVL
+    std::array<Crd,dim> ilo;
+    std::array<Crd,dim> ihi;
+    std::array<Crd,dim> span;
+    Pos sz; // product of ihi-ilo for 0..dim-1
+    Pos pos;
+};
+
+
 /** for VE vectorization [or scalar] */
 // customize options for off_l and off_v
 #define VEC 0 // allow vectorization over dims_t[], for scalar off_*
@@ -40,10 +257,6 @@ namespace impl {
 #define VEC_U32 0 // check for u32 arithmetic in vec_off_* routines
 // results: on VE, u32 and u64 arithmetic is essentially same speed
 // maybe slightly good, but need to run benchdnn performace mode
-
-#ifndef MVL
-#define MVL 256
-#endif
 
 #define NOVEC_ _Pragma("_NEC novector")
 #define VEC_ _Pragma("_NEC vector")
@@ -93,6 +306,23 @@ struct memory_desc_wrapper_opt : public memory_desc_wrapper {
     memory_desc_wrapper_opt(const memory_desc_t *md);
     memory_desc_wrapper_opt(const memory_desc_t &md);
 
+    /** For efficiency, use VecPos so as to avoid 32-to-64-bit
+     * conversion instructions during the address calculations.
+     * \note VecPos32 would always suffice, with minimum memory.
+     *
+     * In principle we could have \b DNNL_MAX_NDIMS, but we actually
+     * know that memory descriptors only use up to \b six coordinates
+     * TODO \b six --> something like DNNL_MAX_MEMORY_DESC_DIMS ?
+     *
+     * \note twelve exactly allows for blocked versions of six-nested loops,
+     * but we don't have such need in this class.  Is it an unspoken truth
+     * that DNNL_MAX_MEMORY_DESC_DIMS will always be DNNL_MAX_NDIMS / 2?
+     *
+     * What's the current fmt (tag?) --> ndims mechanism?
+     */
+    using VecPos = CoordRegs<uint64_t, 6>;
+    using VecPos32 = CoordRegs<uint32_t, 6>;
+#if 0
     /** vec_off_l uses a work area to pass "as-if-dense" coords to vec_off_v.
      * Potentially could be a set of vector registers.
      * (Or just call vec_off_v directly if modified and made public) */
@@ -104,6 +334,7 @@ struct memory_desc_wrapper_opt : public memory_desc_wrapper {
         //     NO! packed int reg ops NOT available
         uint32_t vp[DNNL_MAX_NDIMS][MVL];
     };
+#endif
 
 public: // fastdiv support (experimental)
     // optimize divisions by inner_block sizes, blk.inner_blks[iblk]

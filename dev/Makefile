@@ -18,6 +18,7 @@ CXXFLAGS+= -std=gnu++11 -O2
 CXXFLAGS+= -ffast-math
 CXXFLAGS+= -fopenmp
 thr: thr.cpp
+	$(CXX) $(CXXFLAGS) -S $< -o $<.s
 	$(CXX) $(CXXFLAGS) -c $< -o $@.o
 	$(CXX) -fopenmp $@.o -o $@
 	./$@
@@ -56,6 +57,7 @@ clean:
 	rm -f vrsqrt vrsqrt.cpp.s vrsqrt.L vrsqrt.LL
 	rm -f has_def has_def.cpp.s has_def.L has_def.LL
 	rm -f round round.cpp.s round.L round.LL
+	rm -f thr thr.cpp.s thr.L thr.LL
 realclean: clean
 	rm -f *.log
 	#
