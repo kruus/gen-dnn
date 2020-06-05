@@ -20,6 +20,10 @@
 #include <array>
 
 #include "common/memory_desc_wrapper.hpp"
+#include <sstream>
+#ifndef NDEBUG
+#include <iostream>
+#endif
 
 namespace dnnl {
 namespace impl {
@@ -31,6 +35,15 @@ namespace impl {
 #define MVL 32
 #endif
 #endif
+
+#if defined(__ve)
+#define NOVEC_ _Pragma("_NEC novector")
+#define VEC_ _Pragma("_NEC vector")
+#else
+#define NOVEC_
+#define VEC_
+#endif
+
 
 /** memory-backed replacement for <TT>a set of vector registers</TT>.
  *
@@ -124,6 +137,7 @@ struct CoordsFor : public CoordRegs<Crd,dim> {
             //if (sz == 0) printf("Warning: zero-size CoordsVP3\n");
 #endif
             init(pos); // expect pos=0
+            //std::cout<<" +CoordsFor "<<this->lim_str()<<std::endl;
         }
 
     // easy access to base().vp, for invoking memory_desc_wrapper_opt::vec_off_v,
@@ -137,6 +151,11 @@ struct CoordsFor : public CoordRegs<Crd,dim> {
     /// If get_vl(), then we have something in this->vp to process.
     /// Use `step()` which returns true and next batch (or false).
     unsigned get_vl()  const {return vl;}
+    /// how many coords implied by for-loop limits?
+    unsigned get_sz()  const {return sz;}
+    /// Within \c sz, at simd batch [pos..po+vl-1] are we at?
+    unsigned get_pos()  const {return pos;}
+    /// In this class, `dim` is a compile-time template param
     unsigned constexpr get_dim() const {return dim;}
     std::array<Crd,dim> const& get_lo() const { return ilo; }
     std::array<Crd,dim> const& get_hi() const { return ihi; }
@@ -230,6 +249,14 @@ struct CoordsFor : public CoordRegs<Crd,dim> {
         oss<<"}";
         return oss.str();
     }
+    std::string lim_str(char const* pfx="CoordsFor") {
+        std::ostringstream oss;
+        oss<<pfx<<"[dim="<<dim<<"][vl="<<vl<<"]";
+        for(unsigned d=0U; d<dim; ++d)
+            oss<<",["<<ilo[d]<<","<<ihi[d]<<")";
+        oss<<",pos="<<pos<<",sz="<<sz<<",vl="<<vl<<"}";
+        return oss.str();
+    }
     private:
     //unsigned dim;               ///< 0..DNNL_MAX_NDIMS
     unsigned vl;                ///< 0..MVL
@@ -239,6 +266,242 @@ struct CoordsFor : public CoordRegs<Crd,dim> {
     Pos sz; // product of ihi-ilo for 0..dim-1
     Pos pos;
 };
+
+/** While \c CoordsFor has compile-time dim, \c CoordsForNd has runtime dim
+ *
+ * Example: 6 max dims, runtime dimensions like `for(0..4) for(0..3) for(0..2)`
+ * ```
+ * for(auto c = CoordsForNd<6,uint64_t,uint64_t>::mk(0,4,0,3,0,2); c; ++c)
+ *     cout<<c.coord_str("CoordsForNd batch");
+ * ```
+ * As above, \c cf.vp type will be compatible with
+ * \c memory_desc_wrapper_opt::VecPos
+ */
+template<unsigned MaxDims=DNNL_MAX_NDIMS, typename Crd = unsigned, typename Pos=size_t>
+struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
+#define COORDSFORND_EXTEND 0 /*experimental feature, useless? */
+    typedef CoordRegs<Crd,MaxDims> Base;
+    CoordsForNd() : dim(0), vl(0), ilo{0}, ihi{0}, sz(0), pos(0) {}
+
+    Base /* */& base() /* */ { return *this; }
+    Base const& base() const { return *this; }
+    operator bool() const { return vl > 0; }
+    operator ++() { this->step(); return *this; }
+
+    /// If get_vl(), then we have something in this->vp to process.
+    /// Use `step()` which returns true and next batch (or false).
+    unsigned get_vl()  const {return vl;}
+    unsigned get_dim() const {return dim;}
+    Pos get_sz() const {return sz;}
+    Pos get_pos() const {return pos;}
+    /// unchecked lo for loop limit
+    Crd get_lo(unsigned const dim)  const { return ilo[dim]; }
+    Crd get_hi(unsigned const dim)  const { return ihi[dim]; }
+    //int constexpr MVL = 32;
+    private:
+    unsigned dim;               ///< 0..DNNL_MAX_NDIMS
+    unsigned vl;                ///< 0..MVL
+    // now add "vl-wise" iteration:
+    Crd ilo[MaxDims];
+    Crd ihi[MaxDims];
+    Pos sz; // product of ihi-ilo for 0..dim-1
+    Pos pos;
+    private:
+    /** init at linear iter pos, shorten vl from MVL iif pos+vl "past end"
+     * Note diff with off_l_vec API where a vector of `lin` values are input
+     * \return true iff remaining iteration length vl > 0.
+     *
+     * Once you have a span-relative coord, a global physical offset is:
+     * - `coord_i*stride_i`
+     *   - where strides are padded/not.
+     * - we bypass the off_l_vec translation from linear-->coords
+     *
+     * - we can directly input our coords into vec_off_v 
+     *
+     * mdw API:
+     * - vec_off_loops(l0,h0, l1,h1, ...) where every dim gets lo,hi args
+     *   - internally generate a CoordsVP
+     * - vec_off_loops_next() generate next coordsVP, ret false if done
+     * - vec_off_loops_call( void(*f)(VecPos& vp) );
+     *
+     * streamlined API (ignore bool ip=is_pos_padded?)
+     * - vec_off_iter( void(*f)(VecPos&), ip?, l0,h0, l1,h1, ...)
+     *   - call "vector-of-coords" function f in simd-len batches
+     * - vec_off_iter( void(*f)(uint32_t), ip?, l0,h0, l1,h1, ...)
+     *   - call "global-physical-offset" function g in simd-len batches
+     *   - internally call vec_off_v to get physical offsets
+     */
+    bool init_nd(Pos lin){
+        if(lin >= sz){
+            //cout<<" lin="<<lin<<" > sz="<<sz<<endl;
+            pos = sz;
+            vl = 0;
+            return false;
+        }
+        pos = lin;
+        vl = MVL;
+        if(pos + vl > sz){
+            //cout<<" [pos+vl="<<pos<<"+"<<vl<<"] > [sz="<<sz<<"]"<<endl;
+            vl = sz - pos;
+        }
+        assert( vl > 0 );
+        Pos carry[Base::MaxVl];
+        for(unsigned i=0U; i<vl; ++i)
+            carry[i] = pos+i;
+        NOVEC_ for(unsigned d = dim; d--; ) {
+            // TBD decide whether span is member or not XXX
+            auto const span = ihi[d] - ilo[d];
+            if(span <= 1){
+                for(unsigned i=0U; i<vl; ++i){
+                    (this->vp)[d][i] = ilo[d];
+                }
+            } else {
+                for(unsigned i=0U; i<vl; ++i){
+                    (this->vp)[d][i] = ilo[d] + carry[i] % span;
+                    carry[i] = carry[i] / span;
+                }
+            }
+        }
+        return true;
+    }
+#if COORDSFORND_EXTEND
+    /** Maybe "extend" at linear iter pos, increasing existing vl up to MVL.
+     * Keeps old set of vl coords. Possible to extend by zero new coords if vl==MVL already!
+     * Check that `vl+sz<=MVL` if you need all coords to fit with no `step`.
+     * \b Untested.
+     * \return true iff some coords were be added.
+     *
+     * Idea: in some cases you might 'pack' sets of loops into a longer vector?
+     * Problem: How to efficiently unpack/mask the sets later.
+     * Problem: Also needs a setter for new ilo,ihi loop limits, ... extend_at
+     */
+    bool extend_at(Pos lin){
+        if(lin >= sz || vl >= MVL){
+            return false;
+        }
+        pos = lin;
+        auto addvl = sz - lin;
+        assert( addvl > 0 );
+        if (vl + addvl >= MVL) addvl = MVL - vl;
+        for(unsigned i=0U; i<addvl; ++i){
+            uint64_t carry = pos+i;
+            uint64_t mod;
+            for(unsigned d = dim; d--; ) {
+                auto const span = ihi[d] - ilo[d];
+                mod   = carry % span;
+                carry = carry / span;
+                vp[d][vl+i] = ilo[d] + mod;
+            }
+        }
+        vl += addvl;
+        return true;
+    }
+#endif // COORDSFORND_EXTEND
+    inline bool iter_range(unsigned d) {
+        dim = d;
+        return true;
+    }
+    /** iter_range(0 [,lo,hi]...) initializes ilo[],ihi[] iter ranges for dim 0,1,... */
+    template<typename LO, typename HI, typename... Args>
+        inline bool iter_range(unsigned d , LO const lo, HI const hi, Args &&... tuple) {
+            ilo[d] = (unsigned)lo;
+            ihi[d] = (unsigned)hi;
+            // ? span[d] = ilo[d] - ihi[d];
+            iter_range(d+1U, utils::forward<Args>(tuple)...);
+        }
+    public:
+    /** generic init of nested sequential for loops.
+     * Initialize `for(lo0..hi0) for(lo1..hi1) ...`
+     * starting at linear entry `pos`.
+     *
+     * \arg pos linear entry (usually you use 0)
+     * \arg for loop limits  as up to DNNL_MAX_NDIMS pairs.
+     *
+     * \ret true if some coords are now ready to use.
+     *
+     * Use iter_step_nd() to get the next batch of coords (if any).
+     */
+    template<typename T, typename LO, typename HI, typename... Args>
+        inline bool init_at(T const pos, LO const lo, HI const hi, Args &&... tuple) {
+            // store the dimensions
+            iter_range(0,lo,hi,utils::forward<Args>(tuple)...);
+            // calc total size (could be done within iter_range?)
+            sz = Pos{1};
+            for(unsigned d=0U; d<dim; ++d) sz *= ihi[d] - ilo[d];
+#if 0
+            cout<<" init_at dim="<<dim;
+            for(int d=0; d<dim; ++d){
+                cout<<" ["<<ilo[d]<<","<<ihi[d]<<")";
+            }
+            cout<<" sz="<<sz<<" pos="<<pos<<endl;
+#endif
+            // calc first batch of coord vectors, ret true if have some
+            return init_nd(pos);
+        }
+    /** init_at(0,lohi...) */
+    template<typename... Args>
+        inline bool init(Args &&... lohi) {
+            this->init_at( size_t{0}, utils::forward<Args>(lohi)...);
+        }
+    /** set next coord vectors at linear pos+vl.
+     * \return true iff remaining iteration lenght vl > 0 */
+    bool step(){
+#ifndef NDEBUG
+        if (pos < sz ) assert( vl > 0 );
+#endif
+        return pos < sz? init_nd(pos + vl): false;
+    }
+#if COORDSFORND_EXTEND
+    /** extend(lohi...) */
+    template<typename... Args>
+        inline bool extend(Args &&... lohi) {
+            auto old_dim = dim; // error if changed: revert to 'init' behavior
+            this->iter_range(0, utils::forward<Args>(lohi)...);
+            // calc total size (could be done within iter_range?)
+            sz = Pos{1};
+            for(unsigned d=0U; d<dim; ++d) sz *= ihi[d] - ilo[d];
+            if (dim != old_dim) {
+                printf(" warning: extend changed dimension -- treated as init\n");
+                return init(0);
+            }
+            return extend_at(pos);
+        }
+#endif // COORDSFORND_EXTEND
+    /** intended syntax --
+     * for(auto c = CoordsForNd::mk(0,4,0,3,0,2); c; ++c) f(c.vp); */
+    template<typename... Args>
+    static CoordsForNd mk(Args &&... lohi){
+        CoordsForNd ret;
+        ret.init(utils::forward<Args>(lohi)...);
+        return ret;
+    }
+    /** terse output of current 'vp' coordinate vectors. */
+    std::string coord_str(char const* pfx="crd") {
+        std::ostringstream oss;
+        auto const& c = base();
+        oss<<pfx<<"["<<dim<<"][vl="<<vl<<"]~{";
+        for(unsigned v=0; v<vl; ++v){
+            if(v < 5 || v > vl - 5){
+                oss<<(v>0? ",":"")<<"{";
+                for(unsigned d=0; d<dim; ++d){
+                    oss<<(d>0? ",":"")<<c.vp[d][v];
+                }
+                oss<<"}";
+            }else if(v==5) oss<<"...";
+        }
+        oss<<"}";
+        return oss.str();
+    }
+    std::string lim_str(char const* pfx="CoordsForNd") {
+        std::ostringstream oss;
+        oss<<pfx<<"[dim="<<dim<<"][vl="<<vl<<"]";
+        for(unsigned d=0U; d<dim; ++d)
+            oss<<",["<<ilo[d]<<","<<ihi[d]<<")";
+        oss<<",pos="<<pos<<",sz="<<sz<<",vl="<<vl<<"}";
+        return oss.str();
+    }
+};
+
 
 
 /** for VE vectorization [or scalar] */
@@ -257,9 +520,6 @@ struct CoordsFor : public CoordRegs<Crd,dim> {
 #define VEC_U32 0 // check for u32 arithmetic in vec_off_* routines
 // results: on VE, u32 and u64 arithmetic is essentially same speed
 // maybe slightly good, but need to run benchdnn performace mode
-
-#define NOVEC_ _Pragma("_NEC novector")
-#define VEC_ _Pragma("_NEC vector")
 
 #if 0
 --softmax --axis=0 256x5555 (or 2560x555)
@@ -472,12 +732,13 @@ public:
         }
         return;
     }
-private:
+public:
     /** vector-of-physical-offsets version of \c off_v.
      * Unlike \c off_v, we are \e private and can modify
      * our coords \c vp, to save memory.
      *
      * \note This only does a MVL-long section at a time
+     * \note if is_pos_padded, coords \c vp will be modified.
      */
     void vec_off_v( VecPos & vp,         // list of coords (from vec_off_l)
                       dim_t * p_offsets, // output physical offsets

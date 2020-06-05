@@ -415,7 +415,7 @@ std::ostream& operator<<( std::ostream& os, typename CoordRegs<Crd,MaxDims> cons
 }
 #endif
 #if 0
-// better with IO-wrapper function Vp(coordsVP2)
+// better with IO-wrapper function Vp(CoordsForNd)
 template<typename Crd = unsigned, unsigned MaxDims = DNNL_MAX_NDIMS>
 std::ostream& operator<<( std::ostream& os,
         std::tuple< CoordRegs<Crd,MaxDims> const& /*cr*/,
@@ -440,15 +440,15 @@ std::ostream& operator<<( std::ostream& os,
 #endif
 /** here's a cleaned up "production version" beta.
  *
- * WHAT I DO NOT LIKE
+ * This class has runtime dim.  Sometimes this is required.
  *
- * This class has runtime dim.  But initialization always "known" the dim,
- * so dim should really be a compile-time const.
+ * If not, use a different class, with compile-time const dime.
  */
 template<unsigned MaxDims=DNNL_MAX_NDIMS, typename Crd = unsigned, typename Pos=size_t>
-struct CoordsVP2 : public CoordRegs<Crd,MaxDims> {
+struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
+#define COORDSFORND_EXTEND 0 /*experimental feature, useless? */
     typedef CoordRegs<Crd,MaxDims> Base;
-    CoordsVP2() : dim(0), vl(0), ilo{0}, ihi{0}, sz(0), pos(0) {}
+    CoordsForNd() : dim(0), vl(0), ilo{0}, ihi{0}, sz(0), pos(0) {}
 
     Base const& base() const { return *this; }
     operator bool() const { return vl > 0; }
@@ -458,6 +458,8 @@ struct CoordsVP2 : public CoordRegs<Crd,MaxDims> {
     /// Use `step()` which returns true and next batch (or false).
     unsigned get_vl()  const {return vl;}
     unsigned get_dim() const {return dim;}
+    Pos get_sz() const {return sz;}
+    Pos get_pos() const {return pos;}
     /// unchecked lo for loop limit
     Crd get_lo(unsigned const dim)  const { return ilo[dim]; }
     Crd get_hi(unsigned const dim)  const { return ihi[dim]; }
@@ -470,7 +472,7 @@ struct CoordsVP2 : public CoordRegs<Crd,MaxDims> {
     Crd ihi[MaxDims];
     Pos sz; // product of ihi-ilo for 0..dim-1
     Pos pos;
-    public:
+    private:
     /** init at linear iter pos, shorten vl from MVL iif pos+vl "past end"
      * Note diff with off_l_vec API where a vector of `lin` values are input
      * \return true iff remaining iteration length vl > 0.
@@ -495,7 +497,7 @@ struct CoordsVP2 : public CoordRegs<Crd,MaxDims> {
      *   - call "global-physical-offset" function g in simd-len batches
      *   - internally call vec_off_v to get physical offsets
      */
-    bool iter_set(Pos lin){
+    bool init_nd(Pos lin){
         if(lin >= sz){
             //cout<<" lin="<<lin<<" > sz="<<sz<<endl;
             pos = sz;
@@ -521,6 +523,7 @@ struct CoordsVP2 : public CoordRegs<Crd,MaxDims> {
         }
         return true;
     }
+#if COORDSFORND_EXTEND
     /** Maybe "extend" at linear iter pos, increasing existing vl up to MVL.
      * Keeps old set of vl coords. Possible to extend by zero new coords if vl==MVL already!
      * Check that `vl+sz<=MVL` if you need all coords to fit with no `step`.
@@ -529,8 +532,9 @@ struct CoordsVP2 : public CoordRegs<Crd,MaxDims> {
      *
      * Idea: in some cases you might 'pack' sets of loops into a longer vector?
      * Problem: How to efficiently unpack/mask the sets later.
+     * Problem: Also needs a setter for new ilo,ihi loop limits, ... extend_at
      */
-    bool iter_extend(Pos lin){
+    bool extend_at(Pos lin){
         if(lin >= sz || vl >= MVL){
             return false;
         }
@@ -551,15 +555,7 @@ struct CoordsVP2 : public CoordRegs<Crd,MaxDims> {
         vl += addvl;
         return true;
     }
-    /** set next coord vectors at linear pos+vl.
-     * \return true iff remaining iteration lenght vl > 0 */
-    bool step(){
-#ifndef NDEBUG
-        if (pos < sz ) assert( vl > 0 );
-#endif
-        return pos < sz? iter_set(pos + vl): false;
-    }
-    private:
+#endif // COORDSFORND_EXTEND
     inline bool iter_range(unsigned d) {
         dim = d;
         return true;
@@ -599,18 +595,42 @@ struct CoordsVP2 : public CoordRegs<Crd,MaxDims> {
             cout<<" sz="<<sz<<" pos="<<pos<<endl;
 #endif
             // calc first batch of coord vectors, ret true if have some
-            return iter_set(pos);
+            return init_nd(pos);
         }
     /** init_at(0,lohi...) */
     template<typename... Args>
         inline bool init(Args &&... lohi) {
             this->init_at( size_t{0}, utils::forward<Args>(lohi)...);
         }
-    /** intended syntax --
-     * for(auto c = CoordsVP2::mk(0,4,0,3,0,2); c; ++c) f(c.vp); */
+    /** set next coord vectors at linear pos+vl.
+     * \return true iff remaining iteration lenght vl > 0 */
+    bool step(){
+#ifndef NDEBUG
+        if (pos < sz ) assert( vl > 0 );
+#endif
+        return pos < sz? init_nd(pos + vl): false;
+    }
+#if COORDSFORND_EXTEND
+    /** extend(lohi...) */
     template<typename... Args>
-    static CoordsVP2 mk(Args &&... lohi){
-        CoordsVP2 ret;
+        inline bool extend(Args &&... lohi) {
+            auto old_dim = dim; // error if changed: revert to 'init' behavior
+            this->iter_range(0, utils::forward<Args>(lohi)...);
+            // calc total size (could be done within iter_range?)
+            sz = Pos{1};
+            for(unsigned d=0U; d<dim; ++d) sz *= ihi[d] - ilo[d];
+            if (dim != old_dim) {
+                printf(" warning: extend changed dimension -- treated as init\n");
+                return init(0);
+            }
+            return extend_at(pos);
+        }
+#endif // COORDSFORND_EXTEND
+    /** intended syntax --
+     * for(auto c = CoordsForNd::mk(0,4,0,3,0,2); c; ++c) f(c.vp); */
+    template<typename... Args>
+    static CoordsForNd mk(Args &&... lohi){
+        CoordsForNd ret;
         ret.init(utils::forward<Args>(lohi)...);
         return ret;
     }
@@ -628,7 +648,15 @@ struct CoordsVP2 : public CoordRegs<Crd,MaxDims> {
                 oss<<"}";
             }else if(v==5) oss<<"...";
         }
-        oss<<"}\n";
+        oss<<"}";
+        return oss.str();
+    }
+    std::string lim_str(char const* pfx="CoordsForNd") {
+        std::ostringstream oss;
+        oss<<pfx<<"[dim="<<dim<<"][vl="<<vl<<"]";
+        for(unsigned d=0U; d<dim; ++d)
+            oss<<",["<<ilo[d]<<","<<ihi[d]<<")";
+        oss<<",pos="<<pos<<",sz="<<sz<<",vl="<<vl<<"}";
         return oss.str();
     }
 };
@@ -636,8 +664,8 @@ struct CoordsVP2 : public CoordRegs<Crd,MaxDims> {
 #if 0
 template<unsigned MaxDims, typename Crd, typename Pos>
 struct IoVp {
-    IoVp( CoordsVP2<MaxDims,Crd,Pos> const& x ) : x(x) {}
-    CoordsVP2<MaxDims,Crd,Pos> const& x;
+    IoVp( CoordsForNd<MaxDims,Crd,Pos> const& x ) : x(x) {}
+    CoordsForNd<MaxDims,Crd,Pos> const& x;
 };
 #else
 template<typename T>
@@ -647,7 +675,7 @@ struct IoVp {
 };
 #endif
 
-// better with IO-wrapper function Vp(coordsVP2)
+// better with IO-wrapper function Vp(CoordsForNd)
 template<typename T>
 std::ostream& operator<<( std::ostream& os, IoVp<T> const& iovp )
 {
@@ -670,7 +698,7 @@ std::ostream& operator<<( std::ostream& os, IoVp<T> const& iovp )
 
 /** here's a compile-time dim version */
 template<unsigned dim, typename Crd = unsigned, typename Pos=size_t>
-struct CoordsVP3 : public CoordRegs<Crd,dim> {
+struct CoordsFor : public CoordRegs<Crd,dim> {
     typedef CoordRegs<Crd,dim> Base;
     private:
     static typename std::array<Crd,dim> getspan(std::array<Crd,dim>& h, std::array<Crd,dim>& l) {
@@ -682,7 +710,7 @@ struct CoordsVP3 : public CoordRegs<Crd,dim> {
     }
     public:
     /// General constructor
-    CoordsVP3( std::array<Crd,dim>&& lo, std::array<Crd,dim>&& hi, size_t pos=0 )
+    CoordsFor( std::array<Crd,dim>&& lo, std::array<Crd,dim>&& hi, size_t pos=0 )
         : vl(0), ilo{lo}
         , ihi{hi} // maybe don't keep this ?
         , span{getspan(ihi,ilo)}
@@ -694,7 +722,7 @@ struct CoordsVP3 : public CoordRegs<Crd,dim> {
 #ifndef NDEBUG
             for(unsigned d=0U; d<dim; ++d) assert( ihi[d] >= ilo[d] );
             // Following might be intentional, so not an error:
-            //if (sz == 0) printf("Warning: zero-size CoordsVP3\n");
+            //if (sz == 0) printf("Warning: zero-size CoordsFor\n");
 #endif
             init(pos); // expect pos=0
         }
@@ -965,21 +993,21 @@ int main(int,char**){
         cout<<"    nd(1,0,4,0,3,0,2): "<<c<<" ret "<<ret<<endl;
         while((ret=c.iter_step_nd())) cout<<"          step: "<<c<<" ret "<<ret<<endl;
 
-        cout<<"... productions version, CoordsVP2 ..."<<endl;
-        for(auto c = CoordsVP2<>::mk(0,4,0,3,0,2); c; ++c){
+        cout<<"... productions version, CoordsForNd ..."<<endl;
+        for(auto c = CoordsForNd<>::mk(0,4,0,3,0,2); c; ++c){
             //cout<<IoVp<decltype(c)>{c}<<endl;
             // more flexible:
             cout<<c.coord_str("c")<<endl;
         }
 
 
-        cout<<"... productions version, CoordsVP3 ..."<<endl;
-    // now just for(auto c = CoordsVP3({0,0,0},{4,3,2}); c; ++c) f(c.vp);
+        cout<<"... productions version, CoordsFor ..."<<endl;
+        // now just for(auto c = CoordsFor({0,0,0},{4,3,2}); c; ++c) f(c.vp);
         { 
-            auto c = CoordsVP3<3>{{0,0,0},{4,3,2}};
+            auto c = CoordsFor<3>{{0,0,0},{4,3,2}};
             cout<<c.coord_str("freshly constructed")<<endl;;
         }
-        for(auto c = CoordsVP3<3>{{0,0,0},{4,3,2}}; c; ++c){
+        for(auto c = CoordsFor<3>{{0,0,0},{4,3,2}}; c; ++c){
             cout<<c.coord_str("c")<<endl;
         }
     }

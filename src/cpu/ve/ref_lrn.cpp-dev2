@@ -148,6 +148,26 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
     const dim_t half_size = (size - 1) / 2;
     const dim_t summands = compute_n_summands(size);
 
+#if 0
+    // compiler seems to to dead-code-eliminate too late to recognize
+    // many important optimizations... like vectorization of simple cases :)
+    auto data_off = [&](dim_t mb, dim_t c, dim_t d, dim_t h, dim_t w) -> dim_t {
+        switch (tag) {
+            case nChw16c:
+            case nChw8c:
+                return mb * stride_mb + (c / blksize) * H * W * blksize
+                        + h * W * blksize + w * blksize + c % blksize;
+            case nchw: return mb * stride_mb + c * H * W + h * W + w;
+            case nhwc: return mb * stride_mb + h * W * C + w * C + c;
+            default:
+                if (ndims >= 5) return data_d.off(mb, c, d, h, w);
+                if (ndims >= 4) return data_d.off(mb, c, h, w);
+                if (ndims >= 3) return data_d.off(mb, c, w);
+                return data_d.off(mb, c);
+        }
+    };
+#endif
+
     // pass by value due to icc170 and icc180 problem on KNL
     auto ker = [&](data_t * const d, dim_t const mb, dim_t const oc,
             dim_t const od, dim_t const oh, dim_t const ow) {
@@ -199,6 +219,7 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
                         cf; ++cf) {
                     // loop over this simd-length batch
                     auto const vl = cf.get_vl();
+#if 1
                     for(unsigned i=0U; i<vl; ++i) {
                         const acc_data_t s = src[offset<tag>(
                                 data_d, mb,stride_mb, oc,C,
@@ -207,6 +228,20 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
                                 cf.vp[2][i], W)];
                         sum += s * s;
                     }
+#else // 1625.63 ms, not significantly faster
+                    dim_t off[MVL];
+                    for(unsigned i=0U; i<vl; ++i) {
+                        off[i] = offset<tag>(
+                                data_d, mb,stride_mb, oc,C,
+                                cf.vp[0][i], D,
+                                cf.vp[1][i], H,
+                                cf.vp[2][i], W);
+                    }
+                    for(unsigned i=0U; i<vl; ++i) {
+                        const acc_data_t s = src[off[i]];
+                        sum += s * s;
+                    }
+#endif
                 }
                 // generic 3d CoordsFor
                 // -lrn --tag=nchw --alg=WITHIN ic202ih10 --> 7.25 ms
@@ -248,12 +283,101 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
 #define NOVEC PragmaQuote(_NEC novector);
 #define FOR_CHAN for(int i=0; i<C; ++i)
 
+#if 0
+    auto ker2 = [&](dim_t const dst_off, dim_t const mb, dim_t const oc,
+            dim_t const od, dim_t const oh, dim_t const ow) {
+        acc_data_t sum = 0;
+        data_t central = src[offset<tag>(data_d, mb,stride_mb, oc,C, od,D, oh,H, ow,W)];
+        // half_size is quite small -- little opportunity for vectorization
+        const dim_t c_st = nstl::max(oc - half_size + 0, (dim_t)0);
+        const dim_t c_en = nstl::min(oc + half_size + 1, C);
+
+        for (dim_t c = c_st; c < c_en; ++c) {
+            const acc_data_t s = src[offset<tag>(data_d, mb,stride_mb, c,C, od,D, oh,H, ow,W)];
+            sum += s * s;
+        }
+
+        sum = k + alpha * sum / summands;
+        dst[dst_off] = static_cast<data_t>(central * fast_negative_powf(sum, beta));
+    };
+
+    auto ker3 = [&](dim_t const mb, dim_t const oc,
+            dim_t const od, dim_t const oh, dim_t const ow) {
+        const dim_t dst_off = offset<tag>(data_d, mb,stride_mb, oc,C, od,D, oh,H, ow,W);
+        acc_data_t sum = 0;
+        //data_t central = src[offset<tag>(data_d, mb,stride_mb, oc,C, od,D, oh,H, ow,W)];
+        data_t central = src[dst_off];
+        if (across_channels) {
+            // half_size is quite small -- little opportunity for vectorization
+            const dim_t c_st = nstl::max(oc - half_size + 0, (dim_t)0);
+            const dim_t c_en = nstl::min(oc + half_size + 1, C);
+
+            for (dim_t c = c_st; c < c_en; ++c) {
+                const acc_data_t s = src[offset<tag>(data_d, mb,stride_mb, c,C, od,D, oh,H, ow,W)];
+                sum += s * s;
+            }
+
+        } else {
+            // this would require D*H*W*(2*half_size+1) offsets
+            // OR calculate them with a "modernized" off_v_vec routine
+            // OR look into 'for_nd'
+            // ---> version that:
+            //          nd_block_init(MVL,0,D,0,W,0,H) blocks nested loops by MVL
+            //          with offsets[dims][MVL] intermediate outputs,
+            //          ready to pass into existing off_v_vec
+            // Pseudocode:
+            //    auto blk = nd_block_init(MVL,0,D,0,W,0,H) simple block-by-MVL loops
+            // or auto blk = nd_block_init(MVL,d_st,d_en,D,w_st,w_en,W,h_st,h_en,H)
+            //    for(int b=0; b<blk.blocks(); ++b){
+            //       auto const& coords = blk.next();
+            //       auto offsets = mdw_opt::off_v_vec(blk.len(), coords,);
+            //    }
+            dim_t d_st = nstl::max(od - half_size + 0, (dim_t)0);
+            dim_t d_en = nstl::min(od + half_size + 1, D);
+            dim_t h_st = nstl::max(oh - half_size + 0, (dim_t)0);
+            dim_t h_en = nstl::min(oh + half_size + 1, H);
+            dim_t w_st = nstl::max(ow - half_size + 0, (dim_t)0);
+            dim_t w_en = nstl::min(ow + half_size + 1, W);
+
+            for_(dim_t d = d_st; d < d_en; ++d)
+            for_(dim_t h = h_st; h < h_en; ++h)
+            for (dim_t w = w_st; w < w_en; ++w) {
+                const acc_data_t s = src[offset<tag>(
+                        data_d, mb,stride_mb, oc,C, d,D, h,H, w,W)];
+                sum += s * s;
+            }
+        }
+        sum = k + alpha * sum / summands;
+        dst[dst_off] = static_cast<data_t>(central * fast_negative_powf(sum, beta));
+    };
+#endif
+
 #ifndef MVL
 #if defined(__ve)
 #define MVL 256
 #else
 #define MVL 32
 #endif
+#endif
+#if 0 // cannot capture var-len array into lambda :(
+    // calc once, re-use:
+    dim_t c_st[C];
+    dim_t c_en[C];
+    if (across_channels && tag==nchw || tag==nhwc) {
+        for(int i=0; i<C; ++i) {
+            c_st[i] = nstl::max(i - half_size + 0, (dim_t)0);
+            c_en[i] = nstl::min(i + half_size + 1, C);
+        }
+    }
+#elif 0 // for ker_across_vec_blk
+    dim_t c_st[MVL];
+    dim_t c_en[MVL];
+    if (C <= MVL && across_channels && tag==nchw || tag==nhwc) {
+        for(int i=0; i<C; ++i) {
+            c_st[i] = nstl::max(i - half_size + 0, (dim_t)0);
+            c_en[i] = nstl::min(i + half_size + 1, C);
+        }
+    }
 #endif
     // vectorized over oc_st..oc_en, vl<=MVL
     //auto ker_across_vec = [&src,&dst,&stride_mb,&C,&D,&H,&W,&half_size,&k,&alpha,&beta,&summands](
@@ -276,8 +400,8 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
                     * fast_negative_powf(sum[i], beta));
     };
 
-    /** Prepare coords for vectorized physical offset calc.  Streamlines func calls
-     * to memory_desc_wrapper, by using extended version, \c data_opt. */
+    /** When func call to memory_desc_wrapper cannot be avoided,
+     * use vectorizable extension, \c data_opt. */
     auto channel_offsets = []( memory_desc_wrapper_opt const& data_opt,
             size_t * const data_off, dim_t const mb, dim_t const clo, dim_t const chi,
             dim_t const d, dim_t const h, dim_t const w) {
@@ -297,7 +421,6 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
         }
     };
 
-    /** if channels large, break apart and overlap the offset calcs */
     auto ker_across_vec_lapped = [&](
             dim_t const clo, dim_t const chi, // 'central' channels range
             size_t * const dst_off, // now from max(0,clo-half_size) to min(chi+half_size+1,C)
@@ -325,10 +448,39 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
     };
 
 
+#define KER_ACROSS_VEC(dst_off,mb,od,oh,ow) do { \
+    acc_data_t sum[C]; \
+    FOR_CHAN sum[i]= 0; \
+    FOR_CHAN { \
+        dim_t c_st = nstl::max(i - half_size + 0, (dim_t)0); \
+        dim_t c_en = nstl::min(i + half_size + 1, C); \
+        for(dim_t c = c_st; c < c_en; ++c) { \
+            const acc_data_t s = src[dst_off[c]]; \
+            sum[i] += s * s; \
+        } \
+    } \
+    FOR_CHAN sum[i] = k + alpha * sum[i] / summands; \
+    FOR_CHAN dst[dst_off[i]] = static_cast<data_t>( src[dst_off[i]] \
+            * fast_negative_powf(sum[i], beta)); \
+}while(0)
+
     const dim_t MB = pd()->MB();
-    dim_t stack_channels = 32768; // stack usage threshold for channel offsets
-    if (across_channels && C >= size && C <= stack_channels ) {
+    if (across_channels && C >= size && C <= 32768 ) {
         // vectorize across channels, using fast offsets calculated on stack.
+        //
+        // limit range of C to bound stack space
+        //  - or use scratchpad
+        //  - or half-size-overlapped ker_across_vec_blocked
+        // common impl, vectorizing over c=0..C
+        //
+        // formulas vectorize well
+        // --lrn --tag=nchw ic202ih10 0.26416
+        // --lrn --tag=nhwc ic202ih10 0.26416
+        // --lrn --tag=nChw16c ic202ih10 0.327148
+        // --lrn --tag=ncdhw ic202id10 19.2898      <-- offset<tag> is a func call
+        // func class with some help:
+        // --lrn --tag=ncdhw ic202id10 2.85 ms (vec_off_v ~ 7x faster)
+        // --lrn --tag=ncdhw ic202id10 2.66 ms w/ hi==lo+1 optimization
         parallel_nd(MB, D, H, W, [&](dim_t mb, dim_t d, dim_t h, dim_t w) {
                 size_t data_off[C];
                 if (formula) {
@@ -339,13 +491,15 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
                 }
                 ker_across_vec(&data_off[0], mb, /*c,*/ d, h, w);
             });
-    } else if (1 && across_channels && C > stack_channels ) {
+        // XXX optimizing fwd lrn "across" for C>32768 possible too, but harder
+    } else if (1 && across_channels && C > 32768 ) {
+        // --lrn --tag=nchw ic32777ih10 33.3181 (improved from below code 246.64 ms)
+        // --lrn --tag=ncdhw ic32777id10 3045.35 (func call improve from 24733.4, w/o vec_off_v
         // Large channels: split over threads, and overlap offset calcs,
         // because lrn window can extend half_size past the central range. */
-        dim_t nblks = C/(stack_channels/2); // just a rough estimate
+        dim_t nblks = C/16384; // just a rough estimate
         dim_t blksz = utils::div_up(C, nblks); // can avoid a small "tail" chunk
         // XXX does balance211 do this?
-        assert( blksz < stack_channels ); // expect about stack_channels/2
         parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
                 [&](dim_t mb, dim_t c_blk, dim_t d, dim_t h, dim_t w) {
             dim_t clo = c_blk * blksz;
@@ -366,13 +520,10 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
             ker_across_vec_lapped( clo, chi, &data_off[0], mb, /*c,*/ d, h, w);
             });
     } else {
-        // fall back to "old-style" (vectorize across lrn window, ~5)
-        // XXX need to work on a fast version of channel_offsets for 'within'
-        // case too.  Too bad offsets can't easily be re-used unless d,h,w
-        // get tiled, but that is hard.  I guess some fairly large d,h,w
-        // tiling could be used (just recalc around tile edges).
+        // --lrn --tag=nchw ic32777ih10 246.63 ms
+        // --lrn --tag=ncdhw ic32777id10 24733.4
+        // fall back to across/within vectorized only across lrn size (typically 5)
         if (tag == nChw16c || tag == nChw8c) {
-            // This blocking MIGHT buy a little bit of locality, I guess
             parallel_nd(MB, utils::div_up(C, blksize), H, W,
                     [&](dim_t mb, dim_t c_blk, dim_t h, dim_t w) {
                     dim_t c = c_blk * blksize;
