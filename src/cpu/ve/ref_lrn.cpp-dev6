@@ -68,21 +68,12 @@ static inline acc_data_t fast_negative_powf(acc_data_t omega, acc_data_t beta) {
     return Y;
 };
 
-// nc++ with 32768 sometimes stoppped, but 16384 worked
-dim_t constexpr stack_channels = 16384; // stack usage threshold for channel offsets
-
-/** Divide \c hi into restricted-size blocks.
- *
- * \return a large, MVL-friendly block size < \c stack_channels for
- *         partitioning [0,hi).
- *
- * \c stack_channels maximum block size is some large multiple of MVL,
- * (unlike JIT vl suggestions bounded by MVL)
- */
+// Divide 'hi' up "somewhat loosely" around some target value
+// (unlike vl suggestions, which MUST always partition <= MVL)
 inline dim_t stack_friendly_blksz(dim_t const hi){
-#if 0
     dim_t constexpr stack_channels = 16384;
     dim_t ret = hi;
+#if 0
     if (hi > stack_channels) {
         dim_t const nFull = hi/stack_channels;
         dim_t const rem   = hi%stack_channels;
@@ -96,7 +87,7 @@ inline dim_t stack_friendly_blksz(dim_t const hi){
             ret = (hi+nLoops-1) / nLoops;
         }
     }
-#elif 0 // some better behavior (some fast heuristic)
+#else // some better behavior (some fast heuristic)
     dim_t const nFull = hi/stack_channels;
     dim_t const rem   = hi%stack_channels;
     dim_t const nLoops = nFull + (rem!=0);
@@ -113,24 +104,7 @@ inline dim_t stack_friendly_blksz(dim_t const hi){
             ret = ret2;
         }
     }
-#else // simpler (see dev/blk_friendly.cpp test prog)
-    dim_t ret = hi;
-    if (hi > stack_channels) {
-        ret = stack_channels;
-        dim_t const nFull = hi/stack_channels;
-        dim_t const rem   = hi%stack_channels;
-        if (rem < stack_channels/4) {
-            dim_t const nLoops = nFull + (rem!=0);
-            ret = (hi+nLoops-1) / nLoops;
-            //printf("+%d",(int)ret); // rough equipartition
-            if (ret < stack_channels - MVL) {
-                ret = (ret+MVL-1)/MVL*MVL;
-                //printf("^%d",(int)ret); // round up
-            }
-        }
-    }
 #endif
-    //assert( ret < stack_channels );
     return ret;
 }
 #if 0 // hmm maybe don't need this way
@@ -288,6 +262,7 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
     const dim_t var_en = ((i) + half_size + 1 >= dim_t{hi}? dim_t{hi}: (i) + half_size + 1);
 
     const dim_t MB = pd()->MB();
+    dim_t const stack_channels = 32768; // stack usage threshold for channel offsets
     if(0){
     }
     // --lrn --tag=nchw ic2002ih10 --tag=ncdhw ic2002id10
@@ -336,68 +311,428 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
                 ker_across_vec(&data_off[0], mb, /*c,*/ d, h, w);
             });
     }
-    // dense strided chan + lapped (no restriction on C)
-    else if ((tag==nchw || tag==nhwc) && across_channels) {
-        // C <= stack_channels orig: --tag=nchw,nhwc ic2002ih10 0.184 0.162 ms
-        // Large channels: split over threads, and overlap offset calcs,
-        // because lrn window can extend half_size past the central range.
-        dim_t const blksz = stack_friendly_blksz(C);
-        parallel_nd(MB, utils::div_up(C, blksz), H, W,
-                [&](dim_t const mb, dim_t const c_blk, dim_t const h, dim_t const w) {
-            dim_t const clo = c_blk * blksz;
-            dim_t const chi = nstl::min(clo + blksz, C);
-            dim_t const cspan = chi - clo;
-            acc_data_t sum[cspan];
-            for(dim_t c=0; c<cspan; ++c) sum[c]= 0;
+#if 0
+    // DEV: work on the formula one only :
+    // --lrn --tag=nchw ic2002ih10 --tag=ncdhw ic2002id10
+    // inline the lambda: 2.31 (worse?) 15.8 ms
+    // .LL adjust, stack arrays past end, reorder loops : 5.49 (way worse)
+    // remove mask (recalc new inner loop lims)         : 0.184 ms
+    else if (formula && across_channels && C <= stack_channels ) {
+        parallel_nd(MB, D, H, W, [&](dim_t mb, dim_t d, dim_t h, dim_t w) {
+                dim_t c_off[C];
+                for(dim_t c=0; c<C; ++c) c_off[c] = offset<tag>(
+                        data_d, mb,stride_mb, c,C, d,D, h,H, w,W );
 
-            dim_t c_off0 = offset<tag>(data_d, mb,stride_mb, 0,C, 0,D, h,H, w,W );
-            dim_t const c_stride = (tag==nhwc? dim_t{1}: dim_t{H*W});
-#define COFF(c) (c_off0 + (c) * c_stride)
-#if 0 // correct, but slow loop order
-            // nchw ic2002ih10 ic32777ih10  1.35, 22.41 ms
-            for(dim_t c=clo; c<chi; ++c) { // c ~ central channel
-                DEFINE_HALFSIZE_RANGE(c_st, c_en, c, 0, C);
-                for(dim_t k = c_st; k < c_en; ++k) { // k ~ lrn window
-                    const acc_data_t s = src[COFF(k)]; // lrn window datum
-                    sum[c-clo] += s * s; // accum central sum
-                }
-            }
-#else // Two-stage loop limits for reordered loops
-            // nchw ic2002ih10 ic32777ih10 0.179, 2.97 ms (7.5x speedup)
-            NOVEC for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
-                // oc_lo+l >= clo ==> oc_lo >= clo-l
-                // (oc_hi-1)+l < chi  ==> oc_hi < chi-l+1
-                // ... valid c in range [0,C) "for sure"
-                dim_t oc_lo = (0-l < 0? 0: 0-l);
-                dim_t oc_hi = (C-l > C? C: C-l);
-                // ... (tricky) THEN adjusted to [clo,chi]
-                if (oc_lo < clo) oc_lo = clo;
-                if (oc_hi > chi) oc_hi = chi;
-                for(dim_t c=oc_lo; c<oc_hi; ++c) {   // central chan
-                    data_t const s = src[COFF(c+l)]; // lrn window datum
-                    sum[c-clo] += SQUARE( acc_data_t{s} );
-                }
-            }
+                acc_data_t sum[C];
+                for(dim_t i=0; i<C; ++i) sum[i] = acc_data_t{0};
+
+                dim_t const __restrict__* const rc_off = &c_off[0];
+                acc_data_t /* */ __restrict__ * const rsum = &sum[0];
+                data_t     const __restrict__ * const rsrc = &src[0];
+
+                NOVEC for_(dim_t c = 0-half_size; c <= 0+half_size; ++c) {
+#if 0 // 5.49 ms (bad)
+                    acc_data_t /* */ __restrict__ * const rsum = &sum[half_size];
+                    LISTVEC for(dim_t oc=0; oc<C; ++oc) {
+                        bool ok = oc+c>=0 && oc+c<C;
+                        acc_data_t s = ok? rsrc[c_off[half_size+oc+c]] : data_t{0};
+                        rsum[oc] += s*s;
+                    }
+#else // adjust loop lims, avoid mask : 4.84 ms (bad, slightly better)
+                    // oc+c >= 0 ==> oc >= -c
+                    dim_t oc_lo = -c;
+                    if (oc_lo < 0) oc_lo = 0;
+
+                    // (oc_hi-1)+c < C  ==> oc_hi < C-c+1
+                    dim_t oc_hi = C-c;
+                    if (oc_hi > C) oc_hi = C;
+
+                    LISTVEC IVDEP() PragmaQuote(_NEC assume)//;
+                    for(dim_t oc=oc_lo; oc<oc_hi; ++oc) {
+                        data_t const s = src[c_off[oc+c]];
+                        sum[oc] += acc_data_t{s}*acc_data_t{s};
+                    }
 #endif
-            for(dim_t oc=clo; oc<chi; ++oc) {
-                float const sum_oc = k + alpha * sum[oc-clo] / summands;
-                dst[COFF(oc)] = static_cast<data_t>( src[COFF(oc)]
-                        * fast_negative_powf(sum_oc, beta));
-            }
-#undef COFF
-        });
+                }
+                for(dim_t i=0; i<C; ++i)
+                    sum[i] = k + alpha * sum[i] / summands;
+                for(dim_t i=0; i<C; ++i) {
+                    dst[c_off[i]] = static_cast<data_t>( src[c_off[i]]
+                            * fast_negative_powf(sum[i], beta));
+                }
+            });
     }
-    // maybe get rid of next specialization?
-    // orig, restrict C<=stack_channels, simpler code
+#elif 0
+    // DEV: work on the formula one only :
+    // --lrn --tag=nchw ic2002ih10 --tag=ncdhw ic2002id10
+    // inline the lambda: 2.31 (worse?) 15.8 ms
+    // .LL adjust, stack arrays past end, reorder loops : 5.49 (way worse)
+    // remove mask (recalc new inner loop lims)
+    else if ((tag==nchw || tag==nhwc) && across_channels && C <= stack_channels
+            && 2*half_size+1 <= MVL) {
+        // use strided load instead of vector gather
+        parallel_nd(MB, D, H, W, [&](dim_t mb, dim_t d, dim_t h, dim_t w) {
+                dim_t c_off0 = offset<tag>(data_d, mb,stride_mb, 0,C, d,D, h,H, w,W );
+                dim_t const c_stride = (tag==nhwc? dim_t{1}: dim_t{H*W});
+#define COFF(c) (c_off0 + (c) * c_stride)
+
+                acc_data_t sum[C];
+                for(dim_t i=0; i<C; ++i) sum[i] = acc_data_t{0};
+
+                acc_data_t /* */ __restrict__ * const rsum = &sum[0];
+                data_t     const __restrict__ * const rsrc = &src[0];
+
+#if 0 // a bit slower?
+                //assert( 2*half_size+1 <= MVL );
+                // split the limit calc into (short) vectors
+                dim_t oc_lov[2*half_size+1]; VREG(oc_lov);
+                dim_t oc_hiv[2*half_size+1]; VREG(oc_hiv);
+                ShortLoop() for_(dim_t c = 0-half_size; c <= 0+half_size; ++c) {
+                    // oc+c >= 0 ==> oc >= -c
+                    dim_t oc_lo = -c;
+                    if (oc_lo < 0) oc_lo = 0;
+                    oc_lov[half_size+c] = oc_lo;
+                }
+                for_(dim_t c = 0-half_size; c <= 0+half_size; ++c) {
+                    // (oc_hi-1)+c < C  ==> oc_hi < C-c+1
+                    dim_t oc_hi = C-c;
+                    if (oc_hi > C) oc_hi = C;
+                    oc_hiv[half_size+c] = oc_hi;
+                }
+#endif
+
+                NOVEC for_(dim_t c = 0-half_size; c <= 0+half_size; ++c) {
+                    // oc_lo+c >= 0 ==> oc_lo >= -c
+                    // (oc_hi-1)+c < C  ==> oc_hi < C-c+1
+                    // ... and in range [0,C)
+#if 0
+                    dim_t oc_lo = -c;
+                    if (oc_lo < 0) oc_lo = 0;
+
+                    dim_t oc_hi = C-c;
+                    if (oc_hi > C) oc_hi = C;
+#else
+                    dim_t const oc_lo = ( -c < 0? 0:  -c);
+                    dim_t const oc_hi = (C-c > C? C: C-c);
+#endif
+
+                    LISTVEC IVDEP() PragmaQuote(_NEC assume)//;
+                    //for(dim_t oc=oc_lov[half_size+c]; oc<oc_hiv[half_size+c]; ++oc)
+                    for(dim_t oc=oc_lo; oc<oc_hi; ++oc)
+                    {
+                        data_t const s = rsrc[COFF(oc+c)];
+                        rsum[oc] += SQUARE( acc_data_t{s} );
+                    }
+                }
+#if 1 // 0.184 ms
+                for(dim_t i=0; i<C; ++i) {
+                    auto const sum_i = k + alpha * sum[i] / summands;
+                    dst[COFF(i)] = static_cast<data_t>( src[COFF(i)]
+                            * fast_negative_powf(sum_i, beta));
+                }
+#elif 1 // 0.184 ms
+                for(dim_t i=0; i<C; ++i) {
+                    dst[COFF(i)] = static_cast<data_t>(
+                            src[COFF(i)] * fast_negative_powf(
+                                k + alpha * sum[i] / summands,
+                                beta));
+                }
+#else // 0.185 ms
+                LISTVEC for(dim_t cs=0; cs<C; ++cs){
+                    //sum[cs] = k + alpha * sum[cs] / summands;
+                    acc_data_t const sum_cs = k + alpha * sum[cs] / summands;
+                    dim_t const oc_off = offset<tag>( data_d, mb,stride_mb,
+                            0+cs,C, 0,1, h,H, w,W );
+                    dst[oc_off] = static_cast<data_t>(
+                            src[oc_off]
+                            * fast_negative_powf(
+                                sum_cs, //k + alpha * sum[cs] / summands,
+                                beta));
+                }
+#endif
+            });
+    }
+#elif 0 // cleaan up nchw/nhhwc branch
+    // --lrn --tag=nchw ic2002ih10 --tag=ncdhw ic2002id10 0.184 ms
+    else if ((tag==nchw || tag==nhwc) && across_channels && C <= stack_channels
+            && 2*half_size+1 <= MVL) {
+        // use strided load instead of vector gather
+        parallel_nd(MB, D, H, W, [&](dim_t mb, dim_t d, dim_t h, dim_t w) {
+                dim_t c_off0 = offset<tag>(data_d, mb,stride_mb, 0,C, d,D, h,H, w,W );
+                dim_t const c_stride = (tag==nhwc? dim_t{1}: dim_t{H*W});
+#define COFF(c) (c_off0 + (c) * c_stride)
+                acc_data_t sum[C];
+                for(dim_t i=0; i<C; ++i) sum[i] = acc_data_t{0};
+
+                NOVEC for_(dim_t c = 0-half_size; c <= 0+half_size; ++c) {
+                    // oc_lo+c >= 0 ==> oc_lo >= -c
+                    // (oc_hi-1)+c < C  ==> oc_hi < C-c+1
+                    // ... and in range [0,C)
+                    dim_t const oc_lo = ( -c < 0? 0:  -c);
+                    dim_t const oc_hi = (C-c > C? C: C-c);
+                    //LISTVEC IVDEP() PragmaQuote(_NEC assume)//;
+                    for(dim_t oc=oc_lo; oc<oc_hi; ++oc)
+                    {
+                        data_t const s = src[COFF(oc+c)];
+                        sum[oc] += SQUARE( acc_data_t{s} );
+                    }
+                }
+#if 1 // 0.184 ms
+                for(dim_t i=0; i<C; ++i) {
+                    auto const sum_i = k + alpha * sum[i] / summands;
+                    dst[COFF(i)] = static_cast<data_t>( src[COFF(i)]
+                            * fast_negative_powf(sum_i, beta));
+                }
+#elif 1 // 0.184 ms
+                for(dim_t i=0; i<C; ++i) {
+                    dst[COFF(i)] = static_cast<data_t>(
+                            src[COFF(i)] * fast_negative_powf(
+                                k + alpha * sum[i] / summands,
+                                beta));
+                }
+#else // 0.185 ms
+                LISTVEC for(dim_t cs=0; cs<C; ++cs){
+                    //sum[cs] = k + alpha * sum[cs] / summands;
+                    acc_data_t const sum_cs = k + alpha * sum[cs] / summands;
+                    dim_t const oc_off = offset<tag>( data_d, mb,stride_mb,
+                            0+cs,C, 0,1, h,H, w,W );
+                    dst[oc_off] = static_cast<data_t>(
+                            src[oc_off]
+                            * fast_negative_powf(
+                                sum_cs, //k + alpha * sum[cs] / summands,
+                                beta));
+                }
+#endif
+            });
+    }
+#elif 1 // cleaan up nchw/nhhwc branch
+    // --lrn --tag=nchw ic2002ih10 --tag=ncdhw ic2002id10 0.184 ms
+    else if ((tag==nchw || tag==nhwc) && across_channels && C <= stack_channels
+            && 2*half_size+1 <= MVL) {
+        // use strided load instead of vector gather
+        parallel_nd(MB, D, H, W, [&](dim_t mb, dim_t d, dim_t h, dim_t w) {
+                dim_t c_off0 = offset<tag>(data_d, mb,stride_mb, 0,C, d,D, h,H, w,W );
+                dim_t const c_stride = (tag==nhwc? dim_t{1}: dim_t{H*W});
+#define COFF(c) (c_off0 + (c) * c_stride)
+                acc_data_t sum[C];
+                for(dim_t i=0; i<C; ++i) sum[i] = acc_data_t{0};
+
+                NOVEC for_(dim_t c = 0-half_size; c <= 0+half_size; ++c) {
+                    // oc_lo+c >= 0 ==> oc_lo >= -c
+                    // (oc_hi-1)+c < C  ==> oc_hi < C-c+1
+                    // ... and in range [0,C)
+                    dim_t const oc_lo = ( -c < 0? 0:  -c);
+                    dim_t const oc_hi = (C-c > C? C: C-c);
+                    for(dim_t oc=oc_lo; oc<oc_hi; ++oc) {
+                        data_t const s = src[COFF(oc+c)];
+                        sum[oc] += SQUARE( acc_data_t{s} );
+                    }
+                }
+                for(dim_t i=0; i<C; ++i) {
+                    auto const sum_i = k + alpha * sum[i] / summands;
+                    dst[COFF(i)] = static_cast<data_t>( src[COFF(i)]
+                            * fast_negative_powf(sum_i, beta));
+                }
+            });
+    }
+#endif
+#if 0 // orig ms : 0.184 0.162 2.34 2.34
+    // --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=FWD_D ic2002ih10iw10
     else if ((tag==nChw8c || tag==nChw16c) && across_channels && C <= stack_channels)
     {
-        // 16c ic2002ih10 ic32777ih10 0.196 37.2 ms (37.2 NOT HERE)
-        //
-        //#if 0 // orig ms : dense: 0.184 0.162 blocked: **2.34 2.34 ms**
-        // --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=FWD_D ic2002ih10iw10
-        //#elif 0
-        //#elif 0 // cleanup : 1.07, 1.06 ms
-        //#elif 1 // run-time array --> compile-time size ==> 0.199, 0.203 ms
+        //auto ker_across_vec = [&src,&dst,&stride_mb,&C,&D,&H,&W,&half_size,&k,&alpha,&beta,&summands](
+        auto ker_across_vec = [&](
+                size_t * const dst_off,     // oc from 
+                dim_t const mb,             // 0 .. C-1
+                dim_t const od, dim_t const oh, dim_t const ow) {
+            acc_data_t sum[C];
+            FOR_CHAN sum[i]= 0;
+            FOR_CHAN {
+                DEFINE_HALFSIZE_RANGE(c_st, c_en, i, 0, C);
+                for(dim_t c = c_st; c < c_en; ++c) {
+                    const acc_data_t s = src[dst_off[c]];
+                    sum[i] += s * s;
+                }
+            }
+            FOR_CHAN sum[i] = k + alpha * sum[i] / summands;
+            FOR_CHAN dst[dst_off[i]] = static_cast<data_t>( src[dst_off[i]]
+                        * fast_negative_powf(sum[i], beta));
+        };
+
+        // size^{2 or 3}? XXX
+        // and MB*D*H*W work amount sufficiently large for omp? XXX
+        // vectorize across channels, using fast offsets calculated on stack.
+        parallel_nd(MB, D, H, W, [&](dim_t mb, dim_t d, dim_t h, dim_t w) {
+                size_t data_off[C];
+                for(unsigned c=0U; c<C; ++c) data_off[c] = offset<tag>(
+                        data_d, mb,stride_mb, c,C, d,D, h,H, w,W );
+                ker_across_vec(&data_off[0], mb, /*c,*/ d, h, w);
+            });
+    }
+#elif 0
+    else if ((tag==nChw8c || tag==nChw16c) && across_channels && C <= stack_channels)
+    {
+        parallel_nd(MB, D, H, W, [&](dim_t mb, dim_t d, dim_t h, dim_t w) {
+                dim_t c_off0 = offset<tag>(data_d, mb,stride_mb, 0,C, d,D, h,H, w,W );
+
+                acc_data_t sum[C];
+                for(dim_t i=0; i<C; ++i) sum[i] = acc_data_t{0};
+
+                acc_data_t /* */ __restrict__ * const rsum = &sum[0];
+                data_t     const __restrict__ * const rsrc = &src[0];
+
+                size_t data_off[C];
+#define OFF(blksize) (mb * stride_mb + (c / (blksize)) * H * W * (blksize) \
+        + h * W * (blksize) + w * (blksize) + c % (blksize))
+#if 0
+                // unvec?
+                for(dim_t c=0U; c<C; ++c)
+                    data_off[c] = offset<tag>(
+                        data_d, mb,stride_mb, c,C, d,D, h,H, w,W );
+#elif 1 // 2.34 ms ==> 1.63, 1.51
+                    // add srcdata ==> 1.07, 1.08 ms (partial vec)
+                // these vectorize
+                acc_data_t srcdata[C];
+                if (tag == nChw8c)
+                    //PragmaQuote(_NEC nosync) PragmaQuote(_NEC gather_reorder) PragmaQuote(_NEC list_vector) PragmaQuote(_NEC ivdep) PragmaQuote(_NEC lstval) PragmaQuote(_NEC assume)
+                    for(dim_t c=0U; c<C; ++c){
+                    data_off[c] = OFF(8);
+                    srcdata[c] = src[data_off[c]];
+                }
+                if (tag == nChw16c)
+                    //PragmaQuote(_NEC nosync) PragmaQuote(_NEC gather_reorder) PragmaQuote(_NEC list_vector) PragmaQuote(_NEC ivdep) PragmaQuote(_NEC lstval) PragmaQuote(_NEC assume)
+                    for(dim_t c=0U; c<C; ++c) {
+                    data_off[c] = OFF(16);
+                    srcdata[c] = src[data_off[c]];
+                }
+#endif
+
+#if 0
+                // 'l' for lrn window offset from 'c'
+                for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                    // oc_lo+l >= 0 ==> oc_lo >= -l
+                    // (oc_hi-1)+l < C  ==> oc_hi < C-l+1
+                    // ... and in range [0,C)
+                    dim_t const oc_lo = ( -l < 0? 0:  -l);
+                    dim_t const oc_hi = (C-l > C? C: C-l);
+
+#if 0
+                    //unvec rsum !!!
+                    LISTVEC IVDEP() PragmaQuote(_NEC assume)//;
+                    for(dim_t oc=oc_lo+l; oc<oc_hi+l; ++oc)
+                    {
+                        data_t const s = rsrc[data_off[oc]];
+                        rsum[oc-l] += SQUARE( acc_data_t{s} );
+                    }
+#elif 0 // 0.224 0.239 ms slower
+                    if (tag == nChw8c)
+                        for(dim_t c=oc_lo+l; c<oc_hi+l; ++c) {
+                            data_t const s = src[ OFF(8) ];
+                            rsum[c-l] += SQUARE( acc_data_t{s} );
+                        }
+                    if (tag == nChw16c)
+                        for(dim_t c=oc_lo+l; c<oc_hi+l; ++c) {
+                            data_t const s = rsrc[ OFF(16) ];
+                            rsum[c-l] += SQUARE( acc_data_t{s} );
+                        }
+#elif 1 // 1.61, 1.51 
+                    auto __restrict__ const* const rd_off = &data_off[0];
+                    // nothing seems to convince compiler that it shoud vectorize
+                    PragmaQuote(_NEC nosync) PragmaQuote(_NEC gather_reorder) PragmaQuote(_NEC list_vector) PragmaQuote(_NEC ivdep) PragmaQuote(_NEC lstval) PragmaQuote(_NEC assume)
+                    for(dim_t oc=oc_lo; oc<oc_hi; ++oc) {
+                        acc_data_t ss = rsrc[ rd_off[oc+l] ];
+                        rsum[oc] += SQUARE( ss );
+                    }
+#endif
+                }
+#else
+                //acc_data_t ldata[C];
+                //auto __restrict__ const* const rd_off = &data_off[0];
+                //PragmaQuote(_NEC nosync) PragmaQuote(_NEC gather_reorder) PragmaQuote(_NEC list_vector) PragmaQuote(_NEC ivdep) PragmaQuote(_NEC lstval) PragmaQuote(_NEC assume)
+                //for(dim_t oc=0; oc<C; ++oc) {
+                //    ldata[oc] = rsrc[ rd_off[oc] ];
+                //}
+                for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                    // oc_lo+l >= 0 ==> oc_lo >= -l
+                    // (oc_hi-1)+l < C  ==> oc_hi < C-l+1
+                    // ... and in range [0,C)
+                    dim_t const oc_lo = ( -l < 0? 0:  -l);
+                    dim_t const oc_hi = (C-l > C? C: C-l);
+                    //PragmaQuote(_NEC novovertake) PragmaQuote(_NEC novob)
+                    for(dim_t oc=oc_lo; oc<oc_hi; ++oc)
+                    {
+                        rsum[oc] += SQUARE( srcdata[oc+l] );
+                    }
+                }
+#endif
+                LISTVEC for(dim_t oc=0; oc<C; ++oc){
+                    acc_data_t const sum_cs = k + alpha * sum[oc] / summands;
+                    //dim_t const oc_off = offset<tag>( data_d, mb,stride_mb,
+                    //        0+oc,C, 0,1, h,H, w,W );
+                    auto const oc_off = data_off[oc];
+                    dst[oc_off] = static_cast<data_t>(
+                            src[oc_off]
+                            * fast_negative_powf(
+                                sum_cs, //k + alpha * sum[oc] / summands,
+                                beta));
+                }
+            });
+    }
+#elif 0 // cleanup : 1.07, 1.06 ms
+    else if ((tag==nChw8c || tag==nChw16c) && across_channels && C <= stack_channels)
+    {
+        parallel_nd(MB, D, H, W, [&](dim_t mb, dim_t d, dim_t h, dim_t w) {
+                dim_t c_off0 = offset<tag>(data_d, mb,stride_mb, 0,C, d,D, h,H, w,W );
+
+                acc_data_t sum[C];
+                for(dim_t i=0; i<C; ++i) sum[i] = acc_data_t{0};
+
+                acc_data_t /* */ __restrict__ * const rsum = &sum[0];
+                data_t     const __restrict__ * const rsrc = &src[0];
+
+                size_t data_off[C];
+#define OFF(blksize) (mb * stride_mb + (c / (blksize)) * H * W * (blksize) \
+        + h * W * (blksize) + w * (blksize) + c % (blksize))
+                // partially vectorized
+                acc_data_t srcdata[C];
+                if (tag == nChw8c)
+                    //PragmaQuote(_NEC nosync) PragmaQuote(_NEC gather_reorder) PragmaQuote(_NEC list_vector) PragmaQuote(_NEC ivdep) PragmaQuote(_NEC lstval) PragmaQuote(_NEC assume)
+                    for(dim_t c=0U; c<C; ++c){
+                        data_off[c] = OFF(8);
+                        srcdata[c] = src[data_off[c]];
+                    }
+                if (tag == nChw16c)
+                    //PragmaQuote(_NEC nosync) PragmaQuote(_NEC gather_reorder) PragmaQuote(_NEC list_vector) PragmaQuote(_NEC ivdep) PragmaQuote(_NEC lstval) PragmaQuote(_NEC assume)
+                    for(dim_t c=0U; c<C; ++c) {
+                        data_off[c] = OFF(16);
+                        srcdata[c] = src[data_off[c]];
+                    }
+
+                for (dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                    // oc_lo+l >= 0 ==> oc_lo >= -l
+                    // (oc_hi-1)+l < C  ==> oc_hi < C-l+1
+                    // ... and in range [0,C)
+                    dim_t const oc_lo = ( -l < 0? 0:  -l);
+                    dim_t const oc_hi = (C-l > C? C: C-l);
+                    PragmaQuote(_NEC novovertake) PragmaQuote(_NEC novob)
+                    // unvectorized !
+                    IVDEP() for(dim_t oc=oc_lo; oc<oc_hi; ++oc)
+                        sum[oc] += SQUARE( srcdata[oc+l] );
+                }
+                LISTVEC for(dim_t oc=0; oc<C; ++oc){
+                    acc_data_t const sum_cs = k + alpha * sum[oc] / summands;
+                    auto const oc_off = data_off[oc];
+                    dst[oc_off] = static_cast<data_t>(
+                            src[oc_off]
+                            * fast_negative_powf(
+                                sum_cs, //k + alpha * sum[oc] / summands,
+                                beta));
+                }
+            });
+    }
+#elif 1 // run-time array --> max-sized compile-time size ==> 0.199, 0.203 ms
+    else if ((tag==nChw8c || tag==nChw16c) && across_channels && C <= stack_channels)
+    {
         assert( D==1 );
         parallel_nd(MB, H, W, [&](dim_t mb, dim_t h, dim_t w) {
                 acc_data_t sum[C];
@@ -441,82 +776,7 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
                 }
             });
     }
-    // any number of channels : not hugely slower than C<=stack_channels
-    else if ((tag==nChw8c || tag==nChw16c) && across_channels && half_size<100)
-    {
-        // 16c ic2002ih10 ic32777ih10 0.196 37.2 ms
-        // --> here 1.07 19.42
-        // --> 0.417 8.13 (adjust [] sizes)
-        // now 2 over-sized arrays (uggh) ---> 0.204 2.00 ms
-        //
-        // XXX 2.00 ms is even faster than nchw (2.97 ms)
-        //     So perhaps copying into stride-4 srcdata[] vector load area
-        //     is universally "a good thing" ? ? ?
-        //
-        //#if 0 // orig ms : dense: 0.184 0.162 blocked: **2.34 2.34 ms**
-        // --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=FWD_D ic2002ih10iw10
-        //#elif 0
-        //#elif 0 // cleanup : 1.07, 1.06 ms
-        //#elif 1 // run-time array --> compile-time size ==> 0.199, 0.203 ms
-        assert( D==1 );
-        dim_t const blksz = stack_friendly_blksz(C);
-        assert( blksz <= stack_channels );
-        using std::cout; using std::endl;
-        parallel_nd(MB, utils::div_up(C, blksz), H, W,
-                [&](dim_t const mb, dim_t const c_blk, dim_t const h, dim_t const w) {
-            dim_t const clo = c_blk * blksz;
-            dim_t const chi = nstl::min(clo + blksz, C);
-            dim_t const cspan = chi - clo;
-            //acc_data_t sum[cspan];
-            acc_data_t sum[stack_channels]; // ? ? ?
-            for(dim_t c=0; c<cspan; ++c) sum[c]= acc_data_t{0};
-
-            // for arb C, clo, chi, we need data_off and srcdata possibly
-            // half_size past ends
-            dim_t const clolo = nstl::max(clo - half_size + 0, (dim_t)0);
-            dim_t const chihi = nstl::min(chi + half_size + 1, C);
-            dim_t offset_span = chihi - clolo;
-            size_t data_off[offset_span];
-            for (dim_t c=clolo; c<chihi; ++c) {
-                data_off[c-clolo] = offset<tag>(data_d, mb,stride_mb,
-                        c,C, 0,D, h,H, w,W );
-            }
-
-            // srcdata: vec gather once --> linear vec loads later
-            // (and potentially single conversion to acc_data_t)
-            //acc_data_t srcdata[C];
-            // Undesirable workaround:
-            //   If runtime-array, nc++ gets confused about vector dependencies.
-            //   But making it compile-time size (max size) now vectorizes.
-            // NO amount of pragmas could convince nc++ otherwise
-            //
-            acc_data_t srcdata[stack_channels+2*100];
-            //acc_data_t srcdata[offset_span];  // kills vectorizn !!!
-
-            // Finding : ONE of srcdata or sum must have compile-time size
-
-            // (loop combine with next kills vectorization)
-            for (dim_t c=0; c<offset_span; ++c) {
-                srcdata[c] = src[data_off[c]]; // c=0 ~ channel clolo
-            }
-
-            for (dim_t l = 0-half_size; l <= 0+half_size; ++l) {
-                dim_t oc_lo = ( -l < 0? 0:  -l);
-                dim_t oc_hi = (C-l > C? C: C-l);
-                // lapped range: extra adjust
-                if (oc_lo < clo) oc_lo = clo;
-                if (oc_hi > chi) oc_hi = chi;
-                // unvec !!! so made sum[] compile-time max dim :(
-                for(dim_t c=oc_lo; c<oc_hi; ++c)
-                    sum[c-clo] += SQUARE( srcdata[c+l-clolo] );
-            }
-            for(dim_t oc=clo; oc<chi; ++oc){
-                float const sum_oc = k + alpha * sum[oc-clo] / summands;
-                dst[data_off[oc-clolo]] = static_cast<data_t>( srcdata[oc-clolo]
-                        * fast_negative_powf(sum_oc, beta));
-            }
-        });
-    }
+#endif
     else if (across_channels) {
         // actually this will handle any number of channels,
         // as well as trivial ndims=2 case

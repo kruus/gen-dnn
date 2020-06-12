@@ -336,33 +336,126 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
                 ker_across_vec(&data_off[0], mb, /*c,*/ d, h, w);
             });
     }
-    // dense strided chan + lapped (no restriction on C)
+#if 0 // special case, dense fmt, C<=stack_channels
+    else if ((tag==nchw || tag==nhwc) && across_channels && C <= stack_channels) {
+        //#if 0
+        // DEV: work on the formula one only :
+        // --lrn --tag=nchw ic2002ih10 --tag=ncdhw ic2002id10
+        // inline the lambda: 2.31 (worse?) 15.8 ms
+        // .LL adjust, stack arrays past end, reorder loops : 5.49 (way worse)
+        // remove mask (recalc new inner loop lims)         : 0.184 ms
+        //#elif 0
+        // DEV: work on the formula one only :
+        // --lrn --tag=nchw ic2002ih10 --tag=ncdhw ic2002id10
+        // inline the lambda: 2.31 (worse?) 15.8 ms
+        // .LL adjust, stack arrays past end, reorder loops : 5.49 (way worse)
+        // remove mask (recalc new inner loop lims)
+        //#elif 0 // cleaan up nchw/nhhwc branch
+        // --lrn --tag=nchw ic2002ih10 --tag=ncdhw ic2002id10 0.184 ms
+        //#elif 1 // cleaan up nchw/nhhwc branch
+        // --lrn --tag=nchw ic2002ih10 --tag=ncdhw ic2002id10 0.184 ms
+        // use strided load instead of vector gather
+        parallel_nd(MB, D, H, W, [&](dim_t mb, dim_t d, dim_t h, dim_t w) {
+                dim_t c_off0 = offset<tag>(data_d, mb,stride_mb, 0,C, d,D, h,H, w,W );
+                dim_t const c_stride = (tag==nhwc? dim_t{1}: dim_t{H*W});
+                acc_data_t sum[C];
+                for(dim_t i=0; i<C; ++i) sum[i] = acc_data_t{0};
+
+#define COFF(c) (c_off0 + (c) * c_stride)
+                NOVEC for_(dim_t c = 0-half_size; c <= 0+half_size; ++c) {
+                    // oc_lo+c >= 0 ==> oc_lo >= -c
+                    // (oc_hi-1)+c < C  ==> oc_hi < C-c+1
+                    // ... and in range [0,C)
+                    dim_t const oc_lo = ( -c < 0? 0:  -c);
+                    dim_t const oc_hi = (C-c > C? C: C-c);
+                    for(dim_t oc=oc_lo; oc<oc_hi; ++oc) {
+                        data_t const s = src[COFF(oc+c)];
+                        sum[oc] += SQUARE( acc_data_t{s} );
+                    }
+                }
+                for(dim_t i=0; i<C; ++i) {
+                    auto const sum_i = k + alpha * sum[i] / summands;
+                    dst[COFF(i)] = static_cast<data_t>( src[COFF(i)]
+                            * fast_negative_powf(sum_i, beta));
+                }
+#undef COFF
+            });
+    }
+#endif
+    // lapped (no restriction on C) same speed
     else if ((tag==nchw || tag==nhwc) && across_channels) {
-        // C <= stack_channels orig: --tag=nchw,nhwc ic2002ih10 0.184 0.162 ms
+        // C <= stack_channels: --tag=nchw,nhwc ic2002ih10 0.184 0.162 ms
         // Large channels: split over threads, and overlap offset calcs,
         // because lrn window can extend half_size past the central range.
         dim_t const blksz = stack_friendly_blksz(C);
-        parallel_nd(MB, utils::div_up(C, blksz), H, W,
-                [&](dim_t const mb, dim_t const c_blk, dim_t const h, dim_t const w) {
+        //using std::cout;
+        //using std::endl;
+        //cout<<" blksz="<<blksz<<endl;
+        parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
+                [&](dim_t mb, dim_t c_blk, dim_t d, dim_t h, dim_t w) {
             dim_t const clo = c_blk * blksz;
             dim_t const chi = nstl::min(clo + blksz, C);
             dim_t const cspan = chi - clo;
             acc_data_t sum[cspan];
             for(dim_t c=0; c<cspan; ++c) sum[c]= 0;
+            //cout<<" csum["<<cspan<<"]"<<endl;
 
-            dim_t c_off0 = offset<tag>(data_d, mb,stride_mb, 0,C, 0,D, h,H, w,W );
+            dim_t c_off0 = offset<tag>(data_d, mb,stride_mb, 0,C, d,D, h,H, w,W );
             dim_t const c_stride = (tag==nhwc? dim_t{1}: dim_t{H*W});
 #define COFF(c) (c_off0 + (c) * c_stride)
+//#define COFF(c) offset<tag>(data_d, mb,stride_mb, c,C, d,D, h,H, w,W )
 #if 0 // correct, but slow loop order
             // nchw ic2002ih10 ic32777ih10  1.35, 22.41 ms
             for(dim_t c=clo; c<chi; ++c) { // c ~ central channel
                 DEFINE_HALFSIZE_RANGE(c_st, c_en, c, 0, C);
+                // c_st = max(i-half_size+0,0)
+                // c_en = min(i+half_size+1,C)
                 for(dim_t k = c_st; k < c_en; ++k) { // k ~ lrn window
                     const acc_data_t s = src[COFF(k)]; // lrn window datum
                     sum[c-clo] += s * s; // accum central sum
                 }
             }
-#else // Two-stage loop limits for reordered loops
+#elif 0 // loop reorder : POC, oc_lo,oc_hi limits are trickier for lapped case!
+            //cout<<endl;
+            // nchw ic2002ih10 ic32777ih10
+            NOVEC for_(dim_t l = 0-half_size; l < 0+half_size+1; ++l) {
+                // for c in [clo,chi)
+                //   c_st = max(i-half_size+0,0)
+                //   c_en = min(i+half_size+1,C)
+                //
+                // oc_lo+l >= clo ==> oc_lo >= clo-l
+                // (oc_hi-1)+l < chi  ==> oc_hi < chi-l+1
+                // ... and in range [0,C)
+                cout<<" clo-l="<<clo-l;
+                dim_t oc_lo = ( 0-l < 0? 0: 0-l);
+                cout<<" oc_lo-->"<<oc_lo;
+                if (oc_lo < clo) oc_lo = clo;
+                cout<<" -->"<<oc_lo;
+                cout<<"     chi-l="<<chi-l;
+                dim_t oc_hi = (C-l > C? C: C-l);
+                cout<<" oc_hi-->"<<oc_hi;
+                if( oc_hi > chi ) oc_hi = chi;
+                cout<<" -->"<<oc_hi<<endl;
+                // oc+l>=0 ==> oc>=0-l      AND oc>=clo
+                cout<<"clo,chi="<<clo<<","<<chi<<"  l="<<l
+                    <<"  clo+l = "<<clo+l<<"  chi+l = "<<chi+l
+                    <<"     oc_lo="<<oc_lo<<", oc_hi="<<oc_hi
+                    <<"    ";
+                NOVEC for(dim_t c=clo; c<chi; ++c) { // for(central)
+                    bool src_ok = c+l >= 0 && c+l < C;
+                    if (src_ok) { // valid lrn channel?
+                        acc_data_t const s = src[COFF(c+l)]; // lrn window datum
+                        sum[c-clo] += s * s;
+                    }
+                    if (c<clo+5 || c>chi-5) {
+                        cout<<(src_ok?" ":" !")<<c<<","<<l;
+                    }else if (c==clo+5) {
+                        cout<<" ... ";
+                    }
+                }
+                cout<<endl;
+            }
+#else // Two-stage loop limits
             // nchw ic2002ih10 ic32777ih10 0.179, 2.97 ms (7.5x speedup)
             NOVEC for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
                 // oc_lo+l >= clo ==> oc_lo >= clo-l
@@ -380,19 +473,15 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
             }
 #endif
             for(dim_t oc=clo; oc<chi; ++oc) {
-                float const sum_oc = k + alpha * sum[oc-clo] / summands;
+                auto const sum_oc = k + alpha * sum[oc-clo] / summands;
                 dst[COFF(oc)] = static_cast<data_t>( src[COFF(oc)]
                         * fast_negative_powf(sum_oc, beta));
             }
 #undef COFF
         });
     }
-    // maybe get rid of next specialization?
-    // orig, restrict C<=stack_channels, simpler code
     else if ((tag==nChw8c || tag==nChw16c) && across_channels && C <= stack_channels)
     {
-        // 16c ic2002ih10 ic32777ih10 0.196 37.2 ms (37.2 NOT HERE)
-        //
         //#if 0 // orig ms : dense: 0.184 0.162 blocked: **2.34 2.34 ms**
         // --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=FWD_D ic2002ih10iw10
         //#elif 0
@@ -440,82 +529,6 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
                                 beta));
                 }
             });
-    }
-    // any number of channels : not hugely slower than C<=stack_channels
-    else if ((tag==nChw8c || tag==nChw16c) && across_channels && half_size<100)
-    {
-        // 16c ic2002ih10 ic32777ih10 0.196 37.2 ms
-        // --> here 1.07 19.42
-        // --> 0.417 8.13 (adjust [] sizes)
-        // now 2 over-sized arrays (uggh) ---> 0.204 2.00 ms
-        //
-        // XXX 2.00 ms is even faster than nchw (2.97 ms)
-        //     So perhaps copying into stride-4 srcdata[] vector load area
-        //     is universally "a good thing" ? ? ?
-        //
-        //#if 0 // orig ms : dense: 0.184 0.162 blocked: **2.34 2.34 ms**
-        // --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=FWD_D ic2002ih10iw10
-        //#elif 0
-        //#elif 0 // cleanup : 1.07, 1.06 ms
-        //#elif 1 // run-time array --> compile-time size ==> 0.199, 0.203 ms
-        assert( D==1 );
-        dim_t const blksz = stack_friendly_blksz(C);
-        assert( blksz <= stack_channels );
-        using std::cout; using std::endl;
-        parallel_nd(MB, utils::div_up(C, blksz), H, W,
-                [&](dim_t const mb, dim_t const c_blk, dim_t const h, dim_t const w) {
-            dim_t const clo = c_blk * blksz;
-            dim_t const chi = nstl::min(clo + blksz, C);
-            dim_t const cspan = chi - clo;
-            //acc_data_t sum[cspan];
-            acc_data_t sum[stack_channels]; // ? ? ?
-            for(dim_t c=0; c<cspan; ++c) sum[c]= acc_data_t{0};
-
-            // for arb C, clo, chi, we need data_off and srcdata possibly
-            // half_size past ends
-            dim_t const clolo = nstl::max(clo - half_size + 0, (dim_t)0);
-            dim_t const chihi = nstl::min(chi + half_size + 1, C);
-            dim_t offset_span = chihi - clolo;
-            size_t data_off[offset_span];
-            for (dim_t c=clolo; c<chihi; ++c) {
-                data_off[c-clolo] = offset<tag>(data_d, mb,stride_mb,
-                        c,C, 0,D, h,H, w,W );
-            }
-
-            // srcdata: vec gather once --> linear vec loads later
-            // (and potentially single conversion to acc_data_t)
-            //acc_data_t srcdata[C];
-            // Undesirable workaround:
-            //   If runtime-array, nc++ gets confused about vector dependencies.
-            //   But making it compile-time size (max size) now vectorizes.
-            // NO amount of pragmas could convince nc++ otherwise
-            //
-            acc_data_t srcdata[stack_channels+2*100];
-            //acc_data_t srcdata[offset_span];  // kills vectorizn !!!
-
-            // Finding : ONE of srcdata or sum must have compile-time size
-
-            // (loop combine with next kills vectorization)
-            for (dim_t c=0; c<offset_span; ++c) {
-                srcdata[c] = src[data_off[c]]; // c=0 ~ channel clolo
-            }
-
-            for (dim_t l = 0-half_size; l <= 0+half_size; ++l) {
-                dim_t oc_lo = ( -l < 0? 0:  -l);
-                dim_t oc_hi = (C-l > C? C: C-l);
-                // lapped range: extra adjust
-                if (oc_lo < clo) oc_lo = clo;
-                if (oc_hi > chi) oc_hi = chi;
-                // unvec !!! so made sum[] compile-time max dim :(
-                for(dim_t c=oc_lo; c<oc_hi; ++c)
-                    sum[c-clo] += SQUARE( srcdata[c+l-clolo] );
-            }
-            for(dim_t oc=clo; oc<chi; ++oc){
-                float const sum_oc = k + alpha * sum[oc-clo] / summands;
-                dst[data_off[oc-clolo]] = static_cast<data_t>( srcdata[oc-clolo]
-                        * fast_negative_powf(sum_oc, beta));
-            }
-        });
     }
     else if (across_channels) {
         // actually this will handle any number of channels,

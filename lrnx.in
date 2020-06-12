@@ -1,0 +1,4 @@
+--tag=nchw,nChw16c --alg=ACROSS --dir=FWD_D ic2002ih10iw10
+--tag=nchw,nChw16c --alg=ACROSS --dir=FWD_D ic32777ih10iw10
+--tag=ncdhw --alg=ACROSS --dir=FWD_D ic2002id10
+--tag=ncdhw --alg=ACROSS --dir=FWD_D ic32777id10

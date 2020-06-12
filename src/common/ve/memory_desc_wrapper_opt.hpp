@@ -112,6 +112,8 @@ struct CoordRegs {
 template<unsigned dim, typename Crd = unsigned, typename Pos=size_t>
 struct CoordsFor : public CoordRegs<Crd,dim> {
     typedef CoordRegs<Crd,dim> Base;
+    typedef Crd crd_t;
+    typedef Pos pos_t;
     private:
     static typename std::array<Crd,dim> getspan(std::array<Crd,dim>& h, std::array<Crd,dim>& l) {
         std::array<Crd,dim> ret;
@@ -152,9 +154,9 @@ struct CoordsFor : public CoordRegs<Crd,dim> {
     /// Use `step()` which returns true and next batch (or false).
     unsigned get_vl()  const {return vl;}
     /// how many coords implied by for-loop limits?
-    unsigned get_sz()  const {return sz;}
+    Pos get_sz()  const {return sz;}
     /// Within \c sz, at simd batch [pos..po+vl-1] are we at?
-    unsigned get_pos()  const {return pos;}
+    Pos get_pos()  const {return pos;}
     /// In this class, `dim` is a compile-time template param
     unsigned constexpr get_dim() const {return dim;}
     std::array<Crd,dim> const& get_lo() const { return ilo; }
@@ -281,6 +283,8 @@ template<unsigned MaxDims=DNNL_MAX_NDIMS, typename Crd = unsigned, typename Pos=
 struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
 #define COORDSFORND_EXTEND 0 /*experimental feature, useless? */
     typedef CoordRegs<Crd,MaxDims> Base;
+    typedef Crd crd_t;
+    typedef Pos pos_t;
     CoordsForNd() : dim(0), vl(0), ilo{0}, ihi{0}, sz(0), pos(0) {}
 
     Base /* */& base() /* */ { return *this; }
@@ -294,6 +298,8 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
     unsigned get_dim() const {return dim;}
     Pos get_sz() const {return sz;}
     Pos get_pos() const {return pos;}
+    // TODO ex. if dim = 3: ((dim_t)(od-d_st} * (h_en-h_st) + (oh-h_st)) * (w_en-w_st) + (ow-w_st);
+    // template<typename Coords...> Coords::pos_t pos_of(...) {...};
     /// unchecked lo for loop limit
     Crd get_lo(unsigned const dim)  const { return ilo[dim]; }
     Crd get_hi(unsigned const dim)  const { return ihi[dim]; }
@@ -699,7 +705,8 @@ public:
                         }
                     }
                     // "dense-layout" coords in vp --> output p_offset
-                    vec_off_v(vp32, &p_offsets[lb], llen, is_pos_padded);
+                    vec_off_vtmp(vp32, &p_offsets[lb], llen, is_pos_padded);
+                    //      ^^^^  vp32 can be modified (it is temporary)
                 }
             } else
 #endif // VEC_U32
@@ -725,7 +732,8 @@ public:
                         }
                     }
                     // "dense-layout" coords in vp --> output p_offset
-                    vec_off_v(vp, &p_offsets[lb], llen, is_pos_padded);
+                    vec_off_vtmp(vp, &p_offsets[lb], llen, is_pos_padded);
+                    //      ^^^^  vp32 can be modified (it is temporary)
                 }
             }
 #undef SHORT_
@@ -734,20 +742,97 @@ public:
     }
 public:
     /** vector-of-physical-offsets version of \c off_v.
-     * Unlike \c off_v, we are \e private and can modify
-     * our coords \c vp, to save memory.
+     * Now that we're public, \c vp_in is \c const.
      *
      * \note This only does a MVL-long section at a time
-     * \note if is_pos_padded, coords \c vp will be modified.
+     * \note if is_pos_padded or inner_nblks, coords \c vp may be modified.
+     *
      */
-    void vec_off_v( VecPos & vp,         // list of coords (from vec_off_l)
+    void vec_off_v( VecPos const& vp_in,    // list of coords (from vec_off_l)
                       dim_t * p_offsets, // output physical offsets
                       int const noff,    // how many offsets in vp and p_offsets
                       bool is_pos_padded = false) const {
         assert(noff <= MVL);
         assert(is_blocking_desc());
         const blocking_desc_t &blk = blocking_desc();
-#ifndef NDEBUG
+#if 0 && !defined(NDEBUG)
+        unsigned nsame=0U;
+        for (int i=0; i<blk.inner_nblks; ++i) {
+            for (int j=i+1; j<blk.inner_nblks; ++j) {
+                if (blk.inner_idxs[i] == blk.inner_idxs[j])
+                    ++nsame;
+            }
+        }
+        assert( nsame == 0U ); // inner_idxs[] MUST be distinct
+#endif
+
+#define Short_ PragmaQuote(_NEC vector) PragmaQuote(_NEC nounroll)
+        const int nd = ndims();
+        assert( nd < 6 );
+        VecPos vp;
+        if (is_pos_padded) {
+            NOVEC_ ShortLoop() PragmaQuote(_NEC nounroll) PragmaQuote(_NEC loop_count(6))//;
+            for (int d = 0; d < nd; ++d) {
+               VEC_ for(int l = 0; l < noff; ++l) {
+                    vp.vp[d][l] = vp_in.vp[d][l] + padded_offsets()[d];
+               }
+            }
+        }else{
+            NOVEC_ ShortLoop() PragmaQuote(_NEC nounroll) PragmaQuote(_NEC loop_count(6))//;
+            for (int d = 0; d < nd; ++d) {
+               VEC_ for(int l = 0; l < noff; ++l) {
+                    vp.vp[d][l] = vp_in.vp[d][l];
+               }
+            }
+        }
+
+        // phys[] : a vreg mirror of p_offsets[noff] output, until final vector store
+        uint64_t phys[MVL];
+        _Pragma("_NEC vreg(phys)")
+        for(int l=0; l<noff; ++l)
+            phys[l] = offset0();
+
+        if (blk.inner_nblks > 0) {
+            // Note: have a better VEC_U32 choice made in vec_off_l
+            NOVEC_ for (int iblk = blk.inner_nblks - 1; iblk >= 0; --iblk) {
+                const int d = blk.inner_idxs[iblk];
+                VEC_ for(int l=0; l<noff; ++l) {
+                    uint64_t const p = vp.vp[d][l] % (uint64_t)blk.inner_blks[iblk];
+                    vp.vp[d][l] /= (uint64_t)blk.inner_blks[iblk];
+                    phys[l] += p * ib_strides[iblk];
+                }
+            }
+        }
+
+        NOVEC_ for (int d = 0; d < nd; ++d) {
+            uint64_t tmp[MVL];
+            _Pragma("_NEC vreg(tmp)")
+            VEC_ for(int l=0; l<noff; ++l) tmp[l] = vp.vp[d][l]; // VLD (nec.?)
+            VEC_ for(int l=0; l<noff; ++l) {
+                phys[l] += tmp[l] * (uint64_t)blk.strides[d];     // VMUL,VADD (extra vcopy)
+            }
+        }
+
+        Short_ for(int l=0; l<noff; ++l)
+            p_offsets[l] = phys[l]; // final vector store VST to output
+#undef Short_
+    }
+private:
+    /** vector-of-physical-offsets version of \c off_v.
+     * Unlike \c off_v or \c vec_off_v, we are \e private and can modify
+     * our coords \c vp, to save memory.
+     *
+     * \note This only does a MVL-long section at a time
+     * \note if is_pos_padded or inner_nblks, coords \c vp may be modified.
+     */
+    void vec_off_vtmp( VecPos & vp,    // list of coords (from vec_off_l)
+                      dim_t * p_offsets, // output physical offsets
+                      int const noff,    // how many offsets in vp and p_offsets
+                      bool is_pos_padded = false) const {
+        assert(noff <= MVL);
+        assert(is_blocking_desc());
+        const blocking_desc_t &blk = blocking_desc();
+#if 0 && !defined(NDEBUG)
         unsigned nsame=0U;
         for (int i=0; i<blk.inner_nblks; ++i) {
             for (int j=i+1; j<blk.inner_nblks; ++j) {
@@ -803,7 +888,80 @@ public:
     }
 
 #if VEC_U32
-    void vec_off_v( VecPos32 & vp32,         // list of coords (from vec_off_l)
+public:
+    void vec_off_v( VecPos32 const& vp_in, // list of coords (from vec_off_l)
+                      dim_t * p_offsets,  // output physical offsets
+                      int const noff,     // how many offsets in vp32 and p_offsets
+                      bool is_pos_padded = false) const {
+        assert(noff <= MVL);
+        assert(is_blocking_desc());
+        const blocking_desc_t &blk = blocking_desc();
+#ifndef NDEBUG
+        unsigned nsame=0U;
+        for (int i=0; i<blk.inner_nblks; ++i) {
+            for (int j=i+1; j<blk.inner_nblks; ++j) {
+                if (blk.inner_idxs[i] == blk.inner_idxs[j])
+                    ++nsame;
+            }
+        }
+        assert( nsame == 0U ); // inner_idxs[] MUST be distinct
+#endif
+
+#define Short_ PragmaQuote(_NEC vector) PragmaQuote(_NEC nounroll)
+        const int nd = ndims();
+        assert( nd < 6 );
+        VecPos32 vp32;
+        if (is_pos_padded) {
+            NOVEC_ ShortLoop() PragmaQuote(_NEC nounroll) PragmaQuote(_NEC loop_count(6))//;
+            for (int d = 0; d < nd; ++d) {
+               VEC_ for(int l = 0; l < noff; ++l) {
+                    vp32.vp[d][l] = vp_in.vp[d][l] + padded_offsets()[d];
+               }
+            }
+        }else{
+            NOVEC_ ShortLoop() PragmaQuote(_NEC nounroll) PragmaQuote(_NEC loop_count(6))//;
+            for (int d = 0; d < nd; ++d) {
+               VEC_ for(int l = 0; l < noff; ++l) {
+                    vp32.vp[d][l] = vp_in.vp[d][l];
+               }
+            }
+        }
+
+        //uint64_t phys_offset = offset0();
+        // phys[] : vreg mirror of p_offsets[noff] output, until final vector store
+        uint64_t phys[MVL];
+        _Pragma("_NEC vreg(phys)")
+        for(int l=0; l<noff; ++l)
+            phys[l] = offset0();
+
+        if (blk.inner_nblks > 0) {
+            NOVEC_ for (int iblk = blk.inner_nblks - 1; iblk >= 0; --iblk) {
+                const int d = blk.inner_idxs[iblk];
+                VEC_ for(int l=0; l<noff; ++l) {
+                    // ibs32 ~ blk.inner_blocks
+                    uint32_t const p = vp32.vp[d][l] % ibs32[iblk];
+                    vp32.vp[d][l] /= ibs32[iblk];
+                    phys[l] += p * ib_strides32[iblk];
+                }
+            }
+        }
+
+        NOVEC_ for (int d = 0; d < nd; ++d) {
+            uint32_t tmp[MVL];
+            _Pragma("_NEC vreg(tmp)")
+            VEC_ for(int l=0; l<noff; ++l) tmp[l] = vp32.vp[d][l]; // need vld??
+            VEC_ for(int l=0; l<noff; ++l) {
+                // VMUL,VADD (extra vcopy) XXX check for vec reduc?
+                phys[l] += tmp[l] * blk_strides32[d];
+            }
+        }
+
+        Short_ for(int l=0; l<noff; ++l)
+            p_offsets[l] = phys[l]; // final vector store VST to output
+#undef Short_
+    }
+private:
+    void vec_off_vtmp( VecPos32 & vp32,         // list of coords (from vec_off_l)
                       dim_t * p_offsets, // output physical offsets
                       int const noff,    // how many offsets in vp32 and p_offsets
                       bool is_pos_padded = false) const {
