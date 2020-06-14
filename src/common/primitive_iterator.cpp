@@ -95,10 +95,12 @@ status_t dnnl_primitive_desc_create(
     primitive_desc_iterator_t *it;
     status_t status = dnnl_primitive_desc_iterator_create(
             &it, c_op_desc, attr, engine, hint_fwd_pd);
+    //printf(" dnnl_primitive_desc_iterator_create status=%d\n",(int)status); // XXX REMOVE!
     if (status != status::success) return status;
 
     primitive_desc_iface_t *pd_iface
             = new primitive_desc_iface_t(it->fetch_once(), engine);
+    //printf(" primitive_desc_iface @%p\n",(void*)pd_iface); // XXX REMOVE!
     dnnl_primitive_desc_iterator_destroy(it);
     if (pd_iface == nullptr) return out_of_memory;
 

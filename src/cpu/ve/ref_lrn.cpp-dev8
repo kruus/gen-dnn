@@ -150,36 +150,6 @@ inline dim_t stack_friendly_blksz(dim_t const hi){
     //assert( ret < stack_channels );
     return ret;
 }
-/** but also want blksz low enough that max_threads can actually be used...
- * XXX return to this with measurements XXX. */
-inline dim_t stack_friendly_blksz(dim_t const hi, dim_t const other_work){
-    dim_t stack_lim = (other_work*hi/dnnl_get_max_threads());
-    // adjust following, which assumes one MVL is "enough work"
-    // here MVL ~ min desirable blksz (but we can go lower, a bit)
-    if (stack_lim < MVL) stack_lim = MVL;
-    stack_lim = (stack_lim+(MVL-1)) / MVL * MVL;
-    if (stack_lim > stack_channels) stack_lim = stack_channels;
-
-    // now heuristic with possibly smaller version of stack_channels
-    dim_t ret = hi;
-    if (hi > stack_lim) {
-        ret = (stack_lim+31)/32*32;
-        dim_t const nFull = hi/stack_lim;
-        dim_t const rem   = hi%stack_lim;
-        if (rem < MVL/4) {
-            dim_t const nLoops = nFull + (rem!=0);
-            ret = (hi+nLoops-1) / nLoops;
-            //printf("+%d",(int)ret); // rough equipartition
-            if (ret < stack_lim - MVL) {
-                ret = (ret+MVL-1)/MVL*MVL;
-                //printf("^%d",(int)ret); // round up
-            }
-        }
-        ret = (ret+31)/32*32;
-    }
-    //assert( ret < stack_channels );
-    return ret;
-}
 #if 0 // hmm maybe don't need this way
 inline dim_t stack_friendly_nparts(dim_t const hi){
     dim_t constexpr stack_channels = 16384;
@@ -342,21 +312,110 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
     //const auto wrk_per_C = MB * D * H * W;
     if(0){
     }
+#if 0
+    else if(ndims == 2 && across_channels) { // trivial [useless] case
+        assert( data_d.matches_one_of_tag(format_tag::ab/*,format_tag::ba*/) );
+
+        dim_t blksz = stack_friendly_blksz(C);
+        // MB = "work per C".  If small, should use smaller blksz O(MVL)
+        // add work per C option to stack_friendly_blksz() XXX
+        auto cparts = utils::div_up(C, blksz);
+        if (MB * cparts < 8) {
+            auto blksmall = MB * 8 / C;
+            if (blksmall < MVL/2) blksmall=MVL/2;
+            if (blksmall < blksz) blksz = blksmall;
+        }
+
+        // "copy" nchw && across_channels case, changing COFF(c) macro
+        parallel_nd(MB, utils::div_up(C, blksz), [&](dim_t mb, dim_t c_blk)
+            {
+                dim_t const clo = c_blk * blksz;
+                dim_t const chi = (clo + blksz >= C? C: clo + blksz);
+#define COFF(c) (mb * stride_mb + (c))
+                dim_t const cspan = chi - clo;
+                acc_data_t sum[cspan];
+                for(dim_t c=0; c<cspan; ++c) sum[c]= 0;
+
+                NOVEC for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                    // ... valid c have lrn window still in range [0,C)
+                    dim_t oc_lo = (0-l < 0? 0: 0-l);
+                    dim_t oc_hi = (C-l > C? C: C-l);
+                    // ... and ALSO we focus on range [clo,chi)
+                    if (oc_lo < clo) oc_lo = clo;
+                    if (oc_hi > chi) oc_hi = chi;
+                    for(dim_t c=oc_lo; c<oc_hi; ++c) {   // central chan
+                        data_t const s = src[COFF(c+l)]; // lrn window datum
+                        sum[c-clo] += SQUARE( acc_data_t{s} );
+                    }
+                }
+                for(dim_t oc=clo; oc<chi; ++oc) {
+                    float const sum_oc = k + alpha * sum[oc-clo] / summands;
+                    dst[COFF(oc)] = static_cast<data_t>( src[COFF(oc)]
+                            * fast_negative_powf(sum_oc, beta));
+                }
+#undef COFF
+            });
+    }
+    else if(ndims == 2 && !across_channels) { // degenerate case
+        assert( data_d.matches_one_of_tag(format_tag::ab/*,format_tag::ba*/) );
+        // degenerate case: lrn window of size 1 is all we can use.
+        //printf(" warning: TBD ndims==2 fwd lrn within UNTESTED. tag=%s\n",dnnl_fmt_tag2str(tag));
+        //OK, come in with tag="any"
+        dim_t blksz = stack_friendly_blksz(C);
+        // MB = "work per C".  If small, should use smaller blksz O(MVL)
+        // add work per C option to stack_friendly_blksz() XXX
+        auto cparts = utils::div_up(C, blksz);
+        if (MB * cparts < 8) {
+            auto blksmall = MB * 8 / C;
+            if (blksmall < MVL/2) blksmall=MVL/2;
+            if (blksmall < blksz) blksz = blksmall;
+        }
+
+        parallel_nd(MB, utils::div_up(C, blksz), [&](dim_t mb, dim_t c_blk)
+                {
+                dim_t const clo = c_blk * blksz;
+                dim_t const chi = (clo + blksz >= C? C: clo + blksz);
+                // NOTE: lrn pd always has MB() as axis 0 and C() as axis 1 (fmt ab)
+#define COFF(c) (mb * stride_mb + (c))
+                for(dim_t c=clo; c<chi; ++c) {
+#if 0
+                    acc_data_t const central = src[cent[c-clo]];
+                    auto const sum = k + alpha * central * central / summands;
+                    dst[cent[c-clo]] = static_cast<data_t>(
+                            central * fast_negative_powf(sum, beta));
+#else
+                    auto const coff = mb*stride_mb + c;
+                    acc_data_t central = src[coff];
+                    auto const sum = k + alpha * SQUARE(central) / summands;
+                    dst[coff] = static_cast<data_t>( central
+                            * fast_negative_powf(sum, beta));
+#endif
+#undef COFF
+                }
+                });
+    }
+#endif
     else if(ndims == 2) { // degenerate case
         // degenerate case: lrn window of size 1 is all we can use.
-        // come in with tag="any"
+        //printf(" warning: TBD ndims==2 fwd lrn within UNTESTED. tag=%s\n",dnnl_fmt_tag2str(tag));
+        //OK, come in with tag="any"
         // NOTE: lrn pd always has MB() as axis 0 and C() as axis 1 (fmt ab)
         assert( data_d.matches_one_of_tag(format_tag::ab/*,format_tag::ba*/) );
-#define COFF(c) (mb * stride_mb + (c))
-        //dim_t blksz = stack_friendly_blksz(C);
-        dim_t blksz = stack_friendly_blksz(C,MB/*other iter dims*/);
-        //printf("mb=%ld C=%ld blksz=%ld div_up(C,blksz)=%ld\n",
-        //        MB,C,blksz,utils::div_up(C, blksz));
+        dim_t blksz = stack_friendly_blksz(C);
+        // MB = "work per C".  If small, should use smaller blksz O(MVL)
+        // add work per C option to stack_friendly_blksz() XXX
+        auto cparts = utils::div_up(C, blksz);
+        if (MB * cparts < 8) {
+            auto blksmall = MB * 8 / C;
+            if (blksmall < MVL/2) blksmall=MVL/2;
+            if (blksmall < blksz) blksz = blksmall;
+        }
 
         parallel_nd(MB, utils::div_up(C, blksz), [&](dim_t mb, dim_t c_blk)
             {
                 dim_t const clo = c_blk * blksz;
                 dim_t const chi = (clo + blksz >= C? C: clo + blksz);
+#define COFF(c) (mb * stride_mb + (c))
                 if (across_channels) {
                     dim_t const cspan = chi - clo;
                     acc_data_t sum[cspan];

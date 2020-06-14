@@ -50,6 +50,7 @@ struct ref_lrn_fwd_t : public primitive_t {
 
             dat_tag_ = memory_desc_matches_one_of_tag(
                     *src_md(), nChw16c, nChw8c, nchw, nhwc);
+            printf(" ref_lrn.hpp dat_tag_=%s\n", dnnl_fmt_tag2str(dat_tag_)); // XXX REMOVE!
 
             return status::success;
         }

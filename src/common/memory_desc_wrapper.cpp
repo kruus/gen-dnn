@@ -22,6 +22,9 @@
 #include "memory_desc_wrapper.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+#if defined(__ve)
+#include "ve/consistency.hpp" // XXX
+#endif
 
 namespace dnnl {
 namespace impl {
@@ -29,9 +32,24 @@ namespace impl {
 status_t fill_blocked(memory_desc_t &md, std::initializer_list<int> perm,
         std::initializer_list<int> inner_blks,
         std::initializer_list<int> inner_idxs) {
-    const bool ok = true && perm.size() == (size_t)md.ndims
-            && inner_blks.size() == inner_idxs.size();
+#if 0 && defined(__ve)
+    Consistency ok("fill_blocked");
+#define AND_(...) SCHKVV(ok,__VA_ARGS__) // XXX change to SCHK
+    printf("md.ndims=%d perm.size()=%d ",(int)md.ndims,(int)perm.size());
+    for(auto const i: perm) printf(" %d",(int)i);
+    printf("\ninner_blks : "); for(auto const i: inner_blks) printf(" %d",(int)i);
+    printf("\ninner_idxs : "); for(auto const i: inner_idxs) printf(" %d",(int)i);
+    printf("\n");
+
+    AND_(perm.size() == (size_t)md.ndims);
+    AND_(inner_blks.size() == inner_idxs.size());
+#undef AND_
+#else
+    bool ok = true && perm.size() == (size_t)md.ndims
+        && inner_blks.size() == inner_idxs.size();
+#endif
     if (!ok) return status::invalid_arguments;
+    //printf(" Consistent!\n");
 
     md.offset0 = 0;
 
@@ -127,6 +145,7 @@ status_t memory_desc_wrapper::compute_blocking(
         memory_desc_t &memory_desc, format_tag_t tag) {
     using namespace format_tag;
 
+    //if (memory_desc.ndims == 0) printf(" mdw:compute_blocking ndims==0!\n"); // XXX REMOVE!
     if (memory_desc.ndims == 0) return status::invalid_arguments;
 
 #define C(tag, ... /* perm, inner_blks, inner_idxs */) \

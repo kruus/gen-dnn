@@ -40,6 +40,7 @@ status_t lrn_desc_init(lrn_desc_t *lrn_desc, prop_kind_t prop_kind,
             && IMPLICATION(
                     prop_kind == backward_data, diff_data_desc != nullptr);
     if (!args_ok) return invalid_arguments;
+    //printf(" lrn_desc_init args ok\n"); // XXX REMOVE!
 
     auto ld = lrn_desc_t();
     ld.primitive_kind = primitive_kind::lrn;
@@ -55,6 +56,7 @@ status_t lrn_desc_init(lrn_desc_t *lrn_desc, prop_kind_t prop_kind,
                 || memory_desc_wrapper(diff_data_desc)
                            .has_runtime_dims_or_strides();
     if (runtime_dims_or_strides) return unimplemented;
+    //printf(" not runtime dims or strides (good)\n");
 
     ld.data_desc = *data_desc;
     if (!is_fwd) ld.diff_data_desc = *diff_data_desc;
@@ -69,6 +71,7 @@ status_t lrn_desc_init(lrn_desc_t *lrn_desc, prop_kind_t prop_kind,
         consistency = array_cmp(
                 ld.diff_data_desc.dims, ld.data_desc.dims, ld.data_desc.ndims);
     if (!consistency) return invalid_arguments;
+    //printf(" lrn consistent (good)\n");
 
     *lrn_desc = ld;
     return success;

@@ -112,6 +112,7 @@ status_t dnnl_memory_desc_init_by_tag(memory_desc_t *memory_desc, int ndims,
         // nop
     } else if (format_kind == format_kind::blocked) {
         status = memory_desc_wrapper::compute_blocking(md, tag);
+        //printf(" compute_blocking(md,tag=%d = %s)-->%d\n",(int)tag,dnnl_fmt_tag2str(tag),(int)status);
     } else {
         assert(!"unreachable");
         status = invalid_arguments;

@@ -110,36 +110,64 @@ static int init_pd(const engine_t &engine_tgt, const prb_t *p,
     dnnl_dims_t data_dims_2d = {p->mb, p->ic, p->ih, p->iw};
     dnnl_dims_t data_dims_3d = {p->mb, p->ic, p->id, p->ih, p->iw};
 
-    dnnl_dim_t *data_dims = p->ndims == 5
-            ? data_dims_3d
-            : p->ndims == 4 ? data_dims_2d
-                            : p->ndims == 3 ? data_dims_1d : data_dims_0d;
+    dnnl_dim_t *data_dims
+        = p->ndims == 5 ? data_dims_3d
+        : p->ndims == 4 ? data_dims_2d
+        : p->ndims == 3 ? data_dims_1d
+        : data_dims_0d;
 
+    // convert_tag : converts special shorthands to a dimensionally
+    //               consistent canonical value
+#if 0
+    char buf[200];
+    dnnl_md2dim_str(buf,200,&data_d);
+    std::cout<<" data_d : "<<buf<<"\n";
+    std::cout<<" p->ndims="<<p->ndims<<"\n";
+    std::cout<<" data_dims={"; for(unsigned i=0; i<p->ndims; ++i) std::cout<<" "<<data_dims[i]; std::cout<<"}\n";
+    std::cout<<" p->dt="<<dnnl_dt2str(p->dt)<<"\n";
+    std::cout<<" p->tag="<<p->tag<<" convert_tag="<<convert_tag(p->tag, p->ndims)
+        <<" tag="<<dnnl_fmt_tag2str(convert_tag(p->tag, p->ndims))<<std::endl;
+#endif
     DNN_SAFE(dnnl_memory_desc_init_by_tag(&data_d, p->ndims, data_dims, p->dt,
                      convert_tag(p->tag, p->ndims)),
             WARN);
+#if 0
+    dnnl_md2dim_str(buf,200,&data_d);
+    std::cout<<"\n data_d : "<<buf;
+    dnnl_md2fmt_str(buf,200,&data_d);
+    std::cout<<"\n data_d : "<<buf;
+    std::cout<<std::endl;
+    //std::cout<<"000\n"<<std::endl;
+#endif
 
     dnnl_alg_kind_t alg = alg2alg_kind(p->alg);
     if (dir & FLAG_FWD) {
         auto prop = p->dir & FLAG_INF ? dnnl_forward_inference
                                       : dnnl_forward_training;
+        //std::cout<<"000a\n"<<std::endl;
         DNN_SAFE(dnnl_lrn_forward_desc_init(&ld, prop, alg, &data_d, p->ls,
                          p->alpha, p->beta, p->k),
                 WARN);
     } else {
         dnnl_memory_desc_t diff_data_d;
+        //std::cout<<"000c\n"<<std::endl;
         DNN_SAFE(dnnl_memory_desc_init_by_tag(&diff_data_d, p->ndims, data_dims,
                          p->dt, dnnl_format_tag_any),
                 WARN);
+        //std::cout<<"000d\n"<<std::endl;
         DNN_SAFE(dnnl_lrn_backward_desc_init(&ld, alg, &diff_data_d, &data_d,
                          p->ls, p->alpha, p->beta, p->k),
                 WARN);
     }
+    //std::cout<<"001\n"<<std::endl;
 
     auto dnnl_attr = create_dnnl_attr(attr_t());
+    //std::cout<<"001b\n"<<std::endl;
 
     dnnl_status_t init_status = dnnl_primitive_desc_create(
             &lpd, &ld, dnnl_attr, engine_tgt, hint);
+
+    //std::cout<<"002\n"<<std::endl;
 
     dnnl_primitive_attr_destroy(dnnl_attr);
 
@@ -148,6 +176,7 @@ static int init_pd(const engine_t &engine_tgt, const prb_t *p,
     else
         SAFE(init_status, WARN);
 
+    //std::cout<<"003\n"<<std::endl;
     // Return if pd is not the one being tested
     if ((dir & FLAG_FWD) != (p->dir & FLAG_FWD)) return OK;
 
@@ -160,6 +189,7 @@ static int init_pd(const engine_t &engine_tgt, const prb_t *p,
     } else {
         BENCHDNN_PRINT(5, "oneDNN implementation: %s\n", r->impl_name.c_str());
     }
+    //std::cout<<"004\n"<<std::endl;
 
     return OK;
 }

@@ -112,6 +112,7 @@ struct CoordRegs {
 template<unsigned dim, typename Crd = unsigned, typename Pos=size_t>
 struct CoordsFor : public CoordRegs<Crd,dim> {
     typedef CoordRegs<Crd,dim> Base;
+    typedef CoordsFor<dim,Crd,Pos> MyType;
     typedef Crd crd_t;
     typedef Pos pos_t;
     private:
@@ -148,7 +149,7 @@ struct CoordsFor : public CoordRegs<Crd,dim> {
 
     /// allow syntax `for(auto CoordsFor<2> c({h_st,w_st},{h_en,w_en}); c; ++c){}`
     operator bool() const { return vl > 0; }
-    operator ++() { this->step(); return *this; }
+    MyType& operator ++() { this->step(); return *this; }
 
     /// If get_vl(), then we have something in this->vp to process.
     /// Use `step()` which returns true and next batch (or false).
@@ -283,6 +284,7 @@ template<unsigned MaxDims=DNNL_MAX_NDIMS, typename Crd = unsigned, typename Pos=
 struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
 #define COORDSFORND_EXTEND 0 /*experimental feature, useless? */
     typedef CoordRegs<Crd,MaxDims> Base;
+    typedef CoordsForNd<MaxDims,Crd,Pos> MyType;
     typedef Crd crd_t;
     typedef Pos pos_t;
     CoordsForNd() : dim(0), vl(0), ilo{0}, ihi{0}, sz(0), pos(0) {}
@@ -290,7 +292,7 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
     Base /* */& base() /* */ { return *this; }
     Base const& base() const { return *this; }
     operator bool() const { return vl > 0; }
-    operator ++() { this->step(); return *this; }
+    MyType& operator ++() { this->step(); return *this; }
 
     /// If get_vl(), then we have something in this->vp to process.
     /// Use `step()` which returns true and next batch (or false).
@@ -352,13 +354,13 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
         }
         assert( vl > 0 );
         Pos carry[Base::MaxVl];
-        for(unsigned i=0U; i<vl; ++i)
+        for(unsigned i=0U; i<vl; ++i) // VRspill
             carry[i] = pos+i;
         NOVEC_ for(unsigned d = dim; d--; ) {
             // TBD decide whether span is member or not XXX
             auto const span = ihi[d] - ilo[d];
             if(span <= 1){
-                for(unsigned i=0U; i<vl; ++i){
+                for(unsigned i=0U; i<vl; ++i){ // VRspill
                     (this->vp)[d][i] = ilo[d];
                 }
             } else {
@@ -413,7 +415,7 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
             ilo[d] = (unsigned)lo;
             ihi[d] = (unsigned)hi;
             // ? span[d] = ilo[d] - ihi[d];
-            iter_range(d+1U, utils::forward<Args>(tuple)...);
+            return iter_range(d+1U, utils::forward<Args>(tuple)...);
         }
     public:
     /** generic init of nested sequential for loops.
@@ -433,7 +435,7 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
             iter_range(0,lo,hi,utils::forward<Args>(tuple)...);
             // calc total size (could be done within iter_range?)
             sz = Pos{1};
-            for(unsigned d=0U; d<dim; ++d) sz *= ihi[d] - ilo[d];
+            for(unsigned d=0U; d<dim; ++d) sz *= ihi[d] - ilo[d]; // VRrestore!
 #if 0
             cout<<" init_at dim="<<dim;
             for(int d=0; d<dim; ++d){
@@ -447,7 +449,7 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
     /** init_at(0,lohi...) */
     template<typename... Args>
         inline bool init(Args &&... lohi) {
-            this->init_at( size_t{0}, utils::forward<Args>(lohi)...);
+            return this->init_at( size_t{0}, utils::forward<Args>(lohi)...);
         }
     /** set next coord vectors at linear pos+vl.
      * \return true iff remaining iteration lenght vl > 0 */
