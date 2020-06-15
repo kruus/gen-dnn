@@ -311,7 +311,7 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
     const dim_t W = pd()->W();
     const auto stride_mb = data_d.blocking_desc().strides[0];
     const bool across_channels = pd()->desc()->alg_kind == lrn_across_channels;
-    //static constexpr dim_t blksize = tag == nChw16c ? 16 : 8;
+    static constexpr dim_t blksize = tag == nChw16c ? 16 : 8;
     const auto ndims = data_d.ndims();
 
     auto compute_n_summands = [&](dim_t size) {
@@ -391,6 +391,51 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
         });
     }
     //  for dev:
+    else if (!formula && across_channels && C <= stack_channels)
+    {
+        //auto ker_across_vec = [&src,&dst,&stride_mb,&C,&D,&H,&W,&half_size,&k,&alpha,&beta,&summands](
+        auto ker_across_vec = [&](
+                size_t * const dst_off,     // oc from 
+                dim_t const mb,             // 0 .. C-1
+                dim_t const od, dim_t const oh, dim_t const ow) {
+            acc_data_t sum[C];
+            FOR_CHAN sum[i]= 0;
+            FOR_CHAN {
+                DEFINE_HALFSIZE_RANGE(c_st, c_en, i, 0, C);
+                for(dim_t c = c_st; c < c_en; ++c) {
+                    const acc_data_t s = src[dst_off[c]];
+                    sum[i] += s * s;
+                }
+            }
+            FOR_CHAN sum[i] = k + alpha * sum[i] / summands;
+            FOR_CHAN dst[dst_off[i]] = static_cast<data_t>( src[dst_off[i]]
+                        * fast_negative_powf(sum[i], beta));
+        };
+
+        // size^{2 or 3}? XXX
+        // and MB*D*H*W work amount sufficiently large for omp? XXX
+        // vectorize across channels, using fast offsets calculated on stack.
+        parallel_nd(MB, D, H, W, [&](dim_t const mb, dim_t const d, dim_t const h, dim_t const w) {
+                //size_t data_off[C];
+                size_t data_off[stack_channels]; // too big, but compilet-time
+                if (formula || C <= size ) { // maybe size^2 or size^3 ?
+#if 0 // only slightly better vectorization (recheck)
+                    if (tag == nchw ) for(size_t c=0U; c<C; ++c)
+                        data_off[c] = mb * stride_mb + c * H * W + h * W + w;
+                    else if (tag == nhwc ) for(size_t c=0U; c<C; ++c)
+                        data_off[c] = mb * stride_mb + h * W * C + w * C + c;
+                    else
+#endif
+                    // always unvectorizable. Fix: use `size_t c` (not "unsigned")
+                    for(size_t c=0U; c<C; ++c) data_off[c] = offset<tag>(
+                            data_d, mb,stride_mb, c,C, d,D, h,H, w,W );
+                } else { // function call phys offset needs a little help to vectorize
+                    // unvec: function calls init_nd and vec_off_v
+                    channel_offsets(data_opt, data_off, mb, 0, C, d, h, w);
+                }
+                ker_across_vec(&data_off[0], mb, /*c,*/ d, h, w);
+            });
+    }
     // dense strided chan + lapped (no restriction on C)
     else if ((tag==nchw || tag==nhwc) && across_channels) {
         // C <= stack_channels orig: --tag=nchw,nhwc ic2002ih10 0.184 0.162 ms
@@ -442,11 +487,8 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
 #undef COFF
         });
     }
-#if 0
-    // --tag=nChw16c --alg=ACROSS --dir=FWD_D ic2002ih10 ic9999ih10 ic32777ih10
-    // this block:   0.200 0.630 1.97 ms
-    // handle below:  (identical)
-    // note both use "oversized runtime array" workaround
+    // XXX Compare timing w/ next specialization. Can we drop specialized code?
+    //     (orig: restrict C<=stack_channels, simpler code
     else if ((tag==nChw8c || tag==nChw16c) && across_channels && C <= stack_channels)
     {
         // 16c ic2002ih10 ic32777ih10 0.196 37.2 ms (37.2 NOT HERE)
@@ -456,8 +498,50 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
         //#elif 0
         //#elif 0 // cleanup : 1.07, 1.06 ms
         //#elif 1 // run-time array --> compile-time size ==> 0.199, 0.203 ms
-    }
+        assert( D==1 );
+        parallel_nd(MB, H, W, [&](dim_t mb, dim_t h, dim_t w) {
+                acc_data_t sum[C];
+                size_t data_off[C];
+                // srcdata: vec gather once --> linear vec loads later
+                // (and potentially single conversion to acc_data_t)
+                //acc_data_t srcdata[C];
+                // Undesirable workaround:
+                //   If runtime-array, nc++ gets confused about vector dependencies.
+                //   But making it compile-time size (max size) now vectorizes.
+                // NO amount of pragmas could convince nc++ otherwise
+                acc_data_t srcdata[stack_channels];
+
+                // (loop combin with next kills vectorization)
+                for(dim_t c=0U; c<C; ++c) sum[c] = acc_data_t{0};
+                for(dim_t c=0U; c<C; ++c){
+#if 0
+#define OFF(blksize) (mb * stride_mb + (c / (blksize)) * H * W * (blksize) \
+        + h * W * (blksize) + w * (blksize) + c % (blksize))
+                    data_off[c] = (tag==nChw8c? OFF(8): OFF(16));
+#undef OFF
+#else // same speed
+                    data_off[c] = offset<tag>(data_d, mb,stride_mb,
+                            c,C, 0,1, h,H, w,W );
 #endif
+                    srcdata[c] = src[data_off[c]];
+                }
+                for (dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                    // oc+l must lie in data bounds:
+                    dim_t const oc_lo = ( -l < 0? 0:  -l);
+                    dim_t const oc_hi = (C-l > C? C: C-l);
+                    for(dim_t oc=oc_lo; oc<oc_hi; ++oc)
+                        sum[oc] += SQUARE( srcdata[oc+l] );
+                }
+                for(dim_t oc=0; oc<C; ++oc){
+                    float const sum_cs = k + alpha * sum[oc] / summands;
+                    dst[data_off[oc]] = static_cast<data_t>(
+                            srcdata[oc]
+                            * fast_negative_powf(
+                                sum_cs, //k + alpha * sum[oc] / summands,
+                                beta));
+                }
+            });
+    }
     // any number of channels : not hugely slower than C<=stack_channels
     else if ((tag==nChw8c || tag==nChw16c) && across_channels && half_size<100)
     {
@@ -552,13 +636,6 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
             }
         });
     }
-#if 0
-    else if (across_channels && C <= stack_channels)
-    {
-        // --tag=ncdhw --alg=ACROSS --dir=FWD_D ic2002id10 ic32777id10
-        // This block: 16.0 274 ms
-        // without (block below) : 15 271 ms
-#endif
     else if (across_channels) {
         // actually this will handle any number of channels,
         // as well as trivial ndims=2 case
@@ -568,8 +645,7 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
                 size_t * const dst_off, // now from max(0,clo-half_size) to min(chi+half_size+1,C)
                 // but &dst_off[0] corresponds to 'clo'  (small -ve offsets possible)
                 dim_t const mb, // internally c=0..C-1
-                dim_t const od, dim_t const oh, dim_t const ow)
-        {
+                dim_t const od, dim_t const oh, dim_t const ow) {
             dim_t const cspan = chi - clo;
             dim_t const clolo = nstl::max(clo - half_size + 0, (dim_t)0); // corresp. dst_off[0]
             acc_data_t sum[cspan];
@@ -593,8 +669,7 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
         // because lrn window can extend half_size past the central range. */
         dim_t const blksz = stack_friendly_blksz(C);
         parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
-                [&](dim_t mb, dim_t c_blk, dim_t d, dim_t h, dim_t w)
-        {
+                [&](dim_t mb, dim_t c_blk, dim_t d, dim_t h, dim_t w) {
             dim_t clo = c_blk * blksz;
             dim_t chi = nstl::min(clo + blksz, C);
             // lrn kernel extends up to half_size past [clo,chi)
@@ -611,124 +686,331 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
                 channel_offsets(data_opt, data_off, mb, clolo, chihi, d, h, w);
             }
             ker_across_vec_lapped( clo, chi, &data_off[0], mb, /*c,*/ d, h, w);
-        });
+            });
     }
-    //
-    // below : all alg=WITHIN cases
-    //
-    else if (formula) {
+#if 0 // very old...
+    else if (across_channels) {
+        // ker single channel (original way, ok if D*H*W is big enough?)
+        // (one part is calculating the channel-wise "central" offsets)
+        parallel_nd(MB, C, D, H, W,
+                [&](dim_t mb, dim_t c, dim_t d, dim_t h, dim_t w) {
+                const dim_t off = offset<tag>(data_d, mb,stride_mb, c,C, d,D, h,H, w,W);
+                ker_within(off, mb, c, d, h, w);
+                });
+    }
+#endif
+    else { // lrn fwd within : multiple versions
         assert( !across_channels );
         assert( ndims >= 3 );
-        // split loops, adress .LL report <Unvectorized loop.>
+        auto ker_within = [&](dim_t const central_off,
+                dim_t const mb, dim_t const oc,
+                dim_t const od, dim_t const oh, dim_t const ow) {
+            // 6 VRspill!
+            acc_data_t sum = 0;
+            // --mode=C --lrn --tag=ncdhw --dir=FWD_D --alg=ACROSS,WITHIN ic202id10 --tag=nchw ic202ih10
+            //      2.366 166 0.231 3.41 ms
+            //                      3.36
+            // perf: 2.39 174 0.266 3.46
+            // perf: 2.39 172 0.266 3.66 expand formula cases here
+            //      2.43 167 0.266 3.38 ms
+            //           133 with ker_within_vec_generic
+            // generic fwd lrn_within_channel
+            assert(ndims >= 3);
+            assert(ndims <= 5);
+            DEFINE_HALFSIZE_RANGE(d_st, d_en, od, 0, D);
+            DEFINE_HALFSIZE_RANGE(h_st, h_en, oh, 0, H);
+            DEFINE_HALFSIZE_RANGE(w_st, w_en, ow, 0, W);
+            if (formula) {
+                // formula ==> DENSE layouts and formula-driven vectorize well
+                if (tag==nchw || tag==nhwc || tag==nChw8c || tag==nChw16c) {
+                    // 4D formulas
+                    for_(dim_t h = h_st; h < h_en; ++h)
+                    for (dim_t w = w_st; w < w_en; ++w)
+                    {
+                        acc_data_t s=0;
+                        if (tag == nchw )
+                            s = src[mb * stride_mb + oc * H * W + h * W + w];
+                        else if (tag == nhwc )
+                            s = src[mb * stride_mb + h * W * C + w * C + oc];
+                        else if(tag == nChw8c ) {
+                            constexpr int blksize = 8;
+                            s = src[mb * stride_mb + (oc / blksize) * H * W * blksize
+                                + h * W * blksize + w * blksize + oc % blksize];
+                        } else /*if(tag == nChw16c)*/ {
+                            constexpr int blksize = 16;
+                            s = src[mb * stride_mb + (oc / blksize) * H * W * blksize
+                                + h * W * blksize + w * blksize + oc % blksize];
+                        }
+                        sum += s * s;
+                    }
+                } else { // only for 'formula=true' testing
+                    for_(dim_t d = d_st; d < d_en; ++d)
+                    for_(dim_t h = h_st; h < h_en; ++h)
+                    for (dim_t w = w_st; w < w_en; ++w)
+                    {
+                        acc_data_t const s = src[offset<tag>(
+                                data_d, mb,stride_mb, oc,C, d,D, h,H, w,W)];
+                        sum += s * s;
+                    }
+                }
+            } else { // ncdhw: 1866 --> 182 ms (~ 9x faster, using vec_off_v)
+                //using dnnl::impl::CoordRegs<uint64_t,6>; // match memory_desc_wrapper_opt::VecPos
+                typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
+                auto cf= (ndims >= 5)? Coords::mk(mb,mb+1, oc,oc+1, d_st,d_en, h_st,h_en, w_st,w_en)
+                : (ndims >= 4)? Coords::mk(mb,mb+1, oc,oc+1, h_st,h_en, w_st,w_en)
+                : Coords::mk(mb,mb+1, oc,oc+1, w_st,w_en); // ndims>=3
+                NOVEC for ( ; cf; ++cf) { // VR 1spill 2restore
+                    dim_t lrnp[MVL];
+                    const unsigned vl=cf.get_vl();
+                    data_opt.vec_off_v( cf.base(), &lrnp[0], vl, false/*is_pos_padded*/ );
+                    for(size_t dhw=0U; dhw<vl; ++dhw) {
+                        sum += SQUARE(acc_data_t{ src[lrnp[dhw]] });
+                    }
+                }
+            }
+            data_t central = src[central_off];
+            sum = k + alpha * sum / summands;
+            dst[central_off] = static_cast<data_t>(central * fast_negative_powf(sum, beta));
+        };
+
+        assert( !across_channels );
+        assert( ndims >= 3 );
+        // "old-style" (vectorize across lrn window, ~5)
+        // "new style" block C loop so kernels exec longer.
+        // Too bad offsets can't easily be re-used unless d,h,w
+        // get tiled, but that is hard.  I guess some fairly large d,h,w
+        // tiling could be used (just recalc around tile edges).
+
+        if(0){
+        }
+#if 0 //orig
+        //   --tag=nchw,nhwc,nChw8c,nChw16c --alg=WITHIN --dir=FWD_D ic2002ih10
+        //   ...  0.311 0.220 32.16 31.74 ms -- so this is SLOW
+        // remove (just use new code for nhwc,nchw case, with offset<tag> func)
+        //   ... 0.312 0.220 0.439 0.507 ms
+        elseif (tag == nChw16c || tag == nChw8c) {
+            // This blocking MIGHT buy a little bit of locality, I guess
+            parallel_nd(MB, utils::div_up(C, blksize), H, W,
+                    [&](dim_t mb, dim_t c_blk, dim_t h, dim_t w) {
+                    dim_t const c = c_blk * blksize;
+                    const dim_t off = offset<tag>(data_d, mb,stride_mb, c,C, 0,1, h,H, w,W);
+                    PRAGMA_OMP_SIMD()
+                    dim_t const cc_en = (blksize <= C - c? blksize: C -c);
+                    for (dim_t cc = 0; cc < cc_en; ++cc)
+                        // novec (func call)
+                        ker_within(off+cc, mb, c + cc, 0, h, w);
+                    });
+        }
+#endif
+#if 0 //orig
+        // lrn fwd_d across --tag=nchw ic2002ih10 36.9 ms
+        else if (tag == nchw || tag == nhwc) {
+            parallel_nd(MB, C, H, W, [&](dim_t mb, dim_t c, dim_t h, dim_t w)
+            {
+                const dim_t off = offset<tag>(data_d, mb,stride_mb, c,C, 0,1, h,H, w,W);
+                ker_within(off, mb, c, 0, h, w);
+            });
+        }
+#elif 0 // expanded original
+        // lrn fwd_d across --tag=nchw ic2002ih10  18.6 ms
+#elif 0 // block along C: expanded original
+        // lrn fwd_d across --tag=nchw ic2002ih10  17.0 ms
+elif 0 // clean up // lrn fwd_d across --tag=nchw ic2002ih10  16.83 ms
+#elif 1 // split loops, adress .LL report <Unvectorized loop.>
         // Use mem areas, allowing loop reorder so 'oc' loop is inner
         // Add c_stride for these dense formats
         // lrn fwd_d across --tag=nchw ic2002ih10  6.18 ms, 5.87 ms, 0.274 ms
         //
         // begin: 18.6 ms    end: 0.274 ms    67x speedup
         //else if (tag == nchw || tag == nhwc)
-        dim_t const blksz = stack_friendly_blksz(C);
-        //printf(".");
-        parallel_nd(MB, utils::div_up(C, blksz), H, W,
-                [&](dim_t const mb, dim_t const c_blk, dim_t const oh, dim_t const ow)
+        else if (formula)
         {
-            dim_t const clo = c_blk * blksz;
-            DEFINE_HALFSIZE_RANGE(h_st, h_en, oh, 0, H);
-            dim_t const chi = (clo + blksz >= C? C: clo+blksz);
-            DEFINE_HALFSIZE_RANGE(w_st, w_en, ow, 0, W);
-            dim_t const cspan = chi - clo;
-
-            acc_data_t sum[cspan];
-            for(dim_t cs=0; cs<cspan; ++cs) sum[cs] = acc_data_t{0};
-            data_t const __restrict__ *rsrc = &src[0];
-
-            for_(dim_t h = h_st; h < h_en; ++h)
-            for_(dim_t w = w_st; w < w_en; ++w)
-            for(dim_t oc=clo; oc<chi; ++oc) // potential large VL as inner loop
+            dim_t const blksz = stack_friendly_blksz(C);
+            //printf(".");
+            parallel_nd(MB, utils::div_up(C, blksz), H, W,
+                    [&](dim_t const mb, dim_t const c_blk, dim_t const oh, dim_t const ow)
             {
-                dim_t const off = offset<tag>(data_d, mb,stride_mb,
-                        oc,C, 0,1, h,H, w,W );
-                acc_data_t const s = rsrc[off];
-                sum[oc-clo] += s * s;
-            }
+                dim_t const clo = c_blk * blksz;
+                DEFINE_HALFSIZE_RANGE(h_st, h_en, oh, 0, H);
+                dim_t const chi = (clo + blksz >= C? C: clo+blksz);
+                DEFINE_HALFSIZE_RANGE(w_st, w_en, ow, 0, W);
+                dim_t const cspan = chi - clo;
+
+                acc_data_t sum[cspan];
+                for(dim_t cs=0; cs<cspan; ++cs) sum[cs] = acc_data_t{0};
+                data_t const __restrict__ *rsrc = &src[0];
+
+                for_(dim_t h = h_st; h < h_en; ++h)
+                for_(dim_t w = w_st; w < w_en; ++w)
+                for(dim_t oc=clo; oc<chi; ++oc) // potential large VL as inner loop
+                {
+                    dim_t const off = offset<tag>(data_d, mb,stride_mb,
+                            oc,C, 0,1, h,H, w,W );
+                    acc_data_t const s = rsrc[off];
+                    sum[oc-clo] += s * s;
+                }
 
 #if 0 // orig 0.276 ms
-            dim_t const c_off = offset<tag>( data_d, mb,stride_mb,
-                    clo,C, 0,1, oh,H, ow,W );
-            dim_t const c_stride = (tag==nhwc? dim_t{1}: dim_t{H*W});
+                dim_t const c_off = offset<tag>( data_d, mb,stride_mb,
+                        clo,C, 0,1, oh,H, ow,W );
+                dim_t const c_stride = (tag==nhwc? dim_t{1}: dim_t{H*W});
 
-            LISTVEC for(dim_t cs=0; cs<cspan; ++cs){
-                //sum[cs] = k + alpha * sum[cs] / summands;
-                //acc_data_t const sum_cs = k + alpha * sum[cs] / summands;
-                dst[c_off + cs*c_stride] = static_cast<data_t>(
-                        src[c_off + cs*c_stride]
-                        * fast_negative_powf(
-                            //sum_cs,
-                            k + alpha * sum[cs] / summands,
-                            beta));
-            }
-#else // 0.274 ms
-            LISTVEC for(dim_t cs=0; cs<cspan; ++cs){
-                //sum[cs] = k + alpha * sum[cs] / summands;
-                acc_data_t const sum_cs = k + alpha * sum[cs] / summands;
-                dim_t const oc_off = offset<tag>( data_d, mb,stride_mb,
-                        clo+cs,C, 0,1, oh,H, ow,W );
-                dst[oc_off] = static_cast<data_t>(
-                        src[oc_off]
-                        * fast_negative_powf(
-                            sum_cs, //k + alpha * sum[cs] / summands,
-                            beta));
-            }
-#endif
-        });
-    }
-    else if (!formula) {
-        assert( !across_channels );
-        assert( ndims >= 3 );
-        // --tag=ncdhw --alg=WITHIN --dir=FWD_D ic2002id10 ic32777id10
-        // ... 219 3583 ms
-        // cf "ker_within" (following)
-        // ... 1727 27878 ms ... leave ker_within "just for show" (?)
-        dim_t const blksz = stack_friendly_blksz(C);
-        parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
-                [&](dim_t mb, dim_t c_blk, dim_t od, dim_t oh, dim_t ow)
-        {
-            dim_t clo = c_blk * blksz;
-            dim_t chi = (clo + blksz >= C? C: clo + blksz);
-            //printf(" clo,chi=%ld,%ld\n", clo, chi);
-            acc_data_t sum[chi-clo];
-            for(dim_t oc=clo; oc<chi; ++oc) sum[oc-clo] = 0; // VRrestore3!
-            DEFINE_HALFSIZE_RANGE(d_st, d_en, od, 0, D);
-            DEFINE_HALFSIZE_RANGE(h_st, h_en, oh, 0, H);
-            DEFINE_HALFSIZE_RANGE(w_st, w_en, ow, 0, W);
-            typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
-            auto cf= (ndims >= 5)? Coords::mk(mb,mb+1, 0,1, d_st,d_en, h_st,h_en, w_st,w_en)
-                : (ndims >= 4)? Coords::mk(mb,mb+1, 0,1, h_st,h_en, w_st,w_en)
-                : Coords::mk(mb,mb+1, 0,1, w_st,w_en); // ndims>=3
-            // Coords constructor and iter is pain point.
-            NOVEC for ( ; cf; ++cf) { // VR 2spill 2restore!
-                const unsigned vl=cf.get_vl(); // vl ~ d,h,w coords
-                for(dim_t oc=clo; oc<chi; ++oc) // VR 4spill 4restore!
-                {
-                    ShortLoop() for(unsigned i=0U; i<vl; ++i)
-                        cf.vp[1][i] = oc; // manual adjustment
-                    dim_t lrnp[MVL];
-                    data_opt.vec_off_v(cf.base(), (dim_t *)&lrnp[0], vl);
-                    for(unsigned i=0U; i<vl; ++i) {
-                        sum[oc-clo] += SQUARE(acc_data_t{ src[lrnp[i]] });
-                    }
+                LISTVEC for(dim_t cs=0; cs<cspan; ++cs){
+                    //sum[cs] = k + alpha * sum[cs] / summands;
+                    //acc_data_t const sum_cs = k + alpha * sum[cs] / summands;
+                    dst[c_off + cs*c_stride] = static_cast<data_t>(
+                            src[c_off + cs*c_stride]
+                            * fast_negative_powf(
+                                //sum_cs,
+                                k + alpha * sum[cs] / summands,
+                                beta));
                 }
-                ShortLoop() for(unsigned i=0U; i<vl; ++i)
-                    cf.vp[1][i] = 0; // restore orig cf channel (0)
-            }
-            size_t center[chi-clo];
-            channel_offsets( data_opt, center, mb, clo, chi, od, oh, ow );
-            for(dim_t oc=clo; oc<chi; ++oc) { // 6 VRspill,restore!
-                auto const sum_oc = k + alpha * sum[oc-clo] / summands;
-                data_t const central = src[center[oc-clo]];
-                dst[center[oc-clo]] = static_cast<data_t>(central
-                        * fast_negative_powf(sum_oc, beta));
-            }
-        });
+#else // 0.274 ms
+                LISTVEC for(dim_t cs=0; cs<cspan; ++cs){
+                    //sum[cs] = k + alpha * sum[cs] / summands;
+                    acc_data_t const sum_cs = k + alpha * sum[cs] / summands;
+                    dim_t const oc_off = offset<tag>( data_d, mb,stride_mb,
+                            clo+cs,C, 0,1, oh,H, ow,W );
+                    dst[oc_off] = static_cast<data_t>(
+                            src[oc_off]
+                            * fast_negative_powf(
+                                sum_cs, //k + alpha * sum[cs] / summands,
+                                beta));
+                }
+#endif
+            });
+        }
+#endif
+        else if (1 && !formula) {
+            // --tag=ncdhw --alg=WITHIN --dir=FWD_D ic2002id10 ic32777id10
+            // ... 219 3583 ms
+            // cf "ker_within" (following)
+            // ... 1727 27878 ms ... leave ker_within "just for show" (?)
+#if 0
+            // Here we address func call offsets, any # channels
+            // lrn fwd_d ACROSS,WITHIN --tag=ncdhw ic32777id10 --tag=nchw ic32777ih10
+            // 300 **3799** 32 529 ms
+            // C=802 : still good
+            auto ker_within_vec_generic2= [&](dim_t const mb,
+                    dim_t const clo, dim_t const chi,
+                    dim_t const od, dim_t const oh, dim_t const ow
+                    )
+            {
+                static_assert( sizeof(dim_t) == sizeof(size_t), "type issue" );
+#if 0 // 134 ms for ncdhw ic202id10
+                // the obvious way to use the "Coords" iterator
+                DEFINE_HALFSIZE_RANGE(d_st, d_en, od, 0, D);
+                DEFINE_HALFSIZE_RANGE(h_st, h_en, oh, 0, H);
+                DEFINE_HALFSIZE_RANGE(w_st, w_en, ow, 0, W);
+                size_t center[chi-clo];
+                channel_offsets( data_opt, &center[0], mb, clo, chi, od, oh, ow );
+                for(dim_t oc=clo; oc<chi; ++oc) {
+                    acc_data_t sum = 0;
+                    typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
+                    auto cf= (ndims >= 5)? Coords::mk(mb,mb+1, oc,oc+1, d_st,d_en, h_st,h_en, w_st,w_en)
+                        : (ndims >= 4)? Coords::mk(mb,mb+1, oc,oc+1, h_st,h_en, w_st,w_en)
+                        : Coords::mk(mb,mb+1, oc,oc+1, w_st,w_en); // ndims>=3
+                    // constructor and iter *many* times :(
+                    NOVEC for ( ; cf; ++cf) {
+                        const unsigned vl=cf.get_vl();
+                        dim_t lrnp[MVL]; // get lrn window phys coords
+                        data_opt.vec_off_v(cf.base(), (dim_t *)&lrnp[0], vl);
+                        ShortLoop() for(unsigned dhw=0U; dhw<vl; ++dhw) {
+                            sum += SQUARE(acc_data_t{ src[lrnp[dhw]] });
+                        }
+                    }
+                    sum = k + alpha * sum / summands;
+                    data_t const central = src[center[oc-clo]];
+                    dst[center[oc-clo]] = static_cast<data_t>(central * fast_negative_powf(sum, beta));
+                }
+#else // 24.5 ms  26.4 ms (x5 faster, reorder loops)
+                acc_data_t sum[chi-clo];
+                for(dim_t oc=clo; oc<chi; ++oc) sum[oc-clo] = 0;
+                DEFINE_HALFSIZE_RANGE(d_st, d_en, od, 0, D);
+                DEFINE_HALFSIZE_RANGE(h_st, h_en, oh, 0, H);
+                DEFINE_HALFSIZE_RANGE(w_st, w_en, ow, 0, W);
+                typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
+                auto cf= (ndims >= 5)? Coords::mk(mb,mb+1, 0,1, d_st,d_en, h_st,h_en, w_st,w_en)
+                    : (ndims >= 4)? Coords::mk(mb,mb+1, 0,1, h_st,h_en, w_st,w_en)
+                    : Coords::mk(mb,mb+1, 0,1, w_st,w_en); // ndims>=3
+                // outer loop: Coords constructor and iter is slow
+                NOVEC for ( ; cf; ++cf) {
+                    const unsigned vl=cf.get_vl(); // vl ~ d,h,w coords
+                    for(dim_t oc=clo; oc<chi; ++oc)
+                    {
+                        ShortLoop() for(unsigned i=0U; i<vl; ++i)
+                            cf.vp[1][i] = oc; // manual adjustment
+                        dim_t lrnp[MVL];
+                        data_opt.vec_off_v(cf.base(), (dim_t *)&lrnp[0], vl);
+                        for(unsigned i=0U; i<vl; ++i) {
+                            sum[oc-clo] += SQUARE(acc_data_t{ src[lrnp[i]] });
+                        }
+                    }
+                    ShortLoop() for(unsigned i=0U; i<vl; ++i)
+                        cf.vp[1][i] = 0; // restore orig cf channel (0)
+                }
+                size_t center[chi-clo];
+                channel_offsets( data_opt, center, mb, clo, chi, od, oh, ow );
+                for(dim_t oc=clo; oc<chi; ++oc) {
+                    auto const sum_oc = k + alpha * sum[oc-clo] / summands;
+                    data_t const central = src[center[oc-clo]];
+                    dst[center[oc-clo]] = static_cast<data_t>(central
+                            * fast_negative_powf(sum_oc, beta));
+                }
+#endif
+            };
+#endif
+            dim_t const blksz = stack_friendly_blksz(C);
+            parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
+                    [&](dim_t mb, dim_t c_blk, dim_t od, dim_t oh, dim_t ow) {
+                    dim_t clo = c_blk * blksz;
+                    dim_t chi = (clo + blksz >= C? C: clo + blksz);
+                    //printf(" clo,chi=%ld,%ld\n", clo, chi);
+                    acc_data_t sum[chi-clo];
+                    for(dim_t oc=clo; oc<chi; ++oc) sum[oc-clo] = 0; // VRrestore3!
+                    DEFINE_HALFSIZE_RANGE(d_st, d_en, od, 0, D);
+                    DEFINE_HALFSIZE_RANGE(h_st, h_en, oh, 0, H);
+                    DEFINE_HALFSIZE_RANGE(w_st, w_en, ow, 0, W);
+                    typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
+                    auto cf= (ndims >= 5)? Coords::mk(mb,mb+1, 0,1, d_st,d_en, h_st,h_en, w_st,w_en)
+                        : (ndims >= 4)? Coords::mk(mb,mb+1, 0,1, h_st,h_en, w_st,w_en)
+                        : Coords::mk(mb,mb+1, 0,1, w_st,w_en); // ndims>=3
+                    // Coords constructor and iter is pain point.
+                    NOVEC for ( ; cf; ++cf) { // VR 2spill 2restore!
+                        const unsigned vl=cf.get_vl(); // vl ~ d,h,w coords
+                        for(dim_t oc=clo; oc<chi; ++oc) // VR 4spill 4restore!
+                        {
+                            ShortLoop() for(unsigned i=0U; i<vl; ++i)
+                                cf.vp[1][i] = oc; // manual adjustment
+                            dim_t lrnp[MVL];
+                            data_opt.vec_off_v(cf.base(), (dim_t *)&lrnp[0], vl);
+                            for(unsigned i=0U; i<vl; ++i) {
+                                sum[oc-clo] += SQUARE(acc_data_t{ src[lrnp[i]] });
+                            }
+                        }
+                        ShortLoop() for(unsigned i=0U; i<vl; ++i)
+                            cf.vp[1][i] = 0; // restore orig cf channel (0)
+                    }
+                    size_t center[chi-clo];
+                    channel_offsets( data_opt, center, mb, clo, chi, od, oh, ow );
+                    for(dim_t oc=clo; oc<chi; ++oc) { // 6 VRspill,restore!
+                        auto const sum_oc = k + alpha * sum[oc-clo] / summands;
+                        data_t const central = src[center[oc-clo]];
+                        dst[center[oc-clo]] = static_cast<data_t>(central
+                                * fast_negative_powf(sum_oc, beta));
+                    }
+                    });
+        }
+        else{ // original way
+            // **655** ms, C=802
+            // ker single channel (original way, ok if D*H*W is big enough?)
+            // (one part is calculating the channel-wise "central" offsets)
+            parallel_nd(MB, C, D, H, W,
+                    [&](dim_t mb, dim_t c, dim_t d, dim_t h, dim_t w) {
+                    const dim_t off = offset<tag>(data_d, mb,stride_mb, c,C, d,D, h,H, w,W);
+                    ker_within(off, mb, c, d, h, w);
+                    });
+        }
     }
 }
 
@@ -755,8 +1037,8 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
     auto diff_src = CTX_OUT_MEM(data_t *, DNNL_ARG_DIFF_SRC);
 
     //bool const formula = true;
-    //bool const formula = false;
-    bool const formula = (tag == nchw || tag == nhwc || tag == nChw8c || tag == nChw16c);
+    bool const formula = false;
+    //bool const formula = (tag == nchw || tag == nhwc || tag == nChw8c || tag == nChw16c);
     //bool const formula = (tag != any); // via pd()->dat_tag_, see ref_lrn.hpp
     // XXX just always construct the optimized one (slightly more work)
     const memory_desc_wrapper_opt data_opt(pd()->src_md());

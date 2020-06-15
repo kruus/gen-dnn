@@ -1,8 +1,7 @@
---tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=FWD_D ic2002ih10
---tag=ncdhw --alg=ACROSS --dir=FWD_D ic2002id10
+--alg=ACROSS,WITHIN --tag=nchw,nhwc,nChw8c,nChw16c --dir=FWD_D mb1ic2002ih10 mb8ic250ih10
+--alg=ACROSS,WITHIN --tag=ncdhw --dir=FWD_D mb1ic2002id10 mb8ic250id10
 
---tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=FWD_D ic32777ih10
---tag=ncdhw --alg=ACROSS --dir=FWD_D ic32777id10
+--alg=ACROSS,WITHIN --tag=nchw,nhwc,nChw8c,nChw16c --dir=FWD_D mb1ic32777ih10 mb8ic4004ih10
+--alg=ACROSS,WITHIN --tag=ncdhw --dir=FWD_D mb1ic32777id10 mb8ic4004ih10
 
---tag=nc --alg=ACROSS,WITHIN --dir=FWD_D ic2002
---tag=nc --alg=ACROSS,WITHIN --dir=FWD_D ic32777
+--tag=nc --alg=ACROSS,WITHIN --dir=FWD_D mb1ic2002 mb1ic32777 mb1ic123456 mb1ic1234567 mb8ic2002 mb8ic32777 mb8ic123456 mb8ic1234567

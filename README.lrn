@@ -1,0 +1,19 @@
+fwd lrn ref impl now OK for long simd vector length.
+Typical optimization:
+  - reorder loops so channels is inner (typ lrn window gives vector length 5)
+  - template function rather than 'if(template_parm==foo){code}'
+    - also other cases moving conditionals out of loop
+  - runtime-size tmp stack arrays sometimes absolutely kill vectorization
+    (array sometimes impossible to recognized as ivdep in inner loop, so only scalar code)
+    so used a large-enough, fixed-size stack buffer [sometimes]
+  - use memory_desc_wrapper_opt vectorized offset calculator for non-formula cases
+  - (dim==2 trivial versions also special cased.
+
+backward lrn needs similar optimizations (I think it might only use
+vectorized formula offset calcs ??)
+  - trickier because two sets of loops, first set similar to fwd lrn case
+    to calculate lrn window sum.
+
+  
+examples tests:
+ { { make -C build-vejd2 -j 4 install || make -C build-vejd2 -j 1 install; } && ./vetest.sh -B build-vejd2 -L lrnx.log -vv -t 8 --benchdnn -v5 --mode=C --lrn --batch=lrnx.in && ./vetest.sh -B build-vejd2 -L lrnxP.log -v -t 8 --benchdnn -v5 --mode=P --lrn --batch=lrnx.in; } >& x.log

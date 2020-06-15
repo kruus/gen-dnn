@@ -8,3 +8,7 @@ sr
 log
 vrsqrt
 *.log
+has_def
+round
+thr
+

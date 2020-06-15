@@ -311,7 +311,7 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
     const dim_t W = pd()->W();
     const auto stride_mb = data_d.blocking_desc().strides[0];
     const bool across_channels = pd()->desc()->alg_kind == lrn_across_channels;
-    //static constexpr dim_t blksize = tag == nChw16c ? 16 : 8;
+    static constexpr dim_t blksize = tag == nChw16c ? 16 : 8;
     const auto ndims = data_d.ndims();
 
     auto compute_n_summands = [&](dim_t size) {
@@ -442,6 +442,8 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
 #undef COFF
         });
     }
+    // XXX Compare timing w/ next specialization. Can we drop specialized code?
+    //     (orig: restrict C<=stack_channels, simpler code
 #if 0
     // --tag=nChw16c --alg=ACROSS --dir=FWD_D ic2002ih10 ic9999ih10 ic32777ih10
     // this block:   0.200 0.630 1.97 ms
@@ -456,6 +458,49 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
         //#elif 0
         //#elif 0 // cleanup : 1.07, 1.06 ms
         //#elif 1 // run-time array --> compile-time size ==> 0.199, 0.203 ms
+        assert( D==1 );
+        parallel_nd(MB, H, W, [&](dim_t mb, dim_t h, dim_t w) {
+                acc_data_t sum[C];
+                size_t data_off[C];
+                // srcdata: vec gather once --> linear vec loads later
+                // (and potentially single conversion to acc_data_t)
+                //acc_data_t srcdata[C];
+                // Undesirable workaround:
+                //   If runtime-array, nc++ gets confused about vector dependencies.
+                //   But making it compile-time size (max size) now vectorizes.
+                // NO amount of pragmas could convince nc++ otherwise
+                acc_data_t srcdata[stack_channels];
+
+                // (loop combin with next kills vectorization)
+                for(dim_t c=0U; c<C; ++c) sum[c] = acc_data_t{0};
+                for(dim_t c=0U; c<C; ++c){
+#if 0
+#define OFF(blksize) (mb * stride_mb + (c / (blksize)) * H * W * (blksize) \
+        + h * W * (blksize) + w * (blksize) + c % (blksize))
+                    data_off[c] = (tag==nChw8c? OFF(8): OFF(16));
+#undef OFF
+#else // same speed
+                    data_off[c] = offset<tag>(data_d, mb,stride_mb,
+                            c,C, 0,1, h,H, w,W );
+#endif
+                    srcdata[c] = src[data_off[c]];
+                }
+                for (dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                    // oc+l must lie in data bounds:
+                    dim_t const oc_lo = ( -l < 0? 0:  -l);
+                    dim_t const oc_hi = (C-l > C? C: C-l);
+                    for(dim_t oc=oc_lo; oc<oc_hi; ++oc)
+                        sum[oc] += SQUARE( srcdata[oc+l] );
+                }
+                for(dim_t oc=0; oc<C; ++oc){
+                    float const sum_cs = k + alpha * sum[oc] / summands;
+                    dst[data_off[oc]] = static_cast<data_t>(
+                            srcdata[oc]
+                            * fast_negative_powf(
+                                sum_cs, //k + alpha * sum[oc] / summands,
+                                beta));
+                }
+            });
     }
 #endif
     // any number of channels : not hugely slower than C<=stack_channels
@@ -553,11 +598,54 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
         });
     }
 #if 0
-    else if (across_channels && C <= stack_channels)
+    else if (0 && across_channels && C <= stack_channels)
     {
         // --tag=ncdhw --alg=ACROSS --dir=FWD_D ic2002id10 ic32777id10
         // This block: 16.0 274 ms
         // without (block below) : 15 271 ms
+        //auto ker_across_vec = [&src,&dst,&stride_mb,&C,&D,&H,&W,&half_size,&k,&alpha,&beta,&summands](
+        auto ker_across_vec = [&](
+                size_t * const dst_off,     // oc from 
+                dim_t const mb,             // 0 .. C-1
+                dim_t const od, dim_t const oh, dim_t const ow) {
+            acc_data_t sum[C];
+            FOR_CHAN sum[i]= 0;
+            FOR_CHAN {
+                DEFINE_HALFSIZE_RANGE(c_st, c_en, i, 0, C);
+                for(dim_t c = c_st; c < c_en; ++c) {
+                    const acc_data_t s = src[dst_off[c]];
+                    sum[i] += s * s;
+                }
+            }
+            FOR_CHAN sum[i] = k + alpha * sum[i] / summands;
+            FOR_CHAN dst[dst_off[i]] = static_cast<data_t>( src[dst_off[i]]
+                        * fast_negative_powf(sum[i], beta));
+        };
+
+        // size^{2 or 3}? XXX
+        // and MB*D*H*W work amount sufficiently large for omp? XXX
+        // vectorize across channels, using fast offsets calculated on stack.
+        parallel_nd(MB, D, H, W, [&](dim_t const mb, dim_t const d, dim_t const h, dim_t const w) {
+                //size_t data_off[C];
+                size_t data_off[stack_channels]; // too big, but compilet-time
+                if (formula || C <= size ) { // maybe size^2 or size^3 ?
+#if 0 // only slightly better vectorization (recheck)
+                    if (tag == nchw ) for(size_t c=0U; c<C; ++c)
+                        data_off[c] = mb * stride_mb + c * H * W + h * W + w;
+                    else if (tag == nhwc ) for(size_t c=0U; c<C; ++c)
+                        data_off[c] = mb * stride_mb + h * W * C + w * C + c;
+                    else
+#endif
+                    // always unvectorizable. Fix: use `size_t c` (not "unsigned")
+                    for(size_t c=0U; c<C; ++c) data_off[c] = offset<tag>(
+                            data_d, mb,stride_mb, c,C, d,D, h,H, w,W );
+                } else { // function call phys offset needs a little help to vectorize
+                    // unvec: function calls init_nd and vec_off_v
+                    channel_offsets(data_opt, data_off, mb, 0, C, d, h, w);
+                }
+                ker_across_vec(&data_off[0], mb, /*c,*/ d, h, w);
+            });
+    }
 #endif
     else if (across_channels) {
         // actually this will handle any number of channels,
@@ -755,8 +843,8 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
     auto diff_src = CTX_OUT_MEM(data_t *, DNNL_ARG_DIFF_SRC);
 
     //bool const formula = true;
-    //bool const formula = false;
-    bool const formula = (tag == nchw || tag == nhwc || tag == nChw8c || tag == nChw16c);
+    bool const formula = false;
+    //bool const formula = (tag == nchw || tag == nhwc || tag == nChw8c || tag == nChw16c);
     //bool const formula = (tag != any); // via pd()->dat_tag_, see ref_lrn.hpp
     // XXX just always construct the optimized one (slightly more work)
     const memory_desc_wrapper_opt data_opt(pd()->src_md());
