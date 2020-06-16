@@ -288,7 +288,7 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
     // offset calcs with builting formula vectorize well:
     //bool const formula = true;
     //bool const formula = false;
-    bool const formula = (tag == nchw || tag == nhwc || tag == nChw8c || tag == nChw16c);
+    bool constexpr formula = (tag == nchw || tag == nhwc || tag == nChw8c || tag == nChw16c);
     //bool const formula = (tag != any); // via pd()->dat_tag_, see ref_lrn.hpp
     //const memory_desc_wrapper data_d(pd()->src_md());
     //
@@ -496,7 +496,6 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
 #else
             acc_data_t sum[stack_channels]; // big compile time size $$$
 #endif
-
             for(dim_t c=0; c<cspan; ++c) sum[c]= acc_data_t{0};
 
             // for arb C, clo, chi, we need data_off and srcdata possibly
@@ -560,7 +559,71 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
         // This block: 16.0 274 ms
         // without (block below) : 15 271 ms
 #endif
-    else if (across_channels) {
+    else if (across_channels /*&& half_size <= 127*/) // lucky w/ optimizations
+    {
+        // adapted from bwd_t, when fwd was slower than bwd!
+        //   remove lapped-kernel call:
+        //      15.67 ms ---> 4.06 ms (whew, faster than bwd now)
+        dim_t const blksz = stack_friendly_blksz(C);
+        parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
+                [&](dim_t const mb, dim_t const c_blk, dim_t const d, dim_t const h, dim_t const w) {
+            dim_t const clo = c_blk * blksz;
+            dim_t const chi = nstl::min(clo + blksz, C);
+
+            // for arb C, clo, chi, we need chanoff and srcdata possibly
+            // half_size past ends
+            dim_t const clolo = nstl::max(clo - half_size + 0, (dim_t)0);
+            dim_t const chihi = nstl::min(chi + half_size + 1, C);
+            // slowdown for nchw, (maybe not, for nhwc (CHECKME))
+            size_t chanoff[chihi - clolo];
+            //size_t chanoff[stack_channels + 2*127];
+
+            //acc_data_t srcgt[chihi - clolo]; // src gathered; need [clolo,chihi)
+            if(formula) {
+                for (dim_t c=clolo; c<chihi; ++c) {
+                    chanoff[c-clolo] = offset<tag>(data_d, mb,stride_mb,
+                            c,C, 0,D, h,H, w,W );
+                    //srcgt[c-clolo] = src[chanoff[c-clolo]];
+                }
+            }else{ // vec_off_v phys offset calc in simd-length chunks
+                channel_offsets(data_opt, chanoff, mb, clolo, chihi, d, h, w);
+                //for(size_t c=clolo; c<chihihi; ++c){
+                //    srcgt[c-clolo] = src[chanoff[c-clolo]];
+                //}
+            }
+#define COFF(c) (chanoff[ (c) - clolo ])
+            //acc_data_t sum[chi-clo];      // rt dim
+            acc_data_t sum[stack_channels]; // vec workaround
+            for(dim_t c=0; c<chi-clo; ++c) sum[c]= acc_data_t{0};
+            float const inv_summands = 1.0f / static_cast<float>(summands);
+            NOVEC for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                // XXX make other fwd look this simple too XXX
+                dim_t const oc_lo = (0-l < clo? clo: 0-l);
+                dim_t const oc_hi = (C-l > chi? chi: C-l);
+                PragmaQuote(_NEC shortloop_reduction)//;
+                for(dim_t c=oc_lo; c<oc_hi; ++c) {   // central chan
+                    sum[c-clo] += SQUARE( acc_data_t{src[COFF(c+l)]} );
+                    //sum[c-clo] += SQUARE( srcgt[c+l-clolo] );
+                }
+            }
+            //PragmaQuote(_NEC shortloop_reduction)//;
+            //for (dim_t c=clolo; c<chihi; ++c) { // c ~ central channel
+            //    sum[c-clolo] = k + (alpha * inv_summands) * sum[c-clolo];
+            //}
+            for(int c=0; c<chi-clo; ++c) sum[c] = k + (alpha * inv_summands) * sum[c];
+            // offset data for 'central' region, fwd by up to half_size
+            size_t * central_off = chanoff + (clo - clolo);
+            for(int c=0; c<chi-clo; ++c) {
+                dst[central_off[c]] = static_cast<data_t>(
+                        src[central_off[c]] * fast_negative_powf(
+                            sum[c],
+                            beta));
+            }
+        });
+#undef COFF
+    }
+#if 0
+    else if (across_channels) { // older lapped-kernel version
         // actually this will handle any number of channels, formula or not,
         // as well as trivial ndims=2 case
         /** if channels large, break apart and overlap the offset calcs */
@@ -614,6 +677,7 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
             ker_across_vec_lapped( clo, chi, &data_off[0], mb, /*c,*/ d, h, w);
         });
     }
+#endif
     //
     // below : all alg=WITHIN cases
     //
@@ -867,6 +931,8 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
 
     if(0) {
     }
+    // Note: bound half_size<=127 is **ONLY** to allow compile-time stack array
+    //       size, which is required to allow nc++ to vectorize inner loops.
 #if 1
     //else if (1 && (tag==nchw || tag==nhwc) && across_channels)
     else if (1 && (tag==nchw || tag==nhwc) && across_channels && half_size <= 127)
@@ -1091,7 +1157,6 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
     }
 #endif
 #if 1
-    //else if (1 && (tag==nchw || tag==nhwc) && across_channels)
     else if (1 && across_channels && half_size <= 127)
     {
         // --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=BWD_D ic2002ih10
@@ -1477,6 +1542,7 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
 #undef JUST_DENSE
     }
 #endif // dev version
+#if 0
     else if (1 && across_channels && half_size <= 127) { // fall-back, "wrong" loop order
         // development version cleanup. wrong loop order still.
         // --lrn --dir=BWD_D --tag=nchw ic32777ih10 : fwd 3 ms, bwd 259 ms
@@ -1574,6 +1640,7 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
             ker_across_vec_lapped( clo, chi, &data_off[0], mb, d, h, w);
         });
     }
+#endif
 #if 0
     else if (0 && across_channels) { // fall-back, "wrong" loop order
         // development version. wrong loop order still.

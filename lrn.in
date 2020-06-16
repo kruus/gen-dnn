@@ -1,17 +1,12 @@
---tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I ic202ih10iw10
---tag=ncdhw --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I ic202_id10ih10iw10 
+--tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I ic202ih10
+--tag=ncdhw --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I ic202id10
 
---tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=BWD_D ic202ih10iw10
-# not yet optimized:
---tag=ncdhw --alg=ACROSS --dir=BWD_D ic32_id10ih10iw10 
---tag=ncdhw --alg=WITHIN --dir=BWD_D ic32_id8ih4iw4 
+--tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=BWD_D ic202ih10
+--tag=ncdhw --alg=ACROSS,WITHIN --dir=BWD_D ic202id10
 
 # large channels
---tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I ic32777ih10iw10
---tag=ncdhw --alg=ACROSS --dir=FWD_D,FWD_I ic32777_id10ih10iw10 
-# not yet optimized:
-#--tag=ncdhw --alg=ACROSS --dir=BWD_D ic32777_id10ih10iw10 
-#--tag=ncdhw --alg=WITHIN --dir=FWD_D,FWD_I ic32777_id10ih10iw10 
+--tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I,BWD_D ic32777ih10iw10
+--tag=ncdhw --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I,BWD_D ic32777_id10ih10iw10 
 
 # tiny channels
 --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I,BWD_D ic1_ih10iw10
