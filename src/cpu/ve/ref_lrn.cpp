@@ -78,6 +78,7 @@ static inline acc_data_t fast_negative_powf(acc_data_t omega, acc_data_t beta) {
          * = sqrtf(1.0f / (sqrtf(omega) * omega))
          */
     if (beta == 0.75f) {
+        //PragmaQuote(_NEC noverror_check) //==> func call ==> no vectorizn
         Y = sqrtf(1.0f / (sqrtf(omega) * omega));
     } else {
         Y = 1.0f / powf(omega, beta);
@@ -560,7 +561,7 @@ void ref_lrn_fwd_t<d_type>::execute_forward(const exec_ctx_t &ctx) const {
         // without (block below) : 15 271 ms
 #endif
     else if (across_channels) {
-        // actually this will handle any number of channels,
+        // actually this will handle any number of channels, formula or not,
         // as well as trivial ndims=2 case
         /** if channels large, break apart and overlap the offset calcs */
         auto ker_across_vec_lapped = [&](
@@ -762,6 +763,7 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
     const memory_desc_wrapper_opt data_opt(pd()->src_md());
     const memory_desc_wrapper& data_d = data_opt;
 
+    const dim_t MB = pd()->MB();
     const dim_t C = pd()->C();
     const dim_t D = pd()->D();
     const dim_t H = pd()->H();
@@ -819,59 +821,9 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
         }
         return (acc_data_t)(k + alpha * sum / summands);
     };
-#if 0
-    // get_omega could be scratchpad data from FWD_D pass? XXX
-    auto get_omega_across_vec = [&](
-            size_t * const dst_off /*[0..C-1]*/,
-            // internal : dim_t const oc,
-            dim_t const od, dim_t const oh, dim_t const ow) {
-        acc_data_t sum[C] = 0;
-        FOR_CHAN sum[i] = acc_data_t{0};
-        FOR_CHAN {
-            const dim_t c_st = nstl::max(oc - half_size + 0, (dim_t)0);
-            const dim_t c_en = nstl::min(oc + half_size + 1, C);
-
-            for (dim_t c = c_st; c < c_en; ++c) {
-                const acc_data_t s = src[dst_off[c]];
-                sum += s * s;
-            }
-        }
-        return (acc_data_t)(k + alpha * sum / summands);
-    };
-    auto ker_across_vec = [&](
-            size_t * const dst_off,     // oc from 
-            dim_t const mb,             // 0 .. C-1
-            dim_t const od, dim_t const oh, dim_t const ow) {
-        for(dim_t oc=0; oc<C; ++oc){
-            acc_data_t A = 0, B = 0;
-            data_t central = src[dst_off[oc]];
-            if(1) {
-                const dim_t c_st = nstl::max(oc - half_size + 0, (dim_t)0);
-                const dim_t c_en = nstl::min(oc + half_size + 1, C);
-
-                for (dim_t c = c_st; c < c_en; c++) {
-                    const auto off = dst_offoffset<tag>(data_d, mb,stride_mb,
-                            c,C, od,D, oh,H, ow,W);
-                    const acc_data_t omega = get_omega(mb, c, od, oh, ow);
-                    const acc_data_t omega_in_beta
-                        = fast_negative_powf(omega, beta);
-                    const acc_data_t tmp
-                        = omega_in_beta * (acc_data_t)diff_dst[off];
-                    if (c == oc) A = tmp;
-                    B += (src[off] * tmp / omega);
-                }
-            }
-            B *= (2.0f * alpha * beta * central / summands);
-            *d = static_cast<data_t>(A - B);
-        }
-    };
-#endif
-
-
     auto ker = [&](data_t * const d, dim_t const mb, dim_t const oc,
             dim_t const od, dim_t const oh, dim_t const ow) {
         acc_data_t A = 0, B = 0;
-        data_t central = src[offset<tag>(data_d, mb,stride_mb, oc,C, od,D, oh,H, ow,W)];
         if (across_channels) {
             const dim_t c_st = nstl::max(oc - half_size + 0, (dim_t)0);
             const dim_t c_en = nstl::min(oc + half_size + 1, C);
@@ -908,31 +860,880 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
                 B += (src[off] * tmp / omega);
             }
         }
+        data_t central = src[offset<tag>(data_d, mb,stride_mb, oc,C, od,D, oh,H, ow,W)];
         B *= (2.0f * alpha * beta * central / summands);
         *d = static_cast<data_t>(A - B);
     };
 
-    const dim_t MB = pd()->MB();
-#if 1
     if(0) {
     }
+#if 1
+    //else if (1 && (tag==nchw || tag==nhwc) && across_channels)
+    else if (1 && (tag==nchw || tag==nhwc) && across_channels && half_size <= 127)
+    {
+        // Old version (after this block)
+        // --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=BWD_D ic2002ih10
+        // bwd perf: 0.558 0.641 0.571 0.585
+        // remeasure: 0.557 0.638 0.572 0.584   14.23 117.0
+        // --tag=nchw --alg=ACROSS --dir=BWD_D ic32777ih10 (14.23 ms)
+        // --tag=nchw --alg=ACROSS --dir=BWD_D ic234567ih10 (117.0 ms)
+        //
+        // Now just enable the JUST_DENSE flag:
+        // nchw .558-->0.505 nhwc .638-->0.458 (up to 28% speedup)
+        // perf: 98.8% vec, <VL>=251
+        // dev version cleanup (again)
+        dim_t const blksz = stack_friendly_blksz(C);
+        parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
+                [&](dim_t const mb, dim_t const c_blk, dim_t const d, dim_t const h, dim_t const w) {
+            dim_t const clo = c_blk * blksz;
+            dim_t const chi = nstl::min(clo + blksz, C);
+            dim_t const cspan = chi - clo;
+            // comp-time array bound [vs cspan] as ++ vectorization workaround
+            acc_data_t A[stack_channels + 2*127];
+            acc_data_t B[stack_channels + 2*127];
+            for(dim_t c=0; c<cspan; ++c) {
+                A[c] = 0;
+                B[c] = 0;
+            }
+            dim_t clolo = nstl::max(clo - half_size, dim_t{0});
+            dim_t chihi = nstl::min(chi + half_size + 1, C);
+
+#define JUST_DENSE 1
+#if JUST_DENSE
+            dim_t c_off0 = offset<tag>(data_d, mb,stride_mb, 0,C, 0,D, h,H, w,W );
+            dim_t const c_stride = (tag==nhwc? dim_t{1}: dim_t{H*W});
+#define COFF(c) (c_off0 + (c) * c_stride)
 #else
-    dim_t const stack_channels = 32768;
-    // new methods =========================================================
-    if (across_channels && C >= size && C <= stack_channels ) { // size^{2 or 3}? XXX
-        // vectorize across channels, using fast offsets calculated on stack.
-        parallel_nd(MB, D, H, W, [&](dim_t mb, dim_t d, dim_t h, dim_t w) {
-                size_t data_off[C];
-                if (formula) {
-                    for(unsigned c=0U; c<C; ++c) data_off[c] = offset<tag>(
-                            data_d, mb,stride_mb, c,C, d,D, h,H, w,W );
-                } else { // function call phys offset needs a little help to vectorize
-                    channel_offsets(data_opt, data_off, mb, 0, C, d, h, w);
+            dim_t clololo = nstl::max(clolo - half_size, dim_t{0});
+            // slowdown for nchw, (maybe not, for nhwc (CHECKME))
+            size_t chanoff[chihi - clolo];
+            {
+                dim_t const chihihi = nstl::min(chihi + half_size + 1, C);
+                if(formula) {
+                    for(size_t c=clololo; c<chihihi; ++c){
+                        chanoff[c-clololo] = offset<tag>(data_d, mb,stride_mb,
+                                c,C, d,D, h,H, w,W );
+                    }
+                }else{ // vec_off_v phys offset calc in simd-length chunks
+                    channel_offsets(data_opt, chanoff, mb, clololo, chihihi, d, h, w);
                 }
-                ker_across_vec(&data_off[0], mb, /*c,*/ d, h, w);
-            });
+            }
+#define COFF(c) (chanoff[ (c) - clololo ])
+#endif
+            float const inv_summands = 1.0f / static_cast<float>(summands);
+            {
+                //acc_data_t sum[chihi-clolo]; // rt dim
+                acc_data_t sum[stack_channels + 2*127]; // vec workaround
+                for (dim_t c=clolo; c<chihi; ++c) sum[c-clolo] = 0;
+                NOVEC for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                    dim_t const oc_lo = (0-l < clolo? clolo: 0-l);
+                    dim_t const oc_hi = (C-l > chihi? chihi: C-l);
+                    PragmaQuote(_NEC shortloop_reduction)//;
+                    for(dim_t c=oc_lo; c<oc_hi; ++c) {   // central chan
+                        sum[c-clolo] += SQUARE( acc_data_t{src[COFF(c+l)]} );
+                    }
+                }
+                PragmaQuote(_NEC shortloop_reduction)//;
+                for (dim_t c=clolo; c<chihi; ++c) { // c ~ central channel
+                    sum[c-clolo] = k + (alpha * inv_summands) * sum[c-clolo];
+                }
+                // --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=BWD_D ic2002ih10
+                // --tag=nchw --alg=ACROSS --dir=BWD_D ic32777ih10 (14.23 ms)
+                // perf: 98.8% vec, <VL>=251
+                NOVEC for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                    dim_t const oc_lo = (0-l < clo? clo: 0-l);
+                    dim_t const oc_hi = (C-l > chi? chi: C-l);
+                    PragmaQuote(_NEC shortloop_reduction)//;
+                    for(dim_t c=oc_lo; c<oc_hi; ++c) {   // central chan
+                        const auto off = COFF(c+l);
+                        const acc_data_t omega = sum[c+l-clolo];
+#if 0
+                        const acc_data_t omega_in_beta
+                            = fast_negative_powf(omega, beta);
+                        const acc_data_t tmp
+                            = omega_in_beta * (acc_data_t)diff_dst[off];
+#else
+                        const acc_data_t tmp
+                            = fast_negative_powf(omega, beta)
+                            * (acc_data_t)diff_dst[off];
+#endif
+                        if (l == 0) A[c-clo] = tmp;
+                        B[c-clo] += (src[off] * tmp / omega);
+                    }
+                }
+            }
+            for(dim_t c=clo; c<chi; ++c) { // c ~ central channel
+                // vsc and vgt ... (14.6 ms)
+                //B[c-clo] *= (2.0f * alpha * beta * inv_summands) * src[COFF(c)];
+                //diff_src[COFF(c)] = static_cast<data_t>(A[c-clo] - B[c-clo]);
+                // better (3 vld, 1 vsc) (14.3 ms)
+                diff_src[COFF(c)] = static_cast<data_t>( A[c-clo]
+                        - (2.0f * alpha * beta * inv_summands)
+                        * B[c-clo] * src[COFF(c)] );
+            }
+        });
+#undef COFF
+#undef JUST_DENSE
     }
 #endif
+#if 1
+    //else if (1 && (tag==nchw || tag==nhwc) && across_channels)
+    else if (1 && (tag==nChw8c || tag==nChw16c) && across_channels && half_size <= 127)
+    {
+        // --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=BWD_D ic2002ih10
+        // bwd perf: 0.558 0.641 0.571 0.585
+        // --tag=nchw --alg=ACROSS --dir=BWD_D ic32777ih10 (14.23 ms)
+        // --tag=nchw --alg=ACROSS --dir=BWD_D ic234567ih10 (117.0 ms)
+        // perf: 98.8% vec, <VL>=251
+        // THIS BLOCK: 0.555 0.542 ms  ** maybe ** ~ 7% speedup
+        dim_t const blksz = stack_friendly_blksz(C);
+        parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
+                [&](dim_t const mb, dim_t const c_blk, dim_t const d, dim_t const h, dim_t const w) {
+            dim_t const clo = c_blk * blksz;
+            dim_t const chi = nstl::min(clo + blksz, C);
+            dim_t const cspan = chi - clo;
+            // comp-time array bound [vs cspan] as ++ vectorization workaround
+            acc_data_t A[stack_channels + 2*127];
+            acc_data_t B[stack_channels + 2*127];
+            for(dim_t c=0; c<cspan; ++c) {
+                A[c] = 0;
+                B[c] = 0;
+            }
+            dim_t clolo = nstl::max(clo - half_size, dim_t{0});
+            dim_t chihi = nstl::min(chi + half_size + 1, C);
+            dim_t clololo = nstl::max(clolo - half_size, dim_t{0});
+
+#define JUST_DENSE 0            
+#if JUST_DENSE
+            dim_t c_off0 = offset<tag>(data_d, mb,stride_mb, 0,C, 0,D, h,H, w,W );
+            dim_t const c_stride = (tag==nhwc? dim_t{1}: dim_t{H*W});
+#define COFF(c) (c_off0 + (c) * c_stride)
+#else
+            dim_t const chihihi = nstl::min(chihi + half_size + 1, C);
+            // slowdown for nchw, (maybe not, for nhwc (CHECKME))
+            //size_t chanoff[chihihi - clololo];
+            size_t chanoff[stack_channels + 4*127];
+            acc_data_t srcgt[chihihi - clololo]; // src gathered; need [clolo,chihi)
+            {
+                // assert(formula)
+                if(1) {
+                    for(size_t c=clololo; c<chihihi; ++c){
+                        chanoff[c-clololo] = offset<tag>(data_d, mb,stride_mb,
+                                c,C, d,D, h,H, w,W );
+                        srcgt[c-clololo] = src[chanoff[c-clololo]];
+                    }
+                }
+                //else{ // vec_off_v phys offset calc in simd-length chunks
+                //    channel_offsets(data_opt, chanoff, mb, clololo, chihihi, d, h, w);
+                //}
+                //  opt attempt: src is VGT twice --> do that once...
+            }
+#define COFF(c) (chanoff[ (c) - clololo ])
+#endif
+            float const inv_summands = 1.0f / static_cast<float>(summands);
+            {
+                //acc_data_t sum[chihi-clolo]; // rt dim
+                acc_data_t sum[stack_channels + 2*127]; // vec workaround
+                for (dim_t c=clolo; c<chihi; ++c) sum[c-clolo] = 0;
+                NOVEC for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                    dim_t const oc_lo = (0-l < clolo? clolo: 0-l);
+                    dim_t const oc_hi = (C-l > chihi? chihi: C-l);
+                    PragmaQuote(_NEC shortloop_reduction)//;
+                    for(dim_t c=oc_lo; c<oc_hi; ++c) {   // central chan
+                        //sum[c-clolo] += SQUARE( acc_data_t{src[COFF(c+l)]} );
+                        sum[c-clolo] += SQUARE( srcgt[c+l-clololo] );
+                    }
+                }
+                PragmaQuote(_NEC shortloop_reduction)//;
+                for (dim_t c=clolo; c<chihi; ++c) { // c ~ central channel
+                    sum[c-clolo] = k + (alpha * inv_summands) * sum[c-clolo];
+                }
+                // --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=BWD_D ic2002ih10
+                // --tag=nchw --alg=ACROSS --dir=BWD_D ic32777ih10 (14.23 ms)
+                // perf: 98.8% vec, <VL>=251
+                NOVEC for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                    dim_t const oc_lo = (0-l < clo? clo: 0-l);
+                    dim_t const oc_hi = (C-l > chi? chi: C-l);
+                    PragmaQuote(_NEC shortloop_reduction)//;
+                    for(dim_t c=oc_lo; c<oc_hi; ++c) {   // central chan
+                        //const auto off = COFF(c+l);
+                        const acc_data_t omega = sum[c+l-clolo];
+#if 0
+                        const acc_data_t omega_in_beta
+                            = fast_negative_powf(omega, beta);
+                        const acc_data_t tmp
+                            = omega_in_beta * (acc_data_t)diff_dst[COFF(c+l)];
+#else
+                        const acc_data_t tmp
+                            = fast_negative_powf(omega, beta)
+                            * (acc_data_t)diff_dst[COFF(c+l)];
+#endif
+                        if (l == 0) A[c-clo] = tmp;
+                        //B[c-clo] += (src[off] * tmp / omega);
+                        B[c-clo] += (srcgt[c+l-clolo] * tmp / omega);
+                    }
+                }
+            }
+            for(dim_t c=clo; c<chi; ++c) { // c ~ central channel
+                // vsc and vgt ... (14.6 ms)
+                //B[c-clo] *= (2.0f * alpha * beta * inv_summands) * src[COFF(c)];
+                //diff_src[COFF(c)] = static_cast<data_t>(A[c-clo] - B[c-clo]);
+                // better (3 vld, 1 vsc) (14.3 ms)
+                diff_src[COFF(c)] = static_cast<data_t>( A[c-clo]
+                        - (2.0f * alpha * beta * inv_summands)
+                        //* B[c-clo] * src[COFF(c)]
+                        * B[c-clo] * srcgt[c-clololo]
+                        );
+            }
+        });
+#undef COFF
+#undef JUST_DENSE
+    }
+#endif
+#if 1
+    //else if (1 && (tag==nchw || tag==nhwc) && across_channels)
+    else if (1 && across_channels && half_size <= 127)
+    {
+        // --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=BWD_D ic2002ih10
+        // bwd perf: 0.558 0.641 0.571 0.585
+        // --tag=nchw --alg=ACROSS --dir=BWD_D ic32777ih10 (14.23 ms)
+        // --tag=nchw --alg=ACROSS --dir=BWD_D ic234567ih10 (117.0 ms)
+        // --tag=ncdhw --alg=ACROSS --dir=BWD_D ic2002id10 (fwd~15.7 bwd:7.28 ms)
+        // NOTE fwd is a "subset" of bwd -- why is it 2x slower?
+        //
+        //orig remeasure 7.41 ms
+        // mod: gather-once: ncdhw 7.10 ms.  extra stack space for 4% speedup
+        //    NOT WORTH gather-once, it seems (removed)
+        //
+        // perf: 98.8% vec, <VL>=251
+        // dev version cleanup (again)
+        dim_t const blksz = stack_friendly_blksz(C);
+        parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
+                [&](dim_t const mb, dim_t const c_blk, dim_t const d, dim_t const h, dim_t const w) {
+            dim_t const clo = c_blk * blksz;
+            dim_t const chi = nstl::min(clo + blksz, C);
+            dim_t const cspan = chi - clo;
+            // comp-time array bound [vs cspan] as ++ vectorization workaround
+            acc_data_t A[stack_channels + 2*127];
+            acc_data_t B[stack_channels + 2*127];
+            for(dim_t c=0; c<cspan; ++c) {
+                A[c] = 0;
+                B[c] = 0;
+            }
+            dim_t clolo = nstl::max(clo - half_size, dim_t{0});
+            dim_t chihi = nstl::min(chi + half_size + 1, C);
+            dim_t clololo = nstl::max(clolo - half_size, dim_t{0});
+
+#define JUST_DENSE 0            
+#if JUST_DENSE
+            dim_t c_off0 = offset<tag>(data_d, mb,stride_mb, 0,C, 0,D, h,H, w,W );
+            dim_t const c_stride = (tag==nhwc? dim_t{1}: dim_t{H*W});
+#define COFF(c) (c_off0 + (c) * c_stride)
+#else
+            // slowdown for nchw, (maybe not, for nhwc (CHECKME))
+            //size_t chanoff[chihi - clolo];
+            size_t chanoff[stack_channels + 4*127];
+            dim_t const chihihi = nstl::min(chihi + half_size + 1, C);
+            //acc_data_t srcgt[chihihi - clololo]; // src gathered; need [clolo,chihi)
+            {
+                if(formula) {
+                    for(size_t c=clololo; c<chihihi; ++c){
+                        chanoff[c-clololo] = offset<tag>(data_d, mb,stride_mb,
+                                c,C, d,D, h,H, w,W );
+                        //srcgt[c-clololo] = src[chanoff[c-clololo]];
+                    }
+                }else{ // vec_off_v phys offset calc in simd-length chunks
+                    channel_offsets(data_opt, chanoff, mb, clololo, chihihi, d, h, w);
+                    //for(size_t c=clololo; c<chihihi; ++c){
+                    //    srcgt[c-clololo] = src[chanoff[c-clololo]];
+                    //}
+                }
+            }
+#define COFF(c) (chanoff[ (c) - clololo ])
+#endif
+            float const inv_summands = 1.0f / static_cast<float>(summands);
+            {
+                //acc_data_t sum[chihi-clolo]; // rt dim
+                acc_data_t sum[stack_channels + 2*127]; // vec workaround
+                for (dim_t c=clolo; c<chihi; ++c) sum[c-clolo] = 0;
+                NOVEC for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                    dim_t const oc_lo = (0-l < clolo? clolo: 0-l);
+                    dim_t const oc_hi = (C-l > chihi? chihi: C-l);
+                    PragmaQuote(_NEC shortloop_reduction)//;
+                    for(dim_t c=oc_lo; c<oc_hi; ++c) {   // central chan
+                        sum[c-clolo] += SQUARE( acc_data_t{src[COFF(c+l)]} );
+                        //sum[c-clolo] += SQUARE( srcgt[c+l-clololo] );
+                    }
+                }
+                PragmaQuote(_NEC shortloop_reduction)//;
+                for (dim_t c=clolo; c<chihi; ++c) { // c ~ central channel
+                    sum[c-clolo] = k + (alpha * inv_summands) * sum[c-clolo];
+                }
+                // --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=BWD_D ic2002ih10
+                // --tag=nchw --alg=ACROSS --dir=BWD_D ic32777ih10 (14.23 ms)
+                // perf: 98.8% vec, <VL>=251
+                NOVEC for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                    dim_t const oc_lo = (0-l < clo? clo: 0-l);
+                    dim_t const oc_hi = (C-l > chi? chi: C-l);
+                    PragmaQuote(_NEC shortloop_reduction)//;
+                    for(dim_t c=oc_lo; c<oc_hi; ++c) {   // central chan
+                        const auto off = COFF(c+l);
+                        const acc_data_t omega = sum[c+l-clolo];
+#if 0
+                        const acc_data_t omega_in_beta
+                            = fast_negative_powf(omega, beta);
+                        const acc_data_t tmp
+                            = omega_in_beta * (acc_data_t)diff_dst[off];
+#else
+                        const acc_data_t tmp
+                            = fast_negative_powf(omega, beta)
+                            * (acc_data_t)diff_dst[off];
+#endif
+                        if (l == 0) A[c-clo] = tmp;
+                        B[c-clo] += (src[off] * tmp / omega);
+                        //B[c-clo] += (srcgt[c+l-clololo] * tmp / omega);
+                    }
+                }
+            }
+            for(dim_t c=clo; c<chi; ++c) { // c ~ central channel
+                // vsc and vgt ... (14.6 ms)
+                //B[c-clo] *= (2.0f * alpha * beta * inv_summands) * src[COFF(c)];
+                //diff_src[COFF(c)] = static_cast<data_t>(A[c-clo] - B[c-clo]);
+                // better (3 vld, 1 vsc) (14.3 ms)
+                diff_src[COFF(c)] = static_cast<data_t>( A[c-clo]
+                        - (2.0f * alpha * beta * inv_summands)
+                        * B[c-clo] * src[COFF(c)]
+                        //* B[c-clo] * srcgt[c-clololo]
+                        );
+            }
+        });
+#undef COFF
+#undef JUST_DENSE
+    }
+#endif
+#if 0
+    //else if (1 && (tag==nchw || tag==nhwc) && across_channels)
+    else if (1 && across_channels && half_size <= 127)
+    {
+        // dev version cleanup. vec chan limit did not use VCMX op :(
+        // innermost loop now over channels:
+        // --lrn --dir=BWD_D --tag=nchw ic32777ih10
+        // here : [0.144] fwd 3 ms bkw 15 ms(was ~285)
+        dim_t const blksz = stack_friendly_blksz(C);
+        parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
+                [&](dim_t const mb, dim_t const c_blk, dim_t const d, dim_t const h, dim_t const w) {
+            dim_t const clo = c_blk * blksz;
+            dim_t const chi = nstl::min(clo + blksz, C);
+            dim_t const cspan = chi - clo;
+            // comp-time array bound [vs cspan] as ++ vectorization workaround
+            acc_data_t A[stack_channels + 2*127];
+            acc_data_t B[stack_channels + 2*127];
+            for(dim_t c=0; c<cspan; ++c) {
+                A[c] = 0;
+                B[c] = 0;
+            }
+            dim_t clolo = nstl::max(clo - half_size, dim_t{0});
+            dim_t chihi = nstl::min(chi + half_size + 1, C);
+            dim_t clololo = nstl::max(clolo - half_size, dim_t{0});
+
+#define JUST_DENSE 0            
+#if JUST_DENSE
+            dim_t c_off0 = offset<tag>(data_d, mb,stride_mb, 0,C, 0,D, h,H, w,W );
+            dim_t const c_stride = (tag==nhwc? dim_t{1}: dim_t{H*W});
+#define COFF(c) (c_off0 + (c) * c_stride)
+#else
+            // slowdown for nchw, (maybe not, for nhwc (CHECKME))
+            size_t chanoff[chihi - clolo];
+            {
+                dim_t const chihihi = nstl::min(chihi + half_size + 1, C);
+                if(formula) {
+                    for(size_t c=clololo; c<chihihi; ++c){
+                        chanoff[c-clololo] = offset<tag>(data_d, mb,stride_mb,
+                                c,C, d,D, h,H, w,W );
+                    }
+                }else{ // vec_off_v phys offset calc in simd-length chunks
+                    channel_offsets(data_opt, chanoff, mb, clololo, chihihi, d, h, w);
+                }
+            }
+#define COFF(c) (chanoff[ (c) - clololo ])
+#endif
+            float const inv_summands = 1.0f / static_cast<float>(summands);
+            {
+                //acc_data_t sum[chihi-clolo]; // rt dim
+                acc_data_t sum[stack_channels + 2*127]; // vec workaround
+                for (dim_t c=clolo; c<chihi; ++c) sum[c-clolo] = 0;
+#define VEC_CHAN_LIM 0 // no great; cannot convince nc++ to use VCMX op
+#if VEC_CHAN_LIM==1
+                dim_t ov_lo[MVL]; //VREG(ov_lo);
+                dim_t ov_hi[MVL]; //VREG(ov_hi);
+                NOVEC //ShortLoop()//;
+                for (dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                    ov_lo[half_size+l] = (0-l < clolo? clolo: 0-l);
+                    ov_hi[half_size+l] = (C-l > chihi? chihi: C-l);
+                }
+#endif
+                NOVEC for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+#if VEC_CHAN_LIM
+                    dim_t const oc_lo = ov_lo[l+half_size];
+                    dim_t const oc_hi = ov_hi[l+half_size];
+#else
+                    dim_t oc_lo = (0-l < clolo? clolo: 0-l);
+                    dim_t oc_hi = (C-l > chihi? chihi: C-l);
+#endif
+                    PragmaQuote(_NEC shortloop_reduction)//;
+                    for(dim_t c=oc_lo; c<oc_hi; ++c) {   // central chan
+                        sum[c-clolo] += SQUARE( acc_data_t{src[COFF(c+l)]} );
+                    }
+                }
+                PragmaQuote(_NEC shortloop_reduction)//;
+                for (dim_t c=clolo; c<chihi; ++c) { // c ~ central channel
+                    sum[c-clolo] = k + (alpha * inv_summands) * sum[c-clolo];
+                }
+#if 1 && VEC_CHAN_LIM
+                // next loop ov_lo,hi slightly more restricted [clo,chi]
+                NOVEC //ShortLoop()//;
+                for (dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                    if (ov_lo[l+half_size] < clo) ov_lo[l+half_size] = clo;
+                    if (ov_hi[l+half_size] > chi) ov_hi[l+half_size] = chi;
+                }
+#endif
+                // --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=BWD_D ic2002ih10
+                // --tag=nchw --alg=ACROSS --dir=BWD_D ic32777ih10
+                // perf: 98.8% vec, <VL>=251
+                NOVEC for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+#if 1 && VEC_CHAN_LIM
+                    dim_t const oc_lo = ov_lo[l+half_size];
+                    dim_t const oc_hi = ov_hi[l+half_size];
+#else
+                    dim_t const oc_lo = (0-l < clo? clo: 0-l);
+                    dim_t const oc_hi = (C-l > chi? chi: C-l);
+#endif
+                    PragmaQuote(_NEC shortloop_reduction)//;
+                    for(dim_t c=oc_lo; c<oc_hi; ++c) {   // central chan
+                        const auto off = COFF(c+l);
+                        const acc_data_t omega = sum[c+l-clolo];
+                        const acc_data_t omega_in_beta
+                            = fast_negative_powf(omega, beta);
+                        const acc_data_t tmp
+                            = omega_in_beta * (acc_data_t)diff_dst[off];
+                        if (l == 0) A[c-clo] = tmp;
+                        B[c-clo] += (src[off] * tmp / omega);
+                    }
+                }
+            }
+            for(dim_t c=clo; c<chi; ++c) { // c ~ central channel
+                // vsc and vgt ... (14.6 ms)
+                //B[c-clo] *= (2.0f * alpha * beta * inv_summands) * src[COFF(c)];
+                //diff_src[COFF(c)] = static_cast<data_t>(A[c-clo] - B[c-clo]);
+                // better (3 vld, 1 vsc) (14.3 ms)
+                diff_src[COFF(c)] = static_cast<data_t>( A[c-clo]
+                        - (2.0f * alpha * beta * inv_summands)
+                        * B[c-clo] * src[COFF(c)] );
+            }
+        });
+#undef COFF
+#undef JUST_DENSE
+    }
+#endif
+#if 0
+    else if (1 && across_channels && half_size <= 127)
+    {
+        // dev version
+        // innermost loop now over channels:
+        // --lrn --dir=BWD_D --tag=nchw ic32777ih10
+        // here : [0.144] fwd 3 ms bkw 15 ms(was ~285)
+        dim_t const blksz = stack_friendly_blksz(C);
+        parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
+                [&](dim_t const mb, dim_t const c_blk, dim_t const d, dim_t const h, dim_t const w) {
+            dim_t const clo = c_blk * blksz;
+            dim_t const chi = nstl::min(clo + blksz, C);
+            dim_t const cspan = chi - clo;
+            // comp-time array bound [vs cspan] as ++ vectorization workaround
+            acc_data_t A[stack_channels + 2*127];
+            acc_data_t B[stack_channels + 2*127];
+            for(dim_t c=0; c<cspan; ++c) {
+                A[c] = 0;
+                B[c] = 0;
+            }
+            dim_t clolo = nstl::max(clo - half_size, dim_t{0});
+            dim_t chihi = nstl::min(chi + half_size + 1, C);
+            dim_t clololo = nstl::max(clolo - half_size, dim_t{0});
+
+#define JUST_DENSE 0            
+#if JUST_DENSE
+            dim_t c_off0 = offset<tag>(data_d, mb,stride_mb, 0,C, 0,D, h,H, w,W );
+            dim_t const c_stride = (tag==nhwc? dim_t{1}: dim_t{H*W});
+#define COFF(c) (c_off0 + (c) * c_stride)
+#else
+            // slowdown for nchw, (maybe not, for nhwc (CHECKME))
+            //dim_t offset_span = chihi - clolo;
+            size_t chanoff[chihi - clolo];
+            {
+                //size_t chanoff0[chihi - clolo];
+                dim_t const chihihi = nstl::min(chihi + half_size + 1, C);
+                if(formula) {
+                    for(size_t c=clololo; c<chihihi; ++c){
+                        chanoff[c-clololo] = offset<tag>(data_d, mb,stride_mb,
+                                c,C, d,D, h,H, w,W );
+                    }
+                }else{ // vec_off_v phys offset calc in simd-length chunks
+                    channel_offsets(data_opt, chanoff, mb, clololo, chihihi, d, h, w);
+                }
+            }
+            //size_t const __restrict__* chanoff = &chanoff[0];
+#if 0 && defined(NDEBUG)
+            for(dim_t c=clololo; c<chihihi; ++c) { // c ~ central channel
+                assert( chanoff[c-clololo] == src[offset<tag>(
+                            data_d, mb,stride_mb, c,C, od,D, oh,H, ow,W)] );
+            }
+#endif
+#define COFF(c) (chanoff[ (c) - clololo ])
+#endif
+            //acc_data_t sum[chihi-clolo];
+            //acc_data_t __restrict__ * __restrict__ sum = &sum0[0]; // nope
+            acc_data_t sum[stack_channels + 2*127]; // compilet-time dim workaround
+            for (dim_t c=clolo; c<chihi; ++c) sum[c-clolo] = 0;
+#if 0 // slow loop order
+            for(dim_t c=clolo; c<chihi; ++c) { // c ~ central channel
+                DEFINE_HALFSIZE_RANGE(c_st, c_en, c, 0, C);
+                ShortLoop() // because half_size <= 127
+                for(dim_t k = c_st; k < c_en; ++k) { // k ~ lrn window
+                    //const acc_data_t s = src[chanoff[k-clololo]]; // lrn window datum
+                    const acc_data_t s = src[COFF(k)]; // lrn window datum
+                    sum[c-clolo] += s * s; // accum central sum
+                }
+            }
+#else // inner loop over channels
+            // --lrn --dir=BWD_D --tag=nchw ic32777ih10 bwd:241 ms
+            NOVEC for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                // ... valid c in range [0,C) "for sure"
+                dim_t oc_lo = (0-l < 0? 0: 0-l);
+                dim_t oc_hi = (C-l > C? C: C-l);
+                // ... (tricky) THEN adjusted to [clolo,chihi] "central" region
+                if (oc_lo < clolo) oc_lo = clolo;
+                if (oc_hi > chihi) oc_hi = chihi;
+                PragmaQuote(_NEC shortloop_reduction)//;
+                for(dim_t c=oc_lo; c<oc_hi; ++c) {   // central chan
+                    data_t const s = src[COFF(c+l)]; // lrn window datum
+                    sum[c-clolo] += SQUARE( acc_data_t{s} );
+                }
+            }
+#endif
+            PragmaQuote(_NEC shortloop_reduction)//;
+            for (dim_t c=clolo; c<chihi; ++c) { // c ~ central channel
+                sum[c-clolo] = k + alpha * sum[c-clolo] / summands;
+            }
+
+#if 0 // orig loop order
+            //PragmaQuote(_NEC outerloop_unroll(4))//;
+            for(dim_t c=clo; c<chi; ++c) { // c ~ central channel
+                DEFINE_HALFSIZE_RANGE(c_st, c_en, c, 0, C);
+                ShortLoop() // because half_size <= 127
+                for (dim_t k = c_st; k < c_en; ++k) { // l ~ lrn channel
+                    const auto off = chanoff[k-clololo];
+                    const acc_data_t omega = sum[k-clolo]; // k extended range!
+                    const acc_data_t omega_in_beta
+                        = fast_negative_powf(omega, beta);
+                    const acc_data_t tmp
+                        = omega_in_beta * (acc_data_t)diff_dst[off];
+                    A[c-clo] += (k==c) * tmp;
+                    B[c-clo] += (src[off] * tmp / omega);
+                }
+            }
+#else
+            // --dir=BWD_D --tag=nchw ic32777ih10 above:241 ms here: 14.4 ms
+            //
+            // --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=BWD_D ic2002ih10
+            // --tag=nchw --alg=ACROSS --dir=BWD_D ic32777ih10
+            // perf: 98.8% vec, <VL>=251
+            NOVEC for_(dim_t l = 0-half_size; l <= 0+half_size; ++l) {
+                // ... valid c in range [0,C) "for sure"
+                dim_t oc_lo = (0-l < 0? 0: 0-l);
+                dim_t oc_hi = (C-l > C? C: C-l);
+                // ... (tricky) THEN adjusted to [clo,chi]
+                if (oc_lo < clo) oc_lo = clo;
+                if (oc_hi > chi) oc_hi = chi;
+                PragmaQuote(_NEC shortloop_reduction)//;
+                for(dim_t c=oc_lo; c<oc_hi; ++c) {   // central chan
+                    const auto off = COFF(c+l);
+                    const acc_data_t omega = sum[c+l-clolo];
+                    const acc_data_t omega_in_beta
+                        = fast_negative_powf(omega, beta);
+                    const acc_data_t tmp
+                        = omega_in_beta * (acc_data_t)diff_dst[off];
+                    if (l == 0) A[c-clo] = tmp; // code branch 14.35 ms
+                    //A[c-clo] += (l==0) * tmp; // fma 14.60 ms
+                    B[c-clo] += (src[off] * tmp / omega);
+                }
+            }
+#endif
+            float const inv_summands = 1.0f / static_cast<float>(summands);
+            for(dim_t c=clo; c<chi; ++c) { // c ~ central channel
+                B[c-clo] *= (2.0f * alpha * beta * src[COFF(c)] * inv_summands);
+                diff_src[COFF(c)] = static_cast<data_t>(A[c-clo] - B[c-clo]);
+            }
+        });
+#undef COFF
+#undef JUST_DENSE
+    }
+#endif // dev version
+    else if (1 && across_channels && half_size <= 127) { // fall-back, "wrong" loop order
+        // development version cleanup. wrong loop order still.
+        // --lrn --dir=BWD_D --tag=nchw ic32777ih10 : fwd 3 ms, bwd 259 ms
+        // cf. orig (below)                           fwd 3 ms, bwd 1269 ms
+        // mode=P : 87% vec, <VL>=22
+        auto ker_across_vec_lapped = [&](
+                dim_t const clo, dim_t const chi, // 'central' channels range
+                size_t * const chanoff,
+                // now from clolo=max(0,clo-half_size) to chihi=min(chi+half_size+1,C)
+                // so channoff[0] corresponds to channel "clolo"
+                dim_t const mb, // internally c=0..C-1
+                dim_t const od, dim_t const oh, dim_t const ow)
+        {
+            dim_t const cspan = chi - clo; // used size of A[], B[]
+            // comp-time array bound [vs cspan] as ++ vectorization workaround
+            acc_data_t A[stack_channels + 2*127];
+            acc_data_t B[stack_channels + 2*127];
+            for(dim_t c=0; c<cspan; ++c) {
+                A[c] = 0;
+                B[c] = 0;
+            }
+            dim_t const clolo = nstl::max(clo - half_size, dim_t{0});
+            dim_t const chihi = nstl::min(chi + half_size + 1, C);
+            dim_t const clololo = nstl::max(clolo - half_size, dim_t{0});
+            //dim_t const chihihi = nstl::min(chihi + half_size + 1, C);
+#if 0 && defined(NDEBUG)
+            for(dim_t c=clololo; c<chihihi; ++c) { // c ~ central channel
+                assert( chanoff[c-clololo] == src[offset<tag>(
+                            data_d, mb,stride_mb, c,C, od,D, oh,H, ow,W)] );
+            }
+#endif
+            // sum[] <-- sum_sq(src) over [clolo,chihi) lrn wind & scale
+            acc_data_t sum[chihi-clolo];
+            for (dim_t c=clolo; c<chihi; ++c) sum[c-clolo] = 0;
+            for(dim_t c=clolo; c<chihi; ++c) { // c ~ central channel
+                DEFINE_HALFSIZE_RANGE(c_st, c_en, c, 0, C);
+                ShortLoop() // because half_size <= 127
+                for(dim_t k = c_st; k < c_en; ++k) { // k ~ lrn window
+                    const acc_data_t s = src[chanoff[k-clololo]]; // lrn window datum
+                    sum[c-clolo] += s * s; // accum central sum
+                }
+            }
+            for (dim_t c=clolo; c<chihi; ++c) { // c ~ central channel
+                sum[c-clolo] = k + alpha * sum[c-clolo] / summands;
+            }
+            //PragmaQuote(_NEC outerloop_unroll(4))//;
+            for(dim_t c=clo; c<chi; ++c) { // c ~ central channel
+                DEFINE_HALFSIZE_RANGE(c_st, c_en, c, 0, C);
+                //IVDEP() PragmaQuote(_NEC inner) PragmaQuote(_NEC assume)//;
+                ShortLoop() // because half_size <= 127
+                for (dim_t k = c_st; k < c_en; ++k) { // l ~ lrn channel
+                    const auto off = chanoff[k-clololo];
+                    const acc_data_t omega = sum[k-clolo]; // k extended range!
+                    const acc_data_t omega_in_beta
+                        = fast_negative_powf(omega, beta);
+                    const acc_data_t tmp
+                        = omega_in_beta * (acc_data_t)diff_dst[off];
+                    //if (k == c) A[c-clo] = tmp; // unvec
+                    //A[c-clo] = (k==c? A[c-clo]: tmp); // unvec
+                    A[c-clo] += (k==c) * tmp;
+                    B[c-clo] += (src[off] * tmp / omega);
+                }
+            }
+            //PragmaQuote(_NEC lstval)
+            for(dim_t c=clo; c<chi; ++c) { // c ~ central channel
+                B[c-clo] *= (2.0f * alpha * beta * src[chanoff[c-clololo]] / summands);
+                diff_src[chanoff[c-clololo]] = static_cast<data_t>(A[c-clo] - B[c-clo]);
+            }
+        };
+
+        // Large channels: split over threads, and overlap offset calcs,
+        // because lrn window can extend half_size past the central range. */
+        dim_t const blksz = stack_friendly_blksz(C);
+        parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
+                [&](dim_t mb, dim_t c_blk, dim_t d, dim_t h, dim_t w)
+        {
+            dim_t clo = c_blk * blksz;
+            dim_t chi = nstl::min(clo + blksz, C);
+            // lrn kernel extends up to half_size past [clo,chi)
+            // bwd kernel window sums use up to 2*half_size past
+            dim_t clolo = nstl::max(clo - half_size, dim_t{0});
+            dim_t chihi = nstl::min(chi + half_size + 1, C);
+            dim_t clololo = nstl::max(clolo - half_size, dim_t{0});
+            dim_t chihihi = nstl::min(chihi + half_size + 1, C);
+            dim_t offset_span = chihi - clolo;
+            size_t data_off[offset_span];
+            if(formula) {
+                for(size_t c=clololo; c<chihihi; ++c){
+                    data_off[c-clololo] = offset<tag>(data_d, mb,stride_mb,
+                            c,C, d,D, h,H, w,W );
+                }
+            }else{ // vec_off_v phys offset calc in simd-length chunks
+                channel_offsets(data_opt, data_off, mb, clololo, chihihi, d, h, w);
+            }
+            ker_across_vec_lapped( clo, chi, &data_off[0], mb, d, h, w);
+        });
+    }
+#if 0
+    else if (0 && across_channels) { // fall-back, "wrong" loop order
+        // development version. wrong loop order still.
+        // --lrn --dir=BWD_D --tag=nchw ic32777ih10 : fwd 3 ms, bwd 285 ms
+        // cf. orig (below)                           fwd 3 ms, bwd 1269 ms
+        auto ker_across_vec_lapped = [&](
+                dim_t const clo, dim_t const chi, // 'central' channels range
+                size_t * const chanoff,
+                // now from clolo=max(0,clo-half_size) to chihi=min(chi+half_size+1,C)
+                // so channoff[0] corresponds to channel "clolo"
+                dim_t const mb, // internally c=0..C-1
+                dim_t const od, dim_t const oh, dim_t const ow)
+        {
+            //acc_data_t A = 0, B = 0;
+            //data_t central = src[offset<tag>(data_d, mb,stride_mb, oc,C, od,D, oh,H, ow,W)];
+#if 0 // OK
+            for(dim_t c=clo; c<chi; ++c) { // c ~ central channel
+                ker(&diff_src[chanoff[c-clolo]], mb, c, od, oh, ow);
+            }
+#else
+            // "faster" : 0 0 1
+#define USE_GET_OMEGA 0
+#define USE_OFFSET_FN 0
+#define COMPTIME_BOUND 1/*nc++ vectorization workaround?*/
+            dim_t const cspan = chi - clo;
+#if COMPTIME_BOUND
+            acc_data_t A[stack_channels + 2*100]; // max halfsize of 100
+#else
+            acc_data_t A[cspan];
+#endif
+#if COMPTIME_BOUND
+            acc_data_t B[stack_channels + 2*100]; // max halfsize of 100
+#else
+            acc_data_t B[cspan];
+#endif
+            //for(dim_t c=0; c<cspan; ++c) A[c] = 0;
+            //for(dim_t c=0; c<cspan; ++c) B[c] = 0;
+            for(dim_t c=0; c<cspan; ++c) {
+                A[c] = 0;
+                B[c] = 0;
+            }
+            dim_t const clolo = nstl::max(clo - half_size, dim_t{0});
+            dim_t const chihi = nstl::min(chi + half_size + 1, C);
+            dim_t const clololo = nstl::max(clolo - half_size, dim_t{0});
+            //dim_t const chihihi = nstl::min(chihi + half_size + 1, C);
+#if 0 && defined(NDEBUG)
+            for(dim_t c=clololo; c<chihihi; ++c) { // c ~ central channel
+                assert( chanoff[c-clololo] == src[offset<tag>(
+                            data_d, mb,stride_mb, c,C, od,D, oh,H, ow,W)] );
+            }
+#endif
+#if USE_GET_OMEGA==0
+            //
+            // get_omega : sum[] = sum_sq(src) over [clolo,chihi) lrn windows
+            //
+            acc_data_t sum[chihi-clolo];
+            for (dim_t c=clolo; c<chihi; ++c) sum[c-clolo] = 0;
+            for(dim_t c=clolo; c<chihi; ++c) { // c ~ central channel
+                DEFINE_HALFSIZE_RANGE(c_st, c_en, c, 0, C);
+                for(dim_t k = c_st; k < c_en; ++k) { // k ~ lrn window
+#if USE_OFFSET_FN
+                    const acc_data_t s = src[offset<tag>(data_d, mb,stride_mb,
+                            k,C, od,D, oh,H, ow,W)];
+#else
+                    const acc_data_t s = src[chanoff[k-clololo]]; // lrn window datum
+#endif
+                    sum[c-clolo] += s * s; // accum central sum
+                }
+            }
+            for (dim_t c=clolo; c<chihi; ++c) { // c ~ central channel
+                sum[c-clolo] = k + alpha * sum[c-clolo] / summands;
+            }
+            // (fwd lrn historical)
+            // size_t * central_off = chanoff + (clo - clolo);
+            // for(int c=0; c<cspan; ++c)
+            //     dst[central_off[c]] = static_cast<data_t>(
+            //             src[central_off[c]] * fast_negative_powf(sum[c], beta));
+#endif
+            //PragmaQuote(_NEC outerloop_unroll(4))//;
+            for(dim_t c=clo; c<chi; ++c) { // c ~ central channel
+                const dim_t c_st = nstl::max(c - half_size + 0, (dim_t)0);
+                const dim_t c_en = nstl::min(c + half_size + 1, C);
+                //DEFINE_HALFSIZE_RANGE(c_st, c_en, c, 0, C);
+                //IVDEP() PragmaQuote(_NEC inner) PragmaQuote(_NEC assume)//;
+                //PragmaQuote(_NEC shortloop_reduction)//;
+                for (dim_t k = c_st; k < c_en; ++k) { // l ~ lrn channel
+                    //const auto off = offset<tag>(data_d, mb,stride_mb,
+                    //        c,C, od,D, oh,H, ow,W);
+                    //          off --> chanoff[k-clololo]
+#if USE_OFFSET_FN
+                    const auto off = offset<tag>(data_d, mb,stride_mb,
+                            k,C, od,D, oh,H, ow,W);
+#else
+                    const auto off = chanoff[k-clololo];
+#endif
+#if USE_GET_OMEGA==1
+                    const acc_data_t omega = get_omega(mb,k,od,oh,ow);
+#else
+                    const acc_data_t omega = sum[k-clolo]; // k extended range!
+#endif
+                    const acc_data_t omega_in_beta
+                        = fast_negative_powf(omega, beta);
+                    const acc_data_t tmp
+                        = omega_in_beta * (acc_data_t)diff_dst[off];
+
+                    // choose one:
+                    //if (k == c) A[c-clo] = tmp; // unvec
+                    //A[c-clo] = (k==c? A[c-clo]: tmp); // unvec
+                    A[c-clo] += (k==c) * tmp;
+
+                    B[c-clo] += (src[off] * tmp / omega);
+                }
+            }
+            PragmaQuote(_NEC lstval)
+            for(dim_t c=clo; c<chi; ++c) { // c ~ central channel
+                //B *= (2.0f * alpha * beta * central / summands);
+                //              central --> src[chanoff[c-clo]]
+#if USE_OFFSET_FN
+                data_t central = src[offset<tag>(data_d, mb,stride_mb, c,C, od,D, oh,H, ow,W)];
+                B[c-clo] *= (2.0f * alpha * beta * central / summands);
+#else
+                B[c-clo] *= (2.0f * alpha * beta * src[chanoff[c-clololo]] / summands);
+#endif
+                //*d = static_cast<data_t>(A - B);
+                //              d --> diff_src[chanoff[c-clo]]
+                diff_src[chanoff[c-clololo]] = static_cast<data_t>(A[c-clo] - B[c-clo]);
+            }
+#undef USE_GET_OMEGA
+#undef USE_OFFSET_FN
+#endif
+        };
+
+        // Large channels: split over threads, and overlap offset calcs,
+        // because lrn window can extend half_size past the central range. */
+        dim_t const blksz = stack_friendly_blksz(C);
+        parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
+                [&](dim_t mb, dim_t c_blk, dim_t d, dim_t h, dim_t w)
+        {
+            dim_t clo = c_blk * blksz;
+            dim_t chi = nstl::min(clo + blksz, C);
+            // lrn kernel extends up to half_size past [clo,chi)
+            // bwd kernel window sums use up to 2*half_size past
+            dim_t clolo = nstl::max(clo - half_size, dim_t{0});
+            dim_t chihi = nstl::min(chi + half_size + 1, C);
+            dim_t clololo = nstl::max(clolo - half_size, dim_t{0});
+            dim_t chihihi = nstl::min(chihi + half_size + 1, C);
+            dim_t offset_span = chihi - clolo;
+            size_t data_off[offset_span];
+            if(formula) {
+                for(size_t c=clololo; c<chihihi; ++c){
+                    data_off[c-clololo] = offset<tag>(data_d, mb,stride_mb,
+                            c,C, d,D, h,H, w,W );
+                }
+            }else{ // vec_off_v phys offset calc in simd-length chunks
+                channel_offsets(data_opt, data_off, mb, clololo, chihihi, d, h, w);
+            }
+            ker_across_vec_lapped( clo, chi, &data_off[0], mb, d, h, w);
+        });
+    }
+#endif // dev version
     // old methods =========================================================
     else if (tag == nChw16c || tag == nChw8c) {
         parallel_nd(MB, utils::div_up(C, blksize), H, W,
@@ -946,10 +1747,24 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
                         ker(&diff_src[off + cc], mb, c + cc, 0, h, w);
                 });
     } else if (tag == nhwc || tag == nchw) {
-        parallel_nd(MB, H, W, C, [&](dim_t mb, dim_t h, dim_t w, dim_t c) {
+#if 0
+        parallel_nd(MB, C, H, W, [&](dim_t mb, dim_t c, dim_t h, dim_t w) {
             const dim_t off = offset<tag>(data_d, mb,stride_mb, c,C, 0,1, h,H, w,W);
             ker(&diff_src[off], mb, c, 0, h, w);
         });
+#else
+        dim_t const blksz = stack_friendly_blksz(C);
+        parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
+                [&](dim_t mb, dim_t c_blk, dim_t d, dim_t h, dim_t w)
+        {
+            dim_t clo = c_blk * blksz;
+            dim_t chi = nstl::min(clo + blksz, C);
+            for (dim_t c=clo; c<chi; ++c) {
+                const dim_t off = offset<tag>(data_d, mb,stride_mb, c,C, 0,1, h,H, w,W);
+                ker(&diff_src[off], mb, c, d, h, w);
+            }
+        });
+#endif
     } else {
         parallel_nd(MB, C, D, H, W,
                 [&](dim_t mb, dim_t c, dim_t d, dim_t h, dim_t w) {

@@ -20,6 +20,7 @@
 #include <array>
 
 #include "common/memory_desc_wrapper.hpp"
+#include "common/dnnl_optimize.h" // VREG, ...
 #include <sstream>
 #ifndef NDEBUG
 #include <iostream>
@@ -353,7 +354,7 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
             vl = sz - pos;
         }
         assert( vl > 0 );
-        Pos carry[Base::MaxVl];
+        Pos carry[Base::MaxVl]; VREG(carry)
         for(unsigned i=0U; i<vl; ++i) // VRspill
             carry[i] = pos+i;
         NOVEC_ for(unsigned d = dim; d--; ) {
