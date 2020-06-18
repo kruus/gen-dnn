@@ -315,7 +315,7 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
     Crd ihi[MaxDims];
     Pos sz; // product of ihi-ilo for 0..dim-1
     Pos pos;
-    private:
+    public:
     /** init at linear iter pos, shorten vl from MVL iif pos+vl "past end"
      * Note diff with off_l_vec API where a vector of `lin` values are input
      * \return true iff remaining iteration length vl > 0.
@@ -373,6 +373,7 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
         }
         return true;
     }
+    private:
 #if COORDSFORND_EXTEND
     /** Maybe "extend" at linear iter pos, increasing existing vl up to MVL.
      * Keeps old set of vl coords. Possible to extend by zero new coords if vl==MVL already!

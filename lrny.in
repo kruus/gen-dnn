@@ -1,7 +1,17 @@
+#--tag=nchw --alg=WITHIN --dir=BWD_D ic3ih4
+#--tag=nchw --alg=WITHIN --dir=BWD_D ic202ih10
+#--tag=ncdhw --alg=WITHIN --dir=BWD_D ic20id6
+
 --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=BWD_D ic2002ih10
 --tag=nchw --alg=ACROSS --dir=BWD_D ic32777ih10
 --tag=nchw --alg=ACROSS --dir=BWD_D ic234567ih10
 --tag=ncdhw --alg=ACROSS --dir=BWD_D ic2002id10
+
+--tag=nchw,nhwc,nChw8c,nChw16c --alg=WITHIN --dir=BWD_D ic2002ih10
+--tag=nchw --alg=WITHIN --dir=BWD_D ic32777ih10
+--tag=nchw --alg=WITHIN --dir=BWD_D ic234567ih10
+--tag=ncdhw --alg=WITHIN --dir=BWD_D ic2002id10
+
 #--tag=nchw,nhwc,nChw8c,nChw16c --alg=WITHIN --dir=FWD_D ic2002ih10
 #--tag=ncdhw --alg=WITHIN --dir=FWD_D ic2002id10 ic32777id10
 #--tag=ncdhw --alg=ACROSS --dir=FWD_D ic2002id10 ic32777id10
