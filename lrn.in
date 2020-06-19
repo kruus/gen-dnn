@@ -6,7 +6,10 @@
 
 # large channels
 --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I,BWD_D ic32777ih10iw10
---tag=ncdhw --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I,BWD_D ic32777_id10ih10iw10 
+# ncdhw WITHIN is still too slow, ACROSS was ~ 816 ms
+--tag=ncdhw --alg=ACROSS --dir=FWD_D,FWD_I,BWD_D ic32777_id10ih10iw10 
+#--tag=ncdhw --alg=WITHIN --dir=FWD_D,FWD_I,BWD_D ic32777_id10ih10iw10 
+
 
 # tiny channels
 --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I,BWD_D ic1_ih10iw10

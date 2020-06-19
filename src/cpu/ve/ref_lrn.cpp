@@ -855,85 +855,6 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
     const dim_t half_size = (size - 1) / 2;
     const dim_t summands = compute_n_summands(size);
 
-    // REMOVED for VE: pass by value due to icc170 and icc180 problem on KNL
-    auto get_omega = [&](dim_t const mb, dim_t const oc, dim_t const od,
-            dim_t const oh, dim_t const ow) {
-        acc_data_t sum = 0;
-        if (across_channels) {
-            const dim_t c_st = nstl::max(oc - half_size + 0, (dim_t)0);
-            const dim_t c_en = nstl::min(oc + half_size + 1, C);
-
-            for (dim_t c = c_st; c < c_en; ++c) {
-                const acc_data_t s = src[offset<tag>(data_d, mb,stride_mb,
-                        c,C, od,D, oh,H, ow,W)];
-                sum += s * s;
-            }
-        } else {
-            dim_t d_st = nstl::max(od - half_size + 0, (dim_t)0);
-            dim_t d_en = nstl::min(od + half_size + 1, D);
-            dim_t h_st = nstl::max(oh - half_size + 0, (dim_t)0);
-            dim_t h_en = nstl::min(oh + half_size + 1, H);
-            dim_t w_st = nstl::max(ow - half_size + 0, (dim_t)0);
-            dim_t w_en = nstl::min(ow + half_size + 1, W);
-            for_(dim_t d = d_st; d < d_en; ++d)
-            for_(dim_t h = h_st; h < h_en; ++h)
-            for (dim_t w = w_st; w < w_en; ++w) {
-                const acc_data_t s = src[offset<tag>(
-                        data_d, mb,stride_mb, oc,C, d,D, h,H, w,W)];
-                sum += s * s;
-            }
-        }
-        return (acc_data_t)(k + alpha * sum / summands);
-    };
-    auto ker = [&](data_t * const d, dim_t const mb, dim_t const oc,
-            dim_t const od, dim_t const oh, dim_t const ow) {
-        acc_data_t A = 0, B = 0;
-        if (across_channels) {
-            const dim_t c_st = nstl::max(oc - half_size + 0, (dim_t)0);
-            const dim_t c_en = nstl::min(oc + half_size + 1, C);
-
-            for (dim_t c = c_st; c < c_en; c++) {
-                const auto off = offset<tag>(data_d, mb,stride_mb,
-                        c,C, od,D, oh,H, ow,W);
-                const acc_data_t omega = get_omega(mb, c, od, oh, ow);
-                const acc_data_t omega_in_beta
-                        = fast_negative_powf(omega, beta);
-                const acc_data_t tmp
-                        = omega_in_beta * (acc_data_t)diff_dst[off];
-                if (c == oc) A = tmp;
-                B += (src[off] * tmp / omega);
-            }
-        } else {
-            dim_t d_st = nstl::max(od - half_size + 0, (dim_t)0);
-            dim_t d_en = nstl::min(od + half_size + 1, D);
-            dim_t h_st = nstl::max(oh - half_size + 0, (dim_t)0);
-            dim_t h_en = nstl::min(oh + half_size + 1, H);
-            dim_t w_st = nstl::max(ow - half_size + 0, (dim_t)0);
-            dim_t w_en = nstl::min(ow + half_size + 1, W);
-            for_(dim_t d = d_st; d < d_en; ++d)
-            for_(dim_t h = h_st; h < h_en; ++h)
-            for (dim_t w = w_st; w < w_en; ++w) {
-                const auto off = offset<tag>(data_d, mb,stride_mb,
-                        oc,C, d,D, h,H, w,W);
-                const acc_data_t omega = get_omega(mb, oc, d, h, w);
-                //printf(" omega[%ld,%ld,%ld,%ld,%ld]=%f\n",mb,oc,d,h,w,omega);
-                const acc_data_t omega_in_beta
-                        = fast_negative_powf(omega, beta);
-                const acc_data_t tmp
-                        = omega_in_beta * (acc_data_t)diff_dst[off];
-                if (d == od && h == oh && w == ow) {
-                    A = tmp;
-                    //printf(" ker A[%ld,%ld,%ld,%ld,%ld]=%f\n",mb,oc,od,oh,ow,double{tmp});
-                }
-                B += (src[off] * tmp / omega);
-            }
-            //printf(" ker B[%ld,%ld,%ld,%ld,%ld]=%f\n",mb,oc,od,oh,ow,double{B});
-        }
-        data_t central = src[offset<tag>(data_d, mb,stride_mb, oc,C, od,D, oh,H, ow,W)];
-        B *= (2.0f * alpha * beta * central / summands);
-        *d = static_cast<data_t>(A - B);
-    };
-
     if(0) {
     }
     // Note: bound half_size<=127 is **ONLY** to allow compile-time stack array
@@ -1320,7 +1241,7 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
     }
 #endif
 #if 1
-    else if (!across_channels) {
+    else if (!across_channels) { // i.e. within channels, lrn window on d,h,w
         // cleanup code (not so much work optimizing yet)
         typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
         float const alpha_inv_summands = static_cast<float>(alpha) / static_cast<float>(summands);
@@ -1378,6 +1299,9 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
                 //assert( sum[c-clo] == get_omega(mb,c,d,h,w) );
             }
         };
+#define OM_INLINE 1
+        // 0~215 ms, 1~86 ms (2.5x speedup)
+#if !OM_INLINE
         // for formula versions (vectorizes well)
         auto get_omega_within = [&]( //dim_t *central_off,
                 dim_t const mb, dim_t const oc, dim_t const od,
@@ -1396,6 +1320,7 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
                 }
             return (acc_data_t)(k + alpha_inv_summands * sum);
         };
+#endif
 
         dim_t const blksz = stack_friendly_blksz(C);
         parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
@@ -1425,10 +1350,42 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
                         for (dim_t oc=clo; oc<chi; ++oc)
                             chanoff[oc-clo] = offset<tag>( data_d, mb,stride_mb,
                                     oc,C, d,D, h,H, w,W );
+#if !OM_INLINE
                         for (dim_t oc=clo; oc<chi; ++oc) {
                             om[oc-clo] = get_omega_within(mb, oc, d, h, w);
-                            //om[oc-clo] = get_omega_within(&chanoff[oc-clo], mb, oc, d, h, w);
                         }
+#else
+                        DEFINE_HALFSIZE_RANGE(ld_st, ld_en, d, 0, D);
+                        DEFINE_HALFSIZE_RANGE(lh_st, lh_en, h, 0, H);
+                        DEFINE_HALFSIZE_RANGE(lw_st, lw_en, w, 0, W);
+                        for (dim_t oc=clo; oc<chi; ++oc) om[oc-clo] = acc_data_t{0};
+                        if (tag == nchw) {
+                            // oc loop here: 86 829 13569 ms ** best for nchw **
+                            // ..nhwc..      119 1189 ms
+                            // ..nChw8/16c   135/139 1482/1465 ms
+                            for_(dim_t oc=clo; oc<chi; ++oc)
+                            for_(dim_t ld = ld_st; ld < ld_en; ++ld)
+                            for_(dim_t lh = lh_st; lh < lh_en; ++lh)
+                            for (dim_t lw = lw_st; lw < lw_en; ++lw)
+                                om[oc-clo] += SQUARE( acc_data_t{ src[
+                                        offset<tag>( data_d, mb,stride_mb,
+                                                oc,C, ld,D, lh,H, lw,W) ] } );
+                        }else{ // nhwc or 8c/16c
+                            // oc loop here: 155 2619 42825 ms
+                            // ..nhwc..      11  23   ms            ** best for nhwc **
+                            // ..nChw8/16c   13.1/13.3  52/57 ms
+                            for_(dim_t ld = ld_st; ld < ld_en; ++ld)
+                            for_(dim_t lh = lh_st; lh < lh_en; ++lh)
+                            for_(dim_t lw = lw_st; lw < lw_en; ++lw)
+                            for (dim_t oc=clo; oc<chi; ++oc)
+                                om[oc-clo] += SQUARE( acc_data_t{ src[
+                                        offset<tag>( data_d, mb,stride_mb,
+                                                oc,C, ld,D, lh,H, lw,W) ] } );
+                        }
+                        for (dim_t oc=clo; oc<chi; ++oc) {
+                            om[oc-clo] = k + alpha_inv_summands * om[oc-clo];
+                        }
+#endif
                     }else{ // this way, 13280 ms --> 330 ms
                         get_omega_vec_clohi(chanoff,om,mb,clo,chi,d,h,w);
                     }
@@ -1476,42 +1433,125 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
 #endif
 
     // old methods =========================================================
-    else if (tag == nChw16c || tag == nChw8c) {
-        parallel_nd(MB, utils::div_up(C, blksize), H, W,
-                [&](dim_t mb, dim_t c_blk, dim_t h, dim_t w) {
-                    dim_t c = c_blk * blksize;
-                    //const dim_t off = mb * stride_mb + c * H * W
-                    //        + (h * W + w) * blksize;
-                    const dim_t off = offset<tag>(data_d, mb,stride_mb, c,C, 0,1, h,H, w,W);
-                    PRAGMA_OMP_SIMD()
-                    for (dim_t cc = 0; cc < nstl::min(blksize, C - c); ++cc)
-                        ker(&diff_src[off + cc], mb, c + cc, 0, h, w);
-                });
-    } else if (tag == nhwc || tag == nchw) {
-#if 0
-        parallel_nd(MB, C, H, W, [&](dim_t mb, dim_t c, dim_t h, dim_t w) {
-            const dim_t off = offset<tag>(data_d, mb,stride_mb, c,C, 0,1, h,H, w,W);
-            ker(&diff_src[off], mb, c, 0, h, w);
-        });
-#else
-        dim_t const blksz = stack_friendly_blksz(C);
-        parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
-                [&](dim_t mb, dim_t c_blk, dim_t d, dim_t h, dim_t w)
-        {
-            dim_t clo = c_blk * blksz;
-            dim_t chi = nstl::min(clo + blksz, C);
-            for (dim_t c=clo; c<chi; ++c) {
-                const dim_t off = offset<tag>(data_d, mb,stride_mb, c,C, 0,1, h,H, w,W);
-                ker(&diff_src[off], mb, c, d, h, w);
+    else{
+        // REMOVED for VE: pass by value due to icc170 and icc180 problem on KNL
+        auto get_omega = [&](dim_t const mb, dim_t const oc, dim_t const od,
+                dim_t const oh, dim_t const ow) {
+            acc_data_t sum = 0;
+            if (across_channels) {
+                const dim_t c_st = nstl::max(oc - half_size + 0, (dim_t)0);
+                const dim_t c_en = nstl::min(oc + half_size + 1, C);
+
+                for (dim_t c = c_st; c < c_en; ++c) {
+                    const acc_data_t s = src[offset<tag>(data_d, mb,stride_mb,
+                            c,C, od,D, oh,H, ow,W)];
+                    sum += s * s;
+                }
+            } else {
+                dim_t d_st = nstl::max(od - half_size + 0, (dim_t)0);
+                dim_t d_en = nstl::min(od + half_size + 1, D);
+                dim_t h_st = nstl::max(oh - half_size + 0, (dim_t)0);
+                dim_t h_en = nstl::min(oh + half_size + 1, H);
+                dim_t w_st = nstl::max(ow - half_size + 0, (dim_t)0);
+                dim_t w_en = nstl::min(ow + half_size + 1, W);
+                for_(dim_t d = d_st; d < d_en; ++d)
+                for_(dim_t h = h_st; h < h_en; ++h)
+                for (dim_t w = w_st; w < w_en; ++w) {
+                    const acc_data_t s = src[offset<tag>(
+                            data_d, mb,stride_mb, oc,C, d,D, h,H, w,W)];
+                    sum += s * s;
+                }
             }
-        });
-#endif
-    } else {
-        parallel_nd(MB, C, D, H, W,
-                [&](dim_t mb, dim_t c, dim_t d, dim_t h, dim_t w) {
-                    const dim_t off = offset<tag>(data_d, mb,stride_mb, c,C, d,D, h,H, w,W);
+            return (acc_data_t)(k + alpha * sum / summands);
+        };
+        auto ker = [&](data_t * const d, dim_t const mb, dim_t const oc,
+                dim_t const od, dim_t const oh, dim_t const ow) {
+            acc_data_t A = 0, B = 0;
+            if (across_channels) {
+                const dim_t c_st = nstl::max(oc - half_size + 0, (dim_t)0);
+                const dim_t c_en = nstl::min(oc + half_size + 1, C);
+
+                for (dim_t c = c_st; c < c_en; c++) {
+                    const auto off = offset<tag>(data_d, mb,stride_mb,
+                            c,C, od,D, oh,H, ow,W);
+                    const acc_data_t omega = get_omega(mb, c, od, oh, ow);
+                    const acc_data_t omega_in_beta
+                            = fast_negative_powf(omega, beta);
+                    const acc_data_t tmp
+                            = omega_in_beta * (acc_data_t)diff_dst[off];
+                    if (c == oc) A = tmp;
+                    B += (src[off] * tmp / omega);
+                }
+            } else {
+                dim_t d_st = nstl::max(od - half_size + 0, (dim_t)0);
+                dim_t d_en = nstl::min(od + half_size + 1, D);
+                dim_t h_st = nstl::max(oh - half_size + 0, (dim_t)0);
+                dim_t h_en = nstl::min(oh + half_size + 1, H);
+                dim_t w_st = nstl::max(ow - half_size + 0, (dim_t)0);
+                dim_t w_en = nstl::min(ow + half_size + 1, W);
+                for_(dim_t d = d_st; d < d_en; ++d)
+                for_(dim_t h = h_st; h < h_en; ++h)
+                for (dim_t w = w_st; w < w_en; ++w) {
+                    const auto off = offset<tag>(data_d, mb,stride_mb,
+                            oc,C, d,D, h,H, w,W);
+                    const acc_data_t omega = get_omega(mb, oc, d, h, w);
+                    //printf(" omega[%ld,%ld,%ld,%ld,%ld]=%f\n",mb,oc,d,h,w,omega);
+                    const acc_data_t omega_in_beta
+                            = fast_negative_powf(omega, beta);
+                    const acc_data_t tmp
+                            = omega_in_beta * (acc_data_t)diff_dst[off];
+                    if (d == od && h == oh && w == ow) {
+                        A = tmp;
+                        //printf(" ker A[%ld,%ld,%ld,%ld,%ld]=%f\n",mb,oc,od,oh,ow,double{tmp});
+                    }
+                    B += (src[off] * tmp / omega);
+                }
+                //printf(" ker B[%ld,%ld,%ld,%ld,%ld]=%f\n",mb,oc,od,oh,ow,double{B});
+            }
+            data_t central = src[offset<tag>(data_d, mb,stride_mb, oc,C, od,D, oh,H, ow,W)];
+            B *= (2.0f * alpha * beta * central / summands);
+            *d = static_cast<data_t>(A - B);
+        };
+
+        if (tag == nChw16c || tag == nChw8c) {
+            parallel_nd(MB, utils::div_up(C, blksize), H, W,
+                    [&](dim_t mb, dim_t c_blk, dim_t h, dim_t w)
+            {
+                dim_t c = c_blk * blksize;
+                //const dim_t off = mb * stride_mb + c * H * W
+                //        + (h * W + w) * blksize;
+                const dim_t off = offset<tag>(data_d, mb,stride_mb, c,C, 0,1, h,H, w,W);
+                PRAGMA_OMP_SIMD()
+                for (dim_t cc = 0; cc < nstl::min(blksize, C - c); ++cc)
+                    ker(&diff_src[off + cc], mb, c + cc, 0, h, w);
+            });
+        } else if (tag == nhwc || tag == nchw) {
+#if 0
+            parallel_nd(MB, C, H, W, [&](dim_t mb, dim_t c, dim_t h, dim_t w) {
+                const dim_t off = offset<tag>(data_d, mb,stride_mb, c,C, 0,1, h,H, w,W);
+                ker(&diff_src[off], mb, c, 0, h, w);
+            });
+#else
+            dim_t const blksz = stack_friendly_blksz(C);
+            parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
+                    [&](dim_t mb, dim_t c_blk, dim_t d, dim_t h, dim_t w)
+            {
+                dim_t clo = c_blk * blksz;
+                dim_t chi = nstl::min(clo + blksz, C);
+                for (dim_t c=clo; c<chi; ++c) {
+                    const dim_t off = offset<tag>(data_d, mb,stride_mb, c,C, 0,1, h,H, w,W);
                     ker(&diff_src[off], mb, c, d, h, w);
-                });
+                }
+            });
+#endif
+        } else {
+            parallel_nd(MB, C, D, H, W,
+                    [&](dim_t mb, dim_t c, dim_t d, dim_t h, dim_t w)
+            {
+                const dim_t off = offset<tag>(data_d, mb,stride_mb, c,C, d,D, h,H, w,W);
+                ker(&diff_src[off], mb, c, d, h, w);
+            });
+        }
     }
 }
 

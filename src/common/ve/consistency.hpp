@@ -94,7 +94,7 @@ struct Consistency {
      * so for now "runtime" SCHKV macro will just be "quiet" */
     Consistency& operator &&(CondLocV const& cl){
 #if !CONDLOCV_FILEINFO
-        var &&= cl.cond;        // no file info --> silent
+        var = var && cl.cond;        // no file info --> silent
 #else
         if (!cl.cond) {
 #if DNNL_VERBOSE_EXTRA // runtime dnnl_get_verbose() is available (even in opt mode?)

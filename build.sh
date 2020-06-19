@@ -188,7 +188,7 @@ if [ ${OMP} -eq 1 ]; then TEST_ENV+=(OMP_NUM_THREADS=1); fi
 #TEST_ENV+=(DNNL_VERBOSE=$VERBOSE)
 # if unspecified, autodetect target via $CC compiler variable
 if [ "${DOTARGET}" == "x" ]; then
-    if [ "${CC}" == "ncc" -a "${CXX}" == "nc++" ]; then
+    if [ "${CC:0:3}" == "ncc" -a "${CXX:0:4}" == "nc++" ]; then
         echo "auto-detected '-a' Aurora compiler (ncc, nc++)"
         DOTARGET="a"; SIZE_T=64
         if [ -f vejit/include/vednn.h ]; then
@@ -513,7 +513,9 @@ echo 'ulimit soft : '`ulimit -Ss`
         ccxx_flags -fdiag-vector=2
         ccxx_flags -report-all
         # -O4 early... when -O4 is specified AFTER, sometimes inlining does not happen
-        ccxx_flags -O4 -finline -finline-functions
+        #ccxx_flags -O4 -finline -finline-functions
+        # nc++-3.0.30 WILL NOT compile some files when -finline is specified:
+        ccxx_flags -O4 -finline-functions
         ccxx_flags -finline-max-function-size=300
         ccxx_flags -finline-max-depth=10
         ccxx_flags -finline-max-times=20
