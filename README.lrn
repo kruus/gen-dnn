@@ -9,10 +9,10 @@ Typical optimization:
   - use memory_desc_wrapper_opt vectorized offset calculator for non-formula cases
   - (dim==2 trivial versions also special cased.
 
-backward lrn needs similar optimizations (I think it might only use
-vectorized formula offset calcs ??)
+backward lrn needs similar optimizations
   - trickier because two sets of loops, first set similar to fwd lrn case
     to calculate lrn window sum.
+  - began an nchw bwd within specialization to try out alternate impls
 
   
 examples tests:

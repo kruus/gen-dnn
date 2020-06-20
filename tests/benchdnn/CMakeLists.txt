@@ -87,6 +87,10 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
     append_if(UNIX  CMAKE_CXX_FLAGS "-prec-div -prec-sqrt -fp-model precise")
 endif()
 
+if(NECVE AND (CMAKE_BUILD_TYPE=RelWithDebInfo OR CMAKE_BUILD_TYPE=Release))
+    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/lnorm/ref_lnorm.cpp "-mnovector-intrinsic-check")
+endif()
+
 if(UNIX AND NOT APPLE AND NOT NECVE)
     find_library(LIBRT rt)
 endif()

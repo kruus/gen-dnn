@@ -512,10 +512,11 @@ echo 'ulimit soft : '`ulimit -Ss`
         ccxx_flags -fdiag-inline=2
         ccxx_flags -fdiag-vector=2
         ccxx_flags -report-all
-        # -O4 early... when -O4 is specified AFTER, sometimes inlining does not happen
-        #ccxx_flags -O4 -finline -finline-functions
+        # -O4 early... when -O4 (or -O3) comes later, sometimes inlining does not happen
+        ccxx_flags -O4 -finline -finline-functions
         # nc++-3.0.30 WILL NOT compile some files when -finline is specified:
-        ccxx_flags -O4 -finline-functions
+        #ccxx_flags -O4 -finline-functions
+        # nc++-3.0.30 has an ICE ** DO NOT USE IT **
         ccxx_flags -finline-max-function-size=300
         ccxx_flags -finline-max-depth=10
         ccxx_flags -finline-max-times=20
@@ -881,7 +882,7 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
         # trouble with cmake COMPONENTs ...
         echo "Installing :"; make install;
         #if [ "$DODOC" == "y" ]; then { echo "Installing docs ..."; make install-doc; } fi
-        ) 2>&1 >> "${BUILDDIR}".log || { echo "'make install' in ${BUILDDIR} had issues (ignored)"; }
+        ) 2>&1 >> "${BUILDDIR}".log || { echo "'make install' in ${BUILDDIR} had issues, ignored"; }
     fi
     echo "Testing ?"
     if [ ! "$DOTARGET" == "s" ]; then # non-SX: -t might run some tests
