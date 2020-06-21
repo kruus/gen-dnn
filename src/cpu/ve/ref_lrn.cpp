@@ -92,7 +92,7 @@ dim_t constexpr stack_channels = 16384; // stack usage threshold for channel off
 /** Divide \c hi into restricted-size blocks.
  *
  * \return a large, MVL-friendly block size < \c stack_channels for
- *         partitioning [0,hi).
+ *         partitioning [0,hi); min return value is 1
  *
  * \c stack_channels maximum block size is some large multiple of MVL,
  * (unlike JIT vl suggestions bounded by MVL)
@@ -132,7 +132,7 @@ inline dim_t stack_friendly_blksz(dim_t const hi){
         }
     }
 #else // simpler (see dev/blk_friendly.cpp test prog)
-    dim_t ret = hi;
+    dim_t ret = (hi>0? hi: 1);
     if (hi > stack_channels) {
         ret = stack_channels;
         dim_t const nFull = hi/stack_channels;
@@ -162,7 +162,7 @@ inline dim_t stack_friendly_blksz(dim_t const hi, dim_t const other_work){
     if (stack_lim > stack_channels) stack_lim = stack_channels;
 
     // now heuristic with possibly smaller version of stack_channels
-    dim_t ret = hi;
+    dim_t ret = (hi>0? hi: 1);
     if (hi > stack_lim) {
         ret = (stack_lim+31)/32*32;
         dim_t const nFull = hi/stack_lim;
