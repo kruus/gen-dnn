@@ -87,7 +87,32 @@ static inline acc_data_t fast_negative_powf(acc_data_t omega, acc_data_t beta) {
 };
 
 // nc++ with 32768 sometimes stoppped, but 16384 worked
-dim_t constexpr stack_channels = 16384; // stack usage threshold for channel offsets
+/** stack usage threshold (max array size) for channel offsets.
+ *
+ * \todo VE blocksz chooser for tmp arrays should have use a
+ * template compiler-time const max size. Best value depends
+ * on across/within/fwd/bwd. (Significant speed differences).
+ * Compile-time bound on tmp stack arrays is frequently req'd
+ * to allow nc++ to vectorize.
+ *
+ */
+//dim_t constexpr stack_channels = 16384;
+//dim_t constexpr stack_channels = 8192;
+dim_t constexpr stack_channels = 4096; // a generally decent value
+//dim_t constexpr stack_channels = 2048;
+//dim_t constexpr stack_channels = 1000;
+//
+// lrnb.in
+// 1000 is just as good as 4096 for bwd WITHIN
+// 4096 is a wee bit bettero for bwd ACROSS (not worth extra mem at this point)
+// 1000 vs 1024: allows twice lrn-size (typ 2*5) overhang for bwd
+//
+// lrnf.in (fwd samples) 
+// 4096 sometimes 25% faster than 1000
+// 16k slower, except one case
+// 2k worse than 4k, generally
+// 8k better for nhwc, 4k better for nchw ACROSS
+// similar for WITHIN, but blocked fmts better at 4k
 
 /** Divide \c hi into restricted-size blocks.
  *
@@ -1240,12 +1265,14 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
 #undef COFF
     }
 #endif
-#if 1
+#if 1 // cleaned up
     else if (tag==nchw && !across_channels) { // i.e. within channels, lrn window on d,h,w
         typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
         float const alpha_inv_summands = static_cast<float>(alpha) / static_cast<float>(summands);
-#define LRN_OFF 0
-#if LRN_OFF
+        // --lrn --dir=BWD_D --tag=nchw --alg=WITHIN ic202ih10 ic2002ih10 ic32777ih10
+        // below version: 84  819 13403 ms
+        // 0 : 85 819 13403 ms
+        // 1 : see below
         int32_t sz = 2*half_size+1;
         // lrn off at given n,c,h,w is central offset
         // lrn window offsets from this are in lrn_off[]
@@ -1253,15 +1280,14 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
         // lrn addresses for ++c all increment by H*W, with same mask.
         int32_t lrn_off0[/* sz * */ sz * sz]; // hw dims of nchw
         {
-            int32_t *lrn_off = &lrn_off[0];
+            int32_t *lrn_off = &lrn_off0[0];
             //for_(dim_t ld = d-half_size; ld < d+half_size+1; ++ld)
             for_(int32_t lh = 0-half_size; lh < 0+half_size+1; ++lh)
-            for (int32_t lw = 0-half_size; lw < 0+half_size+1; ++lw)
+            for (int32_t lw = 0-half_size; lw < 0+half_size+1; ++lw) {
                 *lrn_off++ = lh * W + lw;
+            }
         }
         int32_t const __restrict__* lrn_off = &lrn_off0[0];
-        // for nhwc, perhaps use dim_t (64-bit) offset
-#endif
 
         dim_t const blksz = stack_friendly_blksz(C);
         parallel_nd(MB, utils::div_up(C, blksz), D, H, W,
@@ -1270,6 +1296,8 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
             dim_t clo = c_blk * blksz;
             dim_t chi = nstl::min(clo + blksz, C);
             dim_t const cspan = chi - clo;
+            // rough guess about threshold
+            bool const big_cspan = cspan >= sz*sz/4 && cspan >= 32;
             // comp-time array bound [vs cspan] as ++ vectorization workaround
             //acc_data_t A[cspan], B[cspan];
             acc_data_t A[stack_channels], B[stack_channels];
@@ -1279,33 +1307,54 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
             }
 
             { // calc A[], B[]
-#if LRN_OFF
                 //DEFINE_HALFSIZE_RANGE(d_st, d_en, od, 0, D);
                 DEFINE_HALFSIZE_RANGE(h_st, h_en, oh, 0, H);
                 DEFINE_HALFSIZE_RANGE(w_st, w_en, ow, 0, W);
                 //for_(dim_t d = d_st; d < d_en; ++d)
                 for_(dim_t h = h_st; h < h_en; ++h)
                 for (dim_t w = w_st; w < w_en; ++w) {
+                    acc_data_t om[stack_channels]; // unvec if just cspan
+                    for (dim_t c=0; c<cspan; ++c) om[c] = acc_data_t{0};
                     dim_t const chanoff0 = offset<tag>( data_d, mb,stride_mb,
                             0,C, 0,D, h,H, w,W ); // D==1
 #define COFF(c) (chanoff0 + (c) * H*W)
-                    bool lrn_off_ok[sz * sz];
-                    //for_(dim_t ld = d-half_size; ld < d+half_size+1; ++ld)
-                    for_(dim_t lh = h-half_size; lh < h+half_size+1; ++lh)
-                    for (dim_t lw = w-half_size; lw < w+half_size+1; ++lw)
-                        lrn_off_ok[ lh*sz + lw ] = 1 //(ld > 0 && ld < D)
-                            && (lh > 0 && lh < H)
-                            && (lw > 0 && lw < W) ;
-                    acc_data_t om[cspan];
-                    for_(dim_t oc=clo; oc<chi; ++oc)
-                    for (dim_t dhw=0; dhw < sz*sz; ++dhw) {
-                        // s may be out-of-bounds
-                        acc_data_t s = src[ COFF(oc) + lrn_off[dhw] ];
-                        s = lrn_off_ok[dhw]? s: acc_data_t{0};
-                        om[oc-clo] += SQUARE(s);
+                    if (big_cspan) { // [clo,chi) loop on inside
+                        // ic3ih100, ic32,64,128,202ih10 (2002 32777)
+                        //  1185, 9.1 9.8 10.5 11.1  (17.0 278)
+                        //  so if (cspan >= sz*sz / 4) ? && cspan >= 32 ?
+                        NOVEC for_(dim_t lh = h-half_size; lh < h+half_size+1; ++lh) {
+                        if(lh >= 0 && lh < H) {
+                        NOVEC for (dim_t lw = w-half_size; lw < w+half_size+1; ++lw) {
+                        if(lw >= 0 && lw < W){
+                            auto const dhw = (lh-(h-half_size))*sz + (lw-(w-half_size));
+                            auto const lrn_off_dhw = lrn_off[dhw];
+                            for_(dim_t oc=clo; oc<chi; ++oc) {
+                                acc_data_t s = src[ COFF(oc) + lrn_off[dhw] ];
+                                om[oc-clo] += SQUARE( acc_data_t{
+                                        src[ COFF(oc) + lrn_off[dhw] ]});
+                            }
+                        }}}}
+                    }else{
+                        // ic3ih100, ic32,64,128,202ih10
+                        // 382, 6.1 9.1 15.1 22.0   (191 3118)
+                        //  so if (cspan < sz*sz / 4) || cspan < 32 ?
+                        int lrn_off_ok[sz * sz];
+                        {
+                            auto *pok = &lrn_off_ok[0];
+                            for_(dim_t lh = h-half_size; lh < h+half_size+1; ++lh)
+                            for (dim_t lw = w-half_size; lw < w+half_size+1; ++lw)
+                                *pok++ = (lh >= 0 && lh < H) && (lw >= 0 && lw < W);
+                        }
+                        // for oc here 383 22 191 3118
+                        for (dim_t oc=clo; oc<chi; ++oc) {
+                            for(dim_t dhw=0; dhw<sz*sz; ++dhw) {
+                                if (lrn_off_ok[dhw]) {
+                                    om[oc-clo] += SQUARE( acc_data_t{
+                                             src[ COFF(oc) + lrn_off[dhw] ]});
+                                }
+                            }
+                        }
                     }
-                    //for (dim_t oc=clo; oc<chi; ++oc)
-                    //    om[oc-clo] = k + alpha_inv_summands * om[oc-clo];
                     bool const central = (/* d == od && */ h == oh && w == ow);
                     for (dim_t oc=clo; oc<chi; ++oc) {
                         const acc_data_t omega = k
@@ -1317,59 +1366,6 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
                     }
                 }
 #undef COFF
-#else // older, more general
-                DEFINE_HALFSIZE_RANGE(d_st, d_en, od, 0, D);
-                DEFINE_HALFSIZE_RANGE(h_st, h_en, oh, 0, H);
-                DEFINE_HALFSIZE_RANGE(w_st, w_en, ow, 0, W);
-                for_(dim_t d = d_st; d < d_en; ++d)
-                for_(dim_t h = h_st; h < h_en; ++h)
-                for (dim_t w = w_st; w < w_en; ++w) {
-                    dim_t chanoff[cspan];
-                    acc_data_t om[cspan];
-                    for (dim_t oc=clo; oc<chi; ++oc)
-                        chanoff[oc-clo] = offset<tag>( data_d, mb,stride_mb,
-                                oc,C, d,D, h,H, w,W );
-                    DEFINE_HALFSIZE_RANGE(ld_st, ld_en, d, 0, D);
-                    DEFINE_HALFSIZE_RANGE(lh_st, lh_en, h, 0, H);
-                    DEFINE_HALFSIZE_RANGE(lw_st, lw_en, w, 0, W);
-                    for (dim_t oc=clo; oc<chi; ++oc) om[oc-clo] = acc_data_t{0};
-                    if (tag == nchw) {
-                        // oc loop here: 86 829 13569 ms ** best for nchw **
-                        // ..nhwc..      119 1189 ms
-                        // ..nChw8/16c   135/139 1482/1465 ms
-                        for_(dim_t oc=clo; oc<chi; ++oc)
-                        for_(dim_t ld = ld_st; ld < ld_en; ++ld)
-                        for_(dim_t lh = lh_st; lh < lh_en; ++lh)
-                        for (dim_t lw = lw_st; lw < lw_en; ++lw)
-                            om[oc-clo] += SQUARE( acc_data_t{ src[
-                                    offset<tag>( data_d, mb,stride_mb,
-                                            oc,C, ld,D, lh,H, lw,W) ] } );
-                    }else{ // nhwc or 8c/16c
-                        // oc loop here: 155 2619 42825 ms
-                        // ..nhwc..      11  23   ms            ** best for nhwc **
-                        // ..nChw8/16c   13.1/13.3  52/57 ms
-                        for_(dim_t ld = ld_st; ld < ld_en; ++ld)
-                        for_(dim_t lh = lh_st; lh < lh_en; ++lh)
-                        for_(dim_t lw = lw_st; lw < lw_en; ++lw)
-                        for (dim_t oc=clo; oc<chi; ++oc)
-                            om[oc-clo] += SQUARE( acc_data_t{ src[
-                                    offset<tag>( data_d, mb,stride_mb,
-                                            oc,C, ld,D, lh,H, lw,W) ] } );
-                    }
-                    for (dim_t oc=clo; oc<chi; ++oc) {
-                        om[oc-clo] = k + alpha_inv_summands * om[oc-clo];
-                    }
-
-                    bool const central = (d == od && h == oh && w == ow);
-                    for (dim_t oc=clo; oc<chi; ++oc) {
-                        const acc_data_t omega = om[oc-clo];
-                        const acc_data_t tmp = fast_negative_powf(omega, beta)
-                                * (acc_data_t)diff_dst[chanoff[oc-clo]];
-                        if (central) A[oc-clo] = tmp;
-                        B[oc-clo] += (src[chanoff[oc-clo]] * tmp / omega);
-                    }
-                }
-#endif
             } // A[], B[] calculated
             { // nchw simplification
                 dim_t const chanoff0 = offset<tag>( data_d, mb,stride_mb,
@@ -1387,6 +1383,7 @@ void ref_lrn_bwd_t<d_type>::execute_backward(const exec_ctx_t &ctx) const {
 #endif
 #if 1
     else if (!across_channels) { // i.e. within channels, lrn window on d,h,w
+        //printf("nchw-bwd-within generic\n");
         // cleanup code (not so much work optimizing yet)
         typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
         float const alpha_inv_summands = static_cast<float>(alpha) / static_cast<float>(summands);

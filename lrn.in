@@ -1,14 +1,23 @@
+--tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I ic100ih10
+--tag=ncdhw --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I ic100id10
+--tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=BWD_D ic100ih10
+--tag=ncdhw --alg=ACROSS,WITHIN --dir=BWD_D ic100id10
+
 --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I ic202ih10
 --tag=ncdhw --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I ic202id10
-
 --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=BWD_D ic202ih10
 --tag=ncdhw --alg=ACROSS,WITHIN --dir=BWD_D ic202id10
 
+--tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I ic2002ih10
+--tag=ncdhw --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I ic2002id10
+--tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=BWD_D ic2002ih10
+--tag=ncdhw --alg=ACROSS,WITHIN --dir=BWD_D ic2002id10
+
 # large channels
 --tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS,WITHIN --dir=FWD_D,FWD_I,BWD_D ic32777ih10iw10
+--tag=ncdhw --alg=ACROSS --dir=FWD_D,FWD_I,BWD_D ic32777_id10
 # ncdhw WITHIN is still too slow, ACROSS was ~ 816 ms
---tag=ncdhw --alg=ACROSS --dir=FWD_D,FWD_I,BWD_D ic32777_id10ih10iw10 
-#--tag=ncdhw --alg=WITHIN --dir=FWD_D,FWD_I,BWD_D ic32777_id10ih10iw10 
+#--tag=ncdhw --alg=WITHIN --dir=FWD_D,FWD_I,BWD_D ic32777_id10
 
 
 # tiny channels
