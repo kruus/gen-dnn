@@ -1,0 +1,2 @@
+--dir=FWD_D,BWD_DW           --flags=SR --inplace=false mb96ic64ih112
+--dir=FWD_D,BWD_DW --tag=axb --flags=SR --inplace=false mb96ic64ih112

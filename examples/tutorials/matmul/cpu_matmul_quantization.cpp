@@ -128,7 +128,7 @@
 using namespace dnnl;
 
 //#define DBG defined(__ve)
-#define DBG 1
+#define DBG 0
 
 enum class q10n_scheme_t { DYNAMIC, STATIC };
 

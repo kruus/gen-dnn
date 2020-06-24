@@ -81,7 +81,7 @@ enum class inner_blk_t {
 
 /** returns the offset within the block for weights blocked over oc and ic */
 template <inner_blk_t f>
-constexpr int AB_or_BC_blk_off(int x0, int x1) {
+inline constexpr int AB_or_BC_blk_off(int x0, int x1) {
     using ib = inner_blk_t;
     static_assert(
             utils::one_of(f, ib::_4a4b, ib::_4b4a, ib::_4b4c, ib::_4c4b,

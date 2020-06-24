@@ -18,6 +18,9 @@
 #define CPU_PLATFORM_HPP
 
 #include "dnnl_config.h"
+#if defined(__ve)
+#include "cpu/ve/cpu_isa_traits.hpp"
+#endif
 
 #include "common/c_types_map.hpp"
 #include "common/z_magic.hpp"

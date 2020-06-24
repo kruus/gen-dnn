@@ -36,6 +36,12 @@ namespace cpu {
 
 template <data_type_t d_type>
 struct nspc_batch_normalization_fwd_t : public primitive_t {
+#if defined(__ve)
+    static constexpr dim_t simd_w = cpu_isa_traits<ve_common>::mvl; // MVL=256
+    // platform::get_vector_register_size() is a function call
+#else
+    static const dim_t simd_w = 16;
+#endif
     struct pd_t : public cpu_batch_normalization_fwd_pd_t {
         pd_t(const batch_normalization_desc_t *adesc,
                 const primitive_attr_t *attr,
@@ -99,7 +105,6 @@ struct nspc_batch_normalization_fwd_t : public primitive_t {
                         key_bnorm_tmp_var, stats_buf_sz);
             }
             if (d_type == bf16) {
-                const int simd_w = 16;
                 const int nbufs = 2;
                 const size_t bf16cvt_buf_sz = nbufs * dnnl_get_max_threads()
                         * utils::rnd_up(C(), simd_w);
@@ -127,6 +132,13 @@ private:
 
 template <data_type_t d_type>
 struct nspc_batch_normalization_bwd_t : public primitive_t {
+#if defined(__ve)
+    // here so scratchpad and .cpp impl will agree on simd_w value
+    static constexpr dim_t simd_w = cpu_isa_traits<ve_common>::mvl; // MVL=256
+    // platform::get_vector_register_size() is a function call
+#else
+    static const dim_t simd_w = 16;
+#endif
     struct pd_t : public cpu_batch_normalization_bwd_pd_t {
         pd_t(const batch_normalization_desc_t *adesc,
                 const primitive_attr_t *attr,
@@ -212,7 +224,7 @@ struct nspc_batch_normalization_bwd_t : public primitive_t {
             scratchpad.template book<acc_data_t>(key_bnorm_tmp_diff_ss,
                     2 * C() * (dnnl_get_max_threads() + 1));
             if (d_type == bf16) {
-                const int simd_w = 16;
+                //const int simd_w = 16;
                 const int nbufs = 2 + !use_global_stats();
                 const size_t bf16cvt_buf_sz = nbufs * dnnl_get_max_threads()
                         * utils::rnd_up(C(), simd_w);

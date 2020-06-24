@@ -1,0 +1,8 @@
+--tag=nchw,nhwc,nChw8c,nChw16c --alg=ACROSS --dir=FWD_D ic202ih10 ic2002ih10 ic32777ih10
+--tag=ncdhw --alg=ACROSS --dir=FWD_D ic202id10 #ic2002id10 ic32777id10
+
+--tag=nchw,nhwc,nChw8c,nChw16c --alg=WITHIN --dir=FWD_D ic202ih10 ic2002ih10 ic32777ih10
+--tag=ncdhw --alg=WITHIN --dir=FWD_D ic202id10 #ic2002id10 ic2002id10 ic32777id10
+
+--tag=nchw --alg=WITHIN --dir=FWD_D ic3ih100 ic32ih10 ic64ih10 ic128ih10 ic202ih10
+

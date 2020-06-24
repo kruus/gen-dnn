@@ -18,6 +18,8 @@
 
 #if DNNL_X64
 #include "cpu/x64/cpu_isa_traits.hpp"
+#elif defined(__ve)
+#include "cpu/ve/cpu_isa_traits.hpp"
 #endif
 
 namespace dnnl {
@@ -57,9 +59,15 @@ bool has_data_type_support(data_type_t data_type) {
 unsigned get_per_core_cache_size(int level) {
     auto guess = [](int level) {
         switch (level) {
+#if defined(__ve)
+            case 1: return 32U * 1024; // each, data and instruction
+            case 2: return 256U * 1024;
+            case 3: return 16U * 1024U * 1024 / 8U; // 16G per 8-proc chip today
+#else
             case 1: return 32U * 1024;
             case 2: return 512U * 1024;
             case 3: return 1024U * 1024;
+#endif
             default: return 0U;
         }
     };
@@ -81,6 +89,8 @@ unsigned get_per_core_cache_size(int level) {
 unsigned get_num_cores() {
 #if DNNL_X64
     return x64::cpu.getNumCores(Xbyak::util::CoreLevel);
+#elif defined(__ve)
+    return 8U;
 #else
     return 1;
 #endif
@@ -92,6 +102,8 @@ int get_vector_register_size() {
     if (mayiuse(avx512_common)) return cpu_isa_traits<avx512_common>::vlen;
     if (mayiuse(avx)) return cpu_isa_traits<avx>::vlen;
     if (mayiuse(sse41)) return cpu_isa_traits<sse41>::vlen;
+#elif defined(__ve)
+    return cpu_isa_traits<ve_common>::vlen;
 #endif
     return 0;
 }

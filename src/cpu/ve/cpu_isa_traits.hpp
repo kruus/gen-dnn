@@ -14,19 +14,18 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef CPU_ISA_TRAITS_HPP
-#define CPU_ISA_TRAITS_HPP
+#ifndef VE_CPU_ISA_TRAITS_HPP
+#define VE_CPU_ISA_TRAITS_HPP
 /** \file
  * This file has been branched off of jit_generator.hpp to provide those "jit"
  * utilities/macros that are also useful to non-jit programs.
  */
-
 #include "dnnl.h"
 #include "dnnl_config.h"
 #include "dnnl_types.h"
 
-#include "dnnl_thread.hpp"
-#include "utils.hpp"
+#include "common/dnnl_thread.hpp"
+#include "common/utils.hpp"
 #include <cstdalign>
 
 #if defined(_WIN32) && !defined(__GNUC__)
@@ -76,11 +75,13 @@ namespace dnnl {
 namespace impl {
 namespace cpu {
 
+#if 0 // now in platform.hpp
 // generic, from jit_generator.hpp
 typedef enum {
     PAGE_4K = 4096,
     PAGE_2M = 2097152,
 } cpu_page_size_t;
+#endif
 
 #if defined(__ve)
 enum { CACHE_LINE_SIZE = 128 }; // LLC cache line size
@@ -192,21 +193,29 @@ struct cpu_isa_traits {}; /* ::vlen -> 32 (for avx2) */
 
 template <>
 struct cpu_isa_traits<vanilla> { // MUST work for any cpu (X86, VE, ...)
-    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_vanilla;
+    //static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_vanilla;
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_all;
     static constexpr const char *user_option_env = "VANILLA";
 };
 
 template <>
 struct cpu_isa_traits<x86_common> {
-    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_any;
+    //static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_any;
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_all;
     static constexpr const char *user_option_env = "ANY";
 };
 
 template <>
 struct cpu_isa_traits<ve_common> {
-    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_any;
+    //static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_any;
+    static constexpr dnnl_cpu_isa_t user_option_val = dnnl_cpu_isa_all;
     static constexpr const char *user_option_env = "ANY";
     // describe simd registers here...
+    // Note: vlen is in BYTES, VE has 256 doubles per register
+    static constexpr int vlen_shift = 11; // vlen == 2 ^ vlen_shift
+    static constexpr int vlen = 256 * 8; // or 512 * 4 packed-float
+    static constexpr int n_vregs = 64;
+    static constexpr int mvl = 256; // current chips all have MVL==256 (doubles)
 };
 
 /// x86-specific
@@ -329,8 +338,8 @@ static inline cpu_isa_t from_dnnl(dnnl_cpu_isa_t isa) {
         // Note cases here should match init_max_cpu_isa()
         // All target cpus support "VANILLA", "ANY" ... "ALL"
         HANDLE_CASE(vanilla);
-        HANDLE_CASE(isa_any); // x86_common/ve_common/...
-        HANDLE_CASE(isa_all); // covers x86_all and ve_all
+        //HANDLE_CASE(isa_any); // x86_common/ve_common/...
+        //HANDLE_CASE(isa_all); // covers x86_all and ve_all
 #if TARGET_X86
         HANDLE_CASE(sse41); // x86 jit with vec ops
         HANDLE_CASE(avx);
@@ -417,6 +426,7 @@ static inline bool mayiuse(cpu_isa_t const cpuIsaT, bool const soft = false) {
 #endif // TARGET_* mayiuse variations
 } // namespace
 
+#if 0 // deprecated, see cpu/platform.hpp
 namespace {
 inline unsigned int get_cache_size(int level, bool per_core = true) {
     unsigned int l = level - 1;
@@ -463,9 +473,10 @@ inline bool isa_has_bf16(cpu_isa_t isa) {
 }
 
 } // namespace
+#endif
 
 /* whatever is required to generate string literals... */
-#include "z_magic.hpp"
+#include "common/z_magic.hpp"
 /* clang-format off */
 #if TARGET_X86_JIT
 #define JIT_IMPL_NAME_HELPER(prefix, isa, suffix_if_any) \
@@ -493,4 +504,4 @@ inline bool isa_has_bf16(cpu_isa_t isa) {
 } // namespace dnnl
 
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
-#endif
+#endif // VE_CPU_ISA_TRAITS_HPP

@@ -162,9 +162,12 @@ struct memory_desc_wrapper : public c_compatible {
             const auto &bd = blocking_desc();
 
             size_t max_size = 0;
-            for (int d = 0; d < ndims(); ++d)
-                max_size = nstl::max<size_t>(
-                        max_size, padded_dims()[d] / blocks[d] * bd.strides[d]);
+            for (int d = 0; d < ndims(); ++d) {
+                //max_size = nstl::max<size_t>( /* VE vectorization issue */
+                //        max_size, padded_dims()[d] / blocks[d] * bd.strides[d]);
+                size_t tmp = padded_dims()[d] / blocks[d] * bd.strides[d];
+                if (tmp > max_size) max_size = tmp;
+            }
 
             if (max_size == 1 && bd.inner_nblks != 0) {
                 max_size = utils::array_product(bd.inner_blks, bd.inner_nblks);
@@ -229,7 +232,7 @@ struct memory_desc_wrapper : public c_compatible {
         utils::array_set(blocks, 1, ndims());
 
         const auto &bd = blocking_desc();
-        for (int iblk = 0; iblk < bd.inner_nblks; ++iblk)
+        IVDEP() for (int iblk = 0; iblk < bd.inner_nblks; ++iblk)
             blocks[bd.inner_idxs[iblk]] *= bd.inner_blks[iblk];
     }
 

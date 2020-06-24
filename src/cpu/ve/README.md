@@ -30,6 +30,8 @@ lrn 	yanking v0.16 optimizations into this version (pretty similar, v1.4 just ad
 batch_normalization stuff is 10x to 200x faster (avg 38x speedup on benchdnn)
 bnorm WIP (need to consider how to handle mdw::off_v_vec "officially")
 	lrn did this, so possibly more speedups for bnorm
+	TODO: int8 on VE (for workspace) is unvectorizable. Is bitmap vectorized?
+	caveat - std::vector<bool> has weak threading guarantees.
 
 eltwise_generic also need 'off_l_vec' optimization
 
