@@ -9,6 +9,15 @@ oneAPI Deep Neural Network Library (oneDNN)
 - last set of nc++ bugs were: (i) complicated '&&' expressions misevaluated,
   and (ii) vector VFCP compare with NaN gave wrong result.
 - older issues include workarounds for incorrect C++11 zero-initialization
+- still porting and improving the VE specific optimizations of the ref impls.
+  - sometimes based on v0.16 versions, some with new approaches/tools.
+    - ex. manual loop splitting to move conditionals out of loops
+    - nc++ lambda functions not inlined nicely, giving "unvectorizable"
+      function call --- manually inlining the lambda functions is one way
+      to improve vectorization.
+    - I often adapt threading and loop order to allow long VE vector length
+      with "channels" inner loop.
+  - have *not yet* hooked up to libvednn and libblas, as done in v0.16
 
 - current design can extend/replace files by adding to a ve/ subdirectory
   if file mods are too ugly, or full of debug code.
