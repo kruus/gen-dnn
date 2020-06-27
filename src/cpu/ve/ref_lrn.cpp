@@ -98,7 +98,7 @@ static inline acc_data_t fast_negative_powf(acc_data_t omega, acc_data_t beta) {
  */
 //dim_t constexpr stack_channels = 16384;
 //dim_t constexpr stack_channels = 8192;
-dim_t constexpr stack_channels = 4096; // a generally decent value
+static dim_t constexpr stack_channels = 4096; // a generally decent value
 //dim_t constexpr stack_channels = 2048;
 //dim_t constexpr stack_channels = 1000;
 //

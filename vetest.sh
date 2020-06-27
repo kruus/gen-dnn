@@ -348,6 +348,7 @@ function runtest # runtest COMMAND [ARGS...] -- run in TEST_ENV & send console o
     #VEOSLINE=`awk 'END{print NR}' ${VEOSLOG}`
     >&2 echo "VEOSLINE = ${VEOSLINE}, VEOSLOG = ${VEOSLOG}"
   fi
+  # time for wall time of test?
   ${ENV} ${TEST_ENV[@]} GTEST_FILTER="${GTEST_FILTER}" script -e -a -c "${STRACE} $*"
   rc=$?
   if [ -f ve_exec.log.* ]; then

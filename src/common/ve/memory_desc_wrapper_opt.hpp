@@ -118,6 +118,7 @@ struct CoordsFor : public CoordRegs<Crd,dim> {
     typedef Pos pos_t;
     private:
     static typename std::array<Crd,dim> getspan(std::array<Crd,dim>& h, std::array<Crd,dim>& l) {
+        static_assert( dim <= DNNL_MAX_NDIMS, "CoordsFor dimension unexpectedly large" );
         std::array<Crd,dim> ret;
         for(unsigned d=0U; d<dim; ++d) {
             ret[d] = h[d] - l[d];
@@ -288,7 +289,9 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
     typedef CoordsForNd<MaxDims,Crd,Pos> MyType;
     typedef Crd crd_t;
     typedef Pos pos_t;
-    CoordsForNd() : dim(0), vl(0), ilo{0}, ihi{0}, sz(0), pos(0) {}
+    CoordsForNd() : dim(0), vl(0), ilo{0}, ihi{0}, sz(0), pos(0) {
+        assert( dim <= DNNL_MAX_NDIMS );
+    }
 
     Base /* */& base() /* */ { return *this; }
     Base const& base() const { return *this; }
@@ -361,7 +364,7 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
             // TBD decide whether span is member or not XXX
             auto const span = ihi[d] - ilo[d];
             if(span <= 1){
-                for(unsigned i=0U; i<vl; ++i){ // VRspill
+                ShortLoop() for(unsigned i=0U; i<vl; ++i){ // VRspill
                     (this->vp)[d][i] = ilo[d];
                 }
             } else {
@@ -400,7 +403,7 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
                 auto const span = ihi[d] - ilo[d];
                 mod   = carry % span;
                 carry = carry / span;
-                vp[d][vl+i] = ilo[d] + mod;
+                (this->vp)[d][vl+i] = ilo[d] + mod;
             }
         }
         vl += addvl;
@@ -437,7 +440,7 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
             iter_range(0,lo,hi,utils::forward<Args>(tuple)...);
             // calc total size (could be done within iter_range?)
             sz = Pos{1};
-            for(unsigned d=0U; d<dim; ++d) sz *= ihi[d] - ilo[d]; // VRrestore!
+            ShortLoop() for(unsigned d=0U; d<dim; ++d) sz *= ihi[d] - ilo[d]; // VRrestore!
 #if 0
             cout<<" init_at dim="<<dim;
             for(int d=0; d<dim; ++d){

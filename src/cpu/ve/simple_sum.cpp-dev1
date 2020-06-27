@@ -1,0 +1,520 @@
+/*******************************************************************************
+* Copyright 2017-2020 Intel Corporation
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*******************************************************************************/
+
+#include "cpu/simple_sum.hpp"
+#include "common/bfloat16.hpp"
+#include "common/dnnl_thread.hpp"
+
+#define MVL 256
+
+namespace dnnl {
+namespace impl {
+namespace cpu {
+
+static dim_t constexpr stack_channels = 4096; // a generally decent value
+/** Divide \c hi into restricted-size blocks.
+ *
+ * \return a large, MVL-friendly block size < \c stack_channels for
+ *         partitioning [0,hi); min return value is 1
+ *
+ * \c stack_channels maximum block size is some large multiple of MVL,
+ * (unlike JIT vl suggestions bounded by MVL)
+ */
+static inline dim_t stack_friendly_blksz(dim_t const hi){
+#if 0
+    dim_t constexpr stack_channels = 16384;
+    dim_t ret = hi;
+    if (hi > stack_channels) {
+        dim_t const nFull = hi/stack_channels;
+        dim_t const rem   = hi%stack_channels;
+        dim_t const nLoops = nFull + (rem!=0);
+        if (rem > stack_channels/2) { // remainder "big enough"
+            printf("+");
+            ret = (hi+nLoops-1) / nLoops;
+        }else{                  // o.w. ~equal "2 2 1"
+            dim_t const nLoops = nFull + (rem!=0);
+            //dim_t const nLoops = (hi+stack_channels-1) / stack_channels;
+            ret = (hi+nLoops-1) / nLoops;
+        }
+    }
+#elif 0 // some better behavior (some fast heuristic)
+    dim_t const nFull = hi/stack_channels;
+    dim_t const rem   = hi%stack_channels;
+    dim_t const nLoops = nFull + (rem!=0);
+    if (hi > stack_channels && rem > stack_channels/2) {
+        ret = (hi+nLoops-1) / nLoops;
+        //printf("+%d",(int)ret); // rough equipartition
+    }
+    auto rem256 = ret % 256;
+    if (hi > 256 && rem256 && rem256<32) { // low remainder?
+        auto ret2 = (hi+nLoops) / (nLoops+1); // accept one more loop
+        //printf("-%d",(int)ret2);
+        if( ret2%256 > rem256 ){
+            //printf("!");
+            ret = ret2;
+        }
+    }
+#else // simpler (see dev/blk_friendly.cpp test prog)
+    dim_t ret = (hi>0? hi: 1);
+    if (hi > stack_channels) {
+        ret = stack_channels;
+        dim_t const nFull = hi/stack_channels;
+        dim_t const rem   = hi%stack_channels;
+        if (rem < stack_channels/4) {
+            dim_t const nLoops = nFull + (rem!=0);
+            ret = (hi+nLoops-1) / nLoops;
+            //printf("+%d",(int)ret); // rough equipartition
+            if (ret < stack_channels - MVL) {
+                ret = (ret+MVL-1)/MVL*MVL;
+                //printf("^%d",(int)ret); // round up
+            }
+        }
+    }
+#endif
+    //assert( ret < stack_channels );
+    return ret;
+}
+/** but also want blksz low enough that max_threads can actually be used...
+ * XXX return to this with measurements XXX. */
+static inline dim_t stack_friendly_blksz(dim_t const hi, dim_t const other_work){
+    dim_t stack_lim = (other_work*hi/dnnl_get_max_threads());
+    // adjust following, which assumes one MVL is "enough work"
+    // here MVL ~ min desirable blksz (but we can go lower, a bit)
+    if (stack_lim < MVL) stack_lim = MVL;
+    stack_lim = (stack_lim+(MVL-1)) / MVL * MVL;
+    if (stack_lim > stack_channels) stack_lim = stack_channels;
+
+    // now heuristic with possibly smaller version of stack_channels
+    dim_t ret = (hi>0? hi: 1);
+    if (hi > stack_lim) {
+        ret = (stack_lim+31)/32*32;
+        dim_t const nFull = hi/stack_lim;
+        dim_t const rem   = hi%stack_lim;
+        if (rem < MVL/4) {
+            dim_t const nLoops = nFull + (rem!=0);
+            ret = (hi+nLoops-1) / nLoops;
+            //printf("+%d",(int)ret); // rough equipartition
+            if (ret < stack_lim - MVL) {
+                ret = (ret+MVL-1)/MVL*MVL;
+                //printf("^%d",(int)ret); // round up
+            }
+        }
+        ret = (ret+31)/32*32;
+    }
+    //assert( ret < stack_channels );
+    return ret;
+}
+
+#if 0
+template<typename src_data_t, typename dst_data_t>
+struct SumKernel {
+    int const blksz;
+    dim_t const nelems;
+    int const num_arrs;
+    float const* const __restrict__ scales;
+    src_data_t const* __restrict__ * const __restrict__ input_ptrs;
+    dst_data_t * __restrict__ output;
+
+    SumKernel(dim_t const blksz, dim_t const nelems, int const num_arrs,
+               float const* __restrict__ scales,
+               src_data_t const* __restrict__ * const __restrict__ input_ptrs,
+               dst_data_t * __restrict__ output)
+        : blksz(blksz),
+        nelems(nelems),
+        num_arrs(num_arrs),
+        scales(scales),
+        input_ptrs(input_ptrs),
+        output(output)
+    {
+        assert(num_arrs > 0);
+    }
+
+    void scaled_sum(dim_t const blk) const {
+        dim_t const start_e = blk * blksz;
+        dim_t const end_e = (start_e + blksz < nelems? start_e + blksz: nelems);
+        PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+        for (dim_t e = start_e; e < end_e; ++e) {
+            output[e] = dst_data_t(scales[0] * input_ptrs[0][e]);
+        }
+        for (int a = 1; a < num_arrs; ++a) {
+            PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+                for (dim_t e = start_e; e < end_e; e++) {
+                    output[e] += dst_data_t(scales[a] * input_ptrs[a][e]);
+                }
+        }
+    }
+    void scaled_sum2(dim_t const blk) const {
+        dim_t const start_e = blk * blksz;
+        dim_t const end_e = (start_e + blksz < nelems? start_e + blksz: nelems);
+        PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+        for (dim_t e = start_e; e < end_e; ++e) {
+            output[e] = dst_data_t(scales[0] * input_ptrs[0][e])
+                + dst_data_t(scales[1] * input_ptrs[1][e]);
+        }
+    }
+};
+#endif
+template <data_type_t src_data_type, data_type_t dst_data_type>
+status_t simple_sum_t<src_data_type, dst_data_type>::execute(
+        const exec_ctx_t &ctx) const {
+    auto output = CTX_OUT_MEM(dst_data_t *, DNNL_ARG_DST);
+
+    const memory_desc_wrapper o_d(pd()->dst_md());
+    output += o_d.blk_off(0);
+    const int num_arrs = pd()->n_inputs();
+    const src_data_t *input_ptrs[max_num_arrs];
+
+    for (int a = 0; a < num_arrs; ++a) {
+        const memory_desc_wrapper i_d(pd()->src_md(a));
+        input_ptrs[a]
+                = CTX_IN_MEM(const src_data_t *, DNNL_ARG_MULTIPLE_SRC + a)
+                + i_d.blk_off(0);
+    }
+
+    const dim_t nelems = pd()->nelems_;
+    const dim_t block_size = pd()->block_size_;
+    const dim_t blocks_number = pd()->blocks_number_;
+    const dim_t tail = pd()->tail_;
+
+    const auto scales = pd()->scales();
+
+    // benchdnn test 6, --scales=0.25 3x3x16x4, was 1.05 ms in vqqT-fulltests,
+    // but in build-ve is consistently 1.4 ms.  WHY? XXX
+#if 0 // orig code 0.99 ms --sum --scales=0.25 33x33x316x34
+    auto sum_block_bf16 = [&](dim_t start, dim_t end, int ithr) {
+        const bool is_dst_bf16 = dst_data_type == data_type::bf16;
+
+        const auto bf16_p = pd()->bf16_p_;
+        const auto scratchpad = ctx.get_scratchpad_grantor();
+        acc_data_t *wspace = scratchpad.template get<acc_data_t>(
+                memory_tracking::names::key_sum_srcs_cvt);
+        acc_data_t *my_ws = &wspace[ithr * bf16_p.ws_elements_per_thread_];
+
+        for (dim_t b = start; b < end; b += bf16_p.acc_loop_step_) {
+            acc_data_t *my_acc = is_dst_bf16
+                    ? &my_ws[bf16_p.ws_cvt_elements_per_thread_]
+                    : (acc_data_t *)&output[b];
+            dim_t current_block = nstl::min(bf16_p.acc_loop_step_, end - b);
+            cvt_bfloat16_to_float(
+                    my_ws, (bfloat16_t *)&input_ptrs[0][b], current_block);
+            for (dim_t e = 0; e < current_block; e++)
+                my_acc[e] = scales[0] * my_ws[e];
+
+            for (int a = 1; a < num_arrs; a++) {
+                cvt_bfloat16_to_float(
+                        my_ws, (bfloat16_t *)&input_ptrs[a][b], current_block);
+                for (dim_t e = 0; e < current_block; e++)
+                    my_acc[e] += scales[a] * my_ws[e];
+            }
+            if (is_dst_bf16)
+                cvt_float_to_bfloat16(
+                        (bfloat16_t *)&output[b], my_acc, current_block);
+        }
+    };
+
+    auto sum_block = [&](dim_t start, dim_t end, int ithr) {
+        PRAGMA_OMP_SIMD()
+        for (dim_t e = start; e < end; e++) {
+            output[e] = dst_data_t(scales[0] * input_ptrs[0][e]);
+        }
+        for (int a = 1; a < num_arrs; a++) {
+            PRAGMA_OMP_SIMD()
+            for (dim_t e = start; e < end; e++) {
+                output[e] += dst_data_t(scales[a] * input_ptrs[a][e]);
+            }
+        }
+    };
+
+    parallel(0, [&](const int ithr, const int nthr) {
+        dim_t start {0}, end {0};
+        balance211(blocks_number, nthr, ithr, start, end);
+
+        for (dim_t nb = start; nb < end; ++nb) {
+            dim_t start_e = nb * block_size;
+            dim_t end_e = start_e + block_size;
+            if (src_data_type == data_type::bf16)
+                sum_block_bf16(start_e, end_e, ithr);
+            else
+                sum_block(start_e, end_e, ithr);
+        }
+
+        if (tail != 0 && ithr == nthr - 1) {
+            dim_t start_e = nelems - tail;
+            dim_t end_e = nelems;
+            if (src_data_type == data_type::bf16)
+                sum_block_bf16(start_e, end_e, ithr);
+            else
+                sum_block(start_e, end_e, ithr);
+        }
+    });
+
+#else
+    // mv bf16 condition outside loop, VE doesn't care about this case
+    // nc++ -std=gnu++17 does not yet support 'if constexpr'
+    if (src_data_type == data_type::bf16) {
+        auto sum_block_bf16 = [&](dim_t start, dim_t end, int ithr) {
+            const bool is_dst_bf16 = dst_data_type == data_type::bf16;
+
+            const auto bf16_p = pd()->bf16_p_;
+            const auto scratchpad = ctx.get_scratchpad_grantor();
+            acc_data_t *wspace = scratchpad.template get<acc_data_t>(
+                    memory_tracking::names::key_sum_srcs_cvt);
+            acc_data_t *my_ws = &wspace[ithr * bf16_p.ws_elements_per_thread_];
+
+            for (dim_t b = start; b < end; b += bf16_p.acc_loop_step_) {
+                acc_data_t *my_acc = is_dst_bf16
+                        ? &my_ws[bf16_p.ws_cvt_elements_per_thread_]
+                        : (acc_data_t *)&output[b];
+                dim_t current_block = nstl::min(bf16_p.acc_loop_step_, end - b);
+                cvt_bfloat16_to_float(
+                        my_ws, (bfloat16_t *)&input_ptrs[0][b], current_block);
+                for (dim_t e = 0; e < current_block; e++)
+                    my_acc[e] = scales[0] * my_ws[e];
+
+                for (int a = 1; a < num_arrs; a++) {
+                    cvt_bfloat16_to_float(
+                            my_ws, (bfloat16_t *)&input_ptrs[a][b], current_block);
+                    for (dim_t e = 0; e < current_block; e++)
+                        my_acc[e] += scales[a] * my_ws[e];
+                }
+                if (is_dst_bf16)
+                    cvt_float_to_bfloat16(
+                            (bfloat16_t *)&output[b], my_acc, current_block);
+            }
+        };
+
+        parallel(0, [&](const int ithr, const int nthr) {
+            dim_t start {0}, end {0};
+            balance211(blocks_number, nthr, ithr, start, end);
+            for (dim_t nb = start; nb < end; ++nb) { // unvec
+                dim_t start_e = nb * block_size;
+                dim_t end_e = start_e + block_size;
+                sum_block_bf16(start_e, end_e, ithr);
+            }
+            if (tail != 0 && ithr == nthr - 1) {
+                dim_t start_e = nelems - tail;
+                dim_t end_e = nelems;
+                sum_block_bf16(start_e, end_e, ithr);
+            }
+        });
+    }else{ // !bf16
+#if 0 // 0.96
+        // VE cares about non-bf16,and should inline that lambda...
+        parallel(0, [&](const int ithr, const int nthr) {
+            dim_t start {0}, end {0};
+            balance211(blocks_number, nthr, ithr, start, end);
+            // nc++ lambdas slow : operator() prohibits vectorization
+            // Comments: check with 'test_benchdnn_sum' timings ...
+            // 1. VE is probably fine (perhaps better!) eliminating the tail loop CHECKME
+            //    - only benefit may be a -mvector-shortloop-reduction for tail loop.
+            // 2. VE probably fine recognizing the sum reduction automatically, if the
+            //   output is initially zeroed, I suppose.
+            for (dim_t nb = start; nb < end; ++nb) {
+                dim_t start_e = nb * block_size;
+                dim_t end_e = start_e + block_size;
+                // bock_size is 4096 for f32. How is this determined?
+                // XXX bnorm also has a "simd_w" but I put it into cpu/, not the pd
+
+                //sum_block(start_e, end_e, ithr); ...
+                PRAGMA_OMP_SIMD()
+                //PragmaQuote(_NEC packed_vector) // packed vector is *slower* here
+                PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval)
+                for (dim_t e = start_e; e < end_e; ++e) {
+                    output[e] = dst_data_t(scales[0] * input_ptrs[0][e]);
+                }
+                for (int a = 1; a < num_arrs; ++a) {
+                    PragmaQuote(_NEC nolstval) IVDEP() PRAGMA_OMP_SIMD()
+                    //PragmaQuote(_NEC packed_vector)
+                    PragmaQuote(_NEC retain(output))
+                    for (dim_t e = start_e; e < end_e; e++) {
+                        output[e] += dst_data_t(scales[0] * input_ptrs[a][e]);
+                        //output[e] += dst_data_t(*psc * pin[e]);
+                        //dst_data_t const o = scales[a] * input_ptrs[a][e];
+                        //output[e] += o;
+                        //float const sc_a = scales[a];
+                        //auto const in_a = input_ptrs[a][e];
+                        //output[e] += dst_data_t{sc_a * in_a};
+                    }
+                }
+            }
+            if (tail != 0 && ithr == nthr - 1) {
+                dim_t start_e = nelems - tail;
+                dim_t end_e = nelems;
+                PRAGMA_OMP_SIMD() ShortLoopTest()
+                PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval)
+                for (dim_t e = start_e; e < end_e; e++) {
+                    output[e] = dst_data_t{scales[0] * input_ptrs[0][e]};
+                }
+                for (int a = 1; a < num_arrs; a++) {
+                    PRAGMA_OMP_SIMD() ShortLoopTest() IVDEP() PragmaQuote(_NEC nolstval)
+                    PragmaQuote(_NEC retain(output))
+                    for (dim_t e = start_e; e < end_e; e++) {
+                        output[e] += dst_data_t{scales[a] * input_ptrs[a][e]};
+                    }
+                }
+            }
+        });
+#elif 1 // 0.96 --> 0.83 for summing 2 arrays
+        // remove tail loop (not req'd for VE)
+        parallel(0, [&](const int ithr, const int nthr) {
+            dim_t start {0}, end {0};
+            balance211(blocks_number + (tail!=0), nthr, ithr, start, end);
+            for (dim_t nb = start; nb < end; ++nb) {
+                dim_t const start_e = nb * block_size;
+                dim_t const end_e = (start_e + block_size < nelems? start_e + block_size: nelems);
+#if 0
+                PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+                for (dim_t e = start_e; e < end_e; ++e) {
+                    output[e] = dst_data_t(scales[0] * input_ptrs[0][e]);
+                }
+                for (int a = 1; a < num_arrs; ++a) {
+                    PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+                    for (dim_t e = start_e; e < end_e; e++) {
+                        output[e] += dst_data_t(scales[0] * input_ptrs[a][e]);
+                    }
+                }
+#endif
+                auto const s0 = scales[0];
+                auto const s1 = scales[1];
+                src_data_t const * __restrict__ in0 = input_ptrs[0];
+                src_data_t const * __restrict__ in1 = input_ptrs[1];
+                if (num_arrs == 2) { // Guess this will be most common case
+                    PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+                    for (dim_t e = start_e; e < end_e; ++e) {
+                        //output[e] = dst_data_t(scales[0] * input_ptrs[0][e])
+                        //    + dst_data_t(scales[1] * input_ptrs[1][e]);
+                        output[e] = dst_data_t(s0 * in0[e])
+                                + dst_data_t(s1 * in1[e]);
+                    }
+                }else if (num_arrs == 3) {
+                    auto const s2 = scales[2];
+                    src_data_t const * __restrict__ in2 = input_ptrs[2];
+                    PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+                    for (dim_t e = start_e; e < end_e; ++e) {
+                        output[e] = dst_data_t(s0 * in0[e])
+                                + dst_data_t(s1 * in1[e])
+                                + dst_data_t(s2 * in2[e]);
+                    }
+                }else if (num_arrs >= 4) {
+                    auto const s2 = scales[2];
+                    auto const s3 = scales[3];
+                    src_data_t const * __restrict__ in2 = input_ptrs[2];
+                    src_data_t const * __restrict__ in3 = input_ptrs[3];
+                    PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+                    for (dim_t e = start_e; e < end_e; ++e) {
+                        output[e] = dst_data_t(s0 * in0[e])
+                                + dst_data_t(s1 * in1[e])
+                                + dst_data_t(s2 * in2[e])
+                                + dst_data_t(s3 * in3[e]);
+                    } // could continue optimizing co-additions ... TODO
+                    for (int a = 4; a < num_arrs; ++a) {
+                        PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+                        for (dim_t e = start_e; e < end_e; e++) {
+                            output[e] += dst_data_t(scales[a] * input_ptrs[a][e]);
+                        }
+                    }
+                }else{ // num_arrs 1 (zero not allowed?)
+                    assert( num_arrs == 1 );
+                    PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+                    for (dim_t e = start_e; e < end_e; ++e) {
+                        output[e] = dst_data_t(scales[0] * input_ptrs[0][e]);
+                    }
+                }
+            }
+        });
+#elif 1
+        // can also get this using 'stack_friendly_blksz'
+        dim_t const blksz = stack_friendly_blksz(nelems);
+        parallel_nd(utils::div_up(nelems,blksz), [&](dim_t blk) {
+            // blksz, nelems, scales, input_ptrs, output, num_arrs
+            dim_t const start_e = blk * blksz;
+            dim_t const end_e = (start_e + blksz < nelems? start_e + blksz: nelems);
+            PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+            if (num_arrs == 2) { // Guess this will be most common case
+                PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+                for (dim_t e = start_e; e < end_e; ++e) {
+                    output[e] = dst_data_t(scales[0] * input_ptrs[0][e])
+                        + dst_data_t(scales[1] * input_ptrs[1][e]);
+                }
+            }else if (num_arrs == 3) {
+                PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+                for (dim_t e = start_e; e < end_e; ++e) {
+                    output[e] = dst_data_t(scales[0] * input_ptrs[0][e])
+                        + dst_data_t(scales[1] * input_ptrs[1][e])
+                        + dst_data_t(scales[2] * input_ptrs[2][e]);
+                }
+            }else if (num_arrs >= 4) {
+                PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+                for (dim_t e = start_e; e < end_e; ++e) {
+                    output[e] = dst_data_t(scales[0] * input_ptrs[0][e])
+                        + dst_data_t(scales[1] * input_ptrs[1][e])
+                        + dst_data_t(scales[2] * input_ptrs[2][e])
+                        + dst_data_t(scales[3] * input_ptrs[3][e]);
+                }
+                for (int a = 4; a < num_arrs; ++a) {
+                    PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+                    for (dim_t e = start_e; e < end_e; e++) {
+                        output[e] += dst_data_t(scales[a] * input_ptrs[a][e]);
+                    }
+                }
+            }else{ // num_arrs 1 (zero not allowed?)
+                assert( num_arrs == 1 );
+                PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+                for (dim_t e = start_e; e < end_e; ++e) {
+                    output[e] = dst_data_t(scales[0] * input_ptrs[0][e]);
+                }
+            }
+        });
+#elif 0 // also 0.96 ms
+        dim_t const blksz = stack_friendly_blksz(nelems);
+        typedef SumKernel<src_data_t,dst_data_t> Krn;
+        Krn const krn{ blksz, nelems, num_arrs, scales, input_ptrs, output};
+        using namespace std::placeholders; // for _1, ...
+        if(num_arrs==2){ // slightly faster, 0.83 ms, std::bind efficient
+            parallel_nd(utils::div_up(nelems,blksz), std::bind(
+                        &Krn::scaled_sum2, &krn, _1));
+            //parallel_nd(utils::div_up(nelems,blksz), [&krn](dim_t const blk) {
+            //            krn.scaled_sum2(blk); });
+        }else{ // arbitrary num_arr
+            parallel_nd(utils::div_up(nelems,blksz), std::bind(
+                        &Krn::scaled_sum, &krn, _1));
+            //parallel_nd(utils::div_up(nelems,blksz), [&krn](dim_t const blk) {
+            //            krn.scaled_sum(blk); });
+        }
+#elif 0 // std::bind is slower as a non-temporary, 1.2 ms
+        dim_t const blksz = stack_friendly_blksz(nelems);
+        typedef SumKernel<src_data_t,dst_data_t> Krn;
+        SumKernel<src_data_t,dst_data_t> const krn{
+               blksz, nelems, num_arrs,
+               scales, input_ptrs, output};
+        typedef std::function<void(dim_t const)> BlkFunc;
+        BlkFunc blkfunc = std::bind(&SumKernel<src_data_t,dst_data_t>::scaled_sum, &krn, _1);
+        parallel_nd(utils::div_up(nelems,blksz), blkfunc);
+#endif
+    } // bf16?
+#endif
+
+    return status::success;
+}
+
+template struct simple_sum_t<data_type::f32>;
+template struct simple_sum_t<data_type::bf16>;
+template struct simple_sum_t<data_type::bf16, data_type::f32>;
+
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

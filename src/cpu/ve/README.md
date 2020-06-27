@@ -32,12 +32,16 @@ bnorm WIP (need to consider how to handle mdw::off_v_vec "officially")
 	lrn did this, so possibly more speedups for bnorm
 	TODO: int8 on VE (for workspace) is unvectorizable. Is bitmap vectorized?
 	caveat - std::vector<bool> has weak threading guarantees.
+bnorm still not "fast".
 
-eltwise_generic also need 'off_l_vec' optimization
+eltwise_generic might also need 'off_l_vec' optimization
+	ve version begun, not optimized (needs work)
 
 simple_sum should begin by following v0.16 version
+	did some further optimizations.  still slow cf. x64, I think
 
-simple_concat is v0.16 shortloop_reduction correct?
+simple_concat 
+	some work on ve version, based on v0.16 impl (needs work)
 
 rnn ??
 

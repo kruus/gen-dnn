@@ -26,6 +26,9 @@
 
 #include <memory>
 #include <string>
+#if defined(__ve)
+#include <type_traits>
+#endif
 
 #define MSAN_ENABLED 0
 #define ATTR_NO_MSAN
@@ -201,8 +204,25 @@ inline bool any_null(Args... ptrs) {
 
 template <typename T>
 inline void array_copy(T *dst, const T *src, size_t size) {
+#if defined(__ve) // does not vectorize sub-4-byte T nicely
+    if (std::is_trivially_copyable<T>::value
+              && (sizeof(T) != 4 && sizeof(T) != 8 && sizeof(T) != 16)
+              && /*non-constexpr*/ size*sizeof(T) >= 32*4) {
+        // memcpy can vectorize arbitrary size and alignment via head/tail fixups
+        // XXX sizeof being 4,8,16 is a GUESS at what nc++ might vectorize well with
+        //     the standard copy loop
+        // XXX measure size threshold using array_copy<char> that offsets func call ovhd
+        // XXX assume non-ovlp, probably OK given default impl
+        std::memcpy(dst, src, size*sizeof(T));
+    }else { // particularly, avoid this for long array_copy<8- or 16-bit type>
+        // since VE has no vector support for any "short" types
+        for (size_t i = 0; i < size; ++i)
+            dst[i] = src[i];
+    }
+#else
     for (size_t i = 0; i < size; ++i)
         dst[i] = src[i];
+#endif
 }
 template <typename T>
 inline bool array_cmp(const T *a1, const T *a2, size_t size) {
