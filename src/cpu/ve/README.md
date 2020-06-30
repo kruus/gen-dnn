@@ -39,6 +39,10 @@ eltwise_generic might also need 'off_l_vec' optimization
 	for vectorization, move 'switch' cases out of loop.
 		fwd speedups O(250)x for large tensors
 
+	I notice that for "tiny" benchdnn tests, things take uniformly .057 ms,
+	regardless of --alg, which represents omp + balance + "invoke lambda"
+	overhead!  In comparison, on x86 this is ~ 0.019 ms (3x faster on x86).
+
 simple_sum should begin by following v0.16 version
 	did some further optimizations.  still slow cf. x64, I think
 
@@ -53,3 +57,18 @@ simple_reorder wants at least the v0.16 ShortLoop() pragmas reinstated
 	and reorder(any,any,any) using off_l reorder should use 'off_l_vec'
 	- actually this is an interesting case of how to introduce batching into
 	  a parallel_nd construct
+
+### sample tests
+
+default benchdnn tests :
+
+[aurora-ds08 vanilla-dbg]$ { { make -C build-ve -j 16 install || make -C build-ve -j 1 install; } && ./vetest.sh -B build-ve -L ve-bench-elt.log -t 8 -v -T test_benchdnn_eltwise; } >& ve-elt.log && echo YAY || echo OHOH
+
+test_benchdnn_eltwise in --mode=P :
+
+[aurora-ds08 vanilla-dbg]$ { { make -C build-ve -j 16 install || make -C build-ve -j 1 install; } && (cd /home/kruus/vanilla-dbg/build-ve/tests/benchdnn && /usr/bin/env DNNL_VERBOSE=1 VE_PROGINF=DETAIL DNNL_VERBOSE=0 OMP_NUM_THREADS=8 VE_OMP_NUM_THREADS=8 VE_NODE_NUMBER=2 /home/kruus/vanilla-dbg/build-ve/tests/benchdnn/benchdnn -v1 --engine=cpu --mode=P --eltwise --batch=inputs/eltwise/test_eltwise_all); } >& ve-bench-eltP.log && echo YAY || echo OHOH
+
+debug a single test case :
+
+[aurora-ds08 vanilla-dbg]$ { { make -C build-ve -j 16 install || make -C build-ve -j 1 install; } && ./vetest.sh -B build-ve -v -L f.log --benchdnn --mode=C --eltwise --dir=FWD_D --alg=exp_dst alpha=0 beta=0 44x88x33x3; } >& ve-elt.log && echo YAY || echo OHOH
+
