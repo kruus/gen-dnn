@@ -209,7 +209,13 @@ inline U bounded_relu_bwd(T dd, T s, A alpha) {
 template <typename T, typename U = typename utils::remove_reference<T>::type>
 inline U soft_relu_fwd(T s) {
     float max_logf = 8.872284e+01; //::logf(FLT_MAX)
+#if defined(__ve)
+    // VE will not vectorize call to log1pf
+    // TODO: Remez Exchange to get coeffs for s<0 and s>0 regions
+    return s < max_logf ? (U)(::log(1.0f + ::expf((float)s))) : s;
+#else
     return s < max_logf ? (U)(::log1pf(::expf((float)s))) : s;
+#endif
 }
 template <typename T, typename U = typename utils::remove_reference<T>::type>
 inline U soft_relu_bwd(T dd, T s) {

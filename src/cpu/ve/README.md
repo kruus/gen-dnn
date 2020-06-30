@@ -36,6 +36,8 @@ bnorm still not "fast".
 
 eltwise_generic might also need 'off_l_vec' optimization
 	ve version begun, not optimized (needs work)
+	for vectorization, move 'switch' cases out of loop.
+		fwd speedups O(250)x for large tensors
 
 simple_sum should begin by following v0.16 version
 	did some further optimizations.  still slow cf. x64, I think
