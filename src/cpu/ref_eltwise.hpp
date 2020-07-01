@@ -128,13 +128,21 @@ struct ref_eltwise_bwd_t : public primitive_t {
             //use_dense_ = same_fmt_ && diff_dst_d.is_dense(true)
             //        && is_zero_preserved() && !has_zero_dim_memory();
             // try mirroring fwd logic (seeing generic chosen surprisingly)
-            use_dense_ = same_fmt_ &&
-                    ( diff_dst_d.is_dense()
-                      || diff_dst_d.is_dense(true) && is_zero_preserved() )
-                    && !has_zero_dim_memory();
+            use_dense_ = diff_dst_d.is_dense()
+                      || (diff_dst_d.is_dense(true) && is_zero_preserved());
+
+            if (has_zero_dim_memory()) use_dense_ = false;
+            if (diff_dst_d != memory_desc_wrapper(src_md())) use_dense_ = false;
 
             if (data_type == data_type::bf16) init_scratchpad();
 
+            // reduce vectorization work for generic impl ... extend list as encountered
+            alg_kind_t const alg_ = desc()->alg_kind;
+            using namespace alg_kind;
+            assert( IMPLICATION( !use_dense_,  one_of(alg_,
+                            eltwise_pow, eltwise_sqrt, eltwise_log,
+                            eltwise_sqrt_use_dst_for_bwd
+                            )));
             return status::success;
         }
 
@@ -177,4 +185,4 @@ private:
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
+// vim: et ts=4 sw=4 cindent cino=+2s,l0,\:4,N-s
