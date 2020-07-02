@@ -1,11 +1,59 @@
---dtag=undef,any,abx,axb,aBx8b,aBx16b
---sdt=f32,s32,s8,u8
---ddt=f32,s32,s8,u8
---stag=abx:abx       --axis=3 33x44x55x13:33x44x55x17
---stag=axb:axb       --axis=2 55x22x0x83:55x22x8x88
-                     --axis=0 55x22x8x83:11x22x8x83
---sdt=f32,s32
---ddt=f32,s32
---stag=aBx16b:abx:axb --axis=1
-66x47x33x4x5:66x33x33x4x5:66x15x33x4x5
+# "beginning" benchdnn times (VE Aurora, --mode=C, ms)
+# keep small, because some reorders are **way** slow
+--reset 
+--dtag=undef --sdt=f32 --ddt=f32
+--stag=abx:abx       --axis=3 33x44x555x13:33x44x555x17 # 13.4  phys_dims{33,44,555,1,1},num_arrs=2,nelems{13,17}
+--stag=axb:axb       --axis=2 55x22x0x83:55x22x8x83	# 0.069 phys_dims{55,1,1,1,1},num_arrs=2,nelems{0,14608}
+--stag=axb:axb       --axis=1 55x22x15x83:55x15x15x83	# 1.19  phys_dims{55,15,83,1,1},num_arrs=2,nelems{22,15}
+--stag=axb:axb       --axis=0 55x33x15x83:17x33x15x83	# 0.094 num_arrs=2,nelems{2259675,698445}
+# w/ memcpy_wrap all cases: 9.33 0.070 0.855 0.094 YES!
 
+# simple_concat only applies for specific benchdnn settings
+--reset 
+--dtag=any --sdt=s32 --ddt=s32
+--stag=abx:abx       --axis=3 33x44x5x13:33x44x5x17	# 0.186 
+--stag=axb:axb       --axis=2 55x22x0x83:55x22x8x83	# 0.069
+--stag=axb:axb       --axis=1 55x22x15x83:55x15x15x83	# ??
+--stag=axb:axb       --axis=0 15x33x15x83:17x33x15x83	# 0.083
+# w/ memcpy_wrap all cases: 0.151 0.070 0.856 0.082 YES!
+
+--reset 
+--dtag=any --sdt=u8 --ddt=u8
+--stag=abx:abx       --axis=3 33x44x5x13:33x44x5x17	# 0.186
+--stag=axb:axb       --axis=2 55x22x0x83:55x22x8x83	# 0.067
+--stag=axb:axb       --axis=1 55x22x15x83:55x15x15x83	# 1.39
+--stag=axb:axb       --axis=0 15x33x15x83:17x33x15x83	# 0.331 unvec --> 0.110 memcpy
+# w/ memcpy_wrap all cases: 0.184 0.067 1.36 0.110 (was already memcpy)
+
+--reset 
+--dtag=any --sdt=bf16 --ddt=bf16 # no hassle for VE: size 2, memcpy-able
+--stag=abx:abx       --axis=3 33x44x5x13:33x44x5x17	# 0.192
+--stag=axb:axb       --axis=2 55x22x0x83:55x22x8x83	# 0.068
+--stag=axb:axb       --axis=1 55x22x15x83:55x15x15x83	# 1.46
+--stag=axb:axb       --axis=0 15x33x15x83:17x33x15x83	# 0.331 unvec --> 0.148 memcpy
+# w/ memcpy_wrap all cases: 0.191 0.0682 1.45 0.148 (was already memcpy)
+
+# triple concats ALL done via internal "reorder" simple:any primitives
+# (ref_concat.hpp header)
+#--reset
+#--sdt=f32 --ddt=f32 --stag=aBx16b:ABx16a16b:abx --dtag=any --axis=1
+#9x11x9x9x9:9x22x9x9x9:9x33x9x9x9			# 6.74
+#--sdt=s8 --ddt=f32 --stag=aBx16b:ABx16a16b:abx --dtag=any --axis=1
+#9x11x9x9x9:9x22x9x9x9:9x33x9x9x9			# 309
+
+# --reset 
+# --dtag=abx --sdt=f32 --ddt=f32
+# --stag=abx:abx       --axis=3 33x44x55x13:33x44x55x17
+# --stag=axb:axb       --axis=2 55x22x0x83:55x22x8x83
+#                      --axis=0 55x22x8x83:11x22x8x83
+# --reset
+# --dtag=abx,axb,aBx16b --sdt=f32 --ddt=f32
+# --stag=abx:abx       --axis=3 33x44x55x13:33x44x55x17
+# --stag=axb:axb       --axis=2 55x22x0x83:55x22x8x83
+#                      --axis=0 55x22x8x83:11x22x8x83
+# --reset 
+# --dtag=ABx16a16b --sdt=f32 --ddt=f32
+# --stag=abx:abx       --axis=3 33x44x55x13:33x44x55x17
+# --stag=axb:axb       --axis=2 55x22x0x83:55x22x8x83
+#                      --axis=0 55x22x8x83:11x22x8x83
+# 

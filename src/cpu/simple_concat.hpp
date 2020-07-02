@@ -46,7 +46,12 @@ struct simple_concat_t : public primitive_t {
 
         status_t init(engine_t *engine) {
             const memory_desc_wrapper dst_d(dst_md());
-            bool ok = platform::has_data_type_support(data_type)
+            bool ok = true // XXX tmp remove for testing
+#if defined(__ve) // (sizeof(bf16)==2, memcpyable), so OK to avoid ref_concat fallback
+                    && (platform::has_data_type_support(data_type) || data_type==data_type::bf16)
+#else
+                    && platform::has_data_type_support(data_type)
+#endif
                     && cpu_concat_pd_t::init() == status::success
                     && dst_d.ndims() <= 6;
             if (!ok) return status::unimplemented;
