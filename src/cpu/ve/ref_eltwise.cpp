@@ -24,6 +24,7 @@
 #include "cpu/ref_eltwise.hpp"
 #if defined(__ve)
 #include "common/ve/memory_desc_wrapper_opt.hpp"
+#include "common/dnnl_optimize.h"
 #endif
 
 namespace dnnl {
@@ -43,6 +44,10 @@ namespace cpu {
 using namespace alg_kind;
 using namespace math;
 
+#ifndef MVL
+#define MVL 256 /*FIXME*/
+#endif
+
 /** \file
  * should investigate:
  *
@@ -52,6 +57,70 @@ using namespace math;
  * - possible to reduce lambda usage more w/ helper structs? reduce code duplication?
  */
 namespace {
+/** stack usage threshold (max array size) for channel offsets.
+ *
+ * \todo VE blocksz chooser for tmp arrays should have use a
+ * template compiler-time const max size. Best value depends
+ * on across/within/fwd/bwd. (Significant speed differences).
+ * Compile-time bound on tmp stack arrays is frequently req'd
+ * to allow nc++ to vectorize.
+ *
+ */
+// oh, pragmas need this version (actual number, not constexpr)
+#define STACK_ELEMS 4096
+static dim_t constexpr stack_elems = STACK_ELEMS; // a generally decent value
+
+static inline dim_t stack_friendly_blksz(dim_t const hi){
+    // borrow from ve/ref_lrn.cpp
+    dim_t ret = (hi>0? hi: 1);
+    if (hi > stack_elems) {
+        ret = stack_elems;
+        dim_t const nFull = hi/stack_elems;
+        dim_t const rem   = hi%stack_elems;
+        if (rem < stack_elems/4) {
+            dim_t const nLoops = nFull + (rem!=0);
+            ret = (hi+nLoops-1) / nLoops;
+            //printf("+%d",(int)ret); // rough equipartition
+            if (ret < stack_elems - MVL) {
+                ret = (ret+MVL-1)/MVL*MVL;
+                //printf("^%d",(int)ret); // round up
+            }
+        }
+    }
+    assert( ret <= stack_elems );
+    return ret;
+}
+/** but also want blksz low enough that max_threads can actually be used...
+ * XXX return to this with measurements XXX. */
+static inline dim_t stack_friendly_blksz(dim_t const hi, dim_t const other_work){
+    dim_t stack_lim = (other_work*hi/dnnl_get_max_threads());
+    // adjust following, which assumes one MVL is "enough work"
+    // here MVL ~ min desirable blksz (but we can go lower, a bit)
+    if (stack_lim < MVL) stack_lim = MVL;
+    stack_lim = (stack_lim+(MVL-1)) / MVL * MVL;
+    if (stack_lim > stack_elems) stack_lim = stack_elems;
+
+    // now heuristic with possibly smaller version of stack_elems
+    dim_t ret = (hi>0? hi: 1);
+    if (hi > stack_lim) {
+        ret = (stack_lim+31)/32*32;
+        dim_t const nFull = hi/stack_lim;
+        dim_t const rem   = hi%stack_lim;
+        if (rem < MVL/4) {
+            dim_t const nLoops = nFull + (rem!=0);
+            ret = (hi+nLoops-1) / nLoops;
+            //printf("+%d",(int)ret); // rough equipartition
+            if (ret < stack_lim - MVL) {
+                ret = (ret+MVL-1)/MVL*MVL;
+                //printf("^%d",(int)ret); // round up
+            }
+        }
+        ret = (ret+31)/32*32;
+    }
+    //assert( ret < stack_elems );
+    return ret;
+}
+
 static float compute_eltwise_scalar_fwd(
         const alg_kind_t alg, float s, float alpha, float beta) {
     float d = 0.f;
@@ -149,6 +218,15 @@ float ref_eltwise_scalar_fwd_t::compute_scalar(float s) {
     return compute_eltwise_scalar_fwd(alg_, s, alpha_, beta_) * scale_;
 }
 
+//
+// TODO vectorize this one too  (same approach)
+// 1. amalgamate c<C loops
+// 2. inline the lamda (remove fn call)
+// 3. move switch(alg_kind) outside the parallel_nd so most
+//    math fns can be inlined (and vectorized)
+//
+// pretty much the same as for forward_dense
+//
 template <impl::data_type_t data_type>
 void ref_eltwise_fwd_t<data_type>::execute_forward_nCspBc_padded(
         const exec_ctx_t &ctx) const {
@@ -193,8 +271,12 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_generic(
 
     auto src = CTX_IN_MEM(const data_t *, DNNL_ARG_SRC);
     auto dst = CTX_OUT_MEM(data_t *, DNNL_ARG_DST);
-
+#define ELT_FWD_GEN_VEC 2
+#if !ELT_FWD_GEN_VEC
     const memory_desc_wrapper data_d(pd()->src_md());
+#else
+    const memory_desc_wrapper_opt data_d(pd()->src_md());
+#endif
 
     const dim_t MB = pd()->MB();
     const dim_t C = pd()->C();
@@ -208,19 +290,171 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_generic(
 
     //printf("fwd eltwise generic\n");
     // How to cover this code (not possible in default benchdnn eltwise tests?)
+    //   examples:
+    // --dir=FWD_D --tag=ABx16a16b --alg=log --alpha=0 --beta=0 45x87x33x3
+    // --dir=FWD_D --tag=ABx16a16b --alg=linear --alpha=0 --beta=0.25 45x87x33x3
+    // --dir=FWD_D --tag=ABx16a16b --alg=linear --alpha=0.22 --beta=0.33 45x87x33x3
+    // --dir=FWD_D --tag=ABx16a16b --alg=clip --alpha=0.11 --beta=0.88 45x87x33x3
+    // --dir=FWD_D --tag=ABx16a16b --alg=log,sqrt --alpha=0 --beta=0 45x87x33x3
+    // --dir=FWD_D --tag=ABx16a16b --alg=pow --alpha=0.25 --beta=3.14 45x87x33x3
 
-#if 1 // original
+#if !ELT_FWD_GEN_VEC
+    // --dir=FWD_D --tag=ABx16a16b --alg=log --alpha=0 --beta=0 45x87x33x3
+    // 19.15 ms
     parallel_nd(
             MB, C, D, H, W, [&](dim_t n, dim_t c, dim_t d, dim_t h, dim_t w) {
                 auto data_off = DATA_OFF(data_d, n, c, d, h, w);
                 dst[data_off] = compute_eltwise_scalar_fwd(
                         alg_kind, src[data_off], alpha, beta);
             });
-#else // UNTESTED -- I don't know what tag to use to invoke 'generic'
+#elif ELT_FWD_GEN_VEC == 1 // based on backward "first attempt"
+    // 5.5 ms
+    const ptrdiff_t nelems = static_cast<ptrdiff_t>(data_d.nelems(false));
+    parallel(0, [&](const int ithr, const int nthr) {
+            dim_t start = 0, end = 0;
+            balance211(nelems, nthr, ithr, start, end);
+            if (start == end) return;
+            dim_t loff[MVL]; // array of logical offsets
+            size_t data_off[MVL];      // array of physical offsets
+            // also possible: coords iter and vec_off_p or so
+            for (dim_t i = start; i < end; i+=MVL) {
+                dim_t const vl = (end - i > MVL? MVL: end - i);
+                ShortLoop() for(dim_t j=0; j<vl; ++j)
+                    loff[j] = i+j;
+                // vectorized offset calcs
+                data_d.vec_off_l( &loff[0], vl, (dim_t*)&data_off[0]);
+                ShortLoop() for(dim_t j=0; j<vl; ++j) {
+                    data_t s  = src[data_off[j]];
+                    data_t &d = dst[data_off[j]];
+                    d = compute_eltwise_scalar_fwd(alg_kind, s, alpha, beta);
+                }
+            }
+    });
+#elif ELT_FWD_GEN_VEC == 2 // use larger inner loop size --> 1.01 ms
+    //
+    // This approach blocks not by MVL but some larger stack-centric size
+    //
+    const ptrdiff_t nelems = static_cast<ptrdiff_t>(data_d.nelems(false));
+    dim_t const blksz = stack_friendly_blksz(nelems);
+    assert( blksz <= /*constexpr*/ stack_elems );
+    //printf(" nelems=%ld blksz=%ld\n",nelems, blksz);
+#define Medium_ PragmaQuote(_NEC loop_count(STACK_ELEMS))
+#if 1
+    //
+    //  0.92 ms ~ 10% faster  moving 'case' outside parallel_nd
+    //
+    if (alg_kind == eltwise_log) {
+        parallel_nd(utils::div_up(nelems, blksz), [&](dim_t const blk)
+                {
+                dim_t const start = blk * blksz;
+                dim_t const end   = (start + blksz > nelems? nelems: start + blksz);
+                dim_t const sz = end - start;
+                //assert( sz <= /*constexpr*/ stack_elems );
+                // Only need sz, but fixed-size array allows nc++ to make ivdep assumptions
+                dim_t loff[stack_elems];
+                size_t data_off[stack_elems];
 
-    // see backward_generic for example loops
+                Medium_ for (int i=0; i<sz; ++i)
+                loff[i] = start + i; // a win if sz > ~1
+                data_d.vec_off_l( &loff[0], sz, (dim_t*)&data_off[0] );
 
+                Medium_ for(dim_t i=0; i<sz; ++i) {
+                    data_t s  = src[data_off[i]];
+                    data_t &d = dst[data_off[i]];
+                    d = log_fwd(s);
+                }
+                });
+    }else
 #endif
+    parallel_nd(utils::div_up(nelems, blksz), [&](dim_t const blk)
+    {
+        dim_t const start = blk * blksz;
+        dim_t const end   = (start + blksz > nelems? nelems: start + blksz);
+        dim_t const sz = end - start;
+        //assert( sz <= /*constexpr*/ stack_elems );
+        // Only need sz, butfixed-size array allows nc++ to make ivdep assumptions
+        dim_t loff[stack_elems];
+        size_t data_off[stack_elems];
+
+#define Medium_ PragmaQuote(_NEC loop_count(STACK_ELEMS))
+        Medium_ for (int i=0; i<sz; ++i)
+            loff[i] = start + i; // a win if sz > ~1
+        data_d.vec_off_l( &loff[0], sz, (dim_t*)&data_off[0] );
+
+        switch(alg_kind){
+#define CASE2(ALG,EXPR) case eltwise_##ALG: { \
+            Medium_ for(dim_t i=0; i<sz; ++i) { \
+                data_t s  = src[data_off[i]]; \
+                /*data_t &d = dst[data_off[i]];*/ \
+                dst[data_off[i]] = EXPR; \
+            }} break
+#define CASE(ALG,...) CASE2(ALG, ALG##_fwd(__VA_ARGS__))
+#if 0 // long-hand
+        case(eltwise_log): {
+            Medium_ for(dim_t i=0; i<sz; ++i) {
+                data_t s  = src[data_off[i]];
+                data_t &d = dst[data_off[i]];
+                d = log_fwd(s);
+            }} break;
+#else
+        CASE(log, s);
+#endif
+        CASE(linear, s, alpha, beta);
+        CASE(sqrt, s);
+        CASE(clip, s, alpha, beta);
+        case(eltwise_soft_relu): { // log1pf is NOT vectorized by nc++-3.0.27
+            //float constexpr max_logf = 8.872284e+01f; // ::log(FLT_MAX) (move const outside loop)
+            float constexpr max_logf = 88.0f; // need room for 1+exp
+            Medium_ for(dim_t i=0; i<sz; ++i) {
+#if 1 // same speed
+                float const s  = src[data_off[i]];
+                dst[data_off[i]] = (data_t)(s < max_logf? ::logf(1.0f + ::expf(s)) : s);
+#elif 1 // 1.01 ms
+                float const s  = src[data_off[i]];
+                float d = s;
+                if (s >= max_logf) d = s;
+                else d = ::logf(1.0f + ::expf(s));
+                dst[data_off[i]] = d;
+#elif 0 // cannot convince __vec_expf to use non-all-ones-mask in %vm1 :(
+                float const s  = src[data_off[i]];
+                float d = s;
+                if (s < max_logf) d = ::expf(s);
+                if (s < max_logf) d += 1.0f;
+                if (s < max_logf) d = ::logf(d);
+                dst[data_off[i]] = data_t{d};
+#endif
+            }} break;
+        case eltwise_logistic:
+        case eltwise_logistic_use_dst_for_bwd: // identical
+        { // logistic has VE limit-case issues
+            float constexpr min_logistic = -87; // close to -log(FLT_MAX)
+            Medium_ for(dim_t i=0; i<sz; ++i) {
+                float s = src[data_off[i]];
+                if (s < min_logistic) s = min_logistic;
+                dst[data_off[i]] = logistic_fwd<data_t,float>(s);
+            }} break;
+        case eltwise_exp_use_dst_for_bwd: // lazy way
+        case eltwise_exp: { // ovflw handling for VE
+            float constexpr max_logf = 8.872284e+01f; // log(FLT_MAX)
+            float constexpr float_inf = HUGE_VALF;
+            Medium_ for(dim_t i=0; i<sz; ++i) {
+                float s = src[data_off[i]];
+                dst[data_off[i]] = (s > max_logf? float_inf : std::expf(s));
+            }} break;
+
+        default: {
+            for(dim_t i=0; i<sz; ++i) {
+                dst[data_off[i]] = data_t{0};
+            }}
+            printf(" Error: TBD eltwise fwd generic for %s\n", dnnl_alg_kind2str(alg_kind));
+            assert(!" TBD missing alg_kind case for ref eltwise fwd generic");
+#undef CASE
+#undef CASE2
+        }
+    });
+#elif ELT_FWD_GEN_VEC == 3 // move switch out by 2 loops
+
+#endif // ELT_FWD_GEN_VEC
 }
 
 inline double fast_exp_64(const double x) noexcept {
@@ -312,8 +546,7 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_dense(
             } break;
 
         // slow: CASE(soft_relu, s);
-        case eltwise_soft_relu:
-            {
+        case eltwise_soft_relu: { // moving const outside
                 // soft relu is 
                 parallel(0, [&](const int ithr, const int nthr) {
                     dim_t start = 0, end = 0;
@@ -331,6 +564,7 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_dense(
         // both exp and logistic have 'inf' issues for VE vectorization
         //CASE2(logistic, d = compute_eltwise_scalar_fwd(alg_kind, s, alpha, beta));
         // VE default might not be checking input domain for vector math functions
+        // XXX identical case! (merge) XXX
         case eltwise_logistic: {
             parallel_nd(nelems, [&](ptrdiff_t e) {
                 float s = src[e];
@@ -607,7 +841,7 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_generic(
 #endif
 
                     CASE_BEG(eltwise_sqrt_use_dst_for_bwd);
-                    ds = relu_bwd_use_dst(dd, s, alpha);
+                    ds = sqrt_bwd_use_dst(dd, s);
                     CASE_END;
 
                     default:

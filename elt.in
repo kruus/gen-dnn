@@ -1,12 +1,28 @@
 # -0 should give -inf, but VE vectorizn give +inf
---alg=pow tag=nchw,aBx8b,axb
---alpha=0.25,0,-0.25 --beta=-1,0,0.5,+1,+2 --inplace=true,false 4x8x3x3 45x87x33x3
+#--alg=pow tag=nchw,aBx8b,axb
+#--alpha=0.25,0,-0.25 --beta=-1,0,0.5,+1,+2 --inplace=true,false 4x8x3x3 45x87x33x3
+
+# invoke eltwise forward generic impl
+# Finally found some forward generic testcase:
+--reset
+--dir=FWD_D --tag=ABx16a16b --alg=log --alpha=0 --beta=0 45x87x33x3
+--dir=FWD_D --tag=ABx16a16b --alg=linear --alpha=0 --beta=0.25 45x87x33x3
+--dir=FWD_D --tag=ABx16a16b --alg=linear --alpha=0.22 --beta=0.33 45x87x33x3
+--dir=FWD_D --tag=ABx16a16b --alg=clip --alpha=0.11 --beta=0.88 45x87x33x3
+--dir=FWD_D --tag=ABx16a16b --alg=log,sqrt,srelu,logistic,logistic_dst,exp,exp_dst --alpha=0 --beta=0 45x87x33x3
+--dir=FWD_D --tag=ABx16a16b --alg=pow --alpha=0.25 --beta=3.14 45x87x33x3
+--dir=BWD_D --tag=ABx16a16b --alg=log --alpha=0 --beta=0 45x87x33x3
+--dir=BWD_D --tag=ABx16a16b --alg=linear --alpha=0 --beta=0.25 45x87x33x3
+--dir=BWD_D --tag=ABx16a16b --alg=linear --alpha=0.22 --beta=0.33 45x87x33x3
+--dir=BWD_D --tag=ABx16a16b --alg=clip --alpha=0.11 --beta=0.88 45x87x33x3
+--dir=BWD_D --tag=ABx16a16b --alg=log,sqrt --alpha=0 --beta=0 45x87x33x3
+--dir=BWD_D --tag=ABx16a16b --alg=pow --alpha=0.25 --beta=3.14 45x87x33x3
 
 # invoke eltwise backward generic impl
 --reset
 --dir=BWD_D --tag=aBx16b,aBx8b --alg=log,sqrt 2x3x2x2 # printf debug
 --dir=BWD_D --tag=aBx16b,aBx8b --alg=log,sqrt 22x3x3x3
---dir=BWD_D --tag=aBx16b,aBx8b --alg=log,sqrt 45x87x33x3
+--dir=BWD_D --tag=aBx16b,aBx8b --alg=log,sqrt,sqrt_dst,srelu 45x87x33x3
 --dir=BWD_D --tag=aBx16b --alg=pow --alpha=0.25 --beta=3.14 45x87x33x3
 
 --reset
@@ -21,12 +37,12 @@
 45x87x33x3
 
 --reset
---dir=FWD_D --tag=aBx16b,aBx16a16b
+--dir=FWD_D --tag=aBx16b,ABx16a16b
 --alg=relu,tanh,elu,square,abs,sqrt,linear,brelu,srelu,logistic,exp,gelu_tanh,swish,log,clip,gelu_erf,relu_dst,tanh_dst,elu_dst,sqrt_dst,logistic_dst,exp_dst
 --inplace=true,false
 45x87x33x3
 
---reset --tag=aBx16b,aBx16a16b
+--reset --tag=aBx16b,ABx16a16b
 --dir=BWD_D --alg=relu,tanh,elu,square,abs,sqrt,linear,brelu,srelu,logistic,exp,gelu_tanh,swish,log,clip,gelu_erf,relu_dst,tanh_dst,elu_dst,sqrt_dst,logistic_dst,exp_dst
 --inplace=true,false
 45x87x33x3

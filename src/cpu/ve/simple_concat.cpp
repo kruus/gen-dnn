@@ -20,6 +20,9 @@
 
 #include "cpu/simple_concat.hpp"
 
+#ifndef NOVEC_
+#define NOVEC_ PragmaQuote(_NEC novector)
+#endif
 namespace dnnl {
 namespace impl {
 namespace cpu {
@@ -47,8 +50,9 @@ status_t simple_concat_t<data_type>::execute(const exec_ctx_t &ctx) const {
                 + i_d.blk_off(0);
         optrs[a] = o_base_ptr + o_d.blk_off(0);
         nelems_to_copy[a] = pd()->nelems_to_concat(i_d);
-        ShortLoop() for (int i = 0; i < DNNL_MAX_NDIMS; i++) {
+        NOVEC_ for (int i = 0; i < DNNL_MAX_NDIMS; i++) {
             if (i < perm[concat_dim])
+                // blocks vectorizn :
                 is[a][i] = size_t(i_d.blocking_desc().strides[iperm[i]]);
             else
                 is[a][i] = 0;
@@ -59,7 +63,7 @@ status_t simple_concat_t<data_type>::execute(const exec_ctx_t &ctx) const {
 
     strides_t os = {0};
     bool has_outer_loop = false;
-    for (int i = 0; i < perm[concat_dim]; i++) {
+    NOVEC_ for (int i = 0; i < perm[concat_dim]; i++) {
         os[i] = o_d.blocking_desc().strides[iperm[i]];
         // CAVEAT: if this impl supports not matching stag and dtag, strides
         // should be taken into account for this condition.

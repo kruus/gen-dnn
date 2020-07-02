@@ -1,0 +1,11 @@
+--dtag=undef,any,abx,axb,aBx8b,aBx16b
+--sdt=f32,s32,s8,u8
+--ddt=f32,s32,s8,u8
+--stag=abx:abx       --axis=3 33x44x55x13:33x44x55x17
+--stag=axb:axb       --axis=2 55x22x0x83:55x22x8x88
+                     --axis=0 55x22x8x83:11x22x8x83
+--sdt=f32,s32
+--ddt=f32,s32
+--stag=aBx16b:abx:axb --axis=1
+66x47x33x4x5:66x33x33x4x5:66x15x33x4x5
+

@@ -43,6 +43,11 @@ eltwise_generic might also need 'off_l_vec' optimization
 	regardless of --alg, which represents omp + balance + "invoke lambda"
 	overhead!  In comparison, on x86 this is ~ 0.019 ms (3x faster on x86).
 
+	ref_eltwise bwd generic (only a few cases hit this) is optimized.
+
+	TBD: VE vectorization for forward_nCspBc_padded
+		(same method as forward_dense)
+
 simple_sum should begin by following v0.16 version
 	did some further optimizations.  still slow cf. x64, I think
 
