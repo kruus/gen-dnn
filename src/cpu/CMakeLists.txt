@@ -293,6 +293,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 if(TARGET_X86_JIT)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/xbyak)
 endif()
+
 if(NECVE)
     file(GLOB SOURCES_VE
         ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.c
@@ -337,8 +338,10 @@ endif()
 
 if(NECVE)
     file(GLOB FILES_REDUCE_INLINING
-        ${CMAKE_CURRENT_SOURCE_DIR}/*resampling*.cpp
+        #${CMAKE_CURRENT_SOURCE_DIR}/*resampling.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/simple_resampling.cpp
         )
+    message(STATUS "FILES_REDUCE_INLINING = ${FILES_REDUCE_INLINING}")
     # error:
     # !(cd /home/kruus/vanilla-dbg/build-vejd/src/cpu && /opt/nec/ve/bin/nc++  -DDNNL_DLL -DDNNL_DLL_EXPORTS
     # -DDNNL_ENABLE_CONCURRENT_EXEC -DDNNL_ENABLE_MAX_CPU_ISA -DDNNL_VE=1 -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS
@@ -352,10 +355,12 @@ if(NECVE)
     set_source_files_properties(${FILES_REDUCE_INLINING}
         PROPERTIES COMPILE_FLAGS "-finline-max-depth=4")
 
-    # nc++ "compiler error" if use -mvector-intrinsic-check option [append default option]
-    set_source_files_properties(
+    file(GLOB_RECURSE FILES_NO_VECTOR_INTRINSIC_CHECK
         ${CMAKE_CURRENT_SOURCE_DIR}/ncsp_batch_normalization.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/nspc_batch_normalization.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/nspc_batch_normalization.cpp)
+    message(STATUS "FILES_NO_VECTOR_INTRINSIC_CHECK = ${FILES_NO_VECTOR_INTRINSIC_CHECK}")
+    # nc++ "compiler error" if use -mvector-intrinsic-check option [append default option]
+    set_source_files_properties(${FILES_NO_VECTOR_INTRINSIC_CHECK}
         PROPERTIES COMPILE_FLAGS "-mno-vector-intrinsic-check")
 endif()
 

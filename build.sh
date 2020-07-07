@@ -170,12 +170,14 @@ while getopts ":m:u:N:hvjatTdDqQP:FbBrRowW1567iMrcC" arg; do
         c) # cache: support primitive caching
             USE_CACHE=1
             ;;
-        C) # force -DUSE_CBLAS compile flag
+        C) # force -DUSE_CBLAS compile flag (extended_sgemm will use libcblas
+            # instead of the OneDNN built-in gemm.
             # x86: expect errors if not very careful about omp libs
             #      (or set OMP_NUM_THREADS=1)
             # non-x86: this *may* provide a speed boost if your platform has an
             #          optimized cblas library
             USE_CBLAS=1; USE_MKL=0
+            # Note: ve.cmake always LINKs with cblas (-ooo default)
             ;;
     h | *) # help
             usage
@@ -281,7 +283,7 @@ fi
 if [ $DODEBUG -eq 1 ]; then BUILDDIR="${BUILDDIR}d"; INSTALLDIR="${INSTALLDIR}d"; fi
 if [ $DODEBUG -gt 1 ]; then BUILDDIR="${BUILDDIR}d${DODEBUG}"; INSTALLDIR="${INSTALLDIR}d${DODEBUG}"; fi
 if [ $NEC_FTRACE -gt 0 ]; then BUILDDIR="${BUILDDIR}F"; fi
-if [ $USE_CBLAS -gt 0 ]; then BUILDDIR="${BUILDDIR}C"; fi
+if [ $USE_CBLAS -gt 0 ]; then BUILDDIR="${BUILDDIR}C"; INSTALLDIR="${INSTALLDIR}C";fi
 if [ "$BUILDDIR_SUFFIX" ]; then BUILDDIR="${BUILDDIR}${BUILDDIR_SUFFIX}"; fi
 if [ "$BFLOAT16" = "y" ]; then BUILDDIR="${BUILDDIR}-bf16"; fi
 if [ "$BFLOAT16" = "n" ]; then BUILDDIR="${BUILDDIR}-nobf16"; fi
@@ -496,8 +498,10 @@ echo 'ulimit soft : '`ulimit -Ss`
     if [ $DODEBUG -eq 0 ]; then
         CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=Release"
     elif [ $DODEBUG -eq 1 ]; then
-        CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=RelWithDebInfo"
+        CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=ReleaseWithAssert"
     elif [ $DODEBUG -eq 2 ]; then
+        CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=RelWithDebInfo"
+    elif [ $DODEBUG -eq 3 ]; then
         CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=Debug"
     else
         CMAKEOPT="${CMAKEOPT} -DCMAKE_BUILD_TYPE=Debug"
@@ -535,14 +539,17 @@ echo 'ulimit soft : '`ulimit -Ss`
         #ccxx_flags -D_FORTIFY_SOURCE=1
         #ccxx_flags -D_FORTIFY_SOURCE=2 -Wl,-z,-muldefs
         if [ $DODEBUG -gt 0 ]; then
+            # VE can give some wrong math results for +/-0, inf, NaN or ovflw
             # default is -mno-vector-intrinsic-check
+            #
             # In optimized mode, we are OK with failing some tests for
             # limit cases of some math functions.
-            ccxx_flags -mvector-intrinsic-check
+            #
+            : #ccxx_flags -mvector-intrinsic-check
+            #
             # In debug modes, check for benchdnn NaN,0,inf limit cases,
-            # -- does this resolve benchdnn failures in these cases ? XXX
-            # Reasoning:
-            #   Do NOT want more limit checks in src/common/math_utils.hpp
+            # In debug mode, this can be very verbose during benchdnn tests
+            # Not sure wether it makes any return values more correct!
         fi
     fi
     # Show build commands
@@ -614,12 +621,17 @@ echo 'ulimit soft : '`ulimit -Ss`
     #CMAKEOPT="${CMAKEOPT} -DMKLDNN_WERROR=ON" # default OFF
     # REMOVED:
     #CMAKEOPT="${CMAKEOPT} -DDNNL_JIT_SUPPORT=${CPU}"    # default max jit for target cpu
-    #if [ $USE_CBLAS -ne 0 ]; then
-    #    CMAKEOPT="${CMAKEOPT} -DDNNL_CPU_EXTERNAL_GEMM=CBLAS" # default NONE
-    #fi
+    if [ $USE_CBLAS -ne 0 ]; then
+        # This way of configuring external gemm was NOT ACCEPTED.
+        # so we continue using a compile flag instead
+        #CMAKEOPT="${CMAKEOPT} -DDNNL_CPU_EXTERNAL_GEMM=CBLAS" # default NONE
+        # upstream will use something like this for "system default":
+        CMAKEOPT="${CMAKEOPT} -DDNNL_BLAS_VENDOR=ANY" # default NONE
+    fi
     if [ $USE_MKL -ne 0 ]; then
-        CMAKEOPT="${CMAKEOPT} -D_DNNL_USE_MKL=1"
+        CMAKEOPT="${CMAKEOPT} -D_DNNL_USE_MKL=1" # older way
         #CMAKEOPT="${CMAKEOPT} -DDNNL_CPU_EXTERNAL_GEMM=MKL" # default NONE
+        CMAKEOPT="${CMAKEOPT} -DDNNL_BLAS_VENDOR=MKL" # newer way
     fi
     if [ "$DOTARGET" == "a" ]; then
         TOOLCHAIN=../cmake/ve.cmake
@@ -632,12 +644,14 @@ echo 'ulimit soft : '`ulimit -Ss`
         #CMAKEOPT="${CMAKEOPT} -DDNNL_LIBRARY_TYPE=SHARED" # default
 
         # USE_OPENMP defaults to off, so force it on (VE openmp has improved)
+        echo " build.sh : OMP = ${OMP}"
         if [ "${OMP}" -eq 0 ]; then
             # CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=OFF"
-            CMAKEOPT="${CMAKEOPT} -DDNNL_CPU_RUNTIME=SEQ"
+            CMAKEOPT="-DVE_SEQ=1 ${CMAKEOPT} -DDNNL_CPU_RUNTIME=SEQ"
+            # VE_SEQ=1 [default] is for the ve.cmake TOOLKIT file
         else
             # CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=ON"
-            CMAKEOPT="${CMAKEOPT} -DDNNL_CPU_RUNTIME=OMP"
+            CMAKEOPT="-DVE_SEQ=0 ${CMAKEOPT} -DDNNL_CPU_RUNTIME=OMP"
             #ccxx_flags -fopenmp # ?? -mparallel and -fopenmp both => -pthread
         fi
         # TODO proginf is not working automatically any more?

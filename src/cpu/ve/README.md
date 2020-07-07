@@ -53,6 +53,12 @@ simple_sum should begin by following v0.16 version
 
 simple_concat 
 	some work on ve version, based on v0.16 impl (needs work)
+	main mod is to introduce memcpy_wrap<T>, which avoids fn call for types T
+	which nc++ is able to efficiently vectorize.  bf16 now also allowed for
+	simple_concat because it is size 2 and memcpyable.  VE has no vectorization
+        support for 1- or 2-byte types,so revert to memcpy in those cases.
+	ve-banch-catP.log: Av VL 102, Vec% only 11$
+	(is this the scalar reorders, or perhaps small benchdnn problem sizes?)
 
 rnn ??
 
@@ -62,6 +68,9 @@ simple_reorder wants at least the v0.16 ShortLoop() pragmas reinstated
 	and reorder(any,any,any) using off_l reorder should use 'off_l_vec'
 	- actually this is an interesting case of how to introduce batching into
 	  a parallel_nd construct
+
+ref_deconvolution
+	switching to vectorized offset calcs (WIP)
 
 ### sample tests
 
@@ -77,3 +86,27 @@ debug a single test case :
 
 [aurora-ds08 vanilla-dbg]$ { { make -C build-ve -j 16 install || make -C build-ve -j 1 install; } && ./vetest.sh -B build-ve -v -L f.log --benchdnn --mode=C --eltwise --dir=FWD_D --alg=exp_dst alpha=0 beta=0 44x88x33x3; } >& ve-elt.log && echo YAY || echo OHOH
 
+*** Errors
+
+##### linking with cblas, an assertion fails during test_rnn_small:
+
+dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:abcd:f0,,,1x1x3x2,0.0168457
+rel_eps(0x1p-14) eps(0x1p-20) 84
+rel_eps(6.10352e-05) eps(9.53674e-07) 84
+dt: min(-0x1.0f3558p-2) max(0x1.054018p+1) mean(0x1.34282ef555555p-1), var(0x1.759cc08dd6486p-1)
+dt: min(-0.264852) max(2.04102) mean(0.6benchdnn: /home/kruus/vanilla-dbg/src/cpu/gemm/gemm_msan_unpoison.hpp:26: void dnnl::impl::cpu::msan_unpoison_matrix(void *, long, long, long, unsigned long): Assertion `C != nullptr && M > 0 && N > 0 && LDC >= M && typesize' failed. 
+/bin/sh: line 1: 35378 Killed                  /home/kruus/vanilla-dbg/build-vejdC/tests/benchdnn/benchdnn -v1 --engine=cpu --rnn --batch=inputs/rnn/test_rnn_small
+
+##### new gtest bugs (from ve mods)
+
+[ RUN      ] SimpleZeroDim_f32/eltwise_test_f32.TestsEltwise/0
+dnnl_verbose,info,oneDNN v1.4.0 (commit 30203a2a9a60bb0c1f45b09d33025ca86977a8eb)
+dnnl_verbose,info,cpu,runtime:OpenMP
+dnnl_verbose,info,cpu,isa:Generic
+dnnl_verbose,info,gpu,runtime:none
+dnnl_verbose,create:cache_miss,cpu,eltwise,ref:any,forward_training,data_f32::blocked:abcde:f0 diff_undef::undef::f0,,alg:eltwise_gelu_tanh alpha:0.1 beta:0,0x2x4x4x4,0.0720215
+dnnl_verbose,exec,cpu,eltwise,ref:any,forward_training,data_f32::blocked:abcde:f0 diff_undef::undef::f0,,alg:eltwise_gelu_tanh alpha:0.1 beta:0,0x2x4x4x4,0.00292969
+test_eltwise: /home/kruus/vanilla-dbg/src/cpu/ref_eltwise.hpp:145: dnnl_status_t dnnl::impl::cpu::ref_eltwise_bwd_t<data_type>::pd_t::init(dnnl_engine *) [with data_type = (dnnl_data_type_t)3]: Assertion `(!(!use_dense_) || !!(one_of(alg_, eltwise_pow, eltwise_sqrt, eltwise_log, eltwise_sqrt_use_dst_for_bwd )))' failed.
+
+Tests 2,3,4,5,6 fail (wrong result)
+[  FAILED  ] SimpleSmall_NCHW_CPU/deconvolution_test_float.TestDeconvolution/2

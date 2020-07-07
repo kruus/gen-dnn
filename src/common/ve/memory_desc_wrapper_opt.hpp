@@ -150,6 +150,7 @@ struct CoordsFor : public CoordRegs<Crd,dim> {
     Base const& base() const { return *this; }
 
     /// allow syntax `for(auto CoordsFor<2> c({h_st,w_st},{h_en,w_en}); c; ++c){}`
+    /// VE: this might not be inlined, sometimes  (check .L diagnostics)
     operator bool() const { return vl > 0; }
     MyType& operator ++() { this->step(); return *this; }
 
@@ -262,9 +263,10 @@ struct CoordsFor : public CoordRegs<Crd,dim> {
         oss<<",pos="<<pos<<",sz="<<sz<<",vl="<<vl<<"}";
         return oss.str();
     }
-    private:
+    private: // VE: get_vl() was not inlining ???
     //unsigned dim;               ///< 0..DNNL_MAX_NDIMS
     unsigned vl;                ///< 0..MVL
+    private:
     std::array<Crd,dim> ilo;
     std::array<Crd,dim> ihi;
     std::array<Crd,dim> span;
@@ -297,14 +299,13 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
     Base const& base() const { return *this; }
     operator bool() const { return vl > 0; }
     MyType& operator ++() { this->step(); return *this; }
-
     /// If get_vl(), then we have something in this->vp to process.
     /// Use `step()` which returns true and next batch (or false).
     unsigned get_vl()  const {return vl;}
     unsigned get_dim() const {return dim;}
     Pos get_sz() const {return sz;}
     Pos get_pos() const {return pos;}
-    // TODO ex. if dim = 3: ((dim_t)(od-d_st} * (h_en-h_st) + (oh-h_st)) * (w_en-w_st) + (ow-w_st);
+    // TODO ex. if dim = 3: ((dim_t)(od-d_st) * (h_en-h_st) + (oh-h_st)) * (w_en-w_st) + (ow-w_st);
     // template<typename Coords...> Coords::pos_t pos_of(...) {...};
     /// unchecked lo for loop limit
     Crd get_lo(unsigned const dim)  const { return ilo[dim]; }
@@ -312,7 +313,9 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
     //int constexpr MVL = 32;
     private:
     unsigned dim;               ///< 0..DNNL_MAX_NDIMS
+    public: // get_vl() sometimes was "vectorization obstuructive" ?
     unsigned vl;                ///< 0..MVL
+    private:
     // now add "vl-wise" iteration:
     Crd ilo[MaxDims];
     Crd ihi[MaxDims];
@@ -375,6 +378,13 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
             }
         }
         return true;
+    }
+    /** when parallelized over linear nelems, from 'start' to 'end-1',
+     * generate coords by lowering linear 'sz' to 'end'. */
+    bool init_nd(Pos start, Pos end){
+        assert( end <= sz );
+        sz = end;
+        init_nd(start);
     }
     private:
 #if COORDSFORND_EXTEND
@@ -514,7 +524,6 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
         return oss.str();
     }
 };
-
 
 
 /** for VE vectorization [or scalar] */
@@ -824,7 +833,7 @@ public:
             p_offsets[l] = phys[l]; // final vector store VST to output
 #undef Short_
     }
-private:
+public:
     /** vector-of-physical-offsets version of \c off_v.
      * Unlike \c off_v or \c vec_off_v, we are \e private and can modify
      * our coords \c vp, to save memory.
@@ -967,7 +976,7 @@ public:
             p_offsets[l] = phys[l]; // final vector store VST to output
 #undef Short_
     }
-private:
+public:
     void vec_off_vtmp( VecPos32 & vp32,         // list of coords (from vec_off_l)
                       dim_t * p_offsets, // output physical offsets
                       int const noff,    // how many offsets in vp32 and p_offsets

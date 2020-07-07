@@ -101,7 +101,9 @@ void parallel(int nthr, F f) {
         bool ok;
         ok = (nthr_ == nthr);
         if (omp_get_dynamic()) printf(" omp_dynamic!");
-        if(1){
+
+        // REORDER frequently ends up using a single thread. Not sure why.
+        if(0){
             char const* fmt = ok
                 ? " good parallel: Thread %d asked for omp nthr=%d, and got nthr_=%d\n"
                 : " warning: Unexpected parallel: Thread %d asked for omp nthr=%d, but got nthr_=%d\n";
@@ -111,6 +113,8 @@ void parallel(int nthr, F f) {
             // if env VE_TRACEBACK is set...
             __builtin_traceback((unsigned long *)__builtin_frame_address(0));
 #endif
+        }else if(0) {
+            if (!ok) printf(" t0?"); // better for benchdnn runs
         }
 #endif
         f(ithr_, nthr_);

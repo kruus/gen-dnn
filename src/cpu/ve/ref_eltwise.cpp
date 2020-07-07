@@ -798,7 +798,57 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_generic(
 #define SRC src[data_off[j]]
 #define DIFF_DST diff_dst[diff_data_off[j]]
 #define DIFF_SRC diff_src[diff_data_off[j]]
-#if 1 // pow_bwd ... "Structure pointer inhibits" message but still OK !
+
+#define CASE2(ALG,EXPR) case eltwise_##ALG: { \
+    ShortLoop() for(dim_t j=0; j<vl; ++j) { \
+        data_t s   = src     [data_off     [j]]; \
+        data_t dd  = diff_dst[diff_data_off[j]]; \
+        data_t &ds = diff_src[diff_data_off[j]]; \
+        EXPR; /* ex. ds = relu_bwd(dd,s,alpha); */ \
+    }} break
+#define CASE(ALG,...) CASE2(ALG, ds = ALG##_bwd(__VA_ARGS__))
+
+#if 1 // full set of cases: (as in dense case, below)
+        CASE(relu, dd, s, alpha);
+        CASE(tanh, dd, s);
+        CASE(elu, dd, s, alpha);
+        CASE(square, dd, s);
+        CASE(abs, dd, s);
+        CASE(sqrt, dd, s);
+        CASE(linear, dd, s, alpha, beta);
+        //
+        CASE(bounded_relu, dd, s, alpha);
+        CASE(soft_relu, dd, s);
+        CASE(logistic, dd, s);
+        // ovflw cases: CASE(exp, dd, s);
+        case eltwise_exp: {
+            float const float_inf = HUGE_VALF;
+            ShortLoop() for(dim_t j=0; j<vl; ++j) {
+                data_t const s   = src     [data_off     [j]];
+                DIFF_SRC = (data_t)( DIFF_DST *
+                    (s > 87.0f? float_inf : std::expf(s))
+                    );
+            }} break;
+        //
+        CASE(gelu_tanh, dd, s);
+        CASE(swish, dd, s, alpha);
+        CASE(log, dd, s);
+        CASE(clip, dd, s, alpha, beta);
+        CASE(pow, dd, s, alpha, beta);
+        CASE(gelu_erf, dd, s);
+        //
+        CASE2(relu_use_dst_for_bwd, ds = relu_bwd_use_dst(dd, s, alpha));
+        CASE2(tanh_use_dst_for_bwd, ds = tanh_bwd_use_dst(dd, s));
+        CASE2(elu_use_dst_for_bwd, ds = elu_bwd_use_dst(dd, s, alpha));
+        CASE2(sqrt_use_dst_for_bwd, ds = sqrt_bwd_use_dst(dd, s));
+        CASE2(logistic_use_dst_for_bwd, ds = logistic_bwd_use_dst(dd, s));
+        CASE2(exp_use_dst_for_bwd, ds = exp_bwd_use_dst(dd, s));
+
+#else // an initial set of encountered cases ..
+
+#if 1
+                    CASE(pow, dd, s, alpha, beta);
+#elif 1 // pow_bwd ... "Structure pointer inhibits" message (for bf16?)
                     // --tag=aBx16b --alg=pow --alpha=0.25 --beta=3.14 45x87x33x3
                     // 36.9 ms
                     CASE_BEG(eltwise_pow);
@@ -819,14 +869,21 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_generic(
                             }
                         }
                     } break;
-
 #endif
 
-                    CASE_BEG(eltwise_sqrt);
-                    ds = sqrt_bwd(dd, s);
-                    CASE_END;
+                    CASE(sqrt, dd, s);
+                    //CASE_BEG(eltwise_sqrt);
+                    //ds = sqrt_bwd(dd, s);
+                    //CASE_END;
+
+                    CASE(gelu_tanh, dd, s);
+                    //CASE_BEG(eltwise_gelu_tanh);
+                    //ds = gelu_tanh_bwd(dd, s);
+                    //CASE_END;
 
 #if 1
+                    CASE(log, dd, s);
+#elif 1
                     CASE_BEG(eltwise_log);
                     ds = log_bwd(dd, s);
                     CASE_END;
@@ -844,6 +901,8 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_generic(
                     ds = sqrt_bwd_use_dst(dd, s);
                     CASE_END;
 
+#endif // an initial set of encountered cases ..
+
                     default:
                     ShortLoop() for(dim_t j=0; j<vl; ++j) {
                         //data_t s   = src     [data_off     [j]];
@@ -851,16 +910,20 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_generic(
                         data_t &ds = diff_src[diff_data_off[j]];
                         ds = data_t{0};
                     }
-                    assert(!"unhandled eltwise bwd generic case");
+                    printf("\nError: unhandled elwise bwd generic case %s\n",
+                            dnnl_alg_kind2str(alg_kind));
+                    //assert(!"unhandled eltwise bwd generic case");
+                }
+#endif
+            }
+    });
 #undef CASE_BEG
 #undef CASE_END
 #undef SRC
 #undef DIFF_DST
 #undef DIFF_SRC
-                }
-#endif
-            }
-    });
+#undef CASE
+#undef CASE2
 #endif // ELT_BKW_GEN_VEC
 #undef ELT_BKW_GEN_VEC
 }

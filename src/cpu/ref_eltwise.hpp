@@ -136,13 +136,6 @@ struct ref_eltwise_bwd_t : public primitive_t {
 
             if (data_type == data_type::bf16) init_scratchpad();
 
-            // reduce vectorization work for generic impl ... extend list as encountered
-            alg_kind_t const alg_ = desc()->alg_kind;
-            using namespace alg_kind;
-            assert( IMPLICATION( !use_dense_,  one_of(alg_,
-                            eltwise_pow, eltwise_sqrt, eltwise_log,
-                            eltwise_sqrt_use_dst_for_bwd
-                            )));
             return status::success;
         }
 

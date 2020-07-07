@@ -153,7 +153,24 @@ option(BENCHDNN_USE_RDPMC
      CAUTION: may not work on all cpus (hence disabled by default)"
     OFF) # disabled by default
 
-# =========================
+# =============================
+# External BLAS library options
+# =============================
+set (DNNL_BLAS_VENDOR "NONE" CACHE STRING
+    "Use an external BLAS library. Valid values:
+      - NONE (default)
+        Use in-house implementation.
+      - MKL
+        Intel Math Kernel Library
+        (https://software.intel.com/content/www/us/en/develop/tools/math-kernel-library.html)
+      - OPENBLAS
+        (https://www.openblas.net)
+      - ARMPL
+        Arm Performance Libraries
+        (https://developer.arm.com/tools-and-software/server-and-hpc/compile/arm-compiler-for-linux/arm-performance-libraries)
+      - ANY
+        FindBLAS (or FindCBLAS) will search default library paths for a known BLAS installation.")
+
 # Developer and debug flags
 # =========================
 
