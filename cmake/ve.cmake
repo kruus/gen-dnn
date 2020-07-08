@@ -654,7 +654,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE NEVER)
     
 # Check for VE_FOO things from environment:
-# default to just cblas, VE_SEQ=1 (you probably want VE_SEQ=0 ?)
+# default use multithreaded cblas, use VE_SEQ=0
 if(DEFINED $ENV{VE_SEQ})
     set(VE_SEQ $ENV{VE_SEQ})
 endif()
@@ -674,6 +674,7 @@ endif()
 # if not set there, check if VE_FOO was preset from CMakeLists.txt (before "project" line)
 if(NOT DEFINED VE_SEQ)
     set(VE_SEQ 1) # default to nlc using _sequential libs (**no** OpenMP parallelization)
+    # Note: OneDNN does its own parallelization, so this is the right choice
 endif()
 if(NOT DEFINED VE_FFT)
     set(VE_FFT 0)

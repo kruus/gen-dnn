@@ -14,17 +14,14 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef CPU_REF_DECONVOLUTION_HPP
-#define CPU_REF_DECONVOLUTION_HPP
-
-#if 0 || defined(__ve)
-#include "cpu/ve/ref_deconvolution.hpp" //init dbg: replacement file
-#else
+#ifndef CPU_VE_REF_DECONVOLUTION_HPP
+#define CPU_VE_REF_DECONVOLUTION_HPP
 
 #include <assert.h>
 #include <string.h>
 
 #include "common/c_types_map.hpp"
+#include "common/ve/consistency.hpp"
 #include "common/primitive.hpp"
 #include "common/primitive_iterator.hpp"
 #include "common/stream.hpp"
@@ -33,6 +30,7 @@
 
 #include "cpu/cpu_convolution_pd.hpp"
 #include "cpu/cpu_deconvolution_pd.hpp"
+#include "cpu/platform.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -124,22 +122,26 @@ struct ref_deconvolution_fwd_t : public primitive_t {
                 conv_supports_bias_
                         = static_cast<cpu_convolution_bwd_data_pd_t *>(_conv_pd)
                                   ->support_bias();
-                bool ref_deconv_supports_bias = true
-                        && desc()->accum_data_type == data_type::f32
-                        && utils::one_of(desc()->dst_desc.data_type, f32, bf16)
-                        && IMPLICATION(desc()->src_desc.data_type == bf16,
-                                memory_desc_matches_one_of_tag(
-                                        *_conv_pd->diff_src_md(),
-                                        utils::pick(
-                                                ndims() - 3, ncw, nchw, ncdhw),
-                                        utils::pick(ndims() - 3, nCw16c,
-                                                nChw16c, nCdhw16c)));
-                bool ok = true
-                        && _conv_pd->weights_md()->extra.flags == 0
-                        /* deconv reference code can process only f32 bias */
-                        && IMPLICATION(with_bias(),
-                                conv_supports_bias_
-                                        || ref_deconv_supports_bias);
+
+                Consistency ref_deconv_supports_bias("ref_deconv_supports_bias");
+#define AND_(...) SCHKVV(ref_deconv_supports_bias,(__VA_ARGS__))
+                AND_(desc()->accum_data_type == data_type::f32);
+                AND_(platform::has_data_type_support(desc()->dst_desc.data_type));
+                AND_(utils::one_of(desc()->dst_desc.data_type, f32, bf16));
+                AND_(IMPLICATION(desc()->src_desc.data_type == bf16,
+                        memory_desc_matches_one_of_tag(
+                                *_conv_pd->diff_src_md(),
+                                utils::pick(ndims() - 3, ncw, nchw, ncdhw),
+                                utils::pick(ndims() - 3, nCw16c, nChw16c,
+                                        nCdhw16c))));
+#undef AND_
+                Consistency ok("ref_deconvolution_fwd_t::init_convolution");
+#define AND_(...) SCHKVV(ok,(__VA_ARGS__))
+                AND_(_conv_pd->weights_md()->extra.flags == 0);
+                /* deconv reference code can process only f32 bias */
+                AND_(IMPLICATION(with_bias(), conv_supports_bias_
+                                || ref_deconv_supports_bias));
+#undef AND_
                 if (ok) {
                     conv_pd_.reset(_conv_pd);
                     return status::success;
@@ -150,11 +152,21 @@ struct ref_deconvolution_fwd_t : public primitive_t {
 
         status_t init(engine_t *engine) {
             using namespace format_tag;
+#if 0
             bool ok = true && is_fwd()
                     && utils::one_of(desc()->alg_kind,
                             alg_kind::deconvolution_direct,
                             alg_kind::deconvolution_winograd)
                     && attr()->has_default_values();
+#endif
+            Consistency ok("ref_deconvolution_fwd_t::pd_t::init");
+#define AND_(...) SCHKVV(ok,(__VA_ARGS__))
+            AND_(is_fwd());
+            AND_(utils::one_of(desc()->alg_kind,
+                   alg_kind::deconvolution_direct,
+                   alg_kind::deconvolution_winograd));
+            AND_(attr()->has_default_values());
+#undef AND_
 
             if (ok) {
                 CHECK(init_convolution(engine));
@@ -295,6 +307,7 @@ struct ref_deconvolution_bwd_data_t : public primitive_t {
             auto dsrc_type = desc()->diff_src_desc.data_type;
             auto wei_type = desc()->weights_desc.data_type;
             auto ddst_type = desc()->diff_dst_desc.data_type;
+#if 0
             bool ok = true && desc()->prop_kind == prop_kind::backward_data
                     && (utils::everyone_is(f32, dsrc_type, wei_type, ddst_type)
                             || (utils::one_of(dsrc_type, f32, bf16)
@@ -304,7 +317,20 @@ struct ref_deconvolution_bwd_data_t : public primitive_t {
                             alg_kind::deconvolution_direct,
                             alg_kind::deconvolution_winograd)
                     && attr()->has_default_values();
-
+#else
+            Consistency ok("ref_deconvolution_bwd_t");
+#define AND_(...) SCHKVV(ok,(__VA_ARGS__))
+            AND_(desc()->prop_kind == prop_kind::backward_data);
+            AND_(utils::everyone_is(f32, dsrc_type, wei_type, ddst_type)
+                    || (utils::one_of(dsrc_type, f32, bf16)
+                            && utils::everyone_is(bf16, wei_type, ddst_type)
+                            && platform::has_data_type_support(bf16)));
+            AND_(utils::one_of(desc()->alg_kind,
+                    alg_kind::deconvolution_direct,
+                    alg_kind::deconvolution_winograd));
+            AND_(attr()->has_default_values());
+#undef AND_
+#endif
             if (ok) {
                 CHECK(init_convolution(engine));
                 if (weights_md_.format_kind == format_kind::any)
@@ -520,7 +546,5 @@ private:
 } // namespace impl
 } // namespace dnnl
 
-#endif // defined(__ve)
-#endif
-
-// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
+#endif // CPU_VE_REF_DECONVOLUTION_HPP
+// vim: et ts=4 sw=4 cindent cino=+2s,l0,\:4,N-s

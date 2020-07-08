@@ -651,7 +651,9 @@ echo 'ulimit soft : '`ulimit -Ss`
             # VE_SEQ=1 [default] is for the ve.cmake TOOLKIT file
         else
             # CMAKEOPT="${CMAKEOPT} -DUSE_OPENMP=ON"
-            CMAKEOPT="-DVE_SEQ=0 ${CMAKEOPT} -DDNNL_CPU_RUNTIME=OMP"
+            CMAKEOPT="-DVE_SEQ=1 ${CMAKEOPT} -DDNNL_CPU_RUNTIME=OMP"
+            # NB: ve.cmake is instructed by VE_SEQ to use single-threaded libcblas_sequential,
+            #     since OneDNN uses all threads.
             #ccxx_flags -fopenmp # ?? -mparallel and -fopenmp both => -pthread
         fi
         # TODO proginf is not working automatically any more?

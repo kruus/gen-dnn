@@ -118,7 +118,14 @@ dnnl_status_t extended_sgemm(const char *transa, const char *transb,
                 cblas_saxpy(*M, 1.0, bias, incx, C + offset, incy);
             });
         }
-        msan_unpoison_matrix(C, *M, *N, *ldc, sizeof(*C));
+        // M>0 && N>0 && LDC>=M assertion failure in msan_unpoison_matrix
+        //printf("gemm: C@%p M=%ld N=%ld ldc=%ld\n",(void*)C,*M,*N,*ldc);
+        //
+        // benchdnn --mode=C --rnn --alg=VANILLA_GRU --activation=TANH --trivial-strides=true l2t1mb4sic2slc2dhc2dic2
+        // will generate a gemm call with N==0
+        if (*N > 0) {
+            msan_unpoison_matrix(C, *M, *N, *ldc, sizeof(*C));
+        }
         return dnnl_success;
     }
 #endif

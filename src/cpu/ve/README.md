@@ -32,7 +32,8 @@ bnorm WIP (need to consider how to handle mdw::off_v_vec "officially")
 	lrn did this, so possibly more speedups for bnorm
 	TODO: int8 on VE (for workspace) is unvectorizable. Is bitmap vectorized?
 	caveat - std::vector<bool> has weak threading guarantees.
-bnorm still not "fast".
+bnorm still not "fast", but maybe the 3 hr benchdnn test is largely due to the "reorders"
+	work around ccom compiler error by explicityly adding -mno-vector-intrinsic-check (just in case)
 
 eltwise_generic might also need 'off_l_vec' optimization
 	ve version begun, not optimized (needs work)
@@ -72,6 +73,11 @@ simple_reorder wants at least the v0.16 ShortLoop() pragmas reinstated
 ref_deconvolution
 	switching to vectorized offset calcs (WIP)
 
+### cblas (build.sh -C)
+FindBLAS is no longer working.  hardwired USE_CBLAS and directories using cmake/ve.cmake toolchain variables.
+Changed to blas_openmp instead of \_sequential version.  Introduces msan_unpoison_matrix assertion failure:
+enchdnn: /home/kruus/vanilla-dbg/src/cpu/gemm/gemm_msan_unpoison.hpp:26: void dnnl::impl::cpu::msan_unpoison_matrix(void *, long, long, long, unsigned long): Assertion `C != nullptr && M > 0 && N > 0 && LDC >= M && typesize' failed. 
+
 ### sample tests
 
 default benchdnn tests :
@@ -86,19 +92,23 @@ debug a single test case :
 
 [aurora-ds08 vanilla-dbg]$ { { make -C build-ve -j 16 install || make -C build-ve -j 1 install; } && ./vetest.sh -B build-ve -v -L f.log --benchdnn --mode=C --eltwise --dir=FWD_D --alg=exp_dst alpha=0 beta=0 44x88x33x3; } >& ve-elt.log && echo YAY || echo OHOH
 
-*** Errors
+### Errors
 
 ##### linking with cblas, an assertion fails during test_rnn_small:
 
+```
 dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:abcd:f0,,,1x1x3x2,0.0168457
 rel_eps(0x1p-14) eps(0x1p-20) 84
 rel_eps(6.10352e-05) eps(9.53674e-07) 84
 dt: min(-0x1.0f3558p-2) max(0x1.054018p+1) mean(0x1.34282ef555555p-1), var(0x1.759cc08dd6486p-1)
 dt: min(-0.264852) max(2.04102) mean(0.6benchdnn: /home/kruus/vanilla-dbg/src/cpu/gemm/gemm_msan_unpoison.hpp:26: void dnnl::impl::cpu::msan_unpoison_matrix(void *, long, long, long, unsigned long): Assertion `C != nullptr && M > 0 && N > 0 && LDC >= M && typesize' failed. 
 /bin/sh: line 1: 35378 Killed                  /home/kruus/vanilla-dbg/build-vejdC/tests/benchdnn/benchdnn -v1 --engine=cpu --rnn --batch=inputs/rnn/test_rnn_small
+```
+next try... failed assertion: M > 0 && N > 0 && LDC >= M
 
 ##### new gtest bugs (from ve mods)
 
+```
 [ RUN      ] SimpleZeroDim_f32/eltwise_test_f32.TestsEltwise/0
 dnnl_verbose,info,oneDNN v1.4.0 (commit 30203a2a9a60bb0c1f45b09d33025ca86977a8eb)
 dnnl_verbose,info,cpu,runtime:OpenMP
@@ -107,6 +117,13 @@ dnnl_verbose,info,gpu,runtime:none
 dnnl_verbose,create:cache_miss,cpu,eltwise,ref:any,forward_training,data_f32::blocked:abcde:f0 diff_undef::undef::f0,,alg:eltwise_gelu_tanh alpha:0.1 beta:0,0x2x4x4x4,0.0720215
 dnnl_verbose,exec,cpu,eltwise,ref:any,forward_training,data_f32::blocked:abcde:f0 diff_undef::undef::f0,,alg:eltwise_gelu_tanh alpha:0.1 beta:0,0x2x4x4x4,0.00292969
 test_eltwise: /home/kruus/vanilla-dbg/src/cpu/ref_eltwise.hpp:145: dnnl_status_t dnnl::impl::cpu::ref_eltwise_bwd_t<data_type>::pd_t::init(dnnl_engine *) [with data_type = (dnnl_data_type_t)3]: Assertion `(!(!use_dense_) || !!(one_of(alg_, eltwise_pow, eltwise_sqrt, eltwise_log, eltwise_sqrt_use_dst_for_bwd )))' failed.
+```
 
 Tests 2,3,4,5,6 fail (wrong result)
+```
 [  FAILED  ] SimpleSmall_NCHW_CPU/deconvolution_test_float.TestDeconvolution/2
+```
+or benchdnn test_deconv_all, at beginnning of test.
+
+test_conv_regression segfault w/ benchdnn: `--conv --cfg=f32_full mb1ic16ih1oc16oh1kh3ph0`
+
