@@ -15,6 +15,7 @@
 *******************************************************************************/
 
 #include <assert.h>
+#include <type_traits>
 
 #include "common/c_types_map.hpp"
 #include "common/dnnl_thread.hpp"
@@ -57,6 +58,18 @@ using namespace math;
  * - possible to reduce lambda usage more w/ helper structs? reduce code duplication?
  */
 namespace {
+// emulate 'if constexpr', pre c++17 (and eliminate < 0 warning for unsigned)
+template<typename T> inline static
+        typename std::enable_if<std::is_signed<T>::value, void>::type
+        mkNonNegative(T &x) {
+            x = (x < T{0}? T{0}: x);
+        }
+template<typename T> inline static
+        typename std::enable_if<!std::is_signed<T>::value, void>::type
+        mkNonNegative(T &x) {
+            ;
+        }
+
 /** stack usage threshold (max array size) for channel offsets.
  *
  * \todo VE blocksz chooser for tmp arrays should have use a
@@ -535,7 +548,9 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_dense(
                     for (dim_t i = start; i < end; i++) {
 #if 1 // 0.02 ms (cf ~ 10 ms in WAY==1) XXX PERF timing?
                         data_t s = src[i];
-                        s = (s < 0? data_t{0}: s);
+                        //if /*constexpr*/ (std::is_signed<data_t>::value)
+                        //    s = (s < 0? data_t{0}: s);
+                        mkNonNegative(s);
                         s = (s > d_alpha? d_alpha: s);
                         dst[i] = s;
 #else // perhaps a bit slower??

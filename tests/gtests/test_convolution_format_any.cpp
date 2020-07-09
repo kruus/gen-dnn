@@ -42,15 +42,14 @@ class convolution_any_fmt_test
     : public ::testing::TestWithParam<conv_any_fmt_test_params> {
 protected:
     virtual void SetUp() {
-#if DNNL_X64
         // Skip this test if the library cannot select blocked format a priori.
+#if !DNNL_X64
+        return;
+#else
         // Currently blocking is supported only for sse41 and later CPUs.
         bool implementation_supports_blocking
                 = impl::cpu::x64::mayiuse(impl::cpu::x64::sse41);
         if (!implementation_supports_blocking) return;
-#else
-        return;
-#endif
 
         auto p = ::testing::TestWithParam<conv_any_fmt_test_params>::GetParam();
 
@@ -98,6 +97,7 @@ protected:
                 check_fmt(conv_prim_desc.src_desc().data, p.expected_src_fmt));
         ASSERT_TRUE(
                 check_fmt(conv_prim_desc.dst_desc().data, p.expected_dst_fmt));
+#endif //DNNL_X64 (and >= sse41)
     }
 };
 

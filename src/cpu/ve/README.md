@@ -36,9 +36,11 @@ bnorm still not "fast", but maybe the 3 hr benchdnn test is largely due to the "
 	work around ccom compiler error by explicityly adding -mno-vector-intrinsic-check (just in case)
 
 eltwise_generic might also need 'off_l_vec' optimization
-	ve version begun, not optimized (needs work)
 	for vectorization, move 'switch' cases out of loop.
 		fwd speedups O(250)x for large tensors
+	LIMIT CASE ISSUES:
+	eltwise_pow with beta==-1 has issues with f(-0)  (are alpha cases ok?)
+	eltwise_logistic alpha=0.1 beta=0.2 during gtest
 
 	I notice that for "tiny" benchdnn tests, things take uniformly .057 ms,
 	regardless of --alg, which represents omp + balance + "invoke lambda"
@@ -69,6 +71,8 @@ simple_reorder wants at least the v0.16 ShortLoop() pragmas reinstated
 	and reorder(any,any,any) using off_l reorder should use 'off_l_vec'
 	- actually this is an interesting case of how to introduce batching into
 	  a parallel_nd construct
+	Split apart the 45-minute compile of cpu_reorder (nc++ stuck in ipa, which eventually stops)
+	by putting reorder map values `std::vector<rpd_create_f>` into separate small files.
 
 ref_deconvolution
 	switching to vectorized offset calcs (WIP)
@@ -76,7 +80,10 @@ ref_deconvolution
 ### cblas (build.sh -C)
 FindBLAS is no longer working.  hardwired USE_CBLAS and directories using cmake/ve.cmake toolchain variables.
 Changed to blas_openmp instead of \_sequential version.  Introduces msan_unpoison_matrix assertion failure:
-enchdnn: /home/kruus/vanilla-dbg/src/cpu/gemm/gemm_msan_unpoison.hpp:26: void dnnl::impl::cpu::msan_unpoison_matrix(void *, long, long, long, unsigned long): Assertion `C != nullptr && M > 0 && N > 0 && LDC >= M && typesize' failed. 
+```
+benchdnn: /home/kruus/vanilla-dbg/src/cpu/gemm/gemm_msan_unpoison.hpp:26: void dnnl::impl::cpu::msan_unpoison_matrix(void *, long, long, long, unsigned long): Assertion `C != nullptr && M > 0 && N > 0 && LDC >= M && typesize' failed. 
+```
+Also now see segfault in deconv (below) ... reverting to blas_sequential (VE_SEQ=1 default setting)
 
 ### sample tests
 
@@ -105,6 +112,7 @@ dt: min(-0.264852) max(2.04102) mean(0.6benchdnn: /home/kruus/vanilla-dbg/src/cp
 /bin/sh: line 1: 35378 Killed                  /home/kruus/vanilla-dbg/build-vejdC/tests/benchdnn/benchdnn -v1 --engine=cpu --rnn --batch=inputs/rnn/test_rnn_small
 ```
 next try... failed assertion: M > 0 && N > 0 && LDC >= M
+FIX: rnn calls extended_sgemm with N==0, so check first: `if (*N > 0) msan_unpoison_matrix`
 
 ##### new gtest bugs (from ve mods)
 
@@ -118,6 +126,10 @@ dnnl_verbose,create:cache_miss,cpu,eltwise,ref:any,forward_training,data_f32::bl
 dnnl_verbose,exec,cpu,eltwise,ref:any,forward_training,data_f32::blocked:abcde:f0 diff_undef::undef::f0,,alg:eltwise_gelu_tanh alpha:0.1 beta:0,0x2x4x4x4,0.00292969
 test_eltwise: /home/kruus/vanilla-dbg/src/cpu/ref_eltwise.hpp:145: dnnl_status_t dnnl::impl::cpu::ref_eltwise_bwd_t<data_type>::pd_t::init(dnnl_engine *) [with data_type = (dnnl_data_type_t)3]: Assertion `(!(!use_dense_) || !!(one_of(alg_, eltwise_pow, eltwise_sqrt, eltwise_log, eltwise_sqrt_use_dst_for_bwd )))' failed.
 ```
+FIXED: just support all alg_kind in generic (as done for dense bwd eltwise) 
+--eltwise --tag=aBx8b --alg=pow --alpha=-0.25 --beta=-1 3x7x4x5
+	[  13][0x0x2x3] src:       -0 fp0:     -inf fp:     -inf dt:      inf diff:     inf rdiff:    -nan
+RESOLUTION: live with it for now.  It is already special-cased a bit.
 
 Tests 2,3,4,5,6 fail (wrong result)
 ```
@@ -126,4 +138,10 @@ Tests 2,3,4,5,6 fail (wrong result)
 or benchdnn test_deconv_all, at beginnning of test.
 
 test_conv_regression segfault w/ benchdnn: `--conv --cfg=f32_full mb1ic16ih1oc16oh1kh3ph0`
+
+retrying using libblas_sequential...
+
+##### ./build.sh -vdd
+some error in cpu_reorder file split?  anything with reorders has issues!
+modify scr/cpu/CMakeLists to make it optional.
 

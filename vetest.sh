@@ -283,6 +283,7 @@ function quickbuild
     echo -n "Rebuilding ${BLD} ... "
     { make -C "${BLD}" depend && make -C "${BLD}";
       echo "quick build exit code $?";
+      sync;
     } >& q.log \
       && echo "YAY (see q.log)" || { echo "OHOH (see q.log)"; exit 1; }
   fi
@@ -348,10 +349,11 @@ function runtest # runtest COMMAND [ARGS...] -- run in TEST_ENV & send console o
     #VEOSLINE=`awk 'END{print NR}' ${VEOSLOG}`
     >&2 echo "VEOSLINE = ${VEOSLINE}, VEOSLOG = ${VEOSLOG}"
   fi
+  sync
   # time for wall time of test?
   ${ENV} ${TEST_ENV[@]} GTEST_FILTER="${GTEST_FILTER}" script -e -a -c "${STRACE} $*"
   rc=$?
-  if [ -f ve_exec.log.* ]; then
+  if [ $(find . -name 've_exec.log.*' | wc -l) -eq 1 ]; then
     pid=`ls -1 ve_exec.log* | sed 's/.*log.//'`
   else
     pid=-1

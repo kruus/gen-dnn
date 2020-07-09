@@ -299,8 +299,17 @@ if(NECVE)
         ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.c
         ${CMAKE_CURRENT_SOURCE_DIR}/ve/*.cpp
         )
+
+    # OPTIONAL: split cpu_reorder impl list into smaller compilations?
+    # (after split full rebuild in under half an hour, MUCH faster)
+    if(0) # original monolithic list
+        list_filter_exclude(SOURCES_VE ".*cpu_reorder.*")
+    else() # split impl maps by map value
+        list(REMOVE_ITEM SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/cpu_reorder.cpp)
+    endif()
+
     # Same-Name cpp files in subdirectory REPLACE parent ones:
-    #   some cpu-specific code / optimization is too ugly!
+    #   some cpu-specific code / optimization is too ugly for src/cpu/
     string(REPLACE "/ve/" "/" x_ "${SOURCES_VE}")
     list(REMOVE_ITEM SOURCES ${x_})
 

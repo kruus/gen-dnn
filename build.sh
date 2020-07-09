@@ -829,13 +829,15 @@ echo 'ulimit soft : '`ulimit -Ss`
         TEST_ENV+=(VE_NODE_NUMBER=${NODE})
 
         { echo "api-c                   ...";
+            sync; # sometimes it fails in build, but runs fine when run again?
             ${ENV} ${TEST_ENV[@]} ${TESTRUNNER} ${VE_EXEC} tests/api-c \
-                || xBUILDOK="n"; # do not stop tests on failure
+                || BUILDOK="n"; # BUILDOK="n" will stop tests on failure
         } 
         if [ $DOTEST -eq 13 ]; then # another short test, this one can fail too
             { echo "cpu-cnn-training-f32-c"
+                sync;
                 ${ENV} ${TEST_ENV[@]} ${TESTRUNNER}  ${VE_EXEC} examples/cpu-cnn-training-f32-c \
-                    || xBUILDOK="n"; # do not stop tests on failure
+                    || BUILDOK="n";
             }
         fi
     fi
@@ -955,7 +957,7 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
                     echo "Running tests via vetests.sh ..."
                     echo "Command : ./vetest.sh -B ${BUILDDIR} \${Targs} -L xtest1-${BUILDDIR}.log"
                     # note: vetest.sh will recognize cpu-FOO and search for FOO if nec.
-                    ./vetest.sh -B ${BUILDDIR} -L xtest2-${BUILDDIR}.log ${Targs} || true
+                    ./vetest.sh -B ${BUILDDIR} -L xtest2-${BUILDDIR}.log -N ${NODE} ${Targs} || true
                     cat xtest2-${BUILDDIR}.log
                     set -x
                 } 2>&1 | tee "${BUILDDIR}/test2.log" || true
@@ -979,7 +981,7 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
                     echo "tests = "
                     echo "${tests}" | sed 's/ /\n    /g'
                     for t in ${tests}; do
-                        ./vetest.sh -B ${BUILDDIR} -T ${t} || true
+                        ./vetest.sh -B ${BUILDDIR} -N ${NODE} -T ${t} || true
                         cat f.log
                     done
                 else
@@ -997,7 +999,7 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
                         echo "Running tests via vetests.sh ..."
                         echo "Command : ./vetest.sh -B ${BUILDDIR} \${Targs} -L xtest3-${BUILDDIR}.log"
                         # note: vetest.sh will recognize cpu-FOO and search for FOO if nec.
-                        ./vetest.sh -B ${BUILDDIR} -L xtest3-${BUILDDIR}.log ${Targs} || true
+                        ./vetest.sh -B ${BUILDDIR} -L xtest3-${BUILDDIR}.log -N ${NODE} ${Targs} || true
                         cat xtest3-${BUILDDIR}.log
                         set -x
                     } 2>&1 | tee "${BUILDDIR}/test3.log" || true

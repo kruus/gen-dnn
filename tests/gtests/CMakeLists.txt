@@ -93,6 +93,7 @@ else() # THIS MIGHT BE ALL WRONG NOW [ejk]
             # in v1.4 need to rethink isa_mask and isa_iface for VE
             #test_isa_iface*.cpp
             test_isa_mask*.cpp
+            test_iface_primitive_cache.cpp
 
             test_dnnl_threading.cpp
             test_dnnl_memory.cpp
@@ -174,19 +175,23 @@ else() # THIS MIGHT BE ALL WRONG NOW [ejk]
     endif()
 endif()
 
-# Some tests will fail on AArch64 and need to be skipped.
-# For example, any tests wich check for ISAs not present on AArch64.
-# AARCH64_SKIP_TESTS is a list of tests to be removed from PRIM_TEST_CASES_SRC.
-if(TARGET_ARCH STREQUAL "AARCH64")
-    file(GLOB AARCH64_SKIP_TESTS
+# Some platforms (VE) have no primitive cache (no jit) so skip primtiive_cache test
+# Other platforms (AArch64) may not handle tests checking for unsupported x64 ISAs
+# GTESTS_SKIP_TESTS is a list of tests to be removed from PRIM_TEST_CASES_SRC.
+if(        DNNL_TARGET_ARCH STREQUAL "VE"
+        OR DNNL_TARGET_ARCH STREQUAL "ARCH_GENERIC")
+    file(GLOB GTESTS_SKIP_TESTS
+        test_iface_primitive_cache.cpp
+        )
+elseif(TARGET_ARCH STREQUAL "AARCH64")
+    file(GLOB GTESTS_SKIP_TESTS
         test_isa_iface.cpp
         )
-
-# Remove AARCH64_SKIP_TESTS entries from PRIM_TEST_CASES_SRC.
-    foreach(TEST_FILE ${AARCH64_SKIP_TESTS})
-        list(REMOVE_ITEM PRIM_TEST_CASES_SRC "${TEST_FILE}")
-    endforeach()
 endif()
+# Remove GTESTS_SKIP_TESTS entries from PRIM_TEST_CASES_SRC.
+foreach(TEST_FILE ${GTESTS_SKIP_TESTS})
+    list(REMOVE_ITEM PRIM_TEST_CASES_SRC "${TEST_FILE}")
+endforeach()
 
 # Add X64-specific tests
 if(DNNL_TARGET_ARCH STREQUAL "X64")
