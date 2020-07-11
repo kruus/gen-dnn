@@ -120,7 +120,7 @@ struct ref_eltwise_bwd_t : public primitive_t {
             if (!ok) return status::unimplemented;
 
             const memory_desc_wrapper diff_dst_d(diff_dst_md());
-            const bool same_fmt_ = diff_dst_d == memory_desc_wrapper(src_md());
+            //const bool same_fmt_ = diff_dst_d == memory_desc_wrapper(src_md());
             //if (!same_fmt_) printf(" eltwise-bwd-not-same-fmt(diff_dst,src) ");
             //if (!diff_dst_d.is_dense(true)) printf(" eltwise_bwd-not-diff_dst.is_dense ");
             //if (!diff_dst_d.is_dense())

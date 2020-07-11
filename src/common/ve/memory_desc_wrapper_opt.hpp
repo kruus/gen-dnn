@@ -231,7 +231,7 @@ struct CoordsFor : public CoordRegs<Crd,dim> {
                 auto const span = ihi[d] - ilo[d];
                 mod   = carry % span;
                 carry = carry / span;
-                vp[d][vl+i] = ilo[d] + mod;
+                (this->vp)[d][vl+i] = ilo[d] + mod;
             }
         }
         vl += addvl;
@@ -380,11 +380,13 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
         return true;
     }
     /** when parallelized over linear nelems, from 'start' to 'end-1',
-     * generate coords by lowering linear 'sz' to 'end'. */
+     * generate coords by lowering linear 'sz' to 'end'.
+     * \pre end <= get_sz() and 0<=start<end.
+     * \return true if successful. */
     bool init_nd(Pos start, Pos end){
-        assert( end <= sz );
+        assert( end <= sz ); // maybe always check?
         sz = end;
-        init_nd(start);
+        return init_nd(start);
     }
     private:
 #if COORDSFORND_EXTEND
