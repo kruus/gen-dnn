@@ -517,9 +517,9 @@ echo 'ulimit soft : '`ulimit -Ss`
         ccxx_flags -fdiag-vector=2
         ccxx_flags -report-all
         # -O4 early... when -O4 (or -O3) comes later, sometimes inlining does not happen
-        ccxx_flags -O4 -finline -finline-functions
+        ccxx_flags -O3 -finline -finline-functions
         # nc++-3.0.30 WILL NOT compile some files when -finline is specified:
-        #ccxx_flags -O4 -finline-functions
+        #ccxx_flags -O3 -finline-functions
         # nc++-3.0.30 has an ICE ** DO NOT USE IT **
         ccxx_flags -finline-max-function-size=300
         ccxx_flags -finline-max-depth=10
@@ -1042,7 +1042,8 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
             ( eval ${cmd}; )
             ( eval ${cmd}; ) > ${BUILDDIR}/bench.targets
             # run the relevant cmake benchdnn targets
-            rm -f ${BUILDDIR}/bench.summary
+            rm -f "${BUILDDIR}/bench.summary"
+            rm -f "${BUILDDIR}/test5.log"
             { while read -r bench_target; do
                 # note default is --mode=C (correctness check)
                 # can set BENCHDNN_ARGS="--mode=P' for other modes (e.g. performance, even slower)
@@ -1052,7 +1053,7 @@ if [ "$BUILDOK" == "y" ]; then # Install? Test?
                     >>${BUILDDIR}/bench.summary) \
                     | sed "s/^tests:/test:${bench_target}\\ntests:/"
                 echo "Finished bench_target = ${bench_target}"
-            done < ${BUILDDIR}/bench.targets; }
+            done < ${BUILDDIR}/bench.targets; } 2>&1 | tee "${BUILDDIR}/test5.log"
             # file "bench.summary", 1 line per test, copied to LOGDIR
         fi
         echo "Tests done"

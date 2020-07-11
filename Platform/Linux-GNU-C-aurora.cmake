@@ -11,8 +11,8 @@ unset(CMAKE_C_COMPILE_OPTIONS_VISIBILITY_INLINES_HIDDEN)
 #set(CMAKE_C_FLAGS_DEBUG_INIT "${CMAKE_C_FLAGS_DEBUG_INIT} -g2 -mretain-list-vector -O0")
 #set(CMAKE_C_FLAGS_RELWITHDEBINFO_INIT "${CMAKE_C_FLAGS_RELWITHDEBINFO_INIT} -g2 -mretain-list-vector")
 # override...
-set(CMAKE_C_FLAGS_RELEASE_INIT "-O4 -DNDEBUG -mretain-list-vector")
-set(CMAKE_C_FLAGS_RELWITHDEBINFO_INIT "-O4 -g2 -DNDEBUG -mretain-list-vector")
+set(CMAKE_C_FLAGS_RELEASE_INIT "-O3 -DNDEBUG -mretain-list-vector")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO_INIT "-O3 -g2 -DNDEBUG -mretain-list-vector")
 set(CMAKE_C_FLAGS_DEBUG_INIT "-O0 -g2 -mretain-list-vector")
 # -Os is not supported
 set(CMAKE_C_FLAGS_MINSIZEREL_INIT CMAKE_C_FLAGS_RELEASE_INIT)

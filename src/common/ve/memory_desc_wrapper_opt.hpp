@@ -292,7 +292,68 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
     typedef Crd crd_t;
     typedef Pos pos_t;
     CoordsForNd() : dim(0), vl(0), ilo{0}, ihi{0}, sz(0), pos(0) {
-        assert( dim <= DNNL_MAX_NDIMS );
+        assert( dim <= MaxDims );
+        static_assert(MaxDims <= DNNL_MAX_NDIMS, "unexpectedly large number dims");
+    }
+    // iter 0..dims[i] for 0<=i<nelems
+    template<typename DIM_T, typename NDIMS_T>
+    CoordsForNd(DIM_T const* d,  NDIMS_T const nd)
+    : dim(nd), vl(0), ilo{0}, ihi{0}, sz(0), pos(0) {
+        assert( nd <= MaxDims );
+        static_assert(MaxDims <= DNNL_MAX_NDIMS, "unexpectedly large number dims");
+        sz = Pos{1};
+        ShortLoop() for(int i=0; i<dim; ++i){
+            ilo[i] = Crd{0};
+            ihi[i] = d[i];
+            sz *= d[i];
+        }
+        // streamline generic init_nd code for pos=0, ilo[i]=0
+        // pos = 0;
+        vl = MVL;
+        if(pos + vl > sz) vl = sz - pos;
+        Pos carry[Base::MaxVl]; VREG(carry)
+        ShortLoop() for(unsigned i=0U; i<vl; ++i)
+            carry[i] = /*pos+*/ i;
+        NOVEC_ for(unsigned d = dim; d--; ) {
+            // TBD decide whether span is member or not XXX
+            auto const span = ihi[d]; // - ilo[d];
+            if(span <= 1){
+                ShortLoop() for(unsigned i=0U; i<vl; ++i){ // VRspill
+                    (this->vp)[d][i] = 0; //ilo[d];
+                }
+            } else {
+                for(unsigned i=0U; i<vl; ++i){
+                    (this->vp)[d][i] = /*ilo[d] +*/ carry[i] % span;
+                    carry[i] = carry[i] / span;
+                }
+            }
+        }
+    }
+    template<typename DIM_T, typename NDIMS_T>
+    CoordsForNd(DIM_T const* d,  NDIMS_T const nd, Pos const start)
+    : dim(nd), vl(0), ilo{0}, ihi{0}, sz(0), pos(0) {
+        assert( nd <= MaxDims );
+        static_assert(MaxDims <= DNNL_MAX_NDIMS, "unexpectedly large number dims");
+        sz = Pos{1};
+        ShortLoop() for(int i=0; i<dim; ++i){
+            ilo[i] = Crd{0};
+            ihi[i] = d[i];
+            sz *= d[i];
+        }
+        this->init_nd(start);
+    }
+    template<typename DIM_T, typename NDIMS_T>
+    CoordsForNd(DIM_T const* d,  NDIMS_T const nd, Pos const start, Pos const end)
+    : dim(nd), vl(0), ilo{0}, ihi{0}, sz(0), pos(0) {
+        assert( nd <= MaxDims );
+        static_assert(MaxDims <= DNNL_MAX_NDIMS, "unexpectedly large number dims");
+        sz = Pos{1};
+        ShortLoop() for(int i=0; i<dim; ++i){
+            ilo[i] = Crd{0};
+            ihi[i] = d[i];
+            sz *= d[i];
+        }
+        this->init_nd(start,end);
     }
 
     Base /* */& base() /* */ { return *this; }
@@ -324,6 +385,9 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
     public:
     /** init at linear iter pos, shorten vl from MVL iif pos+vl "past end"
      * Note diff with off_l_vec API where a vector of `lin` values are input
+     *
+     * - input: dim, ilo[], ihi[], sz
+     * - set up: pos, vp
      * \return true iff remaining iteration length vl > 0.
      *
      * Once you have a span-relative coord, a global physical offset is:
