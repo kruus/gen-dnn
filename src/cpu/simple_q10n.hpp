@@ -42,21 +42,51 @@ inline int mxcsr_round(float f) ATTR_NO_MSAN {
 #elif defined(__ve)
     // \sa tests/benchdnn/common.hpp, which also defines mxcsr_round
     return (int)nearbyintf(f);
+    // TODO remove fn call on VE!
+    // Perhaps test:
+    //return f + 0.5 - (f<0); (but this is not ties-to-even, and sometimes wrong)
+    //
+    //or
+    //return (!(f > -8388608.0f && f < 8388608.0f)? f // non-fractional or NaN
+    //  : f>0? (float)(f + 8388608.0f) - 8388608.0f
+    //  :      (float)(f - 8c88608.0f) + 8388608.0f;
+    //
     //return ::lrint(f);  // round according to fesetround, in program status word
     //return ::lround(f);    // always round-to-nearest-even  (wrong?)
     //return ::lround(f);    // always round-to-nearest-even  (wrong?)
+    //
     //// FIX op: sx/zx sign extension, ne~nearest_even (absent => default)
-    //long ret;
+    //int ret; // only have cvt.w.d and cvt.w.s cvt.l.d
     //asm("cvt.w.s.sx.ne %[iout], %[fin]\n\t"
     // : [iout] "=r"(ret)       // outputs
     // : [fin]  "r"(f)          // inputs
     // :                        // clobbers
     //);
-    //Vector version VFIX, or asm vcvt 
+    //return ret;
 #else
     return (int)nearbyintf(f); // optimism
 #endif
 }
+#if 0 && defined(__ve)
+//
+// Might also need saturate and round_and_saturate vector versions,
+// all the way up to out_round, I think.
+//
+
+/** UNTESTED vector-register version of mxcsr_round.
+ * \pre vl less than max vector register size.
+ * May prohibit some client optimizations, but removes fn-call overhead. */
+inline void mxcsr_round_v(int * const dst, float const* const src,
+        int const vl){
+    asm("lvl %[vl]\n"
+        "cvt.w.s.sx.ne %[iout], %[fin]\n\t" // VFIX opcode
+     : [iout] "=r"(ret)                 // outputs
+     : [fin]"r"(f), [vl]"r"(vl)         // inputs
+     : "%vl"                            // clobbers
+    );
+}
+#endif
+
 
 template <typename data_t, typename acc_t>
 inline typename utils::enable_if<!nstl::is_integral<data_t>::value,

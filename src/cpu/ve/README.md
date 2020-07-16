@@ -147,7 +147,7 @@ retrying using libblas_sequential...
 some error in cpu_reorder file split?  anything with reorders has issues!
 modify scr/cpu/CMakeLists to make it optional.
 
-##### vdd5.log
+##### compare -O4 with -O3 compile
 Segfault during: benchdnn -v1 --engine=cpu --sum --batch=inputs/sum/test_sum_all
 Example benchdnn test:
  benchdnn --mode=C -v5 --sum --ddt=u8 --sdt=f32:f32 --dtag=abx  3x3x16x4
@@ -164,3 +164,20 @@ Segfault: --shuffle --dt=s8 --tag=axb --group=4 1x12x56x56
 	--concat --ddt=s8 --dtag=aBx16b --axis=3 3x4x5x13:3x4x5x17
 	--binary --sdt=s8:s8 --ddt=s8 --stag=abc:bac --alg=MAX --inplace=false 4x6x7:4x6x1
 	--sum --ddt=u8 --dtag=abx --scales=0.25 3x3x16x4
+Compile with -O3: removes segfaults in shuffle,reorder,pool,matmul,concat,binary,sum
+./build.sh -addTttttt
+gtests: failed: ;test_deconvolution;test_eltwise
+	Ex: Simple_blocked_padded_f32/eltwise_test_f32.TestsEltwise/38 Simple_blocked_3d_padded_f32/eltwise_test_f32.TestsEltwise/12
+		 Simple_blocked_padded_f32/eltwise_test_f32.TestsEltwise/51
+		(limit case behavior, ignorable)
+		SimpleSmall_NCHW_CPU/deconvolution_test_float.TestDeconvolution/2
+		(also likely to be limit case behavior of math funcs)
+	segfaults:
+	--conv --cfg=f32_full mb1ic16ih1oc16oh1kh3ph0
+	--conv --dir=BWD_D g1ic16iw5oc16ow3kw3pw4dw4n"large_padding_and_dilation_w.r.t._kernel_size"
+	--conv --dir=BWD_D --alg=auto ic3ih300oc64oh300kh3ph1n"ssd_300_voc0712:conv1_1"
+	--conv ic512ih14oc512oh14kh3ph1n"vgg_19:conv5_1*4"
+	--conv --dir=BWD_D --cfg=f32_full ic4ih8iw8oc6oh4ow8kh3kw3sh2sw1ph1pw1dh1dw0n"dilated_conv:11"
+	--conv --dir=BWD_D g32ic32ih112oc32oh112kh3ph1n"mobilenet:conv2_1/dw"
+		Hopefully an init() logic bug (try using consistency.hpp for the header *first*)
+

@@ -40,6 +40,9 @@ struct ref_convolution_fwd_t : public primitive_t {
 
         DECLARE_COMMON_PD_T("ref:any", ref_convolution_fwd_t);
 
+#if defined(__ve)
+        status_t init(engine_t *engine);
+#else
         status_t init(engine_t *engine) {
             using namespace data_type;
 
@@ -61,6 +64,7 @@ struct ref_convolution_fwd_t : public primitive_t {
                     && output_scales_mask_ok() && post_ops_ok();
             return ok ? status::success : status::unimplemented;
         }
+#endif
 
     protected:
         bool set_default_formats() {
@@ -141,6 +145,9 @@ struct ref_convolution_bwd_data_t : public primitive_t {
 
         DECLARE_COMMON_PD_T("ref:any", ref_convolution_bwd_data_t);
 
+#if defined(__ve)
+        status_t init(engine_t *engine);
+#else
         status_t init(engine_t *engine) {
             bool ok = true && desc()->prop_kind == prop_kind::backward_data
                     && set_default_alg_kind(alg_kind::convolution_direct)
@@ -153,6 +160,7 @@ struct ref_convolution_bwd_data_t : public primitive_t {
 
             return ok ? status::success : status::unimplemented;
         }
+#endif
 
         virtual bool support_bias() const override { return true; }
 
@@ -202,6 +210,9 @@ struct ref_convolution_bwd_weights_t : public primitive_t {
 
         DECLARE_COMMON_PD_T("ref:any", ref_convolution_bwd_weights_t);
 
+#if defined(__ve)
+        status_t init(engine_t *engine);
+#else
         status_t init(engine_t *engine) {
             bool ok = true && desc()->prop_kind == prop_kind::backward_weights
                     && set_default_alg_kind(alg_kind::convolution_direct)
@@ -210,6 +221,7 @@ struct ref_convolution_bwd_weights_t : public primitive_t {
                     && set_default_formats() && attr()->has_default_values();
             return ok ? status::success : status::unimplemented;
         }
+#endif
 
     protected:
         bool set_default_formats() {
@@ -242,6 +254,10 @@ private:
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
+
+#if defined(__ve)
+#include "cpu/ve/ref_convolution_init.hpp"
+#endif
 
 #endif
 

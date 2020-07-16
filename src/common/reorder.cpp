@@ -57,8 +57,15 @@ status_t dnnl_reorder_primitive_desc_create(
 
     auto s_ek = src_engine->kind();
     auto d_ek = dst_engine->kind();
+#if 0 // orig
     if (!IMPLICATION(s_ek != d_ek, one_of(engine_kind::cpu, s_ek, d_ek)))
         return invalid_arguments;
+#else // !IMP(a,b) = !(!a || b) = a && !b
+    //if (s_ek != d_ek && !one_of(engine_kind::cpu, s_ek, d_ek))
+    //    return invalid_arguments;
+    if (!one_of(engine_kind::cpu, s_ek, d_ek)) // simplify test (mystery nc++ segfault)
+        return invalid_arguments;
+#endif
 
     auto s_mdw = memory_desc_wrapper(*src_md);
     auto d_mdw = memory_desc_wrapper(*dst_md);

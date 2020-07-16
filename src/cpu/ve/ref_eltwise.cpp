@@ -168,6 +168,45 @@ static float compute_eltwise_scalar_fwd(
     return d;
 }
 
+/** vector version of compute_eltwise_scalar_fwd.
+ * \pre vl <= maximum vector register length [at least for now]
+ * \todo check VE other opportunities for compute_eltwise_vector_fwd.
+ * \todo increase inline size limits to accomodate this fn (or make it a fn call)
+ */
+static void compute_eltwise_vector_fwd( const alg_kind_t alg,
+        float alpha, float beta, float const scale,
+        float * const d, float const* const s, int const vl) {
+    switch (alg) {
+#define vfor(...) ShortLoop() for(int i=0; i<vl; ++i) {d[i] = (__VA_ARGS__)*scale;} break
+        case eltwise_relu: vfor(relu_fwd(s[i], alpha));
+        case eltwise_tanh: vfor(tanh_fwd(s[i]));
+        case eltwise_elu: vfor(elu_fwd(s[i], alpha));
+        case eltwise_square: vfor(square_fwd(s[i]));
+        case eltwise_abs: vfor(abs_fwd(s[i]));
+        case eltwise_sqrt: vfor(sqrt_fwd(s[i]));
+        case eltwise_linear: vfor(linear_fwd(s[i], alpha, beta));
+        case eltwise_bounded_relu: vfor(bounded_relu_fwd(s[i], alpha));
+        case eltwise_soft_relu: vfor(soft_relu_fwd(s[i]));
+        case eltwise_logistic: vfor(logistic_fwd(s[i]));
+        case eltwise_exp: vfor(exp_fwd(s[i]));
+        case eltwise_gelu_tanh: vfor(gelu_tanh_fwd(s[i]));
+        case eltwise_swish: vfor(swish_fwd(s[i], alpha));
+        case eltwise_log: vfor(log_fwd(s[i]));
+        case eltwise_clip: vfor(clip_fwd(s[i], alpha, beta));
+        case eltwise_pow: vfor(pow_fwd(s[i], alpha, beta));
+        case eltwise_gelu_erf: vfor(gelu_erf_fwd(s[i]));
+
+        case eltwise_relu_use_dst_for_bwd: vfor(relu_fwd(s[i], alpha));
+        case eltwise_tanh_use_dst_for_bwd: vfor(tanh_fwd(s[i]));
+        case eltwise_elu_use_dst_for_bwd: vfor(elu_fwd(s[i], alpha));
+        case eltwise_sqrt_use_dst_for_bwd: vfor(sqrt_fwd(s[i]));
+        case eltwise_logistic_use_dst_for_bwd: vfor(logistic_fwd(s[i]));
+        case eltwise_exp_use_dst_for_bwd: vfor(exp_fwd(s[i]));
+#undef vfor
+        default: assert(!"unknown eltwise alg_kind");
+    }
+}
+
 static float compute_eltwise_scalar_bwd(
         const alg_kind_t alg, float dd, float s, float alpha, float beta) {
     float ds = 0.f;
@@ -229,6 +268,11 @@ ref_eltwise_scalar_fwd_t::ref_eltwise_scalar_fwd_t(
 
 float ref_eltwise_scalar_fwd_t::compute_scalar(float s) {
     return compute_eltwise_scalar_fwd(alg_, s, alpha_, beta_) * scale_;
+}
+
+void ref_eltwise_scalar_fwd_t::compute_vec_reg(
+    float * const dst, float const* const src, int const vl) {
+    compute_eltwise_vector_fwd(alg_, alpha_, beta_, scale_, dst, src, vl);
 }
 
 //

@@ -302,7 +302,53 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
         d *= scales[(g * OC + ic) * scale_idx_mult];
     };
 
-    auto ker = [=](int g, int mb, int ic, int id, int ih, int iw) {
+#if 1
+    auto offg5d = [](memory_desc_wrapper const& mdw,
+            int const g, int const oc, int const ic,
+            int const kd, int const kh, int const kw) {
+        return mdw.off(g, oc, ic, kd, kh, kw);
+    };
+    auto off5d = [](memory_desc_wrapper const& mdw,
+            int const /*g*/, int const oc, int const ic,
+            int const kd, int const kh, int const kw) {
+        return mdw.off(oc, ic, kd, kh, kw);
+    };
+    auto offg4d = [](memory_desc_wrapper const& mdw,
+            int const g, int const oc, int const ic,
+            int const /*kd*/, int const kh, int const kw) {
+        return mdw.off(g, oc, ic, kh, kw);
+    };
+    auto off4d = [](memory_desc_wrapper const& mdw,
+            int const /*g*/, int const oc, int const ic,
+            int const /*kd*/, int const kh, int const kw) {
+        return mdw.off(oc, ic, kh, kw);
+    };
+    auto offg3d = [](memory_desc_wrapper const& mdw,
+            int const g, int const oc, int const ic,
+            int const /*kd*/, int const /*kh*/, int const kw) {
+        return mdw.off(g, oc, ic, kw);
+    };
+    auto off3d = [](memory_desc_wrapper const& mdw,
+            int const /*g*/, int const oc, int const ic,
+            int const /*kd*/, int const /*kh*/, int const kw) {
+        return mdw.off(oc, ic, kw);
+    };
+    auto oops = [](memory_desc_wrapper const& mdw,
+            int const /*g*/, int const oc, int const ic,
+            int const /*kd*/, int const kh, int const kw) {
+        assert(false); return dim_t{0};
+    };
+    auto offnd_g = (with_groups
+            ? (ndims == 5? offg5d: ndims == 4? offg4d:
+                ndims == 3? offg3d: oops)
+            : (ndims == 5? off5d: ndims == 4? off4d:
+                ndims == 3? off3d: oops));
+    auto offnd = (ndims == 5? off5d: ndims == 4? off4d:
+                ndims == 3? off3d: oops);
+#endif
+
+    auto ker = [&](int g, int mb, int ic, int id, int ih, int iw) {
+        printf("k"); fflush(stdout);
         acc_data_t d = 0;
         for_(int oc = 0; oc < OC; ++oc)
         for_(int kd = 0; kd < KD; ++kd)
@@ -321,29 +367,50 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
             od /= KSD;
 
             if (od < OD && oh < OH && ow < OW) {
+#if 0
                 if (ndims == 5)
                     d += (acc_data_t)diff_dst[diff_dst_d.off(
                                  mb, g * OC + oc, od, oh, ow)]
+#if 0
                             * (with_groups ? weights[weights_d.off(
                                        g, oc, ic, kd, kh, kw)]
                                            : weights[weights_d.off(
                                                    oc, ic, kd, kh, kw)]);
+#else
+                            * weights[offnd_g(weights_d,
+                                    g, oc, ic, kd, kh, kw)];
+#endif
                 else if (ndims == 4)
                     d += (acc_data_t)diff_dst[diff_dst_d.off(
                                  mb, g * OC + oc, oh, ow)]
+#if 0
                             * (with_groups ? weights[weights_d.off(
                                        g, oc, ic, kh, kw)]
                                            : weights[weights_d.off(
                                                    oc, ic, kh, kw)]);
+#else
+                            * weights[offnd_g(weights_d,
+                                    g, oc, ic, kd, kh, kw)];
+#endif
                 else if (ndims == 3)
                     d += (acc_data_t)diff_dst[diff_dst_d.off(
                                  mb, g * OC + oc, ow)]
+#if 0
                             * (with_groups ? weights[weights_d.off(
                                        g, oc, ic, kw)]
                                            : weights[weights_d.off(
                                                    oc, ic, kw)]);
+#else
+                            * weights[offnd_g(weights_d,
+                                    g, oc, ic, kd, kh, kw)];
+#endif
                 else
                     assert(false);
+#else
+                d += (acc_data_t)diff_dst[offnd(diff_dst_d,
+                        0, mb, g * OC + oc, od, oh, ow)]
+                        * weights[offnd(weights_d, g, oc, ic, kd, kh, kw)];
+#endif
             }
         }
         return d;
@@ -366,14 +433,20 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
     const dim_t weights_kd_stride
             = (ndims >= 4) ? weights_str[ndims - 3 + gr_shift] : 0;
 
-    auto ker_plain = [=](int g, int mb, int ic, int id, int ih, int iw) {
+    auto ker_plain = [&](int g, int mb, int ic, int id, int ih, int iw) {
+        printf("p"); fflush(stdout);
         assert(3 <= ndims && ndims <= 5);
         acc_data_t d = 0;
+#if 0
         const dim_t diff_dst_loc_off = (ndims == 5)
                 ? diff_dst_d.off(mb, g * OC, 0, 0, 0)
                 : (ndims == 4)
                         ? diff_dst_d.off(mb, g * OC, 0, 0)
                         : (ndims == 3) ? diff_dst_d.off(mb, g * OC, 0) : 0;
+#else
+        const dim_t diff_dst_loc_off = offnd(diff_dst_d, 0, mb, g*OC, 0, 0, 0);
+#endif
+#if 0
         const dim_t weights_loc_off = (ndims == 5)
                 ? with_groups ? weights_d.off(g, 0, ic, 0, 0, 0)
                               : weights_d.off(0, ic, 0, 0, 0)
@@ -383,6 +456,9 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
                                         ? weights_d.off(g, 0, ic, 0)
                                         : weights_d.off(0, ic, 0)
                                               : 0;
+#else
+        const dim_t weights_loc_off = offnd_g(weights_d, g, 0, ic, 0, 0, 0);
+#endif
 
         const diff_dst_data_t *__restrict diff_dst_loc
                 = diff_dst + diff_dst_loc_off;
@@ -686,4 +762,4 @@ template struct ref_convolution_bwd_weights_t<f32, f32, f32, f32>;
 } // namespace impl
 } // namespace dnnl
 
-// vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s
+// vim: et ts=4 sw=4 cindent cino=+2s,l0,\:4,N-s

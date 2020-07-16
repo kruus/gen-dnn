@@ -41,6 +41,14 @@ public:
 
     float compute_scalar(float s);
 
+#if defined(__ve)
+    /** single vector-register version of \c compute_scalar.
+     * \pre for now, \b unchecked, \c vl <= max vector register length.
+     * \c dst==src is allowed : use simple `dst[i] = fn(src[i])` expressions. */
+    void compute_vec_reg(float * const dst, float const* const src,
+            int const vl);
+#endif
+
     const alg_kind_t alg_;
     const float alpha_;
     const float beta_;

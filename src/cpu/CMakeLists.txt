@@ -302,9 +302,10 @@ if(NECVE)
 
     # OPTIONAL: split cpu_reorder impl list into smaller compilations?
     # (after split full rebuild in under half an hour, MUCH faster)
-    if(0) # original monolithic list
+    if(1) # original monolithic list [very long nc++ compile time]
         list_filter_exclude(SOURCES_VE ".*cpu_reorder.*")
     else() # split impl maps by map value
+        # may introduce rand seg faults ??
         list(REMOVE_ITEM SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/cpu_reorder.cpp)
     endif()
 
@@ -347,7 +348,6 @@ endif()
 
 if(NECVE)
     file(GLOB FILES_REDUCE_INLINING
-        #${CMAKE_CURRENT_SOURCE_DIR}/*resampling.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/simple_resampling.cpp
         )
     message(STATUS "FILES_REDUCE_INLINING = ${FILES_REDUCE_INLINING}")
@@ -363,6 +363,23 @@ if(NECVE)
     # -c /home/kruus/vanilla-dbg/src/cpu/simple_resampling.cpp) && echo YAY || echo OHOH
     set_source_files_properties(${FILES_REDUCE_INLINING}
         PROPERTIES COMPILE_FLAGS "-finline-max-depth=4")
+
+    file(GLOB FILES_BIG_INLINING
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/ncsp_batch_normalization.cpp
+        #${CMAKE_CURRENT_SOURCE_DIR}/ve/nspc_batch_normalization.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/nhwc_pooling.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/ref_binary.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ref_convolution.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/ref_eltwise.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ref_inner_product.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ref_layer_normalization.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/ref_lrn.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ref_pooling.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ref_resampling.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ref_softmax.cpp
+        )
+    set_source_files_properties(${FILES_BIG_INLINING}
+        PROPERTIES COMPILE_FLAGS "-finline-max-function-size=12288")
 
     file(GLOB_RECURSE FILES_NO_VECTOR_INTRINSIC_CHECK
         ${CMAKE_CURRENT_SOURCE_DIR}/ncsp_batch_normalization.cpp

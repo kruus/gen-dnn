@@ -40,6 +40,9 @@ struct gemm_convolution_fwd_t : public primitive_t {
         DECLARE_COMMON_PD_T(
                 GEMM_IMPL_STR, gemm_convolution_fwd_t, USE_GLOBAL_SCRATCHPAD);
 
+#if defined(__ve)
+        status_t init(engine_t *engine);
+#else
         status_t init(engine_t *engine) {
             bool ok = true && is_fwd()
                     && set_default_alg_kind(alg_kind::convolution_direct)
@@ -61,6 +64,7 @@ struct gemm_convolution_fwd_t : public primitive_t {
                     *desc(), src_md(), weights_md(0), dst_md(),
                     dnnl_get_max_threads());
         }
+#endif
 
         conv_gemm_conf_t jcp_;
 
@@ -131,6 +135,9 @@ struct gemm_convolution_bwd_data_t : public primitive_t {
         DECLARE_COMMON_PD_T(GEMM_IMPL_STR, gemm_convolution_bwd_data_t,
                 USE_GLOBAL_SCRATCHPAD);
 
+#if defined(__ve)
+        status_t init(engine_t *engine);
+#else
         status_t init(engine_t *engine) {
             bool ok = true && desc()->prop_kind == prop_kind::backward_data
                     && set_default_alg_kind(alg_kind::convolution_direct)
@@ -150,6 +157,7 @@ struct gemm_convolution_bwd_data_t : public primitive_t {
                     *desc(), diff_src_md(), weights_md(0), diff_dst_md(),
                     dnnl_get_max_threads());
         }
+#endif
 
         conv_gemm_conf_t jcp_;
 
@@ -190,6 +198,9 @@ struct gemm_convolution_bwd_weights_t : public primitive_t {
         DECLARE_COMMON_PD_T(GEMM_IMPL_STR, gemm_convolution_bwd_weights_t,
                 USE_GLOBAL_SCRATCHPAD);
 
+#if defined(__ve)
+        status_t init(engine_t *engine);
+#else
         status_t init(engine_t *engine) {
             bool ok = true && desc()->prop_kind == prop_kind::backward_weights
                     && set_default_alg_kind(alg_kind::convolution_direct)
@@ -209,6 +220,7 @@ struct gemm_convolution_bwd_weights_t : public primitive_t {
                     *desc(), src_md(), diff_weights_md(0), diff_dst_md(),
                     dnnl_get_max_threads());
         }
+#endif
 
         conv_gemm_conf_t jcp_;
 
@@ -233,14 +245,27 @@ struct gemm_convolution_bwd_weights_t : public primitive_t {
         execute_backward_weights(ctx);
         return status::success;
     }
-
 private:
     void execute_backward_weights(const exec_ctx_t &ctx) const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd().get(); }
+#if defined(__ve)
+#define VE_OPENMP_BUG 1
+    // nc++ used to have a bug with multiple openmp clauses in a single function
+    void execute_backward_weights_reduction(const exec_ctx_t &ctx) const;
+    void execute_backward_weights_bias(const exec_ctx_t &ctx) const;
+#else
+#define VE_OPENMP_BUG 0
+#endif
+
 };
 
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
 
+#if defined(__ve) // nc++ may misompile long logical expressions
+#include "cpu/ve/gemm_convolution_init.hpp"
+#endif
+
+// vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s
 #endif
