@@ -330,6 +330,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                         + ic * plain_d.blocking_desc().strides[w_groups + 1];
                 out[index(oc, ic)] = qz_b0<data_t<type_i>, data_t<type_o>>()(
                         inp[plain_off], s[oc] * adj_scale);
+                // if (!order_keep), then c could be nullptr XXX Reported within issue #774
                 c[oc] -= (128 * (int32_t)(out[index(oc, ic)]));
             }
 #undef index

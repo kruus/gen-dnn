@@ -47,18 +47,50 @@ using namespace data_type;
 namespace jit_gemm_convolution_utils {
 
 namespace {
-static inline void compute_oh_bounds(conv_gemm_conf_t const& jcp, int& oh_beg, int& oh_end,
-        int const kh) [[always_inline]] {
+/** Calc `oh` loop limits so `ih` lies within valid range.
+ * Normally oh goes from 0..jcp.oh-1 and we only use
+ * ```
+ *    ih = oh * jcp.stride_h - jcp.t_pad + kh * (1 + jcp.dilate_h);
+ *              [--- b ----] [------------  a  ------------------]
+ * ```
+ * with ih in valid range [0,jcp.ih) = [c,d) with an inner loop conditional
+ *
+ * This can be inverted to calculated the range of oh s.t. ih is valid
+ *
+ * (within this file, this is often simplified for special cases to
+ *  use the 'saturate' function)
+ */
+static inline __attribute((always_inline)) void compute_oh_bounds(
+        conv_gemm_conf_t const& jcp, int& oh_beg, int& oh_end, int const kh) {
     oh_beg = div_floor( 0      + jcp.t_pad - kh * (jcp.dilate_h + 1) + jcp.stride_h - 1, jcp.stride_h);//(c-a+b-1)/b
     oh_end = div_floor( jcp.ih + jcp.t_pad - kh * (jcp.dilate_h + 1) + jcp.stride_h - 1, jcp.stride_h);//(d-a+b-1)/b
     if (oh_beg < 0      ) oh_beg = 0;
     if (oh_end > jcp.oh ) oh_end = jcp.oh;
+    // do not need any more fixup of oh_beg and oh_end
+    // because only care about oh_beg < oh_end cases.
 }
-static inline void compute_ow_bounds(conv_gemm_conf_t const& jcp, int& ow_beg, int& ow_end,
-        int const kw) [[always_inline]] {
+
+/** Calc `ow` loop limits so `iw` lies within valid range [0,jcp,iw).
+ * Normally ow goes from 0..jcp.ow-1 and we only use
+ * ```
+ *    iw = ow * jcp.stride_2 - jcp.t_pad + kw * (1 + jcp.dilate_w)
+ *       = ow *      b       + a
+ * ```
+ * using an inner loop conditional to process only iw in valid range [c,d).
+ *
+ * This is inverted to calculated the range of ow s.t. iw will lie in [c,d).
+ *
+ * Naive solution as `ow=(iw-a)/b` neglects round incorrectly.
+ * 
+ * Instead the formula is based on `ow = (iw-a+b-1)/b` where
+ * \c div_floor does round-to-negative-infinity integer division
+ * for +ve numerator `b = jcp.stride_w`.
+ */
+static inline __attribute((always_inline)) void compute_ow_bounds(
+        conv_gemm_conf_t const& jcp, int& ow_beg, int& ow_end, int const kw) {
     // return for(ow_beg..ow_end) loop range such that linear mapping
     //    iw = a + ow * b satisfies (c=0) <= iw < (d=jcp.iw).
-    //                  --c,d--  [---------       -a      ---------]   [--- b ----]
+    //                  --c,d--  [-----------     -a      ---------]   [--- b ----]
     ow_beg = div_floor( 0      + jcp.l_pad - kw * (jcp.dilate_w + 1) + jcp.stride_w - 1, jcp.stride_w);//(c-a+b-1)/b
     ow_end = div_floor( jcp.iw + jcp.l_pad - kw * (jcp.dilate_w + 1) + jcp.stride_w - 1, jcp.stride_w);//(d-a+b-1)/b
     if (ow_beg < 0      ) ow_beg = 0;
@@ -176,12 +208,11 @@ void im2col_3d(const conv_gemm_conf_t &jcp, const data_type_t *im,
             }
             id += (1 + jcp.dilate_d);
         }
-#elif 1 // Workaround 2 : calculate bounds to remove inner loop conditionals
+#elif 0 // Workaround 2 : calculate bounds to remove inner loop conditionals
         int id = od * jcp.stride_d - jcp.f_pad;
         NOVEC FOR(kd,jcp.kd) {
             data_type_t *__restrict col_ = col_loc + kd * jcp.kh * jcp.kw * OHW;
             if (id < 0 || id >= jcp.id) {
-                int ih_ = -jcp.t_pad;
                 FOR(kh,jcp.kh) {
                     int oh_beg, oh_end;
                     compute_oh_bounds(jcp, oh_beg, oh_end, kh);
@@ -222,7 +253,49 @@ void im2col_3d(const conv_gemm_conf_t &jcp, const data_type_t *im,
             }
             id += (1 + jcp.dilate_d);
         }
-#elif 0 // Workaround 3 : TODO : precalc ohb[], ohe[], owb[], owe[] bounds
+#elif 1 // Workaround 3 : precalc ohb[], ohe[], owb[], owe[] bounds
+        // (possibly calc this const data pre-parallel?)
+        int oh_beg[jcp.kh], oh_end[jcp.kh];
+        FOR(kh, jcp.kh) compute_oh_bounds(jcp, oh_beg[kh], oh_end[kh], kh);
+        int ow_beg[jcp.kw], ow_end[jcp.kw];
+        FOR(kw, jcp.kw) compute_ow_bounds(jcp, ow_beg[kw], ow_end[kw], kw);
+
+        int id = od * jcp.stride_d - jcp.f_pad;
+        NOVEC FOR(kd,jcp.kd) {
+            data_type_t *__restrict col_ = col_loc + kd * jcp.kh * jcp.kw * OHW;
+            if (id < 0 || id >= jcp.id) {
+                FOR(kh,jcp.kh) {
+                    for(int oh=oh_beg[kh]; oh<oh_end[kh]; ++oh) {
+                        FOR(kw,jcp.kw) {
+                            for(int_t ow=ow_beg[kw]; ow<ow_end[kw]; ++ow) {
+                                col_[oh * jcp.ow + kw * OHW + ow]
+                                        = data_type_t{0};
+                            }
+                        }
+                    }
+                    col_ += jcp.kw * OHW;
+                }
+            } else {
+                const data_type_t *__restrict im_
+                        = im_loc + id * jcp.ih * jcp.iw;
+                FOR(kh,jcp.kh) {
+                    for(int oh=oh_beg[kh]; oh<oh_end[kh]; ++oh) {
+                        const int_t ih_IW_pad = (oh * jcp.stride_h - jcp.t_pad
+                                + kh * (1 + jcp.dilate_h)) * jcp.iw - jcp.l_pad;
+                        FOR(kw,jcp.kw) {
+                            for(int_t ow=ow_beg[kw]; ow<ow_end[kw]; ++ow) {
+                                col_[oh * jcp.ow + kw * OHW + ow]
+                                        = im_[ih_IW_pad
+                                        +     kw * (1 + jcp.dilate_w)
+                                        +     ow * jcp.stride_w];
+                            }
+                        }
+                    }
+                    col_ += jcp.kw * OHW;
+                }
+            }
+            id += (1 + jcp.dilate_d);
+        }
 #endif
     });
 }
@@ -1695,4 +1768,156 @@ void bwd_weights_reduction_par(int ithr, int nthr, const conv_gemm_conf_t &jcp,
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
+/** \page ConditionalHoisting  Hoisting Linear Tests out of Loops
+ * VE compiler often has difficulty when vectorizing loops with vector
+ * stores gaurded by conditionals.  Antagonistic cases may store data
+ * past array bounds, cause segfaults.   The VE VST (vector store) is
+ * not maskable.
+ *
+ * Both SX mainframe (sxc++) and SX Aurora (nc++) vectorizations benefit
+ * from such code modifications.
+ *
+ * Here we show a frequent case and one way to rewrite the code to remove
+ * inner loop conditionals.
+ *
+ * Original:
+ * \code
+ * for(i=imin; i<imax; ++i){       // original loop
+ *   int const ApiB = a + i*b;      // linear fn, ( b>=0 ? )
+ *   if( ApiB < c || ApiB >= d ) continue;
+ *   // Loop Body
+ * }
+ * \endcode
+ *
+ * Transformed:
+ * \code
+ * int const ibeg, iend;
+ * hoist_ApiB_in( ibeg, iend, imin,imax, a,b, c,d );
+ * for(i=ibeg; i<iend; ++i){       // original loop
+ *   int const ApiB = a + i*b;
+ *   // GONE: if( ApiB < c || ApiB >= d ) continue;
+ *   // Loop Body
+ * }
+ * \endcode
+ *
+ * For \c kh, for example, we replaced and simplified the \em hoist routine
+ * in steps:
+ *
+ * \ref ref_conv2.cpp
+ * \code
+ *  for (int kh = 0; kh < p->kh; ++kh) {
+ *      const int ih = oh * p->sh - p->ph + kh * (p->dh + 1);
+ *      if (ih < 0 || ih >= p->ih) continue;
+ *      // etc
+ * \endcode
+ * With hoisting, \ref refconv3_fwd
+ * \code   
+ * int kh_beg, kh_end;
+ * hoist_ApiB_in( kh_beg, kh_end,
+ *                0, p->kh                          // i  in  [0, p->kh)
+ *               (oh * p->sh - p->ph), (p->dh + 1), // ih=A+iB
+ *               0, p->ih);                         // ih in [0, p->ih)
+ * //if (kh_beg >= kh_end) continue;
+ * for (int kh = kh_beg; kh < kh_end; ++kh) {
+ *     const int ih = oh * p->sh - p->ph + kh * (p->dh + 1);
+ *     // etc
+ * \endcode
+ * which simplifies to
+ * \code
+ * //                  +--- ih must lie in [0,IH)
+ * //                  |
+ * //                  V  [_______ -a+b-1 _______]  [__ b __]
+ * kh_beg = div_floor( 0  - (oh * SH - PH) + p->dh, (p->dh+1) );
+ * kh_end = div_floor( IH - (oh * SH - PH) + p->dh, (p->dh+1) );
+ * if( kh_beg < 0     ) kh_beg = 0;
+ * if( kh_end > p->kh ) kh_end = p->kh;
+ * // correct kh_beg, kh_end at other limits irrelevant:
+ * //    if (kh_beg >= kh_end) continue;
+ * for (int kh = kh_beg; kh < kh_end; ++kh) {
+ *     const int ih = oh * p->sh - p->ph + kh * (p->dh + 1);
+ *     // etc, with ih guaranteed not to exceed bounds
+ * \endcode
+ *
+ * A key feature for the mathematics of such formulas is that integer
+ * rounding \b must be toward negative infinity.  Unfortunately, C99
+ * and C++11 round toward zero.  So div_floor, which has been optimized
+ * for x86, may have conditionals that don't behave so well for other
+ * chips.
+ *
+ * \c div_floor(i,j) rounds integer division \c i/j toward negative infinity
+ * for any \c j>0.  It was developed to produce decent x86 code.
+ * \sa idiv.hpp
+ *
+ * We now derive a way to do all calculations with positive integers,
+ * avoiding negatives.  Such a calculation is now correct when evaluated
+ * with unsigned integers, and also allows normal division to be used.
+ *
+ * - First, solve for \c kh, assuming div_floor rounding.
+ *   - ih = oh * p->sh - p->ph + kh * (p->dh + 1)
+ *   - \f$ih = oh*SH - PH + kh*DH\f$
+ *   - \f$kh*DH = ih + PH - oh*SH\f$
+ *   - \f$kh = div\_floor( ih+PH-oh*SH+DH-1, DH )\f$, which we'll loosely call
+ *   - \f$kh(ih,oh) \approx (ih+DH-1+PH-oh*SH) / DH\f$
+ *                  (equality for +ve numerator & denominator)
+ *
+ * - \f$kh_{beg}\f$, the lowest \c kh value, is associated with the lowest
+ *   possible \c oh.
+ *   - We avoid testing for values of zero, since division values of zero can
+ *     result by rounding negative integers upward
+ * - Consider \f$kh(ih,oh) >= 1\f$
+ *   - \f$ (0 + DH-1+PH-oh*SH) / DH >= 1\f$  (for +ve numerator & denominator)
+ *   - \f$ DH-1+PH-oh*SH >= DH\f$
+ *   - \f$ PH-1 - oh*SH >= 0\f$
+ *   - \f$ oh*SH <= PH-1 \f$
+ *   - \f$ oh*SH < PH \f$
+ * - Therefore if \f$oh*SH < PH\f$, we use the formula
+ *   \f$kh_{beg}=(DH-1+[PH-oh*SH]) / DH\f$.
+ *   - Notice that both numerator and denominator are both strictly positive.
+ *   - So this formula is correct for signed/unsigned integers.
+ * - Otherwise, \f$kh_{beg} = 0\f$, the lowest possible value.
+ * - We don't need to set \f$kh_{beg} > KH\f$, because only the
+ *   \f$kh_{beg} < kh_{end}\f$ affects the rewritten \c for loop.
+ *
+ *
+ * - Now Consider \f$kh_{end} >= KH\f$, where KH is the highest valid value for \f$kh_{end}\f$
+ *   - The largest \f$kh\f$ occurs when \c ih has it's largest possible value, \c IH.
+ * - Let's first check for \f$kh(ih,oh) >= KH\f$
+ *   - \f$ (IH + DH-1 + PH - oh*SH) / DH >= KH \f$
+ *   - \f$ IH + DH - 1 + PH - oh*SH  >= KH*DH \f$
+ *   - \f$ KH*DH + oh*SH + 1 <= IH+PH+DH \f$, now RHS and LHS are positive
+ *   - \f$ KH*DH + oh*SH < IH+PH+DH \f$
+ *   - When the above condition holds, we can set \f$kh_{end} = KH\f$ (maximal value)
+ * - Otherwise we can also check for \f$kh(ih,oh) >= 1\f$, so that we can safely use
+ *   division with positive integers.
+ *   - Replacing 'KH' with '1' in above...  \f$ 1*DH + oh*SH < IH+PH+DH \f$
+ *   - So when \f$oh*SH < IH+PH\f$, \f$kh_{end} =  (DH-1 + [IH+PH - oh*SH]) / DH \f$
+ *     will be \f$ > 0\f$
+ *     - Otherwise we can set \f$kh_{end} = 0\f$
+ *
+ * So the \em long-hand +ve integer solutions for \c kh_beg and \c kh_end are:
+ *
+ * \code
+ * if( oh*SH < PH )
+ *   kh_beg = (p->dh + (PH - oh * SH)) / DH;
+ * else
+ *   kh_beg = 0;
+ * \endcode
+ * and a slightly longer version for \f$kh_{end}\f$ :
+ * \code
+ * if (oh*SH + KH*DH < IH + PH + DH)
+ *   kh_end = KH;
+ * else if (oh*SH >= IH+PH)
+ *   kh_end = 0;
+ * else
+ *   kh_end = ([IH+PH - oh*SH] + DH-1) / DH;
+ * \endcode
+ *
+ * This approach might be a tiny bit faster than the signed-integer \e idiv method.
+ *
+ * \ref sxconv_4_fwd shows how this can be done, and results in big speedups for sxc++,
+ * whose compiler can vectorize the few remaining simple conditionals quite well (apparently).
+ *
+ * Other SX optimizations include using unit-stride temporaries, since complex expressions
+ * with multiple strided vectors are sometimes not vectorized very well.
+ */
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

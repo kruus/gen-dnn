@@ -348,7 +348,7 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
 #endif
 
     auto ker = [&](int g, int mb, int ic, int id, int ih, int iw) {
-        printf("k"); fflush(stdout);
+        //printf("k"); fflush(stdout);
         acc_data_t d = 0;
         for_(int oc = 0; oc < OC; ++oc)
         for_(int kd = 0; kd < KD; ++kd)
@@ -434,7 +434,7 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
             = (ndims >= 4) ? weights_str[ndims - 3 + gr_shift] : 0;
 
     auto ker_plain = [&](int g, int mb, int ic, int id, int ih, int iw) {
-        printf("p"); fflush(stdout);
+        //printf("p"); fflush(stdout);
         assert(3 <= ndims && ndims <= 5);
         acc_data_t d = 0;
 #if 0

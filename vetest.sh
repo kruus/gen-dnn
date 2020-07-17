@@ -226,10 +226,16 @@ TEST_ENV+=(VE_NODE_NUMBER=${NODE})
 
 if [ "debug log4c" -a "${VEOSLOG}" ]; then
   # following put ve_exec (etc.) logs in current directory, at DEBUG level
-  if [ ! -d ve ]; then mkdir ve; fi
+  if [ ! -d ve ]; then
+    mkdir ve
+  else
+    # clear out old files a week or older -- ve/ can get huge
+    find ve -maxdepth 1 -mtime +7 -type f -print0 | xargs -0 rm
+  fi
   cat /etc/opt/nec/ve/veos/log4crc \
     | sed -e 's/INFO/DEBUG/;s/CRIT/DEBUG/;s/layout="ve"/layout="ve_debug"/' \
     > ./ve/log4crc
+  # adjust according to desired debug level...
   #export LOG4C_RCPATH=`pwd`/ve # ---> ve_exec.log.PID under ve/
   export LOG4C_RCPATH=`pwd`
 else
