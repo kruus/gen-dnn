@@ -28,57 +28,6 @@ namespace dnnl {
 namespace impl {
 namespace cpu {
 
-namespace {
-//
-// remap scalar offset calls uniformly via a 6-arg version.
-// Set a function pointer to the "right version".
-// Variants differ on which args are ignored before calling
-// memory_desc_wrapper::off function
-//
-// NOT inline because purpose is to call via a fn ptr
-// (easier-to-read code)
-//
-// mdw.off is a slow fn call anyway on VE, that eventually
-// might be handled better by vectorizing the offset calc.
-//
-static dim_t offg5d(memory_desc_wrapper const& mdw,
-        int const g, int const oc, int const ic,
-        int const kd, int const kh, int const kw) {
-    return mdw.off(g, oc, ic, kd, kh, kw);
-}
-static dim_t off5d(memory_desc_wrapper const& mdw,
-        int const /*g*/, int const oc, int const ic,
-        int const kd, int const kh, int const kw) {
-    return mdw.off(oc, ic, kd, kh, kw);
-};
-static dim_t offg4d(memory_desc_wrapper const& mdw,
-        int const g, int const oc, int const ic,
-        int const /*kd*/, int const kh, int const kw) {
-    return mdw.off(g, oc, ic, kh, kw);
-};
-static dim_t off4d(memory_desc_wrapper const& mdw,
-        int const /*g*/, int const oc, int const ic,
-        int const /*kd*/, int const kh, int const kw) {
-    return mdw.off(oc, ic, kh, kw);
-};
-static dim_t offg3d(memory_desc_wrapper const& mdw,
-        int const g, int const oc, int const ic,
-        int const /*kd*/, int const /*kh*/, int const kw) {
-    return mdw.off(g, oc, ic, kw);
-};
-static dim_t off3d(memory_desc_wrapper const& mdw,
-        int const /*g*/, int const oc, int const ic,
-        int const /*kd*/, int const /*kh*/, int const kw) {
-    return mdw.off(oc, ic, kw);
-};
-static dim_t oops(memory_desc_wrapper const& mdw,
-        int const /*g*/, int const /*oc*/, int const /*ic*/,
-        int const /*kd*/, int const /*kh*/, int const /*kw*/) {
-    assert(false);
-    return dim_t{0};
-};
-}//anon::
-
 using math::get_bias;
 
 template <data_type_t src_type, data_type_t wei_type, data_type_t dst_type,
@@ -353,7 +302,47 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
         d *= scales[(g * OC + ic) * scale_idx_mult];
     };
 
-    // make offset calls "look the same"
+#define OFFND 2 /* 0,1,2 for more template magic */
+// OFFND 0 is OK for test :
+// --conv --dir=FWD_D,BWD_D --stag=aBcd16b --wtag=Abcde16a --dtag=aBcd16b mb1_g16ic16oc16_ih500oh698kh3sh1dh0ph100_iw500ow698kw3sw1dw0pw100
+#if OFFND > 0
+    // Note: Likely faster for nc++ as as non-lambda helpers,
+    // perhaps templated on <with_groups> like simpler_reorder.hpp.
+    auto offg5d = [](memory_desc_wrapper const& mdw,
+            int const g, int const oc, int const ic,
+            int const kd, int const kh, int const kw) {
+        return mdw.off(g, oc, ic, kd, kh, kw);
+    };
+    auto off5d = [](memory_desc_wrapper const& mdw,
+            int const /*g*/, int const oc, int const ic,
+            int const kd, int const kh, int const kw) {
+        return mdw.off(oc, ic, kd, kh, kw);
+    };
+    auto offg4d = [](memory_desc_wrapper const& mdw,
+            int const g, int const oc, int const ic,
+            int const /*kd*/, int const kh, int const kw) {
+        return mdw.off(g, oc, ic, kh, kw);
+    };
+    auto off4d = [](memory_desc_wrapper const& mdw,
+            int const /*g*/, int const oc, int const ic,
+            int const /*kd*/, int const kh, int const kw) {
+        return mdw.off(oc, ic, kh, kw);
+    };
+    auto offg3d = [](memory_desc_wrapper const& mdw,
+            int const g, int const oc, int const ic,
+            int const /*kd*/, int const /*kh*/, int const kw) {
+        return mdw.off(g, oc, ic, kw);
+    };
+    auto off3d = [](memory_desc_wrapper const& mdw,
+            int const /*g*/, int const oc, int const ic,
+            int const /*kd*/, int const /*kh*/, int const kw) {
+        return mdw.off(oc, ic, kw);
+    };
+    auto oops = [](memory_desc_wrapper const& mdw,
+            int const /*g*/, int const /*oc*/, int const /*ic*/,
+            int const /*kd*/, int const /*kh*/, int const /*kw*/) {
+        assert(false); return dim_t{0};
+    };
     auto offnd_g = (with_groups
             ? (ndims == 5? offg5d: ndims == 4? offg4d:
                 ndims == 3? offg3d: oops)
@@ -361,6 +350,7 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
                 ndims == 3? off3d: oops));
     auto offnd = (ndims == 5? off5d: ndims == 4? off4d:
                 ndims == 3? off3d: oops);
+#endif
 
     auto ker = [&](int g, int mb, int ic, int id, int ih, int iw) {
         //printf("k"); fflush(stdout);
@@ -375,8 +365,8 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
             int ow = iw - kw * KDW + padL;
             int oh = ih - kh * KDH + padT;
             int od = id - kd * KDD + padFront;
-            // hoisting this conditional can be a little more complex! See
-            // ex. ref_conv3.cpp for handling ow_beg/end and ow inner loop
+            // hoisting this conditional, follow (e.g.) ref_conv3.cpp example code
+            //    (shows how to handle oh_beg/end and ow_beg/end)
             if (ow % KSW != 0 || oh % KSH != 0 || od % KSD != 0) continue;
 
             ow /= KSW;
@@ -384,12 +374,66 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
             od /= KSD;
 
             if (od < OD && oh < OH && ow < OW) {
-                // single-statement approach had issues?
-                acc_data_t const dd = diff_dst[offnd(
-                        diff_dst_d, 0, mb, g * OC + oc, od, oh, ow)];
-                acc_data_t const ww = weights[offnd_g(
-                        weights_d, g, oc, ic, kd, kh, kw)];
-                d += dd * ww;
+#if OFFND <= 1
+                if (ndims == 5)
+                    d += (acc_data_t)diff_dst[diff_dst_d.off(
+                                 mb, g * OC + oc, od, oh, ow)]
+#if OFFND==0
+                            * (with_groups ? weights[weights_d.off(
+                                       g, oc, ic, kd, kh, kw)]
+                                           : weights[weights_d.off(
+                                                   oc, ic, kd, kh, kw)]);
+#else
+                            * weights[offnd_g(weights_d,
+                                    g, oc, ic, kd, kh, kw)];
+#endif
+                else if (ndims == 4)
+#if 0 // orig
+                    d += (acc_data_t)(diff_dst[diff_dst_d.off(
+                                 mb, g * OC + oc, oh, ow)]
+#if OFFND==0 //both branches OK
+                            * (with_groups ? weights[weights_d.off(
+                                       g, oc, ic, kh, kw)]
+                                           : weights[weights_d.off(
+                                                   oc, ic, kh, kw)]);
+#else
+                            * weights[offnd_g(weights_d,
+                                    g, oc, ic, kd, kh, kw)]);
+#endif
+#else // try both...
+                {
+                    acc_data_t const dd = (acc_data_t)(diff_dst[offnd(
+                                diff_dst_d, 0/*ignored*/, mb,
+                                g * OC + oc, od/*ignored*/, oh, ow)]);
+                    auto const ww = weights[offnd_g(
+                            weights_d, g, oc, ic, kd, kh, kw)];
+                    d += dd * ww;
+                }
+#endif
+                else if (ndims == 3)
+                    d += (acc_data_t)diff_dst[diff_dst_d.off(
+                                 mb, g * OC + oc, ow)]
+#if OFFND == 0
+                            * (with_groups ? weights[weights_d.off(
+                                       g, oc, ic, kw)]
+                                           : weights[weights_d.off(
+                                                   oc, ic, kw)]);
+#else
+                            * weights[offnd_g(weights_d,
+                                    g, oc, ic, kd, kh, kw)];
+#endif
+                else
+                    assert(false);
+#elif OFFND >= 2 // more generic
+                {
+                    // single-statement approach had issues?
+                    acc_data_t const dd = diff_dst[offnd(
+                                diff_dst_d, 0, mb, g * OC + oc, od, oh, ow)];
+                    acc_data_t const ww = weights[offnd_g(
+                            weights_d, g, oc, ic, kd, kh, kw)];
+                    d += dd * ww;
+                }
+#endif
             }
         }
         return d;
@@ -416,8 +460,28 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
         //printf("p"); fflush(stdout);
         assert(3 <= ndims && ndims <= 5);
         acc_data_t d = 0;
+#if OFFND == 0
+        const dim_t diff_dst_loc_off = (ndims == 5)
+                ? diff_dst_d.off(mb, g * OC, 0, 0, 0)
+                : (ndims == 4)
+                        ? diff_dst_d.off(mb, g * OC, 0, 0)
+                        : (ndims == 3) ? diff_dst_d.off(mb, g * OC, 0) : 0;
+#else
         const dim_t diff_dst_loc_off = offnd(diff_dst_d, 0, mb, g*OC, 0, 0, 0);
+#endif
+#if OFFND == 0
+        const dim_t weights_loc_off = (ndims == 5)
+                ? with_groups ? weights_d.off(g, 0, ic, 0, 0, 0)
+                              : weights_d.off(0, ic, 0, 0, 0)
+                : (ndims == 4) ? with_groups ? weights_d.off(g, 0, ic, 0, 0)
+                                             : weights_d.off(0, ic, 0, 0)
+                               : (ndims == 3) ? with_groups
+                                        ? weights_d.off(g, 0, ic, 0)
+                                        : weights_d.off(0, ic, 0)
+                                              : 0;
+#else
         const dim_t weights_loc_off = offnd_g(weights_d, g, 0, ic, 0, 0, 0);
+#endif
 
         const diff_dst_data_t *__restrict diff_dst_loc
                 = diff_dst + diff_dst_loc_off;
@@ -545,16 +609,7 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
     using namespace data_type;
     bool is_int_conv = utils::one_of(src_type, s32, s8, u8);
 
-    // make offset calls "look the same"
-    auto offnd_g = (with_groups
-            ? (ndims == 5? offg5d: ndims == 4? offg4d:
-                ndims == 3? offg3d: oops)
-            : (ndims == 5? off5d: ndims == 4? off4d:
-                ndims == 3? off3d: oops));
-    auto offnd = (ndims == 5? off5d: ndims == 4? off4d:
-                ndims == 3? off3d: oops);
-
-    auto ker = [=,&offnd](acc_data_t &d, int g, int oc, int ic, int kd, int kh,
+    auto ker = [=](acc_data_t &d, int g, int oc, int ic, int kd, int kh,
                        int kw) {
         for_(int mb = 0; mb < MB; ++mb)
         for_(int od = 0; od < OD; ++od)
@@ -570,17 +625,23 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
             int id = od * KSD - padFront + kd * KDD;
             int ih = oh * KSH - padT + kh * KDH;
             int iw = ow * KSW - padL + kw * KDW;
-            {
-                acc_data_t const dd = diff_dst[ offnd(diff_dst_d,
-                        0, mb, g*OC+oc, od, oh, ow) ];
-                acc_data_t const ss = src[ offnd(src_d,
-                        0, mb, g*IC+ic, id, ih, iw) ];
-                d += dd * ss;
-            }
+            if (ndims == 5)
+                d += (acc_data_t)diff_dst[diff_dst_d.off(
+                             mb, g * OC + oc, od, oh, ow)]
+                        * src[src_d.off(mb, g * IC + ic, id, ih, iw)];
+            else if (ndims == 4)
+                d += (acc_data_t)diff_dst[diff_dst_d.off(
+                             mb, g * OC + oc, oh, ow)]
+                        * src[src_d.off(mb, g * IC + ic, ih, iw)];
+            else if (ndims == 3)
+                d += (acc_data_t)diff_dst[diff_dst_d.off(mb, g * OC + oc, ow)]
+                        * src[src_d.off(mb, g * IC + ic, iw)];
+            else
+                assert(false);
         }
     };
 
-    auto ker_plain = [=,&offnd](acc_data_t &d, int g, int oc, int ic, int kd, int kh,
+    auto ker_plain = [=](acc_data_t &d, int g, int oc, int ic, int kd, int kh,
                              int kw) {
         assert(3 <= ndims && ndims <= 5);
         // help compiler optimize the code
@@ -598,9 +659,17 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
         const dim_t src_ih_stride = (ndims >= 4) ? src_str[ndims - 2] : 0;
         const dim_t src_id_stride = (ndims >= 5) ? src_str[ndims - 3] : 0;
 
-        // always-6-args version:
-        const dim_t diff_dst_loc_off = offnd(diff_dst_d, 0, 0, g * OC + oc, 0, 0, 0);
-        const dim_t src_loc_off      = offnd(src_d,      0, 0, g * IC + ic, 0, 0, 0);
+        const dim_t diff_dst_loc_off = (ndims == 5)
+                ? diff_dst_d.off(0, g * OC + oc, 0, 0, 0)
+                : (ndims == 4)
+                        ? diff_dst_d.off(0, g * OC + oc, 0, 0)
+                        : (ndims == 3) ? diff_dst_d.off(0, g * OC + oc, 0) : 0;
+
+        const dim_t src_loc_off = (ndims == 5)
+                ? src_d.off(0, g * IC + ic, 0, 0, 0)
+                : (ndims == 4)
+                        ? src_d.off(0, g * IC + ic, 0, 0)
+                        : (ndims == 3) ? src_d.off(0, g * IC + ic, 0) : 0;
 
         const diff_dst_data_t *__restrict diff_dst_loc
                 = diff_dst + diff_dst_loc_off;
@@ -624,13 +693,21 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
         }
     };
 
-    auto ker_bias = [=,&offnd](acc_data_t &d, int g, int oc) {
+    auto ker_bias = [=](acc_data_t &d, int g, int oc) {
         for_(int mb = 0; mb < MB; ++mb)
         for_(int od = 0; od < OD; ++od)
         for_(int oh = 0; oh < OH; ++oh)
         for (int ow = 0; ow < OW; ++ow) {
-            d += (acc_data_t) diff_dst[ offnd(diff_dst_d,
-                    0, mb, g * OC + oc, od, oh, ow)];
+            if (ndims == 5)
+                d += (acc_data_t)
+                        diff_dst[diff_dst_d.off(mb, g * OC + oc, od, oh, ow)];
+            else if (ndims == 4)
+                d += (acc_data_t)
+                        diff_dst[diff_dst_d.off(mb, g * OC + oc, oh, ow)];
+            else if (ndims == 3)
+                d += (acc_data_t)diff_dst[diff_dst_d.off(mb, g * OC + oc, ow)];
+            else
+                assert(false);
         }
     };
 
@@ -658,7 +735,18 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
             else
                 ker(dw, g, oc, ic, kd, kh, kw);
 
-            const dim_t idx = offnd_g(diff_weights_d, g, oc, ic, kd, kh, kw);
+            dim_t idx {0};
+            if (ndims == 5)
+                idx = with_groups ? diff_weights_d.off(g, oc, ic, kd, kh, kw)
+                                  : diff_weights_d.off(oc, ic, kd, kh, kw);
+            else if (ndims == 4)
+                idx = with_groups ? diff_weights_d.off(g, oc, ic, kh, kw)
+                                  : diff_weights_d.off(oc, ic, kh, kw);
+            else if (ndims == 3)
+                idx = with_groups ? diff_weights_d.off(g, oc, ic, kw)
+                                  : diff_weights_d.off(oc, ic, kw);
+            else
+                assert(false);
             if (is_int_conv)
                 diff_weights[idx] = round_and_saturate<diff_wei_data_t>(dw);
             else

@@ -3,7 +3,14 @@
 lambda function overhead fairly noticable. Lambdas not inlined, while
 true func calls can be inlined.
 
-conditions inside loops can create problems / slowdowns,
+Sometimes VE_OMP_NUM_THREADS>1 VE_PROGINFO=DETAIL runs hang during exit
+stats printout.
+
+Depending sentsitively on compile options, zero, underlow and overflow results
+like +/-NaN and +/-inf for vectorized math functions may not agree with scalar
+(or IEEE) results.  Usually the scalar functions conform to standards.
+
+Conditions inside loops can create problems / slowdowns,
 even if compile-time const.
 
 arrange inner loops to have high vector length.
@@ -181,3 +188,25 @@ gtests: failed: ;test_deconvolution;test_eltwise
 	--conv --dir=BWD_D g32ic32ih112oc32oh112kh3ph1n"mobilenet:conv2_1/dw"
 		Hopefully an init() logic bug (try using consistency.hpp for the header *first*)
 
+----------------------------------------- 
+After some col2im & im2col fixes (conditional hoisting), some of above errors now pass.
+Gtests now show some errors:
+
+BackwardData_Simple_NCHW_CPU/convolution_test.TestConvolution/6 FAILED during
+	build-vejd2/tests/gtests/test_convolution_backward_data_f32
+A corresponding "wrong result" benchdnn test is:
+	--mode=C --conv --dir=BWD_D --stag=acdb --wtag=decab --dtag=axb mb2_g2ic4oc6_ih4oh4kh3sh1dh0ph0_iw4ow4kw3sw1dw0pw0
+This failure exercises ref:any backward_data:
+gtest:
+dnnl_verbose,exec,cpu,convolution,ref:any,backward_data,src_f32::blocked:acdb:f0 wei_f32::blocked:decab:f0 bia_undef::undef::f0 dst_f32::blocked:acdb:f0,,alg:convolution_direct,mb2_g2ic4oc6_ih4oh4kh3sh1dh0ph0_iw4ow4kw3sw1dw0pw0,0.218018
+benchdnn:
+dnnl_verbose,exec,cpu,convolution,ref:any,backward_data,src_f32::blocked:acdb:f0 wei_f32::blocked:decab:f0 bia_undef::undef::f0 dst_f32::blocked:acdb:f0,,alg:convolution_direct,mb2_g2ic4oc6_ih4oh4kh3sh1dh0ph0_iw4ow4kw3sw1dw0pw0,0.220947
+
+Also test:
+   wrong results:
+	--conv --dir=BWD_D --stag=aBcd16b --wtag=abcde --dtag=aBcd16b mb1_g16ic16oc16_ih500oh698kh3sh1dh0ph100_iw500ow698kw3sw1dw0pw100
+   segfault:
+	--conv --dir=BWD_D --stag=aBcd16b --wtag=Abcde16a --dtag=aBcd16b mb1_g16ic16oc16_ih500oh698kh3sh1dh0ph100_iw500ow698kw3sw1dw0pw100
+In some respects, segfault is nicer because maybe gdb backtrace can (if very lucky) point at potential issues.
+	... Ex. ref_convolution.cpp:365 'if(...) continue'
+	... FIXED (test in stages, OFFND=0,1,2 : split apart monolithic "d +=" into 3 statements
