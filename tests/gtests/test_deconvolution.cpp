@@ -420,9 +420,11 @@ protected:
         auto weights_tr = memory(*con_weights_desc, eng);
         transpose_wei<data_t>(dd, weights->get(), weights_tr);
 
+        printf(" cf.data...");
         compare_data<data_t>(weights_tr, conv_weights);
 
         if (with_bias) {
+            printf(" cf.bias...");
             auto ref_bias = memory(*dec_bias_desc, eng);
             compute_bias_bwd<data_t>(dd, dst->get(), ref_bias);
             compare_data<data_t>(ref_bias, bias->get());
@@ -468,7 +470,8 @@ CPU_INST_TEST_CASE(SimpleSmall_NCHW,
         PARAMS(nhwc, oihw, x, nhwc, 2, 1, 6, 2, 2, 4, 4, 4, 3, 3, 0, 0, 1, 1),
         PARAMS(nhwc, hwio, x, nhwc, 2, 1, 6, 4, 4, 4, 4, 4, 3, 3, 1, 1, 1, 1),
         PARAMS(nhwc, hwio, x, nhwc, 2, 1, 6, 2, 2, 4, 4, 4, 3, 3, 0, 0, 1, 1),
-        PARAMS(nhwc, goihw, x, nhwc, 2, 2, 6, 4, 4, 4, 4, 4, 3, 3, 0, 0, 1, 1),
+        //PARAMS(nhwc, goihw, x, nhwc, 2, 2, 6, 4, 4, 4, 4, 4, 3, 3, 0, 0, 1, 1),
+        PARAMS(nhwc, goihw, x, nhwc, 2, 2, 6, 2, 2, 4, 4, 4, 3, 3, 0, 0, 1, 1),
         PARAMS(nhwc, hwigo, x, nhwc, 2, 2, 6, 4, 4, 4, 4, 4, 3, 3, 1, 1, 1, 1)
 
 );
@@ -521,7 +524,8 @@ GPU_INST_TEST_CASE(SimpleSmall_NCHW,
         PARAMS(nhwc, oihw, x, nhwc, 2, 1, 6, 2, 2, 4, 4, 4, 3, 3, 0, 0, 1, 1),
         PARAMS(nhwc, hwio, x, nhwc, 2, 1, 6, 4, 4, 4, 4, 4, 3, 3, 1, 1, 1, 1),
         PARAMS(nhwc, hwio, x, nhwc, 2, 1, 6, 2, 2, 4, 4, 4, 3, 3, 0, 0, 1, 1),
-        PARAMS(nhwc, goihw, x, nhwc, 2, 2, 6, 4, 4, 4, 4, 4, 3, 3, 0, 0, 1, 1),
+        //PARAMS(nhwc, goihw, x, nhwc, 2, 2, 6, 4, 4, 4, 4, 4, 3, 3, 0, 0, 1, 1),
+        PARAMS(nhwc, goihw, x, nhwc, 2, 2, 6, 2, 2, 4, 4, 4, 3, 3, 0, 0, 1, 1),
         PARAMS(nhwc, hwigo, x, nhwc, 2, 2, 6, 4, 4, 4, 4, 4, 3, 3, 1, 1, 1, 1)
 
 );

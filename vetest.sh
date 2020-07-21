@@ -230,7 +230,7 @@ if [ "debug log4c" -a "${VEOSLOG}" ]; then
     mkdir ve
   else
     # clear out old files a week or older -- ve/ can get huge
-    find ve -maxdepth 1 -mtime +7 -type f -print0 | xargs -0 rm
+    find ve -maxdepth 1 -mtime +7 -type f -print0 | xargs -0 rm -f
   fi
   cat /etc/opt/nec/ve/veos/log4crc \
     | sed -e 's/INFO/DEBUG/;s/CRIT/DEBUG/;s/layout="ve"/layout="ve_debug"/' \
@@ -560,9 +560,9 @@ if [ ${fail} -gt 0 ]; then
   mv -v ve_*.log* ve/ || echo "(no ve_*.log* in current dir)"
   comment "Common VE exit codes (${fail} failure[s]):"
   comment "    1 --> failed assertion"
-  comment "  134 --> Unable to grow stack"
+  comment "  134 --> Unable to grow stack (veos)"
   comment "  137 --> free(): invalid pointer: 0x..., and backtrace"
-  comment "  139 --> Segmentation fault: Address not mapped to object at 0x..."
+  comment "  139 --> Address not mapped to object at 0x... segfault"
 fi
 options
 if [ ${ok} -gt 0 ]; then

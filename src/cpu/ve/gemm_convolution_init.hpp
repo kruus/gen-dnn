@@ -93,6 +93,7 @@ inline status_t gemm_convolution_bwd_weights_t::pd_t::init(engine_t *engine) {
     return jit_gemm_convolution_utils::init_conf(jcp_, scratchpad,
             *desc(), src_md(), diff_weights_md(0), diff_dst_md(),
             dnnl_get_max_threads());
+#undef AND_
 }
 
 } // namespace cpu

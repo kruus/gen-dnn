@@ -210,3 +210,103 @@ Also test:
 In some respects, segfault is nicer because maybe gdb backtrace can (if very lucky) point at potential issues.
 	... Ex. ref_convolution.cpp:365 'if(...) continue'
 	... FIXED (test in stages, OFFND=0,1,2 : split apart monolithic "d +=" into 3 statements
+
+Next corruption : --conv g1ic3ih224oc64oh112kh7sh2ph3
+	 /home/kruus/vanilla-dbg/src/cpu/ve/gemm_convolution_utils.cpp:787   im2col
+
+------------------------------ now tackle deconv gtest issue
+[ RUN      ] SimpleSmall_NCHW_CPU/deconvolution_test_float.TestDeconvolution/3
+ ref_deconvolution_bwd_t [/home/kruus/vanilla-dbg/src/cpu/ve/ref_deconvolution.hpp:323] (desc()->prop_kind == prop_kind::backward_data)
+dnnl_verbose,create:cache_miss,cpu,convolution,ref:any,backward_data,src_f32::blocked:acdb:f0 wei_f32::blocked:cdab:f0 bia_f32::blocked:a:f0 dst_f32::blocked:acdb:f0,scratchpad_mode:user;,alg:convolution_direct,mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.0551758
+dnnl_verbose,create:cache_miss,cpu,deconvolution,ref:any,forward_training,src_f32::blocked:acdb:f0 wei_f32::blocked:cdba:f0 bia_f32::blocked:a:f0 dst_f32::blocked:acdb:f0,,alg:deconvolution_direct,mb2_ic6oc4_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.529053
+dnnl_verbose,exec,cpu,deconvolution,ref:any,forward_training,src_f32::blocked:acdb:f0 wei_f32::blocked:cdba:f0 bia_f32::blocked:a:f0 dst_f32::blocked:acdb:f0,,alg:deconvolution_direct,mb2_ic6oc4_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.531982
+dnnl_verbose,create:cache_miss,cpu,convolution,ref:any,backward_data,src_f32::blocked:acdb:f0 wei_f32::blocked:cdba:f0 bia_undef::undef::f0 dst_f32::blocked:acdb:f0,,alg:convolution_direct,mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.0620117
+dnnl_verbose,exec,cpu,convolution,ref:any,backward_data,src_f32::blocked:acdb:f0 wei_f32::blocked:cdba:f0 bia_undef::undef::f0 dst_f32::blocked:acdb:f0,,alg:convolution_direct,mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.447998
+ ref_deconvolution_bwd_t [/home/kruus/vanilla-dbg/src/cpu/ve/ref_deconvolution.hpp:323] (desc()->prop_kind == prop_kind::backward_data)
+dnnl_verbose,create:cache_miss,cpu,convolution,ref:any,forward_training,src_f32::blocked:acdb:f0 wei_f32::blocked:cdab:f0 bia_undef::undef::f0 dst_f32::blocked:acdb:f0,scratchpad_mode:user;,alg:convolution_direct,mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.0529785
+dnnl_verbose,create:cache_miss,cpu,deconvolution,ref:any,backward_data,src_f32::blocked:acdb:f0 wei_f32::blocked:cdba:f0 bia_undef::undef::f0 dst_f32::blocked:acdb:f0,,alg:deconvolution_direct,mb2_ic6oc4_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.5271
+dnnl_verbose,exec,cpu,deconvolution,ref:any,backward_data,src_f32::blocked:acdb:f0 wei_f32::blocked:cdba:f0 bia_undef::undef::f0 dst_f32::blocked:acdb:f0,,alg:deconvolution_direct,mb2_ic6oc4_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.49292
+dnnl_verbose,create:cache_miss,cpu,convolution,ref:any,forward_training,src_f32::blocked:acdb:f0 wei_f32::blocked:cdba:f0 bia_undef::undef::f0 dst_f32::blocked:acdb:f0,,alg:convolution_direct,mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.0629883
+dnnl_verbose,exec,cpu,convolution,ref:any,forward_training,src_f32::blocked:acdb:f0 wei_f32::blocked:cdba:f0 bia_undef::undef::f0 dst_f32::blocked:acdb:f0,,alg:convolution_direct,mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.444092
+ ref_deconvolution_bwd_t [/home/kruus/vanilla-dbg/src/cpu/ve/ref_deconvolution.hpp:323] (desc()->prop_kind == prop_kind::backward_data)
+dnnl_verbose,create:cache_miss,cpu,convolution,ref:any,backward_weights,src_f32::blocked:acdb:f0 wei_f32::blocked:cdab:f0 bia_undef::undef::f0 dst_f32::blocked:acdb:f0,scratchpad_mode:user;,alg:convolution_direct,mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.0510254
+dnnl_verbose,create:cache_miss,cpu,deconvolution,ref:any,backward_weights,src_f32::blocked:acdb:f0 wei_f32::blocked:cdba:f0 bia_f32::blocked:a:f0 dst_f32::blocked:acdb:f0,,alg:deconvolution_direct,mb2_ic6oc4_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.506836
+dnnl_verbose,exec,cpu,deconvolution,ref:any,backward_weights,src_f32::blocked:acdb:f0 wei_f32::blocked:cdba:f0 bia_f32::blocked:a:f0 dst_f32::blocked:acdb:f0,,alg:deconvolution_direct,mb2_ic6oc4_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.141113
+dnnl_verbose,create:cache_miss,cpu,convolution,ref:any,backward_weights,src_f32::blocked:acdb:f0 wei_f32::blocked:cdba:f0 bia_undef::undef::f0 dst_f32::blocked:acdb:f0,,alg:convolution_direct,mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.0629883
+dnnl_verbose,exec,cpu,convolution,ref:any,backward_weights,src_f32::blocked:acdb:f0 wei_f32::blocked:cdba:f0 bia_undef::undef::f0 dst_f32::blocked:acdb:f0,,alg:convolution_direct,mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.0788574
+benchdnn: --deconv --dir=FWD_D,BWD_W,BWD_D --stag=acdb --wtag=cdba --dtag=acdb mb2_ic6oc4_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1
+
+--deconv --dir=FWD_D,BWD_D,BWD_W --stag=acdb --wtag=cdba --dtag=acdb mb2_ic6oc4_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1
+fails for BWD_W (FWD_D,BWD_D ok)
+run: --deconv --dir=BWD_W --stag=acdb --wtag=cdba --dtag=acdb ic6ih4oc4oh4kh3ph1
+oneDNN implementation: ref:any
+dnnl_verbose,create:cache_miss,cpu,convolution,ref:any,backward_weights,src_f32::blocked:acdb:f0 wei_f32::blocked:cdab:f0 bia_undef::undef::f0 dst_f32::blocked:acdb:f0,scratchpad_mode:user;,alg:convolution_direct,mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.0529785
+
+also fails during corresponding --conv operation, for BWD_W only:
+	--conv --dir=FWD_D,BWD_D,BWD_W --stag=acdb --wtag=cdba --dtag=acdb mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1
+Thread 3 "ve_exec" received signal SIGSEGV, Segmentation fault.
+[Switching to Thread 0x7ff817fff000 (LWP 112248)]
+0x000060000ba27780 in dnnl_primitive_attr::_ZZNK4dnnl4impl3cpu21ref_convolution_fwd_tIL16dnnl_data_type_t3ELS3_3ELS3_3ELS3_3EE15execute_forwardERKNS0_10exec_ctx_tEEUlRffE_::_ZZNK4dnnl4impl3cpu21ref_convolution_fwd_tIL16dnnl_data_type_t3ELS3_3ELS3_3ELS3_3EE15execute_forwardERKNS0_10exec_ctx_tEEUliiiiiiE_::_ZZNK4dnnl4impl3cpu21ref_convolution_fwd_tIL16dnnl_data_type_t3ELS3_3ELS3_9
+609             for_(dim_t mb = 0; mb < MB; ++mb)
+
+dnnl_verbose,create:cache_miss,cpu,deconvolution,ref:any,backward_weights,src_f32::blocked:acdb:f0 wei_f32::blocked:cdba:f0 bia_undef::undef::f0 dst_f32::blocked:acdb:f0,,alg:deconvolution_direct,mb2_ic6oc4_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1,0.51001
+dnnl_verbose,create:cache_miss,cpu,reorder,simple:any,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:acdb:f0,,,2x4x4x4,0.0620117
+dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:acdb:f0,,,2x4x4x4,0.119873
+dnnl_verbose,create:cache_miss,cpu,reorder,simple:any,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:cdba:f0,,,4x6x3x3,0.0610352
+dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:cdba:f0,,,4x6x3x3,0.158936
+dnnl_verbose,create:cache_miss,cpu,reorder,simple:any,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:acdb:f0,,,2x6x4x4,0.0610352
+dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:acdb:f0,,,2x6x4x4,0.171875
+
+Thread 2 "ve_exec" received signal SIGSEGV, Segmentation fault.
+[Switching to Thread 0x7ff80bfff000 (LWP 95163)]
+0x000060000ba277a0 in dnnl_primitive_attr::_ZZNK4dnnl4impl3cpu21ref_convolution_fwd_tIL16dnnl_data_type_t3ELS3_3ELS3_3ELS3_3EE15execute_forwardERKNS0_10exec_ctx_tEEUlRffE_::_ZZNK4dnnl4impl3cpu21ref_convolution_fwd_tIL16dnnl_data_type_t3ELS3_3ELS3_3ELS3_3EE15execute_forwardERKNS0_10exec_ctx_tEEUliiiiiiE_::_ZZNK4dnnl4impl3cpu21ref_convolution_fwd_tIL16dnnl_data_type_t3ELS3_3ELS3_9
+611             for_(dim_t oh = 0; oh < OH; ++oh) (first run)
+609             for_(dim_t mb = 0; mb < MB; ++mb) (next run)
+#3  0x000060000bbac9b8 in dnnl::impl::parallel<void dnnl::impl::parallel_nd<int, int, dnnl::impl::cpu::ref_convolution_bwd_weights_t<(dnnl_data_type_t)3, (dnnl_data_type_t)3, (dnnl_data_type_t)3, (dnnl_data_type_t)3>::execute_backward_weights(dnnl::impl::exec_ctx_t const&) const::{lambda(int, int)#1}>(int const&, int const&, dnnl::impl::cpu::ref_convolution_bwd_weights_t<(dnnl_9
+
+
+split ve/ref_convolution.cpp into 3 files. still segfault w/ 
+BDIR=build-vejd2; { rm -f install; { make -C $BDIR -j 16 install || make -C $BDIR -j 1 install; } >& x.log  && VE_NODE_NUMBER=2 DNNL_VERBOSE=2 gdb --args $BDIR/tests/benchdnn/benchdnn --mode=C -v8 --conv --dir=FWD_D,BWD_D,BWD_WB --stag=axb --dtag=axb mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1 ; }
+
+Thread 3 "ve_exec" received signal SIGSEGV, Segmentation fault.
+[Switching to Thread 0x7ff817fff000 (LWP 106117)]
+0x000060000c898860 in dnnl_primitive_attr::_ZZNK4dnnl4impl3cpu29ref_convolution_bwd_weights_tIL16dnnl_data_type_t3ELS3_3ELS3_3ELS3_3EE24execute_backward_weightsERKNS0_10exec_ctx_tEEUlRfiiiiiiE_::operator() (this=0x60ffffff9370, d=@0x7ff817ffe7a8: 0, g=0, oc=2, ic=0, kd=0, kh=2, kw=0) at /home/kruus/vanilla-dbg/src/cpu/ve/ref_convolution_bwd_w.cpp:100
+100                 int ih = oh * KSH - padT     + kh * KDH; // in [0,IH)
+
+compilation:
+
+[ 27%] Building CXX object src/cpu/CMakeFiles/dnnl_cpu.dir/ve/ref_convolution_bwd_d.cpp.o
+cd /home/kruus/vanilla-dbg/build-vejd2/src/cpu && /opt/nec/ve/bin/nc++-3.0.27  -DDNNL_DLL -DDNNL_DLL_EXPORTS -DDNNL_ENABLE_CONCURRENT_EXEC -DDNNL_ENABLE_MAX_CPU_ISA -DDNNL_VE=1 -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -I/home/kruus/vanilla-dbg/include -I/home/kruus/vanilla-dbg/build-vejd2/include -I/home/kruus/vanilla-dbg/src -I/home/kruus/vanilla-dbg/src/cpu  -include stdint.h -minit-stack=zero -Wunknown-pragma -fdiag-inline=2 -fdiag-vector=2 -report-all -O3 -finline -finline-functions -finline-max-function-size=300 -finline-max-depth=10 -finline-max-times=20 -ftemplate-depth=50 -DCBLAS_LAYOUT=CBLAS_ORDER -DDNNL_VALUE_INITIALIZATION_BUG -pthread -std=gnu++14 -fopenmp   -D_SDL_beg -fPIC -D_FORTIFY_SOURCE=0 -D_SDL_end    -O3 -g2 -DNDEBUG -mretain-list-vector   -finline-max-function-size=12288 -o CMakeFiles/dnnl_cpu.dir/ve/ref_convolution_bwd_d.cpp.o -c /home/kruus/vanilla-dbg/src/cpu/ve/ref_convolution_bwd_d.cpp
+
+now compiling with -O0:
+
+cd /home/kruus/vanilla-dbg/build-vejd2/src/cpu && /opt/nec/ve/bin/nc++-3.0.27  -DDNNL_DLL -DDNNL_DLL_EXPORTS -DDNNL_ENABLE_CONCURRENT_EXEC -DDNNL_ENABLE_MAX_CPU_ISA -DDNNL_VE=1 -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -I/home/kruus/vanilla-dbg/include -I/home/kruus/vanilla-dbg/build-vejd2/include -I/home/kruus/vanilla-dbg/src -I/home/kruus/vanilla-dbg/src/cpu  -include stdint.h -minit-stack=zero -Wunknown-pragma -fdiag-inline=2 -fdiag-vector=2 -report-all -O3 -finline -finline-functions -finline-max-function-size=300 -finline-max-depth=10 -finline-max-times=20 -ftemplate-depth=50 -DCBLAS_LAYOUT=CBLAS_ORDER -DDNNL_VALUE_INITIALIZATION_BUG -pthread -std=gnu++14 -fopenmp   -D_SDL_beg -fPIC -D_FORTIFY_SOURCE=0 -D_SDL_end    -O3 -g2 -DNDEBUG -mretain-list-vector   -finline-max-function-size=12288 -o CMakeFiles/dnnl_cpu.dir/ve/ref_convolution_bwd_d.cpp.o -c /home/kruus/vanilla-dbg/src/cpu/ve/ref_convolution_bwd_d.cpp
+
+
+--------------------------------------------- go back to original bwd_w-orig.ipp implementation
+OK for test_convolution_backward_weights_f32
+failures for test_deconvolution, but they pass in benchdnn: ex:
+--deconv --dir=FWD_D --stag=nhwc --wtag=oihw --dtag=nhwc mb2_ic6oc4_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1
+
+Bias is incorrectly set to zero for benchdnn (deconv.in)
+--deconv --dir=BWD_WB --stag=nhwc --wtag=oihw --dtag=nhwc ic6ih2oc4oh4kh3ph0
+--deconv --dir=BWD_WB --stag=nhwc --wtag=hwio --dtag=nhwc ic6ih4oc4oh4kh3ph1
+--deconv --dir=BWD_WB --stag=nhwc --wtag=hwio --dtag=nhwc ic6ih2oc4oh4kh3ph0
+
+OH. was missing a chunk of code in src/cpu/ve/ref_deconvolution.cpp (WIP)
+
+--------------------------------- fixed some test_convolution_backward_f32, retry kdd2.log
+tests issues with sum [eltwise]
+benchdnn issues:  ldd2.log
+segfault: test_binary_all  --binary --sdt=u8:s8 --ddt=u8 3x5x6x9:3x5x6x9 
+	test_concat-all 	--concat --ddt=u8 --dtag=any --axis=3 3x4x5x13:3x4x5x17 
+	test_conv_functin	--conv --cfg=u8s8s8 --alg=auto ic3ih300oc64oh300kh3ph1n"ssd_300_voc0712:conv1_1"
+				benchdnn -v1 --engine=cpu --conv --batch=inputs/conv/test_conv_function
+				test_benchdnn_conv_function_cpu
+	test_benchdnn_matmul_cpu	--matmul --cfg=u8s8u8 --stag=ab --wtag=ab --attr="oscale=common:2.25*;" m1n1k1
+	test_benchdnn_pool_cpu		--pool --dir=FWD_I --cfg=u8 --tag=axb ic64iw32ow16kw3sw2pw0
+	test_reorder_all	 --reorder --sdt=f32 --ddt=u8 --stag=abx --dtag=abx --attr="oscale=per_dim_1:0.125;" 2x64x3x3 
+	test_shuffle_all	benchdnn -v1 --engine=cpu --shuffle --batch=inputs/shuffle/test_shuffle_all
+				--shuffle --dt=u8 --group=4 1x12x56x56
+--------------------------------- turn off fast reorder compile option in src/cpu/CMakeLists.txt
+ldd.log

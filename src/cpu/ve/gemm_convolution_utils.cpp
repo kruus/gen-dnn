@@ -25,7 +25,7 @@
 #include "cpu/gemm_convolution_utils.hpp"
 
 #include "cpu/platform.hpp"
-#include "common/ve/idiv.hpp"
+#include "cpu/ve/hoist.hpp"
 
 #if defined(__ve)
 typedef int64_t int_t;
@@ -45,8 +45,10 @@ using namespace prop_kind;
 using namespace data_type;
 
 namespace jit_gemm_convolution_utils {
-
 namespace {
+//
+// simplify generic hoist.hpp function for conv_gemm_conf_t &jcp arguments
+//
 /** Calc `oh` loop limits so `ih` lies within valid range.
  * Normally oh goes from 0..jcp.oh-1 and we only use
  * ```
@@ -60,7 +62,7 @@ namespace {
  * (within this file, this is often simplified for special cases to
  *  use the 'saturate' function)
  */
-static inline __attribute((always_inline)) void compute_oh_bounds(
+inline __attribute((always_inline)) void compute_oh_bounds(
         conv_gemm_conf_t const& jcp, int& oh_beg, int& oh_end, int const kh) {
     oh_beg = div_floor( 0      + jcp.t_pad - kh * (jcp.dilate_h + 1) + jcp.stride_h - 1, jcp.stride_h);//(c-a+b-1)/b
     oh_end = div_floor( jcp.ih + jcp.t_pad - kh * (jcp.dilate_h + 1) + jcp.stride_h - 1, jcp.stride_h);//(d-a+b-1)/b
@@ -86,7 +88,7 @@ static inline __attribute((always_inline)) void compute_oh_bounds(
  * \c div_floor does round-to-negative-infinity integer division
  * for +ve numerator `b = jcp.stride_w`.
  */
-static inline __attribute((always_inline)) void compute_ow_bounds(
+inline __attribute((always_inline)) void compute_ow_bounds(
         conv_gemm_conf_t const& jcp, int& ow_beg, int& ow_end, int const kw) {
     // return for(ow_beg..ow_end) loop range such that linear mapping
     //    iw = a + ow * b satisfies (c=0) <= iw < (d=jcp.iw).
@@ -299,93 +301,6 @@ void im2col_3d(const conv_gemm_conf_t &jcp, const data_type_t *im,
 #endif
     });
 }
-
-#if 0
-// Can I coax optimization info out of nc++ diagnostics ? ? ?
-template <>
-void im2col_3d(const conv_gemm_conf_t &jcp, const float *im,
-        float *col, int od) {
-    typedef float data_type_t;
-    const size_t OHW = jcp.oh * jcp.ow;
-    const size_t im_step = jcp.ih * jcp.iw * jcp.id;
-    const size_t col_step = jcp.ks * OHW;
-
-    parallel_nd(jcp.ic, [&](int ic) {
-        const data_type_t *__restrict im_loc = im + ic * im_step;
-        data_type_t *__restrict col_loc = col + ic * col_step;
-        int id = od * jcp.stride_d - jcp.f_pad;
-        FOR(kd,jcp.kd) {
-            data_type_t *__restrict col_ = col_loc + kd * jcp.kh * jcp.kw * OHW;
-            if (id < 0 || id >= jcp.id) {
-                int ih_ = -jcp.t_pad;
-                NOVEC FOR(kh,jcp.kh) {
-                    int ih = ih_;
-                    NOVEC FOR(oh,jcp.oh) {
-                        if (ih < 0 || ih >= jcp.ih) {
-                            ih += jcp.stride_h;
-                            continue;
-                        }
-                        int iw_ = -jcp.l_pad;
-                        FOR(kw,jcp.kw) {
-                            int iw = iw_;
-                            FOR(ow,jcp.ow) {
-                                if (iw < 0 || iw >= jcp.iw) {
-                                    iw += jcp.stride_w;
-                                    continue;
-                                }
-
-                                const size_t col_idx
-                                        = kw * OHW + oh * jcp.ow + ow;
-
-                                col_[col_idx] = 0;
-                                iw += jcp.stride_w;
-                            }
-                            iw_ += (1 + jcp.dilate_w);
-                        }
-                        ih += jcp.stride_h;
-                    }
-                    ih_ += (1 + jcp.dilate_h);
-                    col_ += jcp.kw * OHW;
-                }
-            } else {
-                const data_type_t *__restrict im_
-                        = im_loc + id * jcp.ih * jcp.iw;
-                int ih_ = -jcp.t_pad;
-                NOVEC FOR(kh,jcp.kh) {
-                    int ih = ih_;
-                    NOVEC FOR(oh,jcp.oh) {
-                        if (ih < 0 || ih >= jcp.ih) {
-                            ih += jcp.stride_h;
-                            continue;
-                        }
-                        int iw_ = -jcp.l_pad;
-                        FOR(kw,jcp.kw) {
-                            int iw = iw_;
-                            FOR(ow,jcp.ow) {
-                                    const size_t col_idx
-                                            = kw * OHW + oh * jcp.ow + ow;
-                                    const size_t im_idx = ih * jcp.iw + iw;
-
-                                //if (iw >= 0 && iw < jcp.iw) {
-                                //    col_[col_idx] = im_[im_idx];
-                               // }
-                                col_[col_idx] = (iw >= 0 && iw < jcp.iw
-                                        ? data_type_t{0}: im_[im_idx]);
-                                iw += jcp.stride_w;
-                            }
-                            iw_ += (1 + jcp.dilate_w);
-                        }
-                        ih += jcp.stride_h;
-                    }
-                    ih_ += (1 + jcp.dilate_h);
-                    col_ += jcp.kw * OHW;
-                }
-            }
-            id += (1 + jcp.dilate_d);
-        }
-    });
-}
-#endif
 
 template void im2col_3d(
         const conv_gemm_conf_t &jcp, const float *im, float *col, int od);
@@ -649,6 +564,25 @@ void im2col_inner_thr(const conv_gemm_conf_t &jcp, const data_type_t *__restrict
 template <typename data_type_t>
 void im2col(const conv_gemm_conf_t &jcp, const data_type_t *__restrict im,
         data_type_t *__restrict col, int ss, int sb, int cs, int cb) {
+    // ss,sb ~ spatial start+step    cs,cb ~ ic start+step
+    // inclusive spatial tile covers [ss,ss+sb-1]
+    //      --> 2D tile [first_oh,last_oh] x [first_ow,last_ow]
+    //      --> loop    [oh_begin,oh_end)  x [ow_begin,ow_end)
+    // For loop order: ic, kh,kw, oh, ow(boundary-->0, interior from col_
+    // mappings:        ih = oh*sh + (kh*dh-tp)
+    //                  iw = ow, constrained to [lp-kw*dw, jcp.iw+lp-kw*dw)
+    // Given kh, hoisting problem is:
+    //          For what subrange of [oh_begin,oh_end) does linear fn
+    //          ih=sh*oh+(kh*dh-tp) like within [0,jcp.ih) ?
+    //          A:  [ohb,ohe)
+    //          For [oh_begin,ohb) and [ohe,ohe_end), col_[ow] is set to zero
+    //          For [ohb,ohe) :
+    //                  For what subrange of [ow_begin,ow_end) does linear fn
+    //                  iw = 1*ow+0 lie within [0+lp-kw*dw, jcp.iw+lp-kw*dw)?
+    //                  --> equiv. iw' = ow+jp-kw*dw lie within [0,jcp.iw)?
+    //                  A: [owb,owe)  For this subrange, set col_[ow]=im_[iw=ow]
+    //
+    //
     if (jcp.outer_threading) {
         const size_t im_step = jcp.is;
         const size_t col_step = jcp.ks * sb;
@@ -687,13 +621,42 @@ void im2col(const conv_gemm_conf_t &jcp, const data_type_t *__restrict im,
                             if (ih < 0 || ih >= jcp.ih)
                                 for (int_t ow = ow_begin; ow < ow_end; ow++)
                                     col_[ow] = (data_type_t)0;
-                            else { UNROLL(8)
+                            else {
+#if 0
+                                UNROLL(8)
                                 for (int_t ow = ow_begin; ow < ow_end; ++ow) {
                                     const int_t iw = ow;
                                     col_[ow] = (iw < lp - kw * dw
                                             || iw >= jcp.iw + lp - kw * dw
-                                            ? data_type_t{0}: im_[iw]);
+                                            ? data_type_t{0}
+                                            //: im_ic[ih*jcp.iw + ow*1 - kw*dw - lp];
+                                            : im_[iw]
+                                            // OK (could do same for next else-block)
+                                            );
                                 }
+#else // nc++ full hoist, tiple loop split UNTESTED
+                            { // iw = a + ow*b with a = - lp + kw * dw and b = sw = 1
+                                const int iw_shift = kw * dw - lp;
+                                int owlo, owhi;
+                                //         sub_range  original__range  a  + ow * b  iw_range
+                                hoist_ApiB(owlo,owhi, ow_begin,ow_end, iw_shift,1, 0,jcp.iw);
+                                // triple loop-split needs owlo,owhi fully "in-range":
+                                if (owlo > ow_end  ) owlo = ow_end;
+                                if (owhi < ow_begin) owhi = ow_begin;
+                                // triple loop-split (each with no inner conditionals
+                                for (int ow = ow_begin; ow < owlo; ++ow) {
+                                    col_[ow] = data_type_t{0};
+                                }
+                                for (int ow = owlo; ow < owhi; ++ow) {
+                                    //const auto im_idx = ih*jcp.iw + ow*sw + iw_shift;
+                                    // im_ has ih*jcp.iw + kw*dw-lp included
+                                    col_[ow] = im_[ow];
+                                }
+                                for (int ow = owhi; ow < ow_end; ++ow) {
+                                    col_[ow] = data_type_t{0};
+                                }
+                            }
+#endif
                             }
                         }
                     }
@@ -706,6 +669,7 @@ void im2col(const conv_gemm_conf_t &jcp, const data_type_t *__restrict im,
                     FOR(kw,jcp.kw) {
                         data_type_t *__restrict col_k
                                 = col + ic * col_step + (kh * jcp.kw + kw) * sb;
+#if 1
                         for (int_t oh = oh_begin; oh < oh_end; oh++) {
                             const int_t ih = oh * sh - tp + kh * dh;
                             const int_t ow_begin
@@ -717,27 +681,92 @@ void im2col(const conv_gemm_conf_t &jcp, const data_type_t *__restrict im,
                             if (ih < 0 || ih >= jcp.ih)
                                 for (int_t ow = ow_begin; ow < ow_end; ow++)
                                     col_oh[ow] = (data_type_t)0;
-                            else UNROLL(8)
+                            else //UNROLL(8)
+#if 0
                                 for (int_t ow = ow_begin; ow < ow_end; ow++) {
                                     const int_t iw = ow * sw - lp + kw * dw;
                                     col_oh[ow] = (iw < 0 || iw >= jcp.iw
                                             ? data_type_t{0}
                                             : im_[ih * jcp.iw + iw]);
                                 }
+#else // nc++ full hoist, triple loop split UNTESTED
+                            { // iw = a + ow*b with a = - lp + kw * dw and b = sw
+                                const int iw_shift = kw * dw - lp;
+                                int owlo, owhi;
+                                //         sub_range  original__range  a  + ow * b  iw_range
+                                hoist_ApiB(owlo,owhi, ow_begin,ow_end, iw_shift,sw, 0,jcp.iw);
+                                // triple loop-split needs owlo,owhi fully "in-range":
+                                if (owlo > ow_end  ) owlo = ow_end;
+                                if (owhi < ow_begin) owhi = ow_begin;
+                                // triple loop-split (each with no inner conditionals
+                                for (int ow = ow_begin; ow < owlo; ++ow) {
+                                    col_oh[ow] = data_type_t{0};
+                                }
+                                for (int ow = owlo; ow < owhi; ++ow) {
+                                    //const auto im_idx = ih*jcp.iw + ow*sw + iw_shift;
+                                    col_oh[ow] = im_[ih * jcp.iw + ow * sw + iw_shift];
+                                }
+                                for (int ow = owhi; ow < ow_end; ++ow) {
+                                    col_oh[ow] = data_type_t{0};
+                                }
+                            }
+#endif
                         }
+#else // hoist at least ih range-check
+                        int ohlo, ohhi; // ih = -tp+kh*dh + ih * sh
+                        hoist_ApiB(ohlo,ohhi, oh_begin,oh_end, -tp+kh*dh, sh, 0,jcp.ih);
+                        // to triple-split the loop, also enforce
+                        if (ohlo > oh_end) ohlo = oh_end;
+                        if (ohhi < oh_begin) ohhi = oh_begin;
+                            const int_t ih = oh * sh - tp + kh * dh;
+                            data_type_t *__restrict col_oh
+                                    = col_k + oh * jcp.ow - ss;
+                        for (int oh = oh_begin; oh < ohlo; ++oh) {
+                            const int_t ow_begin
+                                    = (oh == first_oh) ? first_ow : 0;
+                            const int_t ow_end
+                                    = (oh == last_oh) ? (last_ow + 1) : jcp.ow;
+                            for (int_t ow = ow_begin; ow < ow_end; ow++)
+                                col_oh[ow] = (data_type_t)0;
+                        }
+                        for (int oh = ohlo; oh < ohhi; ++oh) {
+                            const int_t ow_begin
+                                    = (oh == first_oh) ? first_ow : 0;
+                            const int_t ow_end
+                                    = (oh == last_oh) ? (last_ow + 1) : jcp.ow;
+#if 1 // orig
+                            for (int_t ow = ow_begin; ow < ow_end; ow++) {
+                                const int_t iw = ow * sw - lp + kw * dw;
+                                col_oh[ow] = (iw < 0 || iw >= jcp.iw
+                                        ? data_type_t{0}
+                                        : im_[ih * jcp.iw + iw]);
+                            }
+#else // hoist iw condition
+#endif
+                        }
+                        for (int oh = ohhi; oh < oh_end; ++oh) {
+                            const int_t ow_begin
+                                    = (oh == first_oh) ? first_ow : 0;
+                            const int_t ow_end
+                                    = (oh == last_oh) ? (last_ow + 1) : jcp.ow;
+                            for (int_t ow = ow_begin; ow < ow_end; ow++)
+                                col_oh[ow] = (data_type_t)0;
+                        }
+
+#endif
                     }
                 }
             }
         }
     } else {
-#if 0 // CRASH!
+#if 0 // CRASH! WRONG? debug other block first!
         // older nc++ had trouble with many OpenMP clauses in single function
         if (jcp.stride_w == 1)
             // nc++-3.0.25, however, has segfault in this version!
             im2col_inner_thr_sw1(jcp, im, col, ss, sb, cs, cb);
         else
             im2col_inner_thr(jcp, im, col, ss, sb, cs, cb);
-#else
+#else // still crash (orig) ex. --conv g1ic3ih224oc64oh112kh7sh2ph3
         const size_t im_step = jcp.is;
         const size_t col_step = jcp.ks * sb;
         const int dh = 1 + jcp.dilate_h;
@@ -775,13 +804,48 @@ void im2col(const conv_gemm_conf_t &jcp, const data_type_t *__restrict im,
                             for (int ow = ow_start; ow < ow_end; ow++)
                                 col_oh[ow] = (data_type_t)0;
                         else
-                            for (int ow = ow_start; ow < ow_end; ow++) {
+#if 0 // nc++ NOVEC workaround:
+                            NOVEC for (int ow = ow_start; ow < ow_end; ow++) {
                                 const int iw = ow + iw_shift;
                                 if (iw < 0 || iw >= jcp.iw)
                                     col_oh[ow] = (data_type_t)0;
                                 else
                                     col_oh[ow] = im_[iw];
                             }
+#elif 0 // UNTESTED nc++ hoisting, but only to simplify inner loop conditional
+                        {
+                            // This changed segfault to pass, at least once.
+                            // iw = a + ow*b with a=iw_shift, b=1
+                            int owlo, owhi;
+                            hoist_ApiB(owlo,owhi, ow_start,ow_end, iw_shift,1, ,jcp.iw);
+                            for (int ow = ow_start; ow < ow_end; ++ow) {
+                                // condition directly on loop variable instead of linear fn
+                                col_oh[ow] = (ow >= owlo && ow <= owhi
+                                        ? im_[ow*1+iw_shift]
+                                        : data_type_t{0});
+                            }
+                        }
+#elif 1 // hoist with triple-loop split "full solution"
+                        { // iw = a + ow*b with a = - lp + kw * dw and b = sw = 1
+                            int owlo, owhi;
+                            //         sub_range  original__range  a  + ow * b  iw_range
+                            hoist_ApiB(owlo,owhi, ow_start,ow_end, iw_shift,1, 0,jcp.iw);
+                            // triple loop-split needs owlo,owhi fully "in-range":
+                            if (owlo > ow_end) owlo = ow_end;
+                            if (owhi < ow_start) owhi = ow_start;
+                            // triple loop-split (each with no inner conditionals
+                            for (int ow = ow_start; ow < owlo; ++ow) {
+                                col_oh[ow] = data_type_t{0};
+                            }
+                            for (int ow = owlo; ow < owhi; ++ow) {
+                                //const auto im_idx = ih*jcp.iw + ow*sw + iw_shift;
+                                col_oh[ow] = im_[ow + iw_shift];
+                            }
+                            for (int ow = owhi; ow < ow_end; ++ow) {
+                                col_oh[ow] = data_type_t{0};
+                            }
+                        }
+#endif
                     });
         else
             parallel_nd(cb, jcp.kh, jcp.kw, oh_range,
@@ -794,11 +858,14 @@ void im2col(const conv_gemm_conf_t &jcp, const data_type_t *__restrict im,
                         data_type_t *__restrict col_oh = col + ic * col_step
                                 + (kh * jcp.kw + kw) * sb + oh * jcp.ow - ss;
                         const data_type_t *__restrict im_
-                                = im + (ic + cs) * im_step;
+                                = im + (ic + cs) * im_step; // + ih * jcp.iw !!
+                        // + const int iw_shift = kw * dw - lp;
                         if (ih < 0 || ih >= jcp.ih)
                             for (int ow = ow_start; ow < ow_end; ow++)
                                 col_oh[ow] = (data_type_t)0;
                         else
+#if 0 // nc++ NOVEC workaround
+                            NOVEC // nc++ workaround;
                             for (int ow = ow_start; ow < ow_end; ow++) {
                                 const int iw = ow * sw - lp + kw * dw;
                                 if (iw < 0 || iw >= jcp.iw)
@@ -808,6 +875,41 @@ void im2col(const conv_gemm_conf_t &jcp, const data_type_t *__restrict im,
                                     col_oh[ow] = im_[im_idx];
                                 }
                             }
+#elif 0 // nc++ simplify the inner loop conditional to directly use loop variable
+                        // still segfaults without NOVEC
+                        { // iw = a + ow*b with a = - lp + kw * dw and b = sw > 0
+                            int const iw_shift = -lp + kw * dw;
+                            int owlo, owhi;
+                            hoist_ApiB(owlo,owhi, ow_start,ow_end, iw_shift,sw, 0,jcp.iw);
+                            NOVEC for (int ow = ow_start; ow < ow_end; ++ow) {
+                                const bool cond = (ow >= owlo && ow < owhi);
+                                const auto im_idx = ih*jcp.iw + ow*sw + iw_shift;
+                                col_oh[ow] = (cond? im_[im_idx]: data_type_t{0});
+                            }
+                        }
+#elif 1 // nc++ full hoist (triple-loop split, NO mask ops inside loops)
+                        // successfully negotiates one segfault run: --conv g1ic3ih224oc64oh112kh7sh2ph3
+                        { // iw = a + ow*b with a = - lp + kw * dw and b = sw > 0
+                            int const iw_shift = -lp + kw * dw;
+                            int owlo, owhi;
+                            //         sub_range  original__range  a  + ow * b  iw_range
+                            hoist_ApiB(owlo,owhi, ow_start,ow_end, iw_shift,sw, 0,jcp.iw);
+                            // triple loop-split needs owlo,owhi fully "in-range":
+                            if (owlo > ow_end) owlo = ow_end;
+                            if (owhi < ow_start) owhi = ow_start;
+                            // triple loop-split (each with no inner conditionals
+                            for (int ow = ow_start; ow < owlo; ++ow) {
+                                col_oh[ow] = data_type_t{0};
+                            }
+                            for (int ow = owlo; ow < owhi; ++ow) {
+                                const auto im_idx = ih*jcp.iw + ow*sw + iw_shift;
+                                col_oh[ow] = im_[im_idx];
+                            }
+                            for (int ow = owhi; ow < ow_end; ++ow) {
+                                col_oh[ow] = data_type_t{0};
+                            }
+                        }
+#endif
                     });
 #endif
     }
@@ -821,6 +923,11 @@ template void im2col(const conv_gemm_conf_t &jcp,
         int hb, int ws, int wb);
 
 /* col[kh][kw][ic][oh][ow] <-- im2col_u8(im[ih][iw][ic]) */
+// NOTE: OneDNN master collapses _u8 and _s32 versions of this
+// into im2col_dt<orig_im_dt,orig_col_dt>.
+//
+// Note that this impl already does the [0,oh_start,oh_end,jcp.oh) loop partition
+// of hoisting conditionals.
 template <typename T>
 void im2col_u8(const conv_gemm_conf_t &jcp, const T *__restrict im,
         T *__restrict imtr, uint8_t *__restrict col, int hs, int hb, int ws,
@@ -1763,161 +1870,9 @@ void bwd_weights_reduction_par(int ithr, int nthr, const conv_gemm_conf_t &jcp,
     }
 }
 
-}; // namespace jit_gemm_convolution_utils
+} // namespace jit_gemm_convolution_utils
 
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-/** \page ConditionalHoisting  Hoisting Linear Tests out of Loops
- * VE compiler often has difficulty when vectorizing loops with vector
- * stores gaurded by conditionals.  Antagonistic cases may store data
- * past array bounds, cause segfaults.   The VE VST (vector store) is
- * not maskable.
- *
- * Both SX mainframe (sxc++) and SX Aurora (nc++) vectorizations benefit
- * from such code modifications.
- *
- * Here we show a frequent case and one way to rewrite the code to remove
- * inner loop conditionals.
- *
- * Original:
- * \code
- * for(i=imin; i<imax; ++i){       // original loop
- *   int const ApiB = a + i*b;      // linear fn, ( b>=0 ? )
- *   if( ApiB < c || ApiB >= d ) continue;
- *   // Loop Body
- * }
- * \endcode
- *
- * Transformed:
- * \code
- * int const ibeg, iend;
- * hoist_ApiB_in( ibeg, iend, imin,imax, a,b, c,d );
- * for(i=ibeg; i<iend; ++i){       // original loop
- *   int const ApiB = a + i*b;
- *   // GONE: if( ApiB < c || ApiB >= d ) continue;
- *   // Loop Body
- * }
- * \endcode
- *
- * For \c kh, for example, we replaced and simplified the \em hoist routine
- * in steps:
- *
- * \ref ref_conv2.cpp
- * \code
- *  for (int kh = 0; kh < p->kh; ++kh) {
- *      const int ih = oh * p->sh - p->ph + kh * (p->dh + 1);
- *      if (ih < 0 || ih >= p->ih) continue;
- *      // etc
- * \endcode
- * With hoisting, \ref refconv3_fwd
- * \code   
- * int kh_beg, kh_end;
- * hoist_ApiB_in( kh_beg, kh_end,
- *                0, p->kh                          // i  in  [0, p->kh)
- *               (oh * p->sh - p->ph), (p->dh + 1), // ih=A+iB
- *               0, p->ih);                         // ih in [0, p->ih)
- * //if (kh_beg >= kh_end) continue;
- * for (int kh = kh_beg; kh < kh_end; ++kh) {
- *     const int ih = oh * p->sh - p->ph + kh * (p->dh + 1);
- *     // etc
- * \endcode
- * which simplifies to
- * \code
- * //                  +--- ih must lie in [0,IH)
- * //                  |
- * //                  V  [_______ -a+b-1 _______]  [__ b __]
- * kh_beg = div_floor( 0  - (oh * SH - PH) + p->dh, (p->dh+1) );
- * kh_end = div_floor( IH - (oh * SH - PH) + p->dh, (p->dh+1) );
- * if( kh_beg < 0     ) kh_beg = 0;
- * if( kh_end > p->kh ) kh_end = p->kh;
- * // correct kh_beg, kh_end at other limits irrelevant:
- * //    if (kh_beg >= kh_end) continue;
- * for (int kh = kh_beg; kh < kh_end; ++kh) {
- *     const int ih = oh * p->sh - p->ph + kh * (p->dh + 1);
- *     // etc, with ih guaranteed not to exceed bounds
- * \endcode
- *
- * A key feature for the mathematics of such formulas is that integer
- * rounding \b must be toward negative infinity.  Unfortunately, C99
- * and C++11 round toward zero.  So div_floor, which has been optimized
- * for x86, may have conditionals that don't behave so well for other
- * chips.
- *
- * \c div_floor(i,j) rounds integer division \c i/j toward negative infinity
- * for any \c j>0.  It was developed to produce decent x86 code.
- * \sa idiv.hpp
- *
- * We now derive a way to do all calculations with positive integers,
- * avoiding negatives.  Such a calculation is now correct when evaluated
- * with unsigned integers, and also allows normal division to be used.
- *
- * - First, solve for \c kh, assuming div_floor rounding.
- *   - ih = oh * p->sh - p->ph + kh * (p->dh + 1)
- *   - \f$ih = oh*SH - PH + kh*DH\f$
- *   - \f$kh*DH = ih + PH - oh*SH\f$
- *   - \f$kh = div\_floor( ih+PH-oh*SH+DH-1, DH )\f$, which we'll loosely call
- *   - \f$kh(ih,oh) \approx (ih+DH-1+PH-oh*SH) / DH\f$
- *                  (equality for +ve numerator & denominator)
- *
- * - \f$kh_{beg}\f$, the lowest \c kh value, is associated with the lowest
- *   possible \c oh.
- *   - We avoid testing for values of zero, since division values of zero can
- *     result by rounding negative integers upward
- * - Consider \f$kh(ih,oh) >= 1\f$
- *   - \f$ (0 + DH-1+PH-oh*SH) / DH >= 1\f$  (for +ve numerator & denominator)
- *   - \f$ DH-1+PH-oh*SH >= DH\f$
- *   - \f$ PH-1 - oh*SH >= 0\f$
- *   - \f$ oh*SH <= PH-1 \f$
- *   - \f$ oh*SH < PH \f$
- * - Therefore if \f$oh*SH < PH\f$, we use the formula
- *   \f$kh_{beg}=(DH-1+[PH-oh*SH]) / DH\f$.
- *   - Notice that both numerator and denominator are both strictly positive.
- *   - So this formula is correct for signed/unsigned integers.
- * - Otherwise, \f$kh_{beg} = 0\f$, the lowest possible value.
- * - We don't need to set \f$kh_{beg} > KH\f$, because only the
- *   \f$kh_{beg} < kh_{end}\f$ affects the rewritten \c for loop.
- *
- *
- * - Now Consider \f$kh_{end} >= KH\f$, where KH is the highest valid value for \f$kh_{end}\f$
- *   - The largest \f$kh\f$ occurs when \c ih has it's largest possible value, \c IH.
- * - Let's first check for \f$kh(ih,oh) >= KH\f$
- *   - \f$ (IH + DH-1 + PH - oh*SH) / DH >= KH \f$
- *   - \f$ IH + DH - 1 + PH - oh*SH  >= KH*DH \f$
- *   - \f$ KH*DH + oh*SH + 1 <= IH+PH+DH \f$, now RHS and LHS are positive
- *   - \f$ KH*DH + oh*SH < IH+PH+DH \f$
- *   - When the above condition holds, we can set \f$kh_{end} = KH\f$ (maximal value)
- * - Otherwise we can also check for \f$kh(ih,oh) >= 1\f$, so that we can safely use
- *   division with positive integers.
- *   - Replacing 'KH' with '1' in above...  \f$ 1*DH + oh*SH < IH+PH+DH \f$
- *   - So when \f$oh*SH < IH+PH\f$, \f$kh_{end} =  (DH-1 + [IH+PH - oh*SH]) / DH \f$
- *     will be \f$ > 0\f$
- *     - Otherwise we can set \f$kh_{end} = 0\f$
- *
- * So the \em long-hand +ve integer solutions for \c kh_beg and \c kh_end are:
- *
- * \code
- * if( oh*SH < PH )
- *   kh_beg = (p->dh + (PH - oh * SH)) / DH;
- * else
- *   kh_beg = 0;
- * \endcode
- * and a slightly longer version for \f$kh_{end}\f$ :
- * \code
- * if (oh*SH + KH*DH < IH + PH + DH)
- *   kh_end = KH;
- * else if (oh*SH >= IH+PH)
- *   kh_end = 0;
- * else
- *   kh_end = ([IH+PH - oh*SH] + DH-1) / DH;
- * \endcode
- *
- * This approach might be a tiny bit faster than the signed-integer \e idiv method.
- *
- * \ref sxconv_4_fwd shows how this can be done, and results in big speedups for sxc++,
- * whose compiler can vectorize the few remaining simple conditionals quite well (apparently).
- *
- * Other SX optimizations include using unit-stride temporaries, since complex expressions
- * with multiple strided vectors are sometimes not vectorized very well.
- */
 // vim: et ts=4 sw=4 cindent cino=+2s,^=l0,\:0,N-s

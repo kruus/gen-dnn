@@ -1,5 +1,4 @@
 /*******************************************************************************
-* Copyright 2018-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -251,6 +250,21 @@ void ref_deconvolution_bwd_weights_t::compute_bwd_bias(
                 for (int oh = 0; oh < OH; ++oh) {
                     for (int ow = 0; ow < OW; ++ow) {
                         // XXX unvectorized
+                        switch (ndims) {
+                            case 5:
+                                db += diff_dst[diff_dst_d.off(
+                                        mb, g * OC + oc, od, oh, ow)];
+                                break;
+                            case 4:
+                                db += diff_dst[diff_dst_d.off(
+                                        mb, g * OC + oc, oh, ow)];
+                                break;
+                            case 3:
+                                db += diff_dst[diff_dst_d.off(
+                                        mb, g * OC + oc, ow)];
+                                break;
+                            default: assert(!"invalid dimension size");
+                        }
                     }
                 }
             }

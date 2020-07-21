@@ -16,10 +16,8 @@
 
 set(TEST_EXE test_api)
 
-if(DNNLPRIM_ALL OR (DNNLPRIM_REORDER))
-    file(GLOB TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_*.cpp)
-    list(APPEND TEST_SOURCES ${MAIN_SRC_GTEST})
+file(GLOB TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_*.cpp)
+list(APPEND TEST_SOURCES ${MAIN_SRC_GTEST})
 
-    register_exe(${TEST_EXE} "${TEST_SOURCES}" "test" "dnnl_gtest")
-endif()
+register_exe(${TEST_EXE} "${TEST_SOURCES}" "test" "dnnl_gtest")
 
