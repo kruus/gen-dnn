@@ -75,28 +75,6 @@
 #cmakedefine DNNL_ENABLE_MAX_CPU_ISA
 #cmakedefine DNNL_ENABLE_JIT_PROFILING
 #endif
-// this is an option to help build smalll test cases for bug reports
-#cmakedefine DNNLPRIM_ALL
-#ifndef DNNLPRIM_ALL
-#cmakedefine DNNLPRIM_BATCH_NORMALIZATION
-#cmakedefine DNNLPRIM_BINARY
-#cmakedefine DNNLPRIM_CONCAT
-#cmakedefine DNNLPRIM_CONVOLUTION
-#cmakedefine DNNLPRIM_DECONVOLUTION
-#cmakedefine DNNLPRIM_ELTWISE
-#cmakedefine DNNLPRIM_INNER_PRODUCT
-#cmakedefine DNNLPRIM_LAYER_NORMALIZATION
-#cmakedefine DNNLPRIM_LRN
-#cmakedefine DNNLPRIM_LOGSOFTMAX
-#cmakedefine DNNLPRIM_MATMUL
-#cmakedefine DNNLPRIM_POOLING
-#cmakedefine DNNLPRIM_REORDER
-#cmakedefine DNNLPRIM_RESAMPLING
-#cmakedefine DNNLPRIM_RNN
-#cmakedefine DNNLPRIM_SHUFFLE
-#cmakedefine DNNLPRIM_SOFTMAX
-#cmakedefine DNNLPRIM_SUM
-#endif
 
 // clang-format on
 

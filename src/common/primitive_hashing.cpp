@@ -64,23 +64,19 @@ void key_t::init_mds(const primitive_desc_t *pd) {
     // XXX: There is too much knowledge about in the internals...
 
     switch (primitive_kind_) {
-#define NO_MDS_FOR_(kind) \
-    IF_USE_KIND( \
-            kind, case primitive_kind::kind \
-            : { break; })
-        NO_MDS_FOR_(batch_normalization)
-        NO_MDS_FOR_(binary)
-        NO_MDS_FOR_(concat)
-        NO_MDS_FOR_(convolution)
-        NO_MDS_FOR_(deconvolution)
-        NO_MDS_FOR_(eltwise)
-        NO_MDS_FOR_(gemm)
-        NO_MDS_FOR_(inner_product)
-        NO_MDS_FOR_(layer_normalization)
-        NO_MDS_FOR_(logsoftmax)
-        NO_MDS_FOR_(lrn)
-        NO_MDS_FOR_(matmul)
-#if USE_pooling
+#define NO_MDS_FOR_(kind) case primitive_kind::kind : break
+        NO_MDS_FOR_(batch_normalization);
+        NO_MDS_FOR_(binary);
+        NO_MDS_FOR_(concat);
+        NO_MDS_FOR_(convolution);
+        NO_MDS_FOR_(deconvolution);
+        NO_MDS_FOR_(eltwise);
+        NO_MDS_FOR_(gemm);
+        NO_MDS_FOR_(inner_product);
+        NO_MDS_FOR_(layer_normalization);
+        NO_MDS_FOR_(logsoftmax);
+        NO_MDS_FOR_(lrn);
+        NO_MDS_FOR_(matmul);
         case primitive_kind::pooling: {
             auto typed_pd = utils::downcast<const pooling_pd_t *>(pd);
             if (!typed_pd->is_fwd()) {
@@ -89,11 +85,9 @@ void key_t::init_mds(const primitive_desc_t *pd) {
             }
             break;
         }
-#endif
-            NO_MDS_FOR_(reorder)
-            NO_MDS_FOR_(resampling)
-            NO_MDS_FOR_(rnn)
-#if USE_shuffle
+        NO_MDS_FOR_(reorder);
+        NO_MDS_FOR_(resampling);
+        NO_MDS_FOR_(rnn);
         case primitive_kind::shuffle: {
             auto typed_pd = utils::downcast<const shuffle_pd_t *>(pd);
             if (!typed_pd->is_fwd()) {
@@ -102,9 +96,8 @@ void key_t::init_mds(const primitive_desc_t *pd) {
             }
             break;
         }
-#endif
-            NO_MDS_FOR_(sum)
-            NO_MDS_FOR_(softmax)
+        NO_MDS_FOR_(sum);
+        NO_MDS_FOR_(softmax);
         default: assert(!"unknown primitive_kind");
     }
 #undef NO_MDS_FOR_
@@ -124,31 +117,28 @@ bool key_t::operator==(const key_t &rhs) const {
     switch (primitive_kind_) {
 #define CAST_AND_COMPARE(kind) \
     ret = cast_and_compare<kind##_desc_t>(op_desc_, rhs.op_desc_);
-#define CASE(kind) \
-    IF_USE_KIND(kind, case primitive_kind::kind \
-                : CAST_AND_COMPARE(kind); \
-                break;)
+#define CASE(kind) case primitive_kind::kind : CAST_AND_COMPARE(kind); break
 
         // NOTE: make sure that op_descs for all primitives are compared below
-        CASE(batch_normalization)
-        CASE(binary)
-        CASE(concat)
-        CASE(convolution)
-        CASE(deconvolution)
-        CASE(eltwise)
-        CASE(gemm)
-        CASE(inner_product)
-        CASE(layer_normalization)
-        CASE(logsoftmax)
-        CASE(lrn)
-        CASE(matmul)
-        CASE(pooling)
-        CASE(reorder)
-        CASE(resampling)
-        CASE(rnn)
-        CASE(shuffle)
-        CASE(sum)
-        CASE(softmax)
+        CASE(batch_normalization);
+        CASE(binary);
+        CASE(concat);
+        CASE(convolution);
+        CASE(deconvolution);
+        CASE(eltwise);
+        CASE(gemm);
+        CASE(inner_product);
+        CASE(layer_normalization);
+        CASE(logsoftmax);
+        CASE(lrn);
+        CASE(matmul);
+        CASE(pooling);
+        CASE(reorder);
+        CASE(resampling);
+        CASE(rnn);
+        CASE(shuffle);
+        CASE(sum);
+        CASE(softmax);
         //case primitive_kind::batch_normalization:
         //    ret = cast_and_compare<batch_normalization_desc_t>(
         //            op_desc_, rhs.op_desc_);
