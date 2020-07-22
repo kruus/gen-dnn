@@ -5,11 +5,30 @@ oneAPI Deep Neural Network Library (oneDNN)
 
 - nc++ full build OK: examples, tests, benchdnn targets all OK
   (except one test that is no longer possible with 'vanilla' build)
+- nc++-3.0.27 work:
+  - many layers now vectorize the offset calcs
+  - now some vectorized math funcs depart (as per doc) for +/-inf,Nan,+/-0
+    behavior (despite some efforts to manually correct many cases).
+    - this is a documented optimization effect of vectorization.
+  - compilation VERY sensitive to idempotent code changes.
+    - Now ./build.sh -vdd (-O3 debug build) passed all tests w/o segfaults.
+
 - still quite a bit of debug stuff in cmake stuff.
+  - REMOVED
 - last set of nc++ bugs were: (i) complicated '&&' expressions misevaluated,
   and (ii) vector VFCP compare with NaN gave wrong result.
+  - and some segfaults esp. for conv backward weights code
+  - several other files need modified compiler options (try by hand until find
+    a set of options that skirt around bad code productions).
+- reorder compile takes a long time.
+  - compile much faster breaking apart into several src/cpu/ve/ files, BUT
+    this introduces a bug -- the lengthy, monolithic compile seems to avoid
+    segfaults.   This suggests that the 'ipa' phase of compiler optimization
+    is introducing bugs.  There are so many reorder functions that eventually
+    the compiler quites ipa optimizations, and the library avoids segfaults
+    in many benchdnn tests.  (So still use monolithic "forever" compile).
 - older issues include workarounds for incorrect C++11 zero-initialization
-- still porting and improving the VE specific optimizations of the ref impls.
+- many non-convolution ref impls have VE specific optimizations.
   - sometimes based on v0.16 versions, some with new approaches/tools.
     - ex. manual loop splitting to move conditionals out of loops
     - nc++ lambda functions not inlined nicely, giving "unvectorizable"
@@ -17,14 +36,21 @@ oneAPI Deep Neural Network Library (oneDNN)
       to improve vectorization.
     - I often adapt threading and loop order to allow long VE vector length
       with "channels" inner loop.
+    - typical speedups 10--200x for vectorizing offset calcs.
   - have *not yet* hooked up to libvednn and libblas, as done in v0.16
+    - did some preliminary testing with libblas (./build.sh -Cvdd or so).
 
 - current design can extend/replace files by adding to a ve/ subdirectory
   if file mods are too ugly, or full of debug code.
-- cmake files need to be cleaned up (supporting just a few layers, for fast
-  compile, was only to shorten the hour-long compilation while debugging).
 
 - still have to change 'any' format to prefer (say) nchw, and retest.
+- convolution WIP:
+  - several compiler workarounds needed for col2im, im2col and esp conv bkw weights
+    to avoid segfaults or wrong answers.
+    - code quite fragile wrt. to idempotent code changes reintroducing
+      buggy compilation -- behavior quite sensitive to compile options.
+  - vectorize offset calcs (for blocked memory formats)
+  - pull in older speedups for im2col, col2im
 
 ### Original README:
 

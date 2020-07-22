@@ -80,25 +80,25 @@ public:
             const op_desc_t *desc) const override {
         static const primitive_desc_create_f empty_list[] = {nullptr};
 
-#define CASE(kind) \
+#define CPU_ENGINE_LIST(kind) \
     case primitive_kind::kind: \
-        return get_##kind##_impl_list((const kind##_desc_t *)desc);)
+        return get_##kind##_impl_list((const kind##_desc_t *)desc)
         switch (desc->kind) {
-            CPU_ENGINE_LIST(batch_normalization)
-            CPU_ENGINE_LIST(binary)
-            CPU_ENGINE_LIST(convolution)
-            CPU_ENGINE_LIST(deconvolution)
-            CPU_ENGINE_LIST(eltwise)
-            CPU_ENGINE_LIST(inner_product)
-            CPU_ENGINE_LIST(layer_normalization)
-            CPU_ENGINE_LIST(lrn)
-            CPU_ENGINE_LIST(logsoftmax)
-            CPU_ENGINE_LIST(matmul)
-            CPU_ENGINE_LIST(pooling)
-            CPU_ENGINE_LIST(resampling)
-            CPU_ENGINE_LIST(rnn)
-            CPU_ENGINE_LIST(shuffle)
-            CPU_ENGINE_LIST(softmax)
+            CPU_ENGINE_LIST(batch_normalization);
+            CPU_ENGINE_LIST(binary);
+            CPU_ENGINE_LIST(convolution);
+            CPU_ENGINE_LIST(deconvolution);
+            CPU_ENGINE_LIST(eltwise);
+            CPU_ENGINE_LIST(inner_product);
+            CPU_ENGINE_LIST(layer_normalization);
+            CPU_ENGINE_LIST(lrn);
+            CPU_ENGINE_LIST(logsoftmax);
+            CPU_ENGINE_LIST(matmul);
+            CPU_ENGINE_LIST(pooling);
+            CPU_ENGINE_LIST(resampling);
+            CPU_ENGINE_LIST(rnn);
+            CPU_ENGINE_LIST(shuffle);
+            CPU_ENGINE_LIST(softmax);
             default: assert(!"unknown primitive kind"); return empty_list;
         }
     }

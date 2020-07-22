@@ -21,12 +21,8 @@
 
 // some primitives compare memory descriptors
 #include "cpu_target.h"
-#if USE_pooling
 #include "pooling_pd.hpp"
-#endif
-#if USE_shuffle
 #include "shuffle_pd.hpp"
-#endif
 
 #include "engine.hpp"
 
