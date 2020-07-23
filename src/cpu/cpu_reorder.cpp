@@ -73,7 +73,7 @@ using impl_list_map_t = std::map<reorder_impl_key_t, std::vector<rpd_create_f>>;
             REG_SR(idt, any, odt, any, fmt_order::any, \
                     spec::direct_copy_except_dim_0)
 
-#if defined(__INTEL_COMPILER) || (defined(__GNUC__) && !defined(__clang__))
+#if ! DNNL_X64 || defined(__INTEL_COMPILER) || (defined(__GNUC__) && !defined(__clang__))
 /* Direct copy for icc which is faster than jitted code;
  * Direct copy for gcc which might or might not be faster than jitted
  * code, but still worth it because doesn't require jitting, i.e. much
@@ -85,7 +85,7 @@ using impl_list_map_t = std::map<reorder_impl_key_t, std::vector<rpd_create_f>>;
 #endif
 
 /* regular reorders */
-#ifdef __INTEL_COMPILER
+#if ! DNNL_X64 || defined(__INTEL_COMPILER) || !DNNL_X64
 /* direct copy for icc, which is faster than jitted code */
 #define REG_FAST_DIRECT_COPY_COMMA(sdt, ddt) REG_SR_DIRECT_COPY(sdt, ddt),
 #else

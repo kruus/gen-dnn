@@ -829,14 +829,17 @@ echo 'ulimit soft : '`ulimit -Ss`
         TEST_ENV+=(VE_NODE_NUMBER=${NODE})
 
         { echo "api-c                   ...";
-            sync; # sometimes it fails in build, but runs fine when run again?
+            sync # sometimes fails in full build, but rerun with -qq is OK ?
+            sleep 1 # so let's give it 2 chances now...
+            ${ENV} ${TEST_ENV[@]} ${TESTRUNNER} ${VE_EXEC} tests/api-c || \
             ${ENV} ${TEST_ENV[@]} ${TESTRUNNER} ${VE_EXEC} tests/api-c \
                 || BUILDOK="n"; # BUILDOK="n" will stop tests on failure
         } 
         if [ $DOTEST -eq 13 ]; then # another short test, this one can fail too
             { echo "cpu-cnn-training-f32-c"
                 sync;
-                ${ENV} ${TEST_ENV[@]} ${TESTRUNNER}  ${VE_EXEC} examples/cpu-cnn-training-f32-c \
+                ${ENV} ${TEST_ENV[@]} ${TESTRUNNER} ${VE_EXEC} examples/cpu-cnn-training-f32-c || \
+                ${ENV} ${TEST_ENV[@]} ${TESTRUNNER} ${VE_EXEC} examples/cpu-cnn-training-f32-c \
                     || BUILDOK="n";
             }
         fi

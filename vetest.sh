@@ -559,7 +559,7 @@ if [ ${fail} -gt 0 ]; then
   comment "`ls -1 ve_exec.log*` --> ve/"
   mv -v ve_*.log* ve/ || echo "(no ve_*.log* in current dir)"
   comment "Common VE exit codes (${fail} failure[s]):"
-  comment "    1 --> failed assertion"
+  comment "    1 --> failed-assert"
   comment "  134 --> Unable to grow stack (veos)"
   comment "  137 --> free(): invalid pointer: 0x..., and backtrace"
   comment "  139 --> Address not mapped to object at 0x... segfault"

@@ -72,7 +72,7 @@ simple_concat
 	ve-banch-catP.log: Av VL 102, Vec% only 11$
 	(is this the scalar reorders, or perhaps small benchdnn problem sizes?)
 
-rnn ??
+rnn ?? still rather slow.  Have not looked at it.
 
 pooling	already started with VE bugfixes, no optimization yet: off_v_vec optimizations possible
 
@@ -82,9 +82,16 @@ simple_reorder wants at least the v0.16 ShortLoop() pragmas reinstated
 	  a parallel_nd construct
 	Split apart the 45-minute compile of cpu_reorder (nc++ stuck in ipa, which eventually stops)
 	by putting reorder map values `std::vector<rpd_create_f>` into separate small files.
+	BUT, split apart compiler ipa is not stopped, and segfaults happen.
+	SAFEST is to do the forever-compile, which stops ipa, and avoids the split-induced segfaults.
 
 ref_deconvolution
 	switching to vectorized offset calcs (WIP)
+	convolution segfaults dealt with. Compilation correctness for im2col/col2im worked around.
+	Hardest was compile bug for backward weights, where hoisting conditionals always resulted
+	in some [rare] segfaults.
+	TODO: vectorize offset calcs
+	TODO: im2col and col2im unrollings (a la v0.16)
 
 ### cblas (build.sh -C)
 FindBLAS is no longer working.  hardwired USE_CBLAS and directories using cmake/ve.cmake toolchain variables.
@@ -108,7 +115,11 @@ debug a single test case :
 
 [aurora-ds08 vanilla-dbg]$ { { make -C build-ve -j 16 install || make -C build-ve -j 1 install; } && ./vetest.sh -B build-ve -v -L f.log --benchdnn --mode=C --eltwise --dir=FWD_D --alg=exp_dst alpha=0 beta=0 44x88x33x3; } >& ve-elt.log && echo YAY || echo OHOH
 
-### Errors
+S=vejd2 B=build-$S I=install-$S; { rm -f $I; { make -C $B -j 16 install || make -C $B -j 1 install; } >& x.log  && VE_NODE_NUMBER=2 DNNL_VERBOSE=2 gdb --args $B/tests/benchdnn/benchdnn --mode=C -v8 --conv --dir=FWD_D,BWD_D,BWD_WB --stag=axb --dtag=axb mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1 ; }
+S=vejd2 B=build-$S I=install-$S; { rm -f $I; { make -C $B -j 16 install || make -C $B -j 1 install; } >& x.log  && ./vetest.sh -B $B -N 0 -L f.log --benchdnn -v8 --mode=C --conv --dir=BWD_WB --stag=abx --dtag=abx mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1 ; } >&y.log && echo YAY || echo OHOH
+S=vejd2 B=build-$S I=install-$S; { rm -f $I; { make -C $B -j 16 install || make -C $B -j 1 install; } >& x.log  && ./vetest.sh -B $B -N 0 -L f.log -T test_sum; } >&y.log && echo YAY || echo OHOH
+
+### Errors during fixing of git tag v1.4-dbg-0
 
 ##### linking with cblas, an assertion fails during test_rnn_small:
 
@@ -139,6 +150,8 @@ FIXED: just support all alg_kind in generic (as done for dense bwd eltwise)
 --eltwise --tag=aBx8b --alg=pow --alpha=-0.25 --beta=-1 3x7x4x5
 	[  13][0x0x2x3] src:       -0 fp0:     -inf fp:     -inf dt:      inf diff:     inf rdiff:    -nan
 RESOLUTION: live with it for now.  It is already special-cased a bit.
+Note: in Release mode compile, limit case behavior is OK, but in debug mode there are differences.
+      vector ops are documented to skimp on limit case behaviour for speed.
 
 Tests 2,3,4,5,6 fail (wrong result)
 ```
@@ -308,5 +321,13 @@ segfault: test_binary_all  --binary --sdt=u8:s8 --ddt=u8 3x5x6x9:3x5x6x9
 	test_reorder_all	 --reorder --sdt=f32 --ddt=u8 --stag=abx --dtag=abx --attr="oscale=per_dim_1:0.125;" 2x64x3x3 
 	test_shuffle_all	benchdnn -v1 --engine=cpu --shuffle --batch=inputs/shuffle/test_shuffle_all
 				--shuffle --dt=u8 --group=4 1x12x56x56
+S=vejd2 B=build-$S I=install-$S; { rm -f $I; { make -C $B -j 16 install || make -C $B -j 1 install; } >& x.log  && VE_NODE_NUMBER=2 DNNL_VERBOSE=2 gdb --args $B/tests/benchdnn/benchdnn --mode=C -v8 --conv --dir=FWD_D,BWD_D,BWD_WB --stag=axb --dtag=axb mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1 ; }
+S=vejd2 B=build-$S I=install-$S; { rm -f $I; { make -C $B -j 16 install || make -C $B -j 1 install; } >& x.log  && ./vetest.sh -B $B -N 0 -L f.log --benchdnn -v8 --mode=C --conv --dir=BWD_WB --stag=abx --dtag=abx mb2_ic4oc6_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1 ; } >&y.log && echo YAY || echo OHOH
+S=vejd2 B=build-$S I=install-$S; { rm -f $I; { make -C $B -j 16 install || make -C $B -j 1 install; } >& x.log  && ./vetest.sh -B $B -N 0 -L f.log -T test_sum; } >&y.log && echo YAY || echo OHOH
 --------------------------------- turn off fast reorder compile option in src/cpu/CMakeLists.txt
-ldd.log
+fix up issues after removing partial-build support...
+./build.sh -addTttttt >& ldd.log
+./build.sh -N 2 -vdqqTttttt >&      # 1st time had a veos? error, claiming !BUILD_OK, but rerun seems OK.
+
+Good news: at RelWithDebInfo compile, ./build.sh -ad, eltwise vector results are OK.
+ (but limit cases +/-inf,nan,+/-0 descrepancies for ./build.sh -add)
