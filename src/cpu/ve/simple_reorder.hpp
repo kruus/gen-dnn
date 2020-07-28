@@ -1502,7 +1502,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 });
 #else // vectorize SOME offset calcs.
         // 2x to 66x faster
-        if (D_mask > 1) {
+        if (1 || D_mask > 1) {
             assert( nelems == D_start * D_mask * D_rest );
             parallel(0, [&](const int ithr, const int nthr) {
                     dim_t start = 0, end = 0;
@@ -1639,25 +1639,28 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                         }
                         // XXX do we need to vectorize the quantization loop?
                         // ex. out_round<int> inhibits optimization for s32-->f32
-#if 1 // scalar loop
+                        //
+#if 1 // scalar loop // f32-->u8 errors?
                         // This is often ok, but sometimes (like f32->s32) we
                         // invoke a non-vectorizable rounding fn
-                        FOR_vl out[i] = _qz<data_type::f32, type_o>()(
+                        // This has difficulty when type_o is dst_u8 .. is it some
+                        // strange alignment issue?
+                        NOVECTOR FOR_vl out[i] = _qz<data_type::f32, type_o>()(
                                 f[i], out[i], 1.f, beta);
-                        if (1) { // cross-check vec version
-                            data_t<type_o> out2[MVL];
-                            FOR_vl out2[i] = data_t<type_o> {0};
-                            _qzv<data_type::f32, type_o>()(
-                                    &f[0], &out2[0], vl, 1.f, beta);
-                            int nwrong = 0;
-                            FOR_vl {
-                                if( out[0] != out2[0] ){
-                                    printf(" correct: %ld vec: %ld\n", (long)out[i], (long)out2[i]);
-                                    ++nwrong;
-                                }
-                                if (nwrong > 10) break;
+#if 0 // cross-check vec version
+                        data_t<type_o> out2[MVL];
+                        FOR_vl out2[i] = data_t<type_o> {0};
+                        _qzv<data_type::f32, type_o>()(
+                                &f[0], &out2[0], vl, 1.f, beta);
+                        int nwrong = 0;
+                        NOVECTOR FOR_vl {
+                            if( out[0] != out2[0] ){
+                                printf(" correct: %ld vec: %ld\n", (long)out[i], (long)out2[i]);
+                                ++nwrong;
                             }
+                            if (nwrong > 10) break;
                         }
+#endif
 #else
                         // new vector-quant header... WIP
                         _qzv<data_type::f32, type_o>()(

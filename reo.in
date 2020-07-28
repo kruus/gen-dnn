@@ -20,7 +20,9 @@
 --sdt=f32,s32 --ddt=f32,s32 --stag=acdeb --dtag=abcde 6x2x1024x4x102
 #--sdt=f32 --ddt=s32,s8,u8 --stag=acdeb --dtag=abcde 6x2x102x4x102
 
-#Problematic?
+#Problematic perhaps in u8 qunatization routines?  Anyway u8 is SLOW on VE.
+--sdt=s32,f32 --ddt=u8 --stag=abcde --dtag=abcde 6x2x1024x4x102
+--sdt=f32 --ddt=u8 --stag=abx --dtag=abx --attr=oscale=per_dim_0:0.125 8x64x33x33
 --sdt=f32 --ddt=u8 --stag=abx --dtag=abx --attr=oscale=per_dim_1:0.125 8x64x33x33
 
 #--sdt=f32 --ddt=u8 --stag=abx --dtag=abx --attr=oscale=common:2.01 2x64x3x3

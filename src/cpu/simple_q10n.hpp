@@ -88,26 +88,6 @@ inline int mxcsr_round __attribute__((always_inline)) (float const f) ATTR_NO_MS
     return (int)nearbyintf(f); // optimism
 #endif
 }
-#if 0 && defined(__ve)
-//
-// Might also need saturate and round_and_saturate vector versions,
-// all the way up to out_round, I think.
-//
-
-/** UNTESTED vector-register version of mxcsr_round.
- * \pre vl less than max vector register size.
- * May prohibit some client optimizations, but removes fn-call overhead. */
-inline void mxcsr_round_v(int * const dst, float const* const src,
-        int const vl){
-    asm("lvl %[vl]\n"
-        "cvt.w.s.sx %[iout], %[fin]\n\t" // VFIX opcode
-     : [iout] "=r"(ret)                 // outputs
-     : [fin]"r"(f), [vl]"r"(vl)         // inputs
-     : "%vl"                            // clobbers
-    );
-}
-#endif
-
 
 template <typename data_t, typename acc_t> inline
 typename utils::enable_if<!nstl::is_integral<data_t>::value,
@@ -126,6 +106,16 @@ saturate(const acc_t &x) {
     if (v > (acc_t)nstl::numeric_limits<data_t>::max())
         v = (acc_t)nstl::numeric_limits<data_t>::max();
     return (typename utils::remove_reference<data_t>::type)v;
+}
+
+template <typename data_t> inline
+float saturate(const float &x) {
+    float v = x;
+    if (v < (double)nstl::numeric_limits<data_t>::lowest())
+        v = (double)nstl::numeric_limits<data_t>::lowest();
+    if (v > (double)nstl::numeric_limits<data_t>::max())
+        v = (double)nstl::numeric_limits<data_t>::max();
+    return v;
 }
 
 template <typename data_t> inline

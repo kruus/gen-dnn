@@ -17,6 +17,9 @@
 #ifndef CPU_VE_SIMPLE_Q10N_VEC_HPP
 #define CPU_VE_SIMPLE_Q10N_VEC_HPP
 // this file should be included from cpu/simple_q10n.hpp
+//
+// NOTE: quantization has been greatly rewritten at some point after v1.4
+//
 
 #include "common/dnnl_optimize.h" // ShortLoop() etc.
 
@@ -58,6 +61,7 @@ inline void mxcsr_roundv(float const* const f, int * const out, unsigned const v
      : [f]"r"(f), [vl]"r"(vl), [out]"r"(out)  // inputs
      : "%v63", "memory"                // clobbers, %vl unknown
     );
+#if 0
     // double-check:
     if(1){
         int nerr=0;
@@ -70,6 +74,7 @@ inline void mxcsr_roundv(float const* const f, int * const out, unsigned const v
             if (nerr > 10) break;
         }
     }
+#endif
 
 #endif
 #else
@@ -81,8 +86,8 @@ inline void mxcsr_roundv(float const* const f, int * const out, unsigned const v
 template <typename data_t, typename acc_t> inline
 typename utils::enable_if<!nstl::is_integral<data_t>::value, void>::type
 saturate(const acc_t *x,
-        //typename utils::remove_reference<data_t>::type *out,
-        data_t *out,
+        typename utils::remove_reference<data_t>::type *out,
+        //data_t *out,
         unsigned const vl) {
     FOR_vl out[i] =  (data_t)x[i];
 }
@@ -90,19 +95,34 @@ saturate(const acc_t *x,
 template <typename data_t, typename acc_t> inline
 typename utils::enable_if<nstl::is_integral<data_t>::value, void>::type
         //typename utils::remove_reference<data_t>::type>::type
-saturatev(const acc_t *x, data_t *out, unsigned const vl) {
+saturatev(const acc_t *x,
+        typename utils::remove_reference<data_t>::type *out,
+        //data_t *out,
+        unsigned const vl) {
     FOR_vl {
         acc_t v = x[i];
         if (v < (acc_t)nstl::numeric_limits<data_t>::lowest())
             v = (acc_t)nstl::numeric_limits<data_t>::lowest();
         if (v > (acc_t)nstl::numeric_limits<data_t>::max())
             v = (acc_t)nstl::numeric_limits<data_t>::max();
+        out[i] = static_cast<typename utils::remove_reference<data_t>::type>(v);
+    }
+}
+
+template <typename data_t> inline
+void saturatev(const float *x, float *out, unsigned const vl) {
+    FOR_vl {
+        float v = x[i];
+        if (v < (double)nstl::numeric_limits<data_t>::lowest())
+            v = (double)nstl::numeric_limits<data_t>::lowest();
+        if (v > (double)nstl::numeric_limits<data_t>::max())
+            v = (double)nstl::numeric_limits<data_t>::max();
         out[i] = v;
     }
 }
 
 template <typename data_t> inline
-void saturatev(const double *x, data_t *out, unsigned const vl) {
+void saturatev(const double *x, double *out, unsigned const vl) {
     FOR_vl {
         double v = x[i];
         if (v < (double)nstl::numeric_limits<data_t>::lowest())
@@ -223,7 +243,7 @@ struct qzv {
         float scaled[MVL];
         FOR_vl scaled[i] = alpha * in[i] + (beta ? beta * out[i] : 0.f);
         round_and_saturatev<out_t>(scaled, out, vl);
-        printf(" rsv scaled[0]=%f --> out[0]=%ld\n", scaled[0], (long)out[0]);
+        //printf(" rsv scaled[0]=%f --> out[0]=%ld\n", scaled[0], (long)out[0]);
     }
 };
 
