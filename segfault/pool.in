@@ -1,0 +1,2 @@
+--reset
+--pool --dir=FWD_I --cfg=u8 --tag=axb ic64iw32ow16kw3sw2pw0

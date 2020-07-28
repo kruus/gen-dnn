@@ -82,7 +82,9 @@ namespace reorder {
             REG_SR(idt, any, odt, any, fmt_order::any, \
                     spec::direct_copy_except_dim_0)
 
-#if defined(__INTEL_COMPILER) || (defined(__GNUC__) && !defined(__clang__))
+#if !DNNL_X64 || (defined(__INTEL_COMPILER) || (defined(__GNUC__) && !defined(__clang__)))
+//#if              (defined(__INTEL_COMPILER) || (defined(__GNUC__) && !defined(__clang__)))
+//#if !defined(__ve) && (defined(__INTEL_COMPILER) || (defined(__GNUC__) && !defined(__clang__)))
 /* Direct copy for icc which is faster than jitted code;
  * Direct copy for gcc which might or might not be faster than jitted
  * code, but still worth it because doesn't require jitting, i.e. much
@@ -94,7 +96,8 @@ namespace reorder {
 #endif
 
 /* regular reorders */
-#ifdef __INTEL_COMPILER
+#if !DNNL_X64 || defined(__INTEL_COMPILER)
+//#if              defined(__INTEL_COMPILER)
 /* direct copy for icc, which is faster than jitted code */
 #define REG_FAST_DIRECT_COPY_COMMA(sdt, ddt) REG_SR_DIRECT_COPY(sdt, ddt),
 #else

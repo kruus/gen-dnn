@@ -36,6 +36,11 @@ const std::vector<rpd_create_f> f32_s32_0 = {
         nullptr,
     };
 
+// try explicit instantiation to see diagnostics?
+template class simple_reorder_t<f32,any, s32,any, fmt_order::any, spec::direct_copy>;
+//template simple_reorder_t<f32,any, s32,any, fmt_order::any, spec::direct_copy_except_dim_0>;
+template class simple_reorder_t<f32,any, s32,any, fmt_order::any, spec::reference>;
+
 } // namespace reorder
 } // namespace cpu
 } // namespace impl

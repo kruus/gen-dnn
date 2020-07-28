@@ -16,12 +16,10 @@
 
 #ifndef VE_CPU_SIMPLE_REORDER_HPP
 #define VE_CPU_SIMPLE_REORDER_HPP
-#if 0 && DNNL_VE
-#include "cpu/ve/simple_reorder.hpp"
-#endif
 
 #include <assert.h>
 
+#include "common/ve/consistency.hpp"
 #include "common/bfloat16.hpp"
 #include "common/c_types_map.hpp"
 #include "common/dnnl_thread.hpp"
@@ -31,11 +29,20 @@
 #include "common/tag_traits.hpp"
 #include "common/type_helpers.hpp"
 #include "common/utils.hpp"
+#include "common/ve/memory_desc_wrapper_opt.hpp" // vector offset calc
 
 #include "cpu/cpu_primitive.hpp"
 #include "cpu/cpu_reorder_pd.hpp"
 
 #include "cpu/simple_q10n.hpp"
+
+#ifndef NOVECTOR
+#if defined(__ve)
+#define NOVECTOR _Pragma("_NEC novector")
+#else
+#define NOVECTOR
+#endif
+#endif
 
 // XXX add dbg version printing is_applicable returning true impl identity
 namespace dnnl {
@@ -53,6 +60,9 @@ using _qz_a1b0 = qz_a1b0<data_t<type_i>, data_t<type_o>>;
 
 template <impl::data_type_t type_i, impl::data_type_t type_o>
 using _qz = qz<data_t<type_i>, data_t<type_o>>;
+
+template <impl::data_type_t type_i, impl::data_type_t type_o>
+using _qzv = qzv<data_t<type_i>, data_t<type_o>>;
 
 namespace fmt_order {
 const bool keep = true;
@@ -104,6 +114,7 @@ bool simple_fmt_check(bool order_keep, impl::format_tag_t tag_i,
             && output_d.matches_tag(order_keep ? tag_o : tag_i);
 }
 bool simple_po_check(const primitive_attr_t *attr) {
+    // true iff no postops or single sum postop
     const auto &po = attr->post_ops_;
     return po.len_ == 0 || (po.len_ == 1 && po.contain(primitive_kind::sum, 0));
 }
@@ -114,7 +125,14 @@ bool simple_attr_check(const primitive_attr_t *attr, bool many_scales_support,
     if (sum_support) skip_mask = skip_mask | smask_t::post_ops;
     if (!attr->has_default_values(skip_mask)) return false;
     if (!attr->defined()) return false;
+
+#if 0 // orig -- ignores simple_po_check completely?
     if (sum_support) simple_po_check(attr);
+#else
+    if (sum_support) if(!simple_po_check(attr)) return false;
+    else if(attr->post_ops_.len_ != 0) return false;
+#endif
+
     if (many_scales_support) return true;
     return attr->output_scales_.mask_ == 0;
 }
@@ -154,7 +172,8 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     }
 
     GET_SCRATCHPAD_SIZE_ZERO();
-    static char const* impl_name = "simple:any:s8s8_plain";
+
+    static char const* impl_name() { return "simple:any:s8s8_plain"; }
 
     static status_t execute(const cpu_reorder_pd_t *pd, const exec_ctx_t &ctx) {
         DECLARE_COMMON_PARAMS();
@@ -281,7 +300,8 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     }
 
     GET_SCRATCHPAD_SIZE_ZERO();
-    static char const* impl_name = "simple:any:s8s8_special";
+
+    static char const* impl_name() { return "simple:any:s8s8_special"; }
 
     static status_t execute(const cpu_reorder_pd_t *pd, const exec_ctx_t &ctx) {
         DECLARE_COMMON_PARAMS();
@@ -416,7 +436,8 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     }
 
     GET_SCRATCHPAD_SIZE_ZERO();
-    static char const* impl_name = "simple:any:s8s8_outG";
+
+    static char const* impl_name() { return "simple:any:s8s8_outG"; }
 
     static status_t execute(const cpu_reorder_pd_t *pd, const exec_ctx_t &ctx) {
         DECLARE_COMMON_PARAMS();
@@ -523,7 +544,8 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         const int blksize = 16;
         return sizeof(float) * blksize * blksize * dnnl_get_max_threads();
     }
-    static char const* impl_name = "simple:any:f32bf16_OI";
+
+    static char const* impl_name() { return "simple:any:f32bf16_OI"; }
 
     static status_t execute(const cpu_reorder_pd_t *pd, const exec_ctx_t &ctx) {
         DECLARE_COMMON_PARAMS();
@@ -631,7 +653,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         return sizeof(float) * blksize * W * dnnl_get_max_threads();
     }
 
-    static char const* impl_name = "simple:any:f32bf16_nchw_to_16c";
+    static char const* impl_name() { return "simple:any:f32bf16_nchw_to_16c"; }
 
     static status_t execute(const cpu_reorder_pd_t *pd, const exec_ctx_t &ctx) {
         DECLARE_COMMON_PARAMS();
@@ -703,7 +725,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
     GET_SCRATCHPAD_SIZE_ZERO();
 
-    static char const* impl_name = "simple:any:C_to_C";
+    static char const* impl_name() { return "simple:any:C_to_C"; }
 
     static status_t execute(const cpu_reorder_pd_t *pd, const exec_ctx_t &ctx) {
         DECLARE_COMMON_PARAMS();
@@ -806,7 +828,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
     GET_SCRATCHPAD_SIZE_ZERO();
 
-    static char const* impl_name = "simple:any:plain1blocked";
+    static char const* impl_name() { return "simple:any:plain1blocked"; }
 
     static status_t execute(const cpu_reorder_pd_t *pd, const exec_ctx_t &ctx) {
         DECLARE_COMMON_PARAMS();
@@ -943,7 +965,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
     GET_SCRATCHPAD_SIZE_ZERO();
 
-    static char const* impl_name = "simple:any:plain2blocked";
+    static char const* impl_name() { return "simple:any:plain2blocked"; }
 
     static status_t execute(const cpu_reorder_pd_t *pd, const exec_ctx_t &ctx) {
         DECLARE_COMMON_PARAMS();
@@ -1094,15 +1116,41 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     static bool is_applicable(const memory_desc_wrapper &input_d,
             const memory_desc_wrapper &output_d, const primitive_attr_t *attr) {
         /* FIXME: is the formula correct? */
-        return !input_d.has_runtime_dims_or_strides()
-                && input_d.similar_to(output_d, true, false, 0)
-                && input_d.is_dense() && output_d.is_dense()
-                && simple_attr_check(attr, false, true);
+        Consistency ok("reorder_check:direct_copy");
+        // look at why direct_copy was skipped?
+#define AND_(...) SCHKVV(ok,__VA_ARGS__)
+        AND_(!input_d.has_runtime_dims_or_strides());
+        AND_(input_d.similar_to(output_d, true, false, 0));
+        AND_(input_d.is_dense());
+        AND_(output_d.is_dense());
+#if 0 // like original
+        AND_(simple_attr_check(attr, false, true));
+#else // expanded ...
+        const bool many_scales_support = false;
+        bool sum_support = true;
+        AND_(attr->defined());
+
+        using smask_t = primitive_attr_t::skip_mask_t;
+        smask_t skip_mask = smask_t::oscale;
+        if (sum_support) skip_mask = skip_mask | smask_t::post_ops;
+        AND_(attr->has_default_values(skip_mask));
+
+        //re-enabled:
+        if (sum_support)
+            AND_(simple_po_check(attr)); // CHECK
+        else
+            AND_(attr->post_ops_.len_ == 0);
+
+        if (!many_scales_support)
+            AND_(attr->output_scales_.mask_ == 0);
+#undef AND_
+#endif
+        return ok;
     }
 
     GET_SCRATCHPAD_SIZE_ZERO();
 
-    static char const* impl_name = "simple:any:direct_copy";
+    static char const* impl_name() { return "simple:any:direct_copy"; }
 
     static status_t execute(const cpu_reorder_pd_t *pd, const exec_ctx_t &ctx) {
         DECLARE_COMMON_PARAMS();
@@ -1114,15 +1162,37 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         const size_t nelems = input_d.nelems();
 
-#if DNNL_VE
-        constexpr int block_size = 256; // [ejk] simd vector length here, or nice-remainder version XXX
-        // in src/cpu/ve/, use static constexpr dim_t simd_w = cpu_isa_traits<ve_common>::mvl; // MVL=256
-        // in general:
-        // if DNNL_X64, include ...x64/cpu_isa_traits.hpp and use cpu_isa_traits<sse41>::vlen
-        // if DNNL_VE,  include ... ve/cpu_isa_traits.hpp and use cpu_isa_traits<ve_common>::mvl
-#else
+#if 1 && DNNL_VE
+        // - VE has minor effect of block size (there exist nice vl-choice fns
+        //   elsewhere in src/cpu/ve/, if nec.)
+        // - moved alpha,beta conditions outside loop.
+        // - nice .s search via FOR_e line number
+        // QZ_OBJ is a compile-time inlined function (good)
+        // - QZ_OBJ may call non-inlined 'round' (f32-->s32, ouch)
+#define FOR_e(QZ_OBJ,...) do \
+        { \
+            auto const* __restrict in = input; \
+            auto * __restrict out = output; \
+            parallel(0, [&](const int ithr, const int nthr) { \
+                    size_t start {0}, end {0}; \
+                    balance211(nelems, nthr, ithr, start, end); \
+                    PRAGMA_OMP_SIMD() for (size_t e = start; e < end; ++e) { \
+                        out[e] = QZ_OBJ<data_t<type_i>, data_t<type_o>>()( \
+                                __VA_ARGS__ ); /* QZ_ARGS */ \
+                    } \
+            }); \
+        } while(0)
+        if (alpha == 1.0 && beta == 0.0)
+            FOR_e(qz_a1b0, in[e]);
+        else if (alpha == 1.0)
+            FOR_e(qz_a1, in[e], out[e], beta);
+        else if (beta == 0.0)
+            FOR_e(qz_b0, in[e], alpha);
+        else
+            FOR_e(qz, in[e], out[e], alpha, beta);
+#undef FOR_e
+#else // x64 or non-VE... (orig)
         constexpr int block_size = 16; // HARDWIRED!
-#endif
         const auto num_blocks = nelems / block_size;
         const auto rem_elems = nelems % block_size;
 
@@ -1132,7 +1202,6 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             start = start * block_size;
             end = end * block_size;
 
-            // Is there a better "remainder loop" rewrite for VE? XXX
             if (alpha == 1.0 && beta == 0.0) {
                 PRAGMA_OMP_SIMD()
                 for (size_t e = start; e < end; ++e) {
@@ -1187,6 +1256,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 }
             }
         });
+#endif // DNNL_VE, ...
         return status::success;
     }
 };
@@ -1211,7 +1281,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
     GET_SCRATCHPAD_SIZE_ZERO();
 
-    static char const* impl_name = "simple:any:direct_except_dim_0";
+    static char const* impl_name() { return "simple:any:direct_except_dim_0"; }
 
     static status_t execute(const cpu_reorder_pd_t *pd, const exec_ctx_t &ctx) {
         DECLARE_COMMON_PARAMS();
@@ -1226,6 +1296,41 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         const dim_t nelems_no_d0 = nelems_no_dim_0(input_d);
         const dim_t work_amount = N * nelems_no_d0;
 
+#if 1 && DNNL_VE // equivalent, using macro for common iteration code
+        // - QZ_OBJ may call non-inlined 'round' (f32-->s32, ouch)
+#define IN_e in[is * n + e]
+#define OUT_e out[is * n + e]
+#define FOR_e(QZ_OBJ,...) do \
+        { \
+            parallel(0, [&](const int ithr, const int nthr) { \
+                dim_t n {0}, dim1_s {0}; \
+                dim_t start {0}, end {0}; \
+                balance211(work_amount, nthr, ithr, start, end); \
+                nd_iterator_init(start, n, N, dim1_s, nelems_no_d0); \
+                auto const* restrict in = input; \
+                auto      * restrict out = output; \
+                while (start < end) { \
+                    const dim_t work_rem = end - start; \
+                    const dim_t dim1_e = dim1_s + work_rem > nelems_no_d0 \
+                            ? nelems_no_d0 \
+                            : dim1_s + work_rem; \
+                    PRAGMA_OMP_SIMD() IVDEP() \
+                    for (dim_t e = dim1_s; e < dim1_e; ++e) { \
+                        OUT_e = QZ_OBJ<type_i, type_o>()( \
+                                __VA_ARGS__ ); \
+                    } \
+                    nd_iterator_jump(start, end, n, N, dim1_s, nelems_no_d0); \
+                } \
+            }); \
+        } while(0)
+        if (alpha == 1.0 && beta == 0.0)
+            FOR_e(_qz_a1b0, IN_e);
+        else
+            FOR_e(_qz, IN_e, OUT_e, alpha, beta);
+#undef FOR_e
+#undef OUT_e
+#undef IN_e
+#else // orig version
         if (alpha == 1.0 && beta == 0.0) {
             parallel(0, [&](const int ithr, const int nthr) {
                 dim_t n {0}, dim1_s {0};
@@ -1266,6 +1371,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 }
             });
         }
+#endif // macroization
 
         return status::success;
     }
@@ -1289,8 +1395,11 @@ private:
 
         dim_t max_size = blk_size;
         for (int d = 1; d < data_d.ndims(); ++d) {
-            max_size = nstl::max(max_size,
-                    data_d.padded_dims()[d] / blocks[d] * blk.strides[d]);
+            // dependency unknown? nc++
+            //max_size = nstl::max(max_size,
+            //        data_d.padded_dims()[d] / blocks[d] * blk.strides[d]);
+            auto const sz = data_d.padded_dims()[d] / blocks[d] * blk.strides[d];
+            if (max_size < sz) max_size = sz;
         }
 
         return max_size;
@@ -1324,7 +1433,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
     GET_SCRATCHPAD_SIZE_ZERO();
 
-    static char const* impl_name = "simple:any:generic";
+    static char const* impl_name() { return "simple:any:generic"; }
 
     static status_t execute(
             const cpu_reorder_pd_t *pd_object, const exec_ctx_t &ctx) {
@@ -1343,8 +1452,12 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         const auto input_d = ctx.memory_mdw(DNNL_ARG_FROM, pd()->src_md());
         const auto output_d = ctx.memory_mdw(DNNL_ARG_TO, pd()->dst_md());
+#if defined(__ve)
+        const auto input_d_opt = memory_desc_wrapper_opt(input_d.md_);
+        const auto output_d_opt = memory_desc_wrapper_opt(output_d.md_);
+#endif
 
-        const size_t nelems = input_d.nelems();
+        const auto nelems = input_d.nelems();
 
         int ndims_start = 0, ndims_mask = 0;
         int smask = pd()->attr()->output_scales_.mask_;
@@ -1360,6 +1473,22 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 input_d.dims() + ndims_start, ndims_mask);
         const ptrdiff_t D_rest = nelems / D_start / D_mask;
 
+        // special cases..
+        bool same_logical_dims = true;
+        if (input_d.ndims() == output_d.ndims()) {
+            for (int d = 0; d < input_d.ndims(); ++d) {
+                if (input_d.dims()[d] != output_d.dims()[d])
+                    same_logical_dims = false;
+            }
+        }
+#if 0 && DNNL_VE // orig
+        //asm("###generic");
+        // vectorize this -- it occurs frequently in benchdnn,
+        // abcde --> acdeb is perhaps 16000x slower than abcde --> abcde
+        // direct copy (some unavoidable due to gather, scatter, but much
+        // due to scalar loop, because of offset function call).
+        // - QZ_OBJ may call non-inlined 'round' (f32-->s32, ouch)
+        //   - vectorized round might be tricky (libc call).
         parallel_nd(D_start, D_mask, D_rest,
                 [&](ptrdiff_t ds, ptrdiff_t dm, ptrdiff_t dr) {
                     const float scale = scales[dm];
@@ -1371,6 +1500,177 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                     float f = scale * (i - i0) + o0;
                     o = _qz<data_type::f32, type_o>()(f, o, 1.f, beta);
                 });
+#else // vectorize SOME offset calcs.
+        // 2x to 66x faster
+        if (D_mask > 1) {
+            assert( nelems == D_start * D_mask * D_rest );
+            parallel(0, [&](const int ithr, const int nthr) {
+                    dim_t start = 0, end = 0;
+                    balance211(nelems, nthr, ithr, start, end);
+                    if (start == end) return;
+                    typedef CoordsFor<3,ptrdiff_t,ptrdiff_t> Coords;
+                    // establish iter limits per coordinate
+                    //auto cf = Coords::mk(0,D_start, 0,D_mask, 0,D_rest);
+                    Coords cf({0,0,0},{D_start,D_mask,D_rest});
+                    // each thread restricts coord generation to subrange,
+                    // we CAN modify cf.vp coords inside, since
+                    // ++cf will recalc all cords based on linear pos
+                    //printf(" cf lims %s\n", cf.lim_str().c_str()); fflush(stdout);
+                    NOVEC_ for(cf.init(start,end); cf; ++cf)
+                    {
+                        //printf(" cf %s\n", cf.coord_str().c_str()); fflush(stdout);
+                        auto const vl = cf.get_vl();
+                        dim_t const e0 = cf.get_pos();
+#define FOR_vl ShortLoop() for(int i=0; i<vl; ++i)
+                        dim_t e[MVL]; VREG(e);      // logical offfset
+                        float scale[MVL]; VREG(scale);
+
+                        FOR_vl {
+                            dim_t ds[MVL]; VREG(ds);
+                            dim_t dm[MVL]; VREG(dm);
+                            dim_t dr[MVL]; VREG(dr);
+                            ds[i] = cf.vp[0][i]; // CoordFor_nd VectorPhysical
+                            dm[i] = cf.vp[1][i];
+                            dr[i] = cf.vp[2][i];
+                            //e[i] = (ds[i] * D_mask + dm[i]) * D_rest + dr[i];
+                            e[i] = e0 + i;
+                            scale[i] = scales[dm[i]];
+                        }
+                        dim_t p_i[MVL];   // phys inp offset
+                        dim_t p_o[MVL];   // phys out offset
+#define VECTORIZE 0
+#if VECTORIZE
+                        // - vl > MVL also allowed
+                        input_d_opt.vec_off_l(e, vl, p_i, false/*padded*/);
+                        output_d_opt.vec_off_l(e, vl, p_o, false/*padded*/);
+                        //if (0) { // double-check
+                        //    FOR_vl assert( p_i[i] ==  input_d_opt.off_l(e[i]));
+                        //    FOR_vl assert( p_o[i] == output_d_opt.off_l(e[i]));
+                        //}
+#else // scalar way
+                        FOR_vl p_i[i] = input_d_opt.off_l(e[i]);
+                        FOR_vl p_o[i] = output_d_opt.off_l(e[i]);
+#endif
+                        float f[MVL]; VREG(f);
+                        data_t<type_i> in[MVL]; VREG(in);
+                        data_t<type_o> out[MVL]; VREG(out);
+                        FOR_vl {
+                            in[i] = input[p_i[i]];       // gather
+                            out[i] = output[p_o[i]];     // gather
+                            f[i] = scale[i] * (in[i] - i0) + o0;
+                        }
+                        // XXX do we need to vectorize the quantization loop?
+                        // ex. out_round<int> inhibits optimization for s32-->f32
+                        //     so perhaps 30x slower.
+                        NOVECTOR FOR_vl out[i] = _qz<data_type::f32, type_o>()(
+                                f[i], out[i], 1.f, beta);
+                        FOR_vl output[p_o[i]] = out[i]; // scatter
+#undef FOR_vl
+                    }
+            });
+        }else{
+#if 1
+            // special case, no mask (global scale).  Iter directly on input coords
+            // this gives a small speed increase (4-20%?)
+            assert( D_start == 1 );
+            assert( D_mask == 1 );
+            parallel(0, [&](const int ithr, const int nthr) {
+                    dim_t start = 0, end = 0;
+                    balance211(nelems, nthr, ithr, start, end);
+                    if (start == end) return;
+                    typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
+                    Coords cf(&input_d.dims()[0], input_d.ndims());
+                    // cf is in general for input only
+                    NOVEC_ for(cf.init_nd(start,end); cf; ++cf)
+                    {
+                        auto const vl = cf.get_vl();
+                        auto const e0 = cf.get_pos(); // use for output
+#define FOR_vl ShortLoop() for(int i=0; i<vl; ++i)
+                        //float scale[MVL]; VREG(scale);
+                        dim_t p_i[MVL];   // phys inp offset
+                        dim_t p_o[MVL];   // phys out offset
+
+#if 0
+                        // NOTE: if input_d_opt.similar_to(output_d_opt, false/*pad?*/, false/*data_t?*/, 0)
+                        // then p_o == p_i, but we would use direct_copy.
+                        // BUT if input_d_opt.consistent_with(output_d_opt), then dims[] are identical,
+                        // and we can use vec_off_v for p_o here:
+                        // output phys offset still based on logical offset
+                        output_d_opt.vec_off_l(e, vl, p_o, false/*padded*/);
+                        // in favorable cases, could use vec_off_v here too
+                        if(same_logical_dims){
+                            // can reuse input cf.vp for output
+                            dim_t p_o2[MVL];   // phys out offset
+                            output_d_opt.vec_off_v(cf, p_o2, vl); // preserving cf.vp
+                            bool equ_phys = true;
+                            FOR_vl if (p_o[i] != p_o2[i]) equ_phys = false;
+                            assert(same_logical_dims && equ_phys);
+                        }
+#else
+                        if (1 && same_logical_dims) { // new fast-path [common]
+                            // short test suggests ~ 25% speed-up.
+                            // ... should create intermediate impl:
+                            // direct_copy ... "dense_copy" ... this(generic)
+                            output_d_opt.vec_off_v(cf, p_o, vl); // keep cf.vp
+                        } else {// output logical coords differ
+                            dim_t e[MVL];          // logical offfset
+                            FOR_vl e[i] = e0 + i;  // is linear span
+                            output_d_opt.vec_off_l(e, vl, p_o, false/*padded*/);
+                        }
+#endif
+
+                        // cf.vp has input coords, so bypass vec_off_l
+                        // - vl > MVL also allowed. this may MODIFY cf.cp
+                        input_d_opt.vec_off_vtmp(cf, p_i, vl); //false/*padded*/
+
+                        //if (1) { // double-check
+                        //    FOR_vl assert( p_i[i] ==  input_d_opt.off_l(e[i]));
+                        //    FOR_vl assert( p_o[i] == output_d_opt.off_l(e[i]));
+                        //}
+
+                        float const scale = scales[0];
+                        float f[MVL]; VREG(f);
+                        data_t<type_o> out[MVL]; VREG(out);
+                        FOR_vl {
+                            data_t<type_i> in[MVL]; VREG(in);
+                            in[i] = input[p_i[i]];       // gather
+                            out[i] = output[p_o[i]];     // gather
+                            f[i] = scale * (in[i] - i0) + o0;
+                        }
+                        // XXX do we need to vectorize the quantization loop?
+                        // ex. out_round<int> inhibits optimization for s32-->f32
+#if 1 // scalar loop
+                        // This is often ok, but sometimes (like f32->s32) we
+                        // invoke a non-vectorizable rounding fn
+                        FOR_vl out[i] = _qz<data_type::f32, type_o>()(
+                                f[i], out[i], 1.f, beta);
+                        if (1) { // cross-check vec version
+                            data_t<type_o> out2[MVL];
+                            FOR_vl out2[i] = data_t<type_o> {0};
+                            _qzv<data_type::f32, type_o>()(
+                                    &f[0], &out2[0], vl, 1.f, beta);
+                            int nwrong = 0;
+                            FOR_vl {
+                                if( out[0] != out2[0] ){
+                                    printf(" correct: %ld vec: %ld\n", (long)out[i], (long)out2[i]);
+                                    ++nwrong;
+                                }
+                                if (nwrong > 10) break;
+                            }
+                        }
+#else
+                        // new vector-quant header... WIP
+                        _qzv<data_type::f32, type_o>()(
+                                &f[0], &out[0], vl, 1.f, beta);
+#endif
+
+                        FOR_vl output[p_o[i]] = out[i]; // scatter
+#undef FOR_vl
+                    }
+            });
+#endif
+        }
+#endif
 
         return status::success;
     }
@@ -1384,8 +1684,8 @@ struct simple_reorder_t : public primitive_t {
         using cpu_reorder_pd_t::cpu_reorder_pd_t;
 
         // distinguish separate impl names XXX
-        char const* impl_name =
-                simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL, spec>::impl_name;
+        char const* impl_name = simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
+             spec>::impl_name();
         DECLARE_COMMON_PD_T(impl_name, simple_reorder_t);
 
         static status_t create(reorder_pd_t **reorder_pd, engine_t *engine,
@@ -1441,4 +1741,4 @@ private:
 } // namespace dnnl
 
 // vim: et ts=4 sw=4 cindent cino=+2s,l0,\:4,N-s filetype=cpp
-#endif VE_CPU_SIMPLE_REORDER_HPP
+#endif //VE_CPU_SIMPLE_REORDER_HPP

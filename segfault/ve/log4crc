@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE log4c SYSTEM "">
+
+<log4c>
+        <config>
+                <bufsize>1024</bufsize>
+                <debug level="0"/>
+                <nocleanup>0</nocleanup>
+        </config>
+
+        <category name="veos.veo" priority="DEBUG" appender="veo_appender" />
+        <appender name="veo_appender" layout="ve_debug" type="rollingfile" rollingpolicy="veo_rp" logdir="." prefix="veo.log"/>
+        <rollingpolicy name="veo_rp" type="sizewin" maxsize="4194304" maxnum="10" />
+
+        <category name="veos.pseudo_process" priority="DEBUG" appender="ve_exec_appender" />
+        <appender name="ve_exec_appender" layout="ve_debug" type="stream" />
+
+        <category name="veos.os_module" priority="DEBUG" appender="veos_appender" />
+        <category name="veos.os_module.dma" priority="DEBUG" appender="veos_appender" />
+        <appender name="veos_appender" layout="ve_debug" type="rollingfile" rollingpolicy="veos_rp" logdir="/var/opt/nec/ve/veos" prefix="veos.log"/>
+        <rollingpolicy name="veos_rp" type="sizewin" maxsize="4194304" maxnum="8" />
+
+        <category name="veos.ived" priority="DEBUG" appender="ived_appender" />
+        <appender name="ived_appender" layout="ve_debug" type="rollingfile" rollingpolicy="ived_rp" logdir="/var/opt/nec/ve/veos" prefix="ived.log"/>
+        <rollingpolicy name="ived_rp" type="sizewin" maxsize="4194304" maxnum="10" />
+
+        <category name="veos.vemmd" priority="DEBUG" appender="vemmd_appender" />
+        <appender name="vemmd_appender" layout="ve_debug" type="rollingfile" rollingpolicy="vemmd_rp" logdir="/var/opt/nec/ve/veos" prefix="vemmd.log" />
+        <rollingpolicy name="vemmd_rp" type="sizewin" maxsize="4194304" maxnum="10" />
+
+        <category name="veos.ptrace" priority="DEBUG" appender="ve_ptrace_appender" />
+        <appender name="ve_ptrace_appender" layout="ve_debug" type="rollingfile" rollingpolicy="ve_ptrace_rp" logdir="." prefix="ve_ptrace.log"/>
+        <rollingpolicy name="ve_ptrace_rp" type="sizewin" maxsize="4194304" maxnum="10" />
+
+	<category name="veos.command.libveosinfo" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.time" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.iostat" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.mpstat" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.pidstat" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.sar" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.sadc" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.sadf" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.top" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.free" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.pmap" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.tload" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.uptime" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.vmstat" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.w" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.ps" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.accton" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.sa" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.prtstat" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.strace" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.nproc" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.arch" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.uname" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.taskset" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.lscpu" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.prlimit" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.lslocks" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.ipcs" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.ipcrm" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.venumainfo" priority="DEBUG" appender="veos_command_appender" />
+	<category name="veos.command.veswap" priority="DEBUG" appender="veos_command_appender" />
+	<appender name="veos_command_appender" layout="ve_debug" type="rollingfile" rollingpolicy="veos_command_rp" logdir="." prefix="veos_command.log"/>
+	<rollingpolicy name="veos_command_rp" type="sizewin" maxsize="4194304" maxnum="10" />
+
+        <layout name="ve" type="ve_layout"/>
+        <layout name="ve_debug" type="ve_layout_debug"/>
+</log4c>

@@ -1,0 +1,2 @@
+--reset --cfg=u8s8u8 --stag=ab --wtag=ab --attr=oscale=common:2.25* m1n1k1
+--reset --cfg=u8s8s8 --stag=ab --wtag=ba --runtime_m=1 --runtime_n=0 --runtime_k=1 --bia_dt=f32 --bia_mask=3 --attr=oscale=common:2.25;post_ops='sum' m10n20k30

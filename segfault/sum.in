@@ -1,0 +1,2 @@
+--reset
+--ddt=u8 --dtag=abx --scales=0.25 3x3x16x4

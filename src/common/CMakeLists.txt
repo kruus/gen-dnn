@@ -49,6 +49,15 @@ if(NECVE)
 
     set_source_files_properties(${SOURCES_VE} PROPERTIES COMPILE_FLAGS
         "-I${CMAKE_CURRENT_SOURCE_DIR}/ve -I${CMAKE_CURRENT_SOURCE_DIR}")
+
+    # the following might put -O0 too late in command line ? ?
+    file(GLOB FILES_O0
+        ${CMAKE_CURRENT_SOURCE_DIR}/reorder.cpp
+        )
+    set_source_files_properties(${FILES_O0}
+        PROPERTIES COMPILE_FLAGS "-O0"
+        )
+
 else()
     # optional enhancement: vectorized offset calculations:
     # [OK to never make use of these]

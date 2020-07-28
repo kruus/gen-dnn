@@ -1,0 +1,2 @@
+--reset
+--shuffle --dt=u8 --group=4 1x12x56x56

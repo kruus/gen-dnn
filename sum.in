@@ -1,0 +1,16 @@
+--reset
+#--ddt=f32,s32
+#--sdt=f32:f32,f32:s32,s32:f32
+--ddt=f32
+--sdt=f32:f32
+--dtag=abx,axb
+--stag=abx:abx       33x33x33x33 5x5x5x5
+--stag=axb:axb       33x33x33x33 5x5x5x5
+--stag=aBx8b:aBx8b   33x33x33x33 5x5x5x5
+--stag=aBx16b:aBx16b 33x33x33x33 5x5x5x5
+
+--ddt=f32,s32
+--sdt=f32:s32:s8
+--stag=aBx16b:abx:axb,axb:axb:axb
+--scales=1.25:3:0.5    33x33x33x33 5x5x5x5
+

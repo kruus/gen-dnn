@@ -16,6 +16,9 @@
 
 #ifndef CPU_SIMPLE_REORDER_HPP
 #define CPU_SIMPLE_REORDER_HPP
+#if 1 && DNNL_VE
+#include "cpu/ve/simple_reorder.hpp"
+#else
 
 #include <assert.h>
 
@@ -1402,7 +1405,7 @@ private:
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
-
+#endif // !DNNL_VE
 #endif
 
 // vim: et ts=4 sw=4 cindent cino+=l0,\:4,N-s

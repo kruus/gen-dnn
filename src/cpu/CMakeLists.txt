@@ -50,7 +50,7 @@ if(NECVE)
     #  however, this creates segfaults
     #  possibly the compiler turning of ipa in the monolithic compile
     #  is helping avoid bugs ?
-    if(1) # original monolithic list [very long nc++ compile time]
+    if(0) # original monolithic list [very long nc++ compile time]
         # "safe" (nc++ aborts ipa optimization at some point, good!)
         list_filter_exclude(SOURCES_VE ".*cpu_reorder.*")
     else() # split impl maps by map value. Fast compile,

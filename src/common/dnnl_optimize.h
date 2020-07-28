@@ -25,6 +25,12 @@
  * Can be turned OFF by defined ENABLE_OPT_PRAGMAS 0 before including
  */
 
+#if defined(__ve)
+#ifndef restrict
+#define restrict __restrict
+#endif
+#endif
+
 #if !defined(ENABLE_OPT_PRAGMAS)
 #define ENABLE_OPT_PRAGMAS 1
 #endif

@@ -36,12 +36,16 @@ namespace impl {
 namespace cpu {
 
 /** rounds @p f to an integer according to the mxcsr register */
-inline int mxcsr_round(float f) ATTR_NO_MSAN {
+inline int mxcsr_round __attribute__((always_inline)) (float const f) ATTR_NO_MSAN {
 #if DNNL_X64
     return _mm_cvtss_si32(_mm_load_ss(&f));
 #elif defined(__ve)
+#if 0
     // \sa tests/benchdnn/common.hpp, which also defines mxcsr_round
-    return (int)nearbyintf(f);
+    return (int)nearbyintf(f); // libc call
+#else
+    // unfortunately, asm also prohibits inlining, so this is even worse.
+    //
     // TODO remove fn call on VE!
     // Perhaps test:
     //return f + 0.5 - (f<0); (but this is not ties-to-even, and sometimes wrong)
@@ -56,13 +60,30 @@ inline int mxcsr_round(float f) ATTR_NO_MSAN {
     //return ::lround(f);    // always round-to-nearest-even  (wrong?)
     //
     //// FIX op: sx/zx sign extension, ne~nearest_even (absent => default)
-    //int ret; // only have cvt.w.d and cvt.w.s cvt.l.d
-    //asm("cvt.w.s.sx.ne %[iout], %[fin]\n\t"
-    // : [iout] "=r"(ret)       // outputs
-    // : [fin]  "r"(f)          // inputs
-    // :                        // clobbers
-    //);
-    //return ret;
+    int32_t ret;
+    //cvt.[output form].[input form]...
+    //float->int|long:  cvt.w.{s|d}{.s|.sx}{.NONE|.rp|.rm|.re|.ra}, %sx, {%sy|I}
+    //                                  NONE ~ according to PSW
+    //double->long:     cvt.l.d[.rd]
+    //int->float:       cvt.{d.w|s.w|d.l}
+    //float->flat:      cvt.{s|d|q}.{s|d|q}
+    //
+    // NONE-x rn-x rm- OK for +ve numbers  rz-OK
+    //   benchdnn to test rounding of both signs:
+    //   --matmul --cfg=u8s8s8 --stag=ab --wtag=ba --runtime_m=1 --runtime_k=1 --bia_dt=f32 --bia_mask=3 --attr="oscale=common:2.25;post_ops='sum';" m10n20k30
+    //
+    //   SURPRISE!
+    //
+    //   VE nearbyintf was actually does round-to-zero !?  = default VE rounding mode ?!
+    //   (I don't think OneDNN ever calls fesetround)
+    //
+    asm("cvt.w.s.sx.rz %[iout], %[fin]\n\t"
+     : [iout] "=r"(ret)       // outputs
+     : [fin]  "r"(f)          // inputs
+     :                        // clobbers
+    );
+    return ret;
+#endif
 #else
     return (int)nearbyintf(f); // optimism
 #endif
@@ -79,7 +100,7 @@ inline int mxcsr_round(float f) ATTR_NO_MSAN {
 inline void mxcsr_round_v(int * const dst, float const* const src,
         int const vl){
     asm("lvl %[vl]\n"
-        "cvt.w.s.sx.ne %[iout], %[fin]\n\t" // VFIX opcode
+        "cvt.w.s.sx %[iout], %[fin]\n\t" // VFIX opcode
      : [iout] "=r"(ret)                 // outputs
      : [fin]"r"(f), [vl]"r"(vl)         // inputs
      : "%vl"                            // clobbers
@@ -88,15 +109,15 @@ inline void mxcsr_round_v(int * const dst, float const* const src,
 #endif
 
 
-template <typename data_t, typename acc_t>
-inline typename utils::enable_if<!nstl::is_integral<data_t>::value,
+template <typename data_t, typename acc_t> inline
+typename utils::enable_if<!nstl::is_integral<data_t>::value,
         typename utils::remove_reference<data_t>::type>::type
 saturate(const acc_t &x) {
     return (typename utils::remove_reference<data_t>::type)x;
 }
 
-template <typename data_t, typename acc_t>
-inline typename utils::enable_if<nstl::is_integral<data_t>::value,
+template <typename data_t, typename acc_t> inline
+typename utils::enable_if<nstl::is_integral<data_t>::value,
         typename utils::remove_reference<data_t>::type>::type
 saturate(const acc_t &x) {
     acc_t v = x;
@@ -107,7 +128,7 @@ saturate(const acc_t &x) {
     return (typename utils::remove_reference<data_t>::type)v;
 }
 
-template <typename data_t>
+template <typename data_t> inline
 double saturate(const double &x) {
     double v = x;
     if (v < (double)nstl::numeric_limits<data_t>::lowest())
@@ -117,36 +138,36 @@ double saturate(const double &x) {
     return v;
 }
 
-template <>
-inline int8_t saturate<int8_t, uint8_t>(const uint8_t &x) {
+template <> inline
+int8_t saturate<int8_t, uint8_t>(const uint8_t &x) {
     return x <= 127u ? x : 127;
 }
 
-template <>
-inline uint8_t saturate<uint8_t, int8_t>(const int8_t &x) {
+template <> inline
+uint8_t saturate<uint8_t, int8_t>(const int8_t &x) {
     return x >= 0 ? x : 0;
 }
 
-template <typename out_t>
+template <typename out_t> inline
 typename utils::enable_if<nstl::is_integral<out_t>::value, out_t>::type
 out_round(float v) {
     return (out_t)mxcsr_round(v);
 }
 
-template <typename out_t>
+template <typename out_t> inline
 typename utils::enable_if<nstl::is_integral<out_t>::value, out_t>::type
 out_round(double v) {
     return (out_t)mxcsr_round((float)v);
 }
 
-template <typename out_t>
+template <typename out_t> inline 
 typename utils::enable_if<!nstl::is_integral<out_t>::value, out_t>::type
 out_round(float v) {
     return v;
 }
 
-template <typename out_t>
-inline out_t round_and_saturate(float f) {
+template <typename out_t> inline
+out_t round_and_saturate(float f) {
     return saturate<out_t>(out_round<int>(f));
 }
 
@@ -244,4 +265,9 @@ struct qz<float, float16_t> {
 } // namespace impl
 } // namespace dnnl
 
+#if defined(__ve)
+#include "cpu/ve/simple_q10n_vec.hpp"
+#endif
+
+// vim: et ts=4 sw=4 cindent cino=+2s,l0,\:4,N-s filetype=cpp
 #endif

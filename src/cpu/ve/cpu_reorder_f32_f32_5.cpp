@@ -74,6 +74,10 @@ const std::vector<rpd_create_f> f32_f32_5 = {
         nullptr,
     };
 
+// to produce nicer VE diagnostics:
+template class simple_reorder_t<f32,any, f32,any, fmt_order::any, spec::direct_copy>;
+template class simple_reorder_t<f32,any, f32,any, fmt_order::any, spec::reference>;
+
 } // namespace reorder
 } // namespace cpu
 } // namespace impl

@@ -199,6 +199,12 @@ struct CoordsFor : public CoordRegs<Crd,dim> {
         }
         return true;
     }
+    /** unchecked */
+    bool init(Pos start, Pos end) {
+        assert( start <= end && end <= sz );
+        sz = end;
+        return init(start);
+    }
     /** set next coord vectors at linear pos+vl.
      * \return true iff remaining iteration lenght vl > 0 */
     bool step(){
@@ -398,10 +404,20 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
      * - we can directly input our coords into vec_off_v 
      *
      * mdw API:
-     * - vec_off_loops(l0,h0, l1,h1, ...) where every dim gets lo,hi args
-     *   - internally generate a CoordsVP
-     * - vec_off_loops_next() generate next coordsVP, ret false if done
-     * - vec_off_loops_call( void(*f)(VecPos& vp) );
+     * - CoordsForNd<DIM_T,NDIMS_T> x(DIM_T const* d, NDIMS_T const nd) or other constructor
+     *   - or auto cf = CoordsForNd<6>.mk(lo0,hi0,...) (up to 6 lo0,hi0 coords)
+     * - x.init(Pos lin)
+     *   - or x.init(Pos start, Pos end)
+     *   - or x.init(vec_off_loops(l0,h0, l1,h1, ...) where every dim gets lo,hi args
+     *   - or x.init_at(pos, lo0,hi0, lo1,hi1, ...)
+     *   - or x.init_at(lo0,hi0, lo1,hi1, ...) (init at Pos 0);
+     *   - `init` internally generate a CoordsVP, 1 vector register per coordinate
+     * - `(bool)x` Does x have any more coords?
+     * - `x.step()` generate next set of coordsVP, ret false if done
+     *   - or `++x` if you don't need bool ret val (as in for loop)
+     *
+     * - x.vl is current vector length of each x.vp[0..get_dim()-1)][x.vl]
+     * - x.pos goes from 0 to x.get_sz() = product of each hi_i-lo_i.
      *
      * streamlined API (ignore bool ip=is_pos_padded?)
      * - vec_off_iter( void(*f)(VecPos&), ip?, l0,h0, l1,h1, ...)
@@ -901,8 +917,10 @@ public:
     }
 public:
     /** vector-of-physical-offsets version of \c off_v.
-     * Unlike \c off_v or \c vec_off_v, we are \e private and can modify
-     * our coords \c vp, to save memory.
+     * Unlike \c off_v or \c vec_off_v, we may \e modify
+     * our coords \c vp, to save memory.  This is a good option for
+     * CoordsFor iteration, where '++' recalculates on basis of
+     * linear pos and won't be confused if vp[][] data changes.
      *
      * \note This only does a MVL-long section at a time
      * \note if is_pos_padded or inner_nblks, coords \c vp may be modified.

@@ -1,0 +1,54 @@
+#dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_s32::blocked:abcd:f0 dst_f32::blocked:abcd:f0,,,1x12x56x56,70.25
+#--sdt=s32 --ddt=f32 --stag=nchw --dtag=nchw 1x12x56x56
+
+#dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:abcd:f0,,,96x1000x1x1,91.72
+#--sdt=f32 --ddt=f32 --stag=nchw --dtag=nchw 96x1000x1x1
+
+#dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:abcd:f0,,,2x320x7x7,100.657
+#--sdt=f32 --ddt=f32 --stag=nchw --dtag=nchw 2x320x7x7
+
+#dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcde:f0 dst_f32::blocked:abcde:f0,,,6x1x1024x4x1024,1989.06
+# warmup
+--sdt=f32 --ddt=f32 --stag=abcde --dtag=abcde 6x2x1024x4x1024
+#--sdt=f32 --ddt=f32 --stag=abcde --dtag=abcde 2x2x3x2x2
+#tests
+# direct_copy:
+#--sdt=f32,s32 --ddt=f32,s32 --stag=abcde --dtag=abcde 6x2x102x4x102
+--sdt=f32,s32 --ddt=f32,s32 --stag=abcde --dtag=abcde 6x2x1024x4x102
+# reference (generic):
+#--sdt=f32,s32 --ddt=f32,s32 --stag=acdeb --dtag=abcde 6x2x102x4x102
+--sdt=f32,s32 --ddt=f32,s32 --stag=acdeb --dtag=abcde 6x2x1024x4x102
+#--sdt=f32 --ddt=s32,s8,u8 --stag=acdeb --dtag=abcde 6x2x102x4x102
+
+#Problematic?
+--sdt=f32 --ddt=u8 --stag=abx --dtag=abx --attr=oscale=per_dim_1:0.125 8x64x33x33
+
+#--sdt=f32 --ddt=u8 --stag=abx --dtag=abx --attr=oscale=common:2.01 2x64x3x3
+
+#dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:acdb:f0,,,2x96x112x112,203.351
+#--sdt=f32 --ddt=f32 --stag=abcd --dtag=acdb 2x96x112x112
+
+#15: dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:bcda:f0,,,96x3x227x227,1081.82 [build-vejd2, kdd2.log]
+#15: dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:bcda:f0,,,96x3x227x227,9765.31 [build-vejd2:ldd.log build-vejd2C:addC2.log]
+#   print the impl -- direct-copy reorders were enabled recently !
+#--sdt=f32 --ddt=f32 --stag=abcd --dtag=bcda 96x3x227x227
+
+#dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcde:f0 dst_f32::blocked:abcde:f0,,,2x8x11x21x31,58.7871
+#--sdt=f32,s32 --ddt=f32,s32 --stag=abcde --dtag=abcde 2x8x11x21x31
+
+#dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcde:f0 dst_f32::blocked:acdeb:f0,,,2x517x52x20x16,1340.35
+#dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:acdeb:f0 dst_f32::blocked:abcde:f0,,,2x517x52x20x16,1649.67
+#--sdt=f32,s32 --ddt=f32,s32 --stag=abcde --dtag=acdeb 2x517x52x20x16
+#--sdt=f32,s32 --ddt=f32,s32 --stag=acdeb --dtag=abcde 2x517x52x20x16
+#
+#    END
+#
+#dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:acdeb:f0 dst_f32::blocked:abcde:f0,,,2x517x17x5x14,110.974
+#dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:acdeb:f0 dst_f32::blocked:abcde:f0,,,2x517x17x5x14,207.898
+#--sdt=f32 --ddt=f32 --stag=acdeb --dtag=abcde 2x517x17x5x14
+#
+#dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcde:f0 dst_f32::blocked:acdeb:f0,,,2x64x64x64x64,2613.08
+#--sdt=f32 --ddt=f32 --stag=abcde --dtag=acdeb 2x64x64x64x64
+#
+#dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:acdb:f0,,,2x256x272x200,2193.67
+#--sdt=f32 --ddt=f32 --stag=abcd --dtag=acdb 2x256x272x200

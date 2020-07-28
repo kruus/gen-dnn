@@ -63,14 +63,17 @@ status_t dnnl_reorder_primitive_desc_create(
 #else // !IMP(a,b) = !(!a || b) = a && !b
     //if (s_ek != d_ek && !one_of(engine_kind::cpu, s_ek, d_ek))
     //    return invalid_arguments;
+    asm("###");
     if (!one_of(engine_kind::cpu, s_ek, d_ek)) // simplify test (mystery nc++ segfault)
         return invalid_arguments;
+    asm("###");
 #endif
 
     auto s_mdw = memory_desc_wrapper(*src_md);
     auto d_mdw = memory_desc_wrapper(*dst_md);
 
-    if (!s_mdw.consistent_with(d_mdw)) return invalid_arguments;
+    if (!s_mdw.consistent_with(d_mdw))
+        return invalid_arguments;
 
     if (attr == NULL) attr = &default_attr();
 
@@ -79,10 +82,11 @@ status_t dnnl_reorder_primitive_desc_create(
         reorder_pd_t *reorder_pd = nullptr;
         if ((*r)(&reorder_pd, e, attr, src_engine, src_md, dst_engine, dst_md)
                 == success) {
-            auto status
-                    = safe_ptr_assign<primitive_desc_iface_t>(*reorder_pd_iface,
-                            new reorder_primitive_desc_iface_t(
-                                    reorder_pd, e, src_engine, dst_engine));
+            auto pd_if = new reorder_primitive_desc_iface_t(
+                    reorder_pd, e, src_engine, dst_engine);
+            auto status = safe_ptr_assign<primitive_desc_iface_t>(
+                    *reorder_pd_iface, pd_if);
+            asm("### set reorder_pd_iface");
             if (status != status::success) delete reorder_pd;
             return status;
         }

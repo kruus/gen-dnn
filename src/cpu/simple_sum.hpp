@@ -75,12 +75,29 @@ struct simple_sum_t : public primitive_t {
 
     private:
         void compute_blocking() {
-            const int block_size_bytes = src_data_type == data_type::bf16
+            nelems_ = memory_desc_wrapper(dst_md()).nelems();
+            int block_size_bytes = src_data_type == data_type::bf16
                     ? 16 * platform::get_cache_line_size()
                     : platform::get_per_core_cache_size(1) / 2;
+#if 1 && defined(__ve)
+            // quick test shows little effect on speed (nelems=625)
+            // printed values look nicer to give all threads some work.
+            // 
+            // if nelems per thread too low, reduce block_size
+            const int max_thr = dnnl_get_max_threads();
+            const int bytes_per_thr = nelems_*sizeof(src_data_type) / max_thr;
+            //printf(" sum blksz_bytes=%u bytes/thread=%u",block_size_bytes, bytes_per_thr);
+            if (sizeof(src_data_type) >= 4 // vectorizable on VE?
+                && nelems_ > 256 // MVL ~ max elems per simd op
+                && bytes_per_thr < block_size_bytes)
+            {
+                // 32 ~ elems per simd pipeline time slice
+                 const int bsz2 = (nelems_/max_thr + 32 - 1) / 32 * 32 * sizeof(src_data_type);
+                 if (bsz2 < block_size_bytes) block_size_bytes = bsz2;
+            }
+            //printf(" --> %u\n",block_size_bytes);
+#endif
             block_size_ = block_size_bytes / (int)sizeof(src_data_type);
-            const memory_desc_wrapper o_d(dst_md());
-            nelems_ = o_d.nelems();
             blocks_number_ = nelems_ / block_size_;
             tail_ = nelems_ % block_size_;
         }

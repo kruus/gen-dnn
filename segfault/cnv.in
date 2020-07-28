@@ -1,0 +1,2 @@
+--reset
+--conv --cfg=u8s8s8 --alg=auto ic3ih300oc64oh300kh3ph1n"ssd_300_voc0712:conv1_1"

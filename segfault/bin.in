@@ -1,0 +1,2 @@
+--reset
+--binary --sdt=s8:s8 --ddt=s8 --stag=abc:bac --alg=MIN --inplace=false 4x6x7:4x6x1

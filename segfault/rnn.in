@@ -1,0 +1,2 @@
+--reset
+--alg=VANILLA_GRU --activation=TANH l1t2mb4sic2slc2dhc2dic2

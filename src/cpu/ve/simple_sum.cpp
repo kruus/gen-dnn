@@ -95,26 +95,91 @@ status_t simple_sum_t<src_data_type, dst_data_type>::execute(
             }
         });
     }else{ // !bf16
+        // removed tail loop (not req'd for VE)
+#define SUM_PAR_BEG \
+        parallel(0, [&](const int ithr, const int nthr) { \
+            dim_t start {0}, end {0}; \
+            balance211(blocks_number + (tail!=0), nthr, ithr, start, end); \
+            for (dim_t nb = start; nb < end; ++nb) { \
+                dim_t const start_e = nb * block_size; \
+                dim_t const end_e = (start_e + block_size < nelems \
+                        ? start_e + block_size: nelems); \
+                auto const s0 = scales[0]; \
+                src_data_t const * __restrict__ in0 = input_ptrs[0]
+#define SUM_PAR_END } })
+        if (num_arrs == 2){
+            SUM_PAR_BEG;
+            auto const s1 = scales[1];
+            src_data_t const * __restrict__ in1 = input_ptrs[1];
+            IVDEP() for (dim_t e = start_e; e < end_e; ++e) {
+                output[e] = dst_data_t(s0 * in0[e])
+                        + dst_data_t(s1 * in1[e]);
+            }
+            SUM_PAR_END;
+        }else if (num_arrs == 3) {
+            SUM_PAR_BEG;
+            auto const s1 = scales[1];
+            auto const s2 = scales[2];
+            src_data_t const * __restrict__ in1 = input_ptrs[1];
+            src_data_t const * __restrict__ in2 = input_ptrs[2];
+            IVDEP() for (dim_t e = start_e; e < end_e; ++e) {
+                output[e] = dst_data_t(s0 * in0[e])
+                        + dst_data_t(s1 * in1[e])
+                        + dst_data_t(s2 * in2[e]);
+            }
+            SUM_PAR_END;
+        }else if (num_arrs >= 4) {
+            SUM_PAR_BEG;
+            auto const s1 = scales[1];
+            auto const s2 = scales[2];
+            auto const s3 = scales[3];
+            src_data_t const * __restrict__ in1 = input_ptrs[1];
+            src_data_t const * __restrict__ in2 = input_ptrs[2];
+            src_data_t const * __restrict__ in3 = input_ptrs[3];
+            IVDEP() for (dim_t e = start_e; e < end_e; ++e) {
+                output[e] = dst_data_t(s0 * in0[e])
+                        + dst_data_t(s1 * in1[e])
+                        + dst_data_t(s2 * in2[e])
+                        + dst_data_t(s3 * in3[e]);
+            } // could continue optimizing co-additions ... TODO
+            for (int a = 4; a < num_arrs; ++a) {
+                PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+                for (dim_t e = start_e; e < end_e; e++) {
+                    output[e] += dst_data_t(scales[a] * input_ptrs[a][e]);
+                }
+            }
+            SUM_PAR_END;
+        }else{ // num_arrs 1 (zero not allowed?)
+            SUM_PAR_BEG;
+            assert( num_arrs == 1 );
+            PragmaQuote(_NEC retain(output)) PragmaQuote(_NEC nolstval) IVDEP()
+            for (dim_t e = start_e; e < end_e; ++e) {
+                output[e] = dst_data_t(s0 * in0[e]);
+            }
+            SUM_PAR_END;
+        }
+#if 0 // older (conditionals on num_arrs inside || block)
         parallel(0, [&](const int ithr, const int nthr) {
             dim_t start {0}, end {0};
-            // remove tail loop (not req'd for VE)
             balance211(blocks_number + (tail!=0), nthr, ithr, start, end);
             for (dim_t nb = start; nb < end; ++nb) {
                 dim_t const start_e = nb * block_size;
                 dim_t const end_e = (start_e + block_size < nelems
                         ? start_e + block_size: nelems);
                 auto const s0 = scales[0];
-                auto const s1 = scales[1];
                 src_data_t const * __restrict__ in0 = input_ptrs[0];
-                src_data_t const * __restrict__ in1 = input_ptrs[1];
                 if (num_arrs == 2) { // Guess this will be most common case
+                    auto const s1 = scales[1];
+                    src_data_t const * __restrict__ in1 = input_ptrs[1];
                     IVDEP()
                     for (dim_t e = start_e; e < end_e; ++e) {
                         output[e] = dst_data_t(s0 * in0[e])
                                 + dst_data_t(s1 * in1[e]);
                     }
                 }else if (num_arrs == 3) {
+                    auto const s1 = scales[1];
                     auto const s2 = scales[2];
+                    src_data_t const * __restrict__ in1 = input_ptrs[1];
                     src_data_t const * __restrict__ in2 = input_ptrs[2];
                     IVDEP()
                     for (dim_t e = start_e; e < end_e; ++e) {
@@ -123,8 +188,10 @@ status_t simple_sum_t<src_data_type, dst_data_type>::execute(
                                 + dst_data_t(s2 * in2[e]);
                     }
                 }else if (num_arrs >= 4) {
+                    auto const s1 = scales[1];
                     auto const s2 = scales[2];
                     auto const s3 = scales[3];
+                    src_data_t const * __restrict__ in1 = input_ptrs[1];
                     src_data_t const * __restrict__ in2 = input_ptrs[2];
                     src_data_t const * __restrict__ in3 = input_ptrs[3];
                     IVDEP()
@@ -149,6 +216,7 @@ status_t simple_sum_t<src_data_type, dst_data_type>::execute(
                 }
             }
         });
+#endif
 #if 0
         // can also do above using 'stack_friendly_blksz'
         dim_t const blksz = stack_friendly_blksz(nelems);
