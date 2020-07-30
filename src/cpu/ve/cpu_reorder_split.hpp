@@ -39,31 +39,35 @@ using rpd_create_f = dnnl::impl::engine_t::reorder_primitive_desc_create_f;
 namespace reorder {
     using namespace dnnl::impl::data_type;
     using namespace dnnl::impl::format_tag;
+    // make these into functions return static locals that
+    // get created at runtime, to avoid static globals in
+    // library (and initialization order fiasco).
+    //
     // values for regular_impl_list_map
-    extern const std::vector<rpd_create_f> f32_bf16_0;
-    extern const std::vector<rpd_create_f> f32_f16_0;
-    extern const std::vector<rpd_create_f> f32_f32_0;
-    extern const std::vector<rpd_create_f> f32_f32_3;
-    extern const std::vector<rpd_create_f> f32_f32_4;
-    extern const std::vector<rpd_create_f> f32_f32_5;
-    extern const std::vector<rpd_create_f> f32_f32_6;
-    extern const std::vector<rpd_create_f> f32_s32_0;
-    extern const std::vector<rpd_create_f> f32_s8_0;
-    extern const std::vector<rpd_create_f> f32_u8_0;
-    extern const std::vector<rpd_create_f> bf16_undef_0;
-    extern const std::vector<rpd_create_f> f16_undef_0;
-    extern const std::vector<rpd_create_f> s32_undef_0;
-    extern const std::vector<rpd_create_f> s8_undef_0;
-    extern const std::vector<rpd_create_f> u8_undef_0;
+    const std::vector<rpd_create_f>& f32_bf16_0();
+    const std::vector<rpd_create_f>& f32_f16_0();
+    const std::vector<rpd_create_f>& f32_f32_0();
+    const std::vector<rpd_create_f>& f32_f32_3();
+    const std::vector<rpd_create_f>& f32_f32_4();
+    const std::vector<rpd_create_f>& f32_f32_5();
+    const std::vector<rpd_create_f>& f32_f32_6();
+    const std::vector<rpd_create_f>& f32_s32_0();
+    const std::vector<rpd_create_f>& f32_s8_0();
+    const std::vector<rpd_create_f>& f32_u8_0();
+    const std::vector<rpd_create_f>& bf16_undef_0();
+    const std::vector<rpd_create_f>& f16_undef_0();
+    const std::vector<rpd_create_f>& s32_undef_0();
+    const std::vector<rpd_create_f>& s8_undef_0();
+    const std::vector<rpd_create_f>& u8_undef_0();
     // values for comp_s8s8_impl_list_map
-    extern const std::vector<rpd_create_f> f32_s8_3;
-    extern const std::vector<rpd_create_f> f32_s8_4;
-    extern const std::vector<rpd_create_f> f32_s8_5;
-    extern const std::vector<rpd_create_f> f32_s8_6;
-    extern const std::vector<rpd_create_f> s8_s8_3;
-    extern const std::vector<rpd_create_f> s8_s8_4;
-    extern const std::vector<rpd_create_f> s8_s8_5;
-    extern const std::vector<rpd_create_f> s8_s8_6;
+    const std::vector<rpd_create_f>& f32_s8_3();
+    const std::vector<rpd_create_f>& f32_s8_4();
+    const std::vector<rpd_create_f>& f32_s8_5();
+    const std::vector<rpd_create_f>& f32_s8_6();
+    const std::vector<rpd_create_f>& s8_s8_3();
+    const std::vector<rpd_create_f>& s8_s8_4();
+    const std::vector<rpd_create_f>& s8_s8_5();
+    const std::vector<rpd_create_f>& s8_s8_6();
 }
 
 } // namespace cpu

@@ -23,8 +23,11 @@ namespace reorder {
 
 // clang-format off
 
-// f32 -> bf16
-const std::vector<rpd_create_f> u8_undef_0 = {
+// u8 --> undef (searched last)
+//const std::vector<rpd_create_f> DNNL_API u8_undef_0
+// libdnnl.so symbol hash table collision !!! renamed !!!
+const std::vector<rpd_create_f>& u8_undef_0() {
+    static const std::vector<rpd_create_f> v = {
         REG_FAST_DIRECT_COPY_COMMA(u8, f32)
         REG_FAST_DIRECT_COPY_COMMA(u8, s32)
         REG_FAST_DIRECT_COPY_COMMA(u8, s8)
@@ -44,6 +47,8 @@ const std::vector<rpd_create_f> u8_undef_0 = {
 
         nullptr,
     };
+    return v;
+}
 
 } // namespace reorder
 } // namespace cpu

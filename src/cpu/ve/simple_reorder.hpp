@@ -44,6 +44,29 @@
 #endif
 #endif
 
+// XXX standardize this macro
+#ifndef MVL
+#if defined(__ve)
+#define MVL 256
+#else
+#define MVL 16
+#endif
+#endif
+
+// assume ve/cimple_q10n_vec.hpp has been included
+// the one scalar loop does not seem to be a big slowdown
+// SO: the lsge speedups come mostly from vectorized offset calcs.
+//
+// --> TODO: between "direct_copy" and "generic", write a new impl
+//           for "dense_copy" where non-blocked formats can just use
+//           a formula and bypass memory_desc_wrapper* functions.
+//
+/** Allow modifications? */
+#define DNNL_REORDER_ALLOW_MODS 1
+/** Fine control of modifications (if allowed in first place) */
+#define DNNL_REORDER_VEC_Q10N 1
+#define DNNL_REORDER_VECTORIZE 1
+
 // XXX add dbg version printing is_applicable returning true impl identity
 namespace dnnl {
 namespace impl {
@@ -1162,13 +1185,76 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         const size_t nelems = input_d.nelems();
 
-#if 1 && DNNL_VE
+#if DNNL_REORDER_ALLOW_MODS
         // - VE has minor effect of block size (there exist nice vl-choice fns
         //   elsewhere in src/cpu/ve/, if nec.)
         // - moved alpha,beta conditions outside loop.
         // - nice .s search via FOR_e line number
         // QZ_OBJ is a compile-time inlined function (good)
         // - QZ_OBJ may call non-inlined 'round' (f32-->s32, ouch)
+        //
+        // scalar loop version of quantization during direct copy
+#if DNNL_REORDER_VECTORIZE
+        // XXX untested: replace "qz" with "qzv" vector versions
+        // (and block by MVL max vector length)
+        //
+        // In principle, a scalar conversion (nearbyintf) might be done faster
+        // from within the quantization routine (mxcsr_roundv); however this is
+        // still bad asm.  (Can we do this with clang vec intrinsics and still
+        // link & run OneDNN programs correctly?)
+        //
+        // The benefit would be for some cases to invoke "round_mxcsrv" that
+        // might vectorize.  (best if inlined, hence clang might be better)
+        //
+        // Warning: , ## __VA_ARGS__ trick is not standard.
+        //          nc++ also does not support __VA_OPT__(,)
+        //          There are trickier portable workarounds, but we can give
+        //          ",vl,..." to make sure __VA_ARGS__ is never empty.
+        //
+        //  This gave NO SPEEDUP for f32-->s32 (12.308 ms), even though it
+        //  SHOULD BE just a few vec ops (VMIN,VMAX,VFIX?) different from
+        //  f32-->f32 (0.465 ms)
+        //
+#define FOR_e(QZV_OBJ,...) do \
+        { \
+            auto const* __restrict in = input; \
+            auto * __restrict out = output; \
+            parallel(0, [&](const int ithr, const int nthr) { \
+                    size_t start {0}, end {0}; \
+                    balance211(nelems, nthr, ithr, start, end); \
+                    for (size_t e = start; e < end; e+=MVL) { \
+                        size_t const vl = (end-e > MVL? MVL: end-e); \
+                        QZV_OBJ<data_t<type_i>, data_t<type_o>>()( \
+                                &in[e], &out[e], __VA_ARGS__ ); \
+                    } \
+            }); \
+        } while(0)
+        if (alpha == 1.0 && beta == 0.0)
+#if 1
+            FOR_e(qzv_a1b0, vl); // supply vl; nc++ has no empty-... hack
+#else
+            do {
+                auto const* __restrict in = input;
+                auto * __restrict out = output;
+                parallel(0, [&](const int ithr, const int nthr) {
+                        size_t start {0}, end {0};
+                        balance211(nelems, nthr, ithr, start, end);
+                        for (size_t e = start; e < end; e+=MVL) {
+                        size_t const vl = (end-e > MVL? MVL: end-e);
+                        QZV_OBJ<data_t<type_i>, data_t<type_o>>()(
+                                &in[e], &out[e], vl );
+                        }
+                });
+            } while(0);
+#endif
+        else if (alpha == 1.0)
+            FOR_e(qzv_a1, vl, beta);
+        else if (beta == 0.0)
+            FOR_e(qzv_b0, vl, alpha);
+        else
+            FOR_e(qzv, vl, alpha, beta);
+#undef FOR_e
+#else // unvectorized (equiv to orig, but w/ macro)
 #define FOR_e(QZ_OBJ,...) do \
         { \
             auto const* __restrict in = input; \
@@ -1191,7 +1277,8 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         else
             FOR_e(qz, in[e], out[e], alpha, beta);
 #undef FOR_e
-#else // x64 or non-VE... (orig)
+#endif // DNNL_REORDER_VECTORIZE
+#else // not DNNL_REORDER_ALLOW_MODS (x86 original)
         constexpr int block_size = 16; // HARDWIRED!
         const auto num_blocks = nelems / block_size;
         const auto rem_elems = nelems % block_size;
@@ -1256,7 +1343,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 }
             }
         });
-#endif // DNNL_VE, ...
+#endif // DNNL_REORDER_ALLOW_MODS
         return status::success;
     }
 };
@@ -1296,10 +1383,15 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         const dim_t nelems_no_d0 = nelems_no_dim_0(input_d);
         const dim_t work_amount = N * nelems_no_d0;
 
-#if 1 && DNNL_VE // equivalent, using macro for common iteration code
+#if DNNL_REORDER_ALLOW_MODS
+        // equivalent, using macro for common iteration code
         // - QZ_OBJ may call non-inlined 'round' (f32-->s32, ouch)
 #define IN_e in[is * n + e]
 #define OUT_e out[is * n + e]
+        // this macros does NOT vectorize the quantization call.
+        // for f32--> f32/s32 this is OK.
+        // for f32--> [us]{16|8} VE cannot vectorize, and may get
+        // segfaults or other badness
 #define FOR_e(QZ_OBJ,...) do \
         { \
             parallel(0, [&](const int ithr, const int nthr) { \
@@ -1371,7 +1463,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 }
             });
         }
-#endif // macroization
+#endif // DNNL_REORDER_ALLOW_MODS
 
         return status::success;
     }
@@ -1450,12 +1542,20 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         DEFINE_ZERO_POINT_VALUE(i0, DNNL_ARG_FROM);
         DEFINE_ZERO_POINT_VALUE(o0, DNNL_ARG_TO);
 
+#if DNNL_REORDER_ALLOW_MODS
+        // instead, use expanded version of mdw, with vectorized offset calc fns
+        // constructor may be a tiny bit slower, but speedups 2x to 66x easy to
+        // see, with speedup dependent on dst type (whether q10n loops can vectorize
+        // at all on VE).
+        const auto input_d_reg = ctx.memory_mdw(DNNL_ARG_FROM, pd()->src_md());
+        const auto output_d_reg = ctx.memory_mdw(DNNL_ARG_TO, pd()->dst_md());
+        // construct enhanced from trivial "regular" mdw:
+        const auto input_d = memory_desc_wrapper_opt(input_d_reg.md_);
+        const auto output_d = memory_desc_wrapper_opt(output_d_reg.md_);
+#else
         const auto input_d = ctx.memory_mdw(DNNL_ARG_FROM, pd()->src_md());
         const auto output_d = ctx.memory_mdw(DNNL_ARG_TO, pd()->dst_md());
-#if defined(__ve)
-        const auto input_d_opt = memory_desc_wrapper_opt(input_d.md_);
-        const auto output_d_opt = memory_desc_wrapper_opt(output_d.md_);
-#endif
+#endif // DNNL_REORDER_ALLOW_MODS
 
         const auto nelems = input_d.nelems();
 
@@ -1481,28 +1581,14 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                     same_logical_dims = false;
             }
         }
-#if 0 && DNNL_VE // orig
-        //asm("###generic");
-        // vectorize this -- it occurs frequently in benchdnn,
-        // abcde --> acdeb is perhaps 16000x slower than abcde --> abcde
-        // direct copy (some unavoidable due to gather, scatter, but much
-        // due to scalar loop, because of offset function call).
-        // - QZ_OBJ may call non-inlined 'round' (f32-->s32, ouch)
-        //   - vectorized round might be tricky (libc call).
-        parallel_nd(D_start, D_mask, D_rest,
-                [&](ptrdiff_t ds, ptrdiff_t dm, ptrdiff_t dr) {
-                    const float scale = scales[dm];
-
-                    const size_t e = (ds * D_mask + dm) * D_rest + dr;
-                    const auto &i = input[input_d.off_l(e)];
-                    auto &o = output[output_d.off_l(e)];
-
-                    float f = scale * (i - i0) + o0;
-                    o = _qz<data_type::f32, type_o>()(f, o, 1.f, beta);
-                });
-#else // vectorize SOME offset calcs.
+#if DNNL_REORDER_ALLOW_MODS
+        // vectorize SOME offset calcs.
         // 2x to 66x faster
         if (1 || D_mask > 1) {
+            // 1. loop over D_start | D_mask | D_rest,
+            // 2. construct logical offset --> "off_l" phys offset
+            //    for src, dst
+            // 3. scale and q10n
             assert( nelems == D_start * D_mask * D_rest );
             parallel(0, [&](const int ithr, const int nthr) {
                     dim_t start = 0, end = 0;
@@ -1522,6 +1608,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                         auto const vl = cf.get_vl();
                         dim_t const e0 = cf.get_pos();
 #define FOR_vl ShortLoop() for(int i=0; i<vl; ++i)
+                        // note: recent nc++ might not really respect ShortLoop() hint?
                         dim_t e[MVL]; VREG(e);      // logical offfset
                         float scale[MVL]; VREG(scale);
 
@@ -1538,19 +1625,19 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                         }
                         dim_t p_i[MVL];   // phys inp offset
                         dim_t p_o[MVL];   // phys out offset
-#define VECTORIZE 0
-#if VECTORIZE
+#if DNNL_REORDER_VECTORIZE
                         // - vl > MVL also allowed
-                        input_d_opt.vec_off_l(e, vl, p_i, false/*padded*/);
-                        output_d_opt.vec_off_l(e, vl, p_o, false/*padded*/);
+                        input_d.vec_off_l(e, vl, p_i, false/*padded*/);
+                        output_d.vec_off_l(e, vl, p_o, false/*padded*/);
                         //if (0) { // double-check
-                        //    FOR_vl assert( p_i[i] ==  input_d_opt.off_l(e[i]));
-                        //    FOR_vl assert( p_o[i] == output_d_opt.off_l(e[i]));
+                        //    FOR_vl assert( p_i[i] ==  input_d.off_l(e[i]));
+                        //    FOR_vl assert( p_o[i] == output_d.off_l(e[i]));
                         //}
-#else // scalar way
-                        FOR_vl p_i[i] = input_d_opt.off_l(e[i]);
-                        FOR_vl p_o[i] = output_d_opt.off_l(e[i]);
-#endif
+#else
+                        // scalar way, quite slow
+                        FOR_vl p_i[i] = input_d.off_l(e[i]);
+                        FOR_vl p_o[i] = output_d.off_l(e[i]);
+#endif // DNNL_REORDER_VECTORIZE
                         float f[MVL]; VREG(f);
                         data_t<type_i> in[MVL]; VREG(in);
                         data_t<type_o> out[MVL]; VREG(out);
@@ -1559,17 +1646,21 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                             out[i] = output[p_o[i]];     // gather
                             f[i] = scale[i] * (in[i] - i0) + o0;
                         }
-                        // XXX do we need to vectorize the quantization loop?
-                        // ex. out_round<int> inhibits optimization for s32-->f32
-                        //     so perhaps 30x slower.
-                        NOVECTOR FOR_vl out[i] = _qz<data_type::f32, type_o>()(
+#if DNNL_REORDER_VEC_Q10N
+                        _qzv<data_type::f32, type_o>()(
+                                &f[0], &out[0], vl, 1.f, beta);
+#else
+                        // float<-->signed may not vectorize at all due to libc fn calls
+                        // some src<-->dst types might be vectorized (if trivial)
+                        FOR_vl out[i] = _qz<data_type::f32, type_o>()(
                                 f[i], out[i], 1.f, beta);
-                        FOR_vl output[p_o[i]] = out[i]; // scatter
+#endif
+                        // final scatter to output[]
+                        FOR_vl output[p_o[i]] = out[i];
 #undef FOR_vl
                     }
             });
         }else{
-#if 1
             // special case, no mask (global scale).  Iter directly on input coords
             // this gives a small speed increase (4-20%?)
             assert( D_start == 1 );
@@ -1581,6 +1672,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                     typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
                     Coords cf(&input_d.dims()[0], input_d.ndims());
                     // cf is in general for input only
+                    // it batches coords in "MVL", max vector length
                     NOVEC_ for(cf.init_nd(start,end); cf; ++cf)
                     {
                         auto const vl = cf.get_vl();
@@ -1590,64 +1682,63 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                         dim_t p_i[MVL];   // phys inp offset
                         dim_t p_o[MVL];   // phys out offset
 
-#if 0
-                        // NOTE: if input_d_opt.similar_to(output_d_opt, false/*pad?*/, false/*data_t?*/, 0)
+#if 0 // slow verification code
+                        // NOTE: if input_d.similar_to(output_d, false/*pad?*/, false/*data_t?*/, 0)
                         // then p_o == p_i, but we would use direct_copy.
-                        // BUT if input_d_opt.consistent_with(output_d_opt), then dims[] are identical,
+                        // BUT if input_d.consistent_with(output_d), then dims[] are identical,
                         // and we can use vec_off_v for p_o here:
                         // output phys offset still based on logical offset
-                        output_d_opt.vec_off_l(e, vl, p_o, false/*padded*/);
+                        output_d.vec_off_l(e, vl, p_o, false/*padded*/);
                         // in favorable cases, could use vec_off_v here too
                         if(same_logical_dims){
                             // can reuse input cf.vp for output
                             dim_t p_o2[MVL];   // phys out offset
-                            output_d_opt.vec_off_v(cf, p_o2, vl); // preserving cf.vp
+                            output_d.vec_off_v(cf, p_o2, vl); // preserving cf.vp
                             bool equ_phys = true;
                             FOR_vl if (p_o[i] != p_o2[i]) equ_phys = false;
                             assert(same_logical_dims && equ_phys);
                         }
 #else
-                        if (1 && same_logical_dims) { // new fast-path [common]
+                        if (same_logical_dims) { // new fast-path [common]
+                            // cf.vp[][] logical coords also apply to output
                             // short test suggests ~ 25% speed-up.
                             // ... should create intermediate impl:
                             // direct_copy ... "dense_copy" ... this(generic)
-                            output_d_opt.vec_off_v(cf, p_o, vl); // keep cf.vp
+                            output_d.vec_off_v(cf, p_o, vl); // keep cf.vp
                         } else {// output logical coords differ
                             dim_t e[MVL];          // logical offfset
-                            FOR_vl e[i] = e0 + i;  // is linear span
-                            output_d_opt.vec_off_l(e, vl, p_o, false/*padded*/);
+                            FOR_vl e[i] = e0 + i;  // is a linear span
+                            output_d.vec_off_l(e, vl, p_o, false/*padded*/);
                         }
 #endif
 
-                        // cf.vp has input coords, so bypass vec_off_l
-                        // - vl > MVL also allowed. this may MODIFY cf.cp
-                        input_d_opt.vec_off_vtmp(cf, p_i, vl); //false/*padded*/
+                        // cf.vp has input coords, bypass vec_off_l
+                        // - vl > MVL also allowed
+                        // - this may MODIFY cf.vp[] (ok, since last use)
+                        input_d.vec_off_vtmp(cf, p_i, vl); //false/*padded*/
 
                         //if (1) { // double-check
-                        //    FOR_vl assert( p_i[i] ==  input_d_opt.off_l(e[i]));
-                        //    FOR_vl assert( p_o[i] == output_d_opt.off_l(e[i]));
+                        //    FOR_vl assert( p_i[i] ==  input_d.off_l(e[i]));
+                        //    FOR_vl assert( p_o[i] == output_d.off_l(e[i]));
                         //}
 
                         float const scale = scales[0];
                         float f[MVL]; VREG(f);
-                        data_t<type_o> out[MVL]; VREG(out);
+                        data_t<type_o> out[MVL];
+                        // out might be a nov-vectorizable type [u]int{8|16}_t.
+                        // VE DESIRE: out as vectorizable [u]int32_t? XXX
+                        //            with final conversion and scatter?
                         FOR_vl {
                             data_t<type_i> in[MVL]; VREG(in);
                             in[i] = input[p_i[i]];       // gather
-                            out[i] = output[p_o[i]];     // gather
                             f[i] = scale * (in[i] - i0) + o0;
+                        }
+                        FOR_vl {
+                            out[i] = output[p_o[i]];     // gather (sometimes)
                         }
                         // XXX do we need to vectorize the quantization loop?
                         // ex. out_round<int> inhibits optimization for s32-->f32
-                        //
-#if 1 // scalar loop // f32-->u8 errors?
-                        // This is often ok, but sometimes (like f32->s32) we
-                        // invoke a non-vectorizable rounding fn
-                        // This has difficulty when type_o is dst_u8 .. is it some
-                        // strange alignment issue?
-                        NOVECTOR FOR_vl out[i] = _qz<data_type::f32, type_o>()(
-                                f[i], out[i], 1.f, beta);
-#if 0 // cross-check vec version
+#if 0 // verification comparison of scalar and vector results
                         data_t<type_o> out2[MVL];
                         FOR_vl out2[i] = data_t<type_o> {0};
                         _qzv<data_type::f32, type_o>()(
@@ -1660,20 +1751,49 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                             }
                             if (nwrong > 10) break;
                         }
-#endif
-#else
-                        // new vector-quant header... WIP
+#elif DNNL_REORDER_VEC_Q10N
+                        // could be fast if inlined.  sometimes is a trivial op,
+                        // but sometimes can use a vector version of nearbyintf
+                        // (which nc++ unfortunately doesn't inline).
                         _qzv<data_type::f32, type_o>()(
                                 &f[0], &out[0], vl, 1.f, beta);
-#endif
+#else // possibly scalar loop (may be faster sometimes?)
+                        // even with NOVECTR, may see f32-->u8 errors?
+                        // This is often ok, but sometimes (like f32->s32) we
+                        // invoke a non-vectorizable rounding fn
+                        // This has difficulty when type_o is dst_u8 .. is it some
+                        // strange alignment issue?
+                        FOR_vl out[i] = _qz<data_type::f32, type_o>()(
+                                f[i], out[i], 1.f, beta);
+#endif // DNNL_REORDER_VEC_Q10N
 
-                        FOR_vl output[p_o[i]] = out[i]; // scatter
+                        // vector scatter, for 4- or 8-byte output types,
+                        // o.w. unvectorized loop
+                        FOR_vl output[p_o[i]] = out[i];
 #undef FOR_vl
                     }
             });
-#endif
         }
-#endif
+#else
+        //asm("###generic");
+        // vectorize this -- it occurs frequently in benchdnn,
+        // abcde --> acdeb is perhaps 16000x slower than abcde --> abcde
+        // direct copy (some unavoidable due to gather, scatter, but much
+        // due to scalar loop, because of offset function call).
+        // - QZ_OBJ may call non-inlined 'round' via libc fn
+        //    path (f32-->libc-->int-->[us]{8|16|32} ouch)
+        parallel_nd(D_start, D_mask, D_rest,
+                [&](ptrdiff_t ds, ptrdiff_t dm, ptrdiff_t dr) {
+                    const float scale = scales[dm];
+
+                    const size_t e = (ds * D_mask + dm) * D_rest + dr;
+                    const auto &i = input[input_d.off_l(e)];
+                    auto &o = output[output_d.off_l(e)];
+
+                    float f = scale * (i - i0) + o0;
+                    o = _qz<data_type::f32, type_o>()(f, o, 1.f, beta);
+                });
+#endif // DNNL_REORDER_ALLOW_MODS
 
         return status::success;
     }

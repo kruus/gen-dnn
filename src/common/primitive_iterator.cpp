@@ -95,12 +95,21 @@ status_t dnnl_primitive_desc_create(
     primitive_desc_iterator_t *it;
     status_t status = dnnl_primitive_desc_iterator_create(
             &it, c_op_desc, attr, engine, hint_fwd_pd);
-    //printf(" dnnl_primitive_desc_iterator_create status=%d\n",(int)status); // XXX REMOVE!
+    // NOTE: there was a hash table collision for one of the common block
+    //       symbols that caused VE reorder to return an empty vector
+    //       of create fn pointers ! (Fix: change foo --> alt_symbol_foo)
+    //printf(" dnnl_primitive_desc_iterator_/create status=%d\n",(int)status); // XXX REMOVE!
+#if 0 && defined(__ve)
+    asm("### VE: tentative light optimization barrier\n\t" :::"memory");
+#endif
     if (status != status::success) return status;
 
     primitive_desc_iface_t *pd_iface
             = new primitive_desc_iface_t(it->fetch_once(), engine);
     //printf(" primitive_desc_iface @%p\n",(void*)pd_iface); // XXX REMOVE!
+#if 0 && defined(__ve)
+    asm("### VE: tentative light optimization barrier\n\t" :::"memory");
+#endif
     dnnl_primitive_desc_iterator_destroy(it);
     if (pd_iface == nullptr) return out_of_memory;
 

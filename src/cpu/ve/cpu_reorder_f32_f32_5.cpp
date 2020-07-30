@@ -25,7 +25,8 @@ namespace reorder {
 // clang-format off
 
 // f32 -> bf16
-const std::vector<rpd_create_f> f32_f32_5 = {
+const std::vector<rpd_create_f>& f32_f32_5() {
+    static const std::vector<rpd_create_f> v = {
         DNNL_X64_ONLY(x64::wino_reorder_t<f32, f32>::pd_t::create,)
         rnn_weights_reorder_t<f32, f32>::pd_t::create,
 
@@ -73,6 +74,8 @@ const std::vector<rpd_create_f> f32_f32_5 = {
 
         nullptr,
     };
+    return v;
+}
 
 // to produce nicer VE diagnostics:
 template class simple_reorder_t<f32,any, f32,any, fmt_order::any, spec::direct_copy>;

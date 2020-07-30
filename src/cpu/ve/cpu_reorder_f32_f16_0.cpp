@@ -24,11 +24,14 @@ namespace reorder {
 // clang-format off
 
 // f32 -> bf16
-const std::vector<rpd_create_f> f32_f16_0 = {
+const std::vector<rpd_create_f>& f32_f16_0() {
+    static const std::vector<rpd_create_f> v = {
         REG_SR(f32, any, f16, any, fmt_order::any, spec::reference),
 
         nullptr,
     };
+    return v;
+}
 
 } // namespace reorder
 } // namespace cpu

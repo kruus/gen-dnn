@@ -25,7 +25,8 @@ namespace reorder {
 // clang-format off
 
 // f32 -> bf16
-const std::vector<rpd_create_f> f32_u8_0 = {
+const std::vector<rpd_create_f>& f32_u8_0() {
+    static const std::vector<rpd_create_f> v{
         rnn_data_reorder_t<f32, u8>::pd_t::create,
 
         REG_FAST_DIRECT_COPY_COMMA(f32, u8)
@@ -38,6 +39,8 @@ const std::vector<rpd_create_f> f32_u8_0 = {
 
         nullptr,
     };
+    return v;
+}
 
 } // namespace reorder
 } // namespace cpu

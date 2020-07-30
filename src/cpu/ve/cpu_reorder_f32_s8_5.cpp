@@ -24,7 +24,8 @@ namespace reorder {
 // clang-format off
 
 // f32 -> bf16
-const std::vector<rpd_create_f> f32_s8_5 = {
+const std::vector<rpd_create_f>& f32_s8_5() {
+    static const std::vector<rpd_create_f> v = {
         REG_SR(f32, any, s8, hwigo, fmt_order::keep, spec::conv_s8s8),
         REG_SR(f32, any, s8, dhwio, fmt_order::keep, spec::conv_s8s8),
         REG_SR(f32, goihw, s8, gOIhw4i16o4i, fmt_order::keep, spec::conv_s8s8),
@@ -46,6 +47,8 @@ const std::vector<rpd_create_f> f32_s8_5 = {
 
         nullptr,
     };
+    return v;
+}
 
 } // namespace reorder
 } // namespace cpu

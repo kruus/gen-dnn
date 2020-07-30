@@ -24,7 +24,8 @@ namespace reorder {
 // clang-format off
 
 // f32 -> bf16
-const std::vector<rpd_create_f> f32_s32_0 = {
+const std::vector<rpd_create_f>& f32_s32_0() {
+    static const std::vector<rpd_create_f> v = {
         REG_FAST_DIRECT_COPY_COMMA(f32, s32)
 
         DNNL_X64_ONLY(x64::jit_uni_reorder_create,)
@@ -35,6 +36,8 @@ const std::vector<rpd_create_f> f32_s32_0 = {
 
         nullptr,
     };
+    return v;
+}
 
 // try explicit instantiation to see diagnostics?
 template class simple_reorder_t<f32,any, s32,any, fmt_order::any, spec::direct_copy>;

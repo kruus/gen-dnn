@@ -25,7 +25,8 @@ namespace reorder {
 // clang-format off
 
 // f32 -> bf16
-const std::vector<rpd_create_f> f32_bf16_0 = {
+const std::vector<rpd_create_f>& f32_bf16_0() {
+    static const std::vector<rpd_create_f> v = {
         rnn_weights_reorder_t<f32, bf16>::pd_t::create,
 
         DNNL_X64_ONLY(x64::jit_uni_reorder_create,)
@@ -46,6 +47,8 @@ const std::vector<rpd_create_f> f32_bf16_0 = {
 
         nullptr,
     };
+    return v;
+}
 
 } // namespace reorder
 } // namespace cpu
