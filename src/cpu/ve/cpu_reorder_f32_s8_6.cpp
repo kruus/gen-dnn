@@ -16,6 +16,8 @@
 
 #include "cpu/ve/cpu_reorder_split.hpp"
 
+#include "cpu/ve/simple_q10n_ve_f32_int.hpp" // assembler specialization
+
 namespace dnnl {
 namespace impl {
 namespace cpu {

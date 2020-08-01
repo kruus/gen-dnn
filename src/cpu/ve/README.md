@@ -1,3 +1,13 @@
+
+=== new compiler ICE:
+- code has vectorizn, inline extended asm, and nc++ scheduling aborts
+  when I try to use memcpy to copy bytes in inner loop.
+
+nc++: inl(1212): /home/kruus/reo/src/common/memory_tracking.hpp, line 303: Source for routine not found.: std::unordered_map<unsigned int, dnnl::impl::memory_tracking::registry_t::entry_t, std::hash<unsigned int>, std::equal_to<unsigned int>, std::allocator<std::pair<const unsigned int, dnnl::impl::memory_tracking::registry_t::entry_t>>>::operator []
+ccom: ./phase3_src/cg/schedule_vn_sx4.cpp:1387: void VN_TAG::schedule_call(): Assertion `this->get_predecessors_left() == 0' failed.
+nc++: /opt/nec/ve/ncc/3.0.27/libexec/ccom is abnormally terminated by SIGABRT
+make[1]: *** [src/cpu/CMakeFiles/dnnl_cpu.dir/ve/cpu_reorder_f32_u8_0.cpp.s] Error 4
+
 === General VE characteristics (nc++-3.0.27)
 
 lambda function overhead fairly noticable. Lambdas not inlined, while

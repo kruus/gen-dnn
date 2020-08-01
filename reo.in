@@ -8,27 +8,38 @@
 #--sdt=f32 --ddt=f32 --stag=nchw --dtag=nchw 2x320x7x7
 
 #dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcde:f0 dst_f32::blocked:abcde:f0,,,6x1x1024x4x1024,1989.06
-## warmup
-#--sdt=f32 --ddt=f32 --stag=abcde --dtag=abcde 6x2x1024x4x1024
-##--sdt=f32 --ddt=f32 --stag=abcde --dtag=abcde 2x2x3x2x2
-##tests
-## direct_copy:
-##--sdt=f32,s32 --ddt=f32,s32 --stag=abcde --dtag=abcde 6x2x102x4x102
+# warmup
+--sdt=f32 --ddt=f32 --stag=abcde --dtag=abcde 6x2x1024x4x1024
+#--sdt=f32 --ddt=f32 --stag=abcde --dtag=abcde 2x2x3x2x2
+#tests
+# direct_copy:
+--sdt=f32,s32 --ddt=f32 --stag=abcde --dtag=abcde 6x2x102x4x102
+--sdt=f32,s32 --ddt=s32 --stag=abcde --dtag=abcde 6x2x102x4x102
+--sdt=f32,s32 --ddt=u8 --stag=abcde --dtag=abcde 6x2x102x4x102
+--sdt=f32,s32 --ddt=s8 --stag=abcde --dtag=abcde 6x2x102x4x102
 #--sdt=f32,s32 --ddt=f32,s32 --stag=abcde --dtag=abcde 6x2x1024x4x102
 ## reference (generic):
+-sdt=f32,s32 --ddt=f32 --stag=acdeb --dtag=abcde 6x2x1024x4x102
+-sdt=f32,s32 --ddt=s32 --stag=acdeb --dtag=abcde 6x2x1024x4x102
+-sdt=f32,s32 --ddt=u8 --stag=acdeb --dtag=abcde 6x2x1024x4x102
+-sdt=f32,s32 --ddt=s8 --stag=acdeb --dtag=abcde 6x2x1024x4x102
 ##--sdt=f32,s32 --ddt=f32,s32 --stag=acdeb --dtag=abcde 6x2x102x4x102
-#--sdt=f32,s32 --ddt=f32,s32 --stag=acdeb --dtag=abcde 6x2x1024x4x102
 ##--sdt=f32 --ddt=s32,s8,u8 --stag=acdeb --dtag=abcde 6x2x102x4x102
 
+--sdt=f32 --ddt=u8 --stag=abcde --dtag=abcde 1x1x1x1x143
+--sdt=f32 --ddt=u8 --stag=abcde --dtag=abcde 1x1x1x1x147
+--sdt=f32 --ddt=u8 --stag=abcde --dtag=abcde 1x1x1x1x149
+--sdt=f32 --ddt=u8 --stag=abcde --dtag=abcde 1x1x1x1x151
 --sdt=u8 --ddt=u8 --stag=abcde --dtag=abcde 6x2x1024x4x102
 --sdt=u8 --ddt=f32 --stag=abcde --dtag=abcde 6x2x1024x4x102
 #Problematic perhaps in u8 quantization routines?  Anyway u8 is SLOW on VE.
+--sdt=f32 --ddt=u8 --stag=abcde --dtag=abcde 6x2x1024x4x102
 --sdt=f32 --ddt=u8 --stag=abcde --dtag=abcde 6x2x1024x4x102
 --sdt=s32 --ddt=u8 --stag=abcde --dtag=abcde 6x2x1024x4x102
 --sdt=f32 --ddt=u8 --stag=abx --dtag=abx --attr=oscale=per_dim_0:0.125 12x1024x4x102
 --sdt=f32 --ddt=u8 --stag=abx --dtag=abx --attr=oscale=per_dim_1:0.125 12x1024x4x102
 
-#--sdt=f32 --ddt=u8 --stag=abx --dtag=abx --attr=oscale=common:2.01 2x64x3x3
+--sdt=f32 --ddt=u8 --stag=abx --dtag=abx --attr=oscale=common:2.01 2x64x3x3
 
 #dnnl_verbose,exec,cpu,reorder,simple:any,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:acdb:f0,,,2x96x112x112,203.351
 #--sdt=f32 --ddt=f32 --stag=abcd --dtag=acdb 2x96x112x112

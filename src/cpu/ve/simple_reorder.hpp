@@ -17,6 +17,20 @@
 #ifndef VE_CPU_SIMPLE_REORDER_HPP
 #define VE_CPU_SIMPLE_REORDER_HPP
 
+//
+// WARNING:
+//      to speed compile time while developing,
+//      some template specializations are included in separate files.
+//      But if you forget to #include the specialized headers
+//      you may get some less optimized impl.
+//
+//      Ex. src/cpu/ve/simple_q10n_ve_f32_int.hpp
+//      has inline assembly optimizations peculiar to a selected
+//      subset of reorders.
+//
+//      Eventually, all can be put back into more monolithic headers.
+//
+
 #include <assert.h>
 
 #include "common/ve/consistency.hpp"

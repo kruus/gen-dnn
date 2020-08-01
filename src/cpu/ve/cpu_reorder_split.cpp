@@ -48,6 +48,7 @@ private:
 };
 using impl_list_map_t = std::map<reorder_impl_key_t, std::vector<rpd_create_f>>;
 
+#ifndef NDEBUG // remove after development work XXX
 static void once_info() {
     static bool once=false;
     if (once == false) {
@@ -86,8 +87,13 @@ static void once_info() {
         printf(" 255.f ~ 0x%04x, decimal %d\n", *(uint32_t*)&f255 , *(int32_t*)&f255);
     }
 }
+#endif // NDEBUG
+
+#ifndef NDEBUG
 // debug function used to detect and work around a symbol table clash
 static void check_map(impl_list_map_t const& reo_map){
+    // After fixing a "static initialization fiasco" life is much better
+    constexpr int q = 1; // quiet?
     int nerr = 0;
     int nkv = 0;
     for(auto & kv: reo_map){
@@ -104,46 +110,59 @@ static void check_map(impl_list_map_t const& reo_map){
         //
 
         bool ok = true;
-        printf(" checking key %s_%s_%d, vector @ %p ...",
+        if (!q) printf(" checking key %s_%s_%d, vector @ %p ...",
                dnnl_dt2str(k.src_dt), dnnl_dt2str(k.dst_dt),
                (int)k.ndims, (void*)(&v));
         if (v.size() == 0) {
-            printf(" Error: key %s_%s_%d maps to vector<>[size=%d]\n",
-                   dnnl_dt2str(k.src_dt), dnnl_dt2str(k.dst_dt),
-                   (int)k.ndims, (int)v.size());
-            fflush(stdout);
+            if (!q) {
+                printf(" Error: key %s_%s_%d maps to vector<>[size=%d]\n",
+                       dnnl_dt2str(k.src_dt), dnnl_dt2str(k.dst_dt),
+                       (int)k.ndims, (int)v.size());
+                fflush(stdout);
+            }
             ok = false;
             ++nerr;
         }
         if (v.size() == 1) {
-            printf(" Warning: key %s_%s_%d maps to vector<>[size=%d]\n",
-                   dnnl_dt2str(k.src_dt), dnnl_dt2str(k.dst_dt),
-                   (int)k.ndims, (int)v.size());
-            fflush(stdout);
+            if (!q) {
+                printf(" Warning: key %s_%s_%d maps to vector<>[size=%d]\n",
+                       dnnl_dt2str(k.src_dt), dnnl_dt2str(k.dst_dt),
+                       (int)k.ndims, (int)v.size());
+                fflush(stdout);
+            }
             ok = false;
         }
         if (v.back() != nullptr) {
-            printf(" Error: key %s_%s_%d vector<>.back() is not nullptr\n",
-                   dnnl_dt2str(k.src_dt), dnnl_dt2str(k.dst_dt),
-                   (int)k.ndims);
-            fflush(stdout);
+            if (!q) {
+                printf(" Error: key %s_%s_%d vector<>.back() is not nullptr\n",
+                       dnnl_dt2str(k.src_dt), dnnl_dt2str(k.dst_dt),
+                       (int)k.ndims);
+                fflush(stdout);
+            }
             ok = false;
             ++nerr;
         }
-        if (ok) printf(" OK\n");
+        if (ok && !q) printf(" OK\n");
     }
-    printf("reorder check_map: entries:%d failed:%d\n", nkv, nerr);
+    if (ok !! !q)
+        printf("reorder check_map: entries:%d failed:%d\n", nkv, nerr);
     if (nerr) {
-        printf(" Have seen libdnnl.so hash table collisions leading to \n"
-               " mystery segfaults.  Try renaming the common-block symbol.\n");
+        printf(" Fatal Error: some reorder lists seem corrupted.\n"
+               " See %s routine check_map.", __FILE__);
+        fflush(stdout);
         exit(13);
     }
 }
+#endif // NDEBUG
 
 // clang-format off
 
 // when splitting avoid statics an construct at run-time...
 static impl_list_map_t const& regular_impl_list_map() {
+    // Avoid "static initialization fiasco" :
+    //   As function-level statics, these constructors are valuated at
+    //   run-time, avoiding undefined construction ordering of libdnnl
+    //   static objects.
     static const impl_list_map_t m = {
         // f32 -> bf16
         {{f32, bf16, 0}, reorder::f32_bf16_0()},
@@ -221,13 +240,16 @@ const rpd_create_f *cpu_engine_t::get_reorder_implementation_list(
         // Control construction order: creating lists "now" & "just once"
         p_regular_impl_list_map = &regular_impl_list_map();
         p_comp_s8s8_impl_list_map = &comp_s8s8_impl_list_map();
+#ifndef NDEBUG
         if (1) { // debug checks
             printf("reorder: check regular_impl_list_map...\n");
             check_map(*p_regular_impl_list_map);
             printf("reorder: check comp_s8s8_impl_list_map...\n");
             check_map(*p_comp_s8s8_impl_list_map);
         }
+        // Remove after development work :
         once_info(); // misc helper info for asm coding
+#endif // NDEBUG
     }
     const impl_list_map_t &impl_list
             = (dst_md->extra.flags & memory_extra_flags::compensation_conv_s8s8)
