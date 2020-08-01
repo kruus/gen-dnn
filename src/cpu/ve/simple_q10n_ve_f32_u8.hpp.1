@@ -1,0 +1,1018 @@
+/*******************************************************************************
+* Copyright 2020 NEC Labs America LLC
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*******************************************************************************/
+
+#ifndef CPU_VE_SIMPLE_Q10N_VEC_F32_U8_HPP
+#define CPU_VE_SIMPLE_Q10N_VEC_F32_U8_HPP
+#include "cpu/ve/simple_q10n_vec.hpp"
+
+/** \file TEMPORARY q10n specialization for f32 to u8 round(saturate) */
+
+namespace dnnl {
+namespace impl {
+namespace cpu {
+
+// f32->u8 direct 6x2x1024x4x102 --mode=C
+// 0 --> 6.34595 (cf. generic w/ oscale=1 or 2 of 23.27 ms)
+// 1 --> 6.35303 --> 3.00 | 18 | ...
+//   -->  w/ st1b asm loop
+template <>
+struct qzv_a1b0<float, uint8_t, void>
+{
+    void operator()(float const* in, uint8_t *out, unsigned const len) {
+        //printf("  YAHOO  "); fflush(stdout);
+        size_t const blk = MVL;
+        // change to saturate, then round, like trunk
+        // first convert to int32 all with vector ops
+        int32_t sat[MVL] __attribute__((aligned(8))); // later might used packed ops?
+        NOVECTOR for (size_t i=0; i<len; i+=blk){
+            size_t const vl = (len-i > blk? blk: len-i);
+            // TODO mxcsr_roundv(float*, float lbound, float ubound, vl, int*) ??
+            // (all in one asm construct)
+            {
+                int a; // tmp register
+                asm("\t# VE_ROUND_FLOAT_TO_INT_SAT_U8\n\t"
+                        "lvl %[vl]\n\t"
+                        "vldu.nc %v63, 4, %[in]\n\t"
+                        "\n"
+                        "#      f32 saturate between 0.0f and 255.0f\n\t"
+                        "and %[a], 0, (0)1\t\t# (i32)0.0f\n\t"
+                        "vfmax.s %v63, %[a], %v63\n\t"
+                        "lea.sl  %[a],1132396544\t\t# (i32)255.0f\n\t"
+                        "vfmin.s %v63, %[a], %v63\n\t"
+                        "\n"
+                        "#      cvt float to int32, like nearbyintf\n\t"
+                        "vcvt.w.s.sx.rz %v62, %v63\n\t"
+                        "vstl %v62, 4, %[out] # int32 output in lower half\n\t"
+                        : [a]"+r"(a)
+                        , "=m"( /*dummy output*/ *(int (*)[vl]) &sat[0] )
+                        : [in]"r"(&in[i]), [vl]"r"(vl), [out]"r"(&sat[0])
+                        , "m"( /*dummy input*/ *(const float (*)[vl]) &in[i])
+                        : "%v62", "%v63"
+                   );
+            }
+
+#define Q_FLT_U8_VERIFY 0
+#if Q_FLT_U8_VERIFY
+            // fill output with zeroes, initially.
+            NOVECTOR for(int j=0; j<vl; ++j)
+                    out[i+j] = '\0'; // for test
+#endif
+
+
+
+            // method:
+            // default direct_copy                     ~47 ms
+            // 0 : simplest, scalar copy loop           2.96 ms
+            //     
+            // 1 : more complex, vectorize attempt      18.9 ms
+            // 2 : WIP (segfault) loop of 1 might be tiny bit better
+            // 3 : 3.09
+            // 4 : 3.09 --> 2.60 (8-loop all asm) --> 41 : 2.56 ms
+            // 42 : (maintain src-align-8) --> 2.32(wip)
+            // 5 : (cleanup) 2.32 ms
+#define Q_FLT_U8 5
+           
+#if Q_FLT_U8 == 0
+            // Perf 3.65 ms
+            // simple, all-sclar, "just works"
+            // apart from srl;sll (not needed) loop looks tight.
+            uint32_t const* s = (uint32_t const*)(void const*)&sat[0];
+            uint8_t *o = &out[i];
+            // --j loop is much better
+            NOVECTOR for (int j=vl; --j>=0; ++o, ++s){
+                //*o = (uint8_t) *s; // *s << 56 >> 56
+                *o = *s; // still "*s << 56 >> 56"
+            }
+            // bad -- asm halts optimization
+            //unsigned j4 = vl/4*4; // asm kills optimization...
+#elif Q_FLT_U8 == 1
+            // pack first into aligned buf w/ vector ops, them memcpy ??
+            //
+            // EXCEPT builtin_memcpy aborts compiler
+            //         while trying schedule the memcpy
+            //
+            int32_t const *s = &sat[0];
+
+            // TMPBUF 0 should work nicely, but has compiler error
+            // compiler error seems related to asm comments ?
+#define TMPBUF 0
+
+#if TMPBUF
+            uint64_t tmp[ MVL / 8 ];
+            uint64_t *t = &tmp[0];
+            //uint8_t *b = (uint8_t*)(void*)&tmp[0];
+#endif
+            uint8_t * __restrict o = &out[i];
+            // NOTE: vsrl sat[], [{0,1,2,...}*8] would do all the shifts,
+            //   leaving ready to '&' in sets of 8.
+            // - then write to mem[0..vl-1],
+            // - reread mem with vl=8 and vrand (vector-reduce-and)
+            // - write vrand results into tmp[0..vl/8-1]
+            // - (remainder as usual)
+            //asm("# j8 loop");
+
+            int j8full = vl >> 3;
+            if (j8full) {
+                uint32_t shif[8]; VREG(shif); //{0,8,16,24,32,40,48,56};
+                for(int n=0; n<8; ++n) shif[n] = n*8;
+                NOVECTOR for ( ; j8full; s+=8, --j8full)
+                {
+                    uint64_t merged;
+#if 0 // orig, OK
+                    // order might be reversed (machine endianness)
+                    merged =   (int64_t)s[0]
+                            + ((int64_t)s[1] << 8)
+                            + ((int64_t)s[2] << 16)
+                            + ((int64_t)s[3] << 24)
+                            + ((int64_t)s[4] << 32)
+                            + ((int64_t)s[5] << 40)
+                            + ((int64_t)s[6] << 48)
+                            + ((int64_t)s[7] << 56);
+#else
+                    // rewrite as compact vectorization:
+                    // vec load, cvt to u64, vec shift
+                    // final xor-merge of shited byte values
+                    // - nned ShortLoop to generate compact asm
+                    merged = 0;
+                    ShortLoop() for(int n=0; n<8; ++n) {
+                        merged |= ((uint64_t)s[n] << shif[n]);
+                    }
+#endif
+
+#if TMPBUF
+                    *t = merged;
+                    ++t;
+#elif 1 // write directly to output
+#if 0 // fairly ugly
+                    {
+                        uint8_t const* __restrict const b = (uint8_t *)(void*)&merged;
+                        uint8_t      * __restrict const c = o;
+                        // try output write in same loop...
+                        // XXX check alignment and faster write possibilities
+                        c[0] = b[0];
+                        c[1] = b[1];
+                        c[2] = b[2];
+                        c[3] = b[3];
+                        c[4] = b[4];
+                        c[5] = b[5];
+                        c[6] = b[6];
+                        c[7] = b[7];
+                    }
+#else
+                    uint64_t a,b,c,d; // tmp registers
+                    asm("# 8-byte arb align bytewise copy\n\t"
+                            "ld1b.zx    %s[tmp0], 0(,%[src])\n\t"
+                            "ld1b.zx    %s[tmp1], 1(,%[src])\n\t"
+                            "ld1b.zx    %s[tmp2], 2(,%[src])\n\t"
+                            "ld1b.zx    %s[tmp3], 3(,%[src])\n\t"
+                            "st1b       %s[tmp0], 0(,%[dst])\n\t"
+                            "st1b       %s[tmp1], 1(,%[dst])\n\t"
+                            "st1b       %s[tmp2], 2(,%[dst])\n\t"
+                            "st1b       %s[tmp3], 3(,%[dst])\n\t"
+                            "ld1b.zx    %s[tmp0], 4(,%[src])\n\t"
+                            "ld1b.zx    %s[tmp1], 5(,%[src])\n\t"
+                            "ld1b.zx    %s[tmp2], 6(,%[src])\n\t"
+                            "ld1b.zx    %s[tmp3], 7(,%[src])\n\t"
+                            "st1b       %s[tmp0], 4(,%[dst])\n\t"
+                            "st1b       %s[tmp1], 5(,%[dst])\n\t"
+                            "st1b       %s[tmp2], 6(,%[dst])\n\t"
+                            "st1b       %s[tmp3], 7(,%[dst])\n\t"
+                            : [tmp0]"=r"(a), [tmp1]"=r"(b), [tmp2]"=r"(c), [tmp3]"=r"(d) // m
+                            : [src]"r"(&merged), [dst]"r"(o)
+                            //, m
+                            :
+                            );
+#endif
+                    o += 8;
+                    //b += 8;
+#endif
+                }
+            }
+            int j8rem = (vl & 0x7);
+            if (j8rem) {
+                //asm("# j8 remainder loop\n\t");
+                // bytewise remainder loop
+#if TMPBUF
+                uint8_t *b = (uint8_t *)(void*)t;
+                NOVECTOR for( ; j8rem; ++b, ++s, --j8rem){
+                    *b = *s;
+                }
+#else // write remainder directly to output
+                NOVECTOR for( ; j8rem; ++o, ++s, --j8rem){
+                    *o = *s;
+                }
+#endif
+            }
+            //asm("# j8 done. sat[vl] packed as u8 into aligned tmp[] buffer\n\t");
+#if 0 && TMPBUF
+            if (0) { // check above loops
+                s = &sat[0];
+                uint8_t *b = (uint8_t*)(void*)&tmp[0];
+                int nerr = 0;
+                for (int j=0; j<vl; ++j) {
+                    //assert( b[j] == s[j] ); // equality, for uint8_t
+                    if( (uint32_t)b[j] != (uint32_t)s[j] ){
+                        printf(" oops b[%d] != s[%d] (0x%04x vs. 0x%04x)\n",
+                                j, j, (uint32_t)b[j], (uint32_t)s[j] );
+                        ++nerr;
+                    }
+                }
+                if (nerr) {
+                    fflush(stdout);
+                    exit(13);
+                }
+            }
+#endif
+
+#if TMPBUF
+            //
+            // punt to memcpy to deal with ptr alignment and vectorization
+            // (potentially fast if no fn call overhead)
+            //
+            //memcpy( (void*)&out[i], (void const*)&tmp[0], vl );
+            //
+            // CHECK if out is 4 or 8-byte aligned and vld/vst that section XXX
+            //
+            if (1) { // bytewise cpy tmp[] to out ** should combine w/ j8full/j8rem loops
+                uint8_t *b = (uint8_t*)(void*)&tmp[0];
+                uint8_t *o = &out[i];
+#if 1 // this works
+                NOVECTOR for (int j=vl ; j; --j) {
+                    *o++ = *b++;
+                }
+                //asm("# end slow bytewise copy... but compiles\n\t");
+#elif 0 // nc++ compiler error!
+                int j8full = vl >> 3;
+                if (j8full) {
+                    // compiler error :(
+                    NOVECTOR for (int ful = (vl>>3) ; ful; b+=8, o+=8, --ful) {
+                        o[0] = b[0];
+                        o[1] = b[1];
+                        o[2] = b[2];
+                        o[3] = b[3];
+                        o[4] = b[4];
+                        o[5] = b[5];
+                        o[6] = b[6];
+                        o[7] = b[7];
+                    }
+                }
+                int j8rem = (vl & 0x7);
+                if (j8rem) {
+                    NOVECTOR for ( ; j8rem; ++o, ++b, --j8rem) {
+                        *o = *b;
+                    }
+                }
+#endif
+            }
+#endif // TMPBUF final "memcpy"
+
+#elif Q_FLT_U8 == 2 // see segfaults here.
+            //
+            // before writing the 'C' loop carefully, tried asm tight loop
+            // (but still can generate much reg spillage, reg copies, ...)
+            //
+            if(0) {
+                printf(" vl=%d asm ", (int)vl); fflush(stdout);
+                // if align of out[i] is 4, try vector-pack, vector write XXX
+                uint32_t const* s = (uint32_t const*)(void const*)&sat[0];
+                uint8_t *o = &out[i];
+                uint64_t a=0; // tmp register
+                asm("# scalar s32-->u8 bytwise copy\n\t"
+                        //"adds.l     %[s], -4, %[s]          # --s\n\t"
+                        //"adds.l     %[o], -1, %[o]          # --o\n"
+                        "brge.w     0, %[j], 3f\n\t"
+                        "br.w       2f\n\t"
+                        "\n    1:\n\t"
+                        "adds.l     %[s], 4, %[s]           # ++s\n\t"
+                        "adds.l     %[o], 1, %[o]           # ++o\n\t"
+                        "\n    2:\n\t"
+                        "ldl.zx     %[a], 0(,%[s])          # a = load *s\n\t"
+                        "adds.w.sx  %[j], -1, %[j]          # --j\n\t"
+                        "and        %[a], %[a], (56)0       # 1-op cvt, not req for u8\n\t"
+                        "st1b       %[a], 0(,%[o])          # *o = (uint8_t)a\n\t"
+                        "brle.w     0, %[j], 1b\n\t"
+                        "\n    3: # done\n\t:"
+                        :"=m"( /*dummy output*/ *(uint8_t (*)[vl]) out)
+                        : [j]"r"(vl)
+                        , [s]"r"(s), [o]"r"(o)
+                        , [a]"r"(a)
+                        , "m"( /*dummy input*/ *(const uint32_t (*)[vl]) sat)
+                        :
+                   );
+                printf(" vl=%d asm done", (int)vl); fflush(stdout);
+            }else{
+                // cannot get the "trivial" loop to work properly
+                uint32_t const* s = (uint32_t const*)(void const*)&sat[0];
+                uint8_t *o = &out[i];
+                uint64_t a; // tmp register
+                int j;
+                asm("# scalar s32-->u8 bytwise copy\n\t"
+                        "brge.w     0, %[j], 2f\n\t"
+                        "adds.l     %[s], -4, %[s]          # --s\n\t"
+                        "adds.l     %[o], -1, %[o]          # --o\n\t"
+                        "\n    1:\n\t"
+                        "adds.l     %[s], 4, %[s]           # ++s\n\t"
+                        "adds.l     %[o], 1, %[o]           # ++o\n\t"
+                        "ldl.zx     %[a], 0(,%[s])          # a = *(s)\n\t"
+                        //"adds.w.sx  %[j], -1, %[j]          # --j\n\t"
+                        "adds.l     %[j], -1, %[j]          # --j\n\t"
+                        "and        %[a], %[a], (56)0       # 1-op cvt, not req for u8\n\t"
+                        "st1b       %[a], 0(,%[o])          # *o = (uint8_t)a\n\t"
+                        "brle.w     0, %[j], 1b\n\t"
+                        "\n    2: # done\n\t:"
+                        // Even simplified as above, I cannot understand what's wrong
+                        : [j]"=r"(j)
+                        , [s]"=r"(s)
+                        , [o]"=r"(o)
+                        , [a]"=r"(a)
+                        , "=m"( /*dummy output*/ *(uint8_t (*)[vl]) &out[i])
+                        : "[j]"((int64_t)vl)
+                        , "[s]"((uint32_t const*)(void const*)&sat[0])
+                        , "[o]"(&out[i])
+                        //, "[a]"(0);
+                        , "m"( /*dummy input*/ *(const uint32_t (*)[vl]) &sat[0])
+                        :
+                   );
+            }
+
+#elif Q_FLT_U8 == 3
+            {
+                // Perf  3.09 ms (code looks horrid)
+                uint32_t const* s = (uint32_t const*)(void const*)&sat[0];
+                uint8_t *o = &out[i];
+                int j = vl;
+                if (j&1) {
+                    *o++ = *s++;
+                    --j;
+                }
+                if (j&3) {
+                    o[0] = s[0];
+                    o[1] = s[1];
+                    o+=2; s+=2; j-=2;
+                }
+                if (j&7) {
+                    o[0] = s[0];
+                    o[1] = s[1];
+                    o[2] = s[2];
+                    o[3] = s[3];
+                    o+=4; s+=4; j -= 4;
+                }
+                for ( ; j ; s+=8, o+=8, j-=8) {
+#if 0
+                    o[0] = s[0];
+                    o[1] = s[1];
+                    o[2] = s[2];
+                    o[3] = s[3];
+                    o[4] = s[4];
+                    o[5] = s[5];
+                    o[6] = s[6];
+                    o[7] = s[7];
+#else
+                    uint64_t a,b,c,d; // tmp registers
+                    asm("# 8-byte arb align bytewise copy\n\t"
+                            "ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                            "ldl.zx     %[tmp1], 4(,%[src])\n\t"
+                            "ldl.zx     %[tmp2], 8(,%[src])\n\t"
+                            "ldl.zx     %[tmp3], 12(,%[src])\n\t"
+                            "st1b       %[tmp0], 0(,%[dst])\n\t"
+                            "st1b       %[tmp1], 1(,%[dst])\n\t"
+                            "st1b       %[tmp2], 2(,%[dst])\n\t"
+                            "st1b       %[tmp3], 3(,%[dst])\n\t"
+                            "ldl.zx     %[tmp0], 16(,%[src])\n\t"
+                            "ldl.zx     %[tmp1], 20(,%[src])\n\t"
+                            "ldl.zx     %[tmp2], 24(,%[src])\n\t"
+                            "ldl.zx     %[tmp3], 28(,%[src])\n\t"
+                            "st1b       %[tmp0], 4(,%[dst])\n\t"
+                            "st1b       %[tmp1], 5(,%[dst])\n\t"
+                            "st1b       %[tmp2], 6(,%[dst])\n\t"
+                            "st1b       %[tmp3], 7(,%[dst])\n\t"
+                            : [tmp0]"=r"(a), [tmp1]"=r"(b), [tmp2]"=r"(c), [tmp3]"=r"(d) // m
+                            : [src]"r"(s), [dst]"r"(o)
+                            //, m
+                            :
+                            );
+#endif
+                }
+            }
+#elif Q_FLT_U8 == 4
+            {
+                // Perf  3.09 (same)
+                // still huge spill/restore between asm blocks
+                uint64_t a,b,c,d; // tmp registers
+                uint32_t const* s = (uint32_t const*)(void const*)&sat[0];
+                uint8_t *o = &out[i];
+                int j = vl;
+#if 0
+                if (j&1) {
+                    *o++ = *s++;
+                    --j;
+                }
+#else
+                    asm("# 1-byte arb align u32->u8 bytewise copy\n\t"
+                            "and        %[tmp1], 1, %[j]\n\t"
+                            "breq.w     %[tmp1], 0, 1f\n\t"
+                            "ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                            "st1b       %[tmp0], 0(,%[dst])\n\t"
+                            "adds.w.sx  %[j], -1, %[j]\n\t"
+                            "adds.l     %[dst],  1, %[dst]\n\t"
+                            "adds.l     %[src], 4, %[src]\n\t"
+                            "    1: # done 1-byte output\n\t"
+                            : [tmp0]"=r"(a), [tmp1]"=r"(b)
+                            //, [tmp2]"=r"(c), [tmp3]"=r"(d)
+                            , [j]"+r"(j), [src]"+r"(s), [dst]"+r"(o) //, m
+                            :
+                            :
+                            );
+#endif
+#if 0
+                if (j&3) {
+                    asm("# 2-byte arb align bytewise copy\n\t"
+                            "ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                            "ldl.zx     %[tmp1], 4(,%[src])\n\t"
+                            "st1b       %[tmp0], 0(,%[dst])\n\t"
+                            "st1b       %[tmp1], 1(,%[dst])\n\t"
+                            : [tmp0]"=r"(a), [tmp1]"=r"(b) //, m
+                            : [src]"r"(s), [dst]"r"(o) //, m
+                            :
+                            );
+                    o+=2; s+=2; j-=2;
+                }
+#else
+                    asm("# 2-byte arb align u32->u8 bytewise copy\n\t"
+                            "and        %[tmp2], 3, %[j]\n\t"
+                            "breq.w     %[tmp2], 0, 1f\n\t"
+                            "ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                            "ldl.zx     %[tmp1], 4(,%[src])\n\t"
+                            "st1b       %[tmp0], 0(,%[dst])\n\t"
+                            "st1b       %[tmp1], 1(,%[dst])\n\t"
+                            "adds.w.sx  %[j], -2, %[j]\n\t"
+                            "adds.l     %[dst],  2, %[dst]\n\t"
+                            "adds.l     %[src], 8, %[src]\n\t"
+                            "    1: # done 2-byte output\n\t"
+                            : [tmp0]"=r"(a), [tmp1]"=r"(b)
+                            , [tmp2]"=r"(c) //, [tmp3]"=r"(d)
+                            , [j]"+r"(j), [src]"+r"(s), [dst]"+r"(o) //, m
+                            :
+                            :
+                            );
+#endif
+#if 0 // simple 
+                if (j&7) {
+                    asm("# 4-byte arb align bytewise copy\n\t"
+                            "ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                            "ldl.zx     %[tmp1], 4(,%[src])\n\t"
+                            "ldl.zx     %[tmp2], 8(,%[src])\n\t"
+                            "ldl.zx     %[tmp3], 12(,%[src])\n\t"
+                            "st1b       %[tmp0], 0(,%[dst])\n\t"
+                            "st1b       %[tmp1], 1(,%[dst])\n\t"
+                            "st1b       %[tmp2], 2(,%[dst])\n\t"
+                            "st1b       %[tmp3], 3(,%[dst])\n\t"
+                            : [tmp0]"=r"(a), [tmp1]"=r"(b), [tmp2]"=r"(c)
+                            , [tmp3]"=r"(d) //, m
+                            : [src]"r"(s), [dst]"r"(o) //, m
+                            :
+                            );
+                    o+=4; s+=4; j -= 4;
+                }
+#else // include the if in asm...
+                    asm("# 4-byte arb align bytewise copy\n\t"
+                            "and        %[tmp3], 7, %[j]\n\t"
+                            "breq.w     %[tmp3], 0, 1f\n\t"
+                            "ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                            "ldl.zx     %[tmp1], 4(,%[src])\n\t"
+                            "ldl.zx     %[tmp2], 8(,%[src])\n\t"
+                            "ldl.zx     %[tmp3], 12(,%[src])\n\t"
+                            "st1b       %[tmp0], 0(,%[dst])\n\t"
+                            "st1b       %[tmp1], 1(,%[dst])\n\t"
+                            "st1b       %[tmp2], 2(,%[dst])\n\t"
+                            "st1b       %[tmp3], 3(,%[dst])\n\t"
+                            "adds.w.sx  %[j], -4, %[j]\n\t"
+                            "adds.l     %[dst],  4, %[dst]\n\t"
+                            "adds.l     %[src], 16, %[src]\n\t"
+                            "    1: # done 4-byte output\n\t"
+                            : [tmp0]"=r"(a), [tmp1]"=r"(b)
+                            , [tmp2]"=r"(c), [tmp3]"=r"(d)
+                            , [j]"+r"(j), [src]"+r"(s), [dst]"+r"(o) //, m
+                            :
+                            :
+                            );
+#endif
+#if 0
+                for ( ; j>0 ; s+=8, o+=8, j-=8) {
+                    asm("# 8-byte arb align bytewise copy\n\t"
+                            "ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                            "ldl.zx     %[tmp1], 4(,%[src])\n\t"
+                            "ldl.zx     %[tmp2], 8(,%[src])\n\t"
+                            "ldl.zx     %[tmp3], 12(,%[src])\n\t"
+                            "st1b       %[tmp0], 0(,%[dst])\n\t"
+                            "st1b       %[tmp1], 1(,%[dst])\n\t"
+                            "st1b       %[tmp2], 2(,%[dst])\n\t"
+                            "st1b       %[tmp3], 3(,%[dst])\n\t"
+                            "ldl.zx     %[tmp0], 16(,%[src])\n\t"
+                            "ldl.zx     %[tmp1], 20(,%[src])\n\t"
+                            "ldl.zx     %[tmp2], 24(,%[src])\n\t"
+                            "ldl.zx     %[tmp3], 28(,%[src])\n\t"
+                            "st1b       %[tmp0], 4(,%[dst])\n\t"
+                            "st1b       %[tmp1], 5(,%[dst])\n\t"
+                            "st1b       %[tmp2], 6(,%[dst])\n\t"
+                            "st1b       %[tmp3], 7(,%[dst])\n\t"
+                            : [tmp0]"=r"(a), [tmp1]"=r"(b), [tmp2]"=r"(c)
+                            , [tmp3]"=r"(d) //, m
+                            //, [src]"+r"(s), [dst]"+r"(o) //, m
+                            : [src]"r"(s), [dst]"r"(o) //, m
+                            :
+                            );
+                }
+#else
+                //for ( ; j ; s+=8, o+=8, j-=8) {
+                //printf(" j%d",(int)j);
+                    asm("# 8-byte arb align bytewise copy\n\t"
+                            "brge.w     0, %[j], 2f\n\t"
+                            "\n1: # loop\n\t"
+                            "ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                            "ldl.zx     %[tmp1], 4(,%[src])\n\t"
+                            "ldl.zx     %[tmp2], 8(,%[src])\n\t"
+                            "ldl.zx     %[tmp3], 12(,%[src])\n\t"
+                            "st1b       %[tmp0], 0(,%[dst])\n\t"
+                            "st1b       %[tmp1], 1(,%[dst])\n\t"
+                            "st1b       %[tmp2], 2(,%[dst])\n\t"
+                            "st1b       %[tmp3], 3(,%[dst])\n\t"
+                            "ldl.zx     %[tmp0], 16(,%[src])\n\t"
+                            "ldl.zx     %[tmp1], 20(,%[src])\n\t"
+                            "ldl.zx     %[tmp2], 24(,%[src])\n\t"
+                            "ldl.zx     %[tmp3], 28(,%[src])\n\t"
+                            "adds.w.sx  %[j], -8, %[j]\n\t"
+                            "st1b       %[tmp0], 4(,%[dst])\n\t"
+                            "st1b       %[tmp1], 5(,%[dst])\n\t"
+                            "adds.l     %[src], 32, %[src]\n\t"
+                            "st1b       %[tmp2], 6(,%[dst])\n\t"
+                            "st1b       %[tmp3], 7(,%[dst])\n\t"
+                            "adds.l     %[dst],  8, %[dst]\n\t"
+                            "brlt.w     0, %[j], 1b\n\t"
+                            "\n2: # done\n\t"
+                            : [tmp0]"=r"(a), [tmp1]"=r"(b)
+                            , [tmp2]"=r"(c), [tmp3]"=r"(d)
+                            , [j]"+r"(j), [src]"+r"(s), [dst]"+r"(o) //, m
+                            :
+                            :
+                            );
+                //printf(":%d",(int)j);
+                //}
+#endif
+            }
+#elif Q_FLT_U8 == 41
+            {
+                // Perf  2.56, cleanup, merge asm blocks
+                // still huge spill/restore between asm blocks
+                uint64_t a,b,c,d; // tmp registers
+                uint32_t const* s = (uint32_t const*)(void const*)&sat[0];
+                uint8_t *o = &out[i];
+                int j = vl;
+                asm("\n\t"
+                        "# 1-byte arb align u32->u8 bytewise copy\n\t"
+                        "and        %[tmp1], 1, %[j]\n\t"
+                        "breq.w     %[tmp1], 0, 1f\n\t"
+                        "ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                        "st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "adds.w.sx  %[j], -1, %[j]\n\t"
+                        "adds.l     %[dst],  1, %[dst]\n\t"
+                        "adds.l     %[src], 4, %[src]\n"
+                        "    1: # done 1-byte output\n\t"
+                        "# 2-byte arb align u32->u8 bytewise copy\n\t"
+                        "and        %[tmp2], 3, %[j]\n\t"
+                        "breq.w     %[tmp2], 0, 1f\n\t"
+                        "ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                        "ldl.zx     %[tmp1], 4(,%[src])\n\t"
+                        "st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "st1b       %[tmp1], 1(,%[dst])\n\t"
+                        "adds.w.sx  %[j], -2, %[j]\n\t"
+                        "adds.l     %[dst],  2, %[dst]\n\t"
+                        "adds.l     %[src], 8, %[src]\n"
+                        "    1: # done 2-byte output\n\t"
+                        "# 4-byte arb align bytewise copy\n\t"
+                        "and        %[tmp3], 7, %[j]\n\t"
+                        "breq.w     %[tmp3], 0, 1f\n\t"
+                        "ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                        "ldl.zx     %[tmp1], 4(,%[src])\n\t"
+                        "ldl.zx     %[tmp2], 8(,%[src])\n\t"
+                        "ldl.zx     %[tmp3], 12(,%[src])\n\t"
+                        "st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "st1b       %[tmp1], 1(,%[dst])\n\t"
+                        "st1b       %[tmp2], 2(,%[dst])\n\t"
+                        "st1b       %[tmp3], 3(,%[dst])\n\t"
+                        "adds.w.sx  %[j], -4, %[j]\n\t"
+                        "adds.l     %[dst],  4, %[dst]\n\t"
+                        "adds.l     %[src], 16, %[src]\n"
+                        "    1: # done 4-byte output\n\t"
+                        "\n\t# 8-byte arb align bytewise copy\n\t"
+                        "brge.w     0, %[j], 2f\n"
+                        "    1: # loop\n\t"
+                        "ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                        "ldl.zx     %[tmp1], 4(,%[src])\n\t"
+                        "ldl.zx     %[tmp2], 8(,%[src])\n\t"
+                        "ldl.zx     %[tmp3], 12(,%[src])\n\t"
+                        "st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "st1b       %[tmp1], 1(,%[dst])\n\t"
+                        "st1b       %[tmp2], 2(,%[dst])\n\t"
+                        "st1b       %[tmp3], 3(,%[dst])\n\t"
+                        "ldl.zx     %[tmp0], 16(,%[src])\n\t"
+                        "ldl.zx     %[tmp1], 20(,%[src])\n\t"
+                        "ldl.zx     %[tmp2], 24(,%[src])\n\t"
+                        "ldl.zx     %[tmp3], 28(,%[src])\n\t"
+                        "adds.w.sx  %[j], -8, %[j]\n\t"
+                        "st1b       %[tmp0], 4(,%[dst])\n\t"
+                        "st1b       %[tmp1], 5(,%[dst])\n\t"
+                        "adds.l     %[src], 32, %[src]\n\t"
+                        "st1b       %[tmp2], 6(,%[dst])\n\t"
+                        "st1b       %[tmp3], 7(,%[dst])\n\t"
+                        "adds.l     %[dst],  8, %[dst]\n\t"
+                        "brlt.w     0, %[j], 1b\n"
+                        "    2: # done\n\n\t"
+                        : [tmp0]"=r"(a), [tmp1]"=r"(b)
+                        , [tmp2]"=r"(c), [tmp3]"=r"(d)
+                        , [j]"+r"(j), [src]"+r"(s), [dst]"+r"(o) //, m
+                        :
+                        :
+                        );
+            }
+#elif Q_FLT_U8 == 42
+            {
+                // Perf  3.09 (same)
+                // still huge spill/restore between asm blocks
+                uint64_t a,b,c,d; // tmp registers
+                uint32_t const* s = (uint32_t const*)(void const*)&sat[0];
+                uint8_t *o = &out[i];
+                int j = vl;
+                // change to big-blocks first, which preserves 8-byte
+                // alignment of 32-bit src pointer as long as possible
+                printf(" j%d",(int)j);
+                // EIGHTS = 0 1 or 2
+#define EIGHTS 2
+                // FOURS = 0 or 1 or 2 (2 iff EIGHTS==2)
+#define FOURS 2
+#if FOURS == 2 && EIGHTS != 2
+#error "FOURS==2 requires EIGHTS==2"
+#endif
+#define TWOS 1
+#if TWOS != 0 && EIGHTS != 2
+#error "TWOS!=0 requires EIGHTS==2"
+#endif
+#define ONES 1
+#if ONES != 0 && EIGHTS != 2
+#error "ONES!=0 requires EIGHTS==2"
+#endif
+                printf(" f32_u8 settings: %u %u %u %u\n", EIGHTS, FOURS, TWOS, ONES);
+
+
+#if EIGHTS == 0
+                for ( ; j>7 ; s+=8, o+=8, j-=8) {
+                    asm("# 8-byte arb align bytewise copy\n\t"
+                            "ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                            "ldl.zx     %[tmp1], 4(,%[src])\n\t"
+                            "ldl.zx     %[tmp2], 8(,%[src])\n\t"
+                            "ldl.zx     %[tmp3], 12(,%[src])\n\t"
+                            "st1b       %[tmp0], 0(,%[dst])\n\t"
+                            "st1b       %[tmp1], 1(,%[dst])\n\t"
+                            "st1b       %[tmp2], 2(,%[dst])\n\t"
+                            "st1b       %[tmp3], 3(,%[dst])\n\t"
+                            "ldl.zx     %[tmp0], 16(,%[src])\n\t"
+                            "ldl.zx     %[tmp1], 20(,%[src])\n\t"
+                            "ldl.zx     %[tmp2], 24(,%[src])\n\t"
+                            "ldl.zx     %[tmp3], 28(,%[src])\n\t"
+                            "st1b       %[tmp0], 4(,%[dst])\n\t"
+                            "st1b       %[tmp1], 5(,%[dst])\n\t"
+                            "st1b       %[tmp2], 6(,%[dst])\n\t"
+                            "st1b       %[tmp3], 7(,%[dst])\n\t"
+                            : [tmp0]"=r"(a), [tmp1]"=r"(b), [tmp2]"=r"(c)
+                            , [tmp3]"=r"(d) //, m
+                            //, [src]"+r"(s), [dst]"+r"(o) //, m
+                            : [src]"r"(s), [dst]"r"(o) //, m
+                            :
+                            );
+                }
+#endif
+#if EIGHTS > 0
+                asm("# src-align 8, loop by 8s, copying low bytes\n\t"
+                        "brge.w     7, %[j], 2f\t\t# if 7 >= j, skip\n\t"
+                        "\n1: # loop by 8s\n\t"
+#if EIGHTS == 1
+                        "ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                        "ldl.zx     %[tmp1], 4(,%[src])\n\t"
+                        "ldl.zx     %[tmp2], 8(,%[src])\n\t"
+                        "ldl.zx     %[tmp3], 12(,%[src])\n\t"
+                        "st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "st1b       %[tmp1], 1(,%[dst])\n\t"
+                        "st1b       %[tmp2], 2(,%[dst])\n\t"
+                        "st1b       %[tmp3], 3(,%[dst])\n\t"
+#else // use src-align-8:
+                        "ld         %[tmp0],  0(,%[src])\n\t"
+                        "ld         %[tmp2],  8(,%[src])\n\t"
+                        "srl        %[tmp1], %[tmp0], 32\n\t"
+                        "srl        %[tmp3], %[tmp2], 32\n\t"
+                        "st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "st1b       %[tmp2], 2(,%[dst])\n\t"
+                        "st1b       %[tmp1], 1(,%[dst])\n\t"
+                        "st1b       %[tmp3], 3(,%[dst])\n\t"
+#endif
+#if EIGHTS == 1
+                        "ldl.zx     %[tmp0], 16(,%[src])\n\t"
+                        "ldl.zx     %[tmp1], 20(,%[src])\n\t"
+                        "ldl.zx     %[tmp2], 24(,%[src])\n\t"
+                        "ldl.zx     %[tmp3], 28(,%[src])\n\t"
+                        "adds.w.sx  %[j], -8, %[j]\n\t"
+                        "st1b       %[tmp0], 4(,%[dst])\n\t"
+                        "st1b       %[tmp1], 5(,%[dst])\n\t"
+                        "adds.l     %[src], 32, %[src]\n\t"
+                        "st1b       %[tmp2], 6(,%[dst])\n\t"
+                        "st1b       %[tmp3], 7(,%[dst])\n\t"
+#else
+                        "ld         %[tmp0], 16(,%[src])\n\t"
+                        "ld         %[tmp2], 24(,%[src])\n\t"
+                        "srl        %[tmp1], %[tmp0], 32\n\t"
+                        "srl        %[tmp3], %[tmp2], 32\n\t"
+                        "adds.w.sx  %[j], -8, %[j]\t\t# j-=8\n\t"
+                        "st1b       %[tmp0], 4(,%[dst])\n\t"
+                        "st1b       %[tmp2], 6(,%[dst])\n\t"
+                        "adds.l     %[src], 32, %[src]\t# s+=32\n\t"
+                        "st1b       %[tmp1], 5(,%[dst])\n\t"
+                        "st1b       %[tmp3], 7(,%[dst])\n\t"
+#endif
+                        "adds.l     %[dst],  8, %[dst]\t# o+=8\n\t"
+                        "brlt.w     7, %[j], 1b\t# if 7 < j, keep going by 8s\n"
+                        "    2: # by 8s done: assert(j<=7)\n"
+#if FOURS == 2
+                        "\tbrge.w     3, %[j], 3f\t# if 3 >= j, skip\n\t"
+                        "  # 3<j : by 4, src-align-8 LSByte copy\n\t"
+                        "  ld         %[tmp0], 0(,%[src])\n\t"
+                        "  ld         %[tmp2], 8(,%[src])\n\t"
+                        "  srl        %[tmp1], %[tmp0], 32\n\t"
+                        "  srl        %[tmp3], %[tmp2], 32\n\t"
+                        "  st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "  st1b       %[tmp2], 2(,%[dst])\n\t"
+                        "  st1b       %[tmp1], 1(,%[dst])\n\t"
+                        "  st1b       %[tmp3], 3(,%[dst])\n\t"
+                        "adds.w.sx  %[j], -4, %[j]\t\t# j-=4\n\t"
+                        "adds.l     %[src], 16, %[src]\t# s+=16\n\t"
+                        "adds.l     %[dst],  4, %[dst]\t# o+=4\n"
+                        "    3: # by 4 done: assert(j<=3)\n"
+#endif
+#if TWOS == 1
+                        "\n\tbrge.w     1, %[j], 4f\t# if 1 >= j, skip\n\t"
+                        "  # 1<j : by 2, src-align-8 LSByte copy\n\t"
+                        "  ld         %[tmp0], 0(,%[src])\n\t"
+                        "  adds.w.sx  %[j], -2, %[j]\t\t# j-=2\n\t"
+                        "  st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "  srl        %[tmp1], %[tmp0], 32\n\t"
+                        "  adds.l     %[src], 8, %[src]\t# s+=8\n\t"
+                        "  st1b       %[tmp1], 1(,%[dst])\n\t"
+                        "  adds.l     %[dst],  2, %[dst]\t# o+=2\n"
+                        "    4: # by 2 done: assert(j<=1); src-align still 8\n"
+#endif
+#if ONES == 1
+                        "\n\tbrge.w     0, %[j], 5f\t# if 0 >= j, skip\n\t"
+                        "  # j==1, by 1, src-align-8 LSByte copy\n\t"
+                        "  ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                        "  st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "  #adds.w.sx  %[j], -1, %[j]\t# j-=1 don't care\n\t"
+                        "  #adds.l     %[dst],  1, %[dst]\t# o+=1 don't care\n\t"
+                        "  #adds.l     %[src], 4, %[src]\t# s+=4 don't care\n"
+                        "    5: # done last 1-byte output\n\t"
+#endif
+                        : [tmp0]"=r"(a), [tmp1]"=r"(b)
+                        , [tmp2]"=r"(c), [tmp3]"=r"(d)
+                        , [j]"+r"(j), [src]"+r"(s), [dst]"+r"(o) //, m
+                        :
+                        :
+                        );
+#endif // EIGHTS == 0 1 or 2
+
+
+#if FOURS < 2
+                assert(j<8);
+                // remaining 7 ouput bytes
+                printf(":j%d",(int)j); fflush(stdout);
+#if EIGHTS < 2 && FOURS == 0 // simple 
+                if (3 < j) {
+                    asm("# by 4, src-align-8 bytewise copy\n\t"
+                            "ld         %[tmp0], 0(,%[src])\n\t"
+                            "ld         %[tmp2], 8(,%[src])\n\t"
+                            "srl        %[tmp1], %[tmp0], 32\n\t"
+                            "srl        %[tmp3], %[tmp2], 32\n\t"
+                            "st1b       %[tmp0], 0(,%[dst])\n\t"
+                            "st1b       %[tmp2], 2(,%[dst])\n\t"
+                            "st1b       %[tmp1], 1(,%[dst])\n\t"
+                            "st1b       %[tmp3], 3(,%[dst])\n\t"
+                            : [tmp0]"=r"(a), [tmp1]"=r"(b), [tmp2]"=r"(c)
+                            , [tmp3]"=r"(d) //, m
+                            : [src]"r"(s), [dst]"r"(o) //, m
+                            :
+                            );
+                    o+=4; s+=4; j -= 4;
+                }
+#elif EIGHTS < 2 && FOURS == 1 // include the if in asm...
+                asm(
+                        "brge.w     3, %[j], 3f\t# if 3 >= j, skip\n\t"
+                        "  # j>=4, by 4, src-align-8 LSByte copy\n\t"
+                        "  ld         %[tmp0], 0(,%[src])\n\t"
+                        "  ld         %[tmp2], 8(,%[src])\n\t"
+                        "  srl        %[tmp1], %[tmp0], 32\n\t"
+                        "  srl        %[tmp3], %[tmp2], 32\n\t"
+                        "  st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "  st1b       %[tmp2], 2(,%[dst])\n\t"
+                        "adds.w.sx  %[j], -4, %[j]\t\t# j-=4\n\t"
+                        "  st1b       %[tmp1], 1(,%[dst])\n\t"
+                        "  st1b       %[tmp3], 3(,%[dst])\n\t"
+                        "adds.l     %[src], 16, %[src]\t# s+=16\n\t"
+                        "adds.l     %[dst],  4, %[dst]\t# o+=4\n"
+                        "    3: # by 4 done\n"
+                        : [tmp0]"=r"(a), [tmp1]"=r"(b)
+                        , [tmp2]"=r"(c), [tmp3]"=r"(d)
+                        , [j]"+r"(j), [src]"+r"(s), [dst]"+r"(o) //, m
+                        :
+                        :
+                        );
+#endif
+#endif // FOURS < 2
+
+
+#if TWOS == 0
+                assert(j<4);
+                printf(":j%d",(int)j); fflush(stdout);
+#if 1
+                if (1 < j) {
+                    asm("# 2-byte arb align bytewise copy\n\t"
+                            "ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                            "ldl.zx     %[tmp1], 4(,%[src])\n\t"
+                            "st1b       %[tmp0], 0(,%[dst])\n\t"
+                            "st1b       %[tmp1], 1(,%[dst])\n\t"
+                            : [tmp0]"=r"(a), [tmp1]"=r"(b) //, m
+                            : [src]"r"(s), [dst]"r"(o) //, m
+                            :
+                            );
+                    o+=2; s+=2; j-=2;
+                }
+#else
+                asm(
+                        "brge.w     1, %[j], 4f\t# if 1 >= j, skip\n\t"
+                        "  # j>=2, by 2, src-align-8 LSByte copy\n\t"
+                        "  ld         %[tmp0], 0(,%[src])\n\t"
+                        "  srl        %[tmp1], %[tmp0], 32\n\t"
+                        "  adds.w.sx  %[j], -2, %[j]\t\t# j-=2\n\t"
+                        "  st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "  adds.l     %[src], 8, %[src]\t# s+=8\n\t"
+                        "  st1b       %[tmp1], 1(,%[dst])\n\t"
+                        "  adds.l     %[dst],  2, %[dst]\t# o+=2\n"
+                        "    4: # by 2 done: assert(j<=1)\n"
+                        : [tmp0]"=r"(a), [tmp1]"=r"(b)
+                        , [tmp2]"=r"(c) //, [tmp3]"=r"(d)
+                        , [j]"+r"(j), [src]"+r"(s), [dst]"+r"(o) //, m
+                        :
+                        :
+                        );
+#endif
+#endif
+
+
+#if ONES == 0
+                printf(":j%d ",(int)j); fflush(stdout);
+                assert( j == 0 || j == 1 );
+#if 0
+                if (0 < j) {
+                    *o++ = *s++;
+                    --j;
+                }
+#else
+                asm("# 1-byte src-align-8 LSByte copy\n\t"
+                        "brge.w     0, %[j], 5f\t# if 0 >= j, skip\n\t"
+                        "  # j==1, by 2, src-align-8 LSByte copy\n\t"
+                        "  ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                        "  st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "  #adds.w.sx  %[j], -1, %[j]\t# don't need exit value\n\t"
+                        "  #adds.l     %[dst],  1, %[dst]\t# don't need exit value\n\t"
+                        "  #adds.l     %[src], 4, %[src]\t# don't need exit value\n\t"
+                        "    5: # done last 1-byte output\n\t"
+                        : [tmp0]"=r"(a) //, [tmp1]"=r"(b)
+                        //, [tmp2]"=r"(c), [tmp3]"=r"(d)
+                        , [j]"+r"(j), [src]"+r"(s), [dst]"+r"(o) //, m
+                        :
+                        :
+                        );
+#endif
+#endif // ONES == 0
+            }
+#elif Q_FLT_U8 == 5
+            {
+                // Perf  
+                uint64_t a,b,c,d; // tmp registers
+                uint32_t const* s = (uint32_t const*)(void const*)&sat[0];
+                uint8_t *o = &out[i];
+                int j = vl;
+                // process big-blocks first, preserving s-align-8
+                asm("# src-align 8, loop by 8s, copying low bytes\n\t"
+                        "brge.w     7, %[j], 2f\t\t# if 7 >= j, skip\n\t"
+                        "\n1: # loop by 8s\n\t"
+                        "  ld         %[tmp0],  0(,%[src])\n\t"
+                        "  ld         %[tmp2],  8(,%[src])\n\t"
+                        "  srl        %[tmp1], %[tmp0], 32\n\t"
+                        "  srl        %[tmp3], %[tmp2], 32\n\t"
+                        "  st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "  st1b       %[tmp2], 2(,%[dst])\n\t"
+                        "  st1b       %[tmp1], 1(,%[dst])\n\t"
+                        "  st1b       %[tmp3], 3(,%[dst])\n\t"
+                        "  ld         %[tmp0], 16(,%[src])\n\t"
+                        "  ld         %[tmp2], 24(,%[src])\n\t"
+                        "  srl        %[tmp1], %[tmp0], 32\n\t"
+                        "  srl        %[tmp3], %[tmp2], 32\n\t"
+                        "adds.w.sx  %[j], -8, %[j]\t\t# j-=8\n\t"
+                        "  st1b       %[tmp0], 4(,%[dst])\n\t"
+                        "  st1b       %[tmp2], 6(,%[dst])\n\t"
+                        "adds.l     %[src], 32, %[src]\t# s+=32\n\t"
+                        "  st1b       %[tmp1], 5(,%[dst])\n\t"
+                        "  st1b       %[tmp3], 7(,%[dst])\n\t"
+                        "adds.l     %[dst],  8, %[dst]\t# o+=8\n\t"
+                        "brlt.w     7, %[j], 1b\t# if 7 < j, keep going by 8s\n"
+                        "    2: # by 8s done: assert(j<=7)\n"
+                        "\tbrge.w     3, %[j], 3f\t# if 3 >= j, skip\n\t"
+                        "  # 3<j : by 4, src-align-8 LSByte copy\n\t"
+                        "  ld         %[tmp0], 0(,%[src])\n\t"
+                        "  ld         %[tmp2], 8(,%[src])\n\t"
+                        "  srl        %[tmp1], %[tmp0], 32\n\t"
+                        "  srl        %[tmp3], %[tmp2], 32\n\t"
+                        "  st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "  st1b       %[tmp2], 2(,%[dst])\n\t"
+                        "adds.w.sx  %[j], -4, %[j]\t\t# j-=4\n\t"
+                        "  st1b       %[tmp1], 1(,%[dst])\n\t"
+                        "adds.l     %[src], 16, %[src]\t# s+=16\n\t"
+                        "  st1b       %[tmp3], 3(,%[dst])\n\t"
+                        "adds.l     %[dst],  4, %[dst]\t# o+=4\n"
+                        "    3: # by 4 done: assert(j<=3)\n"
+                        "\tbrge.w     1, %[j], 4f\t# if 1 >= j, skip\n\t"
+                        "  # 1<j : by 2, src-align-8 LSByte copy\n\t"
+                        "  ld         %[tmp0], 0(,%[src])\n\t"
+                        "adds.w.sx  %[j], -2, %[j]\t\t# j-=2\n\t"
+                        "  st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "  srl        %[tmp1], %[tmp0], 32\n\t"
+                        "adds.l     %[src], 8, %[src]\t# s+=8\n\t"
+                        "  st1b       %[tmp1], 1(,%[dst])\n\t"
+                        "adds.l     %[dst],  2, %[dst]\t# o+=2\n"
+                        "    4: # by 2 done: assert(j<=1); src-align still 8\n"
+                        "brge.w     0, %[j], 5f\t# if 0 >= j, skip\n\t"
+                        "  # j==1, by 1, src-align-8 LSByte copy\n\t"
+                        "  ldl.zx     %[tmp0], 0(,%[src])\n\t"
+                        "  st1b       %[tmp0], 0(,%[dst])\n\t"
+                        "  #adds.w.sx  %[j], -1, %[j]\t# j-=1 don't care\n\t"
+                        "  #adds.l     %[dst],  1, %[dst]\t# o+=1 don't care\n\t"
+                        "  #adds.l     %[src], 4, %[src]\t# s+=4 don't care\n\t"
+                        "    5: # done last 1-byte output\n\t"
+                        : [tmp0]"=r"(a), [tmp1]"=r"(b)
+                        , [tmp2]"=r"(c), [tmp3]"=r"(d)
+                        , [j]"+r"(j), [src]"+r"(s), [dst]"+r"(o) //, m
+                        :
+                        :
+                        );
+            }
+#endif
+
+
+
+
+#if Q_FLT_U8_VERIFY
+            if (1) { //check above asm
+                int nerr = 0;
+                fflush(stdout);
+                for(int j=0; j<vl; ++j){
+                    if ((uint32_t)out[i+j] != (uint32_t)sat[j]) {
+                        printf(" oops o[%d] != s[%d] (0x%04x vs. 0x%04x)\n",
+                                j, j, (uint32_t)out[i+j], (uint32_t)sat[j]);
+                        ++nerr;
+                    }
+                }
+                if (nerr) {
+                    fflush(stdout);
+                    exit(13);
+                }
+            }
+#endif
+        }
+    }
+};
+
+} // namespace cpu
+} // namespace impl
+} // namespace dnnl
+
+// vim: et ts=4 sw=4 cindent cino=+2s,l0,\:4,N-s filetype=cpp
+#endif // CPU_VE_SIMPLE_Q10N_VEC_F32_U8_HPP
