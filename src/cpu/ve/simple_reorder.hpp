@@ -1155,7 +1155,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         /* FIXME: is the formula correct? */
         Consistency ok("reorder_check:direct_copy");
         // look at why direct_copy was skipped?
-#define AND_(...) SCHKVV(ok,__VA_ARGS__)
+#define AND_(...) SCHK(ok,__VA_ARGS__)
         AND_(!input_d.has_runtime_dims_or_strides());
         AND_(input_d.similar_to(output_d, true, false, 0));
         AND_(input_d.is_dense());
@@ -1537,7 +1537,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                         | dnnl_primitive_attr::skip_mask_t::post_ops)
                 && simple_po_check(attr);
 #else // want to see why generic reorder was not applicable...
-        // did we miss a fancier reorder?
+        // Typically last, always print why not. Did we miss a fancier reorder?
         Consistency ok("reorder_check:direct_copy");
 #define AND_(...) SCHKVV(ok,__VA_ARGS__)
         AND_(input_d.is_blocking_desc());

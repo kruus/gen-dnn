@@ -1,0 +1,5 @@
+# convolution corr. to 3rd deconv of deconv.in (and test_deconvolution gtest)
+--dir=BWD_D --stag=nhwc,nchw --wtag=oihw,hwio --dtag=nhwc,nchw mb2_ic4oc6_ih4oh2kh3sh1dh0ph0_iw4ow2kw3sw1dw0pw0
+--dir=FWD_B --stag=nhwc,nchw --wtag=oihw,hwio --dtag=nhwc,nchw mb2_ic4oc6_ih4oh2kh3sh1dh0ph0_iw4ow2kw3sw1dw0pw0
+--dir=BWD_W --stag=nhwc,nchw --wtag=oihw,hwio --dtag=nhwc,nchw mb2_ic4oc6_ih4oh2kh3sh1dh0ph0_iw4ow2kw3sw1dw0pw0
+--dir=BWD_WB --stag=nhwc,nchw --wtag=oihw,hwio --dtag=nhwc,nchw mb2_ic4oc6_ih4oh2kh3sh1dh0ph0_iw4ow2kw3sw1dw0pw0

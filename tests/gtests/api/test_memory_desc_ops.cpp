@@ -23,7 +23,7 @@
 
 #include "dnnl.hpp"
 
-#define DEBUG_TEST_MEMORY_DESC_OPS_CPP 1
+#define DEBUG_TEST_MEMORY_DESC_OPS_CPP 0
 
 namespace dnnl {
 namespace memory_desc_ops {

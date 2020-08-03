@@ -1,0 +1,17 @@
+# these mimic test_deconvolution gtests settings:
+--dir=FWD_B,FWD_D,BWD_D,BWD_W,BWD_WB --stag=nchw --wtag=oihw --dtag=nchw mb2_ic6oc4_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1
+--dir=FWD_B,FWD_D,BWD_D,BWD_W,BWD_WB --stag=nchw --wtag=oihw --dtag=nchw mb2_ic6oc4_ih2oh4kh3sh1dh0ph0_iw2ow4kw3sw1dw0pw0
+--dir=FWD_B,FWD_D,BWD_D,BWD_W,BWD_WB --stag=nhwc --wtag=oihw --dtag=nhwc mb2_ic6oc4_ih2oh4kh3sh1dh0ph0_iw2ow4kw3sw1dw0pw0
+--dir=FWD_B,FWD_D,BWD_D,BWD_W,BWD_WB --stag=nhwc --wtag=hwio --dtag=nhwc mb2_ic6oc4_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1
+--dir=FWD_B,FWD_D,BWD_D,BWD_W,BWD_WB --stag=nhwc --wtag=hwio --dtag=nhwc mb2_ic6oc4_ih2oh4kh3sh1dh0ph0_iw2ow4kw3sw1dw0pw0
+
+# following was modified (gtest error?)
+--dir=FWD_D,BWD_D,BWD_W --stag=nhwc --wtag=goihw --dtag=nhwc mb2_g2ic6oc4_ih2oh4kh3sh1dh0ph0_iw2ow4kw3sw1dw0pw0
+
+--dir=FWD_D,BWD_D,BWD_W --stag=nhwc --wtag=hwigo --dtag=nhwc mb2_g2ic6oc4_ih4oh4kh3sh1dh0ph1_iw4ow4kw3sw1dw0pw1
+
+# corr. to 3rd deconv:  still all pass in benchdnn (but not gtests)
+#--conv --dir=BWD_D --stag=nhwc --wtag=oihw --dtag=nhwc mb2_ic4oc6_ih4oh2kh3sh1dh0ph0_iw4ow2kw3sw1dw0pw0
+#--conv --dir=FWD_D --stag=nhwc --wtag=oihw --dtag=nhwc mb2_ic4oc6_ih4oh2kh3sh1dh0ph0_iw4ow2kw3sw1dw0pw0
+#--conv --dir=BWD_W --stag=nhwc --wtag=oihw --dtag=nhwc mb2_ic4oc6_ih4oh2kh3sh1dh0ph0_iw4ow2kw3sw1dw0pw0
+
