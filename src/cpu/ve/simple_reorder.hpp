@@ -1397,7 +1397,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         const dim_t nelems_no_d0 = nelems_no_dim_0(input_d);
         const dim_t work_amount = N * nelems_no_d0;
 
-#if DNNL_REORDER_ALLOW_MODS
+#if 0 && DNNL_REORDER_ALLOW_MODS // THIS SECTION IS  BUGGY ? ? ?
         // equivalent, using macro for common iteration code
         // - QZ_OBJ may call non-inlined 'round' (f32-->s32, ouch)
 #define IN_e in[is * n + e]
@@ -1527,6 +1527,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             ;
         for (; smask > 0 && smask & 0x1; smask >>= 1)
             ;
+#if 0 // orig
         return input_d.is_blocking_desc() && output_d.is_blocking_desc()
                 && !output_d.is_additional_buffer()
                 && !input_d.is_additional_buffer() && smask == 0
@@ -1535,6 +1536,21 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                         | dnnl_primitive_attr::skip_mask_t::zero_points_runtime
                         | dnnl_primitive_attr::skip_mask_t::post_ops)
                 && simple_po_check(attr);
+#else // want to see why generic reorder was not applicable...
+        // did we miss a fancier reorder?
+        Consistency ok("reorder_check:direct_copy");
+#define AND_(...) SCHKVV(ok,__VA_ARGS__)
+        AND_(input_d.is_blocking_desc());
+        AND_( output_d.is_blocking_desc());
+        AND_(!output_d.is_additional_buffer());
+        AND_(!input_d.is_additional_buffer());
+        AND_(smask == 0);
+        AND_(attr->has_default_values(
+                    dnnl_primitive_attr::skip_mask_t::oscale_runtime
+                    | dnnl_primitive_attr::skip_mask_t::zero_points_runtime
+                    | dnnl_primitive_attr::skip_mask_t::post_ops));
+        AND_(simple_po_check(attr));
+#endif
     }
 
     GET_SCRATCHPAD_SIZE_ZERO();

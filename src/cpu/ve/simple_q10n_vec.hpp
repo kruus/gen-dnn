@@ -31,7 +31,7 @@
 #endif
 #endif
 
-// XXX standardize this macro
+// XXX standardize this macro (platform.hpp?)
 #ifndef MVL
 #if defined(__ve)
 #define MVL 256
@@ -39,6 +39,10 @@
 #define MVL 16
 #endif
 #endif
+
+// having issues with missing header include (perhaps)
+// or maybe typos in re.in batch file :(
+#define VE_MONOLITHIC 0
 
 namespace dnnl {
 namespace impl {
@@ -466,6 +470,10 @@ struct qzv<float, float16_t> {
 } // namespace cpu
 } // namespace impl
 } // namespace dnnl
+
+#ifdef VE_MONOLITHIC
+#include "cpu/ve/simple_q10n_ve_f32_int.hpp"
+#endif // VE_MONOLITHIC
 
 // vim: et ts=4 sw=4 cindent cino=+2s,l0,\:4,N-s filetype=cpp
 #endif // CPU_VE_SIMPLE_Q10N_VEC_HPP

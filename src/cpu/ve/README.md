@@ -1,3 +1,23 @@
+=== latest issues
+run: --concat --ddt=s32 --stag=aBx8b:aBx8b --dtag=any 7x8x4x9:7x8x4x9
+295:FAILED (errors:3454 total:4032) __REPRO__: --concat --ddt=s32 --stag=aBx8b:aBx8b --dtag=any 7x8x4x9:7x8x4x9
+run: --concat --sdt=s8 --ddt=s8 --stag=aBx16b:abx:aBx8b:axb --dtag=aBx16b 6x0x3x4:6x3x3x4:6x5x3x4:6x5x3x4
+1673:FAILED (errors:179 total:936) __REPRO__: --concat --sdt=s8 --ddt=s8 --stag=aBx16b:abx:aBx8b:axb --dtag=aBx16b 6x0x3x4:6x3x3x4:6x5x3x4:6x5x3x4
+? check new f32-->s32 reorder
+Hmm. May be header split issues (missingg include of fancier optimizations --> missing function?)
+--> revert to monolithic reorder and quantization template headers ?
+(was working before, I think)
+
+gtest test_reorder pases
+gtest test_concat seems to have difficulty with new direct_except_dim_0 code ?? (did little testing of that
+TestConcat_padded/concat_test_float.TestsConcat/8
+TestConcat_padded/concat_test_float.TestsConcat/9
+TestConcat3D/concat_test_float.TestsConcat/7
+TestConcat/concat_test_float.TestsConcat/10
+ex. reorder,simple:any:direct_except_dim_0,undef,src_f32::blocked:abcd:f0 dst_f32::blocked:abcd:f0,scratchpad_mode:user;,,4x25x5x5
+- others use plain1blocked reorder
+- neither gtest nor benchdnn tests seem to hit this impl.
+- rnn also uses direct_except_dim_0 reorder
 
 === new compiler ICE:
 - code has vectorizn, inline extended asm, and nc++ scheduling aborts

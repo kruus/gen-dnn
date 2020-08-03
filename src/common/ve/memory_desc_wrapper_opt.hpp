@@ -109,6 +109,9 @@ struct CoordRegs {
  * alloc_on_vreg pragmas worked).
  *
  * - also have runtime 'dim' version in dev/, if nec.
+ *
+ * - Template parameger dim=6 seems to suffice for most purposes.
+ *   Special optimizations might be able to use fewer.
  */
 template<unsigned dim, typename Crd = unsigned, typename Pos=size_t>
 struct CoordsFor : public CoordRegs<Crd,dim> {
@@ -199,7 +202,7 @@ struct CoordsFor : public CoordRegs<Crd,dim> {
         }
         return true;
     }
-    /** unchecked */
+    /** (unchecked) allow partitioning coords-iteration between threads. */
     bool init(Pos start, Pos end) {
         assert( start <= end && end <= sz );
         sz = end;
@@ -945,7 +948,7 @@ public:
 
 #define Short_ PragmaQuote(_NEC vector) PragmaQuote(_NEC nounroll)
         const int nd = ndims();
-        assert( nd < 6 );
+        assert( nd <= 6 );
         if (is_pos_padded) {
             NOVEC_ ShortLoop() PragmaQuote(_NEC nounroll) PragmaQuote(_NEC loop_count(6))//;
             for (int d = 0; d < nd; ++d) {

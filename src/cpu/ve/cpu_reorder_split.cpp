@@ -142,10 +142,11 @@ static void check_map(impl_list_map_t const& reo_map){
             ok = false;
             ++nerr;
         }
-        if (ok && !q) printf(" OK\n");
+        if (!q) {
+            if (ok) printf(" OK\n");
+            printf("reorder check_map: entries:%d failed:%d\n", nkv, nerr);
+        }
     }
-    if (ok !! !q)
-        printf("reorder check_map: entries:%d failed:%d\n", nkv, nerr);
     if (nerr) {
         printf(" Fatal Error: some reorder lists seem corrupted.\n"
                " See %s routine check_map.", __FILE__);

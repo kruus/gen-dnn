@@ -44,9 +44,9 @@ struct qzv_a1b0<float, int32_t, void>
         //float constexpr ubound = (float)nstl::numeric_limits<int32_t>::max();
         NOVECTOR for (size_t i=0; i<len; i+=blk){
             size_t vl = (len-i > blk? blk: len-i);
-#if 1 // new code, based on u8/s8 work
             {
                 // if good alignments could use packed-vec-ops (and blk=512) XXX
+                // could include block-by-vl loop in asm XXX
                 int a; // tmp 32-bit register for vfmax/vfmin
                 asm("\t# VE_SATURATE_ROUND_FLOAT_TO_INT32\n\t"
                         "lvl %[vl]\n\t"
@@ -67,60 +67,6 @@ struct qzv_a1b0<float, int32_t, void>
                         : "%v62", "%v63"
                    );
             }
-#else // old code
-                    // cannot cvt to int then sat, because
-                    // vcvt might give zero for over/underflow !!!
-                    //
-                    // moving lbound, ubound into asm helps
-                    // reduce spill by a lot.
-                    // --mode=C 0.91 ms, (was ~12 ms)
-            // TODO mxcsr_roundv(float*, float lbound, float ubound, vl, int*) ??
-            // (all in one asm construct)
-#if 0 // essential ubound,lbound code
-             lea.sl  %s55,-822083584  and s54
-                     lea.sl  %s59,1325400064
-            vldu.nc %v63,4,%s59
-                    vfcmp.s %v62,%s55,%v63      # s55=s54= -something
-                    vfmk.s.gt       %vm15,%v62
-                    vbrdu   %v63,%s54,%vm15
-                    vfcmp.s %v61,%s59,%v63
-                    vfmk.s.lt       %vm15,%v61
-                    vbrdu   %v63,%s51,%vm15
-#endif
-            asm("\t# VE_ROUND_FLOAT_TO_INT\n\t"
-                    "lvl %[vl]\n\t"
-                    "vldu.nc %v63, 4, %[in]\n\t"
-                    "\n"
-                    "# if too low, use (float) int32_t.lowet()\n\t"
-                    "lea.sl  %s63,-822083584\n\t"
-                    //"vfcmp.s %v62, %[lbound], %v63\n\t"
-                    "vfcmp.s %v62, %s63, %v63\n\t"
-                    "vfmk.s.gt %vm15, %v62\n\t"
-                    //"lea.sl  %s62,-822083584\n\t"
-                    //"vbrdu %v63, %[lbound2], %vm15\n\t"
-                    "vbrdu %v63, %s63, %vm15\n\t"
-                    "\n"
-                    "# if too high, use (float) int32_t.max()\n\t"
-                    "lea.sl  %s63,1325400064\n\t"
-                    //"vfcmp.s %v62, %[ubound], %v63\n\t"
-                    "vfcmp.s %v62, %s63, %v63\n\t"
-                    "vfmk.s.lt %vm15, %v62\n\t"
-                    //"vbrdu %v63, %[ubound2], %vm15\n\t"
-                    //"lea.sl  %s62,1325400064\n\t"
-                    "vbrdu %v63, %s63, %vm15\n\t"
-                    "\n"
-                    "# cvt float to int, like nearbyintf\n\t"
-                    "vcvt.w.s.sx.rz %v62, %v63\n\t"
-                    "vstl %v62, 4, %[out] # int32 output in lower half\n\t"
-                    : "=m"( /*dummy output*/ *(int (*)[vl]) &out[i] )
-                    : [in]"r"(&in[i]), [vl]"r"(vl), [out]"r"(&out[i])
-                    //, [lbound]"r"(lbound), [ubound]"r"(ubound)
-                    //, [lbound2]"r"(lbound), [ubound2]"r"(ubound)
-                    , "m"( /*dummy input*/ *(const float (*)[vl]) &in[i])
-                    : "%v62", "%v63", "%vm15"
-                    , "%s63" //, "%s62"
-               ); // still circa 10 ms (--mode=C); was 12 ms --mode=P
-#endif
         }
     }
 };
