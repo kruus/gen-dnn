@@ -53,7 +53,10 @@ wo::memory_desc_wrapper_opt(const memory_desc_t *md)
           , dims32()
 #endif
           { 
-              set_ib_info();
+              if (format_kind() != format_kind::undef) {
+                  // XXX does this wrapper_opt make sense for rnn or wino?
+                  set_ib_info();
+              }
           }
 
 wo::memory_desc_wrapper_opt(const memory_desc_t &md)

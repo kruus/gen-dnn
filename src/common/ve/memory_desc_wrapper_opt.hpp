@@ -354,7 +354,7 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
     template<typename DIM_T, typename NDIMS_T>
     CoordsForNd(DIM_T const* d,  NDIMS_T const nd, Pos const start, Pos const end)
     : dim(nd), vl(0), ilo{0}, ihi{0}, sz(0), pos(0) {
-        assert( nd <= MaxDims );
+        assert( (unsigned)nd <= MaxDims );
         static_assert(MaxDims <= DNNL_MAX_NDIMS, "unexpectedly large number dims");
         sz = Pos{1};
         ShortLoop() for(int i=0; i<dim; ++i){
@@ -363,6 +363,17 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
             sz *= d[i];
         }
         this->init_nd(start,end);
+    }
+
+    /** Finalize, after dimension modifications.   Before calling this, \c sz may
+     * be incorrect.  After \c finalize(), \c get_sz() will return the full length.
+     * Thereafter you may \c init_nd(start [,end]) to begin iteration within some
+     * full/sub-range. */
+    void finalize() {
+        sz = Pos{1};
+        ShortLoop() for(int i=0; i<dim; ++i){
+            sz *= ihi[i] - ilo[i];
+        }
     }
 
     Base /* */& base() /* */ { return *this; }
@@ -471,52 +482,34 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
         sz = end;
         return init_nd(start);
     }
-    private:
-#if COORDSFORND_EXTEND
-    /** Maybe "extend" at linear iter pos, increasing existing vl up to MVL.
-     * Keeps old set of vl coords. Possible to extend by zero new coords if vl==MVL already!
-     * Check that `vl+sz<=MVL` if you need all coords to fit with no `step`.
-     * \b Untested.
-     * \return true iff some coords were be added.
-     *
-     * Idea: in some cases you might 'pack' sets of loops into a longer vector?
-     * Problem: How to efficiently unpack/mask the sets later.
-     * Problem: Also needs a setter for new ilo,ihi loop limits, ... extend_at
-     */
-    bool extend_at(Pos lin){
-        if(lin >= sz || vl >= MVL){
-            return false;
-        }
-        pos = lin;
-        auto addvl = sz - lin;
-        assert( addvl > 0 );
-        if (vl + addvl >= MVL) addvl = MVL - vl;
-        for(unsigned i=0U; i<addvl; ++i){
-            uint64_t carry = pos+i;
-            uint64_t mod;
-            for(unsigned d = dim; d--; ) {
-                auto const span = ihi[d] - ilo[d];
-                mod   = carry % span;
-                carry = carry / span;
-                (this->vp)[d][vl+i] = ilo[d] + mod;
+    /** iter_range(0 [,lo,hi]...) initializes ilo[],ihi[] iter ranges for dim
+     * d,d+1,... and sets final dimension 'd'. */
+    template<typename LO, typename HI, typename... Args>
+        inline bool iter_range(unsigned d , LO const lo, HI const hi, Args &&... tuple) {
+            if (d >= MaxDims)
+                return false;
+            else {
+                ilo[d] = (unsigned)lo;
+                ihi[d] = (unsigned)hi;
+                // ? span[d] = ilo[d] - ihi[d];
+                return iter_range(d+1U, utils::forward<Args>(tuple)...);
             }
         }
-        vl += addvl;
-        return true;
+    /** Often need to re-use iterator with different values for some coords.
+     * Since may want to \c fix_coord many times, client should init(Pos)
+     * to propagate changes to this->vp[][]. \b UNCHECKED!
+     * Won't change dimension (consider \c iter_range ) */
+    MyType& fix_coord(int d, Crd value) {
+        assert( ihi[d] - ilo[d] == 1 && "must keep same size" );
+        ilo[d] = value;
+        ihi[d] = value+1;
+        return *this;
     }
-#endif // COORDSFORND_EXTEND
+    private:
     inline bool iter_range(unsigned d) {
         dim = d;
         return true;
     }
-    /** iter_range(0 [,lo,hi]...) initializes ilo[],ihi[] iter ranges for dim 0,1,... */
-    template<typename LO, typename HI, typename... Args>
-        inline bool iter_range(unsigned d , LO const lo, HI const hi, Args &&... tuple) {
-            ilo[d] = (unsigned)lo;
-            ihi[d] = (unsigned)hi;
-            // ? span[d] = ilo[d] - ihi[d];
-            return iter_range(d+1U, utils::forward<Args>(tuple)...);
-        }
     public:
     /** generic init of nested sequential for loops.
      * Initialize `for(lo0..hi0) for(lo1..hi1) ...`
@@ -560,7 +553,40 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
         return pos < sz? init_nd(pos + vl): false;
     }
 #if COORDSFORND_EXTEND
-    /** extend(lohi...) */
+    /** Maybe "extend" at linear iter pos, increasing existing vl up to MVL.
+     * Keeps old set of vl coords. Possible to extend by zero new coords if vl==MVL already!
+     * Check that `vl+sz<=MVL` if you need all coords to fit with no `step`.
+     * \b Untested.
+     * \return true iff some coords were be added.
+     *
+     * Idea: in some cases you might 'pack' sets of loops into a longer vector?
+     * Problem: How to efficiently unpack/mask the sets later.
+     * Problem: Also needs a setter for new ilo,ihi loop limits, ... extend_at
+     */
+    bool extend_at(Pos lin){
+        if(lin >= sz || vl >= MVL){
+            return false;
+        }
+        pos = lin;
+        auto addvl = sz - lin;
+        assert( addvl > 0 );
+        if (vl + addvl >= MVL) addvl = MVL - vl;
+        for(unsigned i=0U; i<addvl; ++i){
+            uint64_t carry = pos+i;
+            uint64_t mod;
+            for(unsigned d = dim; d--; ) {
+                auto const span = ihi[d] - ilo[d];
+                mod   = carry % span;
+                carry = carry / span;
+                (this->vp)[d][vl+i] = ilo[d] + mod;
+            }
+        }
+        vl += addvl;
+        return true;
+    }
+#endif // COORDSFORND_EXTEND
+#if COORDSFORND_EXTEND
+    /** extend(lohi...) more like "rewrite dims"? */
     template<typename... Args>
         inline bool extend(Args &&... lohi) {
             auto old_dim = dim; // error if changed: revert to 'init' behavior
@@ -583,7 +609,8 @@ struct CoordsForNd : public CoordRegs<Crd,MaxDims> {
         ret.init(utils::forward<Args>(lohi)...);
         return ret;
     }
-    /** terse output of current 'vp' coordinate vectors. */
+    /** terse output of current 'vp' coordinate vectors.
+     * TODO remove std::string (keep dependencies down) */
     std::string coord_str(char const* pfx="crd") {
         std::ostringstream oss;
         auto const& c = base();
