@@ -126,6 +126,7 @@ if(NECVE)
         ${CMAKE_CURRENT_SOURCE_DIR}/ref_layer_normalization.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/ve/ref_lrn.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/ref_pooling.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/ve/ref_pooling.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/ref_resampling.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/ref_softmax.cpp
         )
