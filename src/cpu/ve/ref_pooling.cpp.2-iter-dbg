@@ -30,8 +30,6 @@
 #define IMPL 0
 //#define IMPL 10 // old #1 to see old behavior, w/ debug
 //#define IMPL 51? // old #2
-#define DO_DBG 0
-// after bugfixes (and assertions!) --> 200 ms
 
 // many other fwd impls in ref_pooling.cpp.0-....
 // 0 close to original
@@ -169,7 +167,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
         dim_t off = -1; // "invalid" return offset
         if (ws) {
             off = get_offset(ws_d, mb, oc, od, oh, ow);
-            //if (v>0 && IH==0) printf(" set_ws @ %ld to %d\n",off,value);
+            if (v>0 && IH==0) printf(" set_ws @ %ld to %d\n",off,value);
             if (ws_dt == data_type::u8) {
                 //assert(0 <= value
                 //        && value <= numeric_limits<typename prec_traits<
@@ -182,7 +180,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
     };
 
     auto set_ws_off = [=](dim_t ws_off, int value) {
-        //if (v>0 && IH==0) printf(" set_ws_off @ %ld to %d\n",ws_off,value);
+        if (v>0 && IH==0) printf(" set_ws_off @ %ld to %d\n",ws_off,value);
         if (ws && ws_off >= 0) {
             if (ws_dt == data_type::u8) {
                 assert(0 <= value
@@ -233,14 +231,15 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
         dnnl_md2dim_str(ss,100,src_d.md_);
         if (ws) dnnl_md2dim_str(ww,100,ws_d.md_);
         else { w[0] = 'x'; w[1] = '\0'; }
-        //printf(" MB,OC=%d,%d ID,IH,IW=%d,%d,%d --> OD,OH,OW=%d,%d,%d\n"
-        //    " dst %s %s\nsrc %s %s\nwd %s %s\n",
-        //    MB,OC, ID,IH,IW, OD,OH,OW, d, dd, s, ss, w, ww);
+        printf(" MB,OC=%d,%d ID,IH,IW=%d,%d,%d --> OD,OH,OW=%d,%d,%d\n"
+            " dst %s %s\nsrc %s %s\nwd %s %s\n",
+            MB,OC, ID,IH,IW, OD,OH,OW, d, dd, s, ss, w, ww);
     }
 
 #if IMPL>=10 // an older impl, TestZeroDim (what is it supposed to do?)
     auto ker_max = [&](data_t *d, int const mb, int const oc, int const od, int const oh, int const ow, dim_t const ws_off) {
 #if IMPL==10
+#define DO_DBG 1
         if(v>0) {
             printf(" d[%4ld]: dcrd %d,%d,%d,%d,%d ",(long)((data_t*)d-(data_t*)dst),mb,oc,od,oh,ow);
         }
@@ -348,10 +347,9 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                 });
 #else
         // options (fine-tune)
-#define SCRD 2
-        // 0 : 198 ms
-        // 1 : 194 ms
-        // 2 :
+#define SCRD 0
+#define EXTRA_DBG 1
+#define KKPOS_CALC 0 /* minor variations (removed) */
         auto elems = (size_t)MB * OC * OD * OH * OW;
         bool force_sequential = 0; // 1 for debug
         parallel((force_sequential? 1: 0), [&](int ithr, int nthr) {
@@ -365,7 +363,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
             Coords32 dcrd(dst_d.dims(), dm, start, end);
             Coords32 scrd;
 
-            //assert( dcrd.get_sz() >= 0 );
+            assert( dcrd.get_sz() >= 0 );
 
             // fast-path a limit case.
             bool zero_dim_src = (ID * IH * IW <= 0);
@@ -434,7 +432,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                 {
                     if (dm >= 5) {
                         ShortLoop() for(int i=0; i<dvl; ++i) {
-                            //assert( o_spatial[i] == dcrd.vp[dm-3][i] );
+                            assert( o_spatial[i] == dcrd.vp[dm-3][i] );
                             id0[i] = o_spatial[i]/*od*/ * SD - padF;
                             // NB: scrd loops over source coords, id,ih,iw, NOT kd,kh,kw
                             //id = od * SD - padF + kd ~ id0 + kd   (or kd = id - id0), etc.
@@ -445,7 +443,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                     }
                     if (dm >= 4) {
                         ShortLoop() for(int i=0; i<dvl; ++i) {
-                            //assert( o_spatial[i] == dcrd.vp[dm-2][i] );
+                            assert( o_spatial[i] == dcrd.vp[dm-2][i] );
                             ih0[i] = o_spatial[i]/*oh*/ * SH - padT;
                             DEFINE_IN_RANGE_VEC(i, h_st, h_en, ih0, KH, IH);
                             sz[i] *= h_en[i] - h_st[i];
@@ -453,10 +451,21 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                         o_spatial += dcrd.MaxVl;
                     }
                     ShortLoop() for(int i=0; i<dvl; ++i) {
-                        //assert( o_spatial[i] == dcrd.vp[dm-1][i] );
+                        assert( o_spatial[i] == dcrd.vp[dm-1][i] );
                         iw0[i] = dcrd.vp[dm-1][i]/*ow*/ * SW - padL;
                         DEFINE_IN_RANGE_VEC(i, w_st, w_en, iw0, KW, IW);
                         sz[i] *= w_en[i] - w_st[i];
+                    }
+                    if(v>0){
+                        std::cout<<dcrd.lim_str("dcrd")<<"\n"<<dcrd.coord_str("dcrd")<<std::endl;
+                        printf("precalc...\n");
+                        for(int i=0; i<(dvl<30? dvl: 30); ++i){
+                            int const od = dm >= 5? dcrd.vp[dm-3][i]: 0;
+                            int const oh = dm >= 4? dcrd.vp[dm-2][i]: 0;
+                            int const ow = dcrd.vp[dm-1][i];
+                            printf(" d[%4ld] i:%d dhw %d,%d,%d IW=%d, w_wt[i]=%d w_en[i]=%d sz=%d shift %d\n",
+                                    (long)(&dst[dstp[i]]-(data_t*)dst), i,IW, od, oh, ow, w_st[i],w_en[i],sz[i],iw0[i]);
+                        }
                     }
                 }
 
@@ -478,10 +487,9 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
 #else
                         *rlo++ = mb_ptr[i];             // copy mb
                         *rhi++ = mb_ptr[i]+1;           // from dcrd.
-                        *rlo++ = mb_ptr[(int)dcrd.MaxVl+i];  // also oc
-                        *rhi++ = mb_ptr[(int)dcrd.MaxVl+i] + 1;
+                        *rlo++ = mb_ptr[dcrd.MaxVl+i];  // also oc
+                        *rhi++ = mb_ptr[dcrd.MaxVl+i] + 1;
 #endif
-#if 0 // 201/200
                         if (dm >= 5) {                  // id
                             *rlo++ = d_st[i];
                             *rhi++ = d_en[i];
@@ -492,16 +500,6 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                         }
                         *rlo++ = w_st[i];
                         *rhi++ = w_en[i];               // iw
-#else // 200
-                        switch(dm) {
-                            case(5): *rlo++ = d_st[i];  // id
-                                     *rhi++ = d_en[i];
-                            case(4): *rlo++ = h_st[i];  // ih
-                                     *rhi++ = h_en[i];
-                            default: *rlo++ = w_st[i];  // iw
-                                     *rhi++ = w_en[i]; 
-                        }
-#endif
                         *scrd.raw_sz() = sz[i]; // krn ovlp sz precalc'ed
                         *scrd.raw_dim() = dm;
                         scrd.init_nd(0);
@@ -511,14 +509,25 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                     //int kkpos = 0;
                     data_t srcmax = numeric_limits<data_t>::lowest();
                     dim_t srcp[MVL];
+                    if(v>0){
+                        printf(" d[%4ld] i:%d dvl=%d scrd dim %d sz=%d vl=%d dcrd=%d,%d,%d,%d,%d",
+                                (long)(&dst[dstp[i]]-(data_t*)dst),
+                                i,dvl,scrd.get_dim(),scrd.get_sz(),scrd.get_vl(),
+                                dcrd.vp[0][i], dcrd.vp[1][i], dcrd.vp[2][i],
+                                dcrd.vp[3][i], dcrd.vp[4][i]);
+                        std::cout<<" "<<scrd.lim_str("scrd")<<"  "<<scrd.coord_str("scrd");
+                        printf("\n");
+                        fflush(stdout);
+                    }
+
+#if !defined(NDEBUG) && EXTRA_DBG
+                    bool gotmax = false;
+#endif
                     int * psave = nullptr;
                     NOVEC for ( ; scrd; ++scrd) {
                         const unsigned svl=scrd.get_vl(); // svl ~ id,ih,iw coords
                         // calc phy src offsets
-                        // Orig: src_d_opt.vec_off_vtmp(scrd.base(), (dim_t *)&srcp[0], svl);
-                        // Now preserve vp[][] because later use srcmx coords
-                        src_d_opt.vec_off_v(scrd.base(), (dim_t *)&srcp[0], svl);
-
+                        src_d_opt.vec_off_vtmp(scrd.base(), (dim_t *)&srcp[0], svl);
                         int jmax = -1;
                         ShortLoop() for(unsigned j=0U; j<svl; ++j) {
                             auto const s= src[srcp[j]];
@@ -527,37 +536,35 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                                 jmax = j;
                             }
                         }
-                        //assert( jmax < scrd.get_pos() + svl );
+                        assert( jmax < scrd.get_pos() + svl );
 
                         if (jmax >= 0 && ws) {
+#if !defined(NDEBUG) && EXTRA_DBG
+                            gotmax = true;
+#endif
                             // NB: scrd loops over source coords, id,ih,iw, NOT kd,kh,kw
                             //id = od * SD - padF + kd ~ id0 + kd   (or kd = id - id0), etc.
                             // Remember max SOURCE COORDS in pkk_dhw (point to kk_hdw[]);
                             int const* s_spatial = s_spatial0; // ptr within scrd.
                             psave = pkk_dhw; // phk_dhw moves fwd *after* scrd iter
+                            if(v>0) printf(" psave@%d max=%f jmax=%d",
+                                    psave - kk_dhw, (double)srcmax, jmax);
                             // save spatial ih coords with scalar writes
-#if 0 // 203
                             if (dm >=5 ) {
+                                if(v>0) printf(" mxd:%d(kd=%d) ", s_spatial[jmax],
+                                        s_spatial[jmax]-id0[jmax]);
                                 *psave++ = s_spatial[jmax];
                                 s_spatial += scrd.MaxVl;
                             }
                             if (dm >=4 ) {
+                                if(v>0) printf(" mxh:%d(kh=%d) ", s_spatial[jmax],
+                                        s_spatial[jmax]-ih0[jmax]);
                                 *psave++ = s_spatial[jmax];
                                 s_spatial += scrd.MaxVl;
                             }
+                            if(v>0) printf(" mxw:%d(kw=%d) ", s_spatial[jmax],
+                                    s_spatial[jmax]-iw0[jmax]);
                             *psave++ = s_spatial[jmax];
-#else // 200
-                            switch(dm) { // compact VE scalar code
-                                case(5):
-                                    *psave++ = s_spatial[jmax];
-                                    s_spatial += scrd.MaxVl;
-                                case(4):
-                                    *psave++ = s_spatial[jmax];
-                                    s_spatial += scrd.MaxVl;
-                                default:
-                                    *psave++ = s_spatial[jmax];
-                            }
-#endif
                         }
                     }// iter over krn window for max
 
@@ -567,6 +574,29 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                     // vec scatter later seems very slightly faster on VE
                     dst_reg[i] = srcmax;
 #endif
+
+#ifndef NDEBUG
+                    if (psave) assert( scrd.get_sz() && ws );
+#if EXTRA_DEBUG
+                    assert( gotmax == !!psave ); // equiv (unless all inputs == data_t..lowest)
+#endif
+                    if (scrd.get_sz() == 0) {
+                        assert( psave == nullptr );
+                        assert( gotmax == false );
+                        assert( srcmax == numeric_limits<data_t>::lowest() );
+                    }
+                    if (scrd.get_sz() && ws) {
+                        if(v) if (!gotmax) printf(" d[%4ld] i:%d:!gotmax scrd.get_sz()=%ld",
+                                (long)(&dst[dstp[i]]-(data_t*)dst), i,(long)scrd.get_sz());
+#if EXTRA_DBG
+                        if (scrd.get_sz()) assert(gotmax);
+                        // above fails if input has zero dims (for example)
+#endif
+                        assert( psave == pkk_dhw + dm - 2 );
+                        // above fails if input has zero dims (for example)
+                    }
+#endif // NDEBUG
+                    if(v) if(scrd.get_sz()) printf("\n");
 
                     if (ws) {
                         // equiv. if(!gotmax)
@@ -597,35 +627,54 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                     ShortLoop() for(int i=0; i<dvl; ++i)
                             kkpos[i] = 0; // default "no max" value for ws
 
+#if 0 // WRONG: we need to flag EACH i SEPARATELY (not just "last" scrd)
+                    if(scrd.get_sz() == 0) { // special case
+                        if(v>0) printf(" kkpos[i=0..%d]=0 <-- scrd.get_sz()==0\n",dvl-1);
+                        ShortLoop() for(int i=0; i<dvl; ++i) {
+                            kkpos[i] = 0;
+                        }
+                    }else
+#endif
                     // given jmax, calc kd,kh,kw --> kpos --> ws
                     // NB: scrd loops over source coords, id,ih,iw, NOT kd,kh,kw
                     //id = od * SD - padF + kd ~ id0 + kd   (or kd = id - id0), etc.
                     // Remember max SOURCE COORDS in pkk_dhw (point to kk_hdw[]);
                     //
                     {
-                        // Flag if no max found: first_spatial[i] = kk_khw[(dm-2)*i];
+                        //int first_spatial[MVL]; VREG(first_spatial);
+                        //ShortLoop() for(int i=0; i<dvl; ++i)
+                        //        first_spatial[i] = kk_khw[(dm-2)*i];
                         // if first_spatial < 0, this flags "no kkpos" (use zero); 
+                        //
                         // when vectorizing, just live with possible excess reads
-                        // XXX is fall-through switch version possible? (and still vectorized) maybe not.
+                        // (even if first_spatial[i] == -1 flag means we won't use them)
+                        // XXX fixme
+
                         if (dm >= 5) {
                             NOVEC ShortLoop() for(int i=0; i<dvl; ++i) {
                                 int d = kk_dhw[3*i];
-                                if (d >= 0) {
                                     int h = kk_dhw[3*i+1];
                                     int w = kk_dhw[3*i+2];
+                                if (d >= 0) {
                                     kkpos[i] = ((d - id0[i]) * KH
                                             + (h - ih0[i])) * KW
                                             + (w - iw0[i]);
+                                }
+                                if(v>0) if (1 || ws_dt == data_type::u8 && (kkpos[i] < 0 || kkpos[i] > 255)) {
+                                    printf("dm%d kkpos[%d]:%-8d %d,%d,%d\n",dm,i,kkpos[i],d,h,w);
                                 }
                             }
                         }else if (dm >= 4) {
                             NOVEC ShortLoop() for(int i=0; i<dvl; ++i) {
                                 // Note: if align 8, single-load uint64_t and shift XXX
                                 int h = kk_dhw[2*i];
-                                if (h >= 0) {
                                     int w = kk_dhw[2*i+1];
+                                if (h >= 0) {
                                     kkpos[i] = (h - ih0[i]) * KW
                                             + (w - iw0[i]);
+                                }
+                                if(v>0) if (1 || ws_dt == data_type::u8 && (kkpos[i] < 0 || kkpos[i] > 255)) {
+                                    printf("dm%d kkpos[%d]:%-8d %d,%d\n",dm,i,kkpos[i],h,w);
                                 }
                             }
                         }else{
@@ -634,6 +683,9 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                                 if (w >= 0) {
                                     kkpos[i] = w - iw0[i];
                                 }
+                                if(v>0) if (1 || ws_dt == data_type::u8 && (kkpos[i] < 0 || kkpos[i] > 255)) {
+                                    printf("dm%d kkpos[%d]:%-8d\n",dm,i,kkpos[i]);
+                                }
                             }
                         }
                     } // end non-trivial, normal kkpos[i] calculation
@@ -641,6 +693,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
 #ifndef NDEBUG
                         int kkmin = 999;
                         int kkmax = -1;
+                        assert( dvl > 0 );
 #endif
                         ShortLoop() for(int i=0; i<dvl; ++i) {
                             //assert(0 <= value
@@ -652,6 +705,33 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                             if (kkpos[i] > kkmax ) kkmax = kkpos[i];
 #endif
                         }
+#if !defined(NDEBUG) && EXTRA_DBG
+                        if(v>0) if ((kkmin < 0 || kkmax > 255) && scrd.get_sz()) {
+                            if(v>0) printf("dvl=%d scrd.sz=%d out-of-range kkmin,max = %d--%d\n",dvl,scrd.get_sz(),kkmin,kkmax);
+                            if (dm >= 5) {
+                                ShortLoop() for(int i=0; i<dvl; ++i) {
+                                    int kd = kk_dhw[3*i  ] - id0[i];
+                                    int kh = kk_dhw[3*i+1] - ih0[i];
+                                    int kw = kk_dhw[3*i+2] - iw0[i];
+                                    int pos = (kd * KH + kh) * KW + kw;
+                                    if(v>0) printf("%4d:%-8d %d,%d,%d kkpos[i] %d @%d\n",i,pos,kd,kh,kw,kkpos[i],3*i);
+                                }
+                            }else if (dm >= 4) {
+                                ShortLoop() for(int i=0; i<dvl; ++i) {
+                                    int kh = kk_dhw[2*i] - ih0[i];
+                                    int kw = kk_dhw[2*i+1] - iw0[i];
+                                    int pos = kh * KW + kw;
+                                    if(v>0) printf("%4d:%-8d %d,%d kkpos[i] %d @%d\n",i,pos,kh,kw,kkpos[i],2*i);
+                                }
+                            }else{
+                                ShortLoop() for(int i=0; i<dvl; ++i) {
+                                    int kw = kk_dhw[i] - iw0[i];
+                                    int pos = kw;
+                                    if(v>0) printf("%4d:%-8d %d kkpos[i] %d @%d\n",i,kkpos,kw,kkpos[i],i);
+                                }
+                            }
+                        }
+#endif
 #ifndef NDEBUG
                         assert( 0 <= kkmin );
                         assert( kkmax <= numeric_limits<typename prec_traits<
