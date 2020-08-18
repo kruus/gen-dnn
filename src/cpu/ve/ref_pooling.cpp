@@ -30,9 +30,13 @@
 #define DO_DBG 0
 
 // backwards 0~original, 1~outer vec offsets
-#define BIMPL 1
+#define BIMPL 10
 // 0 ~ 1232 ms
 // 1 ~ 430 ms (even without inner-loops vectorized)
+// 0 : 290 ms --reset --dir=BWD_D,BWD_W --tag=aBx16b --alg=MAX
+//              mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
+// 1 : 127 ms
+// 10 : 11.8 ms (another 10x speedup by vectorizing the pre-image phys offset)
 
 #define FAIMPL 1 /*forward averaging method*/
 // 0 ~ 546 ms
@@ -446,8 +450,12 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                     // each dvl<MVL "loop" is one or more simple vector ops
                     //
                     int kkpos[MVL]; VREG(kkpos);
-                    ShortLoop() for(int i=0; i<dvl; ++i)
-                            kkpos[i] = 0; // default "no max" value for ws
+                    ShortLoop() for(int i=0; i<dvl; ++i) {
+                        kkpos[i] = 0; // default "no max" value for ws
+                        // NOTE: benefit for bkwd if use a flag (-1) instead
+                        // also, VE would really like ws data to be
+                        // always int and never u8.
+                    }
 
                     // given jmax, calc kd,kh,kw --> kpos --> ws
                     // NB: scrd loops over source coords, id,ih,iw, NOT kd,kh,kw
@@ -808,20 +816,10 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
     int od_start = max(0, utils::div_up(padF - KD + 1, SD));
     int od_end = min(OD, 1 + (padF + ID - 1) / SD);
 
-    typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
-
     if (alg == alg_kind::pooling_max) {
-        parallel_nd(MB, OC, [&](int mb, int oc) {
-            ker_zero(mb, oc);
-            for_(int od = od_start; od < od_end; ++od)
-            for_(int oh = oh_start; oh < oh_end; ++oh)
-            for (int ow = ow_start; ow < ow_end; ++ow) {
-                const data_t *d
-                        = &diff_dst[get_offset(diff_dst_d, mb, oc, od, oh, ow)];
-                ker_max(d, mb, oc, od, oh, ow);
-            }
-        });
 #if BIMPL==0
+        typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
+
         parallel_nd(MB, OC, [&](int mb, int oc) {
             ker_zero(mb, oc);
             for_(int od = od_start; od < od_end; ++od)
@@ -833,7 +831,9 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                 ker_max(d, mb, oc, od, oh, ow);
             }
         });
-#elif BIMPL>=1 // small amount of vectorization calls
+#elif BIMPL==1 // vectorize outer loop, pooling window via scalar ker_max
+        typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
+
         //parallel_nd(MB, OC, [&](int mb, int oc) {
         auto nouter = (dim_t)MB * OC;
         auto ninner = (dim_t)(od_end - od_start) * (oh_end - oh_start) * (ow_end - ow_start);
@@ -901,7 +901,6 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                     dim_t diff_dst_off[MVL];
                     diff_dst_d_opt.vec_off_v(dcrd.base(), &diff_dst_off[0],
                             dvl, false/*pad*/);
-#if BIMPL==1
                     for (int i=0; i<dvl; ++i) {
                         int c = 1; // after oc-dim, have spatial coords
                         int const od = ddim >= 5? dcrd.vp[++c][i]: 0;
@@ -914,10 +913,307 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                         //assert( diff_dst_off[i] == get_offset(diff_dst_d,mb,oc,od,oh,ow) );
                         ker_max(d, mb, oc, od, oh, ow);
                     }
-#elif BIMPL==2
-                    // XXX 
-#endif
                 }
+            }
+        });
+#elif BIMPL==10
+        typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
+        typedef CoordsForNd<6,uint32_t,int64_t> Coords32;
+        // src-pixel coords (mb,oc,id,ih,iw when they are valid)
+        // do NOT need pooling window coord iterator into diff_src.
+        typedef memory_desc_wrapper_opt::VecPos32 VecPos32;
+        // a.k.a. CoordRegs<uint32_t, 6>,
+        // cast to int32_t* sometimes avoids VE conversion nonsense
+
+        auto nouter = (dim_t)MB * OC;
+        auto ninner = (dim_t)(od_end - od_start) * (oh_end - oh_start) * (ow_end - ow_start);
+        bool force_sequential = 0; // 1 for debug
+        parallel((force_sequential? 1: 0), [&](int ithr, int nthr) {
+            auto dm = diff_dst_d.ndims();
+            //assert(diff_src_d.ndims() == dm);
+
+            dim_t ostart, oend;
+            balance211(nouter, nthr, ithr, ostart, oend);
+
+            // ker_zero iterator alloc & init
+            Coords icrd;
+            icrd.iter_range(0, 0,1, 0,1); // mb and oc dimension placeholders
+            { // add spatial coords
+                int c=2; // next coord whose limits we'll add
+                if (dm >= 5) icrd.iter_range(c++, 0, ID);
+                if (dm >= 4) icrd.iter_range(c++, 0, IH);
+                icrd.iter_range(c++, 0, IW);
+                icrd.finalize(); // done adding dims, recalculate full size.
+            }
+
+            // re-use icrd mem for pooling inner iterator
+
+            // ker_max outer iterator alloc & init
+            Coords32 dcrd;
+            static_assert( sizeof(dcrd.vp[0][0]) == sizeof(int),
+                    "require VecPos32");
+            dcrd.iter_range(0, 0,1, 0,1); // md and oc dimension placeholders
+            //assert( dcrd.get_dim() == 2 );
+            //printf(" dm=%d dcrd.get_dim()=%d\n", (int)dm, (int)dcrd.get_dim());
+            { // add spatial coords
+                int c=2; // next coord whose limits we'll add
+                if (dm >= 5) dcrd.iter_range(c++, od_start, od_end);
+                if (dm >= 4) dcrd.iter_range(c++, oh_start, oh_end);
+                dcrd.iter_range(c++, ow_start, ow_end);
+                dcrd.finalize(); // done adding dims, recalculate full size.
+            }
+
+            VecPos32 src_vp; 
+            /// only VER 0 works, and can already be something like 10x faster than
+            /// BIMPL<10 (no inner-loop vectorization).
+#define VER 0
+#if VER>0
+            int kd[MVL]; VREG(kd);
+            int kh[MVL]; VREG(kh);
+            int kw[MVL]; VREG(kw);
+#endif
+#if VER/10==1 || VER%10==2
+            int strides[3]; int pads[3];
+            {
+                int i=0;
+                if (dm >= 5){ strides[i] = SD; pads[i] = padF; ++i; }
+                if (dm >= 4){ strides[i] = SH; pads[i] = padT; ++i; }
+                if (dm >= 4){ strides[i] = SW; pads[i] = padL; ++i; }
+            }
+#endif
+            // Vector calc src pixel offsets from src_vp
+            dim_t diff_src_off[MVL];    // phys offsets
+
+            for(size_t oo=ostart; oo<oend; ++oo){ // outer coords
+
+                int const mb = oo / OC;
+                int const oc = oo % OC;
+
+                // ker_zero : zero diff_src output
+                {
+                    // if dense, could be much faster (don't care about internal order) XXX
+                    icrd.fix_coord(0,mb).fix_coord(1,oc); // sz unchanged
+                    //icrd.init_nd(0);
+                    //std::cout<<icrd.lim_str("icrd")<<"  "<<icrd.coord_str("icrd")<<std::endl; std::cout.flush();
+                    data_t const zero = data_t{0};
+                    for ( icrd.init_nd(0); icrd; ++icrd) { // inner coords
+                        auto const vl = icrd.get_vl();
+                        dim_t diff_src_off[MVL];
+                        diff_src_d_opt.vec_off_v(icrd.base(), &diff_src_off[0],
+                                vl, false/*pad*/);
+                        for (int i=0; i<vl; ++i)
+                            diff_src[diff_src_off[i]] = zero;
+                    }
+                }
+
+                // dcrd has mb,oc coords fixed; spatial ranges unchanged
+                dcrd.fix_coord(0,mb).fix_coord(1,oc); // sz unchanged
+                //dcrd.init_nd(0);
+                //std::cout<<dcrd.lim_str()<<"  "<<dcrd.coord_str()<<std::endl; std::cout.flush();
+                for (dcrd.init_nd(0); dcrd; ++dcrd) { // outer diff_dst loop
+                    int const dvl = dcrd.get_vl();
+
+                    // vectorized diff_dst physical offsets
+                    dim_t diff_dst_off[MVL];
+                    diff_dst_d_opt.vec_off_v(dcrd.base(), &diff_dst_off[0],
+                            dvl, false/*pad*/);
+
+                    int const* const d_mb_ptr = reinterpret_cast<int const*>
+                            (&dcrd.vp[0][0]); 
+                    int const* const d_spatial0 = reinterpret_cast<int const*>
+                            (&dcrd.vp[2][0]);
+
+                    assert( ws_d_opt );
+                    int index[MVL];
+                    // convert ws(mb,oc,od,oh,ow) data --> kd x kh x kw index
+                    {
+                        // ws position-of-max lookup.
+                        //      offsets via mb,oc,od,oh,ow dcrd.vp[][i]
+                        dim_t ws_off[MVL];
+                        ws_d_opt->vec_off_v(dcrd.base(), &ws_off[0],
+                                dvl, false/*pad*/);
+                        // if use off_vtmp --> dcrd.vp[][] might be clobbered
+
+                        if (ws_d.data_type() == data_type::u8) {
+                            ShortLoop() for (int i=0; i<dvl; ++i) { // VE scalar loop
+                                index[i] =(int)ws[ws_off[i]];
+                            }
+                        }else{
+                            ShortLoop() for (int i=0; i<dvl; ++i) { // VE vec gather
+                                index[i] = ((int *)ws)[ws_off[i]];
+                            }
+                        }
+                    }
+
+                    // convert ws_off into kd,kh,kw, then id,ih,iw
+                    // pre-image coords.  If in-range, then coadd
+                    // diff_dst into diff_src
+                    // Q: could forward ws[] output not hold a flag value for "no max data" ?
+                    //    Example ws[...]==-1 means "do not modify diff_src"
+                    //
+                    // For single-pixel pre-image, VecPos + mask suffices.
+                    //     (no pooling window iterator)
+                    //bool s_ok[MVL];     // in principle, src ok ~ mask register
+                    int s_ok[MVL];     // in principle, src ok ~ mask register
+
+
+//#define SRC_VP(DIM,I) src_vp.vp[DIM][I]
+                    // Q: is this better for nc++?
+#define SRC_VP(DIM,I) ((int*)(void*)src_vp.vp)[(DIM*src_vp.MaxVl) + (I)]
+                    ShortLoop() for (int i=0; i<dvl; ++i) {
+                        SRC_VP(0,i) = mb;
+                        SRC_VP(1,i) = oc;
+                    }
+                    if (dm>=5) {
+#if VER==0
+                        ShortLoop() for (int i=0; i<dvl; ++i) {
+                            const int kd = (index[i] / KW) / KH;
+                            const int kh = (index[i] / KW) % KH;
+                            const int kw = index[i] % KW;
+                            const int od = d_spatial0[0*dcrd.MaxVl + i];
+                            const int oh = d_spatial0[1*dcrd.MaxVl + i];
+                            const int ow = d_spatial0[2*dcrd.MaxVl + i];
+                            const int id = od * SD - padF + kd;
+                            const int ih = oh * SH - padT + kh;
+                            const int iw = ow * SW - padL + kw;
+                            SRC_VP(2,i) = id;
+                            SRC_VP(3,i) = ih;
+                            SRC_VP(4,i) = iw;
+                            // DOES set up mask, but high mask reg usage
+                            s_ok[i] = (id >= 0 && id < ID
+                                    && ih >= 0 && ih < IH
+                                    && iw >= 0 && iw < IW);
+                        }
+#elif VER%10==1
+                        ShortLoop() for (int i=0; i<dvl; ++i) {
+                            kd[i] = index[i] / KW; // tmp
+                            kw[i] = kd[i] / KH;    // tmp
+                            kh[i] = kd[i] - kw[i] % KH; // (index[i]/KW) % KH
+                            kw[i] = index[i] - kd[i] * KW; //index[i] % KW;
+                            kd[i] = kd[i] / KH; //index[i]/KW / KH
+#if VER/10==0
+                            const int id = d_spatial0[0*dcrd.MaxVl + i] * SD - padF + kd[i];
+                            const int ih = d_spatial0[1*dcrd.MaxVl + i] * SH - padT + kh[i];
+                            const int iw = d_spatial0[2*dcrd.MaxVl + i] * SW - padL + kw[i];
+#else
+                            const int id = d_spatial0[0*dcrd.MaxVl + i] * strides[0] - pads[0] + kd[i];
+                            const int ih = d_spatial0[1*dcrd.MaxVl + i] * strides[1] - pads[1] + kh[i];
+                            const int iw = d_spatial0[2*dcrd.MaxVl + i] * strides[2] - pads[2] + kw[i];
+#endif
+                            SRC_VP(2,i) = id;
+                            SRC_VP(3,i) = ih;
+                            SRC_VP(4,i) = iw;
+                            // DOES set up mask, but high mask reg usage
+                            s_ok[i] = (id >= 0 && id < ID
+                                    && ih >= 0 && ih < IH
+                                    && iw >= 0 && iw < IW);
+                        }
+#elif VER%10==2
+                        ShortLoop() for (int i=0; i<dvl; ++i) {
+                            kd[i] = index[i] / (KH*KW);
+                            int tmp = index[i] - kd[i]*(KH*KW);
+                            kh[i] = tmp / KW;
+                            kw[i] = tmp - kh[i] * KW;
+                        }
+                        ShortLoop() for (int i=0; i<dvl; ++i) {
+                            const int id = d_spatial0[0*dcrd.MaxVl + i] * strides[0] - pads[0] + kd[i];
+                            const int ih = d_spatial0[1*dcrd.MaxVl + i] * strides[1] - pads[1] + kh[i];
+                            const int iw = d_spatial0[2*dcrd.MaxVl + i] * strides[2] - pads[2] + kw[i];
+                            SRC_VP(2,i) = id;
+                            SRC_VP(3,i) = ih;
+                            SRC_VP(4,i) = iw;
+                            // DOES set up mask, but high mask reg usage
+                            s_ok[i] = (id >= 0 && id < ID
+                                    && ih >= 0 && ih < IH
+                                    && iw >= 0 && iw < IW);
+                        }
+#endif
+                    } else if (dm>=4) {
+#if VER==0
+                        ShortLoop() for (int i=0; i<dvl; ++i) {
+                            const int kh = index[i] / KW;
+                            const int kw = index[i] % KW;
+                            const int oh = d_spatial0[0*dcrd.MaxVl + i];
+                            const int ow = d_spatial0[1*dcrd.MaxVl + i];
+                            const int ih = oh * SH - padT + kh;
+                            const int iw = ow * SW - padL + kw;
+                            SRC_VP(2,i) = ih;
+                            SRC_VP(3,i) = iw;
+                            s_ok[i] = (ih >= 0 && ih < IH
+                                    && iw >= 0 && iw < IW);
+                        }
+#elif 1
+                        int kh[MVL]; VREG(kh);
+                        int kw[MVL]; VREG(kw);
+                        int ih[MVL]; VREG(ih);
+                        int iw[MVL]; VREG(iw);
+                        ShortLoop() for (int i=0; i<dvl; ++i) {
+                            kh[i] = index[i] / KW;
+                            kw[i] = index[i] - kh[i] * KW;
+                            ih[i] = d_spatial0[0*dcrd.MaxVl + i] * SH - padT + kh[i];
+                            iw[i] = d_spatial0[1*dcrd.MaxVl + i] * SW - padL + kw[i];
+                        }
+                        ShortLoop() for (int i=0; i<dvl; ++i) {
+                            SRC_VP(2,i) = ih[i];
+                            SRC_VP(2,i) = iw[i];
+                        }
+                        ShortLoop() for (int i=0; i<dvl; ++i) {
+#if 1 // a bit bad
+                            s_ok[i] = iw[i] >= 0 && iw[i] < IW
+                                    && ih[i] >= 0 && ih[i] < IH;
+#else // horrible
+                            s_ok[i] = 1; //iw[i] >= 0;
+                            if (s_ok[i]) s_ok[i] = s_ok[i] && iw[i] > 0;
+                            if (s_ok[i]) s_ok[i] = s_ok[i] && ih[i] > 0;
+                            if (s_ok[i]) s_ok[i] = s_ok[i] && iw[i] < IW;
+                            if (s_ok[i]) s_ok[i] = s_ok[i] && ih[i] < IH;
+#endif
+                        }
+#else
+#error "TBD"
+#endif
+                    } else {
+                        //assert( dm == 3 );
+#if VER==0
+                        ShortLoop() for (int i=0; i<dvl; ++i) {
+                            const int kw = index[i];
+                            const int ow = d_spatial0[0*dcrd.MaxVl + i];
+                            const int iw = ow * SW - padL + kw;
+                            SRC_VP(2,i) = iw;
+                            s_ok[i] = (iw >= 0 && iw < IW);
+                        }
+#elif 1
+                        int iw[MVL]; VREG(iw);
+                        ShortLoop() for (int i=0; i<dvl; ++i) {
+                            iw[i] = d_spatial0[0*dcrd.MaxVl + i] * SW - padL + index[i];
+                        }
+                        ShortLoop() for (int i=0; i<dvl; ++i) {
+                            SRC_VP(2,i) = iw[i]/*iw*/;
+                        }
+                        ShortLoop() for (int i=0; i<dvl; ++i) {
+                            s_ok[i] = (iw[i] >= 0 && iw[i] < IW);
+                        }
+#else
+#error "TBD"
+#endif
+                    }
+#undef SRC_VP
+
+                    // when s_ok[i], cooad gradient into pre-image pixel
+                    {
+                        diff_src_d_opt.vec_off_v(src_vp, &diff_src_off[0],
+                                dvl, false/*pad*/);
+
+                        // when s_ok[i], coadd gradient into diff_src pixel
+                        ShortLoop() for (int i=0; i<dvl; ++i) {
+                            if (s_ok[i]) {
+                                diff_src[diff_src_off[i]] += diff_dst[diff_dst_off[i]];
+                            }
+                        }
+                    }
+
+                }
+
             }
         });
 #else
