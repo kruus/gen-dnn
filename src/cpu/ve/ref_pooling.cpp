@@ -194,7 +194,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
     const int OD = pd()->OD();
     const int OH = pd()->OH();
     const int OW = pd()->OW();
-    if( 1 || v) {
+    if (1 || v) {
         char d[100], s[100], w[100], dd[100], ss[100], ww[100];
         dnnl_md2fmt_str(d,100,dst_d.md_);
         dnnl_md2fmt_str(s,100,src_d.md_);
@@ -519,6 +519,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
         });
     } else {
 #if FAIMPL==0 // scalar outer loop (historical)
+        // NEC Aurora: Is this a speed win for KD*KH*KW <= 1? <= 4? <= 8? <= 9? XXX
         parallel_nd(MB, OC, OD, OH, OW,
                 [&](int mb, int oc, int od, int oh, int ow) {
                     data_t *d = &dst[get_offset(dst_d, mb, oc, od, oh, ow)];
@@ -832,7 +833,7 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                 ker_max(d, mb, oc, od, oh, ow);
             }
         });
-#elif BIMPL==1 // small amount of vectorization calls
+#elif BIMPL>=1 // small amount of vectorization calls
         //parallel_nd(MB, OC, [&](int mb, int oc) {
         auto nouter = (dim_t)MB * OC;
         auto ninner = (dim_t)(od_end - od_start) * (oh_end - oh_start) * (ow_end - ow_start);
@@ -896,11 +897,12 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                 //dcrd.init_nd(0);
                 //std::cout<<dcrd.lim_str()<<"  "<<dcrd.coord_str()<<std::endl; std::cout.flush();
                 for (dcrd.init_nd(0); dcrd; ++dcrd) { // inner coords
-                    int const vl = dcrd.get_vl();
+                    int const dvl = dcrd.get_vl();
                     dim_t diff_dst_off[MVL];
                     diff_dst_d_opt.vec_off_v(dcrd.base(), &diff_dst_off[0],
-                            vl, false/*pad*/);
-                    for (int i=0; i<vl; ++i) {
+                            dvl, false/*pad*/);
+#if BIMPL==1
+                    for (int i=0; i<dvl; ++i) {
                         int c = 1; // after oc-dim, have spatial coords
                         int const od = ddim >= 5? dcrd.vp[++c][i]: 0;
                         int const oh = ddim >= 4? dcrd.vp[++c][i]: 0;
@@ -912,6 +914,9 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                         //assert( diff_dst_off[i] == get_offset(diff_dst_d,mb,oc,od,oh,ow) );
                         ker_max(d, mb, oc, od, oh, ow);
                     }
+#elif BIMPL==2
+                    // XXX 
+#endif
                 }
             }
         });
