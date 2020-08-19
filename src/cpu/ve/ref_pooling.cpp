@@ -39,16 +39,21 @@
 //              mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
 // 1 : 127 ms 121 ms
 // 10 : 11.8 ms (another 10x speedup by vectorizing the pre-image phys offset)
+//    -> 8.8 ms (loop pragmas,...)
 // avgpool:
 // 0 : 610 ms
 // 1 : 445 ms
 // 10|0 : 458 ms
 // 10|1 : 181 ms   (hmm. could be better.  faster than fwd because no ws needed?)
-//              (expect about 164 ms, like fwd-avg-pooling, with some work)
+// 10|1|SCRD_PRECALC : 133 ms (borrow from fwd impl)
 
 #define FAIMPL 1 /*forward averaging method*/
+// maxpool:
 // 0 ~ 546 ms
 // 1 ~ 204 ms
+// avgpool:
+// 0 ~
+// 1 ~ 162 ms
 
 #ifndef MVL
 #if defined(__ve)
@@ -291,7 +296,6 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                 int kk_dhw[3*MVL]; // if (ws), max-coord memory (vector kpos post-calc)
                 // vector precalc constants(--> mem)
                 int sz[MVL]; // sz < kern ovlp <= KD*KH*KW (small)
-
                 int dhw[9*MVL]; // nc++ slightly prefers single array over 9
                 // possibly-register spatial-info vectors.  But they're stored
                 // since the coords get copied in a scalar loop to set up
@@ -309,10 +313,12 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
 //#define DHW_ST(which,idx)       ((int32_t*)&dhw[((which*3+1)*MVL)])[idx]
 #define DHW_EN(which,idx)       dhw[((which*3+2)*MVL)+idx]
 #define DEFINE_IN_RANGE_VEC(idx, which, ksz, isz) \
-                    DHW_ST(which,idx) = (DHW_SHIFT(which,idx)       >   0 ? DHW_SHIFT(which,idx): 0); \
-                    DHW_EN(which,idx) = (DHW_SHIFT(which,idx) + ksz < isz ? DHW_SHIFT(which,idx) + ksz: isz); \
-                    /* for prettiness*/ DHW_EN(which,idx) = DHW_EN(which,idx) < 0? 0: DHW_EN(which,idx); \
-                    DHW_ST(which,idx) = (DHW_ST(which,idx) > DHW_EN(which,idx)? DHW_EN(which,idx): DHW_ST(which,idx))
+                    DHW_ST(which,idx) = (DHW_SHIFT(which,idx)       >   0 \
+                            ? DHW_SHIFT(which,idx): 0); \
+                    DHW_EN(which,idx) = (DHW_SHIFT(which,idx) + ksz < isz \
+                            ? DHW_SHIFT(which,idx) + ksz: isz); \
+                    if (DHW_EN(which,idx) < DHW_ST(which,idx)) \
+                            DHW_EN(which,idx) = DHW_ST(which,idx)
 
                 // actually, kernel size fits in int32_t
                 ShortLoop() for(int i=0; i<dvl; ++i)
@@ -320,12 +326,40 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                 int const* o_spatial = o_spatial0;
                 {
                     if (dm >= 5) {
+                        int s[MVL], e[MVL], sh[MVL]; VREG(s); VREG(e); VREG(sh);
                         ShortLoop() for(int i=0; i<dvl; ++i) {
+                            // Why is nc++ doing masking and merging instead of vector max?
+                            // I'd like to use the VCMS op for int32 max/min !
+                            //
+                            // There seem to be a LOT of scalar indexing calcs.
+#if 1
                             //assert( o_spatial[i] == dcrd.vp[dm-3][i] );
                             DHW_SHIFT(DHW_D,i) = o_spatial[i]/*od*/ * SD - padF;
                             // NB: scrd loops over source coords, id,ih,iw, NOT kd,kh,kw
                             //id = od * SD - padF + kd ~ id0 + kd   (or kd = id - id0), etc.
                             DEFINE_IN_RANGE_VEC(i, DHW_D, KD, ID);
+#elif 0
+                            //int const od = o_spatial[i];
+                            int const shift = o_spatial[i]/*od*/ * SD - padF;
+                            int st = (shift      >  0? shift     :  0);
+                            int en = (shift + KD < ID? shift + KD: ID);
+                            if (en < st) en = st;
+                            DHW_SHIFT(DHW_D,i) = shift;
+                            DHW_ST(DHW_D,i) = st;
+                            DHW_EN(DHW_D,i) = en;
+#else
+                            // Why is nc++ doing masking and merging instead of vector max?
+                            // I'd like to use the VCMS op for int32 max/min !
+                            //
+                            //int const od = o_spatial[i];
+                            sh[i] = o_spatial[i]/*od*/ * SD - padF;
+                            s[i] = (sh[i]      >  0? sh[i]     :  0);
+                            e[i] = (sh[i] + KD < ID? sh[i] + KD: ID);
+                            if (e[i] < s[i]) e[i] = s[i];
+                            DHW_SHIFT(DHW_D,i) = sh[i];
+                            DHW_ST(DHW_D,i) = s[i];
+                            DHW_EN(DHW_D,i) = e[i];
+#endif
                             sz[i] *= DHW_EN(DHW_D,i) - DHW_ST(DHW_D,i);
                         }
                         o_spatial += dcrd.MaxVl;
@@ -349,7 +383,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
 
                 // linear write pattern for remembering kk_dhw[] a bit faster
                 auto pkk_dhw = &kk_dhw[0];
-                for (int i=0U; i<dvl; ++i) {
+                NOVEC ShortLoop() for (int i=0U; i<dvl; ++i) {
                     // set up kernel-window vector iterator into src coords
                     { // "raw" CoordsForNd api faster
                         // mem-to-mem copy of uint32_t <-- int does useless sll 32, srl 32 to
@@ -402,7 +436,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                         src_d_opt.vec_off_v(scrd.base(), (dim_t *)&srcp[0], svl);
 
                         int jmax = -1;
-                        ShortLoop() for(unsigned j=0U; j<svl; ++j) {
+                        ShortLoop() for(int j=0U; j<svl; ++j) {
                             auto const s= src[srcp[j]];
                             if ( s > srcmax ) { // VE vfrmax (VFMAX) op
                                 srcmax = s;
@@ -476,7 +510,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                         // when vectorizing, just live with possible excess reads
                         // XXX is fall-through switch version possible? (and still vectorized) maybe not.
                         if (dm >= 5) {
-                            NOVEC ShortLoop() for(int i=0; i<dvl; ++i) {
+                            ShortLoop() for(int i=0; i<dvl; ++i) {
                                 int d = kk_dhw[3*i];
                                 if (d >= 0) {
                                     int h = kk_dhw[3*i+1];
@@ -487,7 +521,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                                 }
                             }
                         }else if (dm >= 4) {
-                            NOVEC ShortLoop() for(int i=0; i<dvl; ++i) {
+                            ShortLoop() for(int i=0; i<dvl; ++i) {
                                 // Note: if align 8, single-load uint64_t and shift XXX
                                 int h = kk_dhw[2*i];
                                 if (h >= 0) {
@@ -497,7 +531,7 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                                 }
                             }
                         }else{
-                            NOVEC ShortLoop() for(int i=0; i<dvl; ++i) {
+                            ShortLoop() for(int i=0; i<dvl; ++i) {
                                 int w = kk_dhw[i];
                                 if (w >= 0) {
                                     kkpos[i] = w - DHW_SHIFT(DHW_W,i);
@@ -587,7 +621,6 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                 int const* const o_spatial0 = reinterpret_cast<int const*>
                         (&dcrd.vp[2][0]);
 
-                acc_data_t sum[MVL]; VREG(sum); // accumulate over pooling window
                 // pooling-window vector precalc constants (--> mem)
                 int sz[MVL]; // sz < kern ovlp <= KD*KH*KW (small)
                 int dhw[9*MVL]; // jit might use 9 vector regs
@@ -633,11 +666,11 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                             inv_num_summands[i] = 1.0f / sz[i];
                 }
 
-                // start sum at zero
+                acc_data_t sum[MVL]; VREG(sum); // accumulate over pooling window
                 ShortLoop() for (int i=0; i<dvl; ++i)
                         sum[i] = acc_data_t{0};
 
-                for (int i=0U; i<dvl; ++i) {
+                NOVEC for (int i=0U; i<dvl; ++i) {
 
                     // set up kernel-window vector iterator into src coords
                     // and related constants.
@@ -673,17 +706,17 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                     acc_data_t ssum{0};
                     {
                         dim_t srcp[MVL];    // src phys offsets
+                        // VE note: ++src is not inlined, creating vector reg spill
                         NOVEC for ( ; scrd; ++scrd) {
                             const unsigned svl=scrd.get_vl(); // svl ~ id,ih,iw coords
                             // calc phy src offsets, (ok to clobber scrd.vp coords)
                             src_d_opt.vec_off_vtmp(scrd.base(), (dim_t *)&srcp[0], svl);
 
-                            ShortLoop() for(unsigned j=0U; j<svl; ++j) { // vec
+                            ShortLoop() for(int j=0U; j<svl; ++j) { // vec
                                 ssum += src[srcp[j]];
                             }
                         }
                     }
-
                     sum[i] = ssum;
 
                 }
@@ -761,7 +794,7 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
             diff_src[off] = data_type_t(0);
         }
     };
-
+#if BIMPL<10
     auto ker_max
             = [=](const data_t *d, int mb, int oc, int od, int oh, int ow) {
                   const auto ws_off = get_offset(ws_d, mb, oc, od, oh, ow);
@@ -786,6 +819,7 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                   const auto off = get_offset(diff_src_d, mb, oc, id, ih, iw);
                   diff_src[off] += d[0];
               };
+#endif
 #if BIMPL<10
     auto ker_avg = [=](const data_t *d, int mb, int oc, int od, int oh,
                            int ow) {
@@ -896,7 +930,7 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                     dim_t diff_src_off[MVL];
                     diff_src_d_opt.vec_off_v(icrd.base(), &diff_src_off[0],
                             vl, false/*pad*/);
-                    for (int i=0; i<vl; ++i)
+                    ShortLoop() for (int i=0; i<vl; ++i)
                         diff_src[diff_src_off[i]] = data_t{0};
                 }
 #endif
@@ -910,7 +944,7 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                     dim_t diff_dst_off[MVL];
                     diff_dst_d_opt.vec_off_v(dcrd.base(), &diff_dst_off[0],
                             dvl, false/*pad*/);
-                    for (int i=0; i<dvl; ++i) {
+                    ShortLoop() for (int i=0; i<dvl; ++i) {
                         int c = 1; // after oc-dim, have spatial coords
                         int const od = ddim >= 5? dcrd.vp[++c][i]: 0;
                         int const oh = ddim >= 4? dcrd.vp[++c][i]: 0;
@@ -925,7 +959,7 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                 }
             }
         });
-#elif BIMPL==10
+#elif BIMPL>=10
         typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
         typedef CoordsForNd<6,uint32_t,int64_t> Coords32;
         // src-pixel coords (mb,oc,id,ih,iw when they are valid)
@@ -973,23 +1007,6 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
             }
 
             VecPos32 src_vp; 
-            /// only VER 0 works, and can already be something like 10x faster than
-            /// BIMPL<10 (no inner-loop vectorization).
-#define VER 0
-#if VER>0
-            int kd[MVL]; VREG(kd);
-            int kh[MVL]; VREG(kh);
-            int kw[MVL]; VREG(kw);
-#endif
-#if VER/10==1 || VER%10==2
-            int strides[3]; int pads[3];
-            {
-                int i=0;
-                if (dm >= 5){ strides[i] = SD; pads[i] = padF; ++i; }
-                if (dm >= 4){ strides[i] = SH; pads[i] = padT; ++i; }
-                if (dm >= 4){ strides[i] = SW; pads[i] = padL; ++i; }
-            }
-#endif
             // Vector calc src pixel offsets from src_vp
             dim_t diff_src_off[MVL];    // phys offsets
 
@@ -1010,7 +1027,7 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                         dim_t diff_src_off[MVL];
                         diff_src_d_opt.vec_off_v(icrd.base(), &diff_src_off[0],
                                 vl, false/*pad*/);
-                        for (int i=0; i<vl; ++i)
+                        ShortLoop() for (int i=0; i<vl; ++i)
                             diff_src[diff_src_off[i]] = zero;
                     }
                 }
@@ -1029,7 +1046,7 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
 
                     int const* const d_mb_ptr = reinterpret_cast<int const*>
                             (&dcrd.vp[0][0]); 
-                    int const* const d_spatial0 = reinterpret_cast<int const*>
+                    int const* const __restrict__ d_spatial0 = reinterpret_cast<int const*>
                             (&dcrd.vp[2][0]);
 
                     assert( ws_d_opt );
@@ -1066,16 +1083,18 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                     int s_ok[MVL];     // in principle, src ok ~ mask register
 
 
-//#define SRC_VP(DIM,I) src_vp.vp[DIM][I]
-                    // Q: is this better for nc++?
-#define SRC_VP(DIM,I) ((int*)(void*)src_vp.vp)[(DIM*src_vp.MaxVl) + (I)]
+#define SRC_VP(DIM,I) src_vp.vp[DIM][I]
+                    // Q: is this better for nc++? No - "unknown dependency" fails to vectorize
+//#define SRC_VP(DIM,I) ((int* restrict)(void*)src_vp.vp)[(DIM*src_vp.MaxVl) + (I)]
+//#define SRC_VP(DIM,I) reinterpret_cast<int* restrict>(src_vp.vp)[(DIM*src_vp.MaxVl) + (I)]
+//#define SRC_VP_RESTRICT(DIM,I) reinterpret_cast<int* restrict>(&src_vp.vp[(DIM*src_vp.MaxVl) + (I)])
+//#define SRC_VP(DIM,I) (*SRC_VP_RESTRICT(DIM,I))
                     ShortLoop() for (int i=0; i<dvl; ++i) {
                         SRC_VP(0,i) = mb;
                         SRC_VP(1,i) = oc;
                     }
                     if (dm>=5) {
-#if VER==0
-                        ShortLoop() for (int i=0; i<dvl; ++i) {
+                        ShortLoop() IVDEP() for (int i=0; i<dvl; ++i) {
                             const int kd = (index[i] / KW) / KH;
                             const int kh = (index[i] / KW) % KH;
                             const int kw = index[i] % KW;
@@ -1089,56 +1108,20 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                             SRC_VP(3,i) = ih;
                             SRC_VP(4,i) = iw;
                             // DOES set up mask, but high mask reg usage
+#if 0
                             s_ok[i] = (id >= 0 && id < ID
                                     && ih >= 0 && ih < IH
                                     && iw >= 0 && iw < IW);
-                        }
-#elif VER%10==1
-                        ShortLoop() for (int i=0; i<dvl; ++i) {
-                            kd[i] = index[i] / KW; // tmp
-                            kw[i] = kd[i] / KH;    // tmp
-                            kh[i] = kd[i] - kw[i] % KH; // (index[i]/KW) % KH
-                            kw[i] = index[i] - kd[i] * KW; //index[i] % KW;
-                            kd[i] = kd[i] / KH; //index[i]/KW / KH
-#if VER/10==0
-                            const int id = d_spatial0[0*dcrd.MaxVl + i] * SD - padF + kd[i];
-                            const int ih = d_spatial0[1*dcrd.MaxVl + i] * SH - padT + kh[i];
-                            const int iw = d_spatial0[2*dcrd.MaxVl + i] * SW - padL + kw[i];
+#elif 0
+                            s_ok[i] = (id|ih|iw) >= 0
+                                    && id < ID && ih < IH && iw < IW;
 #else
-                            const int id = d_spatial0[0*dcrd.MaxVl + i] * strides[0] - pads[0] + kd[i];
-                            const int ih = d_spatial0[1*dcrd.MaxVl + i] * strides[1] - pads[1] + kh[i];
-                            const int iw = d_spatial0[2*dcrd.MaxVl + i] * strides[2] - pads[2] + kw[i];
+                            s_ok[i] = (id | ih | iw 
+                                    | (ID-id-1) | (IH-ih-1) | (IW-iw-1)
+                                    ) >= 0;
 #endif
-                            SRC_VP(2,i) = id;
-                            SRC_VP(3,i) = ih;
-                            SRC_VP(4,i) = iw;
-                            // DOES set up mask, but high mask reg usage
-                            s_ok[i] = (id >= 0 && id < ID
-                                    && ih >= 0 && ih < IH
-                                    && iw >= 0 && iw < IW);
                         }
-#elif VER%10==2
-                        ShortLoop() for (int i=0; i<dvl; ++i) {
-                            kd[i] = index[i] / (KH*KW);
-                            int tmp = index[i] - kd[i]*(KH*KW);
-                            kh[i] = tmp / KW;
-                            kw[i] = tmp - kh[i] * KW;
-                        }
-                        ShortLoop() for (int i=0; i<dvl; ++i) {
-                            const int id = d_spatial0[0*dcrd.MaxVl + i] * strides[0] - pads[0] + kd[i];
-                            const int ih = d_spatial0[1*dcrd.MaxVl + i] * strides[1] - pads[1] + kh[i];
-                            const int iw = d_spatial0[2*dcrd.MaxVl + i] * strides[2] - pads[2] + kw[i];
-                            SRC_VP(2,i) = id;
-                            SRC_VP(3,i) = ih;
-                            SRC_VP(4,i) = iw;
-                            // DOES set up mask, but high mask reg usage
-                            s_ok[i] = (id >= 0 && id < ID
-                                    && ih >= 0 && ih < IH
-                                    && iw >= 0 && iw < IW);
-                        }
-#endif
                     } else if (dm>=4) {
-#if VER==0
                         ShortLoop() for (int i=0; i<dvl; ++i) {
                             const int kh = index[i] / KW;
                             const int kw = index[i] % KW;
@@ -1148,63 +1131,26 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                             const int iw = ow * SW - padL + kw;
                             SRC_VP(2,i) = ih;
                             SRC_VP(3,i) = iw;
+#if 0
                             s_ok[i] = (ih >= 0 && ih < IH
                                     && iw >= 0 && iw < IW);
-                        }
-#elif 1
-                        int kh[MVL]; VREG(kh);
-                        int kw[MVL]; VREG(kw);
-                        int ih[MVL]; VREG(ih);
-                        int iw[MVL]; VREG(iw);
-                        ShortLoop() for (int i=0; i<dvl; ++i) {
-                            kh[i] = index[i] / KW;
-                            kw[i] = index[i] - kh[i] * KW;
-                            ih[i] = d_spatial0[0*dcrd.MaxVl + i] * SH - padT + kh[i];
-                            iw[i] = d_spatial0[1*dcrd.MaxVl + i] * SW - padL + kw[i];
-                        }
-                        ShortLoop() for (int i=0; i<dvl; ++i) {
-                            SRC_VP(2,i) = ih[i];
-                            SRC_VP(2,i) = iw[i];
-                        }
-                        ShortLoop() for (int i=0; i<dvl; ++i) {
-#if 1 // a bit bad
-                            s_ok[i] = iw[i] >= 0 && iw[i] < IW
-                                    && ih[i] >= 0 && ih[i] < IH;
-#else // horrible
-                            s_ok[i] = 1; //iw[i] >= 0;
-                            if (s_ok[i]) s_ok[i] = s_ok[i] && iw[i] > 0;
-                            if (s_ok[i]) s_ok[i] = s_ok[i] && ih[i] > 0;
-                            if (s_ok[i]) s_ok[i] = s_ok[i] && iw[i] < IW;
-                            if (s_ok[i]) s_ok[i] = s_ok[i] && ih[i] < IH;
-#endif
-                        }
 #else
-#error "TBD"
+                            s_ok[i] = (ih | iw | (IH-ih-1) | (IW-iw-1)) >= 0;
 #endif
+                        }
                     } else {
                         //assert( dm == 3 );
-#if VER==0
                         ShortLoop() for (int i=0; i<dvl; ++i) {
                             const int kw = index[i];
                             const int ow = d_spatial0[0*dcrd.MaxVl + i];
                             const int iw = ow * SW - padL + kw;
                             SRC_VP(2,i) = iw;
+#if 0
                             s_ok[i] = (iw >= 0 && iw < IW);
-                        }
-#elif 1
-                        int iw[MVL]; VREG(iw);
-                        ShortLoop() for (int i=0; i<dvl; ++i) {
-                            iw[i] = d_spatial0[0*dcrd.MaxVl + i] * SW - padL + index[i];
-                        }
-                        ShortLoop() for (int i=0; i<dvl; ++i) {
-                            SRC_VP(2,i) = iw[i]/*iw*/;
-                        }
-                        ShortLoop() for (int i=0; i<dvl; ++i) {
-                            s_ok[i] = (iw[i] >= 0 && iw[i] < IW);
-                        }
 #else
-#error "TBD"
+                            s_ok[i] = (iw | (IW-iw-1)) >= 0;
 #endif
+                        }
                     }
 #undef SRC_VP
 
@@ -1214,10 +1160,19 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                                 dvl, false/*pad*/);
 
                         // when s_ok[i], coadd gradient into diff_src pixel
-                        ShortLoop() for (int i=0; i<dvl; ++i) {
+                        ShortLoop() IVDEP() LISTVEC for (int i=0; i<dvl; ++i) {
+#if 1
                             if (s_ok[i]) {
                                 diff_src[diff_src_off[i]] += diff_dst[diff_dst_off[i]];
                             }
+#else // incorrect code from nc++
+                            auto const tmp_d = diff_dst[diff_dst_off[i]];
+                            auto /* */ tmp_s = diff_src[diff_src_off[i]];
+                            if (s_ok[i]) {
+                                tmp_s += tmp_d;
+                            }
+                            diff_src[diff_src_off[i]] = tmp_s;
+#endif
                         }
                     }
 
@@ -1294,7 +1249,7 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                     dim_t diff_src_off[MVL];
                     diff_src_d_opt.vec_off_v(icrd.base(), &diff_src_off[0],
                             vl, false/*pad*/);
-                    for (int i=0; i<vl; ++i)
+                    ShortLoop() for (int i=0; i<vl; ++i)
                         diff_src[diff_src_off[i]] = data_t{0};
                 }
 
@@ -1307,7 +1262,7 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                     dim_t diff_dst_off[MVL];
                     diff_dst_d_opt.vec_off_v(dcrd.base(), &diff_dst_off[0],
                             dvl, false/*pad*/);
-                    for (int i=0; i<dvl; ++i) {
+                    ShortLoop() for (int i=0; i<dvl; ++i) {
                         int c = 1; // after oc-dim, have spatial coords
                         int const od = ddim >= 5? dcrd.vp[++c][i]: 0;
                         int const oh = ddim >= 4? dcrd.vp[++c][i]: 0;
@@ -1325,7 +1280,7 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
 #elif BIMPL==10
         // Unlike maxpooling, avgpooling iterates over pooling window.
         // So impl is more like fwd, with full "inner iterator"
-        typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
+        //typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
         typedef CoordsForNd<6,uint32_t,int64_t> Coords32;
 
         //parallel_nd(MB, OC, [&](int mb, int oc)
@@ -1336,7 +1291,7 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
             auto dm = diff_dst_d.ndims();
             //assert(diff_src_d.ndims() == dm);
 
-            Coords icrd;
+            Coords32 icrd;
             icrd.iter_range(0, 0,1, 0,1); // md and oc dimension placeholders
             { // add spatial coords
                 int c=2; // next coord whose limits we'll add
@@ -1346,7 +1301,7 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                 icrd.finalize(); // done adding dims, recalculate full size.
             }
 
-            Coords dcrd;
+            Coords32 dcrd;
             dcrd.iter_range(0, 0,1, 0,1); // md and oc dimension placeholders
             //assert( dcrd.get_dim() == 2 );
             //printf(" dm=%d dcrd.get_dim()=%d\n", (int)dm, (int)dcrd.get_dim());
@@ -1379,7 +1334,7 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                     dim_t diff_src_off[MVL];
                     diff_src_d_opt.vec_off_v(icrd.base(), &diff_src_off[0],
                             vl, false/*pad*/);
-                    for (int i=0; i<vl; ++i)
+                    ShortLoop() for (int i=0; i<vl; ++i)
                         diff_src[diff_src_off[i]] = data_t{0};
                 }
 
@@ -1394,12 +1349,128 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                     {
                         diff_dst_d_opt.vec_off_v(dcrd.base(), &diff_dst_off[0],
                                 dvl, false/*pad*/);
-                        for (int i=0; i<dvl; ++i) {
+                        ShortLoop() for (int i=0; i<dvl; ++i) {
                             diff_dst_data[i] = diff_dst[diff_dst_off[i]];
                         }
                     }
+#define SCRD_PRECALC 1
+#if SCRD_PRECALC
+                    static_assert( sizeof(dcrd.vp[0][0]) == 4,
+                            "need 4-byte coords in dcrd");
+                    int const* const d_mb_ptr = reinterpret_cast<int const*>
+                            (&dcrd.vp[0][0]); 
+                    int const* const __restrict__ d_spatial0 = reinterpret_cast<int const*>
+                            (&dcrd.vp[2][0]);
 
-                    for (int i=0; i<dvl; ++i) {
+                    // code borrowed from fwd
+                    // vectorize and store, for use in later scalar loop
+                    //
+                    int psz[MVL]; // pooling window sz = kern ovlp <= KD*KH*KW (small)
+                    int dhw[9*MVL]; // nc++ slightly prefers single array over 9
+#define DHW_W 0
+#define DHW_H 1
+#define DHW_D 2
+                    // which = 0,1,2 for w, h, d respectively
+                    // following COULD be done reasonably, but nc++ precalculates
+                    // most pointers, using mem load instead "lea" calc (could use single reg).
+                    // so still fair amount of register spill,restore and mem loads
+#define DHW_SHIFT(which,idx)    dhw[((which*3  )*MVL)+idx]
+#define DHW_ST(which,idx)       dhw[((which*3+1)*MVL)+idx]
+                    //#define DHW_ST(which,idx)       ((int32_t*)&dhw[((which*3+1)*MVL)])[idx]
+#define DHW_EN(which,idx)       dhw[((which*3+2)*MVL)+idx]
+#define DEFINE_IN_RANGE_VEC(idx, which, ksz, isz) \
+                    DHW_ST(which,idx) = (DHW_SHIFT(which,idx)       >   0 \
+                            ? DHW_SHIFT(which,idx): 0); \
+                    DHW_EN(which,idx) = (DHW_SHIFT(which,idx) + ksz < isz \
+                            ? DHW_SHIFT(which,idx) + ksz: isz); \
+                    if (DHW_EN(which,idx) < DHW_ST(which,idx)) \
+                            DHW_EN(which,idx) = DHW_ST(which,idx)
+
+                    // actually, kernel size fits in int32_t
+                    ShortLoop() for(int i=0; i<dvl; ++i)
+                            psz[i] = 1;
+                    int const* restrict d_spatial = d_spatial0;
+                    {
+                        if (dm >= 5) {
+                            //assert( (void*)d_spatial == (void*)&dcrd.vp[dm-3][0] );
+                            ShortLoop() for(int i=0; i<dvl; ++i) {
+                                DHW_SHIFT(DHW_D,i) = d_spatial[i]/*od*/ * SD - padF;
+                                DEFINE_IN_RANGE_VEC(i, DHW_D, KD, ID);
+                                psz[i] *= DHW_EN(DHW_D,i) - DHW_ST(DHW_D,i);
+                            }
+                            d_spatial += dcrd.MaxVl;
+                        }
+                        if (dm >= 4) {
+                            //assert( (void*)d_spatial == (void*)&dcrd.vp[dm-2][0] );
+                            ShortLoop() for(int i=0; i<dvl; ++i) {
+                                DHW_SHIFT(DHW_H,i) = d_spatial[i]/*oh*/ * SH - padT;
+                                DEFINE_IN_RANGE_VEC(i, DHW_H, KH, IH);
+                                psz[i] *= DHW_EN(DHW_H,i) - DHW_ST(DHW_H,i);
+                            }
+                            d_spatial += dcrd.MaxVl;
+                        }
+                        //assert( (void*)d_spatial == (void*)&dcrd.vp[dm-1][0] );
+                        ShortLoop() for(int i=0; i<dvl; ++i) {
+                            DHW_SHIFT(DHW_W,i) = dcrd.vp[dm-1][i]/*ow*/ * SW - padL;
+                            DEFINE_IN_RANGE_VEC(i, DHW_W, KW, IW);
+                            psz[i] *= DHW_EN(DHW_W,i) - DHW_ST(DHW_W,i);
+                        }
+#if 0 // DEBUG
+                        ShortLoop() for(int i=0; i<dvl; ++i) {
+                            int c=2-1;
+                            int const od = dm >= 5? dcrd.vp[++c][i]: 0;
+                            int const oh = dm >= 4? dcrd.vp[++c][i]: 0;
+                            int const ow = dcrd.vp[++c][i];
+                            printf("i=%d dm=%d, mb,oc=%d,%d od,oh,ow=%d,%d,%d",
+                                    i, dm, (void*)&diff_dst[diff_dst_off[i]],
+                                    mb,oc,od,oh,ow);
+                            int const* d_spatial = d_spatial0;
+                            if (dm >= 5) {
+                                auto id_start = max(od * SD - padF, 0);
+                                auto id_end = min(od * SD - padF + KD, ID);
+                                if (id_end < id_start) id_end == id_start;
+                                printf(" DHW:%d,%d,%d od=%d, gold:%d,%d,%d",
+                                        DHW_SHIFT(DHW_D,i), DHW_ST(DHW_D,i), DHW_EN(DHW_D,i),
+                                        od, od*SD-padF, id_start, id_end);
+                                fflush(stdout);
+                                assert( DHW_SHIFT(DHW_D,i) == od*SD-padF );
+                                assert( DHW_ST(DHW_D,i) == id_start );
+                                assert( DHW_EN(DHW_D,i) == id_end );
+                                d_spatial += dcrd.MaxVl;
+                            }
+                            if (dm >= 4) {
+                                auto ih_start = max(oh * SH - padT, 0);
+                                auto ih_end = min(oh * SH - padT + KH, IH);
+                                if (ih_end < ih_start) ih_end == ih_start;
+                                printf(" DHW:%d,%d,%d oh=%d, gold:%d,%d,%d",
+                                        DHW_SHIFT(DHW_H,i), DHW_ST(DHW_H,i), DHW_EN(DHW_H,i),
+                                        oh, oh*SH-padT, ih_start, ih_end);
+                                fflush(stdout);
+                                assert( DHW_SHIFT(DHW_H,i) == oh*SH-padT );
+                                assert( DHW_ST(DHW_H,i) == ih_start );
+                                assert( DHW_EN(DHW_H,i) == ih_end );
+                                d_spatial += dcrd.MaxVl;
+                            }
+                            if (1 /*dm >= 3*/) {
+                                auto iw_start = max(ow * SW - padL, 0);
+                                auto iw_end = min(ow * SW - padL + KW, IW);
+                                if (iw_end < iw_start) iw_end == iw_start;
+                                printf(" DHW:%d,%d,%d ow=%d, gold:%d,%d,%d",
+                                        DHW_SHIFT(DHW_W,i), DHW_ST(DHW_W,i), DHW_EN(DHW_W,i),
+                                        ow, ow*SW-padL, iw_start, iw_end);
+                                fflush(stdout);
+                                assert( DHW_SHIFT(DHW_W,i) == ow*SW-padL );
+                                assert( DHW_ST(DHW_W,i) == iw_start );
+                                assert( DHW_EN(DHW_W,i) == iw_end );
+                            }
+                            printf("\n"); fflush(stdout);
+                        }
+#endif // DEBUG
+                    }
+#endif // SCRD_PRECALC
+
+                    NOVEC ShortLoop() for (int i=0; i<dvl; ++i) {
+#if 0 // plop in the kernel code (scalar offset calc ~ zero speedup)
                         int c=2-1;
                         int const od = dm >= 5? dcrd.vp[++c][i]: 0;
                         int const oh = dm >= 4? dcrd.vp[++c][i]: 0;
@@ -1407,7 +1478,6 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                         //printf("i=%d ker_max(%p,%d,%d,%d,%d,%d)\n",
                         //        i, (void*)&diff_dst[diff_dst_off[i]],
                         //        mb,oc,od,oh,ow);
-#if 0 // plop in the kernel code (~ zero speedup)
                         auto id_start = max(od * SD - padF, 0);
                         auto ih_start = max(oh * SH - padT, 0);
                         auto iw_start = max(ow * SW - padL, 0);
@@ -1430,8 +1500,17 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
 #elif 1 // vectorized ker_avg (several times faster, w/o much effort yet)
                         // TODO look at scrd setup assembler, further
                         // vectorization can follow fwd-maxpool approach
+#if SCRD_PRECALC==0
                         Coords32 scrd; // pooling crd, in src
                         int sz=1;
+                        int c=2-1;
+                        int const od = dm >= 5? dcrd.vp[++c][i]: 0;
+                        int const oh = dm >= 4? dcrd.vp[++c][i]: 0;
+                        int const ow = dcrd.vp[++c][i];
+                        //printf("i=%d ker_max(%p,%d,%d,%d,%d,%d)\n",
+                        //        i, (void*)&diff_dst[diff_dst_off[i]],
+                        //        mb,oc,od,oh,ow);
+#if 1 // lots of register spill, whatever version
                         {
                             scrd.fix_coord(0,mb).fix_coord(1,oc);
                             //int * s_spatial = &scrd.vp[2][0];
@@ -1439,31 +1518,105 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                             if (1 /*dm >= 3*/) {
                                 auto iw_start = max(ow * SW - padL, 0);
                                 auto iw_end = min(ow * SW - padL + KW, IW);
-                                if (iw_start > iw_end) iw_start=iw_end=0;
+                                if (iw_end < iw_start) iw_end = iw_start;
                                 if (dm >= 4) {
                                     auto ih_start = max(oh * SH - padT, 0);
                                     auto ih_end = min(oh * SH - padT + KH, IH);
-                                    if (ih_start > ih_end) ih_start=ih_end=0;
+                                    if (ih_end < ih_start) ih_end = ih_start;
                                     if (dm >= 5) {
                                         auto id_start = max(od * SD - padF, 0);
                                         auto id_end = min(od * SD - padF + KD, ID);
-                                        if (id_start > id_end) id_start=id_end=0;
+                                        if (id_end < id_start) id_end = id_start;
                                         // use s_spatial for od,oh,ow TBD
-                                        scrd.iter_range(++c,id_start,id_end);
+                                        scrd.fix_coord(++c,id_start,id_end);
                                         sz *= (id_end - id_start);
                                     }
-                                    scrd.iter_range(++c,ih_start,ih_end);
+                                    scrd.fix_coord(++c,ih_start,ih_end);
                                     sz *= (ih_end - ih_start);
                                 }
-                                scrd.iter_range(++c,iw_start,iw_end);
+                                scrd.fix_coord(++c,iw_start,iw_end);
                                 sz *= (iw_end - iw_start);
                             }
                             *scrd.raw_dim() = dm;
                             *scrd.raw_sz() = sz;
                             //scrd.finalize(); basically only adds sz calc
                             scrd.init_nd(0); // sets vp[][] coords and vector length
-                    //if(1) std::cout<<" bkw-avg-pool "<<scrd.lim_str("scrd")<<"  "<<scrd.coord_str("scrd")<<std::endl;
+                            //if(1) std::cout<<" bkw-avg-pool "<<scrd.lim_str("scrd")
+                            //    <<"  "<<scrd.coord_str("scrd")<<std::endl;
                         }
+#else
+                        {
+                            // use s_spatial for od,oh,ow TBD
+                            scrd.fix_coord(0,mb).fix_coord(1,oc);
+                            c=2-1;
+                            if (dm >= 5) {
+                                auto id_start = max(od * SD - padF, 0);
+                                auto id_end = min(od * SD - padF + KD, ID);
+                                if (id_end < id_start) id_end = id_start;
+                                scrd.fix_coord(++c,id_start,id_end);
+                                sz *= (id_end - id_start);
+                            }
+                            if (dm >= 4) {
+                                auto ih_start = max(oh * SH - padT, 0);
+                                auto ih_end = min(oh * SH - padT + KH, IH);
+                                if (ih_end < ih_start) ih_end = ih_start;
+                                scrd.fix_coord(++c,ih_start,ih_end);
+                                sz *= (ih_end - ih_start);
+                            }
+                            if (1 /*dm >= 3*/) {
+                                auto iw_start = max(ow * SW - padL, 0);
+                                auto iw_end = min(ow * SW - padL + KW, IW);
+                                if (iw_end < iw_start) iw_end = iw_start;
+                                scrd.fix_coord(++c,iw_start,iw_end);
+                                sz *= (iw_end - iw_start);
+                            }
+                            *scrd.raw_dim() = dm;
+                            *scrd.raw_sz() = sz;
+                            scrd.init_nd(0); // sets vp[][] coords and vector length
+                        }
+#endif
+#elif SCRD_PRECALC>0
+                        Coords32 scrd; // pooling coords, in src
+                        //                      unstrided square/rectangular block
+                        { // "raw" CoordsForNd api faster
+                            // mem-to-mem copy of uint32_t <-- int does useless sll 32, srl 32 to
+                            // USELESSLY add 2 ops.   (Expect just "load" + "store", 2 ops).
+                            // nc++ optimization is to keep same-signedness:
+                            //auto rlo = scrd.raw_lo(); // pointer
+                            //auto rhi = scrd.raw_hi();
+                            //  code looks better for nc++ with ...
+                            int32_t* restrict rlo = (int32_t*)scrd.raw_lo(); // pointer
+                            int32_t* restrict rhi = (int32_t*)scrd.raw_hi();
+                            rlo[0] = d_mb_ptr[i];
+                            rhi[0] = d_mb_ptr[i]+1;
+                            rlo[1] = d_mb_ptr[(int)dcrd.MaxVl+i];  // also oc
+                            rhi[1] = d_mb_ptr[(int)dcrd.MaxVl+i] + 1;
+                            if (dm >= 5) {
+                                // VE loads int with .sx into high bits, then uselessly
+                                // sll,srr by 32 to clear the bits, then stores the lower 32 bits.
+                                // same-signed for mem-to-mem int/uint32_t SKIPS the compiler shifting nonsense.
+                                //          4 scalar ops to 2 ops ~ "ldl.sx...; stl..."
+                                rlo[2] = DHW_ST(DHW_D,i);  // id
+                                rhi[2] = DHW_EN(DHW_D,i);
+                                rlo[3] = DHW_ST(DHW_H,i);  // ih
+                                rhi[3] = DHW_EN(DHW_H,i);
+                                rlo[4] = DHW_ST(DHW_W,i);  // iw
+                                rhi[4] = DHW_EN(DHW_W,i);
+                            } else if (dm >= 4) {
+                                rlo[2] = DHW_ST(DHW_H,i);  // ih
+                                rhi[2] = DHW_EN(DHW_H,i);
+                                rlo[3] = DHW_ST(DHW_W,i);  // iw
+                                rhi[3] = DHW_EN(DHW_W,i);
+                            } else { // dm == 3
+                                rlo[2] = DHW_ST(DHW_W,i);  // iw
+                                rhi[2] = DHW_EN(DHW_W,i); 
+                            }
+                            *scrd.raw_sz() = psz[i]; // krn ovlp sz precalc'ed
+                            *scrd.raw_dim() = dm;
+                            scrd.init_nd(0);
+                        }
+                        int const sz = psz[i];
+#endif // SCRD_PRECALC
 
                         auto num_summands = (alg == alg_kind::pooling_avg_include_padding)
                                 ? KW * KH * KD : sz;
@@ -1472,10 +1625,13 @@ void ref_pooling_bwd_t<data_type>::execute_backward(
                         const data_t grad = diff_dst_data[i] / num_summands;
                         {
                             dim_t diff_src_off[MVL];    // diff_src phys offsets
+                            data_t diff_src_data[MVL]; VREG(diff_src_data)
                             NOVEC for ( ; scrd; ++scrd) {
                                 const unsigned svl=scrd.get_vl(); // svl ~ id,ih,iw coords
                                 diff_src_d_opt.vec_off_vtmp(scrd.base(), (dim_t *)&diff_src_off[0], svl);
-                                ShortLoop() for(unsigned j=0U; j<svl; ++j) { // vec
+                                //LISTVEC helps a bit, but 2 gathers, 2 scatters??
+                                // A: ivdep
+                                ShortLoop() LISTVEC IVDEP() for (int j=0U; j<svl; ++j) {
                                     diff_src[diff_src_off[j]] += grad;
                                 }
                             }
