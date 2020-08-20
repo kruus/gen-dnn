@@ -1155,7 +1155,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         /* FIXME: is the formula correct? */
         Consistency ok("reorder_check:direct_copy");
         // look at why direct_copy was skipped?
-#define AND_(...) SCHK(ok,__VA_ARGS__)
+#define AND_(...) SCHKVV(ok,__VA_ARGS__)
         AND_(!input_d.has_runtime_dims_or_strides());
         AND_(input_d.similar_to(output_d, true, false, 0));
         AND_(input_d.is_dense());
@@ -1373,11 +1373,23 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         auto is_dense_no_0 = [](const memory_desc_wrapper &data_d) {
             return nelems_no_dim_0(data_d) == _size_no_dim_0(data_d);
         };
+#if 0 // orig
         /* FIXME: is the formula correct? */
         return !input_d.has_runtime_dims_or_strides()
                 && input_d.similar_to(output_d, true, false, 1)
                 && is_dense_no_0(input_d) && is_dense_no_0(output_d)
                 && simple_attr_check(attr, false, true);
+#else
+        Consistency ok("reorder_check:direct_copy");
+#define AND_(...) SCHKVV(ok,__VA_ARGS__)
+        AND_(!input_d.has_runtime_dims_or_strides());
+        AND_(input_d.similar_to(output_d, true, false, 1));
+        AND_(is_dense_no_0(input_d) && is_dense_no_0(output_d));
+        AND_(simple_attr_check(attr, false, true));
+        // look at why direct_copy was skipped?
+#undef AND_
+#endif
+        return ok;
     }
 
     GET_SCRATCHPAD_SIZE_ZERO();

@@ -314,10 +314,12 @@ function check_veoserr
     #            and set rc=1 for veos errors
     #VEOSNEW=`awk "NR>${VEOSLINE}" "${VEOSLOG}" | grep $pid`
     VEOSNEW=`awk "NR>${VEOSLINE}" "${VEOSLOG}"`
-    echo "Basic VEOSNEW:"
-    echo "${VEOSNEW}"
+    NIGNORE=`echo "${VEOSNEW}" | grep 'exception not served' | wc -l`
     VEOSNEW=`echo "${VEOSNEW}" | grep -v 'exception not served'` # ignorable errors
+    echo "Basic VEOSNEW (ignore ${NIGNORE} Assign failed exception not served messages)"
+    echo "${VEOSNEW}"
     if [ "${VEOSNEW}" ]; then >&2 echo "${VEOSNEW}"; fi
+    # Lie about ret code 0 if something seems really bad in VEOS log
     if [ $rc == 0 ]; then
       >&2 echo "test return code seems ok... checking VEOS messages"
       # Surprisingly, can succeed with many
