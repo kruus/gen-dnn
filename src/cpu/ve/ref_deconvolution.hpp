@@ -124,7 +124,7 @@ struct ref_deconvolution_fwd_t : public primitive_t {
                                   ->support_bias();
 
                 Consistency ref_deconv_supports_bias("ref_deconv_supports_bias");
-#define AND_(...) SCHKVV(ref_deconv_supports_bias,(__VA_ARGS__))
+#define AND_(...) SCHK(ref_deconv_supports_bias,(__VA_ARGS__))
                 AND_(desc()->accum_data_type == data_type::f32);
                 AND_(platform::has_data_type_support(desc()->dst_desc.data_type));
                 AND_(utils::one_of(desc()->dst_desc.data_type, f32, bf16));
@@ -136,7 +136,7 @@ struct ref_deconvolution_fwd_t : public primitive_t {
                                         nCdhw16c))));
 #undef AND_
                 Consistency ok("ref_deconvolution_fwd_t::init_convolution");
-#define AND_(...) SCHKVV(ok,(__VA_ARGS__))
+#define AND_(...) SCHK(ok,(__VA_ARGS__))
                 AND_(_conv_pd->weights_md()->extra.flags == 0);
                 /* deconv reference code can process only f32 bias */
                 AND_(IMPLICATION(with_bias(), conv_supports_bias_
@@ -160,7 +160,7 @@ struct ref_deconvolution_fwd_t : public primitive_t {
                     && attr()->has_default_values();
 #endif
             Consistency ok("ref_deconvolution_fwd_t::pd_t::init");
-#define AND_(...) SCHKVV(ok,(__VA_ARGS__))
+#define AND_(...) SCHK(ok,(__VA_ARGS__))
             AND_(is_fwd());
             AND_(utils::one_of(desc()->alg_kind,
                    alg_kind::deconvolution_direct,
@@ -319,7 +319,7 @@ struct ref_deconvolution_bwd_data_t : public primitive_t {
                     && attr()->has_default_values();
 #else
             Consistency ok("ref_deconvolution_bwd_t");
-#define AND_(...) SCHKVV(ok,(__VA_ARGS__))
+#define AND_(...) SCHK(ok,(__VA_ARGS__))
             AND_(desc()->prop_kind == prop_kind::backward_data);
             AND_(utils::everyone_is(f32, dsrc_type, wei_type, ddst_type)
                     || (utils::one_of(dsrc_type, f32, bf16)

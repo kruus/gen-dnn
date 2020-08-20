@@ -219,6 +219,7 @@ if [ "${THREADS}" = 0 ]; then
 else
   TEST_ENV+=(OMP_NUM_THREADS=${THREADS})
   TEST_ENV+=(VE_OMP_NUM_THREADS=${THREADS})
+  echo "omp threads : OMP_NUM_THREADS = ${THREADS}"
 fi
 
 # VE_NODE_NUMBER and VEOS debug mode

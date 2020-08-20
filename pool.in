@@ -1,0 +1,49 @@
+## failed benchdnn test #3712:  --pool --tag=aBx8b ic35iw13ow14kw3pw3
+#--reset  --tag=aBx8b
+#ic35iw13_ow13_kw3pw1
+#ic35iw13_ow14_kw3pw3
+## scrd.get_sz() > 0 failed
+#
+## benchdnn test #3808: --pool --tag=aBx8b ic16ih10oh6kh5sh5ph10
+#--reset --tag=aBx8b ic5ih10oh6kh5sh5ph10
+## asserting gotmax failed
+#
+## zerodim spec not allowed (use gtest zerodimtest)
+##--reset --tag=aBx8b ic3id2ih0iw4_od2ih4iw4
+#
+## benchdnn test #3712 : --pool --tag=aBx8b ic35iw13ow14kw3pw3
+#--reset  --tag=aBx8b ic35iw13ow14kw3pw3
+## psave == kkk_dw + dm - 2 failed
+#
+## some settings failed for: --pool --tag=aBx8b ic8ih3oh3kh3ph1
+#--reset --tag=aBx8b ic8ih3oh3kh3ph1
+## assertion 0 = kkmin failed
+#
+## something wrong in next line ?
+##--reset --dir=FWD_D --tag=abx --alg=MAX mb2ic4_ih0oh4kh3sh1ph1_iw4ow4kw3sw1pw1
+#
+## alg:pooling_max,mb2ic4_ih0oh4kh3sh1ph1_iw4ow4kw3sw1pw1
+#--reset --mb=2 --dir=FWD_D --tag=axb --alg=AVG_P ic35iw13ow14kw3pw3
+
+#--reset --dir=BWD_D,BWD_W --tag=aBx16b --alg=AVG_NP,AVG_P mb1ic5_ih30iw50_oh16ow26_kh3kw3_sh2sw2_ph1pw1
+
+--reset --dir=FWD_D --tag=aBx16b --alg=MAX mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
+--reset --dir=FWD_D --tag=aBx16b --alg=MAX mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
+--reset --dir=FWD_D --tag=aBx16b --alg=AVG_P,AVG_NP mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
+--reset --dir=FWD_D --tag=aBx16b --alg=AVG_P,AVG_NP mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
+--reset --dir=BWD_D --tag=aBx16b --alg=MAX mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
+--reset --dir=BWD_D,BWD_W --tag=aBx16b --alg=MAX mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
+--reset --dir=BWD_D,BWD_W --tag=aBx16b --alg=AVG_NP,AVG_P mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
+
+#--reset
+#--dir=FWD_D --tag=aBx16b --alg=MAX,AVG_NP,AVG_P
+#mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
+#
+#--reset
+#--dir=BWD_D --tag=aBx16b --alg=MAX,AVG_NP,AVG_P
+#mb10ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
+
+#mb1ic1_ih4iw4_oh4ow4_kh3kw3_ph1pw1
+#mb122ic32_ih32iw2_oh32ow2_kh3kw3_ph1pw1
+#mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
+#mb1ic96_ih103iw9_oh52ow7_kh3kw3_sh2sw1_ph1pw0

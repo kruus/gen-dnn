@@ -87,30 +87,6 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
     };
 
     auto ker_max = [=](data_t *d, int mb, int oc, int od, int oh, int ow) {
-#if 0 && defined(_ve)
-        auto id_start = max(od * SD - padF, 0);
-        auto ih_start = max(oh * SH - padT, 0);
-        auto iw_start = max(ow * SW - padL, 0);
-        auto id_end = min(od * SD - padF + KD, ID);
-        auto ih_end = min(oh * SH - padT + KH, IH);
-        auto iw_end = min(ow * SW - padL + KW, IW);
-
-        auto num_summands = (alg == alg_kind::pooling_avg_include_padding)
-                ? KW * KH * KD
-                : (id_end - id_start) * (ih_end - ih_start)
-                        * (iw_end - iw_start);
-
-        for_(int id = id_start; id < id_end; ++id)
-        for_(int ih = ih_start; ih < ih_end; ++ih)
-        for (int iw = iw_start; iw < iw_end; ++iw) {
-            const auto off = get_offset(src_d, mb, oc, id, ih, iw);
-            auto s = src[off];
-            if(s > d[0]) {
-                d[0] = s;
-                set_ws(mb, oc, od, oh, ow, (kd * KH + kh) * KW + kw);
-            }
-        }
-#else
         for (int kd = 0; kd < KD; ++kd) {
             const int id = od * SD - padF + kd;
             if (id < 0 || id >= ID) continue;
@@ -130,7 +106,6 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
                 }
             }
         }
-#endif
     };
 
     auto ker_avg = [=](data_t *d, int mb, int oc, int od, int oh, int ow) {

@@ -265,7 +265,7 @@ template<> inline offset_ret_t offset<format_tag::nhwc>(OFFSET_ARGS) {
 } // namespace
 
 /** Calculate phy offset for channels [clo,chi) sequentially into memory
- * \c data_offf.  (i) Prepare coords for vectorized physical offset calc.
+ * \c data_off.  (i) Prepare coords for vectorized physical offset calc.
  * (ii) calc phys offset via func calls to memory_desc_wrapper_opt.
  *
  * \note Do not use if you have a formula version like nchw, nChw8c because

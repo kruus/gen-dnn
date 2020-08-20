@@ -242,12 +242,16 @@ const rpd_create_f *cpu_engine_t::get_reorder_implementation_list(
         p_regular_impl_list_map = &regular_impl_list_map();
         p_comp_s8s8_impl_list_map = &comp_s8s8_impl_list_map();
 #ifndef NDEBUG
-        if (0) { // debug checks
-            printf("reorder: check regular_impl_list_map...\n");
+        if (1) { // debug checks
+            //printf("reorder: check regular_impl_list_map...\n");
             check_map(*p_regular_impl_list_map);
-            printf("reorder: check comp_s8s8_impl_list_map...\n");
+            //printf("reorder: check comp_s8s8_impl_list_map...\n");
             check_map(*p_comp_s8s8_impl_list_map);
             // for development work -- move to dev/ XXX
+            once_info(); // misc helper info for asm coding
+        }
+        // Remove after development work :
+        if (0) {
             once_info(); // misc helper info for asm coding
         }
 #endif // NDEBUG
