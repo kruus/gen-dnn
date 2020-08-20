@@ -166,7 +166,7 @@ inline typename remove_reference<T>::type zero() {
 }
 
 template <typename T, typename... Args>
-std::unique_ptr<T> make_unique(Args &&... args) {
+inline std::unique_ptr<T> make_unique(Args &&... args) {
     return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 
@@ -180,20 +180,20 @@ inline bool everyone_is(T val, P item, Args... item_others) {
 }
 
 template <typename T, typename P>
-constexpr bool one_of(T val, P item) {
+inline constexpr bool one_of(T val, P item) {
     return val == item;
 }
 template <typename T, typename P, typename... Args>
-constexpr bool one_of(T val, P item, Args... item_others) {
+inline constexpr bool one_of(T val, P item, Args... item_others) {
     return val == item || one_of(val, item_others...);
 }
 
 template <typename T, typename P>
-constexpr P map(T pat, P def) {
+inline constexpr P map(T pat, P def) {
     return def;
 }
 template <typename T, typename P, typename... Args>
-constexpr P map(T pat, P def, T item, P ival, Args... item_others) {
+inline constexpr P map(T pat, P def, T item, P ival, Args... item_others) {
     return pat == item ? ival : map(pat, def, item_others...);
 }
 
@@ -241,7 +241,7 @@ template <size_t>
 struct int2type {};
 
 template <typename T>
-constexpr int product_impl(const T *arr, int2type<0>) {
+inline constexpr int product_impl(const T *arr, int2type<0>) {
     return arr[0];
 }
 
@@ -327,7 +327,7 @@ inline typename remove_reference<T>::type max_div(const T a, const U b) {
 }
 
 template <typename T>
-T *align_ptr(T *ptr, uintptr_t alignment) {
+inline T *align_ptr(T *ptr, uintptr_t alignment) {
     return (T *)(((uintptr_t)ptr + alignment - 1) & ~(alignment - 1));
 }
 

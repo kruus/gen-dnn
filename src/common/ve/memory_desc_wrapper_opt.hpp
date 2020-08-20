@@ -921,7 +921,8 @@ public:
 
 #define Short_ PragmaQuote(_NEC vector) PragmaQuote(_NEC nounroll)
         const int nd = ndims();
-        assert( nd < 6 );
+        //assert( nd <= 6 ); // can be equal to 6, as in gtests
+        // Weights_3d_CPU/reorder_simple_test_f32_f32.TestsReorder/13
         VecPos vp;
         if (is_pos_padded) {
             NOVEC_ ShortLoop() PragmaQuote(_NEC nounroll) PragmaQuote(_NEC loop_count(6))//;
@@ -1064,7 +1065,7 @@ public:
 
 #define Short_ PragmaQuote(_NEC vector) PragmaQuote(_NEC nounroll)
         const int nd = ndims();
-        assert( nd < 6 );
+        assert( nd <= 6 );
         VecPos32 vp32;
         if (is_pos_padded) {
             NOVEC_ ShortLoop() PragmaQuote(_NEC nounroll) PragmaQuote(_NEC loop_count(6))//;
@@ -1136,7 +1137,7 @@ public:
 
 #define Short_ PragmaQuote(_NEC vector) PragmaQuote(_NEC nounroll)
         const int nd = ndims();
-        assert( nd < 6 );
+        assert( nd <= 6 );
         if (is_pos_padded) {
             NOVEC_ ShortLoop() PragmaQuote(_NEC nounroll) PragmaQuote(_NEC loop_count(6))//;
             for (int d = 0; d < nd; ++d) {
