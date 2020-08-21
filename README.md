@@ -1,6 +1,15 @@
 oneAPI Deep Neural Network Library (oneDNN)
 ===========================================
 
+### default branch changed from "master" to ve-v1.4
+
+old **master** branch is around v0.16, very old.
+
+new default branch is **ve-v1.4**, and has many ref impls rewritten to
+use high vector length.   The single most important approach is to vectorize
+the offset calculations of *memory_desc_wrapper*, since nc++ won't vectorize
+loops containing function calls at all.  nc++ scalar code is *very* slow.
+
 ### VE Aurora port : v1.4
 
 - nc++ full build OK: examples, tests, benchdnn targets all OK
