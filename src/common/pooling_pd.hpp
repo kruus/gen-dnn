@@ -22,6 +22,7 @@
 #include "c_types_map.hpp"
 #include "primitive_desc.hpp"
 #include "type_helpers.hpp"
+#include "utils.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -56,7 +57,34 @@ struct pooling_pd_t : public primitive_desc_t {
         return status::success;
     }
 
+    bool constexpr is_fwd() const {
+        return utils::one_of(desc_.prop_kind, prop_kind::forward_training,
+                prop_kind::forward_inference);
+    }
+
+    const memory_desc_t *invariant_src_md() const {
+        return is_fwd() ? src_md() : diff_src_md();
+    }
+
+    const memory_desc_t *invariant_dst_md() const {
+        return is_fwd() ? dst_md() : diff_dst_md();
+    }
+
+
+private:
+    const memory_desc_t &src_desc() const {
+        return is_fwd() ? desc_.src_desc : desc_.diff_src_desc;
+    }
+    const memory_desc_t &dst_desc() const {
+        return is_fwd() ? desc_.dst_desc : desc_.diff_dst_desc;
+    }
+
+public:
     /* common pooling aux functions */
+
+    int ndims() const { return src_desc().ndims; }
+    int spatial_ndims() const { return ndims() - 2; }
+    bool is_3d() const { return ndims() == 5; }
 
     dim_t MB() const { return src_desc().dims[0]; }
     dim_t C() const { return src_desc().dims[1]; }
@@ -92,25 +120,8 @@ struct pooling_pd_t : public primitive_desc_t {
     dim_t padL() const { return desc_.padding[0][ndims() - 3]; }
     dim_t padR() const { return desc_.padding[1][ndims() - 3]; }
 
-    int ndims() const { return src_desc().ndims; }
-    int spatial_ndims() const { return ndims() - 2; }
-    bool is_3d() const { return ndims() == 5; }
-
     bool has_zero_dim_memory() const {
         return memory_desc_wrapper(src_desc()).has_zero_dim();
-    }
-
-    bool is_fwd() const {
-        return utils::one_of(desc_.prop_kind, prop_kind::forward_training,
-                prop_kind::forward_inference);
-    }
-
-    const memory_desc_t *invariant_src_md() const {
-        return is_fwd() ? src_md() : diff_src_md();
-    }
-
-    const memory_desc_t *invariant_dst_md() const {
-        return is_fwd() ? dst_md() : diff_dst_md();
     }
 
 protected:
@@ -133,13 +144,6 @@ protected:
                 : data_type::s32;
     }
 
-private:
-    const memory_desc_t &src_desc() const {
-        return is_fwd() ? desc_.src_desc : desc_.diff_src_desc;
-    }
-    const memory_desc_t &dst_desc() const {
-        return is_fwd() ? desc_.dst_desc : desc_.diff_dst_desc;
-    }
 };
 
 struct pooling_fwd_pd_t : public pooling_pd_t {

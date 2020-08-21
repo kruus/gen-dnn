@@ -19,6 +19,9 @@
 #include "norm.hpp"
 #include "rnn/rnn_aux.hpp"
 
+/** uncomment for verbose stats */
+//#define BENCHDNN_RNN_PRINT_STATISTICS
+
 namespace rnn {
 
 alg_t str2alg(const char *str) {
@@ -546,7 +549,6 @@ int compare_dat(const prb_t &p, data_kind_t kind, dnn_mem_t &mem_dt,
     size_t errors = 0;
     r->total += nelems;
 
-#define BENCHDNN_RNN_PRINT_STATISTICS
 #ifdef BENCHDNN_RNN_PRINT_STATISTICS
     final_compare = true; // in this case, always print those stats too
     double min_dt, max_dt, mean_dt = 0.0f, var_dt = 0.0f;
@@ -643,7 +645,7 @@ int compare_dat(const prb_t &p, data_kind_t kind, dnn_mem_t &mem_dt,
                 ok = (fabs(fp) > diff_threshold ? rel_diff : diff) <= rel_eps;
 
             if (!ok) {
-                errors++;
+                ++errors;
                 if (errors < 10 || verbose >= 10)
                     print_value(
                             p, kind, i, fp, dt, diff, rel_diff, final_compare);
