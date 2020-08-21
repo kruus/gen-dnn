@@ -26,13 +26,16 @@
 #--reset --mb=2 --dir=FWD_D --tag=axb --alg=AVG_P ic35iw13ow14kw3pw3
 
 #--reset --dir=BWD_D,BWD_W --tag=aBx16b --alg=AVG_NP,AVG_P mb1ic5_ih30iw50_oh16ow26_kh3kw3_sh2sw2_ph1pw1
-
 --reset --dir=FWD_D --tag=aBx16b --alg=MAX mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
 --reset --dir=FWD_D --tag=aBx16b --alg=MAX mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
 --reset --dir=FWD_D --tag=aBx16b --alg=AVG_P,AVG_NP mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
---reset --dir=BWD_D --tag=aBx16b --alg=MAX mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
 --reset --dir=BWD_D,BWD_W --tag=aBx16b --alg=MAX mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
 --reset --dir=BWD_D,BWD_W --tag=aBx16b --alg=AVG_NP,AVG_P mb1ic32_ih300iw500_oh151ow251_kh3kw3_sh2sw2_ph1pw1
+
+# A 1-d example
+--reset --tag=aBx8b --dir=FWD_D,BWD_D --alg=MAX,AVG_NP,AVG_P ic64iw32ow16kw3sw2pw0
+# A 3-d example
+--reset --tag=aBx8b --dir=FWD_D,BWD_D --alg=MAX,AVG_NP,AVG_P ic8id20ih40iw60od11oh21ow31kd2kh3kw4sd2sh2sw2pd1ph1pw1
 
 #--reset
 #--dir=FWD_D --tag=aBx16b --alg=MAX,AVG_NP,AVG_P
