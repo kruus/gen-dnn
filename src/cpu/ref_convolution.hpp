@@ -79,8 +79,8 @@ struct ref_convolution_fwd_t : public primitive_t {
         bool output_scales_mask_ok() const {
             using namespace data_type;
             const auto &mask = attr()->output_scales_.mask_;
-            return IMPLICATION(!utils::one_of(src_type, s8, u8),
-                           attr()->output_scales_.has_default_values())
+            return 1 //&& IMPLICATION(!utils::one_of(src_type, s8, u8),
+                   //        attr()->output_scales_.has_default_values())
                     && (mask == 0 || mask == 1 << 1);
         }
 
@@ -177,8 +177,8 @@ struct ref_convolution_bwd_data_t : public primitive_t {
         bool output_scales_mask_ok() const {
             using namespace data_type;
             const auto &mask = attr()->output_scales_.mask_;
-            return IMPLICATION(!utils::one_of(diff_dst_type, s8, u8),
-                           attr()->output_scales_.has_default_values())
+            return 1 //&& IMPLICATION(!utils::one_of(diff_dst_type, s8, u8),
+                    //       attr()->output_scales_.has_default_values())
                     && (mask == 0 || mask == 1 << 1);
         }
     };

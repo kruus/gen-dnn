@@ -97,6 +97,26 @@ struct Cvt { // Full definition default for is_int_conv == true
             static RET rs(acc_data_t const acc){
                 return round_and_saturate<RET>(acc);
             }
+    // more efficient if you just need the acc_data_t version
+    // Wait for later simple_q10n, which was rewritten!
+    //template<typename acc_data_t>
+    //        static acc_data_t acc_rs(acc_data_t const acc){
+    //            return round_and_saturate<RET>(acc);
+    //        }
+    template<typename acc_data_t>
+            static RET int_sat(acc_data_t const acc){
+                return saturate<RET>(acc);
+            }
+    template<typename acc_data_t> // default round, not nxcsr_round (slow on VE)
+            static int int_rs(acc_data_t const acc){
+                //return saturate<RET>((int)acc);
+                int v = acc; // VE can vectorize if use this type
+                int constexpr ret_bound_lo = (int)nstl::numeric_limits<RET>::lowest();
+                int constexpr ret_bound_hi = (int)nstl::numeric_limits<RET>::max();
+                if (v < ret_bound_lo) v = ret_bound_lo;
+                if (v > ret_bound_hi) v = ret_bound_hi;
+                return v;
+            }
 };
 template<typename RET>
 struct Cvt<RET, false/*is_int_conv*/> {
@@ -108,7 +128,30 @@ struct Cvt<RET, false/*is_int_conv*/> {
             static RET rs(acc_data_t const acc) { // !is_int_conv
                 return saturate<RET>(acc);
             }
+    template<typename acc_data_t>
+            static RET int_sat(acc_data_t const acc){
+                return acc;
+            }
+    template<typename acc_data_t>
+            static acc_data_t int_rs(acc_data_t const acc){
+                return acc;
+            }
 };
+
+/** round_and_saturate behavior for integer outputs
+ * but default-convert others.  float Nan/inf remain.
+ * ex. sqrt(-ve) s.t. float remains as -NaN. */
+template<typename out_t, typename in_t> inline 
+    typename utils::enable_if<nstl::is_integral<out_t>::value, out_t>::type
+    int_rs(in_t const in) {
+        return round_and_saturate<out_t>(in);
+    }
+
+template<typename out_t, typename in_t> inline 
+    typename utils::enable_if<!nstl::is_integral<out_t>::value, out_t>::type
+    int_rs(in_t const in) {
+        return in;
+    }
 
 }//anon::
 

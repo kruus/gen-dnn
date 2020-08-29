@@ -1124,7 +1124,7 @@ public:
         assert(noff <= MVL);
         assert(is_blocking_desc());
         const blocking_desc_t &blk = blocking_desc();
-#ifndef NDEBUG
+#if 0 && defined(NDEBUG)
         unsigned nsame=0U;
         for (int i=0; i<blk.inner_nblks; ++i) {
             for (int j=i+1; j<blk.inner_nblks; ++j) {
@@ -1132,7 +1132,8 @@ public:
                     ++nsame;
             }
         }
-        assert( nsame == 0U ); // inner_idxs[] MUST be distinct
+        // assert( nsame == 0U ); // inner_idxs[] MUST be distinct
+        // fails for aBCd2b4c2b (for example)
 #endif
 
 #define Short_ PragmaQuote(_NEC vector) PragmaQuote(_NEC nounroll)

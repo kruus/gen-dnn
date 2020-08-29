@@ -300,7 +300,7 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
 #endif // ! INLINE_KER_BIAS
 
     // TODO ||ize offset calcs for VE
-    printf(" rconv-bwd-%s-%s ", (diff_bias? "B":""), (is_int_conv? "I":""));
+    //printf(" rconv-bwd-%s-%s ", (diff_bias? "B":""), (is_int_conv? "I":""));
     parallel_nd(G, OC, [=](int g, int oc) {
         if (diff_bias) {
             // XXX: loss of precision when bias is a float...

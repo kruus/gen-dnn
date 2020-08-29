@@ -1446,6 +1446,218 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_dense(
 #undef SUBCASE
 #undef SUBCASE2
 
+#if 0
+        // 0.185, 0.179
+        case eltwise_soft_relu:
+            { 
+                parallel_nd(nelems, [&](ptrdiff_t e) {
+                        const data_t s = src[e];
+                        data_t &d = dst[e];
+                        d = ve_soft_relu_fwd(s);
+                        });
+            } break;
+#elif 0
+        case eltwise_soft_relu: // 0.1855
+        { // moving const outside
+            // soft relu is 
+            parallel(0, [&](const int ithr, const int nthr) {
+                    dim_t start = 0, end = 0;
+                    balance211(nelems, nthr, ithr, start, end);
+                    if (start == end) return;
+                    float const max_logf = 8.872284e+01; // ::log(FLT_MAX)
+                    for (dim_t i = start; i < end; i++) {
+                        // log1pf is NOT vectorized by nc++-3.0.27
+                        float const s = src[i];
+                        dst[i] = (data_t)( s < max_logf ? ::logf(1.0f + ::expf(s)) : s);
+                    }
+            });
+        } break;
+#endif
+
+#if 0
+        // 1.77 1.77 0.127 0.124
+        case eltwise_logistic: {
+            if (is_vectorizable<data_t>::value) {
+                parallel_nd(nelems, [&](ptrdiff_t e) {
+                    dst[e] = ve_logistic_fwd(src[e]);
+                });
+            } else {
+                parallel_nd(utils::div_up(nelems, blksz), [&](dim_t const blk) {
+                    dim_t const start = blk * blksz;
+                    dim_t const end   = (start + blksz > nelems? nelems: start + blksz);
+                    Medium_ for(dim_t e=start; e<end; ++e) {
+                        float x = -src[e];
+                        if (x > 87.0f) x = 87.0f;
+                        x =  ::expf(x);
+                        dst[e] = 1.f / (1.f + x);
+                    }
+                });
+            }
+        } break;
+#elif 0 // 1.77 1.77 0.123 0.123
+        case eltwise_logistic:
+            parallel_nd(utils::div_up(nelems, blksz), [&](dim_t const blk) {
+                dim_t const start = blk * blksz;
+                dim_t const end   = (start + blksz > nelems? nelems: start + blksz);
+                Medium_ for(dim_t e=start; e<end; ++e) {
+                    //float x = -src[e];
+                    //if (x > 87.0f) x = 87.0f;
+                    //dst[e] = 1.f / (1.f + ::expf(x));
+
+                    float x = src[e];
+                    data_t& y = dst[e];
+            x = -x;
+            if (x > 87.0f) x = 87.0f;
+            x =  ::expf(x);
+            y = 1.f / (1.f + x);
+                }
+            }); break;
+#elif 0 // 2.14 2.13 0.131 0.125
+        // both exp and logistic have 'inf' issues for VE vectorization
+        //CASE2(logistic, d = compute_eltwise_scalar_fwd(alg_kind, s, alpha, beta));
+        // VE default might not be checking input domain for vector math functions
+        case eltwise_logistic: {
+            parallel_nd(nelems, [&](ptrdiff_t e) {
+                float s = src[e];
+                if (s < -87.0f) s = -87.0f;
+                data_t &d = dst[e];
+                d = logistic_fwd<data_t,float>(s);
+            });
+        } break;
+#endif
+#if 0 // shows a more correct saturating version (not important)
+        // round,saturate expr of float s
+        // does not agree with benchdnn, but I think behaviour is better here
+        CASE_CVT_RS(exp, ve_exp_fwd(s));
+#elif 0
+        case eltwise_exp: {
+            // s8, u8, s32, f32
+            // DEN_VEC 1: compute_eltwise_vector_fwd
+            //     10.63 10.67 10.01 0.14
+            // here: XXEXP
+            // 0 : 10.64 10.64 0.109 0.107
+            //                 ***** *****
+            // 1 : 10.59 10.60 34.11 0.122
+            //     --cvt::rs            -- (less code lines)
+            //     ***** *****
+            //      1.78  1.83 0.115 0.108 
+            //     cvt::int_rs noop-int_rs
+            //      1.81  1.88 using ve_exp_fwd
+            // 2 : 10.66 10.62 0.120 0.125
+            //                 0.120 0.124
+            //     --vec_fwd-- --ve_exp_fwd--
+            //     without cvt (some wrong?)
+            //      1.78  1.83 withoutt compute_eltwise (wrong results)
+            parallel_nd(utils::div_up(nelems, blksz), [&](dim_t const blk) {
+                dim_t const start = blk * blksz;
+                dim_t const end   = (start + blksz > nelems? nelems: start + blksz);
+                if (is_vectorizable<data_t>::value) { // f32, s32
+                    // VE f32-->s32 does not need round_and_saturate
+                    float constexpr max_logf  = 87.f; // good enough
+                    float constexpr float_inf = HUGE_VALF;
+                    Medium_ for(dim_t e=start; e<end; ++e) {
+                        float s = src[e];
+                        s = (s > max_logf? float_inf : ::expf(s));
+                        dst[e] = s;
+                        //dst[e] = cvt::int_rs(s); // don't need
+                    }
+                } else {
+                    int const sz = end - start;
+                    // 4--8% FASTER and MORE CORRECT about saturating overflow
+                    // (huge values --> i8 127, but inf still -->0)
+                    float f[stack_elems];
+                    MFOR(i,sz) f[i] = src[start+i];     //unvec
+                    MFOR(i,sz) f[i] = ::expf(f[i]);
+                    float const f_hi = (float)std::numeric_limits<data_t>::max();
+                    MFOR(i,sz) if (f[i] > f_hi) f[i] = f_hi;
+                    MFOR(i,sz) dst[start+i] = (int)f[i]; //unvec
+                }
+            });
+        } break;
+#endif
+
+#if 0
+        // no:
+        CASE2(logistic_use_dst_for_bwd, logistic_fwd(s));
+        //CASE_CVT_RS(logistic_use_dst_for_bwd, ve_logistic_fwd(s));
+#elif 0
+        // VE vector outputs 1, not 0 for too-small input:
+        case eltwise_logistic_use_dst_for_bwd:
+        {
+            parallel(0, [&src,&dst,&nelems](const int ithr, const int nthr) {
+                dim_t start = 0, end = 0;
+                balance211(nelems, nthr, ithr, start, end);
+                if (start == end) return;
+                //float const neg_max_logf = -8.872284e+01f; // ::log(FLT_MAX)
+                float constexpr neg_max_logf = -87.0f; // exp(small x) ~ 0
+                for (dim_t i = start; i < end; ++i) {
+#if 0 // nice behaviour (forgiving) but fails benchdnn
+                    float s = src[i];
+                    if (s < neg_max_logf) s = neg_max_logf;
+                    dst[i] = logistic_fwd<data_t,float>(s);
+#else
+                    float v = ::expf((float)-src[i]);
+                    float w = 1.0f / (1.0f + v);
+                    dst[i] = w;
+#endif
+                }
+            });
+        } break;
+#endif
+
+#if 0
+        // ovflw cases: CASE(pow, s, alpha, beta);
+        // when input is -0, VE output is -inf, but ref output wants +inf
+        // assert( signbit(powf(negzero,-1.0f)) ) FAILS at -O4, OK at -O0
+        // XXX This is a WRONG WAY to appease benchdnn (should fix ref calc first) XXX
+        //     and then readjust here. Perhaps compile ref calc at -O2 or so?
+        case eltwise_pow: {
+            if (beta == 0.0f){
+                parallel_nd(nelems, [&](ptrdiff_t e) {dst[e] = alpha;});
+            }else if (beta == 1.0f){
+                parallel_nd(nelems, [&](ptrdiff_t e) {dst[e] = alpha * src[e];});
+            }else if (beta == 0.5f){
+                parallel_nd(nelems, [&](ptrdiff_t e) {dst[e] = alpha * sqrtf(src[e]);});
+            }else if (beta == 1.5f){
+                parallel_nd(nelems, [&](ptrdiff_t e) {float const s = src[e]; dst[e] = alpha * s * sqrtf(s);});
+            }else if (beta == 2.0f){
+                parallel_nd(nelems, [&](ptrdiff_t e) {float const s = src[e]; dst[e] = alpha * s * s;});
+            }else if (beta < 0.f && beta == (float)(int)beta
+                    && (-(int)beta & 0x1) ) {
+                //printf(" beta<0 is a -ve odd integer\n");
+                // when beta is a -ve odd integer, CORRECT powf(-0,beta) value is -inf
+                // -O4 REF value is incorrect (-O0 is correct)
+                //
+                // (either/both fast-math and vector math funcs allow cheating on limit-cases)
+                // (perhaps -O2 will give standards-compliant ::powf result? or an nc++ flag?)
+                // alpha -ve/+ve is yet another corner case to fix
+                if (alpha >= 0.0f) {
+                    float const negzero = -0.0f;
+                    float const fixup = HUGE_VALF;
+                    parallel_nd(nelems, [&](ptrdiff_t e) {
+                            float const s = src[e];
+                            dst[e] = alpha * (s == negzero
+                                    ? fixup : ::powf(s, beta));
+                            });
+                }else{
+                    float const negzero = -0.0f;
+                    float const fixup = HUGE_VALF;
+                    parallel_nd(nelems, [&](ptrdiff_t e) {
+                            float const s = src[e];
+                            dst[e] = alpha * (::fabs(s) == 0.0f
+                                    ? fixup : ::powf(s, beta));
+                            });
+                }
+            }else{
+                parallel_nd(nelems, [&](ptrdiff_t e) {
+                        //dst[e] = pow_fwd(src[e], alpha, beta);
+                        // beta=0.0f special case done above, avoit test...
+                        dst[e] = alpha * ::powf(src[e], beta);
+                });
+            }
+        } break;
+#endif
+
         default: assert(!"unknown eltwise alg_kind");
         parallel_nd(nelems, [&](ptrdiff_t e) {
                 dst[e] = 0.f;

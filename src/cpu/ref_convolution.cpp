@@ -213,7 +213,6 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
         return d;
     };
 
-    // TODO ||ize offset calcs for VE
     parallel_nd(G, MB, OC, OD, OH, OW,
             [&](int g, int mb, int oc, int od, int oh, int ow) {
                 float a = bias ? get_bias(bias, bias_d.off(g * OC + oc),
@@ -659,6 +658,8 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
 using namespace data_type;
 
 template struct ref_convolution_fwd_t<f32>;
+template struct ref_convolution_fwd_t<bf16,bf16,bf16,f32>;
+template struct ref_convolution_fwd_t<bf16,bf16,f32,f32>;
 
 template struct ref_convolution_fwd_t<u8, s8, f32, s32>;
 template struct ref_convolution_fwd_t<u8, s8, s32, s32>;

@@ -326,21 +326,6 @@ void ref_pooling_fwd_t<data_type, acc_type>::execute_forward(
     }
 #endif
 
-    if (1 || v) {
-        char d[100], s[100], w[100], dd[100], ss[100], ww[100];
-        dnnl_md2fmt_str(d,100,dst_d.md_);
-        dnnl_md2fmt_str(s,100,src_d.md_);
-        if (ws) dnnl_md2fmt_str(w,100,ws_d.md_);
-        else { w[0] = 'x'; w[1] = '\0'; }
-        dnnl_md2dim_str(dd,100,dst_d.md_);
-        dnnl_md2dim_str(ss,100,src_d.md_);
-        if (ws) dnnl_md2dim_str(ww,100,ws_d.md_);
-        else { w[0] = 'x'; w[1] = '\0'; }
-        //printf(" MB,OC=%d,%d ID,IH,IW=%d,%d,%d --> OD,OH,OW=%d,%d,%d\n"
-        //    " dst %s %s\nsrc %s %s\nwd %s %s\n",
-        //    MB,OC, ID,IH,IW, OD,OH,OW, d, dd, s, ss, w, ww);
-    }
-
     if (alg == alg_kind::pooling_max) {
         auto elems = (size_t)MB * OC * OD * OH * OW;
         bool force_sequential = 0; // 1 for debug

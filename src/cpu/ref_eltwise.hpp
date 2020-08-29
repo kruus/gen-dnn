@@ -53,6 +53,7 @@ public:
     const float alpha_;
     const float beta_;
     const float scale_;
+    // XXX VE todo : move alg_subcase and its setter(alg,alpha,beta), for "pow"
 };
 
 template <impl::data_type_t data_type>
@@ -60,7 +61,7 @@ struct ref_eltwise_fwd_t : public primitive_t {
     struct pd_t : public cpu_eltwise_fwd_pd_t {
         using cpu_eltwise_fwd_pd_t::cpu_eltwise_fwd_pd_t;
 
-        DECLARE_COMMON_PD_T("ref:any", ref_eltwise_fwd_t);
+        DECLARE_COMMON_PD_T(this->impl_name(), ref_eltwise_fwd_t);
 
         status_t init(engine_t *engine) {
             using namespace utils;
@@ -87,6 +88,14 @@ struct ref_eltwise_fwd_t : public primitive_t {
         }
 
         bool use_dense_, use_nCspBc_padded_;
+
+        private:
+        char const* impl_name() const {
+            // used to all be called "ref:any"
+            return (use_dense_? "ref:dense"
+                    : use_nCspBc_padded_ ? "ref:nCsp8c_padded"
+                    : "ref:any");
+        }
     };
 
     ref_eltwise_fwd_t(const pd_t *apd) : primitive_t(apd) {}
@@ -114,7 +123,7 @@ struct ref_eltwise_bwd_t : public primitive_t {
     struct pd_t : public cpu_eltwise_bwd_pd_t {
         using cpu_eltwise_bwd_pd_t::cpu_eltwise_bwd_pd_t;
 
-        DECLARE_COMMON_PD_T("ref:any", ref_eltwise_bwd_t);
+        DECLARE_COMMON_PD_T(this->impl_name(), ref_eltwise_bwd_t);
 
         status_t init(engine_t *engine) {
             using namespace utils;
@@ -150,6 +159,10 @@ struct ref_eltwise_bwd_t : public primitive_t {
         bool use_dense_;
 
     private:
+        char const* impl_name() const {
+            return use_dense_? "ref:dense" : "ref:any";
+        }
+
         void init_scratchpad() {
             const memory_desc_wrapper data_d(src_md());
             const memory_desc_wrapper diff_data_d(diff_dst_md());
@@ -186,4 +199,4 @@ private:
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino=+2s,l0,\:4,N-s
+// vim: et ts=4 sw=4 cindent cino+=+2s,l0,\:4,N-s

@@ -34,7 +34,7 @@ inline status_t ref_convolution_fwd_t<src_type,wei_type,dst_type,acc_type>
 ::pd_t::init(engine_t *engine) {
     using namespace data_type;
     Consistency ok("ref_convolution_fwd_t...init");
-#define AND_(...) SCHK(ok,(__VA_ARGS__))
+#define AND_(...) SCHKVV(ok,(__VA_ARGS__))
     AND_(is_fwd());
     AND_(set_default_alg_kind(alg_kind::convolution_direct));
     AND_(expect_data_types(src_type, wei_type, data_type::undef,
@@ -61,7 +61,7 @@ inline status_t ref_convolution_bwd_data_t<diff_src_type, wei_type,
        diff_dst_type,acc_type>::pd_t::init(engine_t *engine)
 {
     Consistency ok("ref_convolution_bwd_data_t...init");
-#define AND_(...) SCHK(ok,(__VA_ARGS__))
+#define AND_(...) SCHKVV(ok,(__VA_ARGS__))
     AND_(desc()->prop_kind == prop_kind::backward_data);
     AND_(set_default_alg_kind(alg_kind::convolution_direct));
     AND_(expect_data_types(diff_src_type, wei_type,

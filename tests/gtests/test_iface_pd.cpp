@@ -65,6 +65,7 @@ TEST_F(pd_test, ConvTestEmpty) {
         } catch (error &) { no_exception = false; }
 
         ASSERT_TRUE(no_exception == allow_empty);
+        // VE XXX why failing? I recall changing to always allow. Why? FIXME
         ASSERT_TRUE(is_empty == allow_empty);
     }
 }
