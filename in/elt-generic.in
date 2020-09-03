@@ -1,29 +1,37 @@
 # test execute_forward_generic
 # generic handles non-zero-preserving cases.  bf16 is UNIMPLEMENTED_FAILED
+# quick test
+#--reset --alg=srelu --dir=FWD_D --dt=f32 --alpha=0 --beta=0 --inplace=true --tag=ABx16a16b 85x87x99x3
+#--reset
+
 # main tests
---reset --dir=FWD_D --dt=u8,s8,s32 --alpha=0 --beta=0 --inplace=true --tag=ABx16a16b
---alg=logistic_dst,exp_dst # most int ones are UNTESTED_FAILED
-85x87x99x3
---reset --dir=FWD_D --dt=f32 --alpha=0 --beta=0 --inplace=true --tag=ABx16a16b
---alg=srelu,logistic,exp,log,logistic_dst,exp_dst
-85x87x99x3
---reset --dir=FWD_D --tag=ABx16a16b --alg=linear --dt=f32 --alpha=0     --beta=0.25 85x87x99x3
---reset --dir=FWD_D --tag=ABx16a16b --alg=linear --dt=f32 --alpha=0.22  --beta=0.33 85x87x99x3
---reset --dir=FWD_D --tag=ABx16a16b --alg=clip   --dt=f32 --alpha=0.11  --beta=0.88 85x87x99x3
+# most int ones are UNTESTED_FAILED
+#--dir=FWD_D --dt=u8 --alpha=0 --beta=0 --inplace=true --tag=ABx16a16b --alg=sqrt_dst # ref:dense!
+#85x87x99x3
+--dir=FWD_D --alpha=0 --beta=0 --inplace=true --tag=ABx16a16b
+
+--dt=u8,s8,s32 --alg=logistic_dst,exp_dst 85x87x99x3 # most still UNTESTED_FAILED
+
+#sqrt_dst is dense
+--dt=f32
+--alg=srelu,logistic,exp,log,logistic_dst,exp_dst 85x87x99x3
+--alg=linear --alpha=0     --beta=0.25 85x87x99x3
+--alg=linear --alpha=0.22  --beta=0.33 85x87x99x3
+--alg=clip   --alpha=0.11  --beta=0.88 85x87x99x3
 
 # touch various subcases
---reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.11  --beta=-2   83x89x99x3
---reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=-0.11 --beta=-2   83x89x99x3
---reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.22  --beta=-1   83x89x99x3
---reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=-0.22 --beta=-1   83x89x99x3
---reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.33  --beta=0    83x89x99x3
-# dense! --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.44  --beta=0.9f 83x89x99x3
-# dense! --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.44  --beta=0.5f 83x89x99x3
-# dense! --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.55  --beta=1.0f 83x89x99x3
-# dense! --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.66  --beta=1.5f 83x89x99x3
-# dense! --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.77  --beta=2.0f 83x89x99x3
---reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.99  --beta=-3   83x89x99x3
---reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=-0.99 --beta=-3   83x89x99x3
---reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.10  --beta=-1.1 83x89x99x3
---reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=-0.10 --beta=-1.1 83x89x99x3 # EDOM for x<0
+--alg=pow --dt=f32
+ --alpha=0,+0.11,-0.11 --beta=-2   85x87x99x3
+ --alpha=0,+0.22,-0.22 --beta=-1   85x87x99x3
+ --alpha=0,+0.33,-0.33 --beta=0    85x87x99x3
+#--alpha=0.44  --beta=0.9f 85x87x99x3 # dense! 
+#--alpha=0.44  --beta=0.5f 85x87x99x3 # dense! 
+#--alpha=0.55  --beta=1.0f 85x87x99x3 # dense! 
+#--alpha=0.66  --beta=1.5f 85x87x99x3 # dense! 
+#--alpha=0.77  --beta=2.0f 85x87x99x3 # dense! 
+ --alpha=0,+0.99,-0.99 --beta=-3   85x87x99x3
+ --alpha=0,-1.99,+1.99 --beta=-4   85x87x99x3
+ --alpha=0,-0.99,+0.99 --beta=-5   85x87x99x3
+ --alpha=0,+1.1,-1.1   --beta=-1.1 85x87x99x3
+#--alpha=+0.44,-0.44   --beta=+1.1 85x87x99x3 # dense!
 

@@ -12,22 +12,23 @@
 # nCsp8c! --reset --dir=FWD_D --tag=aBx16b --alg=clip   --dt=f32 --alpha=0.11  --beta=0.88 83x89x99x3
 
 # simple warmup
---reset --dir=FWD_D --dt=f32 --alpha=0 --beta=0 --inplace=true --tag=abx --alg=relu 83x89x99x3
+#--reset --dir=FWD_D --dt=f32 --alpha=0 --beta=0 --inplace=true --tag=abx --alg=relu 83x89x99x3
 #--reset --dir=FWD_D --dt=s8,u8,s32,f32 --alpha=0 --beta=0 --inplace=true --tag=abx --alg=relu_dst 83x89x99x3
 #
 # touch various subcases
-# generic!--reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.11  --beta=-2   83x89x99x3
-# generic!--reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=-0.11 --beta=-2   83x89x99x3
-# generic!--reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.22  --beta=-1   83x89x99x3
-# generic!--reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=-0.22 --beta=-1   83x89x99x3
-# generic!--reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.33  --beta=0    83x89x99x3
+# any!--reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.11  --beta=-2   83x89x99x3
+# any!--reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=-0.11 --beta=-2   83x89x99x3
+# any!--reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.22  --beta=-1   83x89x99x3
+# any!--reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=-0.22 --beta=-1   83x89x99x3
+# any!--reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.33  --beta=0    83x89x99x3
 --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.44  --beta=0.9f 83x89x99x3
 --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.44  --beta=0.5f 83x89x99x3
 --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.55  --beta=1.0f 83x89x99x3
 --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.66  --beta=1.5f 83x89x99x3
 --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.77  --beta=2.0f 83x89x99x3
-# generic! --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.99  --beta=-3   83x89x99x3
-# generic! --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=-0.99 --beta=-3   83x89x99x3
-# generic! --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0.10  --beta=-1.1 83x89x99x3
-# generic! --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=-0.10 --beta=-1.1 83x89x99x3 # EDOM for x<0
+# any! --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0,+0.88,+1.88,-0.99,+0.99 --beta=-3   83x89x99x3
+# any! --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0,+0.88,+1.88,-0.99,+0.99 --beta=-4   83x89x99x3
+# any! --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0,+0.88,+1.88,-0.99,+0.99 --beta=-5   83x89x99x3
+# any! --reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0,+1.1,-1.1 --beta=-1.1 83x89x99x3
+--reset --dir=FWD_D --tag=ABx16a16b --alg=pow    --dt=f32 --alpha=0,+1.1,-1.1  --beta=+1.1 83x89x99x3
 

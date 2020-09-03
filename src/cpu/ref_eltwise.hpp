@@ -93,7 +93,7 @@ struct ref_eltwise_fwd_t : public primitive_t {
         char const* impl_name() const {
             // used to all be called "ref:any"
             return (use_dense_? "ref:dense"
-                    : use_nCspBc_padded_ ? "ref:nCsp8c_padded"
+                    : use_nCspBc_padded_ ? "ref:nCsp8c_padded-any"
                     : "ref:any");
         }
     };
@@ -104,15 +104,23 @@ struct ref_eltwise_fwd_t : public primitive_t {
     virtual status_t execute(const exec_ctx_t &ctx) const override {
         if (pd()->use_dense_)
             execute_forward_dense(ctx);
+#if ! defined(__ve)
+        // NOT FAST on VE.
+        // code geared to simd vector length 8 or 16
+        // generic impl, optimized for VE, is much fastr
+        // XXX x86: speed comparison with VE generic eltwise fwd XXX
         else if (pd()->use_nCspBc_padded_)
             execute_forward_nCspBc_padded(ctx);
+#endif
         else
             execute_forward_generic(ctx);
         return status::success;
     }
 
 private:
+#if ! defined(__ve)
     void execute_forward_nCspBc_padded(const exec_ctx_t &ctx) const;
+#endif
     void execute_forward_dense(const exec_ctx_t &ctx) const;
     void execute_forward_generic(const exec_ctx_t &ctx) const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd().get(); }

@@ -1,22 +1,33 @@
 # test execute_forward_nCsp8c_padded
---reset
---dir=FWD_D --dt=s8,u8,s32 --alpha=0 --beta=0 --inplace=true --tag=aBx16b
---alg=relu,relu_dst,tanh_dst,elu_dst,sqrt_dst,logistic_dst,exp_dst
-85x89x97x3
+#--reset
+#--dir=FWD_D --dt=s8,u8,s32 --alpha=0 --beta=0 --inplace=true --tag=aBx16b
+#--alg=relu,relu_dst,tanh_dst,elu_dst,sqrt_dst # dense! not nCsp8c
+#--alg=logistic_dst,exp_dst # nCsp8c!
+#85x89x97x3
+
 --reset
 --dir=FWD_D --dt=f32 --alpha=0 --beta=0 --inplace=true --tag=aBx16b
---alg=relu,tanh,elu,square,abs,sqrt,linear,brelu,srelu,logistic,exp,gelu_tanh,swish,log,clip,gelu_erf,relu_dst,tanh_dst,elu_dst,sqrt_dst,logistic_dst,exp_dst
+#--alg=relu,tanh,elu,square,abs,sqrt,linear,brelu,gelu_tanh,swish,clip,gelu_erf,relu_dst,tanh_dst,elu_dst,sqrt_dst # dense!
+--alg=srelu,logistic,exp,log,logistic_dst,exp_dst
 85x89x97x3
 --reset --dir=FWD_D --tag=aBx16b --alg=linear --dt=f32 --alpha=0     --beta=0.25 85x89x97x3
 --reset --dir=FWD_D --tag=aBx16b --alg=linear --dt=f32 --alpha=0.22  --beta=0.33 85x89x97x3
 --reset --dir=FWD_D --tag=aBx16b --alg=clip   --dt=f32 --alpha=0.11  --beta=0.88 85x89x97x3
---reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.5   --beta=0    85x89x97x3
---reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.5   --beta=1    85x89x97x3
---reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.5   --beta=0.5  85x89x97x3
---reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.5   --beta=1.5  85x89x97x3
---reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.5   --beta=2    85x89x97x3
---reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.5   --beta=-1   85x89x97x3
---reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=-0.5  --beta=-3   85x89x97x3
---reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.5   --beta=-0.6 85x89x97x3
---reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=-0.5  --beta=-0.6 85x89x97x3
---reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.5   --beta=3    85x89x97x3
+
+# touch various subcases
+# any! --reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.11  --beta=-2   83x89x99x3
+# any! --reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=-0.11 --beta=-2   83x89x99x3
+# any! --reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.22  --beta=-1   83x89x99x3
+# any! --reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=-0.22 --beta=-1   83x89x99x3
+# any! --reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.33  --beta=0    83x89x99x3
+# dense! --reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.44  --beta=0.9f 83x89x99x3
+# dense! --reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.44  --beta=0.5f 83x89x99x3
+# dense! --reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.55  --beta=1.0f 83x89x99x3
+# dense! --reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.66  --beta=1.5f 83x89x99x3
+# dense! --reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0.77  --beta=2.0f 83x89x99x3
+# any! --reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0,+0.88,+1.88,-0.99,+0.99 --beta=-3   83x89x99x3
+# any! --reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0,+0.88,+1.88,-0.99,+0.99 --beta=-4   83x89x99x3
+# any! --reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0,+0.88,+1.88,-0.99,+0.99 --beta=-5   83x89x99x3
+# any! --reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=0,+1.1,-1.1 --beta=-1.1 83x89x99x3
+# dense! --reset --dir=FWD_D --tag=aBx16b --alg=pow    --dt=f32 --alpha=+0.10,-0.10   --beta=+1.1 83x89x99x3
+
