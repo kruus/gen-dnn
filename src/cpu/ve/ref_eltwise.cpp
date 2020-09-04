@@ -870,8 +870,8 @@ rs_float_to_int_to_notbigger(data_t *i8_out, float const *f_in, int const vl)
  *
  * - VE .s has no function calls, but still has linear "switch" tests (ouch)
  *
- * - no restriction on \c vl (but must be int)
- * - \c d and \c x \b may be aliased
+ * - \b no restriction on \c vl (but must be int)
+ * - \c d and \c s \b may be aliased
  */
 static void compute_eltwise_vector_fwd( const alg_kind_t alg,
         float alpha, float beta, float const scale,

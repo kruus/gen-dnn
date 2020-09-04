@@ -101,9 +101,11 @@ while getopts ":m:u:N:hvjatTdDqQP:FbBrRowW1567iMrcC" arg; do
             CMAKETRACE="--trace --debug-trycompile"
             ;;
         d) # cmake build mode: [0] : cmake Release build.
-            # -d   : RelWithDebInfo
-            # -dd  : Debug
-            # -ddd : Debug and -O0
+            # None : Release
+            # -d   : ReleaseWithAssert
+            # -dd  : RelWithDebInfo
+            # -ddd : Debug
+            # more : Debug and -O0
             DODEBUG=$(( DODEBUG + 1 ))
             ;;
         D) # [no] Doxygen-only : make doc (or doc-full with -DD) and stop. -q will reuse build/

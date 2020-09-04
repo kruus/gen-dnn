@@ -15,14 +15,22 @@
 *******************************************************************************/
 
 #define FWD_IMPL 4
+// errors:
+// 0 : rconv-0.log OK, mistrusted 3 of conv.in mode=C Real Time 17.934
+// 1 : rconv-1.log seg fault in --conv g32ic32ih112oc32oh112kh3ph1n"mobilenet:conv2_1/dw"
+// 1 : rconv-1.log OK RTime 15.98 s
+// 2 : rconv-2.log OK 15.72 s
+// 3 : rconv-3.log OK 15.43 s
+// 4 : rconv-4.log OK 15.23 s
 #define ELT_SCALAR (FWD_IMPL>=3)
 // conv-gemm.in
 // gemm :       190,213,145,265 (191,194,120)
 //   add --skip-impl=gemm to run ref impls?
 //   NO. comment them out in cpu_convolution_list.cpp
 //   Perhaps benchdnn should use iterator api to continue trying
-//   to find a non-skipped impl.  Cannot skip gemm convolution and
-//   still run the ref impl (lower) !)
+//   to find a non-skipped impl.
+//
+//   Cannot skip gemm convolution and still run the ref impl (lower) !)
 // conv.in (much smaller tests when no gemm impl present)
 // -1 : 48.5984 75.4461 68.4999 107.548 31.2228 24.5472 25.612  24.4907 203.698
 //  0 : 48.6771 84.7707 87.7413 108.005 40.8471 24.7904 25.6382 24.2934 215.264
@@ -127,63 +135,75 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
     auto bias = CTX_IN_MEM(const char *, DNNL_ARG_BIAS);
     auto dst = CTX_OUT_MEM(dst_data_t *, DNNL_ARG_DST);
 
-    const memory_desc_wrapper src_d(pd()->src_md());
-    const memory_desc_wrapper dst_d(pd()->dst_md());
-    const memory_desc_wrapper weights_d(pd()->weights_md(0));
-    const memory_desc_wrapper bias_d(pd()->weights_md(1));
+    typedef typename ref_convolution_fwd_t<src_type, wei_type, dst_type,
+            acc_type>::pd_t mypd_t;
+    mypd_t const* mypd = pd();
 
-    const bool with_groups = pd()->with_groups();
+    // debug mem corruption?
+    //assert( src );
+    //assert( weights );
+    //assert( dst );
+    //assert( mypd != nullptr );
+    //assert( mypd->attr() != nullptr );
 
-    const int G = pd()->G();
-    const int MB = pd()->MB();
-    const int OD = pd()->OD();
-    const int OH = pd()->OH();
-    const int OW = pd()->OW();
-    const int ID = pd()->ID();
-    const int IH = pd()->IH();
-    const int IW = pd()->IW();
+    const memory_desc_wrapper src_d(mypd->src_md());
+    const memory_desc_wrapper dst_d(mypd->dst_md());
+    const memory_desc_wrapper weights_d(mypd->weights_md(0));
+    const memory_desc_wrapper bias_d(mypd->weights_md(1));
 
-    const int OCxG = pd()->OC();        // all channels
-    const int ICxG = pd()->IC();
+    const bool with_groups = mypd->with_groups();
+
+    const int G = mypd->G();
+    const int MB = mypd->MB();
+    const int OD = mypd->OD();
+    const int OH = mypd->OH();
+    const int OW = mypd->OW();
+    const int ID = mypd->ID();
+    const int IH = mypd->IH();
+    const int IW = mypd->IW();
+
+    const int OCxG = mypd->OC();        // all channels
+    const int ICxG = mypd->IC();
     const int OC = OCxG / G;            // channels per group
     const int IC = ICxG / G;
-    const int KD = pd()->KD();
-    const int KH = pd()->KH();
-    const int KW = pd()->KW();
+    printf(" g%dic%doc%d IC,OC(per group)=%d,%d\n", G,ICxG,OCxG, IC,OC);
+    const int KD = mypd->KD();
+    const int KH = mypd->KH();
+    const int KW = mypd->KW();
 
-    const int KSD = pd()->KSD();
-    const int KSH = pd()->KSH();
-    const int KSW = pd()->KSW();
+    const int KSD = mypd->KSD();
+    const int KSH = mypd->KSH();
+    const int KSW = mypd->KSW();
 
-    const int KDD = pd()->KDD() + 1;
-    const int KDH = pd()->KDH() + 1;
-    const int KDW = pd()->KDW() + 1;
+    const int KDD = mypd->KDD() + 1;
+    const int KDH = mypd->KDH() + 1;
+    const int KDW = mypd->KDW() + 1;
 
-    const int padFront = pd()->padFront();
-    const int padT = pd()->padT();
-    const int padL = pd()->padL();
+    const int padFront = mypd->padFront();
+    const int padT = mypd->padT();
+    const int padL = mypd->padL();
 
-    const int ndims = pd()->desc()->src_desc.ndims;
+    const int ndims = mypd->desc()->src_desc.ndims;
 
     using namespace data_type;
     bool constexpr is_int_conv = utils::one_of(src_type, s32, s8, u8);
 
     // scale_idx_mult = 1 for per_oc scales and 0, otherwise
     const int scale_idx_mult
-            = pd()->attr()->output_scales_.mask_ == (1 << 1);
-    const float *scales = pd()->attr()->output_scales_.scales_;
+            = mypd->attr()->output_scales_.mask_ == (1 << 1);
+    const float *scales = mypd->attr()->output_scales_.scales_;
 
 #if FWD_IMPL<=1
     auto maybe_oscale = [=](float &d, int g, int oc) {
         const int scale_idx_mult
-                = pd()->attr()->output_scales_.mask_ == (1 << 1);
-        const float *scales = pd()->attr()->output_scales_.scales_;
+                = mypd->attr()->output_scales_.mask_ == (1 << 1);
+        const float *scales = mypd->attr()->output_scales_.scales_;
         // scale_idx_mult = 1 for per_oc scales and 0, otherwise
         d *= scales[(g * OC + oc) * scale_idx_mult];
     };
 #endif
 
-    const post_ops_t& ops = pd()->attr()->post_ops_;
+    const post_ops_t& ops = mypd->attr()->post_ops_;
 
 #if FWD_IMPL<=2
     auto maybe_postops = [&](float &d, dst_data_t const dst_value) {
@@ -226,13 +246,13 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
                     a[i] += e.sum.scale * dst_float[i];
                 }
             } else {
-#if 1 //orig
+#if 0 //orig
                 VFOR(i,dvl) {
                     a[i] = eltwises_[idx]->compute_scalar(a[i]);
                 }
-#elif 0 //new BUGGY sometimes
-                // XXX FIXME bug here?
+#elif 1 //new BUGGY sometimes
                 eltwises_[idx]->compute_vec_reg(a, a, dvl);
+                //using cvt = Cvt<data_t, is_int_dt>; // postops are pure-float!
 #else
                 float tmp[MVL];
                 eltwises_[idx]->compute_vec_reg(tmp, a, dvl);
@@ -315,15 +335,24 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
     const dim_t weights_kw_stride
             = (ndims >= 3) ? weights_str[ndims - 1 + gr_shift] : 0;
 
-    auto ker_plain = [=](int g, int mb, int oc, int od, int oh, int ow) {
+    // pooling has a more advanced "iterate over source pre-image tile" method TODO
+    auto ker_plain = [&](int const g, int const mb, int const oc, int const od, int const oh, int const ow) {
         assert(3 <= ndims && ndims <= 5);
         acc_data_t d = 0;
-
-        const dim_t src_loc_off = off_abx(src_d, 0, mb, g * IC, 0, 0, 0);
-        const dim_t weights_loc_off = off_abxg(weights_d, g, oc, 0, 0, 0, 0);
-
-        const src_data_t *__restrict src_loc = src + src_loc_off;
-        const wei_data_t *__restrict weights_loc = weights + weights_loc_off;
+        const src_data_t * __restrict src_loc;
+        const wei_data_t * __restrict weights_loc;
+        {
+            const dim_t src_loc_off = off_abx(src_d, 0, mb, g * IC, 0, 0, 0);
+            src_loc = src + src_loc_off;
+            const dim_t weights_loc_off = off_abxg(weights_d, g, oc, 0, 0, 0, 0);
+            weights_loc = weights + weights_loc_off;
+        }
+        assert(  g >= 0 &&  g <  G );
+        assert( mb >= 0 && mb < MB );
+        assert( oc >= 0 && oc < OC );
+        assert( od >= 0 && od < OD );
+        assert( oh >= 0 && oh < OH );
+        assert( ow >= 0 && ow < OW );
 
         if (IC > KW) {
             for_(dim_t kd = 0; kd < KD; ++kd)
@@ -332,9 +361,12 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
                 const dim_t id = od * KSD - padFront + kd * KDD;
                 const dim_t ih = oh * KSH - padT + kh * KDH;
                 const dim_t iw = ow * KSW - padL + kw * KDW;
-                if (id < 0 || id >= ID || ih < 0 || ih >= IH || iw < 0
-                        || iw >= IW)
-                    continue;
+                //if (id < 0 || id >= ID || ih < 0 || ih >= IH || iw < 0
+                //        || iw >= IW)
+                //    continue;
+                if (id < 0 || id >= ID) continue;
+                if (ih < 0 || ih >= IH) continue;
+                if (iw < 0 || iw >= IW) continue;
                 for (int ic = 0; ic < IC; ++ic) {
                     const dim_t src_off = ic + id * src_id_stride
                             + ih * src_ih_stride + iw * src_iw_stride;
@@ -346,16 +378,21 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
                 }
             }
         } else {
-            for_(dim_t ic = 0; ic < IC; ++ic)
-            for_(dim_t kd = 0; kd < KD; ++kd)
-            for_(dim_t kh = 0; kh < KH; ++kh)
-            for (dim_t kw = 0; kw < KW; ++kw) {
+            NOVEC for_(dim_t ic = 0; ic < IC; ++ic)
+            NOVEC for_(dim_t kd = 0; kd < KD; ++kd)
+            NOVEC for_(dim_t kh = 0; kh < KH; ++kh)
+            //NOVEC // REQUIRED for VE to avoid [some, NOT ALL] segfaults :(
+            NOVEC for (dim_t kw = 0; kw < KW; ++kw) {
                 const dim_t id = od * KSD - padFront + kd * KDD;
                 const dim_t ih = oh * KSH - padT + kh * KDH;
                 const dim_t iw = ow * KSW - padL + kw * KDW;
-                if (id < 0 || id >= ID || ih < 0 || ih >= IH || iw < 0
-                        || iw >= IW)
-                    continue;
+                //if (id < 0 || id >= ID || ih < 0 || ih >= IH || iw < 0
+                //        || iw >= IW)
+                //    continue;
+                if (id < 0 || id >= ID) continue;
+                if (ih < 0 || ih >= IH) continue;
+                if (iw < 0 || iw >= IW) continue;
+                asm("###"); // this too is required to avoid segfaultj
                 const dim_t src_off = ic + id * src_id_stride
                         + ih * src_ih_stride + iw * src_iw_stride;
                 const dim_t weights_off = ic * weights_ic_stride
@@ -417,7 +454,7 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
             // bias "coord" is the 1-D set of dcrd.vp[1][i] "OCxG" values.
             // Just copy them into a VecPos32 and use low-level offset calc.
             dim_t bias_off[MVL];
-            {
+            if (bias) {
                 VecPos32 bias_vp; 
                 assert( bias_d.ndims() == 1 );
                 ShortLoop() for (int i=0; i<dvl; ++i) {
@@ -477,11 +514,11 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
 
 #if TRY_BIAS_VEC==0
                 float a = (bias ? get_bias(bias, bias_d.off(ocxg),
-                            pd()->desc()->bias_desc.data_type)
+                            mypd->desc()->bias_desc.data_type)
                         : 0);
 #else
                 float a = (bias ? get_bias(bias, bias_off[i],
-                            pd()->desc()->bias_desc.data_type)
+                            mypd->desc()->bias_desc.data_type)
                         : 0);
 #endif
 
@@ -561,7 +598,7 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
             dst_dopt.vec_off_v(dcrd.base(), &dst_off[0], dvl, false/*pad*/);
 
             dim_t bias_off[MVL];
-            {
+            if (bias) {
                 // bias "coord" is the 1-D set of dcrd.vp[1][i] "OCxG" values.
                 // Just copy them into a VecPos32 and use low-level offset calc.
                 VecPos32 bias_vp; 
@@ -634,7 +671,7 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
                 assert( v_ow[i] == ow );
 #endif
                 float a = (bias ? get_bias(bias, bias_off[i],
-                            pd()->desc()->bias_desc.data_type)
+                            mypd->desc()->bias_desc.data_type)
                         : 0);
 
                 if (src_d.is_plain() && weights_d.is_plain()
@@ -661,7 +698,7 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
 #elif VEC_CRD==1
             for (int i=0; i<dvl; ++i) {
                 float a = (bias ? get_bias(bias, bias_off[i],
-                            pd()->desc()->bias_desc.data_type)
+                            mypd->desc()->bias_desc.data_type)
                         : 0);
 
                 if (src_d.is_plain() && weights_d.is_plain()
@@ -688,7 +725,7 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
 #elif VEC_CRD==2
             float a[MVL];
             if (bias) {
-                auto const bias_data_type = pd()->desc()->bias_desc.data_type;
+                auto const bias_data_type = mypd->desc()->bias_desc.data_type;
                 ShortLoop() for (int i=0; i<dvl; ++i)
                     a[i] = get_bias(bias, bias_off[i], bias_data_type);
             } else {
@@ -758,7 +795,7 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
     };
 #elif FWD_IMPL==3
 #warning "ref_convolution FWD_IMPL==3"
-    auto const bias_data_type = pd()->desc()->bias_desc.data_type;
+    auto const bias_data_type = mypd->desc()->bias_desc.data_type;
     if (bias) assert( bias_data_type == data_type::s8
             || bias_data_type == data_type::u8
             || bias_data_type == data_type::s32
@@ -903,6 +940,10 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
             //maybe_oscale(a, g, oc);
             VFOR(i,dvl) a[i] *= scales[v_ocxg[i] * scale_idx_mult];
 
+            // NOTES: in eltwise I now usually do something like:
+            // using cvt = Cvt<data_t, is_int_dt>;
+            // if (is_int_dt) ydata_t[i] = cvt::rs(xfloat);
+            // NOTE: looking here I may want to saturate bf16 (XXX check on x86)
 #if OPT==0
             maybe_postops_vec2(a, dst_gather, dvl); // faster as lambda, go figure
 #endif
@@ -948,7 +989,7 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
 #endif
 #elif OPT==3 // very slow!
             float x[MVL];
-            if (is_int_conv) {
+            if (is_int_conv) { // qz_a1b0 is it different from round,saturate? maybe some bias?
                 VFOR(i,dvl) {
                     x[i]= qz_a1b0<float,dst_data_t>()(a[i]);
                 }
@@ -967,7 +1008,7 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
     };
 #elif FWD_IMPL==4
 #warning "ref_convolution FWD_IMPL==4"
-    auto const bias_data_type = pd()->desc()->bias_desc.data_type;
+    auto const bias_data_type = mypd->desc()->bias_desc.data_type;
     if (bias) assert( bias_data_type == data_type::s8
             || bias_data_type == data_type::u8
             || bias_data_type == data_type::s32
@@ -1081,7 +1122,7 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
     parallel_nd(G, MB, OC, OD, OH, OW,
             [&](int g, int mb, int oc, int od, int oh, int ow) {
                 float a = bias ? get_bias(bias, bias_d.off(g * OC + oc),
-                                  pd()->desc()->bias_desc.data_type)
+                                  mypd->desc()->bias_desc.data_type)
                                : 0;
 
                 if (src_d.is_plain() && weights_d.is_plain()

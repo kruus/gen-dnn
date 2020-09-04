@@ -40,7 +40,7 @@ struct ref_convolution_fwd_t : public primitive_t {
 
         DECLARE_COMMON_PD_T("ref:any", ref_convolution_fwd_t);
 
-#if defined(__ve)
+#if defined(__ve) // allow verbose debug of "why not"reason
         status_t init(engine_t *engine);
 #else
         status_t init(engine_t *engine) {
@@ -105,6 +105,7 @@ struct ref_convolution_fwd_t : public primitive_t {
     };
 
     ref_convolution_fwd_t(const pd_t *apd) : primitive_t(apd) {
+        //printf("+ref_convolution_fwd_t\n");
         for (int idx = 0; idx < dnnl_post_ops::capacity; ++idx)
             eltwises_[idx] = nullptr;
         auto &post_ops = pd()->attr()->post_ops_;
@@ -116,6 +117,7 @@ struct ref_convolution_fwd_t : public primitive_t {
     }
 
     ~ref_convolution_fwd_t() {
+        //printf("-ref_convolution_fwd_t\n");
         for (int idx = 0; idx < dnnl_post_ops::capacity; ++idx)
             if (eltwises_[idx] != nullptr) delete eltwises_[idx];
     }
@@ -183,7 +185,13 @@ struct ref_convolution_bwd_data_t : public primitive_t {
         }
     };
 
-    ref_convolution_bwd_data_t(const pd_t *apd) : primitive_t(apd) {}
+    ref_convolution_bwd_data_t(const pd_t *apd) : primitive_t(apd) {
+        //printf("+ref_convolution_bwd_data_t\n");
+    }
+
+    ~ref_convolution_bwd_data_t() {
+        //printf("-ref_convolution_bwd_data_t\n");
+    }
 
     typedef typename prec_traits<diff_src_type>::type diff_src_data_t;
     typedef typename prec_traits<wei_type>::type wei_data_t;
@@ -234,7 +242,13 @@ struct ref_convolution_bwd_weights_t : public primitive_t {
         }
     };
 
-    ref_convolution_bwd_weights_t(const pd_t *apd) : primitive_t(apd) {}
+    ref_convolution_bwd_weights_t(const pd_t *apd) : primitive_t(apd) {
+        //printf("+ref_convolution_bwd_data_t\n");
+    }
+
+    ~ref_convolution_bwd_weights_t() {
+        //printf("-ref_convolution_bwd_data_t\n");
+    }
 
     typedef typename prec_traits<src_type>::type src_data_t;
     typedef typename prec_traits<diff_wei_type>::type diff_wei_data_t;
