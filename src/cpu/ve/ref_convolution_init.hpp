@@ -51,6 +51,10 @@ inline status_t ref_convolution_fwd_t<src_type,wei_type,dst_type,acc_type>
                 | primitive_attr_t::skip_mask_t::post_ops));
     AND_(output_scales_mask_ok());
     AND_(post_ops_ok());
+
+    // determine ker vs ker_plain, for impl_name() function
+    get_ker_type(this->ker_type_);
+
 #undef AND_
     return ok ? status::success : status::unimplemented;
 }

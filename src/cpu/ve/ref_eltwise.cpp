@@ -937,7 +937,19 @@ static void compute_eltwise_vector_fwd( const alg_kind_t alg,
             }
             break;
         }
-        case eltwise_swish: vfor(s[i] / (1.0f + ::expf(-alpha * s[i])));
+        case eltwise_swish: {
+#if defined(__ve)
+            // better limit case behavior for nc++ (like logistic)
+            float constexpr float_inf = HUGE_VALF;
+            float constexpr max_logf = 87.0f;
+            float x;
+            vfor(x = -alpha * s[i],
+                 x = (x < max_logf? x: max_logf),
+                 s[i] / (1.0f + ::expf(x)));
+#else
+            vfor(s[i] / (1.0f + ::expf(-alpha * s[i])));
+#endif
+        }
         case eltwise_log: vfor(::logf(s[i]));
         case eltwise_pow: {
             float constexpr inf = HUGE_VALF;

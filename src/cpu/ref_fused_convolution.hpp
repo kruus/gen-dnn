@@ -357,9 +357,18 @@ struct ref_fused_convolution_fwd_t : public primitive_t {
                 if (arg_info.is_ctx_arg) {
                     exec_args[arg_info.op_arg] = ctx_args.at(arg_info.ctx_arg);
                 } else {
+#if defined(__ve) // ? nc++ ICE Internal error: check_type_of_variable_node: enk_variable has wrong type
+                    // for "[lvalue] variable: name = inout_buffer, node type: ptr to char"
+                    // when compiled with -O0
+                    auto inout_info = inout_buffer + arg_info.offset;
+                    inout_memory.emplace_back(new memory_t(engine, &arg_info.md,
+                            memory_flags_t::use_runtime_ptr,
+                            inout_info));
+#else
                     inout_memory.emplace_back(new memory_t(engine, &arg_info.md,
                             memory_flags_t::use_runtime_ptr,
                             inout_buffer + arg_info.offset));
+#endif
                     exec_args[arg_info.op_arg].mem = inout_memory.back().get();
                     exec_args[arg_info.op_arg].is_const = arg_info.is_const;
                 }

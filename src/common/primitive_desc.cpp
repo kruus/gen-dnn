@@ -27,7 +27,7 @@ using namespace dnnl::impl::status;
 
 bool primitive_desc_t::compare_ws(const primitive_desc_t *fwd_pd) const {
     if (!workspace_md()) return true; // the impl lives fine w/o workspace
-#if defined(__ve)
+#if defined(__ve) // TODO check if later bugfixes can avoid this ugliness
 #if 0
     printf(" compare_ws: ");
     if (fwd_pd) {
@@ -46,9 +46,14 @@ bool primitive_desc_t::compare_ws(const primitive_desc_t *fwd_pd) const {
     }
     printf("\n");
 #endif
-    int equal = (*fwd_pd->workspace_md() == *workspace_md());
-    return fwd_pd!=nullptr && fwd_pd->workspace_md()!=nullptr
-        && equal; // --> correct answer, on VE.
+    //int equal = (*fwd_pd->workspace_md() == *workspace_md());
+    //return fwd_pd!=nullptr && fwd_pd->workspace_md()!=nullptr
+    //    && equal; // --> correct answer, on VE.
+    bool equal = false;;
+    if (fwd_pd!=nullptr && fwd_pd->workspace_md()!=nullptr){
+        equal = *fwd_pd->workspace_md() == *workspace_md();
+    }
+    return equal;
 #else // your compiler works...
     return fwd_pd && fwd_pd->workspace_md()
         && *fwd_pd->workspace_md() == *workspace_md();

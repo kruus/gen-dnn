@@ -85,7 +85,7 @@ using impl_list_map_t = std::map<reorder_impl_key_t, std::vector<rpd_create_f>>;
 #endif
 
 /* regular reorders */
-#if ! DNNL_X64 || defined(__INTEL_COMPILER) || !DNNL_X64
+#if ! DNNL_X64 || defined(__INTEL_COMPILER)
 /* direct copy for icc, which is faster than jitted code */
 #define REG_FAST_DIRECT_COPY_COMMA(sdt, ddt) REG_SR_DIRECT_COPY(sdt, ddt),
 #else

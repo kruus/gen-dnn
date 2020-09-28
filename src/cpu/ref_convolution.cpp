@@ -658,8 +658,10 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
 using namespace data_type;
 
 template struct ref_convolution_fwd_t<f32>;
+#if !DNNL_X64
 template struct ref_convolution_fwd_t<bf16,bf16,bf16,f32>;
 template struct ref_convolution_fwd_t<bf16,bf16,f32,f32>;
+#endif
 
 template struct ref_convolution_fwd_t<u8, s8, f32, s32>;
 template struct ref_convolution_fwd_t<u8, s8, s32, s32>;

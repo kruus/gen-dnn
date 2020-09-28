@@ -49,7 +49,7 @@ TEST_F(pd_test, ConvTestNotEmpty) {
 
 TEST_F(pd_test, ConvTestEmpty) {
     auto attrs = primitive_attr {};
-    attrs.set_output_scales(0, {2.0});
+    attrs.set_output_scales(0, {2.0}); // expect conv requires oscale 1.0
 
     for (bool allow_empty : {true, false}) {
         bool no_exception = true;
@@ -65,7 +65,6 @@ TEST_F(pd_test, ConvTestEmpty) {
         } catch (error &) { no_exception = false; }
 
         ASSERT_TRUE(no_exception == allow_empty);
-        // VE XXX why failing? I recall changing to always allow. Why? FIXME
         ASSERT_TRUE(is_empty == allow_empty);
     }
 }

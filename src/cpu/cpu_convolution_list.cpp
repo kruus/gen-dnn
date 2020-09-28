@@ -49,9 +49,9 @@
 using namespace dnnl::impl::cpu::x64;
 #endif
 
-// for dev work on non-x86, may remove gemm impls to focus on ref:any
-//#define CPU_INSTANCE_GEMM(...) CPU_INSTANCE(__VA_ARGS__)
-#define CPU_INSTANCE_GEMM(...)
+// for dev work on non-x86, may remove gemm impls to increase code coverage of ref:any
+#define CPU_INSTANCE_GEMM(...) CPU_INSTANCE(__VA_ARGS__)
+//#define CPU_INSTANCE_GEMM(...)
 
 namespace dnnl {
 namespace impl {

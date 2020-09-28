@@ -38,13 +38,56 @@ struct ref_convolution_fwd_t : public primitive_t {
     struct pd_t : public cpu_convolution_fwd_pd_t {
         using cpu_convolution_fwd_pd_t::cpu_convolution_fwd_pd_t;
 
+#if defined(__ve)
+        DECLARE_COMMON_PD_T(this->impl_name(), ref_convolution_fwd_t);
+
+        // allow verbose debug of "why not"reason
+        status_t init(engine_t *engine);
+
+        // XXX get rid of unset, init ker_type_ in ref_convolution_fwd_t constructor?
+        typedef enum { unset=-1, any=0, plain } ker_type_t;
+        ker_type_t ker_type() const {return ker_type_;}
+    private:
+        ker_type_t ker_type_ = unset; // unset -- set during init(engine)
+        void get_ker_type(ker_type_t &ker_type) const {
+            using namespace utils;
+            auto src_d = memory_desc_wrapper(src_md());
+            const dnnl_dims_t &src_str = src_d.blocking_desc().strides;
+            const dim_t src_ic_stride = src_str[1];
+
+            auto weights_d = memory_desc_wrapper(weights_md());
+            const dnnl_dims_t &weights_str = weights_d.blocking_desc().strides;
+            // orig used src_d.ndims(), tougher calc.
+            //const int gr_shift = with_groups() ? 1 : 0;
+            //const int src_ndims = src_d.ndims();
+            //const dim_t weights_kw_stride
+            //    = (src_ndims >= 3) ? weights_str[src_ndims - 1 + gr_shift] : 0;
+            //const int weights_ndims = weights_d.ndims();
+            //AND_( src_ndims - 1 + gr_shift == weights_ndims - 1 );
+            const int weights_ndims = weights_d.ndims();
+            const dim_t weights_kw_stride = weights_ndims
+                ? weights_str[weights_ndims - 1]: 0;
+
+            ker_type = (src_d.is_plain() && weights_d.is_plain()
+                    && src_ic_stride == 1 && weights_kw_stride == 1
+                    ? plain: any);
+        }
+    private:
+        // name() public, impl_name() private
+        // impl_name() must be const, and may be called BEFORE init
+        char const* impl_name() const {
+            ker_type_t kt = ker_type_;
+            if (kt == unset) {
+                get_ker_type(kt);
+            }
+            return kt == any? "ref:any": "ref:plain";
+        }
+#else
         DECLARE_COMMON_PD_T("ref:any", ref_convolution_fwd_t);
 
-#if defined(__ve) // allow verbose debug of "why not"reason
-        status_t init(engine_t *engine);
-#else
         status_t init(engine_t *engine) {
             using namespace data_type;
+            using smask_t = primitive_attr_t::skip_mask_t;
 
             bool ok = true && is_fwd()
                     && set_default_alg_kind(alg_kind::convolution_direct)
@@ -58,10 +101,11 @@ struct ref_convolution_fwd_t : public primitive_t {
                                     && IMPLICATION(src_type == f32,
                                             bias_md_.data_type == f32))
                     && set_default_formats()
-                    && attr()->has_default_values(
-                            primitive_attr_t::skip_mask_t::oscale
-                            | primitive_attr_t::skip_mask_t::post_ops)
-                    && output_scales_mask_ok() && post_ops_ok();
+                    && attr()->has_default_values(smask_t::oscale
+                            //| smask_t::zero_points_runtime
+                            | smask_t::post_ops)
+                    && output_scales_mask_ok() //&& zero_points_ok()
+                    && post_ops_ok();
             return ok ? status::success : status::unimplemented;
         }
 #endif
@@ -69,6 +113,7 @@ struct ref_convolution_fwd_t : public primitive_t {
     protected:
         bool set_default_formats() {
             using namespace format_tag;
+            // TODO VE libvednn defaults might be different
             auto dat_tag = utils::pick(ndims() - 3, nwc, nhwc, ndhwc);
             auto wei_tag = with_groups()
                     ? utils::pick(ndims() - 3, goiw, goihw, goidhw)
@@ -79,9 +124,15 @@ struct ref_convolution_fwd_t : public primitive_t {
         bool output_scales_mask_ok() const {
             using namespace data_type;
             const auto &mask = attr()->output_scales_.mask_;
-            return 1 //&& IMPLICATION(!utils::one_of(src_type, s8, u8),
-                   //        attr()->output_scales_.has_default_values())
+#if 0 && defined(__ve)
+            // allow some 'useless' oscale settings for benchdnn tests
+            // (esp if gemm convolutions are disabled ? XXX)
+            return 1;
+#else // standard setting restricts ref convolution output scale settings
+            return IMPLICATION(!utils::one_of(src_type, s8, u8),
+                           attr()->output_scales_.has_default_values())
                     && (mask == 0 || mask == 1 << 1);
+#endif
         }
 
         bool post_ops_ok() const {
@@ -133,7 +184,18 @@ struct ref_convolution_fwd_t : public primitive_t {
     }
 
 private:
+#if defined(__ve)
+    void execute_forward_plain(const exec_ctx_t &ctx) const;
+    void execute_forward_any(const exec_ctx_t &ctx) const;
+    void execute_forward(const exec_ctx_t &ctx) const {
+        if (pd()->ker_type() == pd_t::plain)
+            execute_forward_plain(ctx);
+        else
+            execute_forward_any(ctx);
+    }
+#else
     void execute_forward(const exec_ctx_t &ctx) const;
+#endif
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd().get(); }
     ref_eltwise_scalar_fwd_t *eltwises_[dnnl_post_ops::capacity];
 };

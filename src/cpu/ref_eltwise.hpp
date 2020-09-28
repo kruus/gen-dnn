@@ -61,39 +61,45 @@ struct ref_eltwise_fwd_t : public primitive_t {
     struct pd_t : public cpu_eltwise_fwd_pd_t {
         using cpu_eltwise_fwd_pd_t::cpu_eltwise_fwd_pd_t;
 
+        // used to all be called "ref:any"
         DECLARE_COMMON_PD_T(this->impl_name(), ref_eltwise_fwd_t);
 
         status_t init(engine_t *engine) {
-            using namespace utils;
-
-            auto src_d = memory_desc_wrapper(src_md());
-
-            use_dense_ = src_d.is_dense()
-                    || (src_d.is_dense(true) && is_zero_preserved());
-
-            use_nCspBc_padded_ = !use_dense_
-                    && src_d.blocking_desc().inner_nblks == 1
-                    && one_of(src_d.blocking_desc().inner_blks[0], 8, 16)
-                    && src_d.blocking_desc().inner_idxs[0] == 1
-                    && src_d.only_padded_dim(1) && src_d.is_dense(true);
-
-            if (has_zero_dim_memory()) use_dense_ = use_nCspBc_padded_ = false;
-
             bool ok = is_fwd() && data_type == desc()->data_desc.data_type
                     && platform::has_data_type_support(data_type)
                     && attr()->has_default_values();
             if (!ok) return status::unimplemented;
+
+            get_ker_type(this->use_dense_, this->use_nCspBc_padded_);
 
             return status::success;
         }
 
         bool use_dense_, use_nCspBc_padded_;
 
-        private:
+    private:
+        void get_ker_type(bool &use_dense, bool &use_nCspBc_padded) const {
+            using namespace utils;
+            // unfortunately, we might also be called BEFORE init() has run :(
+            auto src_d = memory_desc_wrapper(src_md());
+
+            use_dense = src_d.is_dense()
+                    || (src_d.is_dense(true) && is_zero_preserved());
+
+            use_nCspBc_padded = !use_dense
+                    && src_d.blocking_desc().inner_nblks == 1
+                    && one_of(src_d.blocking_desc().inner_blks[0], 8, 16)
+                    && src_d.blocking_desc().inner_idxs[0] == 1
+                    && src_d.only_padded_dim(1) && src_d.is_dense(true);
+
+            if (has_zero_dim_memory()) use_dense = use_nCspBc_padded = false;
+        }
         char const* impl_name() const {
-            // used to all be called "ref:any"
-            return (use_dense_? "ref:dense"
-                    : use_nCspBc_padded_ ? "ref:nCsp8c_padded-any"
+            bool tmp_dense, tmp_nCspBc_padded;
+            // tmp, since must be const AND migth be called before init()
+            get_ker_type(tmp_dense, tmp_nCspBc_padded);
+            return (tmp_dense? "ref:dense"
+                    : tmp_nCspBc_padded ? "ref:nCsp8c_padded-any"
                     : "ref:any");
         }
     };

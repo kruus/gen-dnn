@@ -135,7 +135,6 @@ int str2desc(desc_t *desc, const char *str, bool is_deconv) {
     if (d.has_groups && d.g <= 0) return FAIL;
     if (d.ic == 0 || d.oc == 0) return FAIL;
     if (d.sd <= 0 || d.sh <= 0 || d.sw <= 0) return FAIL;
-    printf(" a"); fflush(stdout);
 
     auto compute_out = [](bool is_deconv, int64_t i, int64_t k, int64_t s,
                                int64_t p, int64_t d) {

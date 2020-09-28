@@ -145,7 +145,7 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
 #if ALLOW_KER_PLAIN
     // TODO ||ize offset calcs for VE
     if (diff_bias) {
-        printf(" bias\n"); fflush(stdout);
+        //printf(" bias\n"); fflush(stdout);
         parallel_nd(G, OC, [&](int g, int oc) {
                 // XXX: loss of precision when bias is a float...
 #if USE_KER_BIAS
@@ -175,7 +175,7 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
 #if ALLOW_KER_PLAIN
     if (diff_dst_d.is_plain() && src_d.is_plain())
     {
-        printf(" plain\n"); fflush(stdout);
+        //printf(" plain\n"); fflush(stdout);
         // this one can have a problem
         parallel_nd(G, OC, [&](int g, int oc) {
 #if 1
@@ -242,7 +242,7 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
                     hoist_ApiB(owlo,owhi, 0,OW, kw*KDW-padL,    KSW,  0,IW  );
                     NOVEC for_(int mb = 0; mb < MB; ++mb)
                     NOVEC for_(int od = odlo; od < odhi; ++od)
-                    NOVEC for_(int oh = ohlo; oh < owhi; ++oh)
+                    NOVEC for_(int oh = ohlo; oh < ohhi; ++oh)
                     NOVEC for (int ow = owlo; ow < owhi; ++ow) {
                         const dim_t id = od * KSD - padFront + kd * KDD;
                         const dim_t ih = oh * KSH - padT + kh * KDH;
@@ -289,7 +289,7 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
     }else
 #endif
     { // this one seems OK, nope it too segfaults with nc++-3.0.25
-        printf(" gen\n"); fflush(stdout);
+        //printf(" gen\n"); fflush(stdout);
         parallel_nd(G, OC, [&](int g, int oc) {
             if (diff_bias) {
 #if USE_KER_BIAS
@@ -330,7 +330,7 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
                     hoist_ApiB(owlo,owhi, 0,OW, kw*KDW-padL,    KSW,  0,IW  );
                     NOVEC for_(int mb = 0; mb < MB; ++mb)
                     NOVEC for_(int od = odlo; od < odhi; ++od)
-                    NOVEC for_(int oh = ohlo; oh < owhi; ++oh)
+                    NOVEC for_(int oh = ohlo; oh < ohhi; ++oh)
                     NOVEC for (int ow = owlo; ow < owhi; ++ow) {
                         int const id = od * KSD - padFront + kd * KDD; // in [0,ID)
                         int const ih = oh * KSH - padT     + kh * KDH; // in [0,IH)

@@ -17,10 +17,12 @@
 /** \file
  * ref:any fwd convolution
  */
-// conv.in timings for ref:any of conv.in beginning at ref:any ih90 tests:
-// 237.2 80.23 57.70 325.7 325.7 1.60
+// this is impl 4, for "plain" (stridable phys address calc) of ref_convolution.cpp.2
+// conv.in timings for ref:plain of conv.in beginning at ref:plain ih90 tests:
+// 37.62 38.87 32.13 65.68 65.61 plain-postops 18.62 18.62 18.53 97.88
 //
 // older timings (dev codes)
+// & historical runs
 // errors:
 // 0 : rconv-0.log OK, mistrusted 3 of conv.in mode=C Real Time 17.934
 // 1 : rconv-1.log seg fault in --conv g32ic32ih112oc32oh112kh3ph1n"mobilenet:conv2_1/dw"
@@ -30,6 +32,7 @@
 // 4 : rconv-4.log OK 15.23 s
 // 5 : rconv-5.log OK  3.52 s
 // 6 : rconv-6.log OK  2.42 s
+
 // conv-gemm.in
 // gemm :       190,213,145,265 (191,194,120)
 //   add --skip-impl=gemm to run ref impls?
@@ -79,10 +82,6 @@
 // Enabling more IKLIMS test cases, I find that NOT using the fn call leads to
 // miscompilation !!!  Only hoist_ApiB(...) fn call avoided all segfaults.
 
-// current conv.in timings
-// plain: 37.77 40.37 34.07 66.81 66.76
-//  any : 240.4 84.05 66.69 334.9 334.9 1.68 postops-plain 18.71 18.72 18.71 99.30
-
 #include "cpu/ve/ref_convolution_util.hpp"
 #include "cpu/ve/hoist.hpp"     // nc++: hoist linear conditions out of loops
 #include <iostream> // tmp debug
@@ -119,6 +118,7 @@ static bool trivial( int const verb, bool const cond, char const* msg,
 #define TRIVIAL( COND ) COND
 //#define TRIVIAL( COND ) trivial(1, (COND), #COND, __PRETTY_FUNCTION__, __LINE__)
 
+#define CONV_CHECK(EXPR) do {if (!(EXPR)) {printf(" FAILED: " #EXPR "\n");}} while(0)
 #if defined(NDEBUG)
 #define DPRINTF(...)
 #define DMUST(...) 1
@@ -149,7 +149,6 @@ inline ALWAYS_INLINE void hoist_ApiBx(
     if( ihi >= iend ) ihi = iend;
     else if( ihi < ibeg ) ihi = ibeg; // intentionally NOT enforced
 }
-#define CONV_CHECK(EXPR) do {if (!(EXPR)) {printf(" FAILED: " #EXPR "\n");}} while(0)
 
 // vector window-tile access macros
 #define DHW_W 0
@@ -265,7 +264,7 @@ namespace dnnl {
 namespace impl {
 namespace cpu {
 
-using math::get_bias;
+//using math::get_bias;
 
 //typedef CoordsForNd<6,uint64_t,uint64_t> Coords;
 // let's use 32-bit Crd (Pos can still be u64)
@@ -288,8 +287,7 @@ typedef memory_desc_wrapper_opt::VecPos32 VecPos32;
 template <data_type_t src_type, data_type_t wei_type, data_type_t dst_type,
         data_type_t acc_type>
 void ref_convolution_fwd_t<src_type, wei_type, dst_type,
-        acc_type>::execute_forward_any(const exec_ctx_t &ctx) const {
-    //printf("\nFWD_IMPL=%d\n", (int)FWD_IMPL); fflush(stdout);
+        acc_type>::execute_forward_plain(const exec_ctx_t &ctx) const {
     auto src = CTX_IN_MEM(const src_data_t *, DNNL_ARG_SRC);
     auto weights = CTX_IN_MEM(const wei_data_t *, DNNL_ARG_WEIGHTS);
     auto bias = CTX_IN_MEM(const char *, DNNL_ARG_BIAS);
@@ -298,8 +296,7 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
     typedef typename ref_convolution_fwd_t<src_type, wei_type, dst_type,
             acc_type>::pd_t mypd_t;
     mypd_t const* mypd = pd();
-    //assert( mypd->ker_type() >= 0 || mypd->ker_type() <= 1 ); // ker vs ker_plain
-    assert( mypd->ker_type() == pd_t::any); // "ref:any"
+    assert( mypd->ker_type() == pd_t::plain); // "ref:plain"
 
     const memory_desc_wrapper src_d(mypd->src_md());
     const memory_desc_wrapper dst_d(mypd->dst_md());
@@ -348,6 +345,7 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
             = mypd->attr()->output_scales_.mask_ == (1 << 1);
     const float *scales = mypd->attr()->output_scales_.scales_;
 
+
     const post_ops_t& ops = mypd->attr()->post_ops_;
 
     auto maybe_postops_vec3 = [&](float *a, float const *dst_float, int const dvl) {
@@ -363,11 +361,16 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
                 VFOR(i,dvl) {
                     a[i] = eltwises_[idx]->compute_scalar(a[i]);
                 }
-#else
-                //if BUGS, be aware that nc++ optimization may "cheat" on extreme values
-                // last such: check swish input -alpha*x > log_float_max
+#elif 1
+                // may see +/-0, +/-inf "limit cases" difference for nc++
                 eltwises_[idx]->compute_vec_reg(a, a, dvl);
-                //using cvt = Cvt<data_t, is_int_dt>; // postops are pure-float!
+                //using cvt = Cvt<data_t, is_int_dt>;
+                // conv postops are pure-float!
+#else // assumes dvl small:
+                assert( dvl <= MVL );
+                float tmp[MVL];
+                eltwises_[idx]->compute_vec_reg(tmp, a, dvl);
+                VFOR(i,dvl) a[i] = tmp[i];
 #endif
             }
         }
@@ -375,7 +378,6 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
 
     // Sum and post ops:
 
-#if 0
     // make offset calls "look the same". We suffer a fn call anyway for the offset.
     auto off_abxg = (with_groups
             ? (ndims == 5? offg5d: ndims == 4? offg4d:
@@ -384,6 +386,50 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
                 ndims == 3? off3d: oops));
     auto off_abx = (ndims == 5? off5d: ndims == 4? off4d:
                 ndims == 3? off3d: oops);
+
+    auto ker = [=](int g, int mb, int oc, int od, int oh, int ow) {
+        acc_data_t d = 0;
+        for_(int ic = 0; ic < IC; ++ic)
+        for_(int kd = 0; kd < KD; ++kd)
+        for_(int kh = 0; kh < KH; ++kh)
+        for (int kw = 0; kw < KW; ++kw) {
+            const int id = od * KSD - padFront + kd * KDD;
+            const int ih = oh * KSH - padT + kh * KDH;
+            const int iw = ow * KSW - padL + kw * KDW;
+
+            if (id < 0 || id >= ID) continue;
+            if (ih < 0 || ih >= IH) continue;
+            if (iw < 0 || iw >= IW) continue;
+
+#if 0
+            if (ndims == 5)
+                d += (acc_data_t)src[src_d.off(mb, g * IC + ic, id, ih, iw)]
+                        * (with_groups ? weights[weights_d.off(
+                                   g, oc, ic, kd, kh, kw)]
+                                       : weights[weights_d.off(
+                                               oc, ic, kd, kh, kw)]);
+            else if (ndims == 4)
+                d += (acc_data_t)src[src_d.off(mb, g * IC + ic, ih, iw)]
+                        * (with_groups ? weights[weights_d.off(
+                                   g, oc, ic, kh, kw)]
+                                       : weights[weights_d.off(
+                                               oc, ic, kh, kw)]);
+            else if (ndims == 3)
+                d += (acc_data_t)src[src_d.off(mb, g * IC + ic, iw)]
+                        * (with_groups ? weights[weights_d.off(g, oc, ic, kw)]
+                                       : weights[weights_d.off(oc, ic, kw)]);
+            else
+                assert(false);
+#else
+            acc_data_t const ss = src[ off_abx(
+                    src_d, 0, mb, g * IC + ic, id, ih, iw) ];
+            acc_data_t const ww = weights[ off_abxg(
+                    weights_d, g, oc, ic, kd, kh, kw) ];
+            d += ss * ww;
+#endif
+        }
+        return d;
+    };
 
     // help compiler optimize the code
     // constants for plain layouts kernel
@@ -401,16 +447,361 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
             = (ndims >= 4) ? weights_str[ndims - 2 + gr_shift] : 0;
     const dim_t weights_kw_stride
             = (ndims >= 3) ? weights_str[ndims - 1 + gr_shift] : 0;
+
+    auto ker_plain = [&](int const g, int const mb, int const oc, int const od, int const oh, int const ow) {
+        assert(3 <= ndims && ndims <= 5);
+        acc_data_t d = 0;
+        const src_data_t * __restrict src_loc;
+        const wei_data_t * __restrict weights_loc;
+        {
+            const dim_t src_loc_off = off_abx(src_d, 0, mb, g * IC, 0, 0, 0);
+            src_loc = src + src_loc_off;
+            const dim_t weights_loc_off = off_abxg(weights_d, g, oc, 0, 0, 0, 0);
+            weights_loc = weights + weights_loc_off;
+        }
+        //assert(  g >= 0 &&  g <  G );
+        //assert( mb >= 0 && mb < MB );
+        //assert( oc >= 0 && oc < OC );
+        //assert( od >= 0 && od < OD );
+        //assert( oh >= 0 && oh < OH );
+        //assert( ow >= 0 && ow < OW );
+
+        if (IC > KW) {
+            for_(dim_t kd = 0; kd < KD; ++kd)
+            for_(dim_t kh = 0; kh < KH; ++kh)
+            for (dim_t kw = 0; kw < KW; ++kw) {
+                const dim_t id = od * KSD - padFront + kd * KDD;
+                const dim_t ih = oh * KSH - padT + kh * KDH;
+                const dim_t iw = ow * KSW - padL + kw * KDW;
+                //if (id < 0 || id >= ID || ih < 0 || ih >= IH || iw < 0
+                //        || iw >= IW)
+                //    continue;
+                if (id < 0 || id >= ID) continue;
+                if (ih < 0 || ih >= IH) continue;
+                if (iw < 0 || iw >= IW) continue;
+                for (int ic = 0; ic < IC; ++ic) {
+                    const dim_t src_off = ic + id * src_id_stride
+                            + ih * src_ih_stride + iw * src_iw_stride;
+                    const dim_t weights_off = ic * weights_ic_stride
+                            + kd * weights_kd_stride + kh * weights_kh_stride
+                            + kw;
+                    d += (acc_data_t)src_loc[src_off]
+                            * weights_loc[weights_off];
+                }
+            }
+        } else {
+            NOVEC for_(dim_t ic = 0; ic < IC; ++ic)
+            NOVEC for_(dim_t kd = 0; kd < KD; ++kd)
+            NOVEC for_(dim_t kh = 0; kh < KH; ++kh)
+            //NOVEC // REQUIRED for VE to avoid [some, NOT ALL] segfaults :(
+            NOVEC for (dim_t kw = 0; kw < KW; ++kw) {
+                const dim_t id = od * KSD - padFront + kd * KDD;
+                const dim_t ih = oh * KSH - padT + kh * KDH;
+                const dim_t iw = ow * KSW - padL + kw * KDW;
+                //if (id < 0 || id >= ID || ih < 0 || ih >= IH || iw < 0
+                //        || iw >= IW)
+                //    continue;
+                if (id < 0 || id >= ID) continue;
+                if (ih < 0 || ih >= IH) continue;
+                if (iw < 0 || iw >= IW) continue;
+                asm("###"); // this too is required to avoid segfaultj
+                const dim_t src_off = ic + id * src_id_stride
+                        + ih * src_ih_stride + iw * src_iw_stride;
+                const dim_t weights_off = ic * weights_ic_stride
+                        + kd * weights_kd_stride + kh * weights_kh_stride + kw;
+                d += (acc_data_t)src_loc[src_off]
+                        * weights_loc[weights_off];
+            }
+        }
+        return d;
+    };
+#if 0 // devel version
+    // pooling has a more advanced "iterate over source pre-image tile" method
+    // but for strided offset calc, the compiler does a good job vectorizing
+    // (well... apart from bugs circumvented by asm("#") to reduce optimization)
+    auto ker_plain6 = [&](int const g, int const mb, int const oc,
+            int const od, int const oh, int const ow) {
+        //assert(3 <= ndims && ndims <= 5);
+        acc_data_t d = 0;
+        const src_data_t * __restrict src_loc;
+        const wei_data_t * __restrict weights_loc;
+        {
+            const dim_t src_loc_off = off_abx(src_d, 0, mb, g * IC, 0, 0, 0);
+            src_loc = src + src_loc_off;
+            const dim_t weights_loc_off = off_abxg(weights_d, g, oc, 0, 0, 0, 0);
+            weights_loc = weights + weights_loc_off;
+        }
+        //assert(  g >= 0 &&  g <  G );
+        //assert( mb >= 0 && mb < MB );
+        //assert( oc >= 0 && oc < OC );
+        //assert( od >= 0 && od < OD );
+        //assert( oh >= 0 && oh < OH );
+        //assert( ow >= 0 && ow < OW );
+
+#if OPT6<0 // ~ original impl
+        if (IC > KW) {
+            for_(dim_t kd = 0; kd < KD; ++kd)
+            for_(dim_t kh = 0; kh < KH; ++kh)
+            for (dim_t kw = 0; kw < KW; ++kw) {
+                const dim_t id = od * KSD - padFront + kd * KDD;
+                const dim_t ih = oh * KSH - padT + kh * KDH;
+                const dim_t iw = ow * KSW - padL + kw * KDW;
+                if (id < 0 || id >= ID || ih < 0 || ih >= IH || iw < 0
+                        || iw >= IW)
+                    continue;
+                //if (id < 0 || id >= ID) continue;
+                //if (ih < 0 || ih >= IH) continue;
+                //if (iw < 0 || iw >= IW) continue;
+                for (int ic = 0; ic < IC; ++ic) {
+                    const dim_t src_off = ic + id * src_id_stride
+                            + ih * src_ih_stride + iw * src_iw_stride;
+                    const dim_t weights_off = ic * weights_ic_stride
+                            + kd * weights_kd_stride + kh * weights_kh_stride
+                            + kw;
+                    d += (acc_data_t)src_loc[src_off]
+                            * weights_loc[weights_off];
+                }
+            }
+        } else {
+            NOVEC for_(dim_t ic = 0; ic < IC; ++ic)
+            NOVEC for_(dim_t kd = 0; kd < KD; ++kd)
+            NOVEC for_(dim_t kh = 0; kh < KH; ++kh)
+            //NOVEC // REQUIRED for VE to avoid [some, NOT ALL] segfaults :(
+            NOVEC for (dim_t kw = 0; kw < KW; ++kw) {
+                const dim_t id = od * KSD - padFront + kd * KDD;
+                const dim_t ih = oh * KSH - padT + kh * KDH;
+                const dim_t iw = ow * KSW - padL + kw * KDW;
+                //if (id < 0 || id >= ID || ih < 0 || ih >= IH || iw < 0
+                //        || iw >= IW)
+                //    continue;
+                if (id < 0 || id >= ID) continue;
+                if (ih < 0 || ih >= IH) continue;
+                if (iw < 0 || iw >= IW) continue;
+                asm("###"); // this too is required to avoid VE segfault
+                const dim_t src_off = ic + id * src_id_stride
+                        + ih * src_ih_stride + iw * src_iw_stride;
+                const dim_t weights_off = ic * weights_ic_stride
+                        + kd * weights_kd_stride + kh * weights_kh_stride + kw;
+                d += (acc_data_t)src_loc[src_off]
+                        * weights_loc[weights_off];
+            }
+        }
+#endif //OPT6<0
+#if OPT6>=0
+        // new vectorization, based on ker6
+        // currently, using Coords32 to lump the for loops
+        // is SLOWER than nc++'s vectorization of the nested loops.
+        // (even with 'asm' and NOVEC, it seems).
+        Coords32 crd; // ic, [[kd,] kh,] kw
+#if OPT6==0
+        int kd_st=0, kd_en=1; // id_0 a.k.a A or ocrd*STRIDE-PAD
+        int kh_st=0, kh_en=1;
+        int kw_st=0, kw_en=1;
+#endif
+        int id_0=0, ih_0=0, iw_0=0;
+        {
+#if OPT6>=1
+            int kd_st=0, kd_en=1; // id_0 a.k.a A or ocrd*STRIDE-PAD
+            int kh_st=0, kh_en=1;
+            int kw_st=0, kw_en=1;
+#endif
+            if (ndims >= 5)
+                IKLIMS(od, KSD, padFront, KDD, KD, ID, kd_st, kd_en, id_0);
+            if (ndims >= 4)
+                IKLIMS(oh, KSH, padT    , KDH, KH, IH, kh_st, kh_en, ih_0);
+            if (1) //ndims >= 3
+                IKLIMS(ow, KSW, padL    , KDW, KW, IW, kw_st, kw_en, iw_0);
+            //assert( weights_d.ndims() == dm + (with_groups? 1: 0) );
+            //       dcrd  // mb, OCxG, [[od,] oh,] ow
+            {
+                auto const dm = dst_d.ndims(); // MB, OCxG, OD?, OH?, OW
+                auto * rlo = crd.raw_lo();
+                auto * rhi = crd.raw_hi();
+                Coords32::pos_t sz = Coords32::pos_t{1};
+                *rlo++ = 0;
+                *rhi++ = IC;
+                sz *= IC;
+                if (dm >= 5) {
+                    *rlo++ = kd_st;
+                    *rhi++ = kd_en;
+                    sz *= kd_en - kd_st;
+                }
+                if (dm >= 4) {
+                    *rlo++ = kh_st;
+                    *rhi++ = kh_en;
+                    sz *= kh_en - kh_st;
+                }
+                if (1) {
+                    *rlo++ = kw_st;
+                    *rhi++ = kw_en;
+                    sz *= kw_en - kw_st;
+                }
+                *crd.raw_sz() = sz;
+                *crd.raw_dim() = weights_d.ndims();
+                crd.init_nd(0);
+            }
+        }
+
+#if OPT6==0 // JUST the loop-limit-precalc...
+        if (IC > KW) {
+            for_(dim_t kd = kd_st; kd < kd_en; ++kd)
+            for_(dim_t kh = kh_st; kh < kh_en; ++kh)
+            for (dim_t kw = kw_st; kw < kw_en; ++kw) {
+                const dim_t id = od * KSD - padFront + kd * KDD;
+                const dim_t ih = oh * KSH - padT + kh * KDH;
+                const dim_t iw = ow * KSW - padL + kw * KDW;
+                for (int ic = 0; ic < IC; ++ic) {
+                    const dim_t src_off = ic + id * src_id_stride
+                            + ih * src_ih_stride + iw * src_iw_stride;
+                    const dim_t weights_off = ic * weights_ic_stride
+                            + kd * weights_kd_stride + kh * weights_kh_stride
+                            + kw;
+                    d += (acc_data_t)src_loc[src_off]
+                            * weights_loc[weights_off];
+                }
+            }
+        } else {
+            for_(dim_t ic = 0; ic < IC; ++ic)
+            for_(dim_t kd = kd_st; kd < kd_en; ++kd)
+            for_(dim_t kh = kh_st; kh < kh_en; ++kh)
+            for (dim_t kw = kw_st; kw < kw_en; ++kw) {
+                const dim_t id = od * KSD - padFront + kd * KDD;
+                const dim_t ih = oh * KSH - padT + kh * KDH;
+                const dim_t iw = ow * KSW - padL + kw * KDW;
+                const dim_t src_off = ic + id * src_id_stride
+                        + ih * src_ih_stride + iw * src_iw_stride;
+                const dim_t weights_off = ic * weights_ic_stride
+                        + kd * weights_kd_stride + kh * weights_kh_stride + kw;
+                d += (acc_data_t)src_loc[src_off]
+                        * weights_loc[weights_off];
+            }
+        }
+#else // OPT6 > 0
+        int const* pw = reinterpret_cast<int const*>(&crd.vp[0][0]);
+        int const ws_ic = weights_ic_stride;
+        int const ws_kd = weights_kd_stride;
+        int const ws_kh = weights_kh_stride;
+        int const ws_kw = weights_kw_stride;
+        for( ; crd; ++crd) // crd ~ ic[,kd,[,kh]],kw
+        {
+            int const wvl = crd.get_vl();
+            dim_t wei_off[MVL]; VREG(wei_off);
+            dim_t src_off[MVL]; VREG(src_off);
+            int const* restrict const vic = &pw[0*MVL];
+            if (dm >= 5) {
+#if OPT6==1
+                VFOR(w,wvl) { //vec : crd --> wei/src_off[]
+                    {
+                        int const ic = pw[0*MVL+w];
+                        src_off[w] = ic;
+                        wei_off[w] = ic * ws_ic;
+                    }
+                    {
+                        int kd = pw[1*MVL+w];
+                        wei_off[w] += kd * ws_kd;
+                        //int const id = id_0 + kd * KDD;
+                        kd = kd * KDD + id_0;
+                        src_off[w] += kd * src_id_stride;
+                    }
+                    {
+                        int const kh = pw[2*MVL+w];
+                        wei_off[w] += kh * ws_kh;
+                        int const ih = ih_0 + kh * KDH;
+                        src_off[w] += ih * src_ih_stride;
+                    }
+                    {
+                        int const kw = pw[3*MVL+w];
+                        wei_off[w] += kw;
+                        int const iw = iw_0 + kw * KDW;
+                        src_off[w] += iw * src_iw_stride;
+                    }
+                }
+#else
+                int const* restrict const vkd = &pw[1*MVL];
+                int const* restrict const vkh = &pw[2*MVL];
+                int const* restrict const vkw = &pw[3*MVL];
+                VFOR(w,wvl) { //vec : crd --> wei/src_off[]
+                    wei_off[w] = vic[w] * weights_ic_stride
+                            + vkd[w] * weights_kd_stride
+                            + vkh[w] * weights_kh_stride
+                            + vkw[w];
+                    src_off[w] = vic[w]
+                            + (id_0 + vkd[w] * KDD)/*id*/ * src_id_stride
+                            + (ih_0 + vkh[w] * KDH)/*ih*/ * src_ih_stride
+                            + (iw_0 + vkw[w] * KDW)/*iw*/ * src_iw_stride;
+                }
+#endif
+            } else if (dm >= 4) {
+#if OPT6==1
+                VFOR(w,wvl) { //vec : crd --> wei/src_off[]
+                    int const ic = pw[0*MVL+w];
+                    int const kh = pw[1*MVL+w];
+                    int const kw = pw[2*MVL+w];
+                    wei_off[w] = ic * ws_ic
+                            + kh * ws_kh + kw;
+                    int const ih = ih_0 + kh * KDH;
+                    int const iw = iw_0 + kw * KDW;
+                    src_off[w] = ic + ih * src_ih_stride
+                            + iw * src_iw_stride;
+                }
+#else
+                int const* restrict const vkh = &pw[1*MVL];
+                int const* restrict const vkw = &pw[2*MVL];
+                VFOR(w,wvl) { //vec : crd --> wei/src_off[]
+                    wei_off[w] = vic[w] * ws_ic
+                            //+ vkd[w] * ws_kd
+                            + vkh[w] * ws_kh
+                            + vkw[w];
+                    src_off[w] = vic[w]
+                            //+ (id_0 + vkd[w] * KDD)/*id*/ * src_id_stride
+                            + (ih_0 + vkh[w] * KDH)/*ih*/ * src_ih_stride
+                            + (iw_0 + vkw[w] * KDW)/*iw*/ * src_iw_stride;
+                }
+#endif
+            } else { // dm >= 3
+#if OPT6==1
+                VFOR(w,wvl) { //vec : crd --> wei/src_off[]
+                    int const ic = pw[0*MVL+w];
+                    int const kw = pw[1*MVL+w];
+                    wei_off[w] = ic * ws_ic + kw;
+                    int const iw = iw_0 + kw * KDW;
+                    src_off[w] = ic + iw * src_iw_stride;
+                }
+#else
+                //int const* restrict const vkd = &pw[1*MVL];
+                //int const* restrict const vkh = &pw[1*MVL];
+                int const* restrict const vkw = &pw[1*MVL];
+                VFOR(w,wvl) { //vec : crd --> wei/src_off[]
+                    wei_off[w] = vic[w] * weights_ic_stride
+                            //+ vkd[w] * weights_kd_stride
+                            //+ vkh[w] * weights_kh_stride
+                            + vkw[w];
+                    src_off[w] = vic[w]
+                            //+ (id_0 + vkd[w] * KDD)/*id*/ * src_id_stride
+                            //+ (ih_0 + vkh[w] * KDH)/*ih*/ * src_ih_stride
+                            + (iw_0 + vkw[w] * KDW)/*iw*/ * src_iw_stride;
+                }
+#endif
+            }
+            VFOR(w,wvl) {
+                acc_data_t const ss = src_loc[src_off[w]];
+                acc_data_t const ww = weights_loc[wei_off[w]];
+                d += ss * ww;
+            }
+        }//for-crd
+#endif
+#endif // OPT6>=0
+        return d;
+    };
 #endif
 
-    // common "iterator" setup
-    // 32-bit coordinate ranges, 64-bit logical/physical offsets
     auto elems = (size_t)MB * OCxG * OD * OH * OW;
     auto dst_dopt = memory_desc_wrapper_opt(dst_d.md_);
     auto bias_dopt = memory_desc_wrapper_opt(
             bias? bias_d.md_: dst_d.md_/*useless*/);
     auto src_dopt = memory_desc_wrapper_opt(src_d.md_);
     auto weights_dopt = memory_desc_wrapper_opt(weights_d.md_);
+
     auto const bias_data_type = mypd->desc()->bias_desc.data_type;
     if (bias) {
         assert( bias_data_type == data_type::s8
@@ -422,248 +813,8 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
         assert( bias_data_type == data_type::undef );
     }
 
-#define OPT6 0
-#define LIM6 0 // -1,0 OK, but 1,2,3 (1,2 check out equiv during -1) may segfault
-    // my guess is that this is a miscompilation with nc++-3.0.27
-
-#if LIM6==0 // div_floor "old faithful" avoids segfault of inline version of this macro.
-#define IKLIMS(ocrd, STRIDE, PAD, DILATION, KSZ, ISZ, k_st, k_en, i_0) do \
-            { \
-                int const A = (int)ocrd * (STRIDE) - (PAD); \
-                int const B = (int)(DILATION); \
-                assert( B > 0 ); \
-                hoist_ApiB( k_st, k_en, \
-                        /*kh in   */ 0, KSZ, \
-                        /*ih=A+kB */ A, B, \
-                        /*ih in   */ 0, ISZ); \
-                /*if (k_st > k_en) k_st = k_en;*/ \
-                i_0 = A; \
-                if (k_en < k_st) k_en = k_st; \
-            } while(0)
-#elif LIM6==1 // signed integer simplification (ranges [0,KSZ) [0,ISZ) positive)
-#define IKLIMS(ocrd, STRIDE, DILATION, PAD, KSZ, ISZ, k_st, k_en, i_0) do \
-            { \
-                i_0 = (int)ocrd * (STRIDE) - (PAD); \
-                k_en = DILATION - 1 - i_0; \
-                k_st = k_en / DILATION; \
-                /* */ \
-                /* nc++ is NOT using cms opcode !!! */ \
-                /*if (k_st < 0) k_st = 0;*/ \
-                k_st = ((int)(k_st) < int{0}? int{0}: (int)k_st); \
-                /*k_st = (k_st >= 0? k_st: 0);*/ \
-                /*even worse: k_st = nstl::max(0,k_st);*/ \
-                /* */ \
-                /*not needed: if (k_st > KSZ) k_st = KSZ;*/ \
-                k_en = (k_en + ISZ) / DILATION; \
-                /*if (k_en > KSZ) k_en = KSZ;*/ \
-                k_en = (k_en > KSZ? KSZ: k_en); \
-                if (k_en < k_st) k_en = k_st; \
-            } while(0)
-#elif LIM6==20 // signed integer simplification
-#define IKLIMS(ocrd, STRIDE, DILATION, PAD, KSZ, ISZ, k_st, k_en, i_0) do \
-            { \
-                int const A = (int)ocrd * (STRIDE) - (PAD); \
-                int const B = (int)(DILATION); \
-                int kk_en = B - A - 1; \
-                int kk_st = kk_en / B; \
-                kk_st = (kk_st < 0? 0: kk_st); \
-                kk_en = (kk_en + (int)(ISZ)) / B; \
-                kk_en = (kk_en > (int)(KSZ)? (int)(KSZ) \
-                        : kk_en < kk_st? kk_st \
-                        : kk_en); \
-                k_st = kk_st; \
-                k_en = kk_en; \
-                i_0 = A; \
-            } while(0)
-#elif LIM6==2 // signed integer simplification
-#define IKLIMS(ocrd, STRIDE, DILATION, PAD, KSZ, ISZ, k_st, k_en, i_0) do \
-            { \
-                int const A = (int)ocrd * (STRIDE) - (PAD); \
-                int const B = (int)(DILATION); \
-                int const x = B - A - 1; \
-                int const y = x / B; \
-                int const z = (x + ISZ) / B; \
-                k_st = (y < 0? 0: y); \
-                k_en = (z > KSZ? KSZ \
-                        : z < k_st? k_st \
-                        : z); \
-                i_0 = A; \
-                asm("###"); \
-                assert( k_st <= k_en ); \
-            } while(0)
-#elif LIM6==3 // unsigned-safe macro version (BUGGY) (XXX should fix, someday)
-#define IKLIMS(ocrd, STRIDE, DILATION, PAD, KSZ, ISZ, k_st, k_en, i_st) do \
-            { \
-                k_st = (ocrd * STRIDE < PAD \
-                        ? (DILATION - 1 + (PAD - ocrd*STRIDE)) / DILATION \
-                        : 0); \
-                i_st = ocrd * STRIDE - PAD + /* k_st=0 * DILATION */ ; \
-                int iLast = ISZ; \
-                k_en = (ocrd * STRIDE + KSZ * DILATION < iLast + PAD + DILATION ? KSZ \
-                        : (ocrd * STRIDE >= iLast + PAD ? 0 \
-                            : ((iLast + PAD - ocrd * STRIDE) + DILATION - 1) / DILATION)); \
-                if (k_en < k_st) k_en = k_st; \
-            } while(0)
-#else // div_floor function, with debug alt. version
-    // although kk_st,kk_en check out as OK, inlining that method leads to segfaults !!!
-#define IKLIMS(ocrd, STRIDE, PAD, DILATION, KSZ, ISZ, k_st, k_en, i_0) do \
-            { \
-                int const A = (int)ocrd * (STRIDE) - (PAD); \
-                int const B = (int)(DILATION); \
-                assert( B > 0 ); \
-                hoist_ApiB( k_st, k_en, \
-                        /*kh in   */ 0, KSZ, \
-                        /*ih=A+kB */ A, B, \
-                        /*ih in   */ 0, ISZ); \
-                if (k_en < k_st) k_en = k_st; \
-                i_0 = A; \
-                /* verify new alg */ \
-                int kk_en = DILATION - A - 1; \
-                int kk_st = kk_en / DILATION; \
-                kk_st = (kk_st < 0? 0: kk_st); \
-                int iLast = ISZ; \
-                kk_en = (kk_en + iLast) / DILATION; \
-                kk_en = (kk_en > KSZ? KSZ: kk_en); \
-                if (kk_en < kk_st) kk_en = kk_st; \
-                /*if (kk_en < kk_st) kk_en = kk_st;*/ \
-                /* kk_en will not agree sometimes when k_en < 0 */ \
-                if ((kk_st != k_st) || (kk_en != k_en)) { \
-                    printf(" ocrd,S,P,D, K,I=%d,%d,%d,%d %d,%d A=%d B=%d k[%d,%d) kk[%d,%d)\n", \
-                            (int)(ocrd),(int)(STRIDE),(int)(PAD),(int)(DILATION), (int)(KSZ),(int)(ISZ), \
-                            A,B, (int)(k_st),(int)(k_en), kk_st,kk_en); \
-                    exit(1); \
-                } \
-                if (k_en < k_st) k_en = k_st; \
-            } while(0)
-            // ih0 = A + k0*B --> k0 = div_floor(ih0-A +B-1, B)
-#endif
-
-    auto ker6 = [=](int g, int mb, int oc, int od, int oh, int ow) {
-        acc_data_t d = 0;
-
-        // macro based on ve/hoist.hpp derivations
-        // unlike pooling, we now support dilation
-        int kd_st=0, kd_en=1, id_0=0; // id_0 a.k.a A or ocrd*STRIDE-PAD
-        int kh_st=0, kh_en=1, ih_0=0;
-        int kw_st=0, kw_en=1, iw_0=0;
-        
-        Coords32::pos_t sz = Coords32::pos_t{1};
-        if (ndims >= 5) {
-            IKLIMS(od, KSD, padFront, KDD, KD, ID, kd_st, kd_en, id_0);
-            sz *= kd_en - kd_st;
-        }
-        if (ndims >= 4) {
-            IKLIMS(oh, KSH, padT    , KDH, KH, IH, kh_st, kh_en, ih_0);
-            sz *= kh_en - kh_st;
-        }
-        if (1) { //ndims >= 3
-            IKLIMS(ow, KSW, padL    , KDW, KW, IW, kw_st, kw_en, iw_0);
-            sz *= kw_en - kw_st;
-        }
-        if (sz == 0) // no iterations in kernel weight loop?
-            return d;
-
-        auto const dm = dst_d.ndims(); // MB, OCxG, OD?, OH?, OW
-        assert( weights_d.ndims() == dm + (with_groups? 1: 0) );
-        //       dcrd  // mb, OCxG, [[od,] oh,] ow
-        Coords32 wcrd; // [g,] oc, ic, [[kd,] kh,] kw
-        {
-            auto * rlo = wcrd.raw_lo();
-            auto * rhi = wcrd.raw_hi();
-            // XXX move out, set g,oc,IC ranges just once (const)
-            int nd=0;
-            if (with_groups) {
-                *rlo++ = g;
-                *rhi++ = g+1;
-                ++nd;
-            }
-            *rlo++ = oc;
-            *rhi++ = oc+1;
-            ++nd;
-            *rlo++ = 0;
-            *rhi++ = IC;
-            ++nd;
-            sz *= IC;
-            if (dm >= 5) {
-                *rlo++ = kd_st;
-                *rhi++ = kd_en;
-                //sz *= kd_en - kd_st;
-                ++nd;
-            }
-            if (dm >= 4) {
-                *rlo++ = kh_st;
-                *rhi++ = kh_en;
-                //sz *= kh_en - kh_st;
-                ++nd;
-            }
-            if (1) {
-                *rlo++ = kw_st;
-                *rhi++ = kw_en;
-                //sz *= kw_en - kw_st;
-                ++nd;
-            }
-            *wcrd.raw_sz() = sz;
-            *wcrd.raw_dim() = weights_d.ndims();
-            //if(0){ std::cout<<wcrd.lim_str("wcrd")<<std::endl; }
-            assert( nd == wcrd.get_dim() );
-            wcrd.init_nd(0);
-        }
-
-        // move out XXX and set mb just once
-        VecPos32 svp; //mb, g*IC+ic, id,ih,iw linear function of kd,kh,kw
-        {
-            int const wvl = wcrd.get_vl(); // may only decrease later
-            VFOR(w,wvl) svp.vp[0][w] = mb; // this dim remains const
-        }
-
-        //int const* restrict const vw = &wcrd.vp[0][0]; // XXX
-        // saw segfault next line:
-        for( ; wcrd; ++wcrd) // wcrd ~ [g,]oc,ic[,kd,[,kh]],kw
-        {
-            //std::cout<<wcrd.coord_str("wcrd")<<std::endl;
-            int const wvl = wcrd.get_vl();
-            VFOR(w,wvl) { //vec : wcrd --> svp src coords
-                //svp.vp[0][i] = mb; // this dim remains const
-                int wdim=0;
-                if (with_groups) { // g * IC + ic
-                    svp.vp[1][w] = wcrd.vp[0][w] * IC + wcrd.vp[2][w];
-                    wdim=3;
-                }else{
-                    svp.vp[1][w] = wcrd.vp[1][w];
-                    wdim=2;
-                }
-                int sdim=2;
-                if (dm >= 5) {
-                    svp.vp[sdim][w] = id_0 + wcrd.vp[wdim][w] * KDD;
-                    ++sdim; ++wdim;
-                }
-                if (dm >= 4) {
-                    svp.vp[sdim][w] = ih_0 + wcrd.vp[wdim][w] * KDH;
-                    ++sdim; ++wdim;
-                }
-                if (1 /*dm >= 3*/) {
-                    svp.vp[sdim][w] = iw_0 + wcrd.vp[wdim][w] * KDW;
-                    ++sdim; ++wdim;
-                }
-            }
-
-            dim_t wei_off[MVL];
-            dim_t src_off[MVL];
-            // vtmp: wcrd and svp are OK to clobber during wei/src_off calc
-            weights_dopt.vec_off_vtmp(wcrd.base(), &wei_off[0], wvl, false/*pad*/);
-            src_dopt.vec_off_vtmp(svp, &src_off[0], wvl, false/*pad*/);
-            VFOR(w, wvl) { //vec
-                acc_data_t const ss = src[src_off[w]];
-                acc_data_t const ww = weights[wei_off[w]];
-                d += ss * ww;
-            }
-        }
-        return d;
-    };
-
-#undef IKLIMS
-
-    auto kern6 = [&](int ithr, int nthr) {
+    auto kern4 = [&](int ithr, int nthr) {
+        //1b2: 31.3331 38.3888 31.7553 59.4035 59.3386 32.1725 15.4924 15.4991 15.491 92.2239
         size_t start, end;
         balance211(elems, nthr, ithr, start, end);
         auto const dm = dst_d.ndims(); // MB, OCxG, OD?, OH?, OW
@@ -716,88 +867,6 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
                 VFOR(i,dvl) a[i] = 0.f;
             }
 
-#if 0
-            // spatial coords of src, dst as raw int pointers
-            //      VE mixed ops w/ unsigned and signed are clunky
-            static_assert( sizeof(dcrd.vp[dm-1][0]) == sizeof(int),
-                    "require VecPos32");
-            int const* const mb_ptr = reinterpret_cast<int const*>
-                    (&dcrd.vp[0][0]); 
-            int const* const o_spatial0 = reinterpret_cast<int const*>
-                    (&dcrd.vp[2][0]);
-            //int const* const s_spatial0 = reinterpret_cast<int const*>
-            //        (&scrd.vp[2][0]); 
-            //int const* const w_spatial0 = reinterpret_cast<int const*>
-            //        (&wcrd.vp[2+ (with_groups?1:0)][0]); 
-
-            // what type? data_t dst_reg[MVL]; VREG(dst_reg); // oh, we write this as mem :(
-            float dst_reg[MVL]; VREG(dst_reg); // oh, we write this as mem :(
-            //int kk_dhw[3*MVL]; // if (ws), max-coord memory (vector kpos post-calc)
-
-            // vector precalc constants (vector calc --> mem)
-            // ssz ~ source pooling window (tile overlap with unpadded src)
-            // dhw ~ shift, start, end iterator (easy vector calc)
-            int ssz[MVL]; // ssz < kern ovlp <= KD*KH*KW (small)
-            int dhw[12*MVL]; // nc++ slightly prefers single array over 9
-            // precalc ssz and dhw vectors for pool window ovlp w/ src
-            //POOL_WINDOW_PRECALC(dm, dvl, o_spatial0, /*outputs*/ ssz, dhw);
-            // macro version of window_precalc
-            // Each destination spatial pixel has a source (and weight) pre-image tile.
-            // Calculate 3 vectors of destination window info per spatial dimension.
-            //
-            // - ls_sz ~ src (/weights) tile coord span.
-            // - ls_st ~ logical source start coord; in interval [0,ID|IH|IW)
-            // - lk_st ~ logical kernel start coord; in interval [0,KD|KH|KW)
-#define CONV_WINDOW_LOOP(d_spatial, dvl, STRIDE, DILATION, PAD, KSZ, ISZ, lscrd, p_st, p_en, ssz) do \
-            { \
-                ShortLoop() for(int i=0; i<dvl; ++i) { \
-                    int lscrd = d_spatial[i]/*od or oh or ow*/ * STRIDE - PAD; \
-                    ls_st[i] = (lscrd > 0? lscrd: 0); \
-                    int ls_en = (lscrd + KSZ < ISZ? lscrd + KSZ: ISZ); \
-                    if (ls_en < ls_st[i]) ls_en = ls_st[i]; \
-                    ls_sz[i] = ls_en - ls_st[i]; \
-                    ssz[i] *= ls_sz[i]; \
-                } \
-            } while(0)
-
-            // expects SD,KD,ID,padF, etc int consts defined as usual
-            // dcrd info passed in as dm~dcrd.get_dim() dvl~dcrd.get_vl(),
-            // and d_spatial0 ~ (int32_t*)&dcrd.vp[2][0].
-#define CONV_WINDOW_PRECALC(dm, dvl, d_spatial0, ssz, dhw) do \
-            { \
-                int const* d_spatial = d_spatial0; \
-                int * p_off; /* input coord offset (from destination coord) */ \
-                int * p_st; /* input coord start */ \
-                int * p_en; /* input coord end, >= start*/ \
-                ShortLoop() for(int i=0; i<dvl; ++i) \
-                ssz[i] = 1; \
-                if (dm >= 5) { \
-                    p_off = dhw + 8*MVL; \
-                    p_st  = dhw + 9*MVL; \
-                    p_en  = dhw + 10*MVL; \
-                    k_st  = dhw + 11*MVL; \
-                    POOL_WINDOW_LOOP(d_spatial, dvl, SD, padF, KD, ID, \
-                            p_off, p_st, p_en, ssz, k_st); \
-                    d_spatial += MVL; /*dcrd.MaxVl*/ \
-                } \
-                if (dm >= 4) { \
-                    p_off = dhw + 4*MVL; \
-                    p_st  = dhw + 5*MVL; \
-                    p_en  = dhw + 6*MVL; \
-                    k_st  = dhw + 7*MVL; \
-                    POOL_WINDOW_LOOP(d_spatial, dvl, SH, padT, KH, IH, \
-                            p_off, p_st, p_en, ssz, k_st); \
-                    d_spatial += MVL; /*dcrd.MaxVl*/ \
-                } \
-                p_off = dhw + 0*MVL; \
-                p_st  = dhw + 1*MVL; \
-                p_en  = dhw + 2*MVL; \
-                p_en  = dhw + 3*MVL; \
-                POOL_WINDOW_LOOP(d_spatial, dvl, SW, padL, KW, IW, \
-                        p_off, p_st, p_en, ssz, k_st); \
-            } while(0)
-#endif
-
             {
                 int v_g[MVL];
                 int v_oc[MVL];
@@ -811,8 +880,9 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
                 COORD_VEC_REGISTER(v_oh, (dm >= 4? (dcrd_i+=MVL): dim_zeros));
                 COORD_VEC_REGISTER(v_ow, dcrd_i+=MVL); // always exists, dm >= 3
 #undef COORD_VEC_REGISTER
-                NOVEC VFOR(i,dvl) { // fn calls, novec
-                    a[i] += ker6(v_g[i], v_mb[i], v_oc[i], v_od[i], v_oh[i], v_ow[i]);
+
+                VFOR(i,dvl) { // fn calls, novec
+                    a[i] += ker_plain(v_g[i], v_mb[i], v_oc[i], v_od[i], v_oh[i], v_ow[i]);
                 }
             }
 
@@ -833,7 +903,7 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type,
     };
 
     bool constexpr force_sequential = 0; // 1 for debug
-    parallel((force_sequential? 1: 0), kern6);
+    parallel((force_sequential? 1: 0), kern4);
 }
 
 using namespace data_type;
