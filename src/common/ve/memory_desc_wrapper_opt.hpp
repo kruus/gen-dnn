@@ -909,6 +909,8 @@ public:
         assert(is_blocking_desc());
         const blocking_desc_t &blk = blocking_desc();
 #if 0 && !defined(NDEBUG)
+        // Counterexample: --reorder --sdt=f32 --ddt=s8 --stag=oiw
+        //                 --dtag=OIw4i16o4i --alg=bootstrap 32x32x3
         unsigned nsame=0U;
         for (int i=0; i<blk.inner_nblks; ++i) {
             for (int j=i+1; j<blk.inner_nblks; ++j) {
