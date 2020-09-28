@@ -53,6 +53,7 @@ public:
     const float alpha_;
     const float beta_;
     const float scale_;
+    // XXX VE todo : move alg_subcase and its setter(alg,alpha,beta), for "pow"
 };
 
 template <impl::data_type_t data_type>
@@ -60,33 +61,47 @@ struct ref_eltwise_fwd_t : public primitive_t {
     struct pd_t : public cpu_eltwise_fwd_pd_t {
         using cpu_eltwise_fwd_pd_t::cpu_eltwise_fwd_pd_t;
 
-        DECLARE_COMMON_PD_T("ref:any", ref_eltwise_fwd_t);
+        // used to all be called "ref:any"
+        DECLARE_COMMON_PD_T(this->impl_name(), ref_eltwise_fwd_t);
 
         status_t init(engine_t *engine) {
-            using namespace utils;
-
-            auto src_d = memory_desc_wrapper(src_md());
-
-            use_dense_ = src_d.is_dense()
-                    || (src_d.is_dense(true) && is_zero_preserved());
-
-            use_nCspBc_padded_ = !use_dense_
-                    && src_d.blocking_desc().inner_nblks == 1
-                    && one_of(src_d.blocking_desc().inner_blks[0], 8, 16)
-                    && src_d.blocking_desc().inner_idxs[0] == 1
-                    && src_d.only_padded_dim(1) && src_d.is_dense(true);
-
-            if (has_zero_dim_memory()) use_dense_ = use_nCspBc_padded_ = false;
-
             bool ok = is_fwd() && data_type == desc()->data_desc.data_type
                     && platform::has_data_type_support(data_type)
                     && attr()->has_default_values();
             if (!ok) return status::unimplemented;
 
+            get_ker_type(this->use_dense_, this->use_nCspBc_padded_);
+
             return status::success;
         }
 
         bool use_dense_, use_nCspBc_padded_;
+
+    private:
+        void get_ker_type(bool &use_dense, bool &use_nCspBc_padded) const {
+            using namespace utils;
+            // unfortunately, we might also be called BEFORE init() has run :(
+            auto src_d = memory_desc_wrapper(src_md());
+
+            use_dense = src_d.is_dense()
+                    || (src_d.is_dense(true) && is_zero_preserved());
+
+            use_nCspBc_padded = !use_dense
+                    && src_d.blocking_desc().inner_nblks == 1
+                    && one_of(src_d.blocking_desc().inner_blks[0], 8, 16)
+                    && src_d.blocking_desc().inner_idxs[0] == 1
+                    && src_d.only_padded_dim(1) && src_d.is_dense(true);
+
+            if (has_zero_dim_memory()) use_dense = use_nCspBc_padded = false;
+        }
+        char const* impl_name() const {
+            bool tmp_dense, tmp_nCspBc_padded;
+            // tmp, since must be const AND migth be called before init()
+            get_ker_type(tmp_dense, tmp_nCspBc_padded);
+            return (tmp_dense? "ref:dense"
+                    : tmp_nCspBc_padded ? "ref:nCsp8c_padded-any"
+                    : "ref:any");
+        }
     };
 
     ref_eltwise_fwd_t(const pd_t *apd) : primitive_t(apd) {}
@@ -95,15 +110,23 @@ struct ref_eltwise_fwd_t : public primitive_t {
     virtual status_t execute(const exec_ctx_t &ctx) const override {
         if (pd()->use_dense_)
             execute_forward_dense(ctx);
+#if ! defined(__ve)
+        // NOT FAST on VE.
+        // code geared to simd vector length 8 or 16
+        // generic impl, optimized for VE, is much fastr
+        // XXX x86: speed comparison with VE generic eltwise fwd XXX
         else if (pd()->use_nCspBc_padded_)
             execute_forward_nCspBc_padded(ctx);
+#endif
         else
             execute_forward_generic(ctx);
         return status::success;
     }
 
 private:
+#if ! defined(__ve)
     void execute_forward_nCspBc_padded(const exec_ctx_t &ctx) const;
+#endif
     void execute_forward_dense(const exec_ctx_t &ctx) const;
     void execute_forward_generic(const exec_ctx_t &ctx) const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd().get(); }
@@ -114,7 +137,7 @@ struct ref_eltwise_bwd_t : public primitive_t {
     struct pd_t : public cpu_eltwise_bwd_pd_t {
         using cpu_eltwise_bwd_pd_t::cpu_eltwise_bwd_pd_t;
 
-        DECLARE_COMMON_PD_T("ref:any", ref_eltwise_bwd_t);
+        DECLARE_COMMON_PD_T(this->impl_name(), ref_eltwise_bwd_t);
 
         status_t init(engine_t *engine) {
             using namespace utils;
@@ -150,6 +173,10 @@ struct ref_eltwise_bwd_t : public primitive_t {
         bool use_dense_;
 
     private:
+        char const* impl_name() const {
+            return use_dense_? "ref:dense" : "ref:any";
+        }
+
         void init_scratchpad() {
             const memory_desc_wrapper data_d(src_md());
             const memory_desc_wrapper diff_data_d(diff_dst_md());
@@ -186,4 +213,4 @@ private:
 
 #endif
 
-// vim: et ts=4 sw=4 cindent cino=+2s,l0,\:4,N-s
+// vim: et ts=4 sw=4 cindent cino+=+2s,l0,\:4,N-s

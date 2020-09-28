@@ -33,7 +33,7 @@ namespace {
 /** hoist linear for loop condition
  * \f$\{i \in [i_{beg},i_{end} \mathrm{and} o \def a+i \cdot b \in [o_{beg},o_{end}\}\f$
  * to a (returned) sub-for-subloop range \f$[i_{lo},i_{hi})\f$ .
- * \pre b>0, ibeg<=iend, obeg<=oend
+ * \pre b>0, ibeg<=iend, obeg<=oend UNCHECKED
  * \return ilo,ihi
  * \post iff ilo<ihi, then ibeg<=ilo<ihi<=iend and o=a+i*b is in [obeg,oend)
  *
@@ -53,7 +53,7 @@ namespace {
  * Transformed:
  * \code
  * int const ibeg, iend;
- * hoist_ApiB_in( ilo,ihi, ibeg,iend, a,b, obeg,oend );
+ * hoist_ApiB( ilo,ihi, ibeg,iend, a,b, obeg,oend );
  * for(i=ilo; i<ihi; ++i){         // sub-loop
  *   int const o = a + i*b;        // linear fn.
  *   assert( o >= o_beg && o < o_end );
@@ -70,12 +70,14 @@ inline ALWAYS_INLINE void hoist_ApiB(
         const int obeg, const int oend)         // linear fn range [obeg,oend)
 {
     // div_floor approach for int args, not the unsigned generalization
-    assert( b > 0 );
-    ilo = div_floor( obeg -a+b-1, b );
-    ihi = div_floor( oend -a+b-1, b );
-    if( ilo < ibeg ) ilo = ibeg;
+    //assert( b > 0 );
+    ilo = div_floor( obeg +b-1-a, b );
+    ihi = div_floor( oend +b-1-a, b );
+    //if( ilo < ibeg ) ilo = ibeg;
+    ilo = (ilo < ibeg? ibeg: ilo);
     //else if( ilo > iend ) ilo = iend; // intentionally NOT enforced
-    if( ihi > iend ) ihi = iend;
+    //if( ihi > iend ) ihi = iend;
+    ihi = (ihi > iend? iend: ihi);
     //else if( ihi < ibeg ) ihi = ibeg; // intentionally NOT enforced
 }
 
@@ -179,14 +181,15 @@ inline ALWAYS_INLINE void hoist_ApiB(
  *   possible \c oh.
  *   - We avoid testing for values of zero, since division values of zero can
  *     result by rounding negative integers upward
- * - Consider \f$kh(ih,oh) >= 1\f$
- *   - \f$ (0 + DH-1+PH-oh*SH) / DH >= 1\f$  (for +ve numerator & denominator)
- *   - \f$ DH-1+PH-oh*SH >= DH\f$
- *   - \f$ PH-1 - oh*SH >= 0\f$
- *   - \f$ oh*SH <= PH-1 \f$
- *   - \f$ oh*SH < PH \f$
- * - Therefore if \f$oh*SH < PH\f$, we use the formula
- *   \f$kh_{beg}=(DH-1+[PH-oh*SH]) / DH\f$.
+ * - Consider \f$kh(ih,oh) >= L\f$, C=0, L=1:
+ *   - \f$ (C + DH-1+PH-oh*SH) / DH >= L\f$  (for +ve numerator & denominator)
+ *   - \f$ C + DH-1+PH-oh*SH >= L*DH\f$
+ *   - \f$ C+PH-1 - oh*SH >= 0\f$
+ *   - \f$ oh*SH <= C+PH-1 \f$
+ *   - \f$ oh*SH < C+PH \f$
+ * - Therefore if \f$oh*SH < C+PH\f$, (C=0) we use the formula
+ *   \f$kh_{beg}=(C+DH-1+[PH-oh*SH]) / DH\f$.
+ *   - (and cap it at KH)
  *   - Notice that both numerator and denominator are both strictly positive.
  *   - So this formula is correct for signed/unsigned integers.
  * - Otherwise, \f$kh_{beg} = 0\f$, the lowest possible value.
@@ -196,17 +199,24 @@ inline ALWAYS_INLINE void hoist_ApiB(
  *
  * - Now Consider \f$kh_{end} >= KH\f$, where KH is the highest valid value for \f$kh_{end}\f$
  *   - The largest \f$kh\f$ occurs when \c ih has it's largest possible value, \c IH.
- * - Let's first check for \f$kh(ih,oh) >= KH\f$
+ * - Let's first check for \f$kh(IH,oh) >= KH\f$
  *   - \f$ (IH + DH-1 + PH - oh*SH) / DH >= KH \f$
  *   - \f$ IH + DH - 1 + PH - oh*SH  >= KH*DH \f$
- *   - \f$ KH*DH + oh*SH + 1 <= IH+PH+DH \f$, now RHS and LHS are positive
+ *   - \f$ KH*DH + oh*SH + 1 <= IH+PH+DH \f$, now RHS and LHS are strictly positive
  *   - \f$ KH*DH + oh*SH < IH+PH+DH \f$
+ *      - NEW: actually largest possible input value is \f$i_{beg}\f$ plus a multiple of DH
+ *        1. after capping \f$k_{beg}\f$ between [0,KH], calculate
+ *           \f$i_{beg} = oh*SH - PH + k_{beg} * DH\f$
+ *        2. max i possible is \f$i_{max} = i_{beg} + (IH-i_{beg})/DH*DH\f$
+ *        3. use \f$i_{max}\f$ in place of IH ...
+ *           so when KH*DH + oh*SH < i_{max} + PH + DH,
+ *           then \f$kh_{end} = KH\f$
  *   - When the above condition holds, we can set \f$kh_{end} = KH\f$ (maximal value)
  * - Otherwise we can also check for \f$kh(ih,oh) >= 1\f$, so that we can safely use
  *   division with positive integers.
- *   - Replacing 'KH' with '1' in above...  \f$ 1*DH + oh*SH < IH+PH+DH \f$
- *   - So when \f$oh*SH < IH+PH\f$, \f$kh_{end} =  (DH-1 + [IH+PH - oh*SH]) / DH \f$
- *     will be \f$ > 0\f$
+ *   - Replacing 'KH' with '1' in above...  \f$ 1*DH + oh*SH < i_{max}+PH+DH \f$
+ *   - So when \f$oh*SH < i_{max}+PH\f$, \f$kh_{end} =  (DH-1 + [i_{max}+PH - oh*SH]) / DH \f$
+ *     will be \f$ > 0\f$.
  *     - Otherwise we can set \f$kh_{end} = 0\f$
  *
  * So the \em long-hand +ve integer solutions for \c kh_beg and \c kh_end are:

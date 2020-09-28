@@ -15,7 +15,7 @@
 *******************************************************************************/
 
 /** \file nc++-3.0.25 had particular difficulties with this compilation. */
-#if 1
+#if 0
 #include "cpu/ve/ref_convolution_bwd_w-orig.ipp" // I guess I introduced an
 #else
 
@@ -104,8 +104,8 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
 #endif // USE_KER_BIAS
 
 #if USE_KER
-    auto ker = [&](int g, int oc, int ic, int kd, int kh,
-                       int kw) {
+    auto ker = [&](int const g, int const oc, int const ic,
+            int const kd, int const kh, int const kw) {
         register acc_data_t tmp = acc_data_t{0};
 
         // nc++ full hoist (vectorization workaround)
@@ -116,18 +116,24 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
         hoist_ApiB(owlo,owhi, 0,OW, kw*KDW-padL,    KSW,  0,IW  );
         NOVEC for_(int mb = 0; mb < MB; ++mb)
         NOVEC for_(int od = odlo; od < odhi; ++od)
-        NOVEC for_(int oh = ohlo; oh < owhi; ++oh)
+        NOVEC for_(int oh = ohlo; oh < ohhi; ++oh) // had typo here!
         NOVEC for (int ow = owlo; ow < owhi; ++ow) {
             int id = od * KSD - padFront + kd * KDD; // in [0,ID)
             int ih = oh * KSH - padT     + kh * KDH; // in [0,IH)
             int iw = ow * KSW - padL     + kw * KDW; // in [0,IW)
-            //assert( id >= 0 && id < ID
-            //     && ih >= 0 && ih < IH
-            //     iw >=0 && iw < IW );
-            acc_data_t const dd = diff_dst[ off_abx(
-                    diff_dst_d, 0, mb, g*OC+oc, od, oh, ow) ];
-            acc_data_t const ss = src[ off_abx(
-                    src_d, 0, mb, g*IC+ic, id, ih, iw) ];
+#if 0
+            if(!( id >= 0 && id < ID && ih >= 0 && ih < IH && iw >=0 && iw < IW)) {
+                printf("CHECK: hoist od[%d,%d) oh[%d,%d) ow[%d,%d) --> id,ih,iw=%d,%d,%d cf ID,IH,IW %d,%d,%d\n",
+                        odlo,odhi, ohlo,ohhi, owlo,owhi, id,ih,iw,  ID,IH,IW);
+            }
+            assert( id >= 0 && id < ID
+                 && ih >= 0 && ih < IH
+                 && iw >=0 && iw < IW );
+#endif
+            dim_t doff = off_abx(diff_dst_d, 0, mb, g*OC+oc, od, oh, ow);
+            dim_t soff = off_abx(src_d,      0, mb, g*IC+ic, id, ih, iw);
+            acc_data_t const dd = diff_dst[doff];
+            acc_data_t const ss = src[soff];
             tmp += dd * ss;
         }
         return tmp;
@@ -139,7 +145,7 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
 #if ALLOW_KER_PLAIN
     // TODO ||ize offset calcs for VE
     if (diff_bias) {
-        printf(" bias\n"); fflush(stdout);
+        //printf(" bias\n"); fflush(stdout);
         parallel_nd(G, OC, [&](int g, int oc) {
                 // XXX: loss of precision when bias is a float...
 #if USE_KER_BIAS
@@ -169,7 +175,7 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
 #if ALLOW_KER_PLAIN
     if (diff_dst_d.is_plain() && src_d.is_plain())
     {
-        printf(" plain\n"); fflush(stdout);
+        //printf(" plain\n"); fflush(stdout);
         // this one can have a problem
         parallel_nd(G, OC, [&](int g, int oc) {
 #if 1
@@ -236,7 +242,7 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
                     hoist_ApiB(owlo,owhi, 0,OW, kw*KDW-padL,    KSW,  0,IW  );
                     NOVEC for_(int mb = 0; mb < MB; ++mb)
                     NOVEC for_(int od = odlo; od < odhi; ++od)
-                    NOVEC for_(int oh = ohlo; oh < owhi; ++oh)
+                    NOVEC for_(int oh = ohlo; oh < ohhi; ++oh)
                     NOVEC for (int ow = owlo; ow < owhi; ++ow) {
                         const dim_t id = od * KSD - padFront + kd * KDD;
                         const dim_t ih = oh * KSH - padT + kh * KDH;
@@ -283,7 +289,7 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
     }else
 #endif
     { // this one seems OK, nope it too segfaults with nc++-3.0.25
-        printf(" gen\n"); fflush(stdout);
+        //printf(" gen\n"); fflush(stdout);
         parallel_nd(G, OC, [&](int g, int oc) {
             if (diff_bias) {
 #if USE_KER_BIAS
@@ -324,7 +330,7 @@ void ref_convolution_bwd_weights_t<src_type, diff_wei_type, diff_dst_type,
                     hoist_ApiB(owlo,owhi, 0,OW, kw*KDW-padL,    KSW,  0,IW  );
                     NOVEC for_(int mb = 0; mb < MB; ++mb)
                     NOVEC for_(int od = odlo; od < odhi; ++od)
-                    NOVEC for_(int oh = ohlo; oh < owhi; ++oh)
+                    NOVEC for_(int oh = ohlo; oh < ohhi; ++oh)
                     NOVEC for (int ow = owlo; ow < owhi; ++ow) {
                         int const id = od * KSD - padFront + kd * KDD; // in [0,ID)
                         int const ih = oh * KSH - padT     + kh * KDH; // in [0,IH)

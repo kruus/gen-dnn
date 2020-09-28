@@ -88,8 +88,10 @@ int str2desc(desc_t *desc, const char *str, bool is_deconv) {
             s += (end_s - s); \
             /* check any # groups, including one, works correcly */ \
             if (!strncmp(p, "g", 1)) d.has_groups = true; \
-            if (d.c < 0) return FAIL; \
-            /* printf("@@@debug: %s: %d\n", p, d. c); */ \
+            if (d.c < 0) { \
+                printf("@@@error: %s: %d\n", p, d.c); \
+                return FAIL; \
+            } \
         } \
     } while (0)
 #define CASE_N(c) CASE_NN(#c, c)
@@ -122,7 +124,10 @@ int str2desc(desc_t *desc, const char *str, bool is_deconv) {
             break;
         }
         if (*s == '_') ++s;
-        if (!ok) return FAIL;
+        if (!ok) {
+            printf(" unrecognized option at: %s\n",s);
+            return FAIL;
+        }
     }
 #undef CASE_NN
 #undef CASE_N
@@ -180,8 +185,10 @@ int str2desc(desc_t *desc, const char *str, bool is_deconv) {
     if (sanitize_desc(d.ndims, {d.od, d.id, d.kd, d.sd, d.pd, d.dd},
                 {d.oh, d.ih, d.kh, d.sh, d.ph, d.dh},
                 {d.ow, d.iw, d.kw, d.sw, d.pw, d.dw}, {1, 1, 1, 1, 0, 0}, true)
-            != OK)
+            != OK) {
+        printf(" sanitize failed!\n"); fflush(stdout);
         return FAIL;
+    }
 
     *desc = d;
 

@@ -1,0 +1,115 @@
+# ERRORS
+#--reset --dir=FWD_B --cfg=f32 --alg=DIRECT --attr=post_ops='square' mb5_ic32oc64_ih200oh190kh7sh1dh1ph1_iw22ow12kw7sw1dw1pw1
+#--reset --skip-impl="ref_fused_convolution" --cfg=f32,u8s8u8 --attr=post_ops='relu;dw_k3s1p1;sqrt' ic256oc256_ih60oh20kh1ph0sh3_iw50ow25kw1pw0sw2
+#--reset --dir=FWD_B --cfg=f32 --alg=DIRECT --attr=post_ops='sum;sum' mb8_ic32oc64_ih20oh10kh7sh1dh1ph1_iw22ow12kw7sw1dw1pw1
+# test_regression seg fault:
+--reset --dir=BWD_WB --cfg=f32_full mb1ic16ih1oc16oh1kh3ph0 # gemm
+--reset --dir=FWD_I g32ic32ih112oc32oh112kh3ph1n"mobilenet:conv2_1/dw" # gemm mb2_g32ic32oc32_ih112oh112kh3sh1dh0ph1_iw112ow112kw3sw1dw0pw1
+# FIXED ...
+--reset --dir=FWD_B g32ic32ih112oc32oh112kh3ph1n"mobilenet:conv2_1/dw" # gemm mb2_g32ic32oc32_ih112oh112kh3sh1dh0ph1_iw112ow112kw3sw1dw0pw1
+--reset --dir=FWD_D g32ic32ih112oc32oh112kh3ph1n"mobilenet:conv2_1/dw" # gemm mb2_g32ic32oc32_ih112oh112kh3sh1dh0ph1_iw112ow112kw3sw1dw0pw1 ## test_benchdnn_conv_depthwise seg fault:
+--reset --dir=FWD_I  g1ic16iw5oc16ow3kw3pw4dw4n"large_padding_and_dilation_w.r.t._kernel_size" # gemm # test_conv_gemm_f32 segfault (in ref:any)
+#--reset --dir=FWD_B  g1ic16iw5oc32ow3kw3pw4dw4n"large_padding_and_dilation_w.r.t._kernel_size" ## test_conv_gemm_f32 segfault (in ref:any)
+#--reset --dir=BWD_WB g1ic16iw5oc32ow3kw3pw4dw4n"large_padding_and_dilation_w.r.t._kernel_size" # mistrusted ## test_conv_gemm_f32 segfault (in ref:any)
+--reset --dir=FWD_B  g1ic16iw25oc32ow27kw3pw7dw5n"large_padding_and_dilation_w.r.t._kernel_size" # gemm 
+--reset --dir=BWD_WB g1ic16iw25oc32ow27kw3pw7dw5n"large_padding_and_dilation_w.r.t._kernel_size" # gemm
+# N/A for ref conv: --reset --dir=FWD_I,FWD_B --stag=acdb --wtag=ABcd4b16a4b --dtag=acdb --cfg=s8s8f32 mb2_ic32oc32_ih13oh12kh3sh1dh0ph0_iw13ow12kw3sw1dw0pw0
+# new failure case:
+# nnl_verbose,exec,cpu,convolution,ref:any,forward_inference,src_s8::blocked:acdb:f0 wei_s8::blocked:ABcd4b16a4b:f0 bia_f32::blocked:a:f0 dst_f32::blocked:acdb:f0,post_ops:'eltwise_swish:0.5;';,alg:convolution_direct,mb2_ic32oc32_ih13oh12kh3sh1dh0ph0_iw13ow12kw3sw1dw0pw0,189.95
+# /home/kruus/conv/tests/gtests/dnnl_test_common.hpp:379: Failure
+#--reset --dir=BWD_W --stag=acdb --wtag=ABcd4b16a4b --dtag=acdb --cfg=s8s8f32 mb2_ic32oc32_ih13oh12kh3sh1dh0ph0_iw13ow12kw3sw1dw0pw0 # BWD_W untested_failed invalid args init_pd_custom
+
+# fail in test_convolution_eltwise_forward_x8s8f32s32
+# dnnl_verbose,exec,cpu,convolution,ref:any,forward_inference,src_s8::blocked:acdb:f0 wei_s8::blocked:ABcd4b16a4b:f0 bia_f32::blocked:a:f0 dst_f32::blocked:acdb:f0,post_ops:'eltwise_swish:0.5;';,alg:convolution_direct,mb2_ic32oc32_ih13oh12kh3sh1dh0ph0_iw13ow12kw3sw1dw0pw0,
+# note: actual output size is oh11, but was listed as oh12
+# following are always ref:any for VE
+--reset --dir=FWD_B --cfg=s8s8f32 --stag=acdb --wtag=ABcd4b16a4b --dtag=acdb                             mb2_ic32oc32_ih13oh11kh3sh1dh0ph0_iw13ow11kw3sw1dw0pw0
+--reset --dir=FWD_B --cfg=s8s8f32 --stag=acdb --wtag=ABcd4b16a4b --dtag=acdb --attr=post_ops='swish:0.5' mb2_ic32oc32_ih13oh11kh3sh1dh0ph0_iw13ow11kw3sw1dw0pw0
+--reset --dir=FWD_B --cfg=s8s8f32 --stag=acdb --wtag=ABcd4b16a4b --dtag=acdb                             mb2_ic32oc32_ih13oh11kh3sh1dh0ph0_iw13ow12kw3sw1dw0pw0
+--reset --dir=FWD_B --cfg=s8s8f32 --stag=acdb --wtag=ABcd4b16a4b --dtag=acdb --attr=post_ops='swish:0.5' mb2_ic32oc32_ih13oh11kh3sh1dh0ph0_iw13ow12kw3sw1dw0pw0
+--reset --dir=FWD_B --cfg=s8s8f32 --stag=acdb --wtag=ABcd4b16a4b --dtag=abcd                             mb2_ic32oc32_ih13oh11kh3sh1dh0ph0_iw13ow11kw3sw1dw0pw0
+--reset --dir=FWD_B --cfg=s8s8f32 --stag=acdb --wtag=ABcd4b16a4b --dtag=abcd --attr=post_ops='swish:0.5' mb2_ic32oc32_ih13oh11kh3sh1dh0ph0_iw13ow11kw3sw1dw0pw0
+--reset --dir=FWD_B --cfg=s8s8f32 --stag=acdb --wtag=ABcd4b16a4b --dtag=abcd                             mb2_ic32oc32_ih13oh11kh3sh1dh0ph0_iw13ow12kw3sw1dw0pw0
+--reset --dir=FWD_B --cfg=s8s8f32 --stag=acdb --wtag=ABcd4b16a4b --dtag=abcd --attr=post_ops='swish:0.5' mb2_ic32oc32_ih13oh11kh3sh1dh0ph0_iw13ow12kw3sw1dw0pw0
+
+# segfault (rc 139) in test_convolution_forward_f32
+# dnnl_verbose,exec,cpu,convolution,ref:any,forward_training,src_f32::blocked:abcd:f0 wei_f32::blocked:aBdec8b:f0 bia_f32::blocked:a:f0 dst_f32::blocked:aBcd8b:f0,,alg:convolution_direct,mb2_g2ic4oc16_ih2oh8kh3sh1dh0ph1_iw2ow8kw3sw1dw0pw1,
+# fix: test for wcrd having no elements in kernel iteration loop
+# these are ref:any on VE
+--reset --dir=FWD_B --stag=abcd                --dtag=aBcd8b mb2_g2ic4oc16_ih2oh8kh3sh1dh0ph1_iw2ow8kw3sw1dw0pw1
+--reset --dir=FWD_B --stag=abcd --wtag=aBdec8b --dtag=aBcd8b mb2_g2ic4oc16_ih2oh8kh3sh1dh0ph1_iw2ow8kw3sw1dw0pw1
+
+# UNIMPL
+#--reset --dir=FWD_B --cfg=f32 --attr=oscale=common:2.25;post_ops='sum:1.5;relu:0.5' mb5_ic32oc64_ih200oh190kh7sh1dh1ph1_iw22ow12kw7sw1dw1pw1
+#--reset --dir=FWD_B --cfg=f32 --alg=DIRECT --attr=oscale=common:0.6;post_ops='square:0.5' mb2_ic32oc32_ih13oh13kh3sh1dh0ph1_iw13ow13kw3sw1dw0pw1
+#--reset --dir=FWD_B --cfg=f32 --alg=DIRECT --attr=oscale=common:0.6;post_ops='square:0.5' mb2_ic32oc32_ih13oh13kh3sh1dh0ph1_iw13ow13kw3sw1dw0pw1
+#--reset --dir=FWD_B --cfg=f32 --attr=oscale=common:2.25 mb5_ic32oc64_ih200oh190kh7sh1dh1ph1_iw22ow12kw7sw1dw1pw1
+
+# DEBUG oh. test_convolution_forward_u8s8s32 has s32 bias, not possible w/ benchdnn
+#--reset --dir=FWD_B --cfg=u8s8s32 --stag=abx --wtag=ABcd4b16a4b --attr=oscale=common:0.30 mb2_ic32oc32_ih13oh12kh3sh1dh0ph0_iw13ow12kw3sw1dw0pw0
+# NB: on VE following use gemm
+--reset --dir=FWD_B ic32ih200oc4oh196kh3ph1dh7n"DilHi"
+--reset --dir=FWD_B ic32ih200oc4oh210kh3ph13dh7n"PadHi"
+--reset --dir=FWD_B ic32ih200oc4oh106kh13ph1dh7n"KerDilHi"
+--reset --dir=FWD_B ic32ih200oc4oh130kh13ph13dh7n"KerPadHi"
+--reset --dir=FWD_B ic32ih200oc4oh196kh3sh6ph1dh3n"DilStrHi"
+--reset --dir=FWD_B ic32ih200oc4oh210kh3sh6ph13dh3n"PadStrHi"
+--reset --dir=FWD_B ic32ih17oc32oh3kh3ph1dh7n"SmallDilHi"
+--reset --dir=FWD_B ic32ih2oc32oh12kh3ph13dh7n"SmallPadHi"
+--reset --dir=FWD_B ic32ih95oc32oh1kh13ph1dh7n"SmallKerDilHi"
+--reset --dir=FWD_B ic32ih78oc32oh8kh13ph13dh7n"SmallKerPadHi"
+--reset --dir=FWD_B ic32ih7oc32kh3sh6ph1dh3n"SmallDilStrHi"
+--reset --dir=FWD_B ic32ih3oc32kh3sh6ph13dh3n"SmallPadStrHi"
+--reset --dir=FWD_B ic2ih125oc16oh196kh3ph1dh7n"ic2DilHi"
+--reset --dir=FWD_B ic2ih125oc16oh210kh3ph13dh7n"ic2PadHi"
+--reset --dir=FWD_B ic2ih125oc16oh106kh13ph1dh7n"ic2KerDilHi"
+--reset --dir=FWD_B ic2ih125oc16oh130kh13ph13dh7n"ic2KerPadHi"
+--reset --dir=FWD_B ic2ih125oc16oh196kh3sh6ph1dh3n"ic2DilStrHi"
+--reset --dir=FWD_B ic2ih125oc16oh210kh3sh6ph13dh3n"ic2PadStrHi"
+--reset --dir=FWD_B ic2ih17oc512oh3kh3ph1dh7n"ic2SmallDilHi"
+--reset --dir=FWD_B ic2ih2oc512oh12kh3ph13dh7n"ic2SmallPadHi"
+--reset --dir=FWD_B ic2ih95oc512oh1kh13ph1dh7n"ic2SmallKerDilHi"
+--reset --dir=FWD_B ic2ih78oc512oh8kh13ph13dh7n"ic2SmallKerPadHi"
+--reset --dir=FWD_B ic2ih7oc32kh3sh6ph1dh3n"ic2SmallDilStrHi"
+--reset --dir=FWD_B ic2ih3oc32kh3sh6ph13dh3n"ic2SmallPadStrHi"
+
+# a ref:any (not ref:plain) testcase
+#--reset --dir=FWD_B --cfg=f32 --stag=aBcd8b --alg=DIRECT mb2_ic32oc64_ih90oh80kh7sh1dh1ph1_iw22ow12kw7sw1dw1pw1
+
+# normal tests: gemm (if unavailable, ref:plain)
+--reset --dir=FWD_B --cfg=f32 --alg=DIRECT mb2_ic32oc64_ih90oh80kh7sh1dh1ph1_iw22ow12kw7sw1dw1pw1
+--reset --dir=FWD_B --cfg=f32 --alg=DIRECT mb6_g2ic32oc48_ih42oh40kh3sh1dh0ph0_iw27ow25kw3sw1dw0pw0
+--reset --dir=FWD_B --cfg=f32 --alg=DIRECT mb7_g32ic32oc64_ih46oh44kh3sh1dh0ph0_iw28ow14kw3sw2dw0pw1
+--reset --dir=FWD_B --cfg=f32 --alg=DIRECT mb4_ic32oc96_ih7oh7kh3sh1dh1ph2_iw129ow129kw9sw1dw1pw8
+--reset --dir=FWD_D --cfg=f32 --alg=DIRECT mb4_ic32oc96_ih7oh7kh3sh1dh1ph2_iw129ow129kw9sw1dw1pw8
+
+# normal tests: ref:any
+--reset --dir=FWD_B --cfg=f32 --stag=aBcd8b --alg=DIRECT mb2_ic32oc64_ih90oh80kh7sh1dh1ph1_iw22ow12kw7sw1dw1pw1
+--reset --dir=FWD_B --cfg=f32 --stag=aBcd8b --alg=DIRECT mb6_g2ic32oc48_ih42oh40kh3sh1dh0ph0_iw27ow25kw3sw1dw0pw0
+--reset --dir=FWD_B --cfg=f32 --stag=aBcd8b --alg=DIRECT mb7_g32ic32oc64_ih46oh44kh3sh1dh0ph0_iw28ow14kw3sw2dw0pw1
+--reset --dir=FWD_B --cfg=f32 --stag=aBcd8b --alg=DIRECT mb4_ic32oc96_ih7oh7kh3sh1dh1ph2_iw129ow129kw9sw1dw1pw8
+--reset --dir=FWD_D --cfg=f32 --stag=aBcd8b --alg=DIRECT mb4_ic32oc96_ih7oh7kh3sh1dh1ph2_iw129ow129kw9sw1dw1pw8
+
+--reset --dir=FWD_B --cfg=f32 --stag=aBcd8b --wtag=aBCde8c8b --dtag=aBcd8b --alg=DIRECT mb2_g2ic16oc24_ih13oh11kh3sh1dh0ph0_iw13ow11kw3sw1dw0pw0
+
+# oscale=common:2.25 is not accepted for f32 src -- enabled it
+#    by removing the IMPLICATION for f32 that oscale is 1 (default attributes)
+#    TODO reinstate the IMPLICATION before git merge
+#--reset --dir=FWD_B --cfg=f32 --alg=DIRECT --attr=oscale=common:2.25;post_ops='relu' mb8_ic32oc64_ih20oh10kh7sh1dh1ph1_iw22ow12kw7sw1dw1pw1
+#--reset --dir=FWD_B --cfg=f32 --alg=DIRECT --attr=oscale=common:2.25;post_ops='tanh' mb8_ic32oc64_ih20oh10kh7sh1dh1ph1_iw22ow12kw7sw1dw1pw1
+#--reset --dir=FWD_B --cfg=f32 --alg=DIRECT --attr=oscale=common:2.25;post_ops='linear:0.5:0.1' mb8_ic32oc64_ih20oh10kh7sh1dh1ph1_iw22ow12kw7sw1dw1pw1
+#--reset --cfg=f32 --dir=FWD_B --attr=oscale=common:2.25;post_ops='sum;relu' mb2_ic100oc500_ih27oh27kh3ph1_n"gemm_acc"
+# after removing non-default-oscale support might still get some code coverage with:
+# VE: will use gemm (unless compiled without)
+--reset --dir=FWD_B --cfg=f32 --alg=DIRECT --attr=oscale=common:1.0;post_ops='relu' mb8_ic32oc64_ih20oh10kh7sh1dh1ph1_iw22ow12kw7sw1dw1pw1
+--reset --dir=FWD_B --cfg=f32 --alg=DIRECT --attr=oscale=common:1.0;post_ops='tanh' mb8_ic32oc64_ih20oh10kh7sh1dh1ph1_iw22ow12kw7sw1dw1pw1
+--reset --dir=FWD_B --cfg=f32 --alg=DIRECT --attr=oscale=common:1.0;post_ops='linear:0.5:0.1' mb8_ic32oc64_ih20oh10kh7sh1dh1ph1_iw22ow12kw7sw1dw1pw1
+--reset --cfg=f32 --dir=FWD_B --attr=oscale=common:1.0;post_ops='sum;relu' mb2_ic100oc500_ih27oh27kh3ph1_n"gemm_acc"
+# VE: will use gemm (unless compiled without)
+--reset --dir=FWD_I,FWD_D,FWD_B,BWD_W,BWD_D,BWD_WB --cfg=f32      --alg=DIRECT mb1ic32ih1oc32oh1kh3ph0 # BWD_W+BWD_WB mistrusted trust is too low
+--reset --dir=FWD_I,FWD_D,FWD_B,BWD_W,BWD_D,BWD_WB --cfg=f32_full --alg=DIRECT mb1ic64ih1oc64oh1kh3ph0
+#--reset --dir=BWD_WB --cfg=f32 --alg=DIRECT mb2_ic32oc64_ih90oh80kh7sh1dh1ph1_iw22ow12kw7sw1dw1pw1
+#--reset --dir=BWD_WB --cfg=f32 --alg=DIRECT mb6_g2ic32oc48_ih42oh40kh3sh1dh0ph0_iw27ow25kw3sw1dw0pw0
+#--reset --dir=BWD_WB --cfg=f32 --alg=DIRECT mb7_g32ic32oc64_ih46oh44kh3sh1dh0ph0_iw28ow14kw3sw2dw0pw1
+#--reset --dir=BWD_WB --cfg=f32 --alg=DIRECT mb4_ic32oc96_ih7oh7kh3sh1dh1ph2_iw129ow129kw9sw1dw1pw8
+

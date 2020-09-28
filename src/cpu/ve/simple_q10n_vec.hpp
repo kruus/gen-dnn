@@ -65,7 +65,10 @@ namespace cpu {
 //           routines for best performance.
 //       A first example: simple_q10n_ve_f32_int.hpp
 //           with various hand-written qzv_a1b0 "kernels"
-inline void mxcsr_roundv(float const* const f, int * const out, unsigned const vl)
+// Note: even when inlined, such functions stop "higher-level optimizations"
+//       whatever those are (perhaps further inlining?)
+#define VE_NOINLINE __attribute__((noinline))
+static void mxcsr_roundv VE_NOINLINE (float const* const f, int * const out, unsigned const vl)
     ATTR_NO_MSAN
 {
 #if DNNL_X64
@@ -84,8 +87,11 @@ inline void mxcsr_roundv(float const* const f, int * const out, unsigned const v
         "vldu %v63, 4, %[f]\n\t"           // float 0:31
         "vcvt.w.s.sx.rz %v63, %v63\n\t"    // VFIX op --> int32 in 32:63 of v64
         "vstl %v63, 4, %[out]\n\t"         // [sx into 0:31] , store 32:63 to out
+        "svob\n\t" // memory
      :                                        // outputs
+     //: "=m"(*(const int (*)[])out)//  error: dummy output "must be modifiable"?*/
      : [f]"r"(f), [vl]"r"(vl), [out]"r"(out)  // inputs
+     , "m"( /*dummy input*/ *(const float (*)[]) f)
      : "%v63", "memory"                // clobbers, %vl unknown
     );
     // expt: can I get rid of "memory" (causes many spills) ??
@@ -95,22 +101,25 @@ inline void mxcsr_roundv(float const* const f, int * const out, unsigned const v
             "vldu %v63, 4, %[f]\n\t" \
             "vcvt.w.s.sx.rz %v63, %v63\n\t" \
             "vstl %v63, 4, %[out]\n\t" \
-            : "m"( /*dummy output*/ *(const int (*)[]) OUT) \
+            : "m"(*(const int (*)[]) OUT) \
             : [f]"r"(F), [vl]"r"(VL), [out]"r"(OUT), \
               "m"( /*dummy input*/ *(const float (*)[]) F) \
             : "%v63"  /*, "memory" causes many spills? */ \
        )
-#if 0
+#if 1
     // double-check:
-    if(1){
-        int nerr=0;
-        for(int i=0; i<vl; ++i){
-            if (out[i] != nearbyintf(f[i])){
-                printf( " nerabyintf(%f)=%d, but vcvt-->%d\n",
-                        f[i], (int)nearbyintf(f[i]), out[i]);
-                ++nerr;
+    if(0){
+        assert(vl <= MVL );
+        static int nerr=0;
+        if (nerr < 50) {
+            for(int i=0; i<vl; ++i){
+                if (out[i] != nearbyintf(f[i])){
+                    printf( " nerabyintf(%f)=%d, but vcvt-->%d\n",
+                            f[i], (int)nearbyintf(f[i]), (int)out[i]);
+                    ++nerr;
+                }
+                if (nerr > 10) break;
             }
-            if (nerr > 10) break;
         }
     }
 #endif
