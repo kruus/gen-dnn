@@ -61,6 +61,18 @@ loops containing function calls at all.  nc++ scalar code is *very* slow.
   - vectorize offset calcs (for blocked memory formats)
   - pull in older speedups for im2col, col2im
 
+- convolution forward vectorization work:
+  - split source files in src/cpu/ve/
+  - offset and eltwise vectorizations
+  - nc++-3.0.27 mods
+    - several conv loops dumbed down to circumvent compiler optimizations sometimes segfaulting.
+    - build.sh -vd and -vdd pass all tests/examples/benchdnn (build.sh -vd[d]Tttttt)
+      - i.e. -O3 + asserts [+ debug]
+    - -O0 has a compiler ICE
+    - ./build.sh -v has several segfaults with access to memory@(-8)
+    - reinstated gemm convolutions after focusing on ref:any testing & optimization
+    - changed min 'malloc' aligment to 8, in prep for vednnx_convolution
+
 ### Original README:
 
 > This software was previously known as

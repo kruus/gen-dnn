@@ -85,6 +85,10 @@ static inline memory_tag_t *get_memory_tags(void *ptr) {
 void *malloc(size_t size, int alignment) {
     void *ptr;
 
+#if defined(__ve)
+    alignment = (alignment > 8? alignment: 8);
+#endif
+
     size_t buffer_size = utils::rnd_up(size, alignment);
     int buffer_alignment = alignment;
     if (buffer_alignment < getpagesize()) alignment = getpagesize();

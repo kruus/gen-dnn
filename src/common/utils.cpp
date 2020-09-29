@@ -111,6 +111,10 @@ void *malloc(size_t size, int alignment) {
     if (memory_debug::is_mem_debug())
         return memory_debug::malloc(size, alignment);
 
+#if defined(__ve)
+    alignment = (alignment > 8? alignment: 8);
+#endif
+
 #ifdef _WIN32
     ptr = _aligned_malloc(size, alignment);
     int rc = ptr ? 0 : -1;

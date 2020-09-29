@@ -8,7 +8,10 @@ DOJUSTDOC=0
 DOWARN=""
 BUILDOK="y"
 SIZE_T=64 # or 64, for -s or -S SX compile
-JOBS="-j$(grep -c processor /proc/cpuinfo)"
+_cpus=`cat /proc/cpuinfo | grep '^processor' | wc -l` || _cpus=16
+_cpus=$((_cpus/2+1))
+_cpus=$((_cpus < 20 ? _cpus : 20 ))
+JOBS="-j${_cpus}" # SIGSEGV in ccom now handle with incr ulimit -s
 CMAKETRACE=""
 USE_MKL=0
 USE_CBLAS=0
@@ -545,7 +548,9 @@ echo 'ulimit soft : '`ulimit -Ss`
             # default is -mno-vector-intrinsic-check
             #
             # In optimized mode, we are OK with failing some tests for
-            # limit cases of some math functions.
+            # limit cases of some math functions, to speed execution.
+            # (Although many ve/ math ops may add such VE_SPECIFIC checks
+            #  to handle some limit cases tested in benchdnn)
             #
             : #ccxx_flags -mvector-intrinsic-check
             #

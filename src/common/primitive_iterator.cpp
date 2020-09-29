@@ -95,9 +95,6 @@ status_t dnnl_primitive_desc_create(
     primitive_desc_iterator_t *it;
     status_t status = dnnl_primitive_desc_iterator_create(
             &it, c_op_desc, attr, engine, hint_fwd_pd);
-    // NOTE: there was a hash table collision for one of the common block
-    //       symbols that caused VE reorder to return an empty vector
-    //       of create fn pointers ! (Fix: change foo --> alt_symbol_foo)
     //printf(" dnnl_primitive_desc_iterator_/create status=%d\n",(int)status); // XXX REMOVE!
 #if 0 && defined(__ve)
     asm("### VE: tentative light optimization barrier\n\t" :::"memory");

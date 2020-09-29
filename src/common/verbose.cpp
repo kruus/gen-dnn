@@ -893,11 +893,21 @@ static void init_info_matmul(const engine_t *e, pd_t *s, char *buffer) {
 
     attr2str(attr_str, DNNL_VERBOSE_ATTR_LEN, attr_written, s->attr());
 
-    if (s->batched())
-        DPRINT(prb_str, DNNL_VERBOSE_PRB_LEN, prb_written, "b" DFMT,
-                s->batch());
-    DPRINT(prb_str, DNNL_VERBOSE_PRB_LEN, prb_written,
-            "m" DFMT "n" DFMT "k" DFMT, s->M(), s->N(), s->K());
+    // VE: is_runtime_val(val) ambiguous between int and float parm (no dim_t version)
+#define DPRINT_RT(str, val) \
+    do { \
+        if ((val) == DNNL_RUNTIME_DIM_VAL) \
+            DPRINT(prb_str, DNNL_VERBOSE_PRB_LEN, prb_written, str "*"); \
+        else \
+            DPRINT(prb_str, DNNL_VERBOSE_PRB_LEN, prb_written, str DFMT, (val)); \
+    } while (0)
+
+
+    if (s->batched()) DPRINT_RT("b", s->batch());
+    DPRINT_RT("m", s->M());
+    DPRINT_RT("n", s->N());
+    DPRINT_RT("k", s->K());
+#undef DPRINT_RT
 
     verbose_templ(buffer, e, s->kind(), s->name(), prop_kind::undef, dat_str,
             attr_str, aux_str, prb_str);
