@@ -66,10 +66,10 @@ loops containing function calls at all.  nc++ scalar code is *very* slow.
   - offset and eltwise vectorizations
   - nc++-3.0.27 mods
     - several conv loops dumbed down to circumvent compiler optimizations sometimes segfaulting.
-    - build.sh -vd and -vdd pass all tests/examples/benchdnn (build.sh -vd[d]Tttttt)
-      - i.e. -O3 + asserts [+ debug]
-    - -O0 has a compiler ICE
-    - ./build.sh -v has several segfaults with access to memory@(-8)
+    - build.sh -v -vd and -vdd pass all tests/examples/benchdnn (e.g. build.sh -vdTttttt)
+      - i.e. -O3 [+ asserts [+ debug]]
+    - ./build.sh -vdddd  [-O0] may have a compiler ICE
+    - ./build.sh -v may also encounter nc++-3.0.31 compiler ICE (not there with nc++-3.0.27?)
     - reinstated gemm convolutions after focusing on ref:any testing & optimization
     - changed min 'malloc' aligment to 8, in prep for vednnx_convolution
 

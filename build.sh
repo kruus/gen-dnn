@@ -34,7 +34,7 @@ NODE=0
 if [ "$VE_NODE_NUMBER" ]; then NODE="$VE_NODE_NUMBER"; fi
 ENV=`which env`
 
-# see dnnl_config.h ...
+# see dnnl_config.h ... (historical?) CPU and ISA approach was not accepted.
 CPU_X86=1
 CPU_VE=2
 CPU_SX=3
